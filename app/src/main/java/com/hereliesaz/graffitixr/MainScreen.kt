@@ -40,6 +40,7 @@ import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import kotlinx.coroutines.coroutineScope
 import android.graphics.Bitmap as AndroidBitmap
+import androidx.core.graphics.createBitmap
 
 /**
  * The main stage where reality is augmented and screen touches are translated into either
@@ -101,7 +102,8 @@ fun MainScreen(
                         }
                     }
 
-                    LaunchedEffect(arUiState.isFlashlightOn) {
+                    // ADDED rendererRef.value to key to catch late initialization
+                    LaunchedEffect(arUiState.isFlashlightOn, rendererRef.value) {
                         rendererRef.value?.updateFlashlight(arUiState.isFlashlightOn)
                     }
 
@@ -298,7 +300,7 @@ private const val COMPOSITE_CANVAS_SIZE = 2048
 private fun compositeLayersForAr(layers: List<Layer>): AndroidBitmap {
     val w = COMPOSITE_CANVAS_SIZE
     val h = COMPOSITE_CANVAS_SIZE
-    val result = AndroidBitmap.createBitmap(w, h, AndroidBitmap.Config.ARGB_8888)
+    val result = createBitmap(w, h, AndroidBitmap.Config.ARGB_8888)
     val canvas = Canvas(result)
     val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     for (layer in layers) {

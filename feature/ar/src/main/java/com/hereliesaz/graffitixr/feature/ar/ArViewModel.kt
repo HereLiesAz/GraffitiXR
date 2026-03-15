@@ -1,4 +1,4 @@
-// FILE: app/src/main/java/com/hereliesaz/graffitixr/feature/ar/ArViewModel.kt
+// FILE: feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/ArViewModel.kt
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
@@ -68,17 +68,13 @@ class ArViewModel @Inject constructor(
     private val isSaving = AtomicBoolean(false)
     private var lastSavedSplatCount = 0
     private var autoSaveJob: kotlinx.coroutines.Job? = null
-    // Tracks which project's map data is currently loaded into native memory.
-    // Used to decide whether loadMapIfExists() can skip the disk read.
     private var loadedProjectId: String? = null
 
     @Volatile
     private var pendingTapPosition: Pair<Float, Float>? = null
 
-    // 12 sectors of 30° each; tracks which headings have been visited during AMBIENT phase.
     private val visitedSectors = BooleanArray(12)
 
-    // Erase history for the REVIEW step mark-removal tool.
     private val eraseUndoStack = ArrayDeque<Bitmap>()
     private val eraseRedoStack = ArrayDeque<Bitmap>()
     private val eraseOpMutex = Mutex()
@@ -90,8 +86,6 @@ class ArViewModel @Inject constructor(
                 val established = project?.fingerprint != null
                 _uiState.update { it.copy(isAnchorEstablished = established) }
                 renderer?.anchorEstablished = established
-                // When the active project changes, invalidate the in-memory map cache so the
-                // next session resume always loads the correct project's data from disk.
                 if (project?.id != loadedProjectId) {
                     loadedProjectId = null
                 }
@@ -102,7 +96,6 @@ class ArViewModel @Inject constructor(
             settingsRepository.arScanMode.collect { mode ->
                 _uiState.update { it.copy(arScanMode = mode) }
                 renderer?.scanMode = mode
-                // Reset scan phase guidance when switching modes.
                 visitedSectors.fill(false)
                 _uiState.update { it.copy(scanPhase = ScanPhase.AMBIENT, ambientSectorsCovered = 0) }
             }
@@ -191,13 +184,6 @@ class ArViewModel @Inject constructor(
                     focusMode = Config.FocusMode.AUTO
                 }
 
-                try {
-                    val flashlightModeClass = Class.forName("com.google.ar.core.Config\$FlashlightMode")
-                    val offMode = flashlightModeClass.getField("OFF").get(null)
-                    val method = config.javaClass.getMethod("setFlashlightMode", flashlightModeClass)
-                    method.invoke(config, offMode)
-                } catch (e: Exception) {}
-
                 newSession.configure(config)
                 session = newSession
                 renderer?.attachSession(newSession)
@@ -221,12 +207,10 @@ class ArViewModel @Inject constructor(
             slamManager.setRelocEnabled(true)
             renderer?.attachSession(s)
 
-            // If a map already exists (either in-memory or on disk), go straight to COMPLETE
-            // so the user doesn't need to re-scan a world they already built.
             val projectId = projectRepository.currentProject.value?.id
             val hasExistingData = slamManager.getSplatCount() > 0
-                || File(appContext.filesDir, "projects/$projectId/map.bin").exists()
-                || File(appContext.filesDir, "projects/$projectId/cloud_points.bin").exists()
+                    || File(appContext.filesDir, "projects/$projectId/map.bin").exists()
+                    || File(appContext.filesDir, "projects/$projectId/cloud_points.bin").exists()
             visitedSectors.fill(false)
             _uiState.update {
                 it.copy(
@@ -265,14 +249,12 @@ class ArViewModel @Inject constructor(
 
     private suspend fun performFullCleanupLocked() {
         stopAutoSave()
-        // Pause rendering before saving so no new frames corrupt the data mid-write.
         renderer?.attachSession(null)
         if (isSessionResumed) {
             try { session?.pause() } catch (e: Exception) {}
             isSessionResumed = false
         }
         slamManager.setRelocEnabled(false)
-        // Blocking saves — must complete before the session is closed.
         saveMapBlocking()
         saveCloudPointsBlocking()
         delay(100)
@@ -282,10 +264,9 @@ class ArViewModel @Inject constructor(
         _isCameraInUseByAr.value = false
     }
 
-    /** Suspending save that blocks until the native map is written to disk. */
     private suspend fun saveMapBlocking() {
         val project = projectRepository.currentProject.value ?: return
-        if (slamManager.getSplatCount() <= 0) return   // never overwrite a good map with empty data
+        if (slamManager.getSplatCount() <= 0) return
         withContext(Dispatchers.IO) {
             try {
                 val root = File(appContext.filesDir, "projects/${project.id}")
@@ -297,7 +278,6 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    /** Suspending save that blocks until the point-cloud buffer is written to disk. */
     private suspend fun saveCloudPointsBlocking() {
         val project = projectRepository.currentProject.value ?: return
         if (_uiState.value.arScanMode != ArScanMode.CLOUD_POINTS) return
@@ -310,7 +290,7 @@ class ArViewModel @Inject constructor(
 
     private fun saveMapNow() {
         val project = projectRepository.currentProject.value ?: return
-        if (slamManager.getSplatCount() <= 0) return  // never overwrite a good map with empty data
+        if (slamManager.getSplatCount() <= 0) return
         if (isSaving.getAndSet(true)) return
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -373,7 +353,6 @@ class ArViewModel @Inject constructor(
 
     private fun loadMapIfExists() {
         val project = projectRepository.currentProject.value ?: return
-        // Skip the disk read only if this exact project's data is already hot in native memory.
         if (project.id == loadedProjectId && slamManager.getSplatCount() > 0) return
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -433,13 +412,11 @@ class ArViewModel @Inject constructor(
     fun setTrackingState(isTracking: Boolean, splatCount: Int, isDepthApiSupported: Boolean, cameraYaw: Float = 0f) {
         val progress = if (isTracking) slamManager.getPaintingProgress() else _uiState.value.paintingProgress
 
-        // Update ambient sector coverage.
         val sector = (((cameraYaw % 360f) + 360f) % 360f / 30f).toInt().coerceIn(0, 11)
         visitedSectors[sector] = true
         val sectorsCovered = visitedSectors.count { it }
 
         _uiState.update { state ->
-            // Phase transitions.
             val newPhase = when (state.scanPhase) {
                 ScanPhase.AMBIENT -> if (sectorsCovered >= 6) ScanPhase.WALL else ScanPhase.AMBIENT
                 ScanPhase.WALL -> if (splatCount >= 30_000) ScanPhase.COMPLETE else ScanPhase.WALL
@@ -489,7 +466,6 @@ class ArViewModel @Inject constructor(
             } else bitmap
 
             pendingTapPosition = null
-            // Clear the capture-request flag synchronously so the renderer doesn't re-capture.
             _uiState.update {
                 it.copy(
                     tapHighlightKeypoints = it.tapHighlightKeypoints + tapPos,
@@ -507,7 +483,6 @@ class ArViewModel @Inject constructor(
                     isCaptureRequested = false
                 )
             }
-            // Run the expensive pixel-crunching on a background thread.
             viewModelScope.launch(Dispatchers.Default) {
                 val maskedBmp = rotatedBmp.isolateMarkings()
                 _uiState.update { it.copy(tempCaptureBitmap = maskedBmp, annotatedCaptureBitmap = null) }
@@ -544,7 +519,6 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    /** Called on drag start — saves current bitmap as a single undo entry for the whole gesture. */
     fun beginErase() {
         val current = _uiState.value.tempCaptureBitmap ?: return
         if (eraseUndoStack.size >= MAX_ERASE_UNDO) eraseUndoStack.removeFirst()
@@ -553,7 +527,6 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(canUndoErase = true, canRedoErase = false) }
     }
 
-    /** Called for each drag position — flood-fills the blob under the finger, serialized via mutex. */
     fun eraseAtPoint(nx: Float, ny: Float) {
         viewModelScope.launch(Dispatchers.Default) {
             eraseOpMutex.withLock {
@@ -619,7 +592,6 @@ class ArViewModel @Inject constructor(
         colorW: Int, colorH: Int,
         intrinsics: FloatArray?
     ): Pair<Float, Float>? {
-        // Scaled down to an unobtrusive 20 centimeters by default.
         return Pair(0.2f, 0.2f)
     }
 
@@ -638,8 +610,6 @@ class ArViewModel @Inject constructor(
 
         var flatViewMat = originalViewMat
 
-        // Default anchor model matrix: inverse of capture view (places anchor at camera pose).
-        // Overwritten with the wall-surface position if a plane is detected.
         var anchorModelMatrix = FloatArray(16)
         android.opengl.Matrix.invertM(anchorModelMatrix, 0, originalViewMat, 0)
 
@@ -678,14 +648,12 @@ class ArViewModel @Inject constructor(
                     val planePoseMatrix = FloatArray(16)
                     plane.centerPose.toMatrix(planePoseMatrix, 0)
 
-                    // Wall surface normal (Y axis of ARCore vertical plane pose).
                     val normalX = planePoseMatrix[4]
                     val normalY = planePoseMatrix[5]
                     val normalZ = planePoseMatrix[6]
 
-                    // Build orthonormal basis: Z = wall normal, X = horizontal, Y = vertical.
                     val zx = normalX; val zy = normalY; val zz = normalZ
-                    var xx = 1f * zz - 0f * zy   // cross(world_up, Z)
+                    var xx = 1f * zz - 0f * zy
                     var xy = 0f * zx - 0f * zz
                     var xz = 0f * zy - 1f * zx
                     val xLen = Math.sqrt((xx*xx + xy*xy + xz*xz).toDouble()).toFloat()
@@ -695,8 +663,6 @@ class ArViewModel @Inject constructor(
                         val yy = zz * xx - zx * xz
                         val yz = zx * xy - zy * xx
 
-                        // Refined view matrix for feature matching: camera at camera position,
-                        // orientation snapped to wall normal.
                         val newCamPose = FloatArray(16)
                         android.opengl.Matrix.setIdentityM(newCamPose, 0)
                         newCamPose[0] = xx; newCamPose[1] = xy; newCamPose[2] = xz
@@ -707,8 +673,6 @@ class ArViewModel @Inject constructor(
                         android.opengl.Matrix.invertM(newViewMat, 0, newCamPose, 0)
                         flatViewMat = newViewMat
 
-                        // Anchor model matrix (object-to-world): same orientation but positioned
-                        // ON the wall surface, not at the camera. This is what the overlay renders at.
                         val wallX = planePoseMatrix[12]
                         val wallY = planePoseMatrix[13]
                         val wallZ = planePoseMatrix[14]
@@ -725,10 +689,8 @@ class ArViewModel @Inject constructor(
             }
         }
 
-        // Push the anchor into the native engine so the overlay actually renders at the wall.
         slamManager.updateAnchorTransform(anchorModelMatrix)
 
-        // Always sync the overlay extent to the renderer here, covering both tap and regular paths.
         _uiState.value.targetPhysicalExtent?.let { (halfW, halfH) ->
             renderer?.updateOverlayExtent(halfW, halfH)
         }

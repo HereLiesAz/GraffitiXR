@@ -1,3 +1,4 @@
+// FILE: feature/dashboard/build.gradle.kts
 plugins {
     id("com.android.library")
     alias(libs.plugins.jetbrains.kotlin.compose)
@@ -33,6 +34,8 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.activity.compose) // Added to fix rememberLauncherForActivityResult
+
     implementation(project(":core:common"))
     implementation(project(":core:domain"))
     implementation(project(":core:design"))

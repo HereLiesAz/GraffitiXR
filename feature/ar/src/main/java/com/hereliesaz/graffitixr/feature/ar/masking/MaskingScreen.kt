@@ -1,3 +1,4 @@
+// FILE: feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/masking/MaskingScreen.kt
 package com.hereliesaz.graffitixr.feature.ar.masking
 
 import android.graphics.Bitmap
@@ -19,12 +20,9 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
-import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
+import com.hereliesaz.graffitixr.common.util.ImageProcessor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -42,14 +40,14 @@ fun MaskingBackground(
             modifier = Modifier.fillMaxSize(),
             contentScale = androidx.compose.ui.layout.ContentScale.Fit
         )
-        
+
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawPath(
                 path = maskPath,
                 color = Color.Green.copy(alpha = 0.5f),
                 style = Stroke(width = 50f, cap = StrokeCap.Round, join = StrokeJoin.Round)
             )
-            
+
             currentPath?.let {
                 drawPath(
                     path = it,
@@ -93,7 +91,7 @@ fun MaskingUi(
         if (isProcessing) {
             CircularProgressIndicator(Modifier.align(Alignment.Center))
         }
-        
+
         // Buttons
         Box(Modifier.fillMaxSize().padding(16.dp)) {
             Button(
@@ -109,7 +107,7 @@ fun MaskingUi(
             ) {
                 Text("Done (No Mask)")
             }
-            
+
             Button(
                 onClick = onRetake,
                 modifier = Modifier.align(Alignment.TopStart)
@@ -121,17 +119,5 @@ fun MaskingUi(
 }
 
 suspend fun applyAutoMask(bitmap: Bitmap): Bitmap? = withContext(Dispatchers.Default) {
-    try {
-        val options = SubjectSegmenterOptions.Builder()
-            .enableForegroundBitmap()
-            .build()
-        val segmenter = SubjectSegmentation.getClient(options)
-        val inputImage = InputImage.fromBitmap(bitmap, 0)
-        
-        val result = segmenter.process(inputImage).await()
-        return@withContext result.foregroundBitmap
-    } catch (e: Exception) {
-        e.printStackTrace()
-        return@withContext null
-    }
+    ImageProcessor.removeBackground(bitmap)
 }

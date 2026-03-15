@@ -223,7 +223,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
-        JNIEnv* env, jobject thiz, jobject depthBuffer, jint width, jint height, jint rowStride, jfloatArray intrArray, jint cpuW, jint cpuH) { 
+        JNIEnv* env, jobject thiz, jobject depthBuffer, jint width, jint height, jint rowStride, jfloatArray intrArray, jint cpuW, jint cpuH) {
 
     gLastDepthTrace.clear();
     DEPTH_TRACE("feedArCoreDepth called w=%d h=%d stride=%d", width, height, rowStride);
@@ -379,8 +379,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetTargetFingerpri
 }
 
 static jobject buildFingerprintObject(JNIEnv* env,
-                                      const std::vector<cv::KeyPoint>& kps,
-                                      const cv::Mat& descs) {
+        const std::vector<cv::KeyPoint>& kps,
+        const cv::Mat& descs) {
     if (descs.empty()) return nullptr;
 
     jclass fpClass  = env->FindClass("com/hereliesaz/graffitixr/common/model/Fingerprint");
@@ -396,8 +396,8 @@ static jobject buildFingerprintObject(JNIEnv* env,
     jobject kpList = env->NewObject(listClass, listCtor, (jint)kps.size());
     for (const auto& kp : kps) {
         jobject jkp = env->NewObject(kpClass, kpCtor,
-                                     kp.pt.x, kp.pt.y, kp.size, kp.angle, kp.response,
-                                     (jint)kp.octave, (jint)kp.class_id);
+                kp.pt.x, kp.pt.y, kp.size, kp.angle, kp.response,
+                (jint)kp.octave, (jint)kp.class_id);
         env->CallBooleanMethod(kpList, addMethod, jkp);
         env->DeleteLocalRef(jkp);
     }
@@ -409,8 +409,8 @@ static jobject buildFingerprintObject(JNIEnv* env,
     env->SetByteArrayRegion(jDescArray, 0, descSize, (const jbyte*)descs.data);
 
     return env->NewObject(fpClass, fpCtor,
-                          kpList, ptsList, jDescArray,
-                          descs.rows, descs.cols, descs.type());
+            kpList, ptsList, jDescArray,
+            descs.rows, descs.cols, descs.type());
 }
 
 JNIEXPORT jobject JNICALL
@@ -479,7 +479,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
     for (const auto& kp : kps) {
         int r = std::max(6, (int)(kp.size * 2.0f));
         cv::circle(overlay, cv::Point((int)kp.pt.x, (int)kp.pt.y),
-                   r, cv::Scalar(0, 210, 50, 255), cv::FILLED);
+                r, cv::Scalar(0, 210, 50, 255), cv::FILLED);
     }
     cv::addWeighted(frame, 0.55, overlay, 0.45, 0, frame);
 
@@ -488,135 +488,15 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
     int baseline = 0;
     cv::Size textSize = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, scale, 2, &baseline);
     cv::rectangle(frame,
-                  cv::Point(8, 8),
-                  cv::Point(textSize.width + 16, textSize.height + baseline + 16),
-                  cv::Scalar(0, 0, 0, 200), cv::FILLED);
+            cv::Point(8, 8),
+            cv::Point(textSize.width + 16, textSize.height + baseline + 16),
+            cv::Scalar(0, 0, 0, 200), cv::FILLED);
     cv::putText(frame, label,
-                cv::Point(12, textSize.height + 12),
-                cv::FONT_HERSHEY_SIMPLEX, scale,
-                cv::Scalar(255, 220, 0, 255), 2);
+            cv::Point(12, textSize.height + 12),
+            cv::FONT_HERSHEY_SIMPLEX, scale,
+            cv::Scalar(255, 220, 0, 255), 2);
 
     matToBitmap(env, frame, bitmap);
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeApplyLiquify(
-        JNIEnv* env, jobject thiz, jobject bitmap, jfloatArray points, jfloat radius, jfloat intensity) {
-    cv::Mat src;
-    bitmapToMat(env, bitmap, src);
-
-    cv::Mat mapX(src.size(), CV_32FC1);
-    cv::Mat mapY(src.size(), CV_32FC1);
-    for (int y = 0; y < src.rows; y++) {
-        for (int x = 0; x < src.cols; x++) {
-            mapX.at<float>(y, x) = x;
-            mapY.at<float>(y, x) = y;
-        }
-    }
-
-    jsize len = env->GetArrayLength(points);
-    jfloat* pts = env->GetFloatArrayElements(points, nullptr);
-
-    for (int i = 0; i < len - 2; i += 2) {
-        cv::Point2f p1(pts[i], pts[i+1]);
-        cv::Point2f p2(pts[i+2], pts[i+3]);
-        cv::Point2f dir = p2 - p1;
-
-        int minX = std::max(0, (int)(std::min(p1.x, p2.x) - radius));
-        int maxX = std::min(src.cols - 1, (int)(std::max(p1.x, p2.x) + radius));
-        int minY = std::max(0, (int)(std::min(p1.y, p2.y) - radius));
-        int maxY = std::min(src.rows - 1, (int)(std::max(p1.y, p2.y) + radius));
-
-        for (int y = minY; y <= maxY; y++) {
-            for (int x = minX; x <= maxX; x++) {
-                float distSq = (x - p1.x)*(x - p1.x) + (y - p1.y)*(y - p1.y);
-                if (distSq < radius * radius) {
-                    float falloff = std::exp(-distSq / (radius * radius / 2.0f));
-                    mapX.at<float>(y, x) -= dir.x * falloff * intensity;
-                    mapY.at<float>(y, x) -= dir.y * falloff * intensity;
-                }
-            }
-        }
-    }
-
-    cv::Mat dst;
-    cv::remap(src, dst, mapX, mapY, cv::INTER_LINEAR, cv::BORDER_REPLICATE);
-    matToBitmap(env, dst, bitmap);
-    env->ReleaseFloatArrayElements(points, pts, JNI_ABORT);
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeApplyHeal(
-        JNIEnv* env, jobject thiz, jobject bitmap, jfloatArray points, jfloat radius) {
-    cv::Mat src;
-    bitmapToMat(env, bitmap, src);
-
-    jsize len = env->GetArrayLength(points);
-    jfloat* pts = env->GetFloatArrayElements(points, nullptr);
-
-    cv::Mat mask = cv::Mat::zeros(src.size(), CV_8UC1);
-    for (int i = 0; i < len - 2; i += 2) {
-        cv::Point pt1(pts[i], pts[i+1]);
-        cv::Point pt2(pts[i+2], pts[i+3]);
-        cv::line(mask, pt1, pt2, cv::Scalar(255), radius * 2, cv::LINE_8);
-    }
-    if (len == 2) {
-        cv::circle(mask, cv::Point(pts[0], pts[1]), radius, cv::Scalar(255), -1);
-    }
-
-    cv::Mat dst;
-    cv::Mat srcRGB;
-    cv::cvtColor(src, srcRGB, cv::COLOR_RGBA2RGB);
-    cv::inpaint(srcRGB, mask, dst, radius, cv::INPAINT_TELEA);
-
-    cv::Mat dstRGBA;
-    cv::cvtColor(dst, dstRGBA, cv::COLOR_RGB2RGBA);
-    std::vector<cv::Mat> srcChannels, dstChannels;
-    cv::split(src, srcChannels);
-    cv::split(dstRGBA, dstChannels);
-    dstChannels[3] = srcChannels[3];
-    cv::merge(dstChannels, dstRGBA);
-
-    matToBitmap(env, dstRGBA, bitmap);
-    env->ReleaseFloatArrayElements(points, pts, JNI_ABORT);
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeApplyBurnDodge(
-        JNIEnv* env, jobject thiz, jobject bitmap, jfloatArray points, jfloat radius, jfloat intensity, jboolean isBurn) {
-    cv::Mat src;
-    bitmapToMat(env, bitmap, src);
-
-    jsize len = env->GetArrayLength(points);
-    jfloat* pts = env->GetFloatArrayElements(points, nullptr);
-
-    cv::Mat mask = cv::Mat::zeros(src.size(), CV_32FC1);
-    for (int i = 0; i < len - 2; i += 2) {
-        cv::Point pt1(pts[i], pts[i+1]);
-        cv::Point pt2(pts[i+2], pts[i+3]);
-        cv::line(mask, pt1, pt2, cv::Scalar(1.0f), radius * 2, cv::LINE_8);
-    }
-    if (len == 2) {
-        cv::circle(mask, cv::Point(pts[0], pts[1]), radius, cv::Scalar(1.0f), -1);
-    }
-
-    cv::GaussianBlur(mask, mask, cv::Size(0,0), radius / 2.0);
-
-    for(int y = 0; y < src.rows; y++) {
-        for(int x = 0; x < src.cols; x++) {
-            float m = mask.at<float>(y,x);
-            if (m > 0) {
-                cv::Vec4b& px = src.at<cv::Vec4b>(y,x);
-                float factor = isBurn ? (1.0f - intensity * m) : (1.0f + intensity * m);
-                px[0] = cv::saturate_cast<uchar>(px[0] * factor);
-                px[1] = cv::saturate_cast<uchar>(px[1] * factor);
-                px[2] = cv::saturate_cast<uchar>(px[2] * factor);
-            }
-        }
-    }
-
-    matToBitmap(env, src, bitmap);
-    env->ReleaseFloatArrayElements(points, pts, JNI_ABORT);
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -670,7 +550,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAddLayerFeatures(
     jfloat* view = env->GetFloatArrayElements(viewMatArray, nullptr);
 
     gSlamEngine->addLayerFeatures(composite, depthData, depthW, depthH, depthStride,
-                                  intr, view);
+            intr, view);
 
     env->ReleaseFloatArrayElements(intrinsicsArray, intr, JNI_ABORT);
     env->ReleaseFloatArrayElements(viewMatArray, view, JNI_ABORT);

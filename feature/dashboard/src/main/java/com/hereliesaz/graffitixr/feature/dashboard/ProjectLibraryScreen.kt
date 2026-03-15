@@ -1,5 +1,9 @@
+// FILE: feature/dashboard/src/main/java/com/hereliesaz/graffitixr/feature/dashboard/ProjectLibraryScreen.kt
 package com.hereliesaz.graffitixr.feature.dashboard
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.Card
@@ -39,8 +44,16 @@ fun ProjectLibraryScreen(
     projects: List<GraffitiProject>,
     onLoadProject: (GraffitiProject) -> Unit,
     onDeleteProject: (String) -> Unit,
-    onNewProject: () -> Unit
+    onNewProject: () -> Unit,
+    onImportProject: (Uri) -> Unit,
+    onClose: () -> Unit
 ) {
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { onImportProject(it) }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -52,12 +65,39 @@ fun ProjectLibraryScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // New Project Button at the Top
-            Box(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), contentAlignment = Alignment.Center) {
-                 AzButton(
+            // Header with Close Button
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Project Library",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = Color.White
+                )
+                IconButton(onClick = onClose) {
+                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                }
+            }
+
+            // New & Import Project Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AzButton(
                     text = "New",
                     onClick = onNewProject,
-                    modifier = Modifier.width(200.dp), // Constrain width, don't fill max
+                    modifier = Modifier.width(120.dp),
+                    shape = com.hereliesaz.aznavrail.model.AzButtonShape.RECTANGLE
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                AzButton(
+                    text = "Import",
+                    onClick = { importLauncher.launch("*/*") },
+                    modifier = Modifier.width(120.dp),
                     shape = com.hereliesaz.aznavrail.model.AzButtonShape.RECTANGLE
                 )
             }

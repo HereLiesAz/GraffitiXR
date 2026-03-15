@@ -1,3 +1,4 @@
+// FILE: feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/rendering/ArRenderer.kt
 package com.hereliesaz.graffitixr.feature.ar.rendering
 
 import android.content.Context
@@ -51,6 +52,8 @@ class ArRenderer(
     @Volatile var showAnchorBoundary: Boolean = false
     @Volatile var anchorEstablished: Boolean = false
 
+    @Volatile private var isFlashlightRequested: Boolean = false
+
     fun saveCloudPoints(path: String) {
         pointCloudRenderer.saveToFile(path)
     }
@@ -64,9 +67,8 @@ class ArRenderer(
 
     private var frameCount = 0
     private var diagFrameCount = 0
-    private var sensorOrientation = 90  
+    private var sensorOrientation = 90
     private var isSurfaceCreated = false
-    private var arCameraId: String? = null
 
     @Volatile var captureRequested: Boolean = false
 
@@ -78,9 +80,12 @@ class ArRenderer(
                 if (isSurfaceCreated) {
                     session.setCameraTextureName(backgroundRenderer.textureId)
                 }
+
+                // Apply queued flashlight state immediately upon attachment
+                applyFlashlightState()
+
                 try {
                     val cameraId = session.cameraConfig.cameraId
-                    arCameraId = cameraId
                     val manager = context.getSystemService(android.content.Context.CAMERA_SERVICE)
                             as android.hardware.camera2.CameraManager
                     sensorOrientation = manager
@@ -102,41 +107,36 @@ class ArRenderer(
     }
 
     fun updateOverlayExtent(halfW: Float, halfH: Float) {
-        // Border = capture-derived reference indicator only.
         overlayRenderer.setBorderExtent(halfW, halfH)
-        // Textured quad is always large so images are never confined by the border box.
         overlayRenderer.setExtent(OverlayRenderer.QUAD_HALF_EXTENT, OverlayRenderer.QUAD_HALF_EXTENT)
     }
 
     fun updateFlashlight(isOn: Boolean) {
+        isFlashlightRequested = isOn
+        applyFlashlightState()
+    }
+
+    private fun applyFlashlightState() {
+        val activeSession = session ?: return
         try {
-            val manager = context.getSystemService(android.content.Context.CAMERA_SERVICE)
-                as android.hardware.camera2.CameraManager
-            // Prefer back-facing camera with flash over ARCore's camera ID, which may not
-            // have FLASH_INFO_AVAILABLE on all devices.
-            val cameraId = manager.cameraIdList.firstOrNull { id ->
-                val chars = manager.getCameraCharacteristics(id)
-                chars.get(android.hardware.camera2.CameraCharacteristics.LENS_FACING) ==
-                    android.hardware.camera2.CameraCharacteristics.LENS_FACING_BACK &&
-                chars.get(android.hardware.camera2.CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
-            } ?: arCameraId ?: return
-            manager.setTorchMode(cameraId, isOn)
+            val config = activeSession.config
+            val newMode = if (isFlashlightRequested) Config.FlashMode.TORCH else Config.FlashMode.OFF
+            if (config.flashMode != newMode) {
+                config.flashMode = newMode
+                activeSession.configure(config)
+            }
         } catch (e: Exception) {
-            Timber.e(e, "Failed to set torch mode (isOn=$isOn)")
+            Timber.e(e, "Failed to set flash mode via ARCore Config")
         }
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         backgroundRenderer.createOnGlThread(context)
-        
-        // This is the critical fix. When the phone rotates, or the app goes to
-        // background, the OpenGL context is completely destroyed by Android. 
-        // We MUST tell the C++ layer to flush all its old GL handles (VBOs/Shaders)
-        // and recompile them in this new context, otherwise everything disappears.
+
         slamManager.resetGlContext()
         slamManager.initGl()
-        
+
         overlayRenderer.createOnGlThread()
         pointCloudRenderer.createOnGlThread(context)
         planeRenderer.createOnGlThread(context)
@@ -184,25 +184,20 @@ class ArRenderer(
             camera.getViewMatrix(viewMatrix, 0)
             camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
 
-            // Mapping matrices: use the unrotated sensor pose and sensor-aligned projection.
-            // This ensures processDepthFrame and other native mapping functions
-            // receive view matrices aligned with the sensor-oriented depth/color frames.
             val mappingViewMatrix = FloatArray(16)
             val mappingProjMatrix = FloatArray(16)
             camera.pose.inverse().toMatrix(mappingViewMatrix, 0)
 
-            // Construct sensor-aligned projection matrix from image intrinsics.
-            // This bypasses display rotation/aspect-ratio-scaling.
             val intrinsics = camera.imageIntrinsics
             val focalLength = intrinsics.focalLength
             val principalPoint = intrinsics.principalPoint
             val dims = intrinsics.imageDimensions
-            
+
             mappingProjMatrix[0] = 2.0f * focalLength[0] / dims[0]
             mappingProjMatrix[5] = 2.0f * focalLength[1] / dims[1]
             mappingProjMatrix[8] = 2.0f * principalPoint[0] / dims[0] - 1.0f
             mappingProjMatrix[9] = 1.0f - 2.0f * principalPoint[1] / dims[1]
-            mappingProjMatrix[10] = -(100.1f) / (99.9f) // far+near / near-far (0.1, 100)
+            mappingProjMatrix[10] = -(100.1f) / (99.9f)
             mappingProjMatrix[11] = -1.0f
             mappingProjMatrix[14] = -(2.0f * 100.0f * 0.1f) / (99.9f)
             mappingProjMatrix[15] = 0.0f
@@ -217,8 +212,6 @@ class ArRenderer(
             val isTracking = camera.trackingState == TrackingState.TRACKING
             val depthSupported = activeSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
 
-            // Extract camera yaw (horizontal heading) from the view matrix.
-            // View matrix row 2 = camera backward in world space; forward = negation.
             val yawRad = kotlin.math.atan2(-viewMatrix[2].toDouble(), -viewMatrix[10].toDouble())
             val yawDeg = Math.toDegrees(yawRad).toFloat()
 
@@ -264,7 +257,6 @@ class ArRenderer(
                             } catch (e: Exception) {}
                         }
 
-                        val intrinsics = camera.imageIntrinsics
                         val intrArr = floatArrayOf(
                             intrinsics.focalLength[0], intrinsics.focalLength[1],
                             intrinsics.principalPoint[0], intrinsics.principalPoint[1]
@@ -307,8 +299,7 @@ class ArRenderer(
                         try {
                             frame.acquireDepthImage16Bits().use { depthImage ->
                                 val depthPlane = depthImage.planes[0]
-                                
-                                val intrinsics = camera.imageIntrinsics
+
                                 val intrArr = floatArrayOf(
                                     intrinsics.focalLength[0], intrinsics.focalLength[1],
                                     intrinsics.principalPoint[0], intrinsics.principalPoint[1]

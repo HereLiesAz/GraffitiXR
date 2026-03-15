@@ -185,7 +185,12 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                val isRailVisible = !editorUiState.hideUiForCapture && !mainUiState.isTouchLocked && !mainUiState.isCapturingTarget && !showLibrary && !showSettings
+                val isRailVisible = !editorUiState.hideUiForCapture &&
+                        !mainUiState.isTouchLocked &&
+                        !mainUiState.isCapturingTarget &&
+                        !mainUiState.planeConfirmationPending &&
+                        !showLibrary &&
+                        !showSettings
 
                 LaunchedEffect(Unit) {
                     if (!hasCameraPermission) {
@@ -203,10 +208,25 @@ class MainActivity : ComponentActivity() {
                 }
 
                 AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
+                    val navStrings = remember { NavStrings() }
+
+                    // UNCONDITIONAL CONFIG: These must run every recomposition to maintain the Rail's internal state
+                    azTheme(
+                        activeColor = Cyan,
+                        defaultShape = AzButtonShape.RECTANGLE,
+                        headerIconShape = AzHeaderIconShape.ROUNDED
+                    )
+                    azConfig(
+                        packButtons = true,
+                        dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
+                    )
+                    azAdvanced(helpEnabled = true)
+
+                    // CONDITIONAL ITEMS: The items are hidden, but the rail framework stays intact
                     if (isRailVisible) {
-                        configureRail(
+                        configureRailItems(
                             mainViewModel, editorViewModel, arViewModel, dashboardViewModel,
-                            overlayImagePicker, backgroundImagePicker, editorUiState, arUiState
+                            overlayImagePicker, backgroundImagePicker, editorUiState, arUiState, navStrings
                         )
                     }
 
@@ -382,8 +402,6 @@ class MainActivity : ComponentActivity() {
                                 )
 
                                 if (mainUiState.captureStep == CaptureStep.REVIEW && fullSize != IntSize.Zero) {
-                                    // Use rememberUpdatedState so the pointerInput(Unit) closure
-                                    // always sees the latest ViewModel reference without restarting gestures.
                                     val latestArViewModel by rememberUpdatedState(arViewModel)
                                     val latestArUiState by rememberUpdatedState(arUiState)
 
@@ -392,7 +410,6 @@ class MainActivity : ComponentActivity() {
                                             .fillMaxWidth()
                                             .fillMaxHeight(0.8f)
                                             .pointerInput(Unit) {
-                                                // Capture bitmap dimensions once per drag so mapping is stable.
                                                 var dragBmpW = 1
                                                 var dragBmpH = 1
                                                 detectDragGestures(
@@ -483,7 +500,11 @@ class MainActivity : ComponentActivity() {
                                     onNewProject = {
                                         dashboardViewModel.onNewProject(editorUiState.isRightHanded)
                                         showLibrary = false
-                                    }
+                                    },
+                                    onImportProject = { uri ->
+                                        dashboardViewModel.importProject(uri)
+                                    },
+                                    onClose = { showLibrary = false }
                                 )
                             }
 
@@ -542,7 +563,7 @@ class MainActivity : ComponentActivity() {
         if (isFinishing) slamManager.destroy()
     }
 
-    private fun AzNavHostScope.configureRail(
+    private fun AzNavHostScope.configureRailItems(
         mainViewModel: MainViewModel,
         editorViewModel: EditorViewModel,
         arViewModel: ArViewModel,
@@ -550,18 +571,9 @@ class MainActivity : ComponentActivity() {
         overlayPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>,
         backgroundPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>,
         editorUiState: EditorUiState,
-        arUiState: ArUiState
+        arUiState: ArUiState,
+        navStrings: NavStrings
     ) {
-        val navStrings = NavStrings()
-
-        azTheme(
-            activeColor = Cyan,
-            defaultShape = AzButtonShape.RECTANGLE,
-            headerIconShape = AzHeaderIconShape.ROUNDED
-        )
-        azConfig(packButtons = true, dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT)
-        azAdvanced(helpEnabled = true)
-
         val requestPermissions = {
             permissionLauncher.launch(
                 arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
@@ -591,11 +603,6 @@ class MainActivity : ComponentActivity() {
             azDivider()
         }
 
-        // Design tools unlock in AR when either:
-        //   - the scan is complete (30k+ points), OR
-        //   - a target is already established (fingerprint exists) — this also covers the
-        //     PlaneConfirmOverlay moment: user needs art to know if it's on the right surface.
-        // All other modes are always editable immediately.
         val canEdit = if (isArMode)
             arUiState.scanPhase == ScanPhase.COMPLETE || arUiState.isAnchorEstablished
         else true

@@ -1,3 +1,4 @@
+// FILE: core/nativebridge/src/main/cpp/MobileGS.cpp
 #include "include/MobileGS.h"
 #include <jni.h>
 #include <EGL/egl.h>
@@ -20,10 +21,10 @@ std::string gLastSplatTrace;
 #define SPLAT_TRACE(fmt, ...) do {     char _buf[256];     snprintf(_buf, sizeof(_buf), fmt, ##__VA_ARGS__);     LOGI("SPLAT_PIPE: %s", _buf);     gLastSplatTrace += std::string(_buf) + "\n"; } while(0)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI", __VA_ARGS__)
 
-extern JavaVM* gJvm; 
+extern JavaVM* gJvm;
 
 static constexpr size_t MAX_SPLATS = 500000;
-static constexpr float VOXEL_SIZE = 0.005f; 
+static constexpr float VOXEL_SIZE = 0.005f;
 
 struct JniThreadAttacher {
     JNIEnv* env = nullptr;
@@ -168,10 +169,6 @@ void MobileGS::initialize(int width, int height) {
 
 void MobileGS::initGl() {
     std::lock_guard<std::mutex> lock(mMutex);
-    // CRITICAL: We DO NOT return early if mProgram != 0.
-    // When the phone rotates, or the app goes to background and comes back,
-    // Android destroys the old GL context and creates a new one.
-    // We MUST recompile shaders and recreate VBOs in the new context.
     if (mProgram != 0) {
         LOGI("MobileGS GL re-initialized. Purging old handles.");
         mProgram = 0; mPointVbo = 0; mIndexVbo = 0;
@@ -189,8 +186,7 @@ void MobileGS::resetGlContext() {
     mMeshProgram = 0;
     mMeshVbo = 0;
     mMeshIbo = 0;
-    
-    // Force the data to be uploaded to the new VBOs on the next draw call
+
     std::lock_guard<std::mutex> glLock(mGlDataMutex);
     mGlDataDirty = true;
 }
@@ -270,8 +266,7 @@ void MobileGS::initShaders() {
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    
-    // We just created fresh buffers, force re-upload
+
     std::lock_guard<std::mutex> glLock(mGlDataMutex);
     mGlDataDirty = true;
 }
@@ -288,6 +283,11 @@ void MobileGS::clearMap() {
     mPointCount = 0;
     mTargetDescriptors = cv::Mat();
     mTargetKeypoints3D.clear();
+
+    // FIX: Clear artwork data to prevent state leaking between projects
+    mArtworkDescriptors = cv::Mat();
+    mArtworkKeypoints3D.clear();
+    mPaintingProgress.store(0.0f, std::memory_order_relaxed);
 
     memset(mAnchorMatrix, 0, sizeof(mAnchorMatrix));
     memset(mTargetAnchorMatrix, 0, sizeof(mTargetAnchorMatrix));
@@ -384,7 +384,7 @@ void MobileGS::sortThreadFunc() {
 }
 
 static void camToWorld(const float* V, float xc, float yc, float zc,
-                       float& xw, float& yw, float& zw) {
+        float& xw, float& yw, float& zw) {
     float tx = V[12], ty = V[13], tz = V[14];
     float camX = -(V[0]*tx + V[1]*ty + V[2]*tz);
     float camY = -(V[4]*tx + V[5]*ty + V[6]*tz);
@@ -395,7 +395,7 @@ static void camToWorld(const float* V, float xc, float yc, float zc,
 }
 
 static void camToWorldNormal(const float* V, float nxc, float nyc, float nzc,
-                             float& nxw, float& nyw, float& nzw) {
+        float& nxw, float& nyw, float& nzw) {
     nxw = V[0]*nxc + V[1]*nyc + V[2]*nzc;
     nyw = V[4]*nxc + V[5]*nyc + V[6]*nzc;
     nzw = V[8]*nxc + V[9]*nyc + V[10]*nzc;
@@ -428,7 +428,7 @@ void MobileGS::scheduleRelocCheck(const cv::Mat& colorFrame) {
         colorFrame.copyTo(mRelocColorFrame);
     }
     bool triggerNow = !mIsArCoreTracking ||
-                      (mFrameCounter - mLastRelocTriggerFrame >= LOOP_CLOSURE_INTERVAL);
+            (mFrameCounter - mLastRelocTriggerFrame >= LOOP_CLOSURE_INTERVAL);
     if (triggerNow) {
         mLastRelocTriggerFrame = mFrameCounter;
         mRelocRequested = true;
@@ -505,7 +505,7 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
     std::vector<cv::KeyPoint> kps;
     cv::Mat descs;
     bool usedSP = mSuperPoint.isLoaded() && (targetDesc.type() != CV_8U)
-                  && mSuperPoint.detect(gray, kps, descs);
+            && mSuperPoint.detect(gray, kps, descs);
     if (!usedSP) {
         cv::ORB::create(500)->detectAndCompute(gray, cv::noArray(), kps, descs);
     }
@@ -522,7 +522,7 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
     std::vector<cv::Point2f> imgPts;
     for (const auto& m : knnMatches) {
         if (m.size() == 2 && m[0].distance < 0.75f * m[1].distance
-            && m[0].queryIdx < (int)targetPts.size()) {
+                && m[0].queryIdx < (int)targetPts.size()) {
             objPts.push_back(targetPts[m[0].queryIdx]);
             imgPts.push_back(kps[m[0].trainIdx].pt);
         }
@@ -556,7 +556,7 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
 
     float drift = glm::length(
             glm::vec3(world_T_obj[3]) -
-            glm::vec3(anchorMat[12], anchorMat[13], anchorMat[14])
+                    glm::vec3(anchorMat[12], anchorMat[13], anchorMat[14])
     );
 
     if (drift > DRIFT_THRESHOLD_M || !isTracking) {
@@ -577,8 +577,8 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
             if (m.size() == 2 && m[0].distance < 0.75f * m[1].distance) ++matched;
         }
         float progress = (artworkDesc.rows > 0)
-                         ? std::min(1.0f, (float)matched / (float)artworkDesc.rows)
-                         : 0.0f;
+                ? std::min(1.0f, (float)matched / (float)artworkDesc.rows)
+                : 0.0f;
         mPaintingProgress.store(progress, std::memory_order_relaxed);
     }
 }
@@ -643,7 +643,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
     std::lock_guard<std::mutex> lock(mMutex);
 
     bool misaligned = !mTargetDescriptors.empty() &&
-                      (mTargetKeypoints3D.size() != (size_t)mTargetDescriptors.rows);
+            (mTargetKeypoints3D.size() != (size_t)mTargetDescriptors.rows);
     if (misaligned || (usedSP && !mTargetDescriptors.empty() && mTargetDescriptors.type() == CV_8U)) {
         mTargetDescriptors = cv::Mat();
         mTargetKeypoints3D.clear();
@@ -665,7 +665,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
     if (mTargetKeypoints3D.size() > MAX_FINGERPRINT_KEYPOINTS) {
         size_t excess = mTargetKeypoints3D.size() - MAX_FINGERPRINT_KEYPOINTS;
         mTargetKeypoints3D.erase(mTargetKeypoints3D.begin(),
-                                 mTargetKeypoints3D.begin() + excess);
+                mTargetKeypoints3D.begin() + excess);
         mTargetDescriptors = mTargetDescriptors
                 .rowRange((int)excess, mTargetDescriptors.rows)
                 .clone();
@@ -709,7 +709,7 @@ void MobileGS::mapThreadFunc() {
             mFrameQueue.erase(mFrameQueue.begin());
         }
         processDepthFrame(frame.depth, frame.color, frame.viewMatrix, frame.projMatrix,
-                          frame.hasIntrinsics ? frame.intrinsics : nullptr, frame.isYuv);
+                frame.hasIntrinsics ? frame.intrinsics : nullptr, frame.isYuv);
     }
 }
 
@@ -733,8 +733,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     }
 
     const float* V = viewMat;
-    
-    // Use physical intrinsics if provided, otherwise derive from projection matrix.
+
     float fx_px, fy_px, cx_px, cy_px;
     if (intrinsics) {
         fx_px = intrinsics[0];
@@ -742,10 +741,6 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         cx_px = intrinsics[2];
         cy_px = intrinsics[3];
     } else {
-        // We must use the true physical intrinsics derived from the camera.
-        // The projection matrix is for the *display* and is cropped/scaled.
-        // By passing the unrotated depth map and the unrotated view matrix,
-        // we bypass the display skew completely.
         const float halfW = depth.cols / 2.0f;
         const float halfH = depth.rows / 2.0f;
         fx_px = projMat[0] * halfW;
@@ -762,9 +757,9 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
 
     auto unproject = [&](int r, int c, float d) {
         return cv::Point3f(
-            (c - cx_px) * d / fx_px,
-           -(r - cy_px) * d / fy_px,
-           -d
+                (c - cx_px) * d / fx_px,
+                -(r - cy_px) * d / fy_px,
+                -d
         );
     };
 
@@ -984,8 +979,8 @@ void MobileGS::pruneMap() {
     const size_t keepCount = splatData.size() - evictCount;
 
     std::nth_element(splatData.begin(),
-                     splatData.begin() + keepCount,
-                     splatData.end(),[](const Splat& a, const Splat& b) {
+            splatData.begin() + keepCount,
+            splatData.end(),[](const Splat& a, const Splat& b) {
                 return a.confidence > b.confidence;
             });
 
@@ -1051,9 +1046,9 @@ void MobileGS::getAnchorTransform(float* outMat16) const {
 }
 
 void MobileGS::addLayerFeatures(const cv::Mat& composite,
-                                const uint8_t* depthData, int depthW, int depthH, int depthStride,
-                                const float* intrinsics4,
-                                const float* viewMat16) {
+        const uint8_t* depthData, int depthW, int depthH, int depthStride,
+        const float* intrinsics4,
+        const float* viewMat16) {
     if (composite.empty() || !depthData) return;
 
     cv::Mat gray;
@@ -1108,7 +1103,7 @@ void MobileGS::addLayerFeatures(const cv::Mat& composite,
 
     std::lock_guard<std::mutex> lock(mMutex);
     bool misaligned = !mTargetDescriptors.empty() &&
-                      (mTargetKeypoints3D.size() != (size_t)mTargetDescriptors.rows);
+            (mTargetKeypoints3D.size() != (size_t)mTargetDescriptors.rows);
     if (misaligned) {
         mTargetDescriptors = cv::Mat();
         mTargetKeypoints3D.clear();
@@ -1132,7 +1127,7 @@ void MobileGS::saveModel(const std::string& path) {
 
     char magic[4] = {'G','X','R','M'};
     out.write(magic, 4);
-    int version = 3; 
+    int version = 3;
     out.write((char*)&version, 4);
     int numSplats = splatData.size();
     out.write((char*)&numSplats, 4);
@@ -1168,9 +1163,9 @@ void MobileGS::loadModel(const std::string& path) {
         splatData.resize(numSplats);
         for(int i=0; i<numSplats; i++) {
             splatData[i] = {legacy[i].x, legacy[i].y, legacy[i].z,
-                            legacy[i].r, legacy[i].g, legacy[i].b, legacy[i].a,
-                            legacy[i].conf,
-                            0.0f, 0.0f, 1.0f, 1.0f};
+                    legacy[i].r, legacy[i].g, legacy[i].b, legacy[i].a,
+                    legacy[i].conf,
+                    0.0f, 0.0f, 1.0f, 1.0f};
         }
     } else {
         return;
@@ -1193,8 +1188,7 @@ void MobileGS::loadModel(const std::string& path) {
             mVoxelGrid[key] = i;
         }
     }
-    
-    // We just loaded new data, force a re-upload to the GPU
+
     std::lock_guard<std::mutex> glLock(mGlDataMutex);
     mPendingSplatData = splatData;
     mGlDataDirty = true;
@@ -1249,7 +1243,6 @@ void MobileGS::draw() {
     glm::mat4 mvp = P * V * A;
     glm::mat4 meshMvp = P * V;
 
-    // --- 1. Draw Splats ---
     if (mSplatsVisible && mPointCount > 0) {
         glUseProgram(mProgram);
 
@@ -1259,13 +1252,11 @@ void MobileGS::draw() {
         cv::Point3f camPos = getCameraWorldPosition();
         GLint camLoc = glGetUniformLocation(mProgram, "uCameraPos");
         glUniform3f(camLoc, camPos.x, camPos.y, camPos.z);
-        
+
         GLint focalLoc = glGetUniformLocation(mProgram, "uFocalY");
         float focalY = std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f);
         glUniform1f(focalLoc, focalY);
 
-        // CRITICAL FIX: Disable alpha blending, Enable true depth writing.
-        // This makes the splats opaque intersecting scales rather than fuzzy overlapping clouds.
         glDisable(GL_BLEND);
         glDepthMask(GL_TRUE);
         glEnable(GL_DEPTH_TEST);
@@ -1306,7 +1297,6 @@ void MobileGS::draw() {
         glDisable(GL_BLEND);
     }
 
-    // --- 2. Draw Wireframe Mesh ---
     if (mMeshProgram != 0 && mMeshIndexCount > 0) {
         glUseProgram(mMeshProgram);
 
@@ -1314,11 +1304,11 @@ void MobileGS::draw() {
         glUniformMatrix4fv(meshMvpLoc, 1, GL_FALSE, glm::value_ptr(meshMvp));
 
         GLint colorLoc = glGetUniformLocation(mMeshProgram, "uColor");
-        glUniform4f(colorLoc, 0.0f, 1.0f, 1.0f, 0.2f); 
+        glUniform4f(colorLoc, 0.0f, 1.0f, 1.0f, 0.2f);
 
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDepthMask(GL_FALSE); // Wireframes don't need to write depth
+        glDepthMask(GL_FALSE);
 
         glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo);
         glEnableVertexAttribArray(0);

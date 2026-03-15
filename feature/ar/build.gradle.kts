@@ -1,3 +1,4 @@
+// FILE: feature/ar/build.gradle.kts
 plugins {
     id("com.android.library")
     alias(libs.plugins.jetbrains.kotlin.compose)
@@ -49,7 +50,6 @@ dependencies {
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
-    // FIX: Added for hiltViewModel()
     implementation(libs.androidx.hilt.navigation.compose)
 
     implementation(libs.arcore.client)
@@ -71,8 +71,7 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
 
-    // MLKit
-    implementation(libs.mlkit.subject.segmentation)
+    // Removed MLKit segmentation dependency here
     implementation(libs.kotlinx.coroutines.play.services)
 
     // Logging

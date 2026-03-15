@@ -1,3 +1,4 @@
+// FILE: core/nativebridge/src/main/java/com/hereliesaz/graffitixr/nativebridge/SlamManager.kt
 package com.hereliesaz.graffitixr.nativebridge
 
 import android.content.res.AssetManager
@@ -55,7 +56,7 @@ class SlamManager @Inject constructor() {
     fun initGl() {
         nativeInitGl()
     }
-    
+
     fun resetGlContext() {
         nativeResetGlContext()
     }
@@ -130,10 +131,6 @@ class SlamManager @Inject constructor() {
         nativeLoadModel(path)
     }
 
-    fun applyLiquify(bitmap: Bitmap, points: FloatArray, radius: Float, intensity: Float) = nativeApplyLiquify(bitmap, points, radius, intensity)
-    fun applyHeal(bitmap: Bitmap, points: FloatArray, radius: Float) = nativeApplyHeal(bitmap, points, radius)
-    fun applyBurnDodge(bitmap: Bitmap, points: FloatArray, radius: Float, intensity: Float, isBurn: Boolean) = nativeApplyBurnDodge(bitmap, points, radius, intensity, isBurn)
-
     fun setTargetFingerprint(descriptorsData: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray) {
         nativeSetTargetFingerprint(descriptorsData, rows, cols, type, points3d)
     }
@@ -151,7 +148,7 @@ class SlamManager @Inject constructor() {
 
     fun generateFingerprintMasked(bitmap: Bitmap, mask: Bitmap?): Fingerprint? {
         return if (mask != null) nativeGenerateFingerprintMasked(bitmap, mask)
-               else nativeGenerateFingerprint(bitmap)
+        else nativeGenerateFingerprint(bitmap)
     }
 
     fun annotateKeypoints(bitmap: Bitmap): Bitmap {
@@ -209,9 +206,6 @@ class SlamManager @Inject constructor() {
         timestampNs: Long
     )
     private external fun nativeFeedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int, timestampNs: Long)
-    private external fun nativeApplyLiquify(bitmap: Bitmap, points: FloatArray, radius: Float, intensity: Float)
-    private external fun nativeApplyHeal(bitmap: Bitmap, points: FloatArray, radius: Float)
-    private external fun nativeApplyBurnDodge(bitmap: Bitmap, points: FloatArray, radius: Float, intensity: Float, isBurn: Boolean)
     private external fun nativeSetTargetFingerprint(descriptorsData: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray)
     private external fun nativeDestroy()
     private external fun nativeGenerateFingerprint(bitmap: Bitmap): Fingerprint?

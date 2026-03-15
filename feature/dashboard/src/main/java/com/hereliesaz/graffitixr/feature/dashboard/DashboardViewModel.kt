@@ -1,3 +1,4 @@
+// FILE: feature/dashboard/src/main/java/com/hereliesaz/graffitixr/feature/dashboard/DashboardViewModel.kt
 package com.hereliesaz.graffitixr.feature.dashboard
 
 import android.app.DownloadManager
@@ -44,6 +45,23 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             val p = repository.createProject("New Project")
             repository.updateProject(p.copy(isRightHanded = isRightHanded))
+        }
+    }
+
+    fun importProject(uri: Uri) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            try {
+                val result = repository.importProject(uri)
+                if (result.isSuccess) {
+                    loadAvailableProjects()
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                android.util.Log.e("DashboardViewModel", "Error importing project", e)
+            } finally {
+                _uiState.update { it.copy(isLoading = false) }
+            }
         }
     }
 
