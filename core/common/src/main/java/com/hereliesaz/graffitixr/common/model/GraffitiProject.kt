@@ -121,6 +121,8 @@ data class GraffitiProject(
 
     // Path to the localized map file (.bin) if using native SLAM
     val mapPath: String? = null,
+    // Path to the point cloud file (.bin) if using cloud-points scan mode
+    val cloudPointsPath: String? = null,
     val targetFingerprint: String? = null,
     val isRightHanded: Boolean = true
 )

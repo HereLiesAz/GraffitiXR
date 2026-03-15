@@ -839,6 +839,10 @@ class ArViewModel @Inject constructor(
         renderer?.showBorderForConfirmation = show
     }
 
+    fun setVisualizationHidden(hidden: Boolean) {
+        renderer?.hideVisualization = hidden
+    }
+
     override fun onCleared() {
         super.onCleared()
         stopAutoSave()
