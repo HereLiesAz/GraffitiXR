@@ -262,9 +262,10 @@ class ArRenderer(
                             try {
                                 frame.acquireDepthImage16Bits().use { depthImage ->
                                     val plane = depthImage.planes[0]
-                                    depthBuffer = ByteBuffer.allocateDirect(plane.buffer.remaining())
-                                    depthBuffer!!.put(plane.buffer)
-                                    depthBuffer!!.rewind()
+                                    val buf = ByteBuffer.allocateDirect(plane.buffer.remaining())
+                                    buf.put(plane.buffer)
+                                    buf.rewind()
+                                    depthBuffer = buf
                                     depthWidth = depthImage.width
                                     depthHeight = depthImage.height
                                     depthStride = plane.rowStride
