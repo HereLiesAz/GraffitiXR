@@ -285,7 +285,7 @@ class MainActivity : ComponentActivity() {
                         var fullSize by remember { mutableStateOf(IntSize.Zero) }
 
                         Box(Modifier.fillMaxSize().onSizeChanged { fullSize = it }) {
-                            AzNavHost(startDestination = EditorMode.AR.name) {
+                            AzNavHost(startDestination = EditorMode.MOCKUP.name) {
                                 composable(EditorMode.AR.name) { EditorOverlay(editorViewModel, mainUiState) }
                                 composable(EditorMode.OVERLAY.name) { EditorOverlay(editorViewModel, mainUiState) }
                                 composable(EditorMode.MOCKUP.name) { EditorOverlay(editorViewModel, mainUiState) }

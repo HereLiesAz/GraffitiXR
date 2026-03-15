@@ -74,7 +74,7 @@ data class EditorUiState(
     val backgroundBitmap: Bitmap? = null,
     val activeLayerId: String? = null,
     val activePanel: EditorPanel = EditorPanel.NONE,
-    val editorMode: EditorMode = EditorMode.AR,
+    val editorMode: EditorMode = EditorMode.MOCKUP,
     // FIX: Default to NONE so transform gestures are always the baseline
     val activeTool: Tool = Tool.NONE,
     val hideUiForCapture: Boolean = false,
