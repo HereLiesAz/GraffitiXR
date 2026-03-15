@@ -64,7 +64,8 @@ object ImageProcessor {
                         brushSize: Float = 50f,
                         brushColor: Int = Color.BLACK,
                         intensity: Float = 0.5f,
-                        mutateInPlace: Boolean = false
+                        mutateInPlace: Boolean = false,
+                        feathering: Float = 0f
                     ): Bitmap = withContext(Dispatchers.Default) {
                         if (stroke.isEmpty()) return@withContext originalBitmap
 
@@ -81,6 +82,9 @@ object ImageProcessor {
                                                                                                     strokeCap = Paint.Cap.ROUND
                                                                                                     strokeJoin = Paint.Join.ROUND
                                                                                                     isAntiAlias = true
+                                                                                                    if (feathering > 0f) {
+                                                                                                        maskFilter = BlurMaskFilter(brushSize * feathering * 0.5f, BlurMaskFilter.Blur.NORMAL)
+                                                                                                    }
                                                                             }
                                                                                             drawStroke(canvas, stroke, paint)
                                                         }
@@ -93,6 +97,9 @@ object ImageProcessor {
                                                                                                                 strokeJoin = Paint.Join.ROUND
                                                                                                                 isAntiAlias = true
                                                                                                                 xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+                                                                                                                if (feathering > 0f) {
+                                                                                                                    maskFilter = BlurMaskFilter(brushSize * feathering * 0.5f, BlurMaskFilter.Blur.NORMAL)
+                                                                                                                }
                                                                                         }
                                                                                                         drawStroke(canvas, stroke, paint)
                                                                     }

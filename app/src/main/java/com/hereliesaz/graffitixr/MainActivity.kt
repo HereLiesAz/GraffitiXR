@@ -744,24 +744,49 @@ class MainActivity : ComponentActivity() {
                                             .fillMaxSize()
                                             .onSizeChanged { size -> itemRadiusPx = size.width / 2f }
                                             .pointerInput(Unit) {
-                                                detectVerticalDragGestures { change, dragAmount ->
+                                                detectDragGestures { change, dragAmount ->
                                                     change.consume()
-                                                    val currentSize = editorViewModel.uiState.value.brushSize
-                                                    editorViewModel.setBrushSize(
-                                                        (currentSize - dragAmount * 0.5f).coerceIn(1f, itemRadiusPx)
-                                                    )
+                                                    // Vertical drag → size, horizontal drag → feathering
+                                                    if (kotlin.math.abs(dragAmount.y) >= kotlin.math.abs(dragAmount.x)) {
+                                                        val currentSize = editorViewModel.uiState.value.brushSize
+                                                        editorViewModel.setBrushSize(
+                                                            (currentSize - dragAmount.y * 0.5f).coerceIn(1f, itemRadiusPx)
+                                                        )
+                                                    } else {
+                                                        val currentFeather = editorViewModel.uiState.value.brushFeathering
+                                                        editorViewModel.setBrushFeathering(
+                                                            (currentFeather + dragAmount.x * 0.005f).coerceIn(0f, 1f)
+                                                        )
+                                                    }
                                                 }
                                             },
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        val displayDp = with(density) {
+                                        val sizeDp = with(density) {
                                             liveState.brushSize.coerceIn(1f, itemRadiusPx).toDp()
                                         }
-                                        Box(
-                                            modifier = Modifier
-                                                .size(displayDp)
-                                                .background(NeonGreen, CircleShape)
-                                        )
+                                        val feathering = liveState.brushFeathering
+                                        // Solid inner circle = hard core; outer blurred ring = feathering amount
+                                        Box(contentAlignment = Alignment.Center) {
+                                            if (feathering > 0.05f) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(sizeDp)
+                                                        .background(
+                                                            NeonGreen.copy(alpha = 0.3f),
+                                                            CircleShape
+                                                        )
+                                                )
+                                            }
+                                            val hardCoreDp = with(density) {
+                                                (liveState.brushSize * (1f - feathering * 0.7f)).coerceIn(2f, itemRadiusPx).toDp()
+                                            }
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(hardCoreDp)
+                                                    .background(NeonGreen, CircleShape)
+                                            )
+                                        }
                                     }
                                 }
                             )
@@ -799,9 +824,15 @@ class MainActivity : ComponentActivity() {
                                                 else Color.Transparent
                                             )
                                             .pointerInput(Unit) {
-                                                detectVerticalDragGestures { change, dragAmount ->
+                                                detectDragGestures { change, dragAmount ->
                                                     change.consume()
-                                                    editorViewModel.adjustColorLightness(-dragAmount * 0.002f)
+                                                    // Vertical: up = lighter, down = darker
+                                                    // Horizontal: right = more saturated, left = less
+                                                    // Both axes apply simultaneously for diagonal drags
+                                                    editorViewModel.adjustColorHSV(
+                                                        lightnessDelta = -dragAmount.y * 0.002f,
+                                                        saturationDelta = dragAmount.x * 0.002f
+                                                    )
                                                 }
                                             },
                                         contentAlignment = Alignment.Center

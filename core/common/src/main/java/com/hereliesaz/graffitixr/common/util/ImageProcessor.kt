@@ -4,6 +4,7 @@ package com.hereliesaz.graffitixr.common.util
 import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 import org.opencv.android.Utils
+import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.MatOfPoint2f
@@ -28,10 +29,15 @@ object ImageProcessor {
             val edgesMat = Mat()
             Imgproc.Canny(grayMat, edgesMat, 50.0, 150.0)
 
-            org.opencv.core.Core.bitwise_not(edgesMat, edgesMat)
-
+            // Build RGBA: black lines (R=G=B=0) where edges were detected, transparent elsewhere.
+            val zero = Mat.zeros(edgesMat.size(), CvType.CV_8UC1)
+            val channels = java.util.ArrayList<Mat>(4)
+            channels.add(zero)      // R = 0
+            channels.add(zero)      // G = 0
+            channels.add(zero)      // B = 0
+            channels.add(edgesMat)  // A = edge mask (255 on edge, 0 elsewhere)
             val dstMat = Mat()
-            Imgproc.cvtColor(edgesMat, dstMat, Imgproc.COLOR_GRAY2RGBA)
+            Core.merge(channels, dstMat)
 
             val resultBitmap = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
             Utils.matToBitmap(dstMat, resultBitmap)
@@ -39,6 +45,7 @@ object ImageProcessor {
             srcMat.release()
             grayMat.release()
             edgesMat.release()
+            zero.release()
             dstMat.release()
 
             resultBitmap

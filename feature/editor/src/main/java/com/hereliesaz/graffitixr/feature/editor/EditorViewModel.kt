@@ -37,7 +37,8 @@ data class StrokeCommand(
     val tool: Tool,
     val brushSize: Float,
     val brushColor: Int,
-    val intensity: Float
+    val intensity: Float,
+    val feathering: Float = 0f
 )
 
 sealed class EditCommand {
@@ -229,7 +230,7 @@ class EditorViewModel @Inject constructor(
                     stroke.path, stroke.canvasSize.width, stroke.canvasSize.height, currentBitmap.width, currentBitmap.height
                 )
                 currentBitmap = com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor.applyToolToBitmap(
-                    currentBitmap, mapped, stroke.tool, stroke.brushSize, stroke.brushColor, stroke.intensity, true
+                    currentBitmap, mapped, stroke.tool, stroke.brushSize, stroke.brushColor, stroke.intensity, true, stroke.feathering
                 )
             }
 
@@ -261,7 +262,7 @@ class EditorViewModel @Inject constructor(
             )
 
             val newBitmap = com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor.applyToolToBitmap(
-                activeBitmap, mappedStroke, command.tool, command.brushSize, command.brushColor, command.intensity, false
+                activeBitmap, mappedStroke, command.tool, command.brushSize, command.brushColor, command.intensity, false, command.feathering
             )
 
             withContext(dispatchers.main) {
@@ -717,11 +718,19 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(brushSize = size.coerceIn(1f, 200f)) }
     }
 
+    fun setBrushFeathering(amount: Float) {
+        _uiState.update { it.copy(brushFeathering = amount.coerceIn(0f, 1f)) }
+    }
+
     override fun setActiveColor(color: Color) {
         _uiState.update { it.copy(activeColor = color, showColorPicker = false) }
     }
 
     override fun adjustColorLightness(delta: Float) {
+        adjustColorHSV(lightnessDelta = delta, saturationDelta = 0f)
+    }
+
+    override fun adjustColorHSV(lightnessDelta: Float, saturationDelta: Float) {
         _uiState.update { state ->
             val c = state.activeColor
             val hsv = FloatArray(3)
@@ -731,10 +740,10 @@ class EditorViewModel @Inject constructor(
                 (c.blue * 255).toInt(),
                 hsv
             )
-            hsv[2] = (hsv[2] + delta).coerceIn(0f, 1f)
+            hsv[1] = (hsv[1] + saturationDelta).coerceIn(0f, 1f)
+            hsv[2] = (hsv[2] + lightnessDelta).coerceIn(0f, 1f)
             val newArgb = android.graphics.Color.HSVToColor(hsv)
-            val newColor = Color(newArgb).copy(alpha = c.alpha)
-            state.copy(activeColor = newColor)
+            state.copy(activeColor = Color(newArgb).copy(alpha = c.alpha))
         }
     }
 

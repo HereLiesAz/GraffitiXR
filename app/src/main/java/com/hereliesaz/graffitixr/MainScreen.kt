@@ -12,6 +12,10 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -22,8 +26,10 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import com.hereliesaz.graffitixr.feature.editor.createColorMatrix
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -285,6 +291,16 @@ fun MainScreen(
                             Image(
                                 bitmap = bmp.asImageBitmap(),
                                 contentDescription = null,
+                                colorFilter = ColorFilter.colorMatrix(
+                                    createColorMatrix(
+                                        saturation = layer.saturation,
+                                        contrast = layer.contrast,
+                                        brightness = layer.brightness,
+                                        colorBalanceR = layer.colorBalanceR,
+                                        colorBalanceG = layer.colorBalanceG,
+                                        colorBalanceB = layer.colorBalanceB
+                                    )
+                                ),
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .graphicsLayer {
@@ -315,6 +331,7 @@ fun MainScreen(
                     activeTool = uiState.activeTool,
                     brushSize = uiState.brushSize,
                     activeColor = uiState.activeColor,
+                    layerBitmapKey = activeLayer.bitmap,
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
@@ -333,6 +350,21 @@ fun MainScreen(
                 )
             }
         }
+
+        if (uiState.isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.45f)),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(56.dp),
+                    color = Color(0xFFFFAA00),
+                    strokeWidth = 4.dp
+                )
+            }
+        }
     }
 }
 
@@ -347,6 +379,17 @@ private fun compositeLayersForAr(layers: List<Layer>): AndroidBitmap {
     for (layer in layers) {
         val bmp = layer.bitmap ?: continue
         paint.alpha = (layer.opacity.coerceIn(0f, 1f) * 255).toInt()
+        val cm = createColorMatrix(
+            saturation = layer.saturation,
+            contrast = layer.contrast,
+            brightness = layer.brightness,
+            colorBalanceR = layer.colorBalanceR,
+            colorBalanceG = layer.colorBalanceG,
+            colorBalanceB = layer.colorBalanceB
+        )
+        paint.colorFilter = android.graphics.ColorMatrixColorFilter(
+            android.graphics.ColorMatrix(cm.values)
+        )
         val matrix = Matrix()
         matrix.postTranslate(-bmp.width / 2f, -bmp.height / 2f)
         matrix.postScale(layer.scale, layer.scale)

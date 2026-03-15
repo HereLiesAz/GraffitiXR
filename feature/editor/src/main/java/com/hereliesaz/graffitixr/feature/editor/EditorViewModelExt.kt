@@ -26,7 +26,8 @@ fun EditorViewModel.applyStrokeToActiveLayer(stroke: List<Offset>, canvasSize: I
         tool = activeTool,
         brushSize = currentState.brushSize,
         brushColor = currentState.activeColor.toArgb(),
-        intensity = 0.5f
+        intensity = 0.5f,
+        feathering = currentState.brushFeathering
     )
 
     processNewStroke(activeLayerId, bitmap, command, activeLayer)

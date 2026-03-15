@@ -20,9 +20,9 @@ data class Layer(
     val brightness: Float = 0.0f,
     val contrast: Float = 1.0f,
     val saturation: Float = 1.0f,
-    val colorBalanceR: Float = 0.0f,
-    val colorBalanceG: Float = 0.0f,
-    val colorBalanceB: Float = 0.0f,
+    val colorBalanceR: Float = 1.0f,
+    val colorBalanceG: Float = 1.0f,
+    val colorBalanceB: Float = 1.0f,
     val isImageLocked: Boolean = false,
     val isSketch: Boolean = false,
     val blendMode: BlendMode = BlendMode.SrcOver,
@@ -86,6 +86,8 @@ data class EditorUiState(
     val redoCount: Int = 0,
     val isLoading: Boolean = false,
     val brushSize: Float = 50f,
+    // Feathering [0..1]: 0 = hard edge, 1 = fully soft (blur radius = brushSize)
+    val brushFeathering: Float = 0f,
     val activeColor: Color = Color.White,
     val showColorPicker: Boolean = false,
     val showDiagOverlay: Boolean = false

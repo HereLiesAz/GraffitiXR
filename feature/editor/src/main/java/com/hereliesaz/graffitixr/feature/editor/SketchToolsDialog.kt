@@ -1,44 +1,32 @@
 // ~~~ FILE: ./feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/SketchToolsDialogs.kt ~~~
 package com.hereliesaz.graffitixr.feature.editor
 
+import android.graphics.Bitmap as AndroidBitmap
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-
-private val COLOR_GRID = listOf(
-    // Whites / grays / blacks
-    Color.White, Color(0xFFE0E0E0), Color(0xFFBDBDBD), Color(0xFF9E9E9E),
-    Color(0xFF757575), Color(0xFF424242), Color(0xFF212121), Color.Black,
-    // Reds / pinks
-    Color(0xFFFFCDD2), Color(0xFFEF9A9A), Color(0xFFE57373), Color(0xFFEF5350),
-    Color(0xFFF44336), Color(0xFFE53935), Color(0xFFB71C1C), Color(0xFF880E4F),
-    // Oranges / yellows
-    Color(0xFFFFE0B2), Color(0xFFFFCC80), Color(0xFFFFA726), Color(0xFFFF9800),
-    Color(0xFFFFF176), Color(0xFFFFEE58), Color(0xFFFFD600), Color(0xFFF57F17),
-    // Greens
-    Color(0xFFC8E6C9), Color(0xFF81C784), Color(0xFF4CAF50), Color(0xFF2E7D32),
-    Color(0xFFB2DFDB), Color(0xFF4DB6AC), Color(0xFF00897B), Color(0xFF004D40),
-    // Blues / purples
-    Color(0xFFBBDEFB), Color(0xFF64B5F6), Color(0xFF1565C0), Color(0xFF0D47A1),
-    Color(0xFFE1BEE7), Color(0xFFCE93D8), Color(0xFF8E24AA), Color(0xFF4A148C),
-    // Browns / skin tones
-    Color(0xFFD7CCC8), Color(0xFFA1887F), Color(0xFF6D4C41), Color(0xFF3E2723),
-    Color(0xFFFFDDB4), Color(0xFFFFBD8A), Color(0xFFE8965C), Color(0xFFC26B3E),
-)
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlin.math.*
 
 @Composable
 fun ColorPickerDialog(
@@ -47,79 +35,189 @@ fun ColorPickerDialog(
     onSelectColor: (Color) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var selected by remember { mutableStateOf(currentColor) }
+    // Decompose current color into HSV
+    val initHsv = FloatArray(3)
+    android.graphics.Color.RGBToHSV(
+        (currentColor.red * 255).toInt(),
+        (currentColor.green * 255).toInt(),
+        (currentColor.blue * 255).toInt(),
+        initHsv
+    )
+
+    var hue by remember { mutableFloatStateOf(initHsv[0]) }
+    var saturation by remember { mutableFloatStateOf(initHsv[1]) }
+    var brightness by remember { mutableFloatStateOf(initHsv[2]) }
+
+    val selectedColor = remember(hue, saturation, brightness) {
+        val argb = android.graphics.Color.HSVToColor(floatArrayOf(hue, saturation, brightness))
+        Color(argb).copy(alpha = currentColor.alpha)
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.surface
         ) {
-            Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-
-                // Current color preview
+            Column(
+                modifier = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Color preview
                 Box(
                     Modifier
                         .size(48.dp)
-                        .background(selected, CircleShape)
+                        .background(selectedColor, CircleShape)
                         .border(2.dp, Color.White.copy(alpha = 0.6f), CircleShape)
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                // Color wheel
+                ColorWheel(
+                    hue = hue,
+                    saturation = saturation,
+                    brightness = brightness,
+                    modifier = Modifier.size(240.dp),
+                    onHueSaturationChanged = { h, s ->
+                        hue = h
+                        saturation = s
+                    }
                 )
 
                 Spacer(Modifier.height(12.dp))
 
-                // Main color grid
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(8),
-                    modifier = Modifier.fillMaxWidth().height(200.dp),
-                    contentPadding = PaddingValues(2.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                // Brightness slider
+                Text(
+                    "Brightness",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.Gray,
+                    modifier = Modifier.align(Alignment.Start)
+                )
+                Slider(
+                    value = brightness,
+                    onValueChange = { brightness = it },
+                    valueRange = 0f..1f,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    items(COLOR_GRID) { color ->
-                        val isSelected = color == selected
-                        Box(
-                            modifier = Modifier
-                                .aspectRatio(1f)
-                                .clip(CircleShape)
-                                .background(color, CircleShape)
-                                .border(
-                                    if (isSelected) 2.dp else 0.5.dp,
-                                    if (isSelected) Color.White else Color.Gray.copy(alpha = 0.4f),
-                                    CircleShape
-                                )
-                                .clickable { selected = color }
-                        )
-                    }
-                }
-
-                // Recent colors row (if any)
-                if (history.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text("Recent", style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.align(Alignment.Start))
-                    Spacer(Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        history.take(8).forEach { color ->
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .background(color, CircleShape)
-                                    .border(0.5.dp, Color.Gray.copy(alpha = 0.4f), CircleShape)
-                                    .clickable { selected = color }
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(16.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onDismiss) { Text("Cancel") }
-                    Button(onClick = { onSelectColor(selected); onDismiss() }) { Text("Apply") }
+                    Spacer(Modifier.width(8.dp))
+                    Button(onClick = { onSelectColor(selectedColor) }) { Text("Apply") }
                 }
             }
         }
     }
 }
+
+@Composable
+private fun ColorWheel(
+    hue: Float,
+    saturation: Float,
+    brightness: Float,
+    modifier: Modifier = Modifier,
+    onHueSaturationChanged: (hue: Float, saturation: Float) -> Unit
+) {
+    var wheelSize by remember { mutableStateOf(IntSize.Zero) }
+    var wheelBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+
+    // Regenerate the wheel bitmap when size or brightness changes
+    LaunchedEffect(wheelSize, brightness) {
+        val px = wheelSize.width
+        if (px <= 0) return@LaunchedEffect
+        wheelBitmap = generateColorWheelBitmap(px, brightness)
+    }
+
+    val selectorPos = remember(hue, saturation, wheelSize) {
+        val radius = wheelSize.width / 2f
+        val angle = Math.toRadians(hue.toDouble())
+        Offset(
+            x = (radius + cos(angle) * saturation * radius).toFloat(),
+            y = (radius + sin(angle) * saturation * radius).toFloat()
+        )
+    }
+
+    fun pickFromOffset(offset: Offset) {
+        val radius = wheelSize.width / 2f
+        if (radius <= 0f) return
+        val dx = offset.x - radius
+        val dy = offset.y - radius
+        val dist = sqrt(dx * dx + dy * dy)
+        val newSat = (dist / radius).coerceIn(0f, 1f)
+        val newHue = ((Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())) + 360) % 360).toFloat()
+        onHueSaturationChanged(newHue, newSat)
+    }
+
+    Canvas(
+        modifier = modifier
+            .onSizeChanged { wheelSize = it }
+            .pointerInput(wheelSize) {
+                detectTapGestures { offset -> pickFromOffset(offset) }
+            }
+            .pointerInput(wheelSize) {
+                detectDragGestures { _, dragAmount ->
+                    val radius = wheelSize.width / 2f
+                    if (radius <= 0f) return@detectDragGestures
+                    val angle = Math.toRadians(hue.toDouble())
+                    val curX = radius + cos(angle) * saturation * radius
+                    val curY = radius + sin(angle) * saturation * radius
+                    pickFromOffset(Offset((curX + dragAmount.x).toFloat(), (curY + dragAmount.y).toFloat()))
+                }
+            }
+    ) {
+        // Draw wheel bitmap
+        wheelBitmap?.let { bmp ->
+            drawImage(bmp)
+        }
+
+        // Draw selector ring
+        drawCircle(
+            color = Color.Black,
+            radius = 12f,
+            center = selectorPos,
+            style = Stroke(width = 3f)
+        )
+        drawCircle(
+            color = Color.White,
+            radius = 10f,
+            center = selectorPos,
+            style = Stroke(width = 2f)
+        )
+    }
+}
+
+private suspend fun generateColorWheelBitmap(size: Int, brightness: Float): ImageBitmap =
+    withContext(Dispatchers.Default) {
+        val pixels = IntArray(size * size)
+        val center = size / 2f
+        val radius = center
+        val hsv = FloatArray(3).also { it[2] = brightness }
+
+        for (y in 0 until size) {
+            for (x in 0 until size) {
+                val dx = (x - center).toDouble()
+                val dy = (y - center).toDouble()
+                val dist = sqrt(dx * dx + dy * dy)
+                pixels[y * size + x] = if (dist <= radius) {
+                    val angle = (Math.toDegrees(atan2(dy, dx)) + 360) % 360
+                    hsv[0] = angle.toFloat()
+                    hsv[1] = (dist / radius).toFloat().coerceIn(0f, 1f)
+                    android.graphics.Color.HSVToColor(hsv)
+                } else {
+                    0 // transparent outside circle
+                }
+            }
+        }
+
+        val bmp = AndroidBitmap.createBitmap(size, size, AndroidBitmap.Config.ARGB_8888)
+        bmp.setPixels(pixels, 0, size, 0, 0, size, size)
+        bmp.asImageBitmap()
+    }
 
 @Composable
 fun SizePickerDialog(
@@ -139,7 +237,7 @@ fun SizePickerDialog(
 
                 Slider(value = currentSize, onValueChange = onSizeChange, valueRange = 5f..150f)
 
-                Button(onClick = onDismiss, modifier = Modifier.padding(top=16.dp)) { Text("Done") }
+                Button(onClick = onDismiss, modifier = Modifier.padding(top = 16.dp)) { Text("Done") }
             }
         }
     }
