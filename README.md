@@ -26,13 +26,6 @@ Strictly decoupled multi-module architecture:
 *   `:core:nativebridge` — `SlamManager` JNI bridge, `MobileGS` voxel engine, OpenGL ES rendering.
 *   `:core:data` / `:core:domain` / `:core:common` — Clean Architecture data layer.
 
-## Setup & Building
-1.  **Libraries:** Run `./setup_libs.sh` to fetch OpenCV and GLM.
-2.  **NDK:** Ensure NDK 25.x or higher is installed.
-3.  **Firebase:** Copy `app/google-services.json.template` → `app/google-services.json` for local builds.
-4.  **Build:** `./gradlew assembleDebug`
-5.  **Tests:** `./gradlew testDebugUnitTest`
-
 ## Documentation
 - [Architecture Overview](docs/ARCHITECTURE.md)
 - [Native Engine Details](docs/NATIVE_ENGINE.md)
