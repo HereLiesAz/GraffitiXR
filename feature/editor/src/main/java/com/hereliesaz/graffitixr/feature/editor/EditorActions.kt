@@ -68,4 +68,12 @@ interface EditorActions {
     /** Adjusts both HSV value (lightness) and saturation simultaneously in one atomic update. */
     fun adjustColorHSV(lightnessDelta: Float, saturationDelta: Float)
     fun onColorPickerDismissed()
+
+    fun onAddTextLayer()
+    fun onTextContentChanged(layerId: String, text: String)
+    fun onTextFontChanged(layerId: String, fontName: String)
+    fun onTextSizeChanged(layerId: String, sizeDp: Float)
+    fun onTextColorChanged(layerId: String, colorArgb: Int)
+    fun onTextKerningChanged(layerId: String, letterSpacingEm: Float)
+    fun onTextStyleChanged(layerId: String, isBold: Boolean, isItalic: Boolean, hasOutline: Boolean, hasDropShadow: Boolean)
 }

@@ -25,6 +25,7 @@ data class Layer(
     val colorBalanceB: Float = 1.0f,
     val isImageLocked: Boolean = false,
     val isSketch: Boolean = false,
+    val textParams: TextLayerParams? = null,
     val blendMode: BlendMode = BlendMode.SrcOver,
     val warpMesh: List<Float> = emptyList(),
     val offset: Offset = Offset.Zero,

@@ -35,7 +35,12 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import android.content.ClipData
 import android.content.ClipboardManager as AndroidClipboardManager
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -233,6 +238,8 @@ class MainActivity : ComponentActivity() {
 
                 val navStrings = remember { NavStrings() }
                 var showHelp by remember { mutableStateOf(false) }
+                var showFontPicker by remember { mutableStateOf(false) }
+                var fontPickerLayerId by remember { mutableStateOf<String?>(null) }
 
                 AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
 
@@ -253,7 +260,8 @@ class MainActivity : ComponentActivity() {
                     if (isRailVisible) {
                         configureRailItems(
                             mainViewModel, editorViewModel, arViewModel, dashboardViewModel,
-                            overlayImagePicker, backgroundImagePicker, editorUiState, arUiState, navStrings
+                            overlayImagePicker, backgroundImagePicker, editorUiState, arUiState, navStrings,
+                            onShowFontPicker = { layerId -> fontPickerLayerId = layerId; showFontPicker = true }
                         )
                     }
 
@@ -548,6 +556,16 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
+                            if (showFontPicker) {
+                                FontPickerDialog(
+                                    onFontSelected = { fontName ->
+                                        fontPickerLayerId?.let { editorViewModel.onTextFontChanged(it, fontName) }
+                                        showFontPicker = false
+                                    },
+                                    onDismiss = { showFontPicker = false }
+                                )
+                            }
+
                             if (showHelpDialog) {
                                 InfoDialog(
                                     title = "GraffitiXR Guide",
@@ -643,7 +661,8 @@ class MainActivity : ComponentActivity() {
         backgroundPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>,
         editorUiState: EditorUiState,
         arUiState: ArUiState,
-        navStrings: NavStrings
+        navStrings: NavStrings,
+        onShowFontPicker: (String) -> Unit = {}
     ) {
         val requestPermissions = {
             permissionLauncher.launch(
@@ -682,6 +701,9 @@ class MainActivity : ComponentActivity() {
             }
             azRailSubItem(id = "add_draw", hostId = "design_host", text = "Draw", color = Color.White, shape = AzButtonShape.NONE, info = navStrings.drawInfo) {
                 editorViewModel.onAddBlankLayer()
+            }
+            azRailSubItem(id = "add_text", hostId = "design_host", text = "Text", color = Color.White, shape = AzButtonShape.NONE) {
+                editorViewModel.onAddTextLayer()
             }
 
             if (editorUiState.editorMode == EditorMode.MOCKUP) {
@@ -799,78 +821,206 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        if (layer.isSketch) {
-                            azRailItem(id = "blend_${layer.id}", text = "Blend", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.blendingInfo, onClick = { activate(); editorViewModel.onCycleBlendMode() })
-                            azRailItem(id = "adj_${layer.id}", text = "Adjust", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.adjustInfo, onClick = { activate(); editorViewModel.onAdjustClicked() })
-
-                            azRailItem(
-                                id = "color_${layer.id}",
-                                text = "Color",
-                                color = Color.White,
-                                shape = AzButtonShape.RECTANGLE,
-                                info = navStrings.colorInfo,
-                                onClick = {
+                        when {
+                            layer.textParams != null -> {
+                                val tp = layer.textParams!!
+                                azRailItem(id = "font_${layer.id}", text = "Font", color = Color.White, shape = AzButtonShape.RECTANGLE) {
                                     activate()
-                                    editorViewModel.setActiveTool(Tool.COLOR)
-                                    editorViewModel.onColorClicked()
-                                },
-                                content = AzComposableContent { isEnabled ->
-                                    val liveState by editorViewModel.uiState.collectAsState()
-                                    val isActive = liveState.activeTool == Tool.COLOR
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(
-                                                if (isActive) Cyan.copy(alpha = 0.15f)
-                                                else Color.Transparent
-                                            )
-                                            .pointerInput(isEnabled) {
-                                                if (!isEnabled) return@pointerInput
-                                                detectDragGestures { change, dragAmount ->
-                                                    change.consume()
-                                                    editorViewModel.adjustColorHSV(
-                                                        lightnessDelta = -dragAmount.y * 0.002f,
-                                                        saturationDelta = dragAmount.x * 0.002f
-                                                    )
-                                                }
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
+                                    onShowFontPicker(layer.id)
+                                }
+                                azRailItem(
+                                    id = "size_${layer.id}",
+                                    text = "Size",
+                                    color = Color.White,
+                                    shape = AzButtonShape.RECTANGLE,
+                                    content = AzComposableContent { isEnabled ->
+                                        val liveState by editorViewModel.uiState.collectAsState()
+                                        val displaySize = liveState.layers.find { it.id == layer.id }?.textParams?.fontSizeDp ?: 150f
                                         Box(
                                             modifier = Modifier
-                                                .size(28.dp)
-                                                .background(liveState.activeColor, CircleShape)
-                                                .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
-                                        )
+                                                .fillMaxSize()
+                                                .pointerInput(isEnabled) {
+                                                    if (!isEnabled) return@pointerInput
+                                                    detectDragGestures { change, dragAmount ->
+                                                        change.consume()
+                                                        val current = editorViewModel.uiState.value.layers
+                                                            .find { it.id == layer.id }?.textParams?.fontSizeDp ?: 150f
+                                                        editorViewModel.onTextSizeChanged(layer.id, (current - dragAmount.y * 0.5f).coerceIn(8f, 300f))
+                                                    }
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "${displaySize.toInt()}pt",
+                                                color = Color.White,
+                                                fontSize = 28.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
                                     }
+                                )
+                                azRailItem(
+                                    id = "color_${layer.id}",
+                                    text = "Color",
+                                    color = Color.White,
+                                    shape = AzButtonShape.RECTANGLE,
+                                    onClick = { activate(); editorViewModel.onColorClicked() },
+                                    content = AzComposableContent { isEnabled ->
+                                        val liveState by editorViewModel.uiState.collectAsState()
+                                        val currentColor = liveState.layers.find { it.id == layer.id }?.textParams?.colorArgb
+                                            ?: 0xFFFFFFFF.toInt()
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .pointerInput(isEnabled) {
+                                                    if (!isEnabled) return@pointerInput
+                                                    detectDragGestures { change, dragAmount ->
+                                                        change.consume()
+                                                        val hsv = FloatArray(3)
+                                                        android.graphics.Color.colorToHSV(currentColor, hsv)
+                                                        hsv[2] = (hsv[2] - dragAmount.y * 0.002f).coerceIn(0f, 1f)
+                                                        hsv[1] = (hsv[1] + dragAmount.x * 0.002f).coerceIn(0f, 1f)
+                                                        editorViewModel.onTextColorChanged(layer.id, android.graphics.Color.HSVToColor(hsv))
+                                                    }
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(28.dp)
+                                                    .background(Color(currentColor), CircleShape)
+                                                    .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+                                            )
+                                        }
+                                    }
+                                )
+                                azRailItem(
+                                    id = "kern_${layer.id}",
+                                    text = "Kern",
+                                    color = Color.White,
+                                    shape = AzButtonShape.RECTANGLE,
+                                    content = AzComposableContent { isEnabled ->
+                                        val liveState by editorViewModel.uiState.collectAsState()
+                                        val displayKern = liveState.layers.find { it.id == layer.id }?.textParams?.letterSpacingEm ?: 0f
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .pointerInput(isEnabled) {
+                                                    if (!isEnabled) return@pointerInput
+                                                    detectDragGestures { change, dragAmount ->
+                                                        change.consume()
+                                                        val current = editorViewModel.uiState.value.layers
+                                                            .find { it.id == layer.id }?.textParams?.letterSpacingEm ?: 0f
+                                                        editorViewModel.onTextKerningChanged(layer.id, (current + dragAmount.x * 0.003f).coerceIn(-0.2f, 1f))
+                                                    }
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = String.format("%.2f", displayKern),
+                                                color = Color.White,
+                                                fontSize = 28.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                )
+                                azRailItem(id = "bold_${layer.id}", text = "Bold", color = if (tp.isBold) Cyan else Color.White, shape = AzButtonShape.RECTANGLE) {
+                                    activate()
+                                    editorViewModel.onTextStyleChanged(layer.id, !tp.isBold, tp.isItalic, tp.hasOutline, tp.hasDropShadow)
                                 }
-                            )
-                            // --- Brush tools at bottom ---
-                            azRailItem(id = "brush_${layer.id}", text = "Brush", color = if (activeTool == Tool.BRUSH) Cyan else Color.White, info = navStrings.brushInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BRUSH) })
-                            azRailItem(id = "eraser_${layer.id}", text = "Eraser", color = if (activeTool == Tool.ERASER) Cyan else Color.White, info = navStrings.eraserInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.ERASER) })
-                            azRailItem(id = "blur_${layer.id}", text = "Blur", color = if (activeTool == Tool.BLUR) Cyan else Color.White, info = navStrings.blurInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BLUR) })
-                            azRailItem(id = "liquify_${layer.id}", text = "Liquify", color = if (activeTool == Tool.LIQUIFY) Cyan else Color.White, info = navStrings.liquifyInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) })
-                            azRailItem(id = "dodge_${layer.id}", text = "Dodge", color = if (activeTool == Tool.DODGE) Cyan else Color.White, info = navStrings.dodgeInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.DODGE) })
-                            azRailItem(id = "burn_${layer.id}", text = "Burn", color = if (activeTool == Tool.BURN) Cyan else Color.White, info = navStrings.burnInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BURN) })
-                            addSizeItem()
-                        } else {
-                            azRailItem(id = "iso_${layer.id}", text = "Isolate", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.isolateInfo, onClick = { activate(); editorViewModel.onRemoveBackgroundClicked() })
-                            azRailItem(id = "line_${layer.id}", text = "Outline", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.outlineInfo, onClick = { activate(); editorViewModel.onLineDrawingClicked() })
-                            azRailItem(id = "adj_${layer.id}", text = "Adjust", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.adjustInfo, onClick = { activate(); editorViewModel.onAdjustClicked() })
-                            azRailItem(id = "balance_${layer.id}", text = "Balance", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.balanceInfo, onClick = { activate(); editorViewModel.onBalanceClicked() })
-                            azRailItem(id = "blend_${layer.id}", text = "Blend", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.blendingInfo, onClick = { activate(); editorViewModel.onCycleBlendMode() })
+                                azRailItem(id = "italic_${layer.id}", text = "Italic", color = if (tp.isItalic) Cyan else Color.White, shape = AzButtonShape.RECTANGLE) {
+                                    activate()
+                                    editorViewModel.onTextStyleChanged(layer.id, tp.isBold, !tp.isItalic, tp.hasOutline, tp.hasDropShadow)
+                                }
+                                azRailItem(id = "outline_${layer.id}", text = "Outline", color = if (tp.hasOutline) Cyan else Color.White, shape = AzButtonShape.RECTANGLE) {
+                                    activate()
+                                    editorViewModel.onTextStyleChanged(layer.id, tp.isBold, tp.isItalic, !tp.hasOutline, tp.hasDropShadow)
+                                }
+                                azRailItem(id = "shadow_${layer.id}", text = "Shadow", color = if (tp.hasDropShadow) Cyan else Color.White, shape = AzButtonShape.RECTANGLE) {
+                                    activate()
+                                    editorViewModel.onTextStyleChanged(layer.id, tp.isBold, tp.isItalic, tp.hasOutline, !tp.hasDropShadow)
+                                }
+                                azRailItem(id = "blend_${layer.id}", text = "Blend", color = Color.White, shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onCycleBlendMode() })
+                                azRailItem(id = "adj_${layer.id}", text = "Adjust", color = Color.White, shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onAdjustClicked() })
+                            }
+                            layer.isSketch -> {
+                                azRailItem(id = "blend_${layer.id}", text = "Blend", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.blendingInfo, onClick = { activate(); editorViewModel.onCycleBlendMode() })
+                                azRailItem(id = "adj_${layer.id}", text = "Adjust", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.adjustInfo, onClick = { activate(); editorViewModel.onAdjustClicked() })
 
-                            // --- Brush tools at bottom ---
-                            azRailItem(id = "eraser_${layer.id}", text = "Eraser", color = if (activeTool == Tool.ERASER) Cyan else Color.White, info = navStrings.eraserInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.ERASER) })
-                            azRailItem(id = "blur_${layer.id}", text = "Blur", color = if (activeTool == Tool.BLUR) Cyan else Color.White, info = navStrings.blurInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BLUR) })
-                            azRailItem(id = "liquify_${layer.id}", text = "Liquify", color = if (activeTool == Tool.LIQUIFY) Cyan else Color.White, info = navStrings.liquifyInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) })
-                            azRailItem(id = "dodge_${layer.id}", text = "Dodge", color = if (activeTool == Tool.DODGE) Cyan else Color.White, info = navStrings.dodgeInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.DODGE) })
-                            azRailItem(id = "burn_${layer.id}", text = "Burn", color = if (activeTool == Tool.BURN) Cyan else Color.White, info = navStrings.burnInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BURN) })
-                            addSizeItem()
+                                azRailItem(
+                                    id = "color_${layer.id}",
+                                    text = "Color",
+                                    color = Color.White,
+                                    shape = AzButtonShape.RECTANGLE,
+                                    info = navStrings.colorInfo,
+                                    onClick = {
+                                        activate()
+                                        editorViewModel.setActiveTool(Tool.COLOR)
+                                        editorViewModel.onColorClicked()
+                                    },
+                                    content = AzComposableContent { isEnabled ->
+                                        val liveState by editorViewModel.uiState.collectAsState()
+                                        val isActive = liveState.activeTool == Tool.COLOR
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(
+                                                    if (isActive) Cyan.copy(alpha = 0.15f)
+                                                    else Color.Transparent
+                                                )
+                                                .pointerInput(isEnabled) {
+                                                    if (!isEnabled) return@pointerInput
+                                                    detectDragGestures { change, dragAmount ->
+                                                        change.consume()
+                                                        editorViewModel.adjustColorHSV(
+                                                            lightnessDelta = -dragAmount.y * 0.002f,
+                                                            saturationDelta = dragAmount.x * 0.002f
+                                                        )
+                                                    }
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(28.dp)
+                                                    .background(liveState.activeColor, CircleShape)
+                                                    .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+                                            )
+                                        }
+                                    }
+                                )
+                                // --- Brush tools at bottom ---
+                                azRailItem(id = "brush_${layer.id}", text = "Brush", color = if (activeTool == Tool.BRUSH) Cyan else Color.White, info = navStrings.brushInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BRUSH) })
+                                azRailItem(id = "eraser_${layer.id}", text = "Eraser", color = if (activeTool == Tool.ERASER) Cyan else Color.White, info = navStrings.eraserInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.ERASER) })
+                                azRailItem(id = "blur_${layer.id}", text = "Blur", color = if (activeTool == Tool.BLUR) Cyan else Color.White, info = navStrings.blurInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BLUR) })
+                                azRailItem(id = "liquify_${layer.id}", text = "Liquify", color = if (activeTool == Tool.LIQUIFY) Cyan else Color.White, info = navStrings.liquifyInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) })
+                                azRailItem(id = "dodge_${layer.id}", text = "Dodge", color = if (activeTool == Tool.DODGE) Cyan else Color.White, info = navStrings.dodgeInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.DODGE) })
+                                azRailItem(id = "burn_${layer.id}", text = "Burn", color = if (activeTool == Tool.BURN) Cyan else Color.White, info = navStrings.burnInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BURN) })
+                                addSizeItem()
+                            }
+                            else -> {
+                                azRailItem(id = "iso_${layer.id}", text = "Isolate", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.isolateInfo, onClick = { activate(); editorViewModel.onRemoveBackgroundClicked() })
+                                azRailItem(id = "line_${layer.id}", text = "Outline", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.outlineInfo, onClick = { activate(); editorViewModel.onLineDrawingClicked() })
+                                azRailItem(id = "adj_${layer.id}", text = "Adjust", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.adjustInfo, onClick = { activate(); editorViewModel.onAdjustClicked() })
+                                azRailItem(id = "balance_${layer.id}", text = "Balance", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.balanceInfo, onClick = { activate(); editorViewModel.onBalanceClicked() })
+                                azRailItem(id = "blend_${layer.id}", text = "Blend", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.blendingInfo, onClick = { activate(); editorViewModel.onCycleBlendMode() })
+
+                                // --- Brush tools at bottom ---
+                                azRailItem(id = "eraser_${layer.id}", text = "Eraser", color = if (activeTool == Tool.ERASER) Cyan else Color.White, info = navStrings.eraserInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.ERASER) })
+                                azRailItem(id = "blur_${layer.id}", text = "Blur", color = if (activeTool == Tool.BLUR) Cyan else Color.White, info = navStrings.blurInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BLUR) })
+                                azRailItem(id = "liquify_${layer.id}", text = "Liquify", color = if (activeTool == Tool.LIQUIFY) Cyan else Color.White, info = navStrings.liquifyInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) })
+                                azRailItem(id = "dodge_${layer.id}", text = "Dodge", color = if (activeTool == Tool.DODGE) Cyan else Color.White, info = navStrings.dodgeInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.DODGE) })
+                                azRailItem(id = "burn_${layer.id}", text = "Burn", color = if (activeTool == Tool.BURN) Cyan else Color.White, info = navStrings.burnInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BURN) })
+                                addSizeItem()
+                            }
                         }
                     }
                 ) {
                     inputItem(hint = "Rename") { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
+                    if (layer.textParams != null) {
+                        inputItem(hint = "Edit text") { text -> editorViewModel.onTextContentChanged(layer.id, text) }
+                    }
                     listItem(text = "Copy Edits") { editorViewModel.copyLayerModifications(layer.id) }
                     listItem(text = "Paste Edits") { editorViewModel.pasteLayerModifications(layer.id) }
                     listItem(text = "Duplicate") { editorViewModel.onLayerDuplicated(layer.id) }
@@ -917,21 +1067,21 @@ private fun TapTargetOverlay(
     ) {
         Box(
             modifier = Modifier
-                .background(Color(0xEE000000), RoundedCornerShape(16.dp))
+                .background(Color(0xEEFFFFFF), RoundedCornerShape(16.dp))
                 .border(2.dp, Color.Cyan, RoundedCornerShape(16.dp))
                 .padding(20.dp)
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "TARGET CREATION",
-                    color = Color.Cyan,
+                    color = Color(0xFF007788),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
                     text = "Tap directly on your painted reference marks on the screen. The app will immediately isolate them.",
-                    color = Color.White,
+                    color = Color(0xFF222222),
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Start
                 )
@@ -1295,4 +1445,49 @@ private fun PaintingProgressIndicator(
             )
         }
     }
+}
+
+private val AVAILABLE_FONTS = listOf(
+    "Roboto", "Oswald", "Bebas Neue", "Anton",
+    "Playfair Display", "Pacifico", "Dancing Script",
+    "Permanent Marker", "Rock Salt", "Bangers", "Righteous"
+)
+
+@Composable
+private fun FontPickerDialog(
+    onFontSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val googleFontsProvider = remember {
+        androidx.compose.ui.text.googlefonts.GoogleFont.Provider(
+            providerAuthority = "com.google.android.gms.fonts",
+            providerPackage = "com.google.android.gms",
+            certificates = com.hereliesaz.graffitixr.R.array.com_google_android_gms_fonts_certs
+        )
+    }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Choose Font") },
+        text = {
+            LazyColumn {
+                items(AVAILABLE_FONTS) { fontName ->
+                    val googleFont = androidx.compose.ui.text.googlefonts.GoogleFont(fontName)
+                    val fontFamily = FontFamily(
+                        androidx.compose.ui.text.googlefonts.Font(googleFont, googleFontsProvider)
+                    )
+                    Text(
+                        text = "Aa  $fontName",
+                        fontFamily = fontFamily,
+                        fontSize = 20.sp,
+                        color = Color.White,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onFontSelected(fontName) }
+                            .padding(12.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {}
+    )
 }

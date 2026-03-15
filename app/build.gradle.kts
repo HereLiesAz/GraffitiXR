@@ -19,7 +19,7 @@ android {
         minSdk = 29
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0.0"
+        versionName = "1.20"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -120,6 +120,7 @@ dependencies {
 
     implementation(libs.az.nav.rail)
     implementation(libs.coil.compose)
+    implementation(libs.compose.ui.text.google.fonts)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -8,6 +8,25 @@ import com.hereliesaz.graffitixr.common.serialization.OffsetSerializer
 import java.util.UUID
 
 @Serializable
+data class TextLayerParams(
+    val text: String = "",
+    val fontName: String = "Roboto",
+    val fontSizeDp: Float = 150f,
+    val colorArgb: Int = 0xFFFFFFFF.toInt(),
+    val letterSpacingEm: Float = 0f,
+    val isBold: Boolean = false,
+    val isItalic: Boolean = false,
+    val hasOutline: Boolean = false,
+    val outlineWidthDp: Float = 4f,
+    val outlineColorArgb: Int = 0xFF000000.toInt(),
+    val hasDropShadow: Boolean = false,
+    val shadowRadiusDp: Float = 8f,
+    val shadowDxDp: Float = 4f,
+    val shadowDyDp: Float = 4f,
+    val shadowColorArgb: Int = 0x88000000.toInt()
+)
+
+@Serializable
 data class OverlayLayer(
     val id: String = UUID.randomUUID().toString(),
     val name: String = "Layer",
@@ -30,5 +49,6 @@ data class OverlayLayer(
     val isImageLocked: Boolean = false,
     val isVisible: Boolean = true,
     val warpMesh: List<Float>? = null,
-    val isSketch: Boolean = false
+    val isSketch: Boolean = false,
+    val textParams: TextLayerParams? = null
 )

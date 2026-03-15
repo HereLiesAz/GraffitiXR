@@ -26,7 +26,8 @@ fun Layer.toOverlayLayer(): OverlayLayer {
         isImageLocked = isImageLocked,
         isVisible = isVisible,
         warpMesh = warpMesh,
-        isSketch = isSketch
+        isSketch = isSketch,
+        textParams = textParams
     )
 }
 
@@ -51,7 +52,8 @@ fun OverlayLayer.toLayer(): Layer {
         isImageLocked = isImageLocked,
         isVisible = isVisible,
         warpMesh = warpMesh ?: emptyList(),
-        isSketch = isSketch
+        isSketch = isSketch,
+        textParams = textParams
     )
 }
 
