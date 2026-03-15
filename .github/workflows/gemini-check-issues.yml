@@ -20,9 +20,22 @@ jobs:
           fetch-depth: 0
 
       - name: Run Gemini CLI to Check Issues
-        uses: 'google-github-actions/run-gemini-cli@v0'
+        uses: google-github-actions/run-gemini-cli@v0
         with:
-          prompt: "Check the source code against the ${{ github.repository }} repository issues. If any open issue is completed or resolved by the current code, close the issue."
+          prompt: |
+            You are a code review assistant for the ${{ github.repository }} repository.
+
+            Your task is to review open GitHub issues and close any that have been resolved by the current codebase.
+
+            Steps:
+            1. Run `gh issue list --state open --json number,title,body --limit 100` to retrieve all open issues.
+            2. Examine the relevant source files to determine whether each issue has been addressed.
+            3. For any issue that is clearly and fully resolved by the current code, close it:
+               `gh issue close <number> --comment "Automatically closed: resolved in the current codebase as of commit ${{ github.sha }}."`
+            4. Leave unresolved or ambiguous issues open.
+
+            Be conservative — only close an issue when the code unambiguously addresses the reported problem.
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
