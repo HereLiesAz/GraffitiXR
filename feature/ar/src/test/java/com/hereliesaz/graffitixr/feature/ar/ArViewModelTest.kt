@@ -55,6 +55,7 @@ class ArViewModelTest {
         every { settingsRepository.arScanMode } returns flowOf(ArScanMode.CLOUD_POINTS)
         every { settingsRepository.isRightHanded } returns flowOf(true)
         every { settingsRepository.showAnchorBoundary } returns flowOf(false)
+        every { settingsRepository.isImperialUnits } returns flowOf(false)
         every { projectRepository.currentProject } returns MutableStateFlow(null)
         every { context.filesDir } returns File("/tmp")
         viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, context)

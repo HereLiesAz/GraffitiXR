@@ -29,4 +29,9 @@ interface SettingsRepository {
     val showAnchorBoundary: Flow<Boolean>
 
     suspend fun setShowAnchorBoundary(show: Boolean)
+
+    /** Whether distances are displayed in imperial (ft) rather than metric (m/cm). */
+    val isImperialUnits: Flow<Boolean>
+
+    suspend fun setImperialUnits(imperial: Boolean)
 }

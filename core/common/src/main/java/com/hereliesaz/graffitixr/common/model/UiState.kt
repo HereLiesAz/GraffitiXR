@@ -90,7 +90,12 @@ data class ArUiState(
 
     // Erase history — whether undo/redo are available during the REVIEW mark-removal step.
     val canUndoErase: Boolean = false,
-    val canRedoErase: Boolean = false
+    val canRedoErase: Boolean = false,
+
+    // Distance from camera to anchor in metres, or -1f when not in front of camera / not established.
+    val distanceToAnchorMeters: Float = -1f,
+    // Whether to display distances in imperial units (feet) rather than metric.
+    val isImperialUnits: Boolean = false
 )
 
 enum class Tool {

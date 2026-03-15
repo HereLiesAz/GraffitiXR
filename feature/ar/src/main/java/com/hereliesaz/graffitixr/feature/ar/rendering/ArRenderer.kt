@@ -31,7 +31,7 @@ class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
     private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int) -> Unit,
-    private val onTrackingUpdated: (Boolean, Int, Boolean, Float) -> Unit,
+    private val onTrackingUpdated: (Boolean, Int, Boolean, Float, Float) -> Unit,
     private val onLightUpdated: (Float) -> Unit,
     private val onDiag: (String) -> Unit = {}
 ) : GLSurfaceView.Renderer {
@@ -219,13 +219,27 @@ class ArRenderer(
             slamManager.setArCoreTrackingState(isTracking)
 
             val currentScanMode = scanMode
+            val anchorMatrix = slamManager.getAnchorTransform()
+            val distanceMeters = run {
+                if (!anchorEstablished) return@run -1f
+                val camPose = FloatArray(16)
+                android.opengl.Matrix.invertM(camPose, 0, viewMatrix, 0)
+                val dx = anchorMatrix[12] - camPose[12]
+                val dy = anchorMatrix[13] - camPose[13]
+                val dz = anchorMatrix[14] - camPose[14]
+                val len = kotlin.math.sqrt((dx * dx + dy * dy + dz * dz).toDouble()).toFloat()
+                // Only report distance when anchor is in front of the camera
+                val fwdDot = dx * (-viewMatrix[8]) + dy * (-viewMatrix[9]) + dz * (-viewMatrix[10])
+                if (len > 0.01f && fwdDot > 0f) len else -1f
+            }
+
             backgroundScope.launch {
                 val count = if (currentScanMode == ArScanMode.CLOUD_POINTS) {
                     pointCloudRenderer.accumulatedPointCount
                 } else {
                     slamManager.getSplatCount()
                 }
-                onTrackingUpdated(isTracking, count, depthSupported, yawDeg)
+                onTrackingUpdated(isTracking, count, depthSupported, yawDeg, distanceMeters)
             }
 
             if (captureRequested) {
@@ -332,7 +346,6 @@ class ArRenderer(
                 pendingOverlayBitmap?.let { overlayRenderer.updateTexture(it) }
             }
 
-            val anchorMatrix = slamManager.getAnchorTransform()
             overlayRenderer.draw(viewMatrix, projMatrix, anchorMatrix)
 
             if ((showAnchorBoundary || showBorderForConfirmation) && anchorEstablished) {

@@ -63,6 +63,8 @@ fun SettingsScreen(
     onArScanModeChanged: (ArScanMode) -> Unit,
     showAnchorBoundary: Boolean,
     onAnchorBoundaryChanged: (Boolean) -> Unit,
+    isImperialUnits: Boolean,
+    onImperialUnitsChanged: (Boolean) -> Unit,
     onCheckForUpdates: () -> Unit,
     onInstallUpdate: () -> Unit,
     onClose: () -> Unit
@@ -168,6 +170,11 @@ fun SettingsScreen(
                                 label = "Show Anchor Boundary",
                                 value = if (showAnchorBoundary) "On" else "Off",
                                 modifier = Modifier.clickable { onAnchorBoundaryChanged(!showAnchorBoundary) }
+                            )
+                            SettingsItem(
+                                label = "Distance Units",
+                                value = if (isImperialUnits) "Imperial (ft)" else "Metric (m)",
+                                modifier = Modifier.clickable { onImperialUnitsChanged(!isImperialUnits) }
                             )
                         }
 

@@ -107,6 +107,12 @@ class ArViewModel @Inject constructor(
                 renderer?.showAnchorBoundary = show
             }
         }
+
+        viewModelScope.launch {
+            settingsRepository.isImperialUnits.collect { imperial ->
+                _uiState.update { it.copy(isImperialUnits = imperial) }
+            }
+        }
     }
 
     fun setArScanMode(mode: ArScanMode) {
@@ -115,6 +121,10 @@ class ArViewModel @Inject constructor(
 
     fun setShowAnchorBoundary(show: Boolean) {
         viewModelScope.launch { settingsRepository.setShowAnchorBoundary(show) }
+    }
+
+    fun setImperialUnits(imperial: Boolean) {
+        viewModelScope.launch { settingsRepository.setImperialUnits(imperial) }
     }
 
     fun onActivityResumed() {
@@ -409,7 +419,7 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    fun setTrackingState(isTracking: Boolean, splatCount: Int, isDepthApiSupported: Boolean, cameraYaw: Float = 0f) {
+    fun setTrackingState(isTracking: Boolean, splatCount: Int, isDepthApiSupported: Boolean, cameraYaw: Float = 0f, distanceToAnchorMeters: Float = -1f) {
         val progress = if (isTracking) slamManager.getPaintingProgress() else _uiState.value.paintingProgress
 
         val sector = (((cameraYaw % 360f) + 360f) % 360f / 30f).toInt().coerceIn(0, 11)
@@ -436,6 +446,7 @@ class ArViewModel @Inject constructor(
                     scanPhase = newPhase,
                     sectorsCovered = sectorsCovered
                 )
+                ,distanceToAnchorMeters = distanceToAnchorMeters
             )
         }
     }

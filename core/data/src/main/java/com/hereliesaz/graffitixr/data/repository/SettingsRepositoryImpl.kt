@@ -21,6 +21,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val IS_RIGHT_HANDED = booleanPreferencesKey("is_right_handed")
     private val AR_SCAN_MODE = stringPreferencesKey("ar_scan_mode")
     private val SHOW_ANCHOR_BOUNDARY = booleanPreferencesKey("show_anchor_boundary")
+    private val IS_IMPERIAL_UNITS = booleanPreferencesKey("is_imperial_units")
 
     override val isRightHanded: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
@@ -53,6 +54,15 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setShowAnchorBoundary(show: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[SHOW_ANCHOR_BOUNDARY] = show
+        }
+    }
+
+    override val isImperialUnits: Flow<Boolean> = context.dataStore.data
+        .map { preferences -> preferences[IS_IMPERIAL_UNITS] ?: false }
+
+    override suspend fun setImperialUnits(imperial: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[IS_IMPERIAL_UNITS] = imperial
         }
     }
 }

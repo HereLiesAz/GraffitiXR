@@ -5,6 +5,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
@@ -185,6 +186,32 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // If the anchor is lost while confirmation is pending (e.g. project reload),
+                // auto-clear so the hidden rail is never left with no escape path.
+                LaunchedEffect(arUiState.isAnchorEstablished) {
+                    if (!arUiState.isAnchorEstablished && mainViewModel.uiState.value.planeConfirmationPending) {
+                        mainViewModel.confirmPlane()
+                    }
+                }
+
+                // Back-press escape hatches — defined lowest-priority first (Compose uses LIFO).
+                BackHandler(enabled = showLibrary) { showLibrary = false }
+                BackHandler(enabled = showSettings) { showSettings = false }
+                BackHandler(enabled = mainUiState.planeConfirmationPending && !mainUiState.isInPlaneRealignment) {
+                    mainViewModel.confirmPlane()
+                }
+                BackHandler(enabled = mainUiState.isInPlaneRealignment) {
+                    mainViewModel.endPlaneRealignment()
+                }
+                BackHandler(enabled = mainUiState.isCapturingTarget) {
+                    mainViewModel.cancelTapMode()
+                    arViewModel.clearTapHighlights()
+                    arViewModel.restoreSplats()
+                }
+                BackHandler(enabled = mainUiState.isTouchLocked) {
+                    mainViewModel.setTouchLocked(false)
+                }
+
                 val isRailVisible = !editorUiState.hideUiForCapture &&
                         !mainUiState.isTouchLocked &&
                         !mainUiState.isCapturingTarget &&
@@ -360,6 +387,21 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
                                         .padding(top = 16.dp, end = 16.dp)
+                                )
+                            }
+
+                            val distanceM = arUiState.distanceToAnchorMeters
+                            if (editorUiState.editorMode == EditorMode.AR
+                                && arUiState.isAnchorEstablished
+                                && distanceM > 0f
+                                && !showLibrary && !showSettings
+                            ) {
+                                DistanceBadge(
+                                    distanceMeters = distanceM,
+                                    imperial = arUiState.isImperialUnits,
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .padding(top = 16.dp, start = 16.dp)
                                 )
                             }
 
@@ -542,6 +584,8 @@ class MainActivity : ComponentActivity() {
                                     onArScanModeChanged = { arViewModel.setArScanMode(it) },
                                     showAnchorBoundary = arUiState.showAnchorBoundary,
                                     onAnchorBoundaryChanged = { arViewModel.setShowAnchorBoundary(it) },
+                                    isImperialUnits = arUiState.isImperialUnits,
+                                    onImperialUnitsChanged = { arViewModel.setImperialUnits(it) },
                                     onCheckForUpdates = { dashboardViewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
                                     onInstallUpdate = { dashboardViewModel.installUpdate(this@MainActivity) },
                                     onClose = { showSettings = false }
@@ -1114,18 +1158,21 @@ private fun PlaneRealignmentOverlay(
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "Find the Correct Wall",
+                    text = "Re-detect Wall Surface",
                     color = Color.White,
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = "The orange outline shows where AR detected a surface. To realign:\n\n" +
-                        "1. Stand back until you can see the full artwork\n" +
-                        "2. Point the camera at the center of your mural\n" +
-                        "3. Slowly scan side-to-side along the wall surface\n\n" +
-                        "When the orange outline covers your artwork, tap below.",
+                    text = "The anchor is placed from where you stood when you captured. " +
+                        "ARCore picks the tracked vertical surface most directly in front of " +
+                        "that original position.\n\n" +
+                        "1. Return to approximately where you stood during capture\n" +
+                        "2. Slowly pan the camera across your mural wall so ARCore can " +
+                        "register it as a flat surface\n" +
+                        "3. Hold steady facing the artwork, then tap below\n\n" +
+                        "The orange border will jump to the newly detected surface.",
                     color = Color.White.copy(alpha = 0.85f),
                     style = MaterialTheme.typography.bodySmall,
                     textAlign = TextAlign.Start
@@ -1136,7 +1183,7 @@ private fun PlaneRealignmentOverlay(
                         onClick = onTryThisPlane,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
                     ) {
-                        Text("Try This Plane")
+                        Text("Use This Wall")
                     }
                     OutlinedButton(
                         onClick = onCancel,
@@ -1147,6 +1194,32 @@ private fun PlaneRealignmentOverlay(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DistanceBadge(
+    distanceMeters: Float,
+    imperial: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val label = if (imperial) {
+        val feet = distanceMeters * 3.28084f
+        "%.1f ft".format(feet)
+    } else {
+        if (distanceMeters < 1f) "${(distanceMeters * 100).toInt()} cm"
+        else "%.1f m".format(distanceMeters)
+    }
+    Box(
+        modifier = modifier
+            .background(Color(0xCC000000), RoundedCornerShape(20.dp))
+            .padding(horizontal = 14.dp, vertical = 6.dp)
+    ) {
+        Text(
+            text = label,
+            color = Color.White,
+            style = MaterialTheme.typography.labelMedium
+        )
     }
 }
 
