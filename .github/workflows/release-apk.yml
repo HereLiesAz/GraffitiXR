@@ -1,0 +1,49 @@
+name: Compile and Release APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Extract Version
+        id: get_version
+        run: |
+          VERSION_MAJOR=$(grep 'versionMajor' version.properties | cut -d '=' -f2 | tr -d '\r ')
+          VERSION_MINOR=$(grep 'versionMinor' version.properties | cut -d '=' -f2 | tr -d '\r ')
+          echo "VERSION=${VERSION_MAJOR}.${VERSION_MINOR}" >> $GITHUB_ENV
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
+
+      - name: Rename APK
+        run: |
+          mv app/build/outputs/apk/release/app-release-unsigned.apk GraffitiXR-release-v${{ env.VERSION }}.apk
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: Latest Release v${{ env.VERSION }}
+          draft: false
+          prerelease: false
+          files: ./GraffitiXR-release-v${{ env.VERSION }}.apk
