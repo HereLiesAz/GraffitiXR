@@ -793,6 +793,10 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch { setInitialAnchorFromCapture() }
     }
 
+    fun setPlaneConfirmationBorder(show: Boolean) {
+        renderer?.showBorderForConfirmation = show
+    }
+
     override fun onCleared() {
         super.onCleared()
         stopAutoSave()

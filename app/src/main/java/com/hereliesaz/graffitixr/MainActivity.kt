@@ -318,17 +318,33 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
+                            LaunchedEffect(mainUiState.planeConfirmationPending) {
+                                arViewModel.setPlaneConfirmationBorder(mainUiState.planeConfirmationPending)
+                            }
+
                             val showPlaneConfirm = mainUiState.planeConfirmationPending
+                                    && !mainUiState.isInPlaneRealignment
                                     && arUiState.isAnchorEstablished
                                     && editorUiState.editorMode == EditorMode.AR
                                     && !showLibrary && !showSettings
                             if (showPlaneConfirm) {
                                 PlaneConfirmOverlay(
                                     onConfirm = { mainViewModel.confirmPlane() },
-                                    onRedetect = {
-                                        mainViewModel.requestPlaneRedetect()
+                                    onRedetect = { mainViewModel.beginPlaneRealignment() },
+                                    modifier = Modifier.align(Alignment.BottomCenter)
+                                )
+                            }
+
+                            val showRealignment = mainUiState.isInPlaneRealignment
+                                    && editorUiState.editorMode == EditorMode.AR
+                                    && !showLibrary && !showSettings
+                            if (showRealignment) {
+                                PlaneRealignmentOverlay(
+                                    onTryThisPlane = {
                                         arViewModel.retriggerPlaneDetection()
+                                        mainViewModel.endPlaneRealignment()
                                     },
+                                    onCancel = { mainViewModel.endPlaneRealignment() },
                                     modifier = Modifier.align(Alignment.BottomCenter)
                                 )
                             }
@@ -367,8 +383,12 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onRetake = {
                                         mainViewModel.onRetakeCapture()
-                                        arViewModel.restoreSplats()
-                                        arViewModel.requestCapture()
+                                        if (mainUiState.captureOriginatedFromTap) {
+                                            arViewModel.clearTapHighlights()
+                                        } else {
+                                            arViewModel.restoreSplats()
+                                            arViewModel.requestCapture()
+                                        }
                                     },
                                     onCancel = {
                                         mainViewModel.onCancelCaptureClicked()
@@ -1069,6 +1089,60 @@ private fun PlaneConfirmOverlay(
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF8C00))
                     ) {
                         Text("Re-detect")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaneRealignmentOverlay(
+    onTryThisPlane: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.padding(bottom = 96.dp).padding(horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .background(Color(0xEE000000), RoundedCornerShape(16.dp))
+                .border(2.dp, Color(0xFFFF8C00), RoundedCornerShape(16.dp))
+                .padding(20.dp)
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "Find the Correct Wall",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "The orange outline shows where AR detected a surface. To realign:\n\n" +
+                        "1. Stand back until you can see the full artwork\n" +
+                        "2. Point the camera at the center of your mural\n" +
+                        "3. Slowly scan side-to-side along the wall surface\n\n" +
+                        "When the orange outline covers your artwork, tap below.",
+                    color = Color.White.copy(alpha = 0.85f),
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Start
+                )
+                Spacer(Modifier.height(16.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        onClick = onTryThisPlane,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
+                    ) {
+                        Text("Try This Plane")
+                    }
+                    OutlinedButton(
+                        onClick = onCancel,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF8C00))
+                    ) {
+                        Text("Cancel")
                     }
                 }
             }

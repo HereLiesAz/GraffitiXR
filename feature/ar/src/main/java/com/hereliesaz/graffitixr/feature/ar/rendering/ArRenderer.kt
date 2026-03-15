@@ -50,6 +50,7 @@ class ArRenderer(
 
     @Volatile var scanMode: ArScanMode = ArScanMode.CLOUD_POINTS
     @Volatile var showAnchorBoundary: Boolean = false
+    @Volatile var showBorderForConfirmation: Boolean = false
     @Volatile var anchorEstablished: Boolean = false
 
     @Volatile private var isFlashlightRequested: Boolean = false
@@ -334,7 +335,7 @@ class ArRenderer(
             val anchorMatrix = slamManager.getAnchorTransform()
             overlayRenderer.draw(viewMatrix, projMatrix, anchorMatrix)
 
-            if (showAnchorBoundary && anchorEstablished) {
+            if ((showAnchorBoundary || showBorderForConfirmation) && anchorEstablished) {
                 overlayRenderer.drawAnchorBorder(viewMatrix, projMatrix, anchorMatrix)
             }
         }

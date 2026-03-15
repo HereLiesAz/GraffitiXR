@@ -29,7 +29,11 @@ data class MainUiState(
     // Phase 4: True while the user is in "tap your painted marks" mode.
     val isWaitingForTap: Boolean = false,
     // True after target creation until user confirms the overlay is on the right wall.
-    val planeConfirmationPending: Boolean = false
+    val planeConfirmationPending: Boolean = false,
+    // True when the user tapped "Re-detect" and is being walked through realignment.
+    val isInPlaneRealignment: Boolean = false,
+    // True when the current capture was initiated via the tap-to-target path (Phase 4).
+    val captureOriginatedFromTap: Boolean = false
 )
 
 @HiltViewModel
@@ -57,7 +61,8 @@ class MainViewModel @Inject constructor(
                 isCapturingTarget = true,
                 // Phase 4: Skip the auto-capture step — user taps their painted marks instead.
                 captureStep = CaptureStep.NONE,
-                isWaitingForTap = true
+                isWaitingForTap = true,
+                captureOriginatedFromTap = true
             )
         }
     }
@@ -76,7 +81,8 @@ class MainViewModel @Inject constructor(
             it.copy(
                 isCapturingTarget = false,
                 captureStep = CaptureStep.NONE,
-                isWaitingForTap = false
+                isWaitingForTap = false,
+                captureOriginatedFromTap = false
             )
         }
     }
@@ -86,15 +92,25 @@ class MainViewModel @Inject constructor(
     }
 
     fun onRetakeCapture() {
-        _uiState.update { it.copy(captureStep = CaptureStep.CAPTURE) }
+        val fromTap = _uiState.value.captureOriginatedFromTap
+        _uiState.update {
+            it.copy(
+                captureStep = if (fromTap) CaptureStep.NONE else CaptureStep.CAPTURE,
+                isWaitingForTap = fromTap
+            )
+        }
     }
 
     fun confirmPlane() {
-        _uiState.update { it.copy(planeConfirmationPending = false) }
+        _uiState.update { it.copy(planeConfirmationPending = false, isInPlaneRealignment = false) }
     }
 
-    fun requestPlaneRedetect() {
-        // planeConfirmationPending stays true; caller must also invoke arViewModel.retriggerPlaneDetection()
+    fun beginPlaneRealignment() {
+        _uiState.update { it.copy(isInPlaneRealignment = true) }
+    }
+
+    fun endPlaneRealignment() {
+        _uiState.update { it.copy(isInPlaneRealignment = false) }
     }
 
     fun onConfirmTargetCreation(bitmap: Bitmap? = null, selectionMask: Bitmap? = null) {
@@ -163,7 +179,8 @@ class MainViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 isCapturingTarget = false,
-                captureStep = CaptureStep.NONE
+                captureStep = CaptureStep.NONE,
+                captureOriginatedFromTap = false
             )
         }
     }
