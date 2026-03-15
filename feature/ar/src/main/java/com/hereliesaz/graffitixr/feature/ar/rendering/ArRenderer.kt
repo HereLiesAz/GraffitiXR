@@ -109,7 +109,7 @@ class ArRenderer(
 
     fun updateOverlayExtent(halfW: Float, halfH: Float) {
         overlayRenderer.setBorderExtent(halfW, halfH)
-        overlayRenderer.setExtent(OverlayRenderer.QUAD_HALF_EXTENT, OverlayRenderer.QUAD_HALF_EXTENT)
+        overlayRenderer.setExtent(halfW, halfH)
     }
 
     fun updateFlashlight(isOn: Boolean) {
@@ -262,9 +262,10 @@ class ArRenderer(
                             try {
                                 frame.acquireDepthImage16Bits().use { depthImage ->
                                     val plane = depthImage.planes[0]
-                                    depthBuffer = ByteBuffer.allocateDirect(plane.buffer.remaining())
-                                    depthBuffer!!.put(plane.buffer)
-                                    depthBuffer!!.rewind()
+                                    val buf = ByteBuffer.allocateDirect(plane.buffer.remaining())
+                                    buf.put(plane.buffer)
+                                    buf.rewind()
+                                    depthBuffer = buf
                                     depthWidth = depthImage.width
                                     depthHeight = depthImage.height
                                     depthStride = plane.rowStride
@@ -348,7 +349,9 @@ class ArRenderer(
 
             overlayRenderer.draw(viewMatrix, projMatrix, anchorMatrix)
 
-            if ((showAnchorBoundary || showBorderForConfirmation) && anchorEstablished) {
+            val showBorder = anchorEstablished &&
+                (showAnchorBoundary || (showBorderForConfirmation && !overlayRenderer.hasTexture))
+            if (showBorder) {
                 overlayRenderer.drawAnchorBorder(viewMatrix, projMatrix, anchorMatrix)
             }
         }

@@ -34,12 +34,13 @@ class OverlayRenderer(private val context: Context) {
     private var borderVboId = 0
 
     private val textureIds = IntArray(1)
-    private var hasTexture = false
+    var hasTexture = false
+        private set
 
     private var vboId = 0
 
-    @Volatile private var halfW = QUAD_HALF_EXTENT
-    @Volatile private var halfH = QUAD_HALF_EXTENT
+    @Volatile private var halfW = 0.5f
+    @Volatile private var halfH = 0.5f
     @Volatile private var quadDirty = false
 
     // Border is a separate visual indicator — decoupled from the textured quad size.

@@ -41,7 +41,7 @@ class MainViewModel @Inject constructor(
     private val projectRepository: ProjectRepository,
     private val slamManager: SlamManager,
     private val projectManager: ProjectManager,
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MainUiState())

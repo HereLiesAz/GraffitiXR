@@ -32,26 +32,24 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.launch
+import android.content.ClipData
+import android.content.ClipboardManager as AndroidClipboardManager
 import androidx.compose.foundation.border
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalDensity
+import kotlinx.coroutines.launch
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.lifecycleScope
@@ -65,7 +63,6 @@ import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
-import com.hereliesaz.graffitixr.common.model.RotationAxis
 import com.hereliesaz.graffitixr.common.model.Tool
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
@@ -83,7 +80,6 @@ import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationBackground
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
 import com.hereliesaz.graffitixr.feature.ar.rememberCameraController
-import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.feature.dashboard.SaveProjectDialog
@@ -105,7 +101,6 @@ class MainActivity : ComponentActivity() {
 
     private val arViewModel: ArViewModel by viewModels()
 
-    var use3dBackground by mutableStateOf(false)
     var showSaveDialog by mutableStateOf(false)
     var showLibrary by mutableStateOf(true)
     var showSettings by mutableStateOf(false)
@@ -113,7 +108,7 @@ class MainActivity : ComponentActivity() {
     var hasCameraPermission by mutableStateOf(false)
 
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p ->
-        hasCameraPermission = p[android.Manifest.permission.CAMERA] ?: false
+        hasCameraPermission = p[Manifest.permission.CAMERA] ?: false
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -138,8 +133,11 @@ class MainActivity : ComponentActivity() {
             GraffitiXRTheme {
                 val navController = rememberNavController()
 
+                @Suppress("DEPRECATION")
                 val mainViewModel: MainViewModel = hiltViewModel()
+                @Suppress("DEPRECATION")
                 val editorViewModel: EditorViewModel = hiltViewModel()
+                @Suppress("DEPRECATION")
                 val dashboardViewModel: DashboardViewModel = hiltViewModel()
                 val cameraController = rememberCameraController()
 
@@ -181,7 +179,7 @@ class MainActivity : ComponentActivity() {
                             try {
                                 val mode = EditorMode.valueOf(route)
                                 if (editorUiState.editorMode != mode) editorViewModel.setEditorMode(mode)
-                            } catch (e: Exception) { }
+                            } catch (_: Exception) { }
                         }
                     }
                 }
@@ -269,7 +267,7 @@ class MainActivity : ComponentActivity() {
                             slamManager = slamManager,
                             hasCameraPermission = hasCameraPermission,
                             cameraController = cameraController,
-                            onRendererCreated = { renderer -> }
+                            onRendererCreated = { _ -> }
                         )
 
                         if (mainUiState.isCapturingTarget) {
@@ -294,11 +292,9 @@ class MainActivity : ComponentActivity() {
 
                             if (mainUiState.isTouchLocked) {
                                 var showUnlockInstructions by remember(mainUiState.isTouchLocked) { mutableStateOf(true) }
-                                LaunchedEffect(mainUiState.isTouchLocked) {
-                                    if (mainUiState.isTouchLocked) {
-                                        kotlinx.coroutines.delay(3000)
-                                        showUnlockInstructions = false
-                                    }
+                                LaunchedEffect(Unit) {
+                                    kotlinx.coroutines.delay(3000)
+                                    showUnlockInstructions = false
                                 }
                                 TouchLockOverlay(
                                     isLocked = true,
@@ -949,11 +945,11 @@ private fun DiagPopup(
     diagLog: String?,
     modifier: Modifier = Modifier
 ) {
-    var offsetX by remember { mutableStateOf(16f) }
-    var offsetY by remember { mutableStateOf(80f) }
+    var offsetX by remember { mutableFloatStateOf(16f) }
+    var offsetY by remember { mutableFloatStateOf(80f) }
     var visible by remember { mutableStateOf(true) }
     var copied by remember { mutableStateOf(false) }
-    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     if (!visible) return
@@ -971,7 +967,8 @@ private fun DiagPopup(
             .pointerInput(diagLog) {
                 detectTapGestures {
                     val text = diagLog ?: return@detectTapGestures
-                    clipboard.setText(AnnotatedString(text))
+                    val cm = context.getSystemService(AndroidClipboardManager::class.java)
+                    cm.setPrimaryClip(ClipData.newPlainText("diag", text))
                     copied = true
                     scope.launch {
                         kotlinx.coroutines.delay(1500)
@@ -991,10 +988,10 @@ private fun DiagPopup(
             .padding(horizontal = 10.dp, vertical = 8.dp)
             .widthIn(max = 300.dp)
     ) {
-        androidx.compose.foundation.layout.Column(
+        Column(
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            androidx.compose.foundation.layout.Row(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -1031,16 +1028,16 @@ private fun DiagPopup(
 private fun ScanCoachingOverlay(
     splatCount: Int,
     hint: String?,
+    modifier: Modifier = Modifier,
     scanPhase: ScanPhase = ScanPhase.AMBIENT,
     ambientSectorsCovered: Int = 0,
-    modifier: Modifier = Modifier
 ) {
     val phaseLabel = when (scanPhase) {
         ScanPhase.AMBIENT -> "Step 1: Map your surroundings"
         ScanPhase.WALL -> "Step 2: Scan the target wall"
         ScanPhase.COMPLETE -> null
     }
-    androidx.compose.foundation.layout.Column(
+    Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -1058,7 +1055,7 @@ private fun ScanCoachingOverlay(
                 },
                 label = "scan_hint"
             ) { text ->
-                androidx.compose.foundation.layout.Box(
+                Box(
                     modifier = Modifier
                         .background(
                             Color(0xCC000000),
@@ -1076,13 +1073,13 @@ private fun ScanCoachingOverlay(
             }
         }
 
-        androidx.compose.foundation.layout.Box(
+        Box(
             modifier = Modifier
                 .background(Color(0xCC000000), RoundedCornerShape(20.dp))
                 .padding(horizontal = 14.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center
         ) {
-            androidx.compose.foundation.layout.Column(
+            Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
@@ -1094,7 +1091,7 @@ private fun ScanCoachingOverlay(
                         fontWeight = FontWeight.Bold
                     )
                 }
-                androidx.compose.foundation.layout.Row(
+                Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -1268,13 +1265,13 @@ private fun PaintingProgressIndicator(
         pct >= 40 -> Color(0xFFFFCA28)
         else      -> Color(0xFFEF5350)
     }
-    androidx.compose.foundation.layout.Box(
+    Box(
         modifier = modifier
             .background(Color(0xCC000000), RoundedCornerShape(20.dp))
             .padding(horizontal = 14.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
-        androidx.compose.foundation.layout.Row(
+        Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {

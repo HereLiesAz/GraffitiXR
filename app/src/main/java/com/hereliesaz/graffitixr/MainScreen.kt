@@ -178,15 +178,13 @@ fun MainScreen(
                                 context = ctx,
                                 slamManager = slamManager,
                                 onTargetCaptured = { bmp, cw, ch, depth, dw, dh, stride, intr, viewMat, _ ->
-                                    bmp?.let { rawBmp ->
-                                        val correctedRotation = if (rawBmp.width > rawBmp.height) 90 else 0
-                                        arViewModel.onTargetCaptured(
-                                            rawBmp, depth,
-                                            cw, ch,
-                                            dw, dh, stride,
-                                            intr, viewMat, correctedRotation
-                                        )
-                                    }
+                                    val correctedRotation = if (bmp.width > bmp.height) 90 else 0
+                                    arViewModel.onTargetCaptured(
+                                        bmp, depth,
+                                        cw, ch,
+                                        dw, dh, stride,
+                                        intr, viewMat, correctedRotation
+                                    )
                                 },
                                 onTrackingUpdated = { isTracking, splatCount, isDepthSupported, yaw, distanceMeters ->
                                     arViewModel.setTrackingState(isTracking, splatCount, isDepthSupported, yaw, distanceMeters)
