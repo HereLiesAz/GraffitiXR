@@ -52,6 +52,8 @@ class ArRenderer(
     @Volatile var showAnchorBoundary: Boolean = false
     @Volatile var showBorderForConfirmation: Boolean = false
     @Volatile var anchorEstablished: Boolean = false
+    /** When true the SLAM/cloud visualization is suppressed — processing continues but nothing is drawn. */
+    @Volatile var hideVisualization: Boolean = false
 
     @Volatile private var isFlashlightRequested: Boolean = false
 
@@ -346,11 +348,13 @@ class ArRenderer(
                 }
             }
 
-            if (currentScanMode == ArScanMode.CLOUD_POINTS) {
-                planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose)
-                pointCloudRenderer.draw(viewMatrix, projMatrix)
-            } else {
-                slamManager.draw()
+            if (!hideVisualization) {
+                if (currentScanMode == ArScanMode.CLOUD_POINTS) {
+                    planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose)
+                    pointCloudRenderer.draw(viewMatrix, projMatrix)
+                } else {
+                    slamManager.draw()
+                }
             }
 
             if (overlayBitmapDirty) {

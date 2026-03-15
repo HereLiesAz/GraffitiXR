@@ -28,32 +28,56 @@ object ImageProcessor {
                     screenWidth: Int,
                     screenHeight: Int,
                     bitmapWidth: Int,
-                    bitmapHeight: Int
+                    bitmapHeight: Int,
+                    layerScale: Float = 1f,
+                    layerOffset: Offset = Offset.Zero,
+                    layerRotationZ: Float = 0f
                 ): List<Offset> {
+                    val screenCx = screenWidth / 2f
+                    val screenCy = screenHeight / 2f
+
+                    // Precompute inverse rotation (negate the layer's rotationZ).
+                    val angleRad = Math.toRadians(-layerRotationZ.toDouble())
+                    val cosA = Math.cos(angleRad).toFloat()
+                    val sinA = Math.sin(angleRad).toFloat()
+
+                    // ContentScale.Fit: compute how the bitmap is letterboxed into the full screen.
                     val imageAspect = bitmapWidth.toFloat() / bitmapHeight.toFloat()
-                            val screenAspect = screenWidth.toFloat() / screenHeight.toFloat()
-
-                                    var renderWidth = screenWidth.toFloat()
-                                            var renderHeight = screenHeight.toFloat()
-                                                    var offsetX = 0f
-                    var offsetY = 0f
-
+                    val screenAspect = screenWidth.toFloat() / screenHeight.toFloat()
+                    val renderWidth: Float
+                    val renderHeight: Float
                     if (imageAspect > screenAspect) {
-                                    renderHeight = renderWidth / imageAspect
-                                    offsetY = (screenHeight - renderHeight) / 2f
+                        renderWidth = screenWidth.toFloat()
+                        renderHeight = screenWidth / imageAspect
                     } else {
-                                    renderWidth = renderHeight * imageAspect
-                                    offsetX = (screenWidth - renderWidth) / 2f
+                        renderHeight = screenHeight.toFloat()
+                        renderWidth = screenHeight * imageAspect
                     }
-
-                            val scaleX = bitmapWidth / renderWidth
-                    val scaleY = bitmapHeight / renderHeight
+                    val fitOffX = (screenWidth - renderWidth) / 2f
+                    val fitOffY = (screenHeight - renderHeight) / 2f
+                    val fitScaleX = bitmapWidth / renderWidth
+                    val fitScaleY = bitmapHeight / renderHeight
 
                     return stroke.map { pt ->
-                                    Offset(
-                                                        (pt.x - offsetX) * scaleX,
-                                                        (pt.y - offsetY) * scaleY
-                                                    )
+                        // Step 1: Move to pivot-relative coords and undo layer translation.
+                        val dx = pt.x - screenCx - layerOffset.x
+                        val dy = pt.y - screenCy - layerOffset.y
+
+                        // Step 2: Undo layer rotationZ.
+                        val rx = dx * cosA - dy * sinA
+                        val ry = dx * sinA + dy * cosA
+
+                        // Step 3: Undo layer scale.
+                        val ux = rx / layerScale
+                        val uy = ry / layerScale
+
+                        // Step 4: Back to layout space, then undo ContentScale.Fit letterboxing.
+                        val lx = ux + screenCx
+                        val ly = uy + screenCy
+                        Offset(
+                            (lx - fitOffX) * fitScaleX,
+                            (ly - fitOffY) * fitScaleY
+                        )
                     }
         }
 

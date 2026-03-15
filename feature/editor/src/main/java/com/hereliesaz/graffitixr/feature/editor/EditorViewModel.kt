@@ -46,7 +46,10 @@ data class StrokeCommand(
     val brushSize: Float,
     val brushColor: Int,
     val intensity: Float,
-    val feathering: Float = 0f
+    val feathering: Float = 0f,
+    val layerScale: Float = 1f,
+    val layerOffset: Offset = Offset.Zero,
+    val layerRotationZ: Float = 0f
 )
 
 sealed class EditCommand {
@@ -88,6 +91,10 @@ class EditorViewModel @Inject constructor(
     private var strokeLayerId: String? = null
     private var strokeCanvasW: Int = 0
     private var strokeCanvasH: Int = 0
+    // Layer transform snapshot captured at stroke start — held constant for the whole stroke.
+    private var strokeLayerScale: Float = 1f
+    private var strokeLayerOffset: Offset = Offset.Zero
+    private var strokeLayerRotationZ: Float = 0f
 
     init {
         viewModelScope.launch(dispatchers.main) {
@@ -246,7 +253,8 @@ class EditorViewModel @Inject constructor(
 
             for (stroke in strokes) {
                 val mapped = com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor.mapScreenToBitmap(
-                    stroke.path, stroke.canvasSize.width, stroke.canvasSize.height, currentBitmap.width, currentBitmap.height
+                    stroke.path, stroke.canvasSize.width, stroke.canvasSize.height, currentBitmap.width, currentBitmap.height,
+                    stroke.layerScale, stroke.layerOffset, stroke.layerRotationZ
                 )
                 currentBitmap = com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor.applyToolToBitmap(
                     currentBitmap, mapped, stroke.tool, stroke.brushSize, stroke.brushColor, stroke.intensity, true, stroke.feathering
@@ -277,7 +285,8 @@ class EditorViewModel @Inject constructor(
             val mappedStroke = com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor.mapScreenToBitmap(
                 command.path,
                 command.canvasSize.width, command.canvasSize.height,
-                activeBitmap.width, activeBitmap.height
+                activeBitmap.width, activeBitmap.height,
+                command.layerScale, command.layerOffset, command.layerRotationZ
             )
 
             val newBitmap = com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor.applyToolToBitmap(
@@ -416,17 +425,26 @@ class EditorViewModel @Inject constructor(
                 )
             }
 
-            if (currentProject == null) {
-                projectRepository.createProject(projectToSave)
-            } else {
-                projectRepository.updateProject(projectToSave)
-            }
-
             val mapPath = projectManager.getMapPath(context, projectToSave.id)
+            val cloudPointsPath = projectManager.getCloudPointsPath(context, projectToSave.id)
+
+            // Persist SLAM world before writing the manifest so the paths are valid.
             slamManager.saveModel(mapPath)
 
+            // Record the SLAM world paths in the .gxr manifest.
+            val manifestToSave = projectToSave.copy(
+                mapPath = mapPath,
+                cloudPointsPath = cloudPointsPath
+            )
+
+            if (currentProject == null) {
+                projectRepository.createProject(manifestToSave)
+            } else {
+                projectRepository.updateProject(manifestToSave)
+            }
+
             if (name != null) {
-                exportProjectInternal(projectToSave)
+                exportProjectInternal(manifestToSave)
             }
         }
     }
@@ -766,6 +784,9 @@ class EditorViewModel @Inject constructor(
         strokeLayerId = layerId
         strokeCanvasW = canvasSize.width
         strokeCanvasH = canvasSize.height
+        strokeLayerScale = layer.scale
+        strokeLayerOffset = layer.offset
+        strokeLayerRotationZ = layer.rotationZ
 
         if (state.activeTool == Tool.LIQUIFY) return  // Liquify finalizes in onStrokeEnd
 
@@ -781,7 +802,8 @@ class EditorViewModel @Inject constructor(
             val paint = buildStrokePaint(tool, argb, brushSize, feathering)
 
             val mapped = ImageProcessor.mapScreenToBitmap(
-                listOf(startPoint), canvasSize.width, canvasSize.height, workBitmap.width, workBitmap.height
+                listOf(startPoint), canvasSize.width, canvasSize.height, workBitmap.width, workBitmap.height,
+                strokeLayerScale, strokeLayerOffset, strokeLayerRotationZ
             ).first()
             workCanvas.drawPoint(mapped.x, mapped.y, paint)
 
@@ -809,7 +831,8 @@ class EditorViewModel @Inject constructor(
         val workBitmap = strokeWorkingBitmap ?: return
 
         val mapped = ImageProcessor.mapScreenToBitmap(
-            listOf(currentPoint), strokeCanvasW, strokeCanvasH, workBitmap.width, workBitmap.height
+            listOf(currentPoint), strokeCanvasW, strokeCanvasH, workBitmap.width, workBitmap.height,
+            strokeLayerScale, strokeLayerOffset, strokeLayerRotationZ
         ).first()
 
         val seg = Path()
@@ -830,6 +853,10 @@ class EditorViewModel @Inject constructor(
         val canvasW = strokeCanvasW
         val canvasH = strokeCanvasH
 
+        val capturedScale = strokeLayerScale
+        val capturedOffset = strokeLayerOffset
+        val capturedRotationZ = strokeLayerRotationZ
+
         if (state.activeTool == Tool.LIQUIFY || strokeWorkingBitmap == null) {
             // Liquify (or a stroke so fast the background copy hadn't finished):
             // fall back to the full whole-stroke approach.
@@ -841,7 +868,10 @@ class EditorViewModel @Inject constructor(
                 brushSize = state.brushSize,
                 brushColor = state.activeColor.toArgb(),
                 intensity = 0.5f,
-                feathering = state.brushFeathering
+                feathering = state.brushFeathering,
+                layerScale = capturedScale,
+                layerOffset = capturedOffset,
+                layerRotationZ = capturedRotationZ
             )
             processNewStroke(layerId, bitmap, command, layer)
         } else {
@@ -854,7 +884,10 @@ class EditorViewModel @Inject constructor(
                 brushSize = state.brushSize,
                 brushColor = state.activeColor.toArgb(),
                 intensity = 0.5f,
-                feathering = state.brushFeathering
+                feathering = state.brushFeathering,
+                layerScale = capturedScale,
+                layerOffset = capturedOffset,
+                layerRotationZ = capturedRotationZ
             )
 
             // Add stroke to history for undo/redo replay.

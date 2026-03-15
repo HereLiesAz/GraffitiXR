@@ -205,16 +205,34 @@ private fun FeatureSelectionReview(
     // Displayed image size tracked via onSizeChanged so we can map touch → image coords
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .onSizeChanged { boxSize = it }
+    ) {
 
-        // ── Annotated image ──────────────────────────────────────────────────
-        displayBitmap?.let { bmp ->
+        // ── Raw image as base ─────────────────────────────────────────────────
+        rawBitmap?.let { bmp ->
+            Image(
+                bitmap = bmp.asImageBitmap(),
+                contentDescription = "Raw Capture",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
+            )
+        }
+
+        // ── Dark scrim to make feature blobs pop ──────────────────────────────
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.45f))
+        )
+
+        // ── Annotated feature overlay ─────────────────────────────────────────
+        annotatedBitmap?.let { bmp ->
             Image(
                 bitmap = bmp.asImageBitmap(),
                 contentDescription = "Feature Review",
-                modifier = Modifier
-                    .fillMaxSize()
-                    .onSizeChanged { boxSize = it },
+                modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
             )
         }
@@ -252,7 +270,7 @@ private fun FeatureSelectionReview(
             }
 
             // Brush radius in box-pixel space → normalized to image space
-            val brushPx = 40f
+            val brushPx = 80f
             val brushNormalized = brushPx / imgW
 
             Canvas(
@@ -360,7 +378,7 @@ private fun DrawScope.drawStrokes(
         val cy = imgY + s.ny * imgH
         val r  = s.nr * imgW
         drawCircle(
-            color = if (s.isAdd) Color(0x5500CC44) else Color(0x55CC2200),
+            color = if (s.isAdd) Color(0xBB00CC44) else Color(0xBBCC2200),
             radius = r,
             center = Offset(cx, cy)
         )

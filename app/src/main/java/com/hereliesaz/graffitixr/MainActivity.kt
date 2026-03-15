@@ -347,6 +347,12 @@ class MainActivity : ComponentActivity() {
                                 arViewModel.setPlaneConfirmationBorder(mainUiState.planeConfirmationPending)
                             }
 
+                            // Hide SLAM/cloud visualization once the anchor is confirmed —
+                            // processing continues but the point cloud / splats are not drawn.
+                            LaunchedEffect(arUiState.isAnchorEstablished) {
+                                arViewModel.setVisualizationHidden(arUiState.isAnchorEstablished)
+                            }
+
                             LaunchedEffect(arUiState.targetPhysicalExtent) {
                                 arUiState.targetPhysicalExtent?.let { (w, h) ->
                                     editorViewModel.setAnchorExtent(w, h)
