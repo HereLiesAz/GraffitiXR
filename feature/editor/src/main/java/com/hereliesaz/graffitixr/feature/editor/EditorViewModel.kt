@@ -641,24 +641,13 @@ class EditorViewModel @Inject constructor(
     override fun onDismissPanel() { _uiState.update { it.copy(activePanel = EditorPanel.NONE) } }
 
     fun onTransformGesture(pan: Offset, zoom: Float, rotationDelta: Float) {
-        updateActiveLayer { layer ->
-            var rx = layer.rotationX
-            var ry = layer.rotationY
-            var rz = layer.rotationZ
-
-            when (_uiState.value.activeRotationAxis) {
-                RotationAxis.X -> rx += rotationDelta
-                RotationAxis.Y -> ry += rotationDelta
-                RotationAxis.Z -> rz += rotationDelta
-            }
-
-            layer.copy(
-                scale = layer.scale * zoom,
-                offset = layer.offset + pan,
-                rotationX = rx,
-                rotationY = ry,
-                rotationZ = rz
-            )
+        val activeId = _uiState.value.activeLayerId ?: return
+        val axis = _uiState.value.activeRotationAxis
+        updateLinkedGroup(activeId) { layer ->
+            val rx = if (axis == RotationAxis.X) layer.rotationX + rotationDelta else layer.rotationX
+            val ry = if (axis == RotationAxis.Y) layer.rotationY + rotationDelta else layer.rotationY
+            val rz = if (axis == RotationAxis.Z) layer.rotationZ + rotationDelta else layer.rotationZ
+            layer.copy(scale = layer.scale * zoom, offset = layer.offset + pan, rotationX = rx, rotationY = ry, rotationZ = rz)
         }
     }
 
@@ -762,6 +751,26 @@ class EditorViewModel @Inject constructor(
 
     private fun updateActiveLayer(transform: (Layer) -> Layer) {
         _uiState.update { state -> val id = state.activeLayerId ?: return@update state; state.copy(layers = state.layers.map { if (it.id == id) transform(it) else it }) }
+    }
+
+    /** Returns the IDs of all layers in the same link-group as [layerId].
+     *  A group is a contiguous run where each layer above the bottom has isLinked = true. */
+    private fun getLinkedGroupIds(layerId: String): Set<String> {
+        val layers = _uiState.value.layers
+        val idx = layers.indexOfFirst { it.id == layerId }
+        if (idx < 0) return setOf(layerId)
+        // Walk down to find group bottom (first layer in run whose isLinked is false)
+        var bottom = idx
+        while (bottom > 0 && layers[bottom].isLinked) bottom--
+        // Walk up to find group top (last consecutive layer whose next has isLinked = true)
+        var top = idx
+        while (top + 1 < layers.size && layers[top + 1].isLinked) top++
+        return layers.subList(bottom, top + 1).map { it.id }.toSet()
+    }
+
+    private fun updateLinkedGroup(activeId: String, transform: (Layer) -> Layer) {
+        val groupIds = getLinkedGroupIds(activeId)
+        _uiState.update { state -> state.copy(layers = state.layers.map { if (it.id in groupIds) transform(it) else it }) }
     }
 
     override fun onFeedbackShown() { _uiState.update { it.copy(showRotationAxisFeedback = false) } }
@@ -996,6 +1005,44 @@ class EditorViewModel @Inject constructor(
 
     override fun onColorPickerDismissed() {
         _uiState.update { it.copy(showColorPicker = false) }
+    }
+
+    override fun onFlattenAllLayers() {
+        val projectId = _uiState.value.projectId ?: return
+        pushHistory()
+        viewModelScope.launch(dispatchers.default) {
+            val metrics = context.resources.displayMetrics
+            val w = metrics.widthPixels.takeIf { it > 0 } ?: 1080
+            val h = metrics.heightPixels.takeIf { it > 0 } ?: 1920
+            val composite = exportManager.compositeLayers(_uiState.value.layers, w, h)
+
+            val filename = "flattened_${UUID.randomUUID()}.png"
+            val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(composite))
+            val localUri = "file://$path".toUri()
+
+            val flatLayer = Layer(
+                id = UUID.randomUUID().toString(),
+                name = "Flattened",
+                uri = localUri,
+                bitmap = composite
+            )
+
+            withContext(dispatchers.main) {
+                _uiState.value.layers.forEach { baseBitmaps.remove(it.id); layerStrokes.remove(it.id) }
+                baseBitmaps[flatLayer.id] = composite.copy(Bitmap.Config.ARGB_8888, false)
+                layerStrokes[flatLayer.id] = mutableListOf()
+                _uiState.update { it.copy(layers = listOf(flatLayer), activeLayerId = flatLayer.id, activeTool = Tool.NONE) }
+                saveProject()
+            }
+        }
+    }
+
+    override fun onToggleLinkLayer(layerId: String) {
+        pushHistory()
+        _uiState.update { state ->
+            state.copy(layers = state.layers.map { if (it.id == layerId) it.copy(isLinked = !it.isLinked) else it })
+        }
+        saveProject()
     }
 
     fun setLayers(layers: List<Layer>) {

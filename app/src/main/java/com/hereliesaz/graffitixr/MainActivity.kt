@@ -744,7 +744,7 @@ class MainActivity : ComponentActivity() {
                     id = "layer_${layer.id}",
                     hostId = "design_host",
                     text = layer.name,
-                    color = Color.White,
+                    color = if (layer.isLinked) Cyan else Color.White,
                     info = navStrings.layerInfo,
                     nestedRailAlignment = AzNestedRailAlignment.VERTICAL,
                     keepNestedRailOpen = true,
@@ -1024,6 +1024,8 @@ class MainActivity : ComponentActivity() {
                     listItem(text = "Copy Edits") { editorViewModel.copyLayerModifications(layer.id) }
                     listItem(text = "Paste Edits") { editorViewModel.pasteLayerModifications(layer.id) }
                     listItem(text = "Duplicate") { editorViewModel.onLayerDuplicated(layer.id) }
+                    listItem(text = if (layer.isLinked) "Unlink Layer" else "Link Layer") { editorViewModel.onToggleLinkLayer(layer.id) }
+                    listItem(text = "Flatten All") { editorViewModel.onFlattenAllLayers() }
                     listItem(text = "Delete") { editorViewModel.onLayerRemoved(layer.id) }
                 }
             }
