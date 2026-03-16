@@ -20,6 +20,7 @@ fun OnboardingDialog(
         EditorMode.TRACE -> "Trace Mode"
         EditorMode.MOCKUP -> "Mockup Mode"
         EditorMode.OVERLAY -> "Overlay Mode"
+        EditorMode.STENCIL -> "Stencil Mode"
     }
 
     val description = when (mode) {
@@ -27,6 +28,7 @@ fun OnboardingDialog(
         EditorMode.TRACE -> "Project images onto surfaces to trace them in real space."
         EditorMode.MOCKUP -> "Visualize your artwork on 3D surfaces with perspective."
         EditorMode.OVERLAY -> "Compare your progress with a semi-transparent reference."
+        EditorMode.STENCIL -> "Generate printable multi-layer stencils from your artwork."
     }
 
     AlertDialog(
