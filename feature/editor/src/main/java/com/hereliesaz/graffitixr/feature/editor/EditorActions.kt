@@ -69,6 +69,9 @@ interface EditorActions {
     fun adjustColorHSV(lightnessDelta: Float, saturationDelta: Float)
     fun onColorPickerDismissed()
 
+    fun onFlattenAllLayers()
+    fun onToggleLinkLayer(layerId: String)
+
     fun onAddTextLayer()
     fun onTextContentChanged(layerId: String, text: String)
     fun onTextFontChanged(layerId: String, fontName: String)

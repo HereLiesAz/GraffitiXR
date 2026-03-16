@@ -27,7 +27,8 @@ fun Layer.toOverlayLayer(): OverlayLayer {
         isVisible = isVisible,
         warpMesh = warpMesh,
         isSketch = isSketch,
-        textParams = textParams
+        textParams = textParams,
+        isLinked = isLinked
     )
 }
 
@@ -53,7 +54,8 @@ fun OverlayLayer.toLayer(): Layer {
         isVisible = isVisible,
         warpMesh = warpMesh ?: emptyList(),
         isSketch = isSketch,
-        textParams = textParams
+        textParams = textParams,
+        isLinked = isLinked
     )
 }
 
