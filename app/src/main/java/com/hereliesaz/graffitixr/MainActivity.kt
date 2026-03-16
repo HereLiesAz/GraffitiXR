@@ -91,6 +91,7 @@ import com.hereliesaz.graffitixr.feature.dashboard.SaveProjectDialog
 import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
 import com.hereliesaz.graffitixr.feature.editor.EditorUi
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
+import com.hereliesaz.graffitixr.feature.editor.stencil.StencilScreen
 import com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor as EditorImageProcessor
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.AndroidEntryPoint
@@ -299,6 +300,7 @@ class MainActivity : ComponentActivity() {
                                 composable(EditorMode.OVERLAY.name) { EditorOverlay(editorViewModel, mainUiState) }
                                 composable(EditorMode.MOCKUP.name) { EditorOverlay(editorViewModel, mainUiState) }
                                 composable(EditorMode.TRACE.name) { EditorOverlay(editorViewModel, mainUiState) }
+                                composable(EditorMode.STENCIL.name) { StencilScreen() }
                             }
 
                             if (mainUiState.isTouchLocked) {
@@ -675,6 +677,7 @@ class MainActivity : ComponentActivity() {
         azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = Color.White, shape = AzButtonShape.NONE, info = navStrings.overlayInfo)
         azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = Color.White, shape = AzButtonShape.NONE, info = navStrings.mockupInfo)
         azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, route = EditorMode.TRACE.name, color = Color.White, shape = AzButtonShape.NONE, info = navStrings.traceInfo)
+        azRailSubItem(id = "stencil", hostId = "mode_host", text = navStrings.stencil, route = EditorMode.STENCIL.name, color = Color.White, shape = AzButtonShape.NONE, info = navStrings.stencilInfo)
 
         azDivider()
 
