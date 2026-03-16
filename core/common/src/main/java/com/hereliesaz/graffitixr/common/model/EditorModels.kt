@@ -43,7 +43,8 @@ enum class EditorMode {
     TRACE,
     MOCKUP,
     OVERLAY,
-    AR
+    AR,
+    STENCIL
 }
 
 /**
