@@ -1,6 +1,6 @@
 # Stencil Mode — Implementation Plan
 **GraffitiXR v1.21.0**
-**Status:** Pre-implementation — awaiting Phase 0 kickoff
+**Status:** Implemented
 
 ---
 
