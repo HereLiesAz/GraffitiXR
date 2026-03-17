@@ -87,6 +87,7 @@ fun MainScreen(
 
         if (hasCameraPermission && isCameraActive && uiState.editorMode != EditorMode.TRACE) {
             when (uiState.editorMode) {
+                EditorMode.STENCIL -> {}
                 EditorMode.AR -> {
                     var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
 

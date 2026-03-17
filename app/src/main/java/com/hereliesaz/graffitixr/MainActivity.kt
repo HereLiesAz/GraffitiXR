@@ -732,7 +732,7 @@ class MainActivity : ComponentActivity() {
         azRailSubItem(id = "export", hostId = "project_host", text = navStrings.export, color = Color.White, shape = AzButtonShape.NONE, info = navStrings.exportInfo) {
             editorViewModel.exportImage()
         }
-        azHelpRailItem(id = "help_sub", hostId = "project_host", text = navStrings.help, color = Color.White, shape = AzButtonShape.NONE)
+        azHelpRailItem(id = "help_sub", text = navStrings.help, color = Color.White, shape = AzButtonShape.NONE)
         azRailSubItem(id = "settings", hostId = "project_host", text = navStrings.settings, color = Color.White, shape = AzButtonShape.NONE, info = navStrings.settingsInfo) {
             showSettings = true
         }
