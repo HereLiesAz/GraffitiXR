@@ -59,3 +59,7 @@ camera.getViewMatrix/ProjectionMatrix ───────► updateCamera()
 ## Teleological Correction
 
 OpenCV fingerprinting compares the current camera frame against a stored reference fingerprint. On match, `slamManager.updateAnchorTransform()` corrects accumulated drift in the global map transform.
+
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

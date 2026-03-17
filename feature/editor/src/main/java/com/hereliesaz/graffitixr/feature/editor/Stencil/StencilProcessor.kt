@@ -14,6 +14,7 @@ import com.hereliesaz.graffitixr.feature.editor.BackgroundRemover
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import org.opencv.android.Utils
 import org.opencv.core.Mat
@@ -76,37 +77,35 @@ class StencilProcessor @Inject constructor(
         emit(StencilProgress.Stage("Preparing image…", 0.05f))
 
         val result = runCatching {
-            withContext(Dispatchers.Default) {
-                // ── Stage 1: Downsample if needed ──────────────────────────────────────
-                val source = downsample(sourceBitmap)
+            // ── Stage 1: Downsample if needed ──────────────────────────────────────
+            val source = downsample(sourceBitmap)
 
-                // ── Stage 2: Subject segmentation via OpenCV GrabCut ──────────────────
-                emit(StencilProgress.Stage("Segmenting subject…", 0.15f))
-                val segmented = backgroundRemover.removeBackground(source)
-                    .getOrElse { throw IllegalStateException("Subject segmentation failed: ${it.message}") }
+            // ── Stage 2: Subject segmentation via OpenCV GrabCut ──────────────────
+            emit(StencilProgress.Stage("Segmenting subject…", 0.15f))
+            val segmented = backgroundRemover.removeBackground(source)
+                .getOrElse { throw IllegalStateException("Subject segmentation failed: ${it.message}", it) }
 
-                // ── Stage 3: Derive binary subject mask from alpha channel ─────────────
-                emit(StencilProgress.Stage("Building mask…", 0.30f))
-                val subjectMask = alphaToMask(segmented)  // white = subject, black = bg
+            // ── Stage 3: Derive binary subject mask from alpha channel ─────────────
+            emit(StencilProgress.Stage("Building mask…", 0.30f))
+            val subjectMask = alphaToMask(segmented)  // white = subject, black = bg
 
-                // ── Stage 4: Contrast crush for tonal separation ──────────────────────
-                emit(StencilProgress.Stage("Analysing tones…", 0.45f))
-                val contrasted = crushContrast(source)
+            // ── Stage 4: Contrast crush for tonal separation ──────────────────────
+            emit(StencilProgress.Stage("Analysing tones…", 0.45f))
+            val contrasted = crushContrast(source)
 
-                // ── Stage 5: Extract layers ───────────────────────────────────────────
-                emit(StencilProgress.Stage("Extracting layers…", 0.60f))
-                val layers = extractLayers(contrasted, subjectMask, layerCount)
+            // ── Stage 5: Extract layers ───────────────────────────────────────────
+            emit(StencilProgress.Stage("Extracting layers…", 0.60f))
+            val layers = extractLayers(contrasted, subjectMask, layerCount)
 
-                // ── Stage 6: Morphological closing on non-silhouette layers ───────────
-                emit(StencilProgress.Stage("Smoothing edges…", 0.75f))
-                val smoothed = applyMorphClose(layers)
+            // ── Stage 6: Morphological closing on non-silhouette layers ───────────
+            emit(StencilProgress.Stage("Smoothing edges…", 0.75f))
+            val smoothed = applyMorphClose(layers)
 
-                // ── Stage 7: Registration marks on all layers ─────────────────────────
-                emit(StencilProgress.Stage("Adding registration marks…", 0.88f))
-                val marked = injectRegistrationMarks(smoothed, subjectMask)
+            // ── Stage 7: Registration marks on all layers ─────────────────────────
+            emit(StencilProgress.Stage("Adding registration marks…", 0.88f))
+            val marked = injectRegistrationMarks(smoothed, subjectMask)
 
-                marked
-            }
+            marked
         }
 
         result.fold(
@@ -118,7 +117,7 @@ class StencilProcessor @Inject constructor(
                 emit(StencilProgress.Error(e.message ?: "Unknown error in stencil pipeline"))
             }
         )
-    }
+    }.flowOn(Dispatchers.Default)
 
     // ── Stage 1 ───────────────────────────────────────────────────────────────
 

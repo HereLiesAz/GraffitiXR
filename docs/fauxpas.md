@@ -18,3 +18,6 @@
 
 ## 4. Do NOT block the UI Thread
 * Never call `MobileGS::saveModel()` on the Main Thread. It writes megabytes to disk. Use a Coroutine with `Dispatchers.IO`.
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

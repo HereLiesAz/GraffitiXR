@@ -51,3 +51,7 @@ Fix: Ensure cvRotateCode is calculated correctly in ArRenderer.kt using DisplayR
 "App crashes after scanning for 2 minutes"
 LRU pruning is implemented via pruneMap() — automatically evicts the 10% least-confident splats using std::partial_sort when MAX_SPLATS is reached. This prevents OOM crashes on long scans.
 
+
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

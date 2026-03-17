@@ -32,3 +32,7 @@ We welcome pull requests, but this is a specialized tool with strict architectur
 * **Native Tests:** There are currently no unit tests for the C++ layer (it's hard). Test visually on a device with `Debug` build variant enabled to see the "Splat Debug" colors.
 
 
+
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

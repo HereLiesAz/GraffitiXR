@@ -712,3 +712,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 - **Live voxel count HUD** — `nativeGetSplatCount()` JNI — nice-to-have, not blocking
 - **GPS wiring to SLAM** — not needed for core use case
 - **CI build-and-test pipeline** — deferred until the above is stable
+
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

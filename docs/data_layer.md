@@ -99,3 +99,6 @@ Byte Offset,Type,Description
 4,int32,Splat Count (N)
 8,struct,"Splat[0] (Pos {x,y,z}, Color {r,g,b,a})"
 ...,...,Splat[N]
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

@@ -57,3 +57,6 @@ When in **Mockup Mode**, editor layers project onto the 3D scene:
 
 1. **Projection:** User's 2D canvas projected as a decal using projective texture mapping.
 2. **Occlusion:** Real-world geometry depth is derived from the SLAM voxel map rendered via `slamManager.draw()`. Graffiti layers are rendered with depth test enabled so geometry (pillars, edges) correctly occludes the projected image.
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

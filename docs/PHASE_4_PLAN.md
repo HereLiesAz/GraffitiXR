@@ -27,3 +27,6 @@ This document tracks the final technical goals for GraffitiXR v1.0.
 - [x] Verify `INTERNET` permission removal.
 - [x] Implement R8 rules to strip verbose native logs.
 - [x] Enable `Checkstyle` for codebase consistency.
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

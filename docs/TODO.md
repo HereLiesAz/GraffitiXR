@@ -24,6 +24,7 @@
 - [x] **3D Imports:** .glb/.gltf support (Stub improved).
 - [x] **Photogrammetry:** Keyframe capture pipeline fully implemented (OpenCV + Pose metadata).
 - [x] **CI/CD:** Static analysis (Checkstyle) and build hardening.
+- [x] **Stencil Mode:** Automatic multi-layer stencil generation.
 
 ## Production Readiness Refinement `[DONE]`
 - [x] **Thread Safety:** Fixed critical race condition in `MobileGS::uploadSplatData`.
@@ -46,3 +47,7 @@
 - [ ] Community feedback loop.
 - [x] LRU culling in `MobileGS::pruneMap()` to handle `MAX_SPLATS` overflow on long scans.
 - [ ] `nativeGetSplatCount()` JNI function to surface live voxel count in the tracking state HUD.
+
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

@@ -27,6 +27,9 @@ No camera. Background is a user-selected static image (`backgroundBitmap`). Comp
 ### Trace Mode (`EditorMode.TRACE`)
 No camera. Full-screen layer display with touch input locked. Unlock gesture re-enables touch.
 
+### Stencil Mode (`EditorMode.STENCIL`)
+No camera. Multi-layer stencil generation and print pipeline. Previews layers and exports tiled PDFs.
+
 ---
 
 ## 2. Editor Modes (Rail Items)
@@ -39,6 +42,7 @@ The "screens" are logic states navigated via the `AzNavRail`:
 | Overlay | Project image over live camera (no SLAM) |
 | Mockup | Compose on a static reference photo |
 | Trace | Lightbox — image at full brightness for physical tracing |
+| Stencil | Generate and print multi-layer stencils |
 
 ---
 
@@ -57,3 +61,7 @@ Full-screen bottom sheet over the main viewport. Lists saved `.gxr` projects; su
 ## 4. Permission Flow
 
 Camera and location permissions are requested together via `permissionLauncher` in `MainActivity`. `hasCameraPermission` state gates all camera-dependent rendering in `ArViewport`. Without camera permission, both AR and Overlay modes show no background.
+
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

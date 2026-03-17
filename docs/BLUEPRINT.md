@@ -31,3 +31,6 @@ We are building a tool that respects the "flow" of painting. It must be:
 * **No Social:** There is no "Share to Feed." Take a screenshot if you want to share.
 * **No Gamification:** No points, no leaderboards, no avatars.
 ~~~
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

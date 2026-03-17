@@ -65,3 +65,7 @@ This document lists key files in the repository and their purposes.
 *   `testing.md`: Unit test locations, existing test files, mock patterns, field test procedure.
 *   `screens.md`: Mode-based rendering layers, camera ownership per mode, secondary screens.
 *   `TODO.md`: Phase-by-phase progress tracker including completed AR pipeline wiring.
+
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

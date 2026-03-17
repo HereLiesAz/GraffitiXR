@@ -86,3 +86,6 @@ We reject deep nesting. We map modules to flattened packages to minimize path le
 
 ## 3. EXECUTION SCRIPT
 The `refactor.sh` script is the single source of truth for file migration. If it's not in the script, it doesn't move.
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

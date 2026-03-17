@@ -5,15 +5,21 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import com.hereliesaz.graffitixr.common.model.StencilLayer
 import com.hereliesaz.graffitixr.common.model.StencilLayerCount
 import com.hereliesaz.graffitixr.common.model.StencilLayerType
 import com.hereliesaz.graffitixr.feature.editor.BackgroundRemover
 import io.mockk.coEvery
 import io.mockk.mockk
+import io.mockk.spyk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
+import io.mockk.mockkConstructor
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -59,12 +65,78 @@ class StencilProcessorTest {
     @Before
     fun setUp() {
         backgroundRemover = mockk()
-        processor = StencilProcessor(backgroundRemover)
+        processor = spyk(StencilProcessor(backgroundRemover), recordPrivateCalls = true)
+
+        io.mockk.every { processor["crushContrast"](any<Bitmap>()) } answers { arg<Bitmap>(0) }
+        io.mockk.every { processor["applyMorphClose"](any<List<StencilLayer>>()) } answers { arg<List<StencilLayer>>(0) }
+
+        // Mock OpenCV Mat
+        io.mockk.mockkConstructor(org.opencv.core.Mat::class)
+        mockkStatic(org.opencv.core.Mat::class)
+        mockkStatic(org.opencv.android.Utils::class)
+        mockkStatic(org.opencv.imgproc.Imgproc::class)
+        mockkStatic(org.opencv.core.Core::class)
+
+        // Mock Android graphics
+        mockkStatic(Bitmap::class)
+        io.mockk.every { Bitmap.createBitmap(any<Int>(), any<Int>(), any()) } answers {
+            val w = arg<Int>(0)
+            val h = arg<Int>(1)
+            mockk<Bitmap>(relaxed = true).apply {
+                io.mockk.every { width } returns w
+                io.mockk.every { height } returns h
+                io.mockk.every { config } returns Bitmap.Config.ARGB_8888
+                io.mockk.every { getPixel(any(), any()) } returns Color.WHITE
+                io.mockk.every { getPixel(50, 50) } returns Color.BLACK
+                io.mockk.every { getPixel(0, 0) } returns Color.WHITE
+                io.mockk.every { getPixel(10, 10) } returns Color.BLACK
+                io.mockk.every { copy(any(), any()) } returns this
+            }
+        }
+        io.mockk.every { Bitmap.createScaledBitmap(any(), any(), any(), any()) } answers {
+            val src = arg<Bitmap>(0)
+            val w = arg<Int>(1)
+            val h = arg<Int>(2)
+            mockk<Bitmap>(relaxed = true).apply {
+                io.mockk.every { width } returns w
+                io.mockk.every { height } returns h
+                io.mockk.every { config } returns Bitmap.Config.ARGB_8888
+                io.mockk.every { getPixel(any(), any()) } returns Color.WHITE
+                io.mockk.every { getPixel(50, 50) } returns Color.BLACK
+                io.mockk.every { getPixel(0, 0) } returns Color.WHITE
+                io.mockk.every { getPixel(10, 10) } returns Color.BLACK
+                io.mockk.every { copy(any(), any()) } returns this
+            }
+        }
+
+        mockkConstructor(Canvas::class)
+        mockkConstructor(Paint::class)
+
+        mockkStatic(Color::class)
+        io.mockk.every { Color.alpha(any<Int>()) } returns 255
+        io.mockk.every { Color.red(any<Int>()) } returns 255
+        io.mockk.every { Color.green(any<Int>()) } returns 255
+        io.mockk.every { Color.blue(any<Int>()) } returns 255
+        io.mockk.every { Color.rgb(any<Int>(), any<Int>(), any<Int>()) } returns 0
 
         sourceBitmap = makeLuminanceGradient(100, 100)
         segmentedBitmap = makeCircleSubject(100, 100, radius = 40)
 
-        coEvery { backgroundRemover.removeBackground(any()) } returns Result.success(segmentedBitmap)
+        coEvery { backgroundRemover.removeBackground(any<Bitmap>()) } returns Result.success(segmentedBitmap)
+    }
+
+    @After
+    fun tearDown() {
+        unmockkStatic(org.opencv.core.Mat::class)
+        unmockkStatic(org.opencv.android.Utils::class)
+        unmockkStatic(org.opencv.imgproc.Imgproc::class)
+        unmockkStatic(org.opencv.core.Core::class)
+        unmockkStatic(Bitmap::class)
+        unmockkStatic(Color::class)
+        io.mockk.unmockkConstructor(org.opencv.core.Mat::class)
+        io.mockk.unmockkConstructor(Canvas::class)
+        io.mockk.unmockkConstructor(Paint::class)
+        io.mockk.clearAllMocks()
     }
 
     // ── Layer count tests ─────────────────────────────────────────────────────
