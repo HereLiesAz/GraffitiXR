@@ -47,3 +47,7 @@
 - [ ] Community feedback loop.
 - [x] LRU culling in `MobileGS::pruneMap()` to handle `MAX_SPLATS` overflow on long scans.
 - [ ] `nativeGetSplatCount()` JNI function to surface live voxel count in the tracking state HUD.
+
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

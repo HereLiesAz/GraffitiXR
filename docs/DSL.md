@@ -68,3 +68,7 @@ Backgrounds: Use the background(weight) DSL to place full-screen content behind 
 
 ## Custom Components
 We extend the Rail with Content {} blocks to render the Vertical Slider directly inside the flyout. This is crucial for opacity control without leaving the context of the rail.
+
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

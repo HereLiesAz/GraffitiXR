@@ -373,3 +373,6 @@ AzButton(text = "Button", onClick = {}, shape = AzButtonShape.SQUARE)
 AzToggle(isChecked = true, onToggle = {}, toggleOnText = "On", toggleOffText = "Off")
 AzCycler(options = listOf("1", "2"), selectedOption = "1", onCycle = {})
 ```
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

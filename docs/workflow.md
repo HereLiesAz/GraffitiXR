@@ -32,3 +32,7 @@
 ## **4. Local Environment Setup**
 -   **SDK:** Ensure `local.properties` points to your Android SDK.
 -   **Keys:** You need `app/google-services.json`. Use the template `app/google-services.json.template` and fill it with dummy data for local compilation if real keys are not available.
+
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

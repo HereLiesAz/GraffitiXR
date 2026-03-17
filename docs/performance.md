@@ -21,3 +21,6 @@ Gaussian Splatting requires back-to-front sorting for alpha blending.
 ### 4. Thermal Throttling
 ARCore + Camera + OpenGL + CV = Heat.
 * **Mitigation:** If the device gets too hot, we automatically lower the `MAX_SPLATS` limit to reduce GPU load.
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

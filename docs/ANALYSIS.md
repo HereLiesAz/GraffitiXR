@@ -112,3 +112,6 @@
 ## Active Risks
 * `TeleologicalTrackerTest` tests are currently commented out — need re-enabling and fixing.
 * `nativeGetSplatCount()` JNI function not yet implemented — can't surface live voxel count in UI.
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

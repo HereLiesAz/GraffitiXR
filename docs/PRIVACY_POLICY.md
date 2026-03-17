@@ -54,3 +54,7 @@ This policy is effective as of 2024-01-01
 ## Contact Us
 
 If you have any questions or suggestions about our Privacy Policy, do not hesitate to contact us at [Insert Contact Email or GitHub Repository Link].
+
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

@@ -34,3 +34,7 @@ Strictly decoupled multi-module architecture:
 - [Testing Strategy](docs/testing.md)
 - [Screen & Mode Reference](docs/screens.md)
   
+
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

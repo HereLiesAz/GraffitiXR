@@ -69,3 +69,7 @@ Before a release:
 4.  Project an image.
 5.  Walk 5 metres away and return.
 6.  **Pass Condition:** The image is still on the wall within < 1cm of drift.
+
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

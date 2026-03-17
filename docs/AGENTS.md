@@ -30,3 +30,6 @@ All AI agents working on this project must read and understand the project docum
 2.  **No Assumptions:** If documentation is ambiguous, request clarification before proceeding.
 3.  **Module Isolation:** Adhere strictly to the defined module boundaries. Do not introduce cross-module dependencies that violate the architecture (see `REFACTORING_STRATEGY.md`).
 4.  **Atomic Functions:** Adhere to the Single Responsibility Principle. Refactor large functions into smaller, testable units.
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

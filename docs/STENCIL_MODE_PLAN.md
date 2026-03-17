@@ -429,3 +429,7 @@ No new external dependencies required. Everything uses:
 ---
 
 *Plan authored: 2026-03-16. Next step: Phase A.*
+
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

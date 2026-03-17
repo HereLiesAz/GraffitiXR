@@ -61,3 +61,7 @@ Full-screen bottom sheet over the main viewport. Lists saved `.gxr` projects; su
 ## 4. Permission Flow
 
 Camera and location permissions are requested together via `permissionLauncher` in `MainActivity`. `hasCameraPermission` state gates all camera-dependent rendering in `ArViewport`. Without camera permission, both AR and Overlay modes show no background.
+
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

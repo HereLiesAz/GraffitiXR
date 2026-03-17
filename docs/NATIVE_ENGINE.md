@@ -68,3 +68,7 @@ uint16_t raw = depthBuffer[r * width + c]
 uint16_t depthMm = raw & 0x1FFF // 13-bit depth in millimetres
 uint8_t conf = (raw >> 13) & 0x7 // 3-bit confidence (0 = invalid, 7 = high)
 
+
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

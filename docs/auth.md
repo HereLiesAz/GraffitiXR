@@ -12,3 +12,6 @@ The application does not communicate with any backend for authentication.
 ## 3. Local Encryption
 * **Current State:** Project files (`.gxr`) are standard ZIP archives. They are not encrypted.
 * **Future Plan:** If user demand exists, we may implement AES-256 encryption for the `.gxr` files to protect proprietary artwork sketches on shared devices.
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

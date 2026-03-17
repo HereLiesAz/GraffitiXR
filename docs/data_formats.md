@@ -21,3 +21,6 @@ A custom binary format for MobileGS Voxel Hash data. Little Endian.
 *   `float x, y, z` (Position)
 *   `float r, g, b, a` (Color & Opacity)
 *   `float confidence` (Observations)
+
+---
+*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*
