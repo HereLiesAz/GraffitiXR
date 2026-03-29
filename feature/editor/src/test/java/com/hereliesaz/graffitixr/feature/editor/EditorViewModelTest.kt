@@ -111,6 +111,8 @@ class EditorViewModelTest {
     @Test
     fun `initial state is correct`() = runTest {
         val state = viewModel.uiState.value
+        println("Initial state layers: ${state.layers.size}")
+        state.layers.forEach { println("Layer: ${it.name}, textParams: ${it.textParams}") }
         assertEquals(EditorMode.AR, state.editorMode)
         assertTrue(state.layers.isEmpty())
         assertFalse(state.isLoading)
@@ -345,5 +347,36 @@ class EditorViewModelTest {
 
         val restoredScale = viewModel.uiState.value.layers.first().scale
         assertEquals(initialScale, restoredScale, 0.01f)
+    }
+
+    @Test
+    fun `Stencil visibility condition is correct`() = runTest {
+        // 1. Initial empty state -> no stencil content
+        val initialLayers = viewModel.uiState.value.layers
+        println("Initial layers: ${initialLayers.size}")
+        initialLayers.forEach { println("Layer: ${it.name}, isSketch: ${it.isSketch}, textParams: ${it.textParams}") }
+        assertFalse(viewModel.uiState.value.layers.any { it.textParams == null })
+
+        // 2. Add text layer -> still no stencil content
+        viewModel.onAddTextLayer()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.layers.any { it.textParams == null })
+
+        // 3. Add image layer -> stencil content exists
+        val uri = Uri.parse("content://test/image.png")
+        viewModel.onAddLayer(uri)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.layers.any { it.textParams == null })
+
+        // 4. Remove image layer -> back to no stencil content
+        val imageLayerId = viewModel.uiState.value.layers.find { it.textParams == null }!!.id
+        viewModel.onLayerRemoved(imageLayerId)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.layers.any { it.textParams == null })
+        
+        // 5. Add sketch layer -> stencil content exists
+        viewModel.onAddBlankLayer()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.layers.any { it.textParams == null })
     }
 }

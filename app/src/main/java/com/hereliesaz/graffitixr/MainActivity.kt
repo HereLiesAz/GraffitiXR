@@ -2,8 +2,10 @@
 package com.hereliesaz.graffitixr
 
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -199,6 +201,20 @@ class MainActivity : ComponentActivity() {
                                 if (editorUiState.editorMode != mode) editorViewModel.setEditorMode(mode)
                             } catch (_: Exception) { }
                         }
+                    }
+                }
+
+                LaunchedEffect(mainUiState.isTouchLocked) {
+                    if (mainUiState.isTouchLocked) {
+                        val params = window.attributes
+                        params.screenBrightness = 1.0f
+                        window.attributes = params
+                        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    } else {
+                        val params = window.attributes
+                        params.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                        window.attributes = params
+                        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     }
                 }
 
@@ -745,14 +761,14 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             )
-            azRailSubItem(id = "print_pdf", hostId = "print_host", text = "Print PDF", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilExportPdfInfo) {
+            azRailSubItem(id = "print_pdf", hostId = "print_host", text = "PDF", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilExportPdfInfo) {
                 stencilViewModel.exportPdf(context)
             }
             
             azDivider()
             
-            azRailHostItem(id = "export_host", text = "Export", color = Color.White)
-            azRailSubItem(id = "save_pngs", hostId = "export_host", text = "Save PNGs", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilSaveLayersInfo) {
+            azRailHostItem(id = "export_host", text = "export", color = Color.White)
+            azRailSubItem(id = "save_pngs", hostId = "export_host", text = "png", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilSaveLayersInfo) {
                 stencilViewModel.saveLayersToGallery(context)
             }
             azRailSubItem(id = "back_editor", hostId = "export_host", text = "← Editor", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilBackInfo) {
@@ -1144,7 +1160,7 @@ class MainActivity : ComponentActivity() {
             azRailItem(id = "light", text = navStrings.light, color = Color.White, info = navStrings.lightInfo, onClick = { arViewModel.toggleFlashlight() })
         }
 
-        val lockText = if (editorUiState.editorMode == EditorMode.TRACE) "Screen Lock" else "Freeze"
+        val lockText = if (editorUiState.editorMode == EditorMode.TRACE) "Lock" else "Freeze"
         val lockAction: () -> Unit = if (editorUiState.editorMode == EditorMode.TRACE) {
             { mainViewModel.setTouchLocked(true) }
         } else {
