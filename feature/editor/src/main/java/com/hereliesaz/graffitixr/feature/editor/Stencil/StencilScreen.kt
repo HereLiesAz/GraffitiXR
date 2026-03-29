@@ -1,43 +1,53 @@
-// FILE: feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/stencil/StencilScreen.kt
 package com.hereliesaz.graffitixr.feature.editor.stencil
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 
-/**
- * Stencil Mode screen.
- *
- * Phase A: Stub — confirms navigation wiring is correct and the composable destination
- * resolves without crashing. Full UI implemented in Phase C.
- *
- * Architecture:
- *  - Hosted by AzNavHost under EditorMode.STENCIL.name
- *  - Rail items defined in MainActivity alongside the other mode rail sub-items
- *  - StencilViewModel (Phase C) drives all state via StencilUiState
- */
 @Composable
-fun StencilScreen() {
+fun StencilScreen(viewModel: StencilViewModel) {
+    val uiState by viewModel.uiState.collectAsState()
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .background(Color.White),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = "Stencil Mode\n(Phase A stub)",
-            color = Color.White,
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(32.dp),
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
+        if (uiState.isProcessing) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(color = Color.Black)
+                Spacer(Modifier.height(16.dp))
+                Text(uiState.processingStage, color = Color.Black)
+            }
+        } else if (uiState.exportError != null) {
+            Text("Error: ${uiState.exportError}", color = Color.Red)
+        } else if (uiState.stencilLayers.isNotEmpty()) {
+            val activeLayer = uiState.stencilLayers.getOrNull(uiState.activeStencilLayerIndex)
+            if (activeLayer != null) {
+                Image(
+                    bitmap = activeLayer.bitmap.asImageBitmap(),
+                    contentDescription = activeLayer.label,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+                
+                Text(
+                    text = "${activeLayer.label} (${uiState.layerCount.count} Layers) - Pages: ${uiState.totalPageCount}",
+                    color = Color.Black,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(32.dp).background(Color.White.copy(alpha=0.8f)).padding(8.dp)
+                )
+            }
+        } else {
+            Text("No stencil layers generated.", color = Color.Black)
+        }
     }
 }

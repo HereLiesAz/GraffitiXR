@@ -18,8 +18,8 @@ android {
         applicationId = "com.hereliesaz.graffitixr"
         minSdk = 29
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.20"
+        versionCode = 3
+        versionName = "1.21"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

@@ -46,6 +46,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
@@ -145,6 +156,7 @@ class MainActivity : ComponentActivity() {
                 val editorViewModel: EditorViewModel = hiltViewModel()
                 @Suppress("DEPRECATION")
                 val dashboardViewModel: DashboardViewModel = hiltViewModel()
+                val stencilViewModel: com.hereliesaz.graffitixr.feature.editor.stencil.StencilViewModel = hiltViewModel()
                 val cameraController = rememberCameraController()
 
                 val editorUiState by editorViewModel.uiState.collectAsState()
@@ -242,6 +254,7 @@ class MainActivity : ComponentActivity() {
                 var showFontPicker by remember { mutableStateOf(false) }
                 var fontPickerLayerId by remember { mutableStateOf<String?>(null) }
 
+                val context = LocalContext.current
                 AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
 
                     azTheme(
@@ -260,7 +273,7 @@ class MainActivity : ComponentActivity() {
 
                     if (isRailVisible) {
                         configureRailItems(
-                            mainViewModel, editorViewModel, arViewModel, dashboardViewModel,
+                            mainViewModel, editorViewModel, arViewModel, dashboardViewModel, stencilViewModel, context,
                             overlayImagePicker, backgroundImagePicker, editorUiState, arUiState, navStrings,
                             onShowFontPicker = { layerId -> fontPickerLayerId = layerId; showFontPicker = true }
                         )
@@ -300,7 +313,16 @@ class MainActivity : ComponentActivity() {
                                 composable(EditorMode.OVERLAY.name) { EditorOverlay(editorViewModel, mainUiState) }
                                 composable(EditorMode.MOCKUP.name) { EditorOverlay(editorViewModel, mainUiState) }
                                 composable(EditorMode.TRACE.name) { EditorOverlay(editorViewModel, mainUiState) }
-                                composable(EditorMode.STENCIL.name) { StencilScreen() }
+                                composable(EditorMode.STENCIL.name) {
+                                    val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId }
+                                    LaunchedEffect(activeLayer) {
+                                        val bmp = activeLayer?.bitmap
+                                        if (bmp != null) {
+                                            stencilViewModel.initFromLayer(activeLayer!!.id, bmp)
+                                        }
+                                    }
+                                    StencilScreen(stencilViewModel)
+                                }
                             }
 
                             if (mainUiState.isTouchLocked) {
@@ -659,6 +681,8 @@ class MainActivity : ComponentActivity() {
         editorViewModel: EditorViewModel,
         arViewModel: ArViewModel,
         dashboardViewModel: DashboardViewModel,
+        stencilViewModel: com.hereliesaz.graffitixr.feature.editor.stencil.StencilViewModel,
+        context: android.content.Context,
         overlayPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>,
         backgroundPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>,
         editorUiState: EditorUiState,
@@ -670,6 +694,71 @@ class MainActivity : ComponentActivity() {
             permissionLauncher.launch(
                 arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
             )
+        }
+
+        if (editorUiState.editorMode == EditorMode.STENCIL) {
+            azRailHostItem(id = "stencil_host", text = "Stencil", color = Color.White, info = navStrings.stencilInfo)
+            azRailSubItem(id = "layers_toggle", hostId = "stencil_host", text = "Layers", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilLayersInfo) {
+                val current = stencilViewModel.uiState.value.layerCount
+                val next = when (current) {
+                    com.hereliesaz.graffitixr.common.model.StencilLayerCount.ONE -> com.hereliesaz.graffitixr.common.model.StencilLayerCount.TWO
+                    com.hereliesaz.graffitixr.common.model.StencilLayerCount.TWO -> com.hereliesaz.graffitixr.common.model.StencilLayerCount.THREE
+                    com.hereliesaz.graffitixr.common.model.StencilLayerCount.THREE -> com.hereliesaz.graffitixr.common.model.StencilLayerCount.ONE
+                }
+                stencilViewModel.setLayerCount(next)
+            }
+            azRailSubItem(id = "rebuild", hostId = "stencil_host", text = "Rebuild", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilRebuildInfo) {
+                stencilViewModel.rebuild()
+            }
+            azRailSubItem(id = "view_layer", hostId = "stencil_host", text = "View Lyr", color = Color.White, shape = AzButtonShape.RECTANGLE) {
+                val state = stencilViewModel.uiState.value
+                val nextIdx = (state.activeStencilLayerIndex + 1) % state.stencilLayers.size.coerceAtLeast(1)
+                stencilViewModel.setActiveStencilLayer(nextIdx)
+            }
+            
+            azDivider()
+            
+            azRailHostItem(id = "print_host", text = "Print", color = Color.White, info = navStrings.stencilPrintInfo)
+            azRailSubItem(id = "print_dim", hostId = "print_host", text = "W / H", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilPrintDimToggleInfo) {
+                stencilViewModel.togglePrintDimension()
+            }
+            azRailSubItem(
+                id = "print_size",
+                hostId = "print_host",
+                text = "Size",
+                color = Color.White,
+                shape = AzButtonShape.RECTANGLE,
+                info = navStrings.stencilPrintSizeInfo,
+                content = AzComposableContent { isEnabled ->
+                    val state by stencilViewModel.uiState.collectAsState()
+                    Box(
+                        modifier = Modifier.fillMaxSize().pointerInput(isEnabled) {
+                            if (!isEnabled) return@pointerInput
+                            detectDragGestures { change, dragAmount ->
+                                change.consume()
+                                stencilViewModel.setPrintSize(state.printSizeMm - dragAmount.y * 2f)
+                            }
+                        },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("${state.printSizeMm.toInt()}mm", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            )
+            azRailSubItem(id = "print_pdf", hostId = "print_host", text = "Print PDF", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilExportPdfInfo) {
+                stencilViewModel.exportPdf(context)
+            }
+            
+            azDivider()
+            
+            azRailHostItem(id = "export_host", text = "Export", color = Color.White)
+            azRailSubItem(id = "save_pngs", hostId = "export_host", text = "Save PNGs", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilSaveLayersInfo) {
+                stencilViewModel.saveLayersToGallery(context)
+            }
+            azRailSubItem(id = "back_editor", hostId = "export_host", text = "← Editor", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilBackInfo) {
+                editorViewModel.setEditorMode(EditorMode.MOCKUP)
+            }
+            return
         }
 
         azRailHostItem(id = "mode_host", text = navStrings.modes, color = Color.White, info = navStrings.modesInfo)
@@ -797,26 +886,41 @@ class MainActivity : ComponentActivity() {
                                         val sizeDp = with(density) {
                                             liveState.brushSize.coerceIn(1f, itemRadiusPx).toDp()
                                         }
-                                        val feathering = liveState.brushFeathering
-                                        // Solid inner circle = hard core; outer blurred ring = feathering amount
+                                        val checkerModifier = Modifier.drawBehind {
+                                            val squareSize = 6.dp.toPx()
+                                            val cols = (size.width / squareSize).toInt() + 1
+                                            val rows = (size.height / squareSize).toInt() + 1
+                                            for (row in 0 until rows) {
+                                                for (col in 0 until cols) {
+                                                    val isEven = (row + col) % 2 == 0
+                                                    drawRect(
+                                                        color = if (isEven) Color.LightGray else Color.Gray,
+                                                        topLeft = Offset(col * squareSize, row * squareSize),
+                                                        size = Size(squareSize, squareSize)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        // Solid inner circle = hard core; outer ring (darker) = feathering amount
                                         Box(contentAlignment = Alignment.Center) {
-                                            if (feathering > 0.05f) {
+                                            if (liveState.brushFeathering > 0.05f) {
                                                 Box(
                                                     modifier = Modifier
                                                         .size(sizeDp)
-                                                        .background(
-                                                            NeonGreen.copy(alpha = 0.3f),
-                                                            CircleShape
-                                                        )
+                                                        .clip(CircleShape)
+                                                        .then(checkerModifier)
+                                                        .background(Color.Black.copy(alpha = 0.5f))
                                                 )
                                             }
                                             val hardCoreDp = with(density) {
-                                                (liveState.brushSize * (1f - feathering * 0.7f)).coerceIn(2f, itemRadiusPx).toDp()
+                                                (liveState.brushSize * (1f - liveState.brushFeathering * 0.7f)).coerceIn(2f, itemRadiusPx).toDp()
                                             }
                                             Box(
                                                 modifier = Modifier
                                                     .size(hardCoreDp)
-                                                    .background(NeonGreen, CircleShape)
+                                                    .clip(CircleShape)
+                                                    .then(checkerModifier)
                                             )
                                         }
                                     }
@@ -1040,7 +1144,13 @@ class MainActivity : ComponentActivity() {
             azRailItem(id = "light", text = navStrings.light, color = Color.White, info = navStrings.lightInfo, onClick = { arViewModel.toggleFlashlight() })
         }
 
-        azRailItem(id = "lock_trace", text = navStrings.lock, color = Color.White, info = navStrings.lockInfo, onClick = { mainViewModel.setTouchLocked(true) })
+        val lockText = if (editorUiState.editorMode == EditorMode.TRACE) "Screen Lock" else "Freeze"
+        val lockAction: () -> Unit = if (editorUiState.editorMode == EditorMode.TRACE) {
+            { mainViewModel.setTouchLocked(true) }
+        } else {
+            { editorViewModel.toggleImageLock() } 
+        }
+        azRailItem(id = "lock_trace", text = lockText, color = Color.White, info = navStrings.lockInfo, onClick = lockAction)
 
     }
 }
