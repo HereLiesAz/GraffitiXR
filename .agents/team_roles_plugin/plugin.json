@@ -1,5 +1,5 @@
 {
-  "name": "GraffitiXR Agent Team",
-  "description": "Specialized agent capabilities and personas mapped from role_prompts.json",
-  "version": "1.0.0"
+  "name": "General Developer Team",
+  "description": "Multi-Session Agent Team with 15 specialized personas. Designed for Orchestrator delegation.",
+  "version": "1.2.0"
 }

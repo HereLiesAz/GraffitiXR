@@ -1,11 +1,16 @@
 import os
 import json
+import re
+import shutil
 
 base_dir = r"g:\My Drive\GraffitiXR\.agents\team_roles_plugin"
-skills_dir = os.path.join(base_dir, "skills")
 agents_dir = os.path.join(base_dir, "agents")
+skills_dir = os.path.join(base_dir, "skills")
 
-os.makedirs(skills_dir, exist_ok=True)
+# Clean up old skills directory if it exists
+if os.path.exists(skills_dir):
+    shutil.rmtree(skills_dir)
+
 os.makedirs(agents_dir, exist_ok=True)
 
 with open(r"g:\My Drive\GraffitiXR\role_prompts.json", "r", encoding="utf-8") as f:
@@ -14,8 +19,8 @@ with open(r"g:\My Drive\GraffitiXR\role_prompts.json", "r", encoding="utf-8") as
 # Splitting the two concatenated JSON objects
 parts = text.split('}\n\n{')
 if len(parts) == 2:
-    json1 = json.loads(parts[0] + '}')
-    json2 = json.loads('{' + parts[1])
+    json_meta = json.loads(parts[0] + '}')
+    json_prompts = json.loads('{' + parts[1])
 else:
     print("Could not split json nicely. Aborting.")
     exit(1)
@@ -23,57 +28,59 @@ else:
 # Write plugin.json
 with open(os.path.join(base_dir, "plugin.json"), "w", encoding="utf-8") as f:
     json.dump({
-        "name": "GraffitiXR Agent Team",
-        "description": "Specialized agent capabilities and personas mapped from role_prompts.json",
-        "version": "1.0.0"
+        "name": "General Developer Team",
+        "description": "Multi-Session Agent Team with 15 specialized personas. Designed for Orchestrator delegation.",
+        "version": "1.2.0"
     }, f, indent=2)
 
-# Write agents/README.md
-with open(os.path.join(agents_dir, "README.md"), "w", encoding="utf-8") as f:
-    f.write("# Agents Directory\nThis directory holds configured subagents for the GraffitiXR Team plugin.\n")
+# Global header string
+session_header = json_prompts.get("MULTI_AGENT_SESSION_HEADER", "")
 
-# Process keys
-seen_folders = set()
-for key, prompt in json2.items():
-    # Attempt to find corresponding metadata in json1
-    # Fallbacks for naming mismatch (geminiService vs julesService)
-    meta_key = key
-    if key == "geminiService.summarizeSession" and "julesService.summarizeSession" in json1:
-        meta_key = "julesService.summarizeSession"
+def slugify(text):
+    return re.sub(r'[^a-zA-Z0-9_]+', '_', text).lower()
+
+# Process each role
+processed_count = 0
+for key, prompt in json_prompts.items():
+    if key == "MULTI_AGENT_SESSION_HEADER":
+        continue
         
-    meta = json1.get(meta_key, {})
+    meta = json_meta.get(key, {})
     
     # Extract metadata fields
-    desc = meta.get("goal", f"Execute the {key} prompt functionality")
-    role = meta.get("role", "")
+    desc = meta.get("goal", f"Execute the {key} functionality")
+    role_name = meta.get("role", key)
     guidelines = meta.get("guidelines", [])
     out_fmt = meta.get("output_format", "")
     
-    # Create folder for the skill
-    folder_name = key.replace(".", "_")
-    skill_path = os.path.join(skills_dir, folder_name)
-    os.makedirs(skill_path, exist_ok=True)
+    # Create folder for the agent session
+    folder_name = slugify(key)
+    agent_path = os.path.join(agents_dir, folder_name)
+    os.makedirs(agent_path, exist_ok=True)
     
-    # Build SKILL.md content
-    md_content = f"---\nname: {key}\ndescription: {desc}\n---\n\n"
+    # Resolve the prompt (replace header placeholder)
+    final_prompt = prompt.replace("{{MULTI_AGENT_SESSION_HEADER}}", session_header)
     
-    if role:
-        md_content += f"## Role\n{role}\n\n"
+    # Build prompt.md content
+    md_content = f"---\nname: {key}\nrole: {role_name}\ndescription: {desc}\n---\n\n"
+    md_content += f"# System Prompt: {role_name}\n\n"
+    
     if guidelines:
         md_content += "## Guidelines\n"
-        for idx, gl in enumerate(guidelines):
-            md_content += f"{idx + 1}. {gl}\n"
+        for gl in guidelines:
+            md_content += f"- {gl}\n"
         md_content += "\n"
-    if out_fmt:
-        md_content += f"## Required Output Format\n{out_fmt}\n\n"
         
-    md_content += f"## Prompt / Instructions\n```\n{prompt}\n```\n"
+    if out_fmt:
+        md_content += f"## Required Output Format\n> {out_fmt}\n\n"
+        
+    md_content += f"## Core Instructions\n\n{final_prompt}\n"
 
-    # Write SKILL.md
-    with open(os.path.join(skill_path, "SKILL.md"), "w", encoding="utf-8") as f:
+    # Write prompt.md
+    with open(os.path.join(agent_path, "prompt.md"), "w", encoding="utf-8") as f:
         f.write(md_content)
         
-    seen_folders.add(folder_name)
+    processed_count += 1
 
-print(f"Plugin generated successfully in {base_dir}")
-print(f"Total skills populated: {len(seen_folders)}")
+print(f"Plugin 'General Developer Team' V1.2.0 generated successfully in {base_dir}")
+print(f"Total agents created: {processed_count}")
