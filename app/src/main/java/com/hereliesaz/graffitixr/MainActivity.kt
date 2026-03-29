@@ -46,6 +46,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
@@ -243,6 +254,7 @@ class MainActivity : ComponentActivity() {
                 var showFontPicker by remember { mutableStateOf(false) }
                 var fontPickerLayerId by remember { mutableStateOf<String?>(null) }
 
+                val context = LocalContext.current
                 AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
 
                     azTheme(
@@ -258,8 +270,6 @@ class MainActivity : ComponentActivity() {
                         helpEnabled = showHelp,
                         onDismissHelp = { showHelp = false }
                     )
-
-                    val context = LocalContext.current
 
                     if (isRailVisible) {
                         configureRailItems(
@@ -306,8 +316,9 @@ class MainActivity : ComponentActivity() {
                                 composable(EditorMode.STENCIL.name) {
                                     val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId }
                                     LaunchedEffect(activeLayer) {
-                                        if (activeLayer?.bitmap != null) {
-                                            stencilViewModel.initFromLayer(activeLayer.id, activeLayer.bitmap)
+                                        val bmp = activeLayer?.bitmap
+                                        if (bmp != null) {
+                                            stencilViewModel.initFromLayer(activeLayer!!.id, bmp)
                                         }
                                     }
                                     StencilScreen(stencilViewModel)
@@ -875,7 +886,7 @@ class MainActivity : ComponentActivity() {
                                         val sizeDp = with(density) {
                                             liveState.brushSize.coerceIn(1f, itemRadiusPx).toDp()
                                         }
-                                        val checkerModifier = androidx.compose.ui.draw.drawBehind {
+                                        val checkerModifier = Modifier.drawBehind {
                                             val squareSize = 6.dp.toPx()
                                             val cols = (size.width / squareSize).toInt() + 1
                                             val rows = (size.height / squareSize).toInt() + 1
@@ -884,8 +895,8 @@ class MainActivity : ComponentActivity() {
                                                     val isEven = (row + col) % 2 == 0
                                                     drawRect(
                                                         color = if (isEven) Color.LightGray else Color.Gray,
-                                                        topLeft = androidx.compose.ui.geometry.Offset(col * squareSize, row * squareSize),
-                                                        size = androidx.compose.ui.geometry.Size(squareSize, squareSize)
+                                                        topLeft = Offset(col * squareSize, row * squareSize),
+                                                        size = Size(squareSize, squareSize)
                                                     )
                                                 }
                                             }
@@ -893,22 +904,22 @@ class MainActivity : ComponentActivity() {
 
                                         // Solid inner circle = hard core; outer ring (darker) = feathering amount
                                         Box(contentAlignment = Alignment.Center) {
-                                            if (feathering > 0.05f) {
+                                            if (liveState.brushFeathering > 0.05f) {
                                                 Box(
                                                     modifier = Modifier
                                                         .size(sizeDp)
-                                                        .androidx.compose.ui.draw.clip(CircleShape)
+                                                        .clip(CircleShape)
                                                         .then(checkerModifier)
                                                         .background(Color.Black.copy(alpha = 0.5f))
                                                 )
                                             }
                                             val hardCoreDp = with(density) {
-                                                (liveState.brushSize * (1f - feathering * 0.7f)).coerceIn(2f, itemRadiusPx).toDp()
+                                                (liveState.brushSize * (1f - liveState.brushFeathering * 0.7f)).coerceIn(2f, itemRadiusPx).toDp()
                                             }
                                             Box(
                                                 modifier = Modifier
                                                     .size(hardCoreDp)
-                                                    .androidx.compose.ui.draw.clip(CircleShape)
+                                                    .clip(CircleShape)
                                                     .then(checkerModifier)
                                             )
                                         }

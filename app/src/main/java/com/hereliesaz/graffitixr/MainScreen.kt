@@ -208,14 +208,7 @@ fun MainScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(
-                        uiState.activeLayerId,
-                        isImageLocked,
-                        uiState.activeTool,
-                        isTouchLocked,
-                        isWaitingForTap,
-                        "tap"
-                    ) {
+                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool) {
                         if (isWaitingForTap) {
                             detectTapGestures { offset ->
                                 val nx = offset.x / size.width
@@ -228,25 +221,16 @@ fun MainScreen(
                             }
                         }
                     }
-                    .pointerInput(
-                        uiState.activeLayerId,
-                        isImageLocked,
-                        uiState.activeTool,
-                        isTouchLocked,
-                        isWaitingForTap,
-                        "transform"
-                    ) {
+                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool) {
                         if (!isTouchLocked && !isImageLocked && activeLayer != null && !isWaitingForTap) {
                             if (uiState.activeTool == Tool.NONE) {
-                                coroutineScope {
-                                    detectTransformGestures { _, pan, zoom, rotation ->
-                                        editorViewModel.onTransformGesture(pan, zoom, rotation)
-                                    }
+                                detectTransformGestures { _, pan, zoom, rotation ->
+                                    editorViewModel.onTransformGesture(pan, zoom, rotation)
                                 }
                             }
                         }
                     }
-            }
+            ) {}
         }
 
         if (uiState.editorMode != EditorMode.AR) {
