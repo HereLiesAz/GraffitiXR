@@ -246,55 +246,55 @@ fun MainScreen(
                             }
                         }
                     }
-            ) {
-                if (uiState.editorMode != EditorMode.AR) {
-                    uiState.layers.filter { it.isVisible }.forEach { layer ->
-                        // During an active stroke the working bitmap is tracked separately so
-                        // Compose can re-render it every time a new segment is drawn.
-                        val isLive = layer.id == uiState.liveStrokeLayerId
-                        val bmp = if (isLive) uiState.liveStrokeBitmap ?: layer.bitmap else layer.bitmap
-                        bmp?.let { displayBmp ->
-                            // For the live layer, re-wrap on every version tick so Compose sees a
-                            // new ImageBitmap reference and re-reads the modified pixel data.
-                            val imageBitmap = if (isLive) {
-                                val version = uiState.liveStrokeVersion
-                                remember(version) { displayBmp.asImageBitmap() }
-                            } else {
-                                remember(displayBmp) { displayBmp.asImageBitmap() }
-                            }
-                            Image(
-                                bitmap = imageBitmap,
-                                contentDescription = null,
-                                colorFilter = ColorFilter.colorMatrix(
-                                    createColorMatrix(
-                                        saturation = layer.saturation,
-                                        contrast = layer.contrast,
-                                        brightness = layer.brightness,
-                                        colorBalanceR = layer.colorBalanceR,
-                                        colorBalanceG = layer.colorBalanceG,
-                                        colorBalanceB = layer.colorBalanceB
-                                    )
-                                ),
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .graphicsLayer {
-                                        translationX = layer.offset.x
-                                        translationY = layer.offset.y
-                                        scaleX = layer.scale
-                                        scaleY = layer.scale
-                                        rotationX = layer.rotationX
-                                        rotationY = layer.rotationY
-                                        rotationZ = layer.rotationZ
-                                        alpha = layer.opacity
-                                        transformOrigin = TransformOrigin.Center
-                                        blendMode = layer.blendMode
-                                        compositingStrategy =
-                                            androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-                                    },
-                                contentScale = ContentScale.Fit
-                            )
-                        }
+            }
+        }
+
+        if (uiState.editorMode != EditorMode.AR) {
+            uiState.layers.filter { it.isVisible }.forEach { layer ->
+                // During an active stroke the working bitmap is tracked separately so
+                // Compose can re-render it every time a new segment is drawn.
+                val isLive = layer.id == uiState.liveStrokeLayerId
+                val bmp = if (isLive) uiState.liveStrokeBitmap ?: layer.bitmap else layer.bitmap
+                bmp?.let { displayBmp ->
+                    // For the live layer, re-wrap on every version tick so Compose sees a
+                    // new ImageBitmap reference and re-reads the modified pixel data.
+                    val imageBitmap = if (isLive) {
+                        val version = uiState.liveStrokeVersion
+                        remember(version) { displayBmp.asImageBitmap() }
+                    } else {
+                        remember(displayBmp) { displayBmp.asImageBitmap() }
                     }
+                    Image(
+                        bitmap = imageBitmap,
+                        contentDescription = null,
+                        colorFilter = ColorFilter.colorMatrix(
+                            createColorMatrix(
+                                saturation = layer.saturation,
+                                contrast = layer.contrast,
+                                brightness = layer.brightness,
+                                colorBalanceR = layer.colorBalanceR,
+                                colorBalanceG = layer.colorBalanceG,
+                                colorBalanceB = layer.colorBalanceB
+                            )
+                        ),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                translationX = layer.offset.x
+                                translationY = layer.offset.y
+                                scaleX = layer.scale
+                                scaleY = layer.scale
+                                rotationX = layer.rotationX
+                                rotationY = layer.rotationY
+                                rotationZ = layer.rotationZ
+                                alpha = layer.opacity
+                                transformOrigin = TransformOrigin.Center
+                                blendMode = layer.blendMode
+                                compositingStrategy =
+                                    androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                            },
+                        contentScale = ContentScale.Fit
+                    )
                 }
             }
         }
