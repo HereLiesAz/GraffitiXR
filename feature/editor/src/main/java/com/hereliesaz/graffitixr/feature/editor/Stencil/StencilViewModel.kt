@@ -5,10 +5,15 @@ import android.content.Context
 import android.graphics.Bitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.StencilLayerCount
 import com.hereliesaz.graffitixr.common.model.StencilPrintDimension
 import com.hereliesaz.graffitixr.common.model.StencilUiState
+import com.hereliesaz.graffitixr.common.model.StencilWizardStep
+import com.hereliesaz.graffitixr.common.util.ImageUtils
+import com.hereliesaz.graffitixr.feature.editor.SubjectIsolator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,22 +28,22 @@ import javax.inject.Inject
  * Orchestrates the [StencilProcessor] pipeline and [StencilPrintEngine] PDF output.
  * All heavy work runs on Dispatchers.Default via the processor's Flow.
  *
- * Phase B: Pipeline + state wiring.
- * Phase C: UI integration (StencilScreen composable observes this).
- * Phase D: StencilPrintEngine wired to exportPdf / saveLayersToGallery.
+ * Implements a guided 6-step wizard:
+ *   PICK_SOURCE → ISOLATE → CHOOSE_LAYERS → GENERATE → PREVIEW → PRINT_EXPORT
  */
 @HiltViewModel
 class StencilViewModel @Inject constructor(
     private val stencilProcessor: StencilProcessor,
-    private val printEngine: StencilPrintEngine
+    private val printEngine: StencilPrintEngine,
+    private val subjectIsolator: SubjectIsolator,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(StencilUiState())
     val uiState: StateFlow<StencilUiState> = _uiState.asStateFlow()
 
-    /** Retains the source bitmap so Rebuild can re-run without re-receiving it. */
-    private var sourceBitmap: Bitmap? = null
-    private var sourceLayerId: String? = null
+    /** Stores eligible layers for the wizard source picker. */
+    private var availableLayers: List<Layer> = emptyList()
 
     /** Cancellable pipeline job — cancel before starting a new run. */
     private var processingJob: Job? = null
@@ -46,31 +51,140 @@ class StencilViewModel @Inject constructor(
     // ── Entry point ───────────────────────────────────────────────────────────
 
     /**
-     * Called when the user enters Stencil Mode with an active layer.
-     * Stores the source and immediately kicks off the pipeline.
+     * Called when the user enters Stencil Mode.
+     * Filters to eligible layers (non-text, non-sketch, has URI) and auto-advances
+     * to ISOLATE if only one eligible layer exists.
      */
-    fun initFromLayer(layerId: String, bitmap: Bitmap) {
-        if (sourceLayerId == layerId && _uiState.value.stencilLayers.isNotEmpty()) {
-            // Same layer, layers already generated — nothing to do.
-            return
+    fun initForWizard(layers: List<Layer>) {
+        val eligible = layers.filter { it.textParams == null && !it.isSketch && it.uri != null }
+        availableLayers = eligible
+
+        if (eligible.size == 1) {
+            // Auto-advance: only one eligible layer
+            _uiState.update {
+                it.copy(
+                    sourceLayerId = eligible[0].id,
+                    wizardStep = StencilWizardStep.ISOLATE
+                )
+            }
+        } else {
+            _uiState.update { it.copy(wizardStep = StencilWizardStep.PICK_SOURCE) }
         }
-        sourceLayerId = layerId
-        sourceBitmap = bitmap
-        _uiState.update { it.copy(sourceLayerId = layerId) }
+    }
+
+    // ── Wizard step actions ───────────────────────────────────────────────────
+
+    fun onSourceLayerPicked(layerId: String) {
+        _uiState.update {
+            it.copy(
+                sourceLayerId = layerId,
+                wizardStep = StencilWizardStep.ISOLATE
+            )
+        }
+    }
+
+    fun onIsolateRequested() {
+        val layerId = _uiState.value.sourceLayerId ?: return
+        val layer = availableLayers.find { it.id == layerId } ?: return
+        val uri = layer.uri ?: return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isProcessing = true, processingStage = "Isolating subject…") }
+            val bitmap = ImageUtils.loadBitmapAsync(context, uri)
+            if (bitmap == null) {
+                _uiState.update {
+                    it.copy(isProcessing = false, exportError = "Could not load source image")
+                }
+                return@launch
+            }
+            subjectIsolator.isolate(bitmap).fold(
+                onSuccess = { isolated ->
+                    _uiState.update {
+                        it.copy(
+                            isProcessing = false,
+                            processingStage = "",
+                            isolatedBitmap = isolated
+                        )
+                    }
+                },
+                onFailure = { e ->
+                    _uiState.update {
+                        it.copy(
+                            isProcessing = false,
+                            exportError = e.message ?: "Isolation failed"
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun onIsolateConfirmed() {
+        if (_uiState.value.isolatedBitmap == null) return
+        _uiState.update { it.copy(wizardStep = StencilWizardStep.CHOOSE_LAYERS) }
+    }
+
+    fun onIsolateRedo() {
+        _uiState.update { it.copy(isolatedBitmap = null) }
+        onIsolateRequested()
+    }
+
+    fun onLayerCountChosen(count: StencilLayerCount) {
+        _uiState.update {
+            it.copy(
+                layerCount = count,
+                wizardStep = StencilWizardStep.GENERATE
+            )
+        }
         runPipeline()
     }
 
-    // ── User actions ──────────────────────────────────────────────────────────
+    fun onRebuild() {
+        _uiState.update {
+            it.copy(
+                stencilLayers = emptyList(),
+                wizardStep = StencilWizardStep.CHOOSE_LAYERS
+            )
+        }
+        processingJob?.cancel()
+    }
 
+    fun onBack() {
+        val current = _uiState.value.wizardStep
+        val previous = when (current) {
+            StencilWizardStep.ISOLATE -> StencilWizardStep.PICK_SOURCE
+            StencilWizardStep.CHOOSE_LAYERS -> StencilWizardStep.ISOLATE
+            StencilWizardStep.GENERATE -> StencilWizardStep.CHOOSE_LAYERS
+            StencilWizardStep.PREVIEW -> StencilWizardStep.CHOOSE_LAYERS
+            StencilWizardStep.PRINT_EXPORT -> StencilWizardStep.PREVIEW
+            else -> return  // PICK_SOURCE has no back
+        }
+        processingJob?.cancel()
+        _uiState.update { it.copy(wizardStep = previous) }
+    }
+
+    fun onProceedToPrint() {
+        _uiState.update { it.copy(wizardStep = StencilWizardStep.PRINT_EXPORT) }
+    }
+
+    // ── Deprecated stubs — kept for MainActivity compilation until Step 7 ────
+
+    @Deprecated("Replaced by initForWizard(layers). Kept for Step 7 migration.")
+    fun initFromLayer(layerId: String, bitmap: Bitmap) {
+        // No-op: Step 7 will replace this call site with initForWizard()
+    }
+
+    @Deprecated("Replaced by onLayerCountChosen(count). Kept for Step 7 migration.")
     fun setLayerCount(count: StencilLayerCount) {
-        if (_uiState.value.layerCount == count) return
-        _uiState.update { it.copy(layerCount = count) }
-        runPipeline()
+        onLayerCountChosen(count)
     }
 
+    @Deprecated("Replaced by onRebuild(). Kept for Step 7 migration.")
     fun rebuild() {
-        runPipeline()
+        onRebuild()
     }
+
+    // ── Other user actions ────────────────────────────────────────────────────
 
     fun setActiveStencilLayer(index: Int) {
         _uiState.update { it.copy(activeStencilLayerIndex = index) }
@@ -126,7 +240,7 @@ class StencilViewModel @Inject constructor(
     // ── Pipeline ──────────────────────────────────────────────────────────────
 
     private fun runPipeline() {
-        val bitmap = sourceBitmap ?: return
+        val bitmap = _uiState.value.isolatedBitmap ?: return
         processingJob?.cancel()
         processingJob = viewModelScope.launch {
             _uiState.update {
@@ -139,13 +253,11 @@ class StencilViewModel @Inject constructor(
             }
             stencilProcessor.process(bitmap, _uiState.value.layerCount).collect { event ->
                 when (event) {
-                    is StencilProgress.Stage -> {
-                        _uiState.update {
-                            it.copy(
-                                processingProgress = event.fraction,
-                                processingStage = event.message
-                            )
-                        }
+                    is StencilProgress.Stage -> _uiState.update {
+                        it.copy(
+                            processingProgress = event.fraction,
+                            processingStage = event.message
+                        )
                     }
                     is StencilProgress.Done -> {
                         val pageCount = computePageCount(
@@ -160,18 +272,17 @@ class StencilViewModel @Inject constructor(
                                 processingStage = "",
                                 stencilLayers = event.layers,
                                 activeStencilLayerIndex = 0,
-                                totalPageCount = pageCount
+                                totalPageCount = pageCount,
+                                wizardStep = StencilWizardStep.PREVIEW
                             )
                         }
                     }
-                    is StencilProgress.Error -> {
-                        _uiState.update {
-                            it.copy(
-                                isProcessing = false,
-                                processingStage = "",
-                                exportError = event.message
-                            )
-                        }
+                    is StencilProgress.Error -> _uiState.update {
+                        it.copy(
+                            isProcessing = false,
+                            processingStage = "",
+                            exportError = event.message
+                        )
                     }
                 }
             }
