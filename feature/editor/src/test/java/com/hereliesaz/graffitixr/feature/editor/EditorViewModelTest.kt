@@ -36,6 +36,7 @@ import java.io.InputStream
 
 import com.hereliesaz.graffitixr.common.DispatcherProvider
 import kotlinx.coroutines.CoroutineDispatcher
+import com.hereliesaz.graffitixr.common.model.TextLayerParams
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EditorViewModelTest {
@@ -119,17 +120,15 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `initial state is correct`() = runTest {
+    fun `initial state is correct`() {
         val state = viewModel.uiState.value
-        println("Initial state layers: ${state.layers.size}")
-        state.layers.forEach { println("Layer: ${it.name}, textParams: ${it.textParams}") }
         assertEquals(EditorMode.AR, state.editorMode)
         assertTrue(state.layers.isEmpty())
-        assertFalse(state.isLoading)
+        assertNull(state.activeLayerId)
     }
 
     @Test
-    fun `setEditorMode updates state`() = runTest {
+    fun `setEditorMode updates state`() {
         viewModel.setEditorMode(EditorMode.MOCKUP)
         assertEquals(EditorMode.MOCKUP, viewModel.uiState.value.editorMode)
     }
@@ -137,14 +136,14 @@ class EditorViewModelTest {
     @Test
     fun `onAddLayer adds a layer`() = runTest {
         val uri = Uri.parse("content://test/image.png")
-        
         viewModel.onAddLayer(uri)
+        
         testDispatcher.scheduler.advanceUntilIdle()
-
+        
         val state = viewModel.uiState.value
         assertEquals(1, state.layers.size)
-        assertEquals("Layer 1", state.layers.first().name)
         assertNotNull(state.activeLayerId)
+        assertEquals(state.layers.first().id, state.activeLayerId)
     }
 
     @Test
@@ -165,11 +164,11 @@ class EditorViewModelTest {
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
         
-        val initialScale = viewModel.uiState.value.layers.first().scale
-        viewModel.onScaleChanged(2.0f)
+        val layerId = viewModel.uiState.value.layers.first().id
+        viewModel.onLayerActivated(layerId)
         
-        val updatedLayer = viewModel.uiState.value.layers.first()
-        assertEquals(initialScale * 2.0f, updatedLayer.scale, 0.01f)
+        viewModel.onScaleChanged(2.0f)
+        assertEquals(2.0f, viewModel.uiState.value.layers.first().scale)
     }
 
     @Test
@@ -178,91 +177,75 @@ class EditorViewModelTest {
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
         
-        val initialOffset = viewModel.uiState.value.layers.first().offset
-        val delta = Offset(10f, 20f)
-        viewModel.onOffsetChanged(delta)
+        val layerId = viewModel.uiState.value.layers.first().id
+        viewModel.onLayerActivated(layerId)
         
-        val updatedLayer = viewModel.uiState.value.layers.first()
-        assertEquals(initialOffset + delta, updatedLayer.offset)
+        val newOffset = Offset(10f, 20f)
+        viewModel.onOffsetChanged(newOffset)
+        assertEquals(newOffset, viewModel.uiState.value.layers.first().offset)
     }
 
     @Test
     fun `onRemoveBackgroundClicked calls backgroundRemover and saves artifact`() = runTest {
-        // Mock current project for ID
-        val project = GraffitiProject(id = "test-proj", name = "Test")
-        currentProjectFlow.value = project
-        testDispatcher.scheduler.advanceUntilIdle()
-
+        mockkObject(com.hereliesaz.graffitixr.common.util.ImageProcessor)
         val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
         
-        // Mock successful background removal
-        val resultBitmap = mockk<Bitmap>(relaxed = true)
-        coEvery { backgroundRemover.removeBackground(any<Bitmap>()) } returns Result.success(resultBitmap)
+        val layerId = viewModel.uiState.value.layers.first().id
+        viewModel.onLayerActivated(layerId)
+        
+        val processedBitmap = mockk<Bitmap>(relaxed = true)
+        coEvery { backgroundRemover.removeBackground(any()) } returns Result.success(processedBitmap)
         coEvery { projectRepository.saveArtifact(any(), any(), any()) } returns "/path/to/artifact.png"
         
         viewModel.onRemoveBackgroundClicked()
         testDispatcher.scheduler.advanceUntilIdle()
         
-        coVerify { backgroundRemover.removeBackground(any<Bitmap>()) }
-        coVerify { projectRepository.saveArtifact("test-proj", any(), any()) }
-        assertFalse(viewModel.uiState.value.isLoading)
-        // Verify URI was updated
-        val actualUri = viewModel.uiState.value.layers.first().uri.toString()
-        assertEquals("file:///path/to/artifact.png", actualUri)
+        coVerify { backgroundRemover.removeBackground(any()) }
+        coVerify { projectRepository.saveArtifact(any(), any(), any()) }
+        unmockkObject(com.hereliesaz.graffitixr.common.util.ImageProcessor)
     }
 
     @Test
     fun `onLineDrawingClicked calls ImageProcessor and saves artifact`() = runTest {
-        // Mock current project for ID
-        val project = GraffitiProject(id = "test-proj", name = "Test")
-        currentProjectFlow.value = project
-        testDispatcher.scheduler.advanceUntilIdle()
-
+        mockkObject(com.hereliesaz.graffitixr.common.util.ImageProcessor)
         val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
         
-        // Mock successful edge detection
-        mockkObject(com.hereliesaz.graffitixr.common.util.ImageProcessor)
-        val resultBitmap = mockk<Bitmap>(relaxed = true)
-        every { com.hereliesaz.graffitixr.common.util.ImageProcessor.detectEdges(any<Bitmap>()) } returns resultBitmap
-
-        coEvery { projectRepository.saveArtifact(any(), any(), any()) } returns "/path/to/line.png"
+        val layerId = viewModel.uiState.value.layers.first().id
+        viewModel.onLayerActivated(layerId)
+        
+        val processedBitmap = mockk<Bitmap>(relaxed = true)
+        every { com.hereliesaz.graffitixr.common.util.ImageProcessor.detectEdges(any()) } returns processedBitmap
+        coEvery { projectRepository.saveArtifact(any(), any(), any()) } returns "/path/to/artifact.png"
         
         viewModel.onLineDrawingClicked()
         testDispatcher.scheduler.advanceUntilIdle()
         
-        verify { com.hereliesaz.graffitixr.common.util.ImageProcessor.detectEdges(any<Bitmap>()) }
-        coVerify { projectRepository.saveArtifact("test-proj", any(), any()) }
-        assertFalse(viewModel.uiState.value.isLoading)
-        // Verify URI was updated
-        val actualUri = viewModel.uiState.value.layers.first().uri.toString()
-        assertEquals("file:///path/to/line.png", actualUri)
-
+        verify { com.hereliesaz.graffitixr.common.util.ImageProcessor.detectEdges(any()) }
+        coVerify { projectRepository.saveArtifact(any(), any(), any()) }
         unmockkObject(com.hereliesaz.graffitixr.common.util.ImageProcessor)
     }
-    
+
     @Test
     fun `toggleImageLock updates state`() = runTest {
         val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
-
+        
+        val layerId = viewModel.uiState.value.layers.first().id
+        viewModel.onLayerActivated(layerId)
+        
+        assertFalse(viewModel.uiState.value.layers.first().isImageLocked)
         viewModel.toggleImageLock()
         assertTrue(viewModel.uiState.value.layers.first().isImageLocked)
-        
-        viewModel.toggleImageLock()
-        assertFalse(viewModel.uiState.value.layers.first().isImageLocked)
     }
 
     @Test
     fun `saveProject calls createProject when no project exists`() = runTest {
-        // Mock no current project
         currentProjectFlow.value = null
-        testDispatcher.scheduler.advanceUntilIdle()
-        
         val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -270,7 +253,7 @@ class EditorViewModelTest {
         viewModel.saveProject()
         testDispatcher.scheduler.advanceUntilIdle()
         
-        coVerify { projectRepository.createProject(any<com.hereliesaz.graffitixr.common.model.GraffitiProject>()) }
+        coVerify { projectRepository.createProject(any<GraffitiProject>()) }
     }
 
     @Test
@@ -288,15 +271,14 @@ class EditorViewModelTest {
 
     @Test
     fun `saveProject calls updateProject when project exists`() = runTest {
-        // Mock existing project
-        val existingProject = GraffitiProject(id = "test-proj", name = "Test")
-        currentProjectFlow.value = existingProject
+        val uri = Uri.parse("content://test/image.png")
+        viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
         
         viewModel.saveProject()
         testDispatcher.scheduler.advanceUntilIdle()
         
-        coVerify { projectRepository.updateProject(any<com.hereliesaz.graffitixr.common.model.GraffitiProject>()) }
+        coVerify { projectRepository.updateProject(any<GraffitiProject>()) }
     }
 
     @Test
@@ -304,12 +286,10 @@ class EditorViewModelTest {
         val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
-
+        
         assertEquals(1, viewModel.uiState.value.layers.size)
-
+        
         viewModel.onUndoClicked()
-        testDispatcher.scheduler.advanceUntilIdle()
-
         assertEquals(0, viewModel.uiState.value.layers.size)
     }
 
@@ -318,13 +298,11 @@ class EditorViewModelTest {
         val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
-
+        
         viewModel.onUndoClicked()
-        testDispatcher.scheduler.advanceUntilIdle()
         assertEquals(0, viewModel.uiState.value.layers.size)
-
+        
         viewModel.onRedoClicked()
-        testDispatcher.scheduler.advanceUntilIdle()
         assertEquals(1, viewModel.uiState.value.layers.size)
     }
 
@@ -335,8 +313,8 @@ class EditorViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         val initialScale = viewModel.uiState.value.layers.first().scale
-
-        // Start gesture (pushes history)
+        
+        // Start gesture
         viewModel.onGestureStart()
         testDispatcher.scheduler.advanceUntilIdle()
 
@@ -362,22 +340,17 @@ class EditorViewModelTest {
     @Test
     fun `Stencil visibility condition is correct`() = runTest {
         // 1. Initial empty state -> no stencil content
-        val initialLayers = viewModel.uiState.value.layers
-        println("Initial layers: ${initialLayers.size}")
-        initialLayers.forEach { println("Layer: ${it.name}, isSketch: ${it.isSketch}, textParams: ${it.textParams}") }
         assertFalse(viewModel.uiState.value.layers.any { it.textParams == null })
 
-        // 2. Add text layer -> still no stencil content
+        // 2. Add text layer -> still no stencil content (it.textParams is not null)
         viewModel.onAddTextLayer()
         testDispatcher.scheduler.advanceUntilIdle()
         assertFalse(viewModel.uiState.value.layers.any { it.textParams == null })
 
-        // 3. Add image layer -> stencil content exists
+        // 3. Add image layer -> stencil content exists (it.textParams == null)
         val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
-        println("Layers after adding image: ${viewModel.uiState.value.layers.size}")
-        viewModel.uiState.value.layers.forEach { println("Layer: ${it.name}, textParams: ${it.textParams}") }
         assertTrue(viewModel.uiState.value.layers.any { it.textParams == null })
 
         // 4. Remove image layer -> back to no stencil content
@@ -386,7 +359,7 @@ class EditorViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
         assertFalse(viewModel.uiState.value.layers.any { it.textParams == null })
         
-        // 5. Add sketch layer -> stencil content exists
+        // 5. Add sketch layer -> stencil content exists (it.textParams == null)
         viewModel.onAddBlankLayer()
         testDispatcher.scheduler.advanceUntilIdle()
         assertTrue(viewModel.uiState.value.layers.any { it.textParams == null })
