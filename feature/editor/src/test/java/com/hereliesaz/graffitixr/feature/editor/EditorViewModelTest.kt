@@ -43,7 +43,7 @@ class EditorViewModelTest {
 
     private lateinit var viewModel: EditorViewModel
     private val projectRepository: ProjectRepository = mockk(relaxed = true)
-    private val currentProjectFlow = kotlinx.coroutines.flow.MutableStateFlow<com.hereliesaz.graffitixr.common.model.GraffitiProject?>(null)
+    private val currentProjectFlow = kotlinx.coroutines.flow.MutableStateFlow<GraffitiProject?>(null)
     private val context: Context = mockk(relaxed = true)
     private val backgroundRemover: BackgroundRemover = mockk(relaxed = true)
     private val projectManager: ProjectManager = mockk(relaxed = true)
@@ -55,7 +55,7 @@ class EditorViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         // Emit a test project so projectId is non-null, enabling onAddLayer to work
-        val testProject = com.hereliesaz.graffitixr.common.model.GraffitiProject(id = "test-project")
+        val testProject = GraffitiProject(id = "test-project")
         currentProjectFlow.value = testProject
         every { projectRepository.currentProject } returns currentProjectFlow
         
@@ -77,6 +77,7 @@ class EditorViewModelTest {
         // Mock ImageUtils so ImageDecoder/BitmapFactory isn't invoked in unit tests
         coEvery { com.hereliesaz.graffitixr.common.util.ImageUtils.getBitmapDimensions(any(), any()) } returns Pair(100, 100)
         coEvery { com.hereliesaz.graffitixr.common.util.ImageUtils.loadBitmapAsync(any(), any()) } returns mockBitmap
+        coEvery { projectRepository.saveArtifact(any(), any(), any()) } returns "/path/to/artifact.png"
         every { com.hereliesaz.graffitixr.common.util.ImageUtils.bitmapToByteArray(any()) } returns ByteArray(0)
 
         // Mock TextRasterizer and GoogleFontCache to avoid Android dependencies
@@ -197,7 +198,6 @@ class EditorViewModelTest {
         
         val processedBitmap = mockk<Bitmap>(relaxed = true)
         coEvery { backgroundRemover.removeBackground(any()) } returns Result.success(processedBitmap)
-        coEvery { projectRepository.saveArtifact(any(), any(), any()) } returns "/path/to/artifact.png"
         
         viewModel.onRemoveBackgroundClicked()
         testDispatcher.scheduler.advanceUntilIdle()
@@ -219,7 +219,6 @@ class EditorViewModelTest {
         
         val processedBitmap = mockk<Bitmap>(relaxed = true)
         every { com.hereliesaz.graffitixr.common.util.ImageProcessor.detectEdges(any()) } returns processedBitmap
-        coEvery { projectRepository.saveArtifact(any(), any(), any()) } returns "/path/to/artifact.png"
         
         viewModel.onLineDrawingClicked()
         testDispatcher.scheduler.advanceUntilIdle()
