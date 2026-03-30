@@ -281,10 +281,6 @@ class StencilProcessor @Inject constructor() {
         val rgbaMat = Mat()
         srcMat.copyTo(rgbaMat)
 
-        // Apply closed alpha
-        val newChannels = java.util.ArrayList<Mat>()
-        Core.split(rgbaMat, newChannels)
-
         // We know it's either Black (0,0,0), Gray (128,128,128), or White (255,255,255)
         // Just fill the RGB channels based on where closedAlpha > 0
         // Or simpler, since the input had transparent background and a single color,
