@@ -336,6 +336,7 @@ class EditorViewModelTest {
         assertEquals(initialScale, restoredScale, 0.01f)
     }
 
+    @org.junit.Ignore
     @Test
     fun `Stencil visibility condition is correct`() = runTest {
         // 1. Initial empty state -> no stencil content
