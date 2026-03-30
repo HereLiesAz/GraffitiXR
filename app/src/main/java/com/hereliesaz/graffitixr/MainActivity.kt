@@ -679,7 +679,6 @@ class MainActivity : ComponentActivity() {
         if (isFinishing) slamManager.destroy()
     }
 
-    @Composable
     private fun AzNavHostScope.configureRailItems(
         mainViewModel: MainViewModel,
         editorViewModel: EditorViewModel,
