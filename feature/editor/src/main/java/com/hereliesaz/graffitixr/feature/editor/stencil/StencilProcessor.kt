@@ -71,7 +71,7 @@ class StencilProcessor @Inject constructor() {
 
         emit(StencilProgress.Stage("Preparing image…", 0.05f))
 
-        if (sourceBitmap.width < 200 || sourceBitmap.height < 200) {
+        if (isolatedBitmap.width < 200 || isolatedBitmap.height < 200) {
             emit(StencilProgress.Error("Source image too small for stencil. (Min 200px)"))
             return@flow
         }
@@ -250,72 +250,52 @@ class StencilProcessor @Inject constructor() {
     private fun applyMorphClose(layers: List<StencilLayer>): List<StencilLayer> {
         return layers.map { layer ->
             if (layer.type == StencilLayerType.SILHOUETTE) return@map layer
-            layer.copy(bitmap = morphClose(layer.bitmap))
+            layer.copy(bitmap = morphClose(layer.bitmap, layer.type.color))
         }
     }
 
-    private fun morphClose(src: Bitmap): Bitmap {
+    private fun morphClose(src: Bitmap, color: Int): Bitmap {
         val srcMat = Mat()
         Utils.bitmapToMat(src, srcMat)
 
-        // The stencil features are alpha>0
+        // The stencil features are defined by alpha > 0
         val channels = java.util.ArrayList<Mat>()
         Core.split(srcMat, channels)
         val alphaMat = channels[3]
-
-        // Invert so black content (stencil) = white in OpenCV binary image
-        val inverted = Mat()
-        Core.bitwise_not(grayMat, inverted)
 
         val kernel = Imgproc.getStructuringElement(
             Imgproc.MORPH_RECT,
             Size(MORPH_KERNEL_SIZE.toDouble(), MORPH_KERNEL_SIZE.toDouble())
         )
         val closedAlpha = Mat()
-        Imgproc.morphologyEx(binary, closedAlpha, Imgproc.MORPH_CLOSE, kernel)
+        Imgproc.morphologyEx(alphaMat, closedAlpha, Imgproc.MORPH_CLOSE, kernel)
 
-        // Re-invert back to black-content-on-white
-        val result = Mat()
-        org.opencv.core.Core.bitwise_not(closed, result)
-
-        val rgbaMat = Mat()
-        srcMat.copyTo(rgbaMat)
-
-        // We know it's either Black (0,0,0), Gray (128,128,128), or White (255,255,255)
-        // Just fill the RGB channels based on where closedAlpha > 0
-        // Or simpler, since the input had transparent background and a single color,
-        // we can just recreate the image using the original color and the new alpha
-
-        // This is a bit complex in OpenCV. A simpler way is to bitwise_and the color.
-        val colorMat = Mat(srcMat.size(), srcMat.type(), org.opencv.core.Scalar(meanColor.`val`[0], meanColor.`val`[1], meanColor.`val`[2], 255.0))
-        val out = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
-
-        // Simpler way using Android Bitmap
-        Utils.matToBitmap(srcMat, out)
-        val alphaPixels = IntArray(src.width * src.height)
-        val outPixels = IntArray(src.width * src.height)
-
-        val alphaBmp = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
+        // Simpler way using Android Bitmap for pixel manipulation
+        val w = src.width
+        val h = src.height
+        val alphaBmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         Utils.matToBitmap(closedAlpha, alphaBmp)
-
-        alphaBmp.getPixels(alphaPixels, 0, src.width, 0, 0, src.width, src.height)
-        out.getPixels(outPixels, 0, src.width, 0, 0, src.width, src.height)
-
-        // The color is meanColor. But wait, it's easier: just use the original outPixels color
-        // since we only have one color in each layer, but set alpha from alphaPixels.
-        // Actually, just find the first non-transparent pixel to get the color, or use meanColor.
-        val color = Color.argb(255, meanColor.`val`[0].toInt(), meanColor.`val`[1].toInt(), meanColor.`val`[2].toInt())
-
-        for (i in outPixels.indices) {
-            val a = Color.blue(alphaPixels[i]) // closedAlpha is grayscale, so blue channel has the value
-            outPixels[i] = Color.argb(a, Color.red(color), Color.green(color), Color.blue(color))
-        }
-        out.setPixels(outPixels, 0, src.width, 0, 0, src.width, src.height)
+        
+        val alphaPixels = IntArray(w * h)
+        alphaBmp.getPixels(alphaPixels, 0, w, 0, 0, w, h)
         alphaBmp.recycle()
 
+        val outPixels = IntArray(w * h)
+        val r = Color.red(color)
+        val g = Color.green(color)
+        val b = Color.blue(color)
 
-        srcMat.release(); alphaMat.release(); binary.release()
-        kernel.release(); closedAlpha.release(); hsv.release(); mask.release()
+        for (i in outPixels.indices) {
+            // closedAlpha is grayscale (CV_8UC1), but bitmap conversion will replicate 
+            // the value across R,G,B. We'll take the blue channel.
+            val aValue = Color.blue(alphaPixels[i])
+            outPixels[i] = Color.argb(aValue, r, g, b)
+        }
+
+        val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        out.setPixels(outPixels, 0, w, 0, 0, w, h)
+
+        srcMat.release(); alphaMat.release(); closedAlpha.release(); kernel.release()
         for(c in channels) { c.release() }
 
         return out
