@@ -85,7 +85,7 @@ fun MainScreen(
             }
         }
 
-        if (hasCameraPermission && isCameraActive && uiState.editorMode != EditorMode.TRACE) {
+        if (hasCameraPermission && isCameraActive && uiState.editorMode != EditorMode.TRACE && uiState.editorMode != EditorMode.STENCIL) {
             when (uiState.editorMode) {
                 EditorMode.STENCIL -> {}
                 EditorMode.AR -> {
@@ -233,7 +233,7 @@ fun MainScreen(
             ) {}
         }
 
-        if (uiState.editorMode != EditorMode.AR) {
+        if (uiState.editorMode != EditorMode.AR && uiState.editorMode != EditorMode.STENCIL) {
             uiState.layers.filter { it.isVisible }.forEach { layer ->
                 // During an active stroke the working bitmap is tracked separately so
                 // Compose can re-render it every time a new segment is drawn.

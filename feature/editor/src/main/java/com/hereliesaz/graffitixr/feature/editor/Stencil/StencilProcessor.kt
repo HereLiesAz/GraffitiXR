@@ -17,7 +17,10 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import org.opencv.android.Utils
+import org.opencv.core.Core
 import org.opencv.core.Mat
+import org.opencv.core.MatOfFloat
+import org.opencv.core.MatOfInt
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
 import javax.inject.Inject
@@ -75,6 +78,11 @@ class StencilProcessor @Inject constructor(
     ): Flow<StencilProgress> = flow {
 
         emit(StencilProgress.Stage("Preparing image…", 0.05f))
+
+        if (sourceBitmap.width < 200 || sourceBitmap.height < 200) {
+            emit(StencilProgress.Error("Source image too small for stencil. (Min 200px)"))
+            return@flow
+        }
 
         val result = runCatching {
             // ── Stage 1: Downsample if needed ──────────────────────────────────────
@@ -153,8 +161,7 @@ class StencilProcessor @Inject constructor(
 
     /**
      * Aggressively crushes contrast to maximise tonal separation.
-     * Uses OpenCV convertScaleAbs: alpha=2.5 (contrast), beta=-80 (brightness offset).
-     * Returns a new ARGB_8888 bitmap preserving original dimensions.
+     * Uses dynamic histogram analysis to compute optimal gain/bias parameters.
      */
     private fun crushContrast(src: Bitmap): Bitmap {
         val srcMat = Mat()
@@ -163,8 +170,10 @@ class StencilProcessor @Inject constructor(
         val grayMat = Mat()
         Imgproc.cvtColor(srcMat, grayMat, Imgproc.COLOR_RGBA2GRAY)
 
+        val (alpha, beta) = calculateDynamicContrastParams(grayMat)
+
         val crushedMat = Mat()
-        org.opencv.core.Core.convertScaleAbs(grayMat, crushedMat, 2.5, -80.0)
+        Core.convertScaleAbs(grayMat, crushedMat, alpha, beta)
 
         // Convert back to RGBA so we can work uniformly in ARGB_8888
         val rgbaMat = Mat()
@@ -175,6 +184,47 @@ class StencilProcessor @Inject constructor(
 
         srcMat.release(); grayMat.release(); crushedMat.release(); rgbaMat.release()
         return result
+    }
+
+    /**
+     * Computes optimal alpha (gain) and beta (bias) for contrast maximization
+     * by clipping 2% of the histogram tails.
+     */
+    private fun calculateDynamicContrastParams(grayMat: Mat): Pair<Double, Double> {
+        val hist = Mat()
+        Imgproc.calcHist(listOf(grayMat), MatOfInt(0), Mat(), hist, MatOfInt(256), MatOfFloat(0f, 256f))
+
+        val totalPixels = grayMat.rows() * grayMat.cols()
+        val clipLimit = (totalPixels * 0.02).toInt()
+
+        var minIntensity = 0
+        var cumulative = 0.0
+        for (i in 0 until 256) {
+            cumulative += hist.get(i, 0)[0]
+            if (cumulative > clipLimit) {
+                minIntensity = i
+                break
+            }
+        }
+
+        var maxIntensity = 255
+        cumulative = 0.0
+        for (i in 255 downTo 0) {
+            cumulative += hist.get(i, 0)[0]
+            if (cumulative > clipLimit) {
+                maxIntensity = i
+                break
+            }
+        }
+
+        hist.release()
+
+        if (maxIntensity <= minIntensity) return 2.5 to -80.0 // fallback
+
+        val alpha = 255.0 / (maxIntensity - minIntensity)
+        val beta = -minIntensity * alpha
+
+        return alpha to beta
     }
 
     // ── Stage 5 ───────────────────────────────────────────────────────────────
@@ -287,7 +337,7 @@ class StencilProcessor @Inject constructor(
 
         // Re-invert back to black-content-on-white
         val result = Mat()
-        org.opencv.core.Core.bitwise_not(closed, result)
+        Core.bitwise_not(closed, result)
 
         val rgbaMat = Mat()
         Imgproc.cvtColor(result, rgbaMat, Imgproc.COLOR_GRAY2RGBA)

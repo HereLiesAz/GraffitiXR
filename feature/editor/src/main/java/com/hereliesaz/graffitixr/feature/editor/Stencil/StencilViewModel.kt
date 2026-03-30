@@ -22,10 +22,6 @@ import javax.inject.Inject
  *
  * Orchestrates the [StencilProcessor] pipeline and [StencilPrintEngine] PDF output.
  * All heavy work runs on Dispatchers.Default via the processor's Flow.
- *
- * Phase B: Pipeline + state wiring.
- * Phase C: UI integration (StencilScreen composable observes this).
- * Phase D: StencilPrintEngine wired to exportPdf / saveLayersToGallery.
  */
 @HiltViewModel
 class StencilViewModel @Inject constructor(
@@ -79,14 +75,32 @@ class StencilViewModel @Inject constructor(
     fun setPrintSize(mm: Float) {
         val clamped = mm.coerceIn(50f, 5000f)
         val pageCount = computePageCount(clamped, _uiState.value.printDimension)
-        _uiState.update { it.copy(printSizeMm = clamped, totalPageCount = pageCount) }
+        
+        val warning = if (pageCount > 50) {
+            "Large output: $pageCount pages. Consider a smaller size."
+        } else null
+        
+        _uiState.update { it.copy(
+            printSizeMm = clamped, 
+            totalPageCount = pageCount,
+            exportError = warning
+        ) }
     }
 
     fun togglePrintDimension() {
         val next = if (_uiState.value.printDimension == StencilPrintDimension.WIDTH)
             StencilPrintDimension.HEIGHT else StencilPrintDimension.WIDTH
         val pageCount = computePageCount(_uiState.value.printSizeMm, next)
-        _uiState.update { it.copy(printDimension = next, totalPageCount = pageCount) }
+        
+        val warning = if (pageCount > 50) {
+            "Large output: $pageCount pages. Consider a smaller size."
+        } else null
+        
+        _uiState.update { it.copy(
+            printDimension = next, 
+            totalPageCount = pageCount,
+            exportError = warning
+        ) }
     }
 
     fun exportPdf(context: Context) {
