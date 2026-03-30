@@ -336,7 +336,7 @@ class EditorViewModelTest {
         assertEquals(initialScale, restoredScale, 0.01f)
     }
 
-    @org.junit.Ignore
+    @org.junit.Ignore("TODO: Fix visibility condition checks after transparent stencil refactor")
     @Test
     fun `Stencil visibility condition is correct`() = runTest {
         // 1. Initial empty state -> no stencil content

@@ -318,16 +318,14 @@ class StencilProcessor @Inject constructor(
         val srcMat = Mat()
         Utils.bitmapToMat(src, srcMat)
 
-        val grayMat = Mat()
-        Imgproc.cvtColor(srcMat, grayMat, Imgproc.COLOR_RGBA2GRAY)
-
         // The stencil features are alpha>0
         val channels = java.util.ArrayList<Mat>()
         Core.split(srcMat, channels)
         val alphaMat = channels[3]
 
-        val binary = Mat()
-        Imgproc.threshold(alphaMat, binary, 127.0, 255.0, Imgproc.THRESH_BINARY)
+        // Invert so black content (stencil) = white in OpenCV binary image
+        val inverted = Mat()
+        org.opencv.core.Core.bitwise_not(grayMat, inverted)
 
         val kernel = Imgproc.getStructuringElement(
             Imgproc.MORPH_RECT,

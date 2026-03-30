@@ -182,6 +182,8 @@ class StencilPrintEngine @Inject constructor() {
         // Convert to OpenCV and find contours
         val mat = Mat()
         Utils.bitmapToMat(tileBmp, mat)
+        val gray = Mat()
+        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGBA2GRAY)
         
         val channels = java.util.ArrayList<Mat>()
         Core.split(mat, channels)
