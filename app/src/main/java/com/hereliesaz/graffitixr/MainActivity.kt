@@ -269,6 +269,7 @@ class MainActivity : ComponentActivity() {
                 var showHelp by remember { mutableStateOf(false) }
                 var showFontPicker by remember { mutableStateOf(false) }
                 var fontPickerLayerId by remember { mutableStateOf<String?>(null) }
+                val layerMenusOpen = remember { mutableStateMapOf<String, Boolean>() }
 
                 val context = LocalContext.current
                 AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
@@ -291,7 +292,8 @@ class MainActivity : ComponentActivity() {
                         configureRailItems(
                             mainViewModel, editorViewModel, arViewModel, dashboardViewModel, stencilViewModel, context,
                             overlayImagePicker, backgroundImagePicker, editorUiState, arUiState, navStrings,
-                            onShowFontPicker = { layerId -> fontPickerLayerId = layerId; showFontPicker = true }
+                            onShowFontPicker = { layerId -> fontPickerLayerId = layerId; showFontPicker = true },
+                            layerMenusOpen = layerMenusOpen
                         )
                     }
 
@@ -704,7 +706,8 @@ class MainActivity : ComponentActivity() {
         editorUiState: EditorUiState,
         arUiState: ArUiState,
         navStrings: NavStrings,
-        onShowFontPicker: (String) -> Unit = {}
+        onShowFontPicker: (String) -> Unit = {},
+        layerMenusOpen: MutableMap<String, Boolean>
     ) {
         val requestPermissions = {
             permissionLauncher.launch(
@@ -849,7 +852,7 @@ class MainActivity : ComponentActivity() {
         if (canEdit) {
             editorUiState.layers.reversed().forEach { layer ->
                 val activeTool = editorUiState.activeTool
-                var forceOpenHiddenMenu by remember(layer.id) { mutableStateOf(false) }
+                val forceOpenHiddenMenu = layerMenusOpen[layer.id] ?: false
 
                 azRailRelocItem(
                     id = "layer_${layer.id}",
@@ -860,7 +863,7 @@ class MainActivity : ComponentActivity() {
                     nestedRailAlignment = AzNestedRailAlignment.VERTICAL,
                     keepNestedRailOpen = true,
                     forceHiddenMenuOpen = forceOpenHiddenMenu,
-                    onHiddenMenuDismiss = { forceOpenHiddenMenu = false },
+                    onHiddenMenuDismiss = { layerMenusOpen[layer.id] = false },
                     onClick = {
                         editorViewModel.onLayerActivated(layer.id)
                         editorViewModel.setActiveTool(Tool.NONE)
@@ -872,7 +875,7 @@ class MainActivity : ComponentActivity() {
                         if (layer.textParams != null) {
                             azRailItem(id = "edit_text_${layer.id}", text = "Edit", color = Color.White, shape = AzButtonShape.RECTANGLE) {
                                 activate()
-                                forceOpenHiddenMenu = true
+                                layerMenusOpen[layer.id] = true
                             }
                         }
 
