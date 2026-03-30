@@ -8,7 +8,7 @@ import android.net.Uri
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import com.hereliesaz.graffitixr.common.model.StencilLayer
-import com.hereliesaz.graffitixr.common.model.StencilPrintDimension
+import com.hereliesaz.graffitixr.common.model.StencilOutputDimension
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.opencv.android.Utils
@@ -60,8 +60,8 @@ class StencilPrintEngine @Inject constructor() {
     suspend fun generatePdf(
         context: Context,
         layers: List<StencilLayer>,
-        printSizeMm: Float,
-        printDimension: StencilPrintDimension
+        outputSizeMm: Float,
+        outputDimension: StencilOutputDimension
     ): Result<Uri> = withContext(Dispatchers.IO) {
         val pdfDocument = PdfDocument()
         
@@ -73,11 +73,11 @@ class StencilPrintEngine @Inject constructor() {
             
             val outputWidthPx: Float
             val outputHeightPx: Float
-            if (printDimension == StencilPrintDimension.WIDTH) {
-                outputWidthPx = printSizeMm * MM_TO_PX
+            if (outputDimension == StencilOutputDimension.WIDTH) {
+                outputWidthPx = outputSizeMm * MM_TO_PX
                 outputHeightPx = outputWidthPx / aspect
             } else {
-                outputHeightPx = printSizeMm * MM_TO_PX
+                outputHeightPx = outputSizeMm * MM_TO_PX
                 outputWidthPx = outputHeightPx * aspect
             }
             

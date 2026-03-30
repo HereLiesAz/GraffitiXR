@@ -2,6 +2,7 @@
 package com.hereliesaz.graffitixr.common.model
 
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.net.Uri
 
 /**
@@ -10,10 +11,10 @@ import android.net.Uri
  * OVERPAINT topology means no bridging is required — upper-layer islands are
  * physically supported by the surrounding sheet material.
  */
-enum class StencilLayerType(val label: String, val order: Int) {
-    SILHOUETTE("Silhouette", 1),
-    MIDTONE("Midtone", 2),
-    HIGHLIGHT("Highlight", 3)
+enum class StencilLayerType(val label: String, val order: Int, val color: Int) {
+    SILHOUETTE("Silhouette", 1, Color.BLACK),
+    MIDTONE("Midtone", 2, Color.GRAY),
+    HIGHLIGHT("Highlight", 3, Color.WHITE)
 }
 
 /**
@@ -38,7 +39,7 @@ enum class StencilLayerCount(val count: Int, val displayLabel: String) {
 /**
  * Which real-world dimension the user has locked for PDF tiling.
  */
-enum class StencilPrintDimension { WIDTH, HEIGHT }
+enum class StencilOutputDimension { WIDTH, HEIGHT }
 
 /**
  * The current step of the guided stencil creation wizard.
@@ -50,7 +51,7 @@ enum class StencilWizardStep {
     CHOOSE_LAYERS,  // Pick 1, 2, or 3 stencil layers
     GENERATE,       // Processing in progress (no user actions)
     PREVIEW,        // Cycle through generated layers; option to rebuild
-    PRINT_EXPORT    // Print size, PDF, PNG, return to editor
+    EXPORT_PDF      // Output size, PDF tiling, return to editor
 }
 
 /**
@@ -86,13 +87,13 @@ data class StencilUiState(
     /** Human-readable description of the current pipeline stage. */
     val processingStage: String = "",
 
-    /** Real-world size value in millimetres for the locked print dimension. */
-    val printSizeMm: Float = 300f,
+    /** Real-world size value in millimetres for the locked output dimension. */
+    val outputSizeMm: Float = 300f,
 
     /** Whether the locked dimension is width or height. */
-    val printDimension: StencilPrintDimension = StencilPrintDimension.WIDTH,
+    val outputDimension: StencilOutputDimension = StencilOutputDimension.WIDTH,
 
-    /** Computed total page count across all layers. Updated whenever printSizeMm changes. */
+    /** Computed total page count across all layers. Updated whenever outputSizeMm changes. */
     val totalPageCount: Int = 0,
 
     /** Non-null when PDF generation failed. */

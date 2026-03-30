@@ -223,11 +223,11 @@ class StencilProcessor @Inject constructor() {
         }
 
         return layerTypes.mapIndexed { sortedPos, layerType ->
-            val layerPixels = IntArray(w * h) { Color.WHITE }
+            val layerPixels = IntArray(w * h) { Color.TRANSPARENT }
             for (i in pixelCluster.indices) {
                 // Paint black if this pixel belongs to this cluster or a darker cluster
                 if (pixelCluster[i] in 0..sortedPos) {
-                    layerPixels[i] = Color.BLACK
+                    layerPixels[i] = layerType.color
                 }
             }
             StencilLayer(layerType, pixelsToBitmap(layerPixels, w, h))

@@ -137,8 +137,8 @@ Runs entirely on `Dispatchers.Default`. Emits progress via `Flow<StencilProgress
 - This enables physical alignment when layering sheets during spray application
 
 ### Stage 6 — Output
-Return `List<StencilLayer>` ordered bottom-to-top (Silhouette first, Highlight last).
-Each bitmap is `ARGB_8888`, background white, subject content black, marks black.
+Return `List<StencilLayer>` ordered bottom-to-top (Silhouette Each bitmap is `ARGB_8888`, background white, subject content black, marks black.
+first, Highlight last).
 
 ---
 

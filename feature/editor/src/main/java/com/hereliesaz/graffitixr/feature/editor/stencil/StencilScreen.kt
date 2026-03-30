@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.hereliesaz.graffitixr.common.model.StencilLayer
 import com.hereliesaz.graffitixr.common.model.StencilLayerCount
 import com.hereliesaz.graffitixr.common.model.StencilLayerType
+import com.hereliesaz.graffitixr.common.model.StencilOutputDimension
 import com.hereliesaz.graffitixr.common.model.StencilUiState
 import com.hereliesaz.graffitixr.design.theme.Cyan
 import com.hereliesaz.graffitixr.design.theme.DarkGrey
@@ -207,7 +208,7 @@ private fun LayerThumbnail(
 @Composable
 fun StencilScreenPreview() {
     val mockBitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888).apply {
-        eraseColor(android.graphics.Color.WHITE)
+        eraseColor(android.graphics.Color.TRANSPARENT)
         val canvas = Canvas(this)
         val paint = Paint().apply {
             color = android.graphics.Color.BLACK
@@ -223,7 +224,9 @@ fun StencilScreenPreview() {
         ),
         activeStencilLayerIndex = 0,
         layerCount = StencilLayerCount.TWO,
-        totalPageCount = 4
+        totalPageCount = 4,
+        outputSizeMm = 300f,
+        outputDimension = StencilOutputDimension.WIDTH
     )
 
     GraffitiXRTheme {

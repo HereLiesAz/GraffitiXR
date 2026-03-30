@@ -321,12 +321,8 @@ class MainActivity : ComponentActivity() {
                                 composable(EditorMode.MOCKUP.name) { EditorOverlay(editorViewModel, mainUiState) }
                                 composable(EditorMode.TRACE.name) { EditorOverlay(editorViewModel, mainUiState) }
                                 composable(EditorMode.STENCIL.name) {
-                                    val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId }
-                                    LaunchedEffect(activeLayer) {
-                                        val bmp = activeLayer?.bitmap
-                                        if (bmp != null) {
-                                            stencilViewModel.initFromLayer(activeLayer!!.id, bmp)
-                                        }
+                                    LaunchedEffect(Unit) {
+                                        stencilViewModel.initForWizard(editorUiState.layers)
                                     }
                                     StencilScreen(stencilViewModel)
                                 }
@@ -714,10 +710,10 @@ class MainActivity : ComponentActivity() {
                     com.hereliesaz.graffitixr.common.model.StencilLayerCount.TWO -> com.hereliesaz.graffitixr.common.model.StencilLayerCount.THREE
                     com.hereliesaz.graffitixr.common.model.StencilLayerCount.THREE -> com.hereliesaz.graffitixr.common.model.StencilLayerCount.ONE
                 }
-                stencilViewModel.setLayerCount(next)
+                stencilViewModel.onLayerCountChosen(next)
             }
             azRailSubItem(id = "rebuild", hostId = "stencil_host", text = "Rebuild", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilRebuildInfo) {
-                stencilViewModel.rebuild()
+                stencilViewModel.onRebuild()
             }
             azRailSubItem(id = "view_layer", hostId = "stencil_host", text = "View Lyr", color = Color.White, shape = AzButtonShape.RECTANGLE) {
                 val state = stencilViewModel.uiState.value
@@ -727,13 +723,13 @@ class MainActivity : ComponentActivity() {
             
             azDivider()
             
-            azRailHostItem(id = "print_host", text = "Print", color = Color.White, info = navStrings.stencilPrintInfo)
-            azRailSubItem(id = "print_dim", hostId = "print_host", text = "W / H", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilPrintDimToggleInfo) {
-                stencilViewModel.togglePrintDimension()
+            azRailHostItem(id = "pdf_host", text = "Export", color = Color.White, info = navStrings.stencilPrintInfo)
+            azRailSubItem(id = "pdf_dim", hostId = "pdf_host", text = "W / H", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilPrintDimToggleInfo) {
+                stencilViewModel.toggleOutputDimension()
             }
             azRailSubItem(
-                id = "print_size",
-                hostId = "print_host",
+                id = "pdf_size",
+                hostId = "pdf_host",
                 text = "Size",
                 color = Color.White,
                 shape = AzButtonShape.RECTANGLE,
@@ -745,26 +741,25 @@ class MainActivity : ComponentActivity() {
                             if (!isEnabled) return@pointerInput
                             detectDragGestures { change, dragAmount ->
                                 change.consume()
-                                stencilViewModel.setPrintSize(state.printSizeMm - dragAmount.y * 2f)
+                                stencilViewModel.setOutputSize(state.outputSizeMm - dragAmount.y * 2f)
                             }
                         },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("${state.printSizeMm.toInt()}mm", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        Text("${state.outputSizeMm.toInt()}mm", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             )
-            azRailSubItem(id = "print_pdf", hostId = "print_host", text = "PDF", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilExportPdfInfo) {
+            azRailSubItem(id = "export_pdf", hostId = "pdf_host", text = "PDF", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilExportPdfInfo) {
                 stencilViewModel.exportPdf(context)
+            }
+            azRailSubItem(id = "save_pngs", hostId = "pdf_host", text = "PNG", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilSaveLayersInfo) {
+                stencilViewModel.saveLayersToGallery(context)
             }
             
             azDivider()
             
-            azRailHostItem(id = "export_host", text = "export", color = Color.White)
-            azRailSubItem(id = "save_pngs", hostId = "export_host", text = "png", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilSaveLayersInfo) {
-                stencilViewModel.saveLayersToGallery(context)
-            }
-            azRailSubItem(id = "back_editor", hostId = "export_host", text = "← Editor", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilBackInfo) {
+            azRailItem(id = "back_editor", text = "← Editor", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilBackInfo) {
                 editorViewModel.setEditorMode(EditorMode.MOCKUP)
             }
             return

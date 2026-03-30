@@ -7,7 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.StencilLayerCount
-import com.hereliesaz.graffitixr.common.model.StencilPrintDimension
+import com.hereliesaz.graffitixr.common.model.StencilOutputDimension
 import com.hereliesaz.graffitixr.common.model.StencilUiState
 import com.hereliesaz.graffitixr.common.model.StencilWizardStep
 import com.hereliesaz.graffitixr.common.util.ImageUtils
@@ -29,7 +29,7 @@ import javax.inject.Inject
  * All heavy work runs on Dispatchers.Default via the processor's Flow.
  *
  * Implements a guided 6-step wizard:
- *   PICK_SOURCE → ISOLATE → CHOOSE_LAYERS → GENERATE → PREVIEW → PRINT_EXPORT
+ *   PICK_SOURCE → ISOLATE → CHOOSE_LAYERS → GENERATE → PREVIEW → EXPORT_PDF
  */
 @HiltViewModel
 class StencilViewModel @Inject constructor(
@@ -156,32 +156,15 @@ class StencilViewModel @Inject constructor(
             StencilWizardStep.CHOOSE_LAYERS -> StencilWizardStep.ISOLATE
             StencilWizardStep.GENERATE -> StencilWizardStep.CHOOSE_LAYERS
             StencilWizardStep.PREVIEW -> StencilWizardStep.CHOOSE_LAYERS
-            StencilWizardStep.PRINT_EXPORT -> StencilWizardStep.PREVIEW
+            StencilWizardStep.EXPORT_PDF -> StencilWizardStep.PREVIEW
             else -> return  // PICK_SOURCE has no back
         }
         processingJob?.cancel()
         _uiState.update { it.copy(wizardStep = previous) }
     }
 
-    fun onProceedToPrint() {
-        _uiState.update { it.copy(wizardStep = StencilWizardStep.PRINT_EXPORT) }
-    }
-
-    // ── Deprecated stubs — kept for MainActivity compilation until Step 7 ────
-
-    @Deprecated("Replaced by initForWizard(layers). Kept for Step 7 migration.")
-    fun initFromLayer(layerId: String, bitmap: Bitmap) {
-        // No-op: Step 7 will replace this call site with initForWizard()
-    }
-
-    @Deprecated("Replaced by onLayerCountChosen(count). Kept for Step 7 migration.")
-    fun setLayerCount(count: StencilLayerCount) {
-        onLayerCountChosen(count)
-    }
-
-    @Deprecated("Replaced by onRebuild(). Kept for Step 7 migration.")
-    fun rebuild() {
-        onRebuild()
+    fun onProceedToExport() {
+        _uiState.update { it.copy(wizardStep = StencilWizardStep.EXPORT_PDF) }
     }
 
     // ── Other user actions ────────────────────────────────────────────────────
@@ -190,32 +173,32 @@ class StencilViewModel @Inject constructor(
         _uiState.update { it.copy(activeStencilLayerIndex = index) }
     }
 
-    fun setPrintSize(mm: Float) {
+    fun setOutputSize(mm: Float) {
         val clamped = mm.coerceIn(50f, 5000f)
-        val pageCount = computePageCount(clamped, _uiState.value.printDimension)
+        val pageCount = computePageCount(clamped, _uiState.value.outputDimension)
 
         val warning = if (pageCount > 50) {
             "Large output: $pageCount pages. Consider a smaller size."
         } else null
 
         _uiState.update { it.copy(
-            printSizeMm = clamped,
+            outputSizeMm = clamped,
             totalPageCount = pageCount,
             exportError = warning
         ) }
     }
 
-    fun togglePrintDimension() {
-        val next = if (_uiState.value.printDimension == StencilPrintDimension.WIDTH)
-            StencilPrintDimension.HEIGHT else StencilPrintDimension.WIDTH
-        val pageCount = computePageCount(_uiState.value.printSizeMm, next)
+    fun toggleOutputDimension() {
+        val next = if (_uiState.value.outputDimension == StencilOutputDimension.WIDTH)
+            StencilOutputDimension.HEIGHT else StencilOutputDimension.WIDTH
+        val pageCount = computePageCount(_uiState.value.outputSizeMm, next)
 
         val warning = if (pageCount > 50) {
             "Large output: $pageCount pages. Consider a smaller size."
         } else null
 
         _uiState.update { it.copy(
-            printDimension = next,
+            outputDimension = next,
             totalPageCount = pageCount,
             exportError = warning
         ) }
@@ -229,8 +212,8 @@ class StencilViewModel @Inject constructor(
             val result = printEngine.generatePdf(
                 context = context,
                 layers = layers,
-                printSizeMm = _uiState.value.printSizeMm,
-                printDimension = _uiState.value.printDimension
+                outputSizeMm = _uiState.value.outputSizeMm,
+                outputDimension = _uiState.value.outputDimension
             )
             result.fold(
                 onSuccess = { uri ->
@@ -279,8 +262,8 @@ class StencilViewModel @Inject constructor(
                     }
                     is StencilProgress.Done -> {
                         val pageCount = computePageCount(
-                            _uiState.value.printSizeMm,
-                            _uiState.value.printDimension,
+                            _uiState.value.outputSizeMm,
+                            _uiState.value.outputDimension,
                             event.layers.firstOrNull()?.bitmap
                         )
                         _uiState.update {
@@ -315,7 +298,7 @@ class StencilViewModel @Inject constructor(
      */
     private fun computePageCount(
         sizeMm: Float,
-        dimension: StencilPrintDimension,
+        dimension: StencilOutputDimension,
         referenceBitmap: Bitmap? = _uiState.value.stencilLayers.firstOrNull()?.bitmap
     ): Int {
         val layerCount = _uiState.value.stencilLayers.size.coerceAtLeast(1)
@@ -327,7 +310,7 @@ class StencilViewModel @Inject constructor(
         val mmToPx = 300f / 25.4f
         val outputWidthPx: Float
         val outputHeightPx: Float
-        if (dimension == StencilPrintDimension.WIDTH) {
+        if (dimension == StencilOutputDimension.WIDTH) {
             outputWidthPx = sizeMm * mmToPx
             outputHeightPx = outputWidthPx / aspect
         } else {
