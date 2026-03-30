@@ -91,6 +91,7 @@ data class EditorUiState(
     val brushSize: Float = 50f,
     // Feathering [0..1]: 0 = hard edge, 1 = fully soft (blur radius = brushSize)
     val brushFeathering: Float = 0f,
+    val sketchThickness: Int = 5,
     val activeColor: Color = Color.White,
     val showColorPicker: Boolean = false,
     val showDiagOverlay: Boolean = false,

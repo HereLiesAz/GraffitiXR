@@ -2,7 +2,7 @@
 package com.hereliesaz.graffitixr.feature.editor
 
 import android.graphics.Bitmap
-import com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor
+import com.hereliesaz.graffitixr.common.util.ImageProcessor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.inject.Inject

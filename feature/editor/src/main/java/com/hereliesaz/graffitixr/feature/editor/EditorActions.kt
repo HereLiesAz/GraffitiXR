@@ -18,7 +18,8 @@ interface EditorActions {
     fun onRedoClicked()
     fun onMagicClicked()
     fun onRemoveBackgroundClicked()
-    fun onLineDrawingClicked()
+    fun onSketchClicked()
+    fun onSketchThicknessChanged(thickness: Int)
     fun onCycleBlendMode()
 
     fun toggleImageLock()
