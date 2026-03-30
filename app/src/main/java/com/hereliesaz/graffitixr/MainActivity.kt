@@ -78,6 +78,8 @@ import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.*
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.CaptureStep
+import com.hereliesaz.graffitixr.common.model.StencilLayerCount
+import com.hereliesaz.graffitixr.common.model.StencilWizardStep
 import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
@@ -269,6 +271,7 @@ class MainActivity : ComponentActivity() {
                 var showHelp by remember { mutableStateOf(false) }
                 var showFontPicker by remember { mutableStateOf(false) }
                 var fontPickerLayerId by remember { mutableStateOf<String?>(null) }
+                val layerMenusOpen = remember { mutableStateMapOf<String, Boolean>() }
 
                 val context = LocalContext.current
                 AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
@@ -291,6 +294,7 @@ class MainActivity : ComponentActivity() {
                         configureRailItems(
                             mainViewModel, editorViewModel, arViewModel, dashboardViewModel, stencilViewModel, context,
                             overlayImagePicker, backgroundImagePicker, editorUiState, arUiState, navStrings,
+                            layerMenusOpen = layerMenusOpen,
                             onShowFontPicker = { layerId -> fontPickerLayerId = layerId; showFontPicker = true }
                         )
                     }
@@ -330,12 +334,8 @@ class MainActivity : ComponentActivity() {
                                 composable(EditorMode.MOCKUP.name) { EditorOverlay(editorViewModel, mainUiState) }
                                 composable(EditorMode.TRACE.name) { EditorOverlay(editorViewModel, mainUiState) }
                                 composable(EditorMode.STENCIL.name) {
-                                    val activeLayer = editorUiState.layers.find { it.id == editorUiState.activeLayerId }
-                                    LaunchedEffect(activeLayer) {
-                                        val bmp = activeLayer?.bitmap
-                                        if (bmp != null) {
-                                            stencilViewModel.initFromLayer(activeLayer!!.id, bmp)
-                                        }
+                                    LaunchedEffect(Unit) {
+                                        stencilViewModel.initForWizard(editorUiState.layers)
                                     }
                                     StencilScreen(stencilViewModel)
                                 }
@@ -692,7 +692,6 @@ class MainActivity : ComponentActivity() {
         if (isFinishing) slamManager.destroy()
     }
 
-    @Composable
     private fun AzNavHostScope.configureRailItems(
         mainViewModel: MainViewModel,
         editorViewModel: EditorViewModel,
@@ -705,6 +704,7 @@ class MainActivity : ComponentActivity() {
         editorUiState: EditorUiState,
         arUiState: ArUiState,
         navStrings: NavStrings,
+        layerMenusOpen: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Boolean> = androidx.compose.runtime.snapshots.SnapshotStateMap(),
         onShowFontPicker: (String) -> Unit = {}
     ) {
         val requestPermissions = {
@@ -714,66 +714,129 @@ class MainActivity : ComponentActivity() {
         }
 
         if (editorUiState.editorMode == EditorMode.STENCIL) {
-            azRailHostItem(id = "stencil_host", text = "Stencil", color = Color.White, info = navStrings.stencilInfo)
-            azRailSubItem(id = "layers_toggle", hostId = "stencil_host", text = "Layers", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilLayersInfo) {
-                val current = stencilViewModel.uiState.value.layerCount
-                val next = when (current) {
-                    com.hereliesaz.graffitixr.common.model.StencilLayerCount.ONE -> com.hereliesaz.graffitixr.common.model.StencilLayerCount.TWO
-                    com.hereliesaz.graffitixr.common.model.StencilLayerCount.TWO -> com.hereliesaz.graffitixr.common.model.StencilLayerCount.THREE
-                    com.hereliesaz.graffitixr.common.model.StencilLayerCount.THREE -> com.hereliesaz.graffitixr.common.model.StencilLayerCount.ONE
-                }
-                stencilViewModel.setLayerCount(next)
-            }
-            azRailSubItem(id = "rebuild", hostId = "stencil_host", text = "Rebuild", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilRebuildInfo) {
-                stencilViewModel.rebuild()
-            }
-            azRailSubItem(id = "view_layer", hostId = "stencil_host", text = "View Lyr", color = Color.White, shape = AzButtonShape.RECTANGLE) {
-                val state = stencilViewModel.uiState.value
-                val nextIdx = (state.activeStencilLayerIndex + 1) % state.stencilLayers.size.coerceAtLeast(1)
-                stencilViewModel.setActiveStencilLayer(nextIdx)
-            }
-            
-            azDivider()
-            
-            azRailHostItem(id = "print_host", text = "Print", color = Color.White, info = navStrings.stencilPrintInfo)
-            azRailSubItem(id = "print_dim", hostId = "print_host", text = "W / H", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilPrintDimToggleInfo) {
-                stencilViewModel.togglePrintDimension()
-            }
-            azRailSubItem(
-                id = "print_size",
-                hostId = "print_host",
-                text = "Size",
-                color = Color.White,
-                shape = AzButtonShape.RECTANGLE,
-                info = navStrings.stencilPrintSizeInfo,
-                content = AzComposableContent { isEnabled ->
-                    val state by stencilViewModel.uiState.collectAsState()
-                    Box(
-                        modifier = Modifier.fillMaxSize().pointerInput(isEnabled) {
-                            if (!isEnabled) return@pointerInput
-                            detectDragGestures { change, dragAmount ->
-                                change.consume()
-                                stencilViewModel.setPrintSize(state.printSizeMm - dragAmount.y * 2f)
-                            }
-                        },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("${state.printSizeMm.toInt()}mm", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            val stencilState = stencilViewModel.uiState.value
+            val step = stencilState.wizardStep
+
+            when (step) {
+
+                // ── PICK_SOURCE ────────────────────────────────────────────────────────
+                StencilWizardStep.PICK_SOURCE -> {
+                    azRailHostItem(id = "stencil_pick", text = "Pick Layer", color = Color.White)
+                    val eligibleLayers = editorUiState.layers.filter { it.textParams == null && !it.isSketch && it.uri != null }
+                    eligibleLayers.forEach { layer ->
+                        azRailSubItem(
+                            id = "pick_${layer.id}",
+                            hostId = "stencil_pick",
+                            text = layer.name,
+                            color = Color.White,
+                            shape = AzButtonShape.RECTANGLE
+                        ) {
+                            stencilViewModel.onSourceLayerPicked(layer.id)
+                        }
                     }
                 }
-            )
-            azRailSubItem(id = "print_pdf", hostId = "print_host", text = "PDF", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilExportPdfInfo) {
-                stencilViewModel.exportPdf(context)
-            }
-            
-            azDivider()
-            
-            azRailHostItem(id = "export_host", text = "export", color = Color.White)
-            azRailSubItem(id = "save_pngs", hostId = "export_host", text = "png", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilSaveLayersInfo) {
-                stencilViewModel.saveLayersToGallery(context)
-            }
-            azRailSubItem(id = "back_editor", hostId = "export_host", text = "← Editor", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilBackInfo) {
-                editorViewModel.setEditorMode(EditorMode.MOCKUP)
+
+                // ── ISOLATE ────────────────────────────────────────────────────────────
+                StencilWizardStep.ISOLATE -> {
+                    azRailHostItem(id = "stencil_isolate", text = "Isolate", color = Color.White)
+                    if (!stencilState.isProcessing && stencilState.isolatedBitmap == null) {
+                        azRailSubItem(id = "run_isolate", hostId = "stencil_isolate", text = "Isolate", color = Color.White, shape = AzButtonShape.RECTANGLE) {
+                            stencilViewModel.onIsolateRequested()
+                        }
+                    }
+                    if (stencilState.isolatedBitmap != null && !stencilState.isProcessing) {
+                        azRailSubItem(id = "confirm_isolate", hostId = "stencil_isolate", text = "✓ Confirm", color = Color.White, shape = AzButtonShape.RECTANGLE) {
+                            stencilViewModel.onIsolateConfirmed()
+                        }
+                        azRailSubItem(id = "redo_isolate", hostId = "stencil_isolate", text = "↺ Redo", color = Color.White, shape = AzButtonShape.RECTANGLE) {
+                            stencilViewModel.onIsolateRedo()
+                        }
+                    }
+                    azRailSubItem(id = "isolate_back", hostId = "stencil_isolate", text = "← Back", color = Color.White, shape = AzButtonShape.RECTANGLE) {
+                        stencilViewModel.onBack()
+                    }
+                }
+
+                // ── CHOOSE_LAYERS ──────────────────────────────────────────────────────
+                StencilWizardStep.CHOOSE_LAYERS -> {
+                    azRailHostItem(id = "stencil_layers", text = "Layers", color = Color.White)
+                    listOf(
+                        StencilLayerCount.ONE to "1 Layer",
+                        StencilLayerCount.TWO to "2 Layers",
+                        StencilLayerCount.THREE to "3 Layers"
+                    ).forEach { (count, label) ->
+                        azRailSubItem(id = "layers_${count.name}", hostId = "stencil_layers", text = label, color = Color.White, shape = AzButtonShape.RECTANGLE) {
+                            stencilViewModel.onLayerCountChosen(count)
+                        }
+                    }
+                    azRailSubItem(id = "layers_back", hostId = "stencil_layers", text = "← Back", color = Color.White, shape = AzButtonShape.RECTANGLE) {
+                        stencilViewModel.onBack()
+                    }
+                }
+
+                // ── GENERATE ───────────────────────────────────────────────────────────
+                StencilWizardStep.GENERATE -> {
+                    azRailHostItem(id = "stencil_gen", text = "Generating…", color = Color.White)
+                }
+
+                // ── PREVIEW ────────────────────────────────────────────────────────────
+                StencilWizardStep.PREVIEW -> {
+                    azRailHostItem(id = "stencil_preview", text = "Preview", color = Color.White)
+                    azRailSubItem(id = "view_layer", hostId = "stencil_preview", text = "View Lyr", color = Color.White, shape = AzButtonShape.RECTANGLE) {
+                        val nextIdx = (stencilState.activeStencilLayerIndex + 1) % stencilState.stencilLayers.size.coerceAtLeast(1)
+                        stencilViewModel.setActiveStencilLayer(nextIdx)
+                    }
+                    azRailSubItem(id = "preview_rebuild", hostId = "stencil_preview", text = "← Rebuild", color = Color.White, shape = AzButtonShape.RECTANGLE) {
+                        stencilViewModel.onRebuild()
+                    }
+                    azRailSubItem(id = "preview_print", hostId = "stencil_preview", text = "→ Print", color = Color.White, shape = AzButtonShape.RECTANGLE) {
+                        stencilViewModel.onProceedToPrint()
+                    }
+                }
+
+                // ── PRINT_EXPORT ───────────────────────────────────────────────────────
+                StencilWizardStep.PRINT_EXPORT -> {
+                    azRailHostItem(id = "print_host", text = "Print", color = Color.White, info = navStrings.stencilPrintInfo)
+                    azRailSubItem(id = "print_dim", hostId = "print_host", text = "W / H", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilPrintDimToggleInfo) {
+                        stencilViewModel.togglePrintDimension()
+                    }
+                    azRailSubItem(
+                        id = "print_size",
+                        hostId = "print_host",
+                        text = "Size",
+                        color = Color.White,
+                        shape = AzButtonShape.RECTANGLE,
+                        info = navStrings.stencilPrintSizeInfo,
+                        content = AzComposableContent { isEnabled ->
+                            val state by stencilViewModel.uiState.collectAsState()
+                            Box(
+                                modifier = Modifier.fillMaxSize().pointerInput(isEnabled) {
+                                    if (!isEnabled) return@pointerInput
+                                    detectDragGestures { change, dragAmount ->
+                                        change.consume()
+                                        stencilViewModel.setPrintSize(state.printSizeMm - dragAmount.y * 2f)
+                                    }
+                                },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("${state.printSizeMm.toInt()}mm", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    )
+                    azRailSubItem(id = "print_pdf", hostId = "print_host", text = "PDF", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilExportPdfInfo) {
+                        stencilViewModel.exportPdf(context)
+                    }
+
+                    azDivider()
+
+                    azRailHostItem(id = "export_host", text = "Export", color = Color.White)
+                    azRailSubItem(id = "save_pngs", hostId = "export_host", text = "PNG", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilSaveLayersInfo) {
+                        stencilViewModel.saveLayersToGallery(context)
+                    }
+                    azRailSubItem(id = "back_editor", hostId = "export_host", text = "← Editor", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilBackInfo) {
+                        editorViewModel.setEditorMode(EditorMode.MOCKUP)
+                    }
+                }
             }
             return
         }
@@ -850,7 +913,7 @@ class MainActivity : ComponentActivity() {
         if (canEdit) {
             editorUiState.layers.reversed().forEach { layer ->
                 val activeTool = editorUiState.activeTool
-                var forceOpenHiddenMenu by remember(layer.id) { mutableStateOf(false) }
+                val forceOpenHiddenMenu = layerMenusOpen[layer.id] ?: false
 
                 azRailRelocItem(
                     id = "layer_${layer.id}",
@@ -861,7 +924,7 @@ class MainActivity : ComponentActivity() {
                     nestedRailAlignment = AzNestedRailAlignment.VERTICAL,
                     keepNestedRailOpen = true,
                     forceHiddenMenuOpen = forceOpenHiddenMenu,
-                    onHiddenMenuDismiss = { forceOpenHiddenMenu = false },
+                    onHiddenMenuDismiss = { layerMenusOpen[layer.id] = false },
                     onClick = {
                         editorViewModel.onLayerActivated(layer.id)
                         editorViewModel.setActiveTool(Tool.NONE)
@@ -873,7 +936,7 @@ class MainActivity : ComponentActivity() {
                         if (layer.textParams != null) {
                             azRailItem(id = "edit_text_${layer.id}", text = "Edit", color = Color.White, shape = AzButtonShape.RECTANGLE) {
                                 activate()
-                                forceOpenHiddenMenu = true
+                                layerMenusOpen[layer.id] = true
                             }
                         }
 
