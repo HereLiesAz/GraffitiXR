@@ -5,20 +5,19 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
 import com.hereliesaz.graffitixr.common.model.StencilLayer
 import com.hereliesaz.graffitixr.common.model.StencilLayerCount
 import com.hereliesaz.graffitixr.common.model.StencilLayerType
-import com.hereliesaz.graffitixr.feature.editor.BackgroundRemover
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.withContext
 import org.opencv.android.Utils
+import org.opencv.core.Core
+import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.Size
+import org.opencv.core.TermCriteria
 import org.opencv.imgproc.Imgproc
 import javax.inject.Inject
 
@@ -34,28 +33,20 @@ sealed class StencilProgress {
 /**
  * Core image processing pipeline for Stencil Mode.
  *
- * Converts an arbitrary source bitmap into 1, 2, or 3 physical stencil layers:
+ * Converts a pre-isolated bitmap (background already removed by SubjectIsolator) into
+ * 1, 2, or 3 physical stencil layers via K-means clustering on the HSV V-channel:
  *   Layer 1 — SILHOUETTE  : solid subject outline (always present)
- *   Layer 2 — MIDTONE     : mid-luminance band (3-layer mode only)
- *   Layer 3 — HIGHLIGHT   : peak luminance areas above the silhouette
+ *   Layer 2 — MIDTONE     : mid-luminance cluster (3-layer mode only)
+ *   Layer 3 — HIGHLIGHT   : peak luminance cluster
  *
  * Island handling: OVERPAINT sequential-layering strategy — no bridging required.
  * Upper-layer holes are physically supported by the surrounding sheet material.
  *
  * All processing runs on Dispatchers.Default. Progress is emitted via Flow.
  */
-class StencilProcessor @Inject constructor(
-    private val backgroundRemover: BackgroundRemover
-) {
+class StencilProcessor @Inject constructor() {
 
     companion object {
-        // Max input dimension before downsampling for GrabCut (performance ceiling)
-        private const val MAX_INPUT_PX = 2048
-
-        // Luminance thresholds for tonal band extraction (0..255)
-        private const val HIGHLIGHT_THRESHOLD = 160  // pixels above this → highlight
-        private const val MIDTONE_THRESHOLD = 80     // pixels above this → midtone (below highlight)
-
         // Registration mark geometry (px at source resolution)
         private const val REG_MARK_ARM_LENGTH = 40   // crosshair arm length in px
         private const val REG_MARK_STROKE = 8        // crosshair stroke width in px
@@ -66,46 +57,34 @@ class StencilProcessor @Inject constructor(
     }
 
     /**
-     * Run the full stencil pipeline on [sourceBitmap].
+     * Run the full stencil pipeline on [isolatedBitmap].
+     * The bitmap must have background removed (transparent pixels = background).
+     * SubjectIsolator is expected to have already downsampled to ≤2048px.
      * Emits [StencilProgress] events; final event is [StencilProgress.Done] or [StencilProgress.Error].
      */
     fun process(
-        sourceBitmap: Bitmap,
+        isolatedBitmap: Bitmap,
         layerCount: StencilLayerCount
     ): Flow<StencilProgress> = flow {
 
         emit(StencilProgress.Stage("Preparing image…", 0.05f))
 
         val result = runCatching {
-            // ── Stage 1: Downsample if needed ──────────────────────────────────────
-            val source = downsample(sourceBitmap)
+            // Stage 2: Build subject mask from alpha channel
+            emit(StencilProgress.Stage("Building mask…", 0.20f))
+            val subjectMask = alphaToMask(isolatedBitmap)
 
-            // ── Stage 2: Subject segmentation via OpenCV GrabCut ──────────────────
-            emit(StencilProgress.Stage("Segmenting subject…", 0.15f))
-            val segmented = backgroundRemover.removeBackground(source)
-                .getOrElse { throw IllegalStateException("Subject segmentation failed: ${it.message}", it) }
-
-            // ── Stage 3: Derive binary subject mask from alpha channel ─────────────
-            emit(StencilProgress.Stage("Building mask…", 0.30f))
-            val subjectMask = alphaToMask(segmented)  // white = subject, black = bg
-
-            // ── Stage 4: Contrast crush for tonal separation ──────────────────────
+            // Stage 3: K-means clustering on luminance channel
             emit(StencilProgress.Stage("Analysing tones…", 0.45f))
-            val contrasted = crushContrast(source)
+            val layers = kmeansLayers(isolatedBitmap, subjectMask, layerCount)
 
-            // ── Stage 5: Extract layers ───────────────────────────────────────────
-            emit(StencilProgress.Stage("Extracting layers…", 0.60f))
-            val layers = extractLayers(contrasted, subjectMask, layerCount)
-
-            // ── Stage 6: Morphological closing on non-silhouette layers ───────────
-            emit(StencilProgress.Stage("Smoothing edges…", 0.75f))
+            // Stage 4: Morphological closing on non-silhouette layers
+            emit(StencilProgress.Stage("Smoothing edges…", 0.70f))
             val smoothed = applyMorphClose(layers)
 
-            // ── Stage 7: Registration marks on all layers ─────────────────────────
+            // Stage 5: Registration marks
             emit(StencilProgress.Stage("Adding registration marks…", 0.88f))
-            val marked = injectRegistrationMarks(smoothed, subjectMask)
-
-            marked
+            injectRegistrationMarks(smoothed, subjectMask)
         }
 
         result.fold(
@@ -119,18 +98,7 @@ class StencilProcessor @Inject constructor(
         )
     }.flowOn(Dispatchers.Default)
 
-    // ── Stage 1 ───────────────────────────────────────────────────────────────
-
-    private fun downsample(src: Bitmap): Bitmap {
-        val maxDim = maxOf(src.width, src.height)
-        if (maxDim <= MAX_INPUT_PX) return src.copy(Bitmap.Config.ARGB_8888, false)
-        val scale = MAX_INPUT_PX.toFloat() / maxDim
-        val w = (src.width * scale).toInt()
-        val h = (src.height * scale).toInt()
-        return Bitmap.createScaledBitmap(src, w, h, true)
-    }
-
-    // ── Stage 3 ───────────────────────────────────────────────────────────────
+    // ── Stage 2 ───────────────────────────────────────────────────────────────
 
     /**
      * Converts the alpha channel of [segmented] into a binary ARGB_8888 mask bitmap.
@@ -149,102 +117,114 @@ class StencilProcessor @Inject constructor(
         return mask
     }
 
-    // ── Stage 4 ───────────────────────────────────────────────────────────────
+    // ── Stage 3 ───────────────────────────────────────────────────────────────
 
     /**
-     * Aggressively crushes contrast to maximise tonal separation.
-     * Uses OpenCV convertScaleAbs: alpha=2.5 (contrast), beta=-80 (brightness offset).
-     * Returns a new ARGB_8888 bitmap preserving original dimensions.
+     * Clusters subject pixels into [layerCount] tonal groups using K-means on the HSV
+     * V-channel (luminance). Returns one [StencilLayer] per cluster, sorted darkest first
+     * (overpaint strategy: each layer includes all pixels at this darkness or darker).
      */
-    private fun crushContrast(src: Bitmap): Bitmap {
-        val srcMat = Mat()
-        Utils.bitmapToMat(src, srcMat)
-
-        val grayMat = Mat()
-        Imgproc.cvtColor(srcMat, grayMat, Imgproc.COLOR_RGBA2GRAY)
-
-        val crushedMat = Mat()
-        org.opencv.core.Core.convertScaleAbs(grayMat, crushedMat, 2.5, -80.0)
-
-        // Convert back to RGBA so we can work uniformly in ARGB_8888
-        val rgbaMat = Mat()
-        Imgproc.cvtColor(crushedMat, rgbaMat, Imgproc.COLOR_GRAY2RGBA)
-
-        val result = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
-        Utils.matToBitmap(rgbaMat, result)
-
-        srcMat.release(); grayMat.release(); crushedMat.release(); rgbaMat.release()
-        return result
-    }
-
-    // ── Stage 5 ───────────────────────────────────────────────────────────────
-
-    /**
-     * Extracts stencil layers using luminance thresholding + Porter-Duff compositing.
-     *
-     * 1-layer:  SILHOUETTE only (solid subject silhouette on white background)
-     * 2-layer:  SILHOUETTE + HIGHLIGHT
-     * 3-layer:  SILHOUETTE + MIDTONE + HIGHLIGHT
-     *
-     * Returns white-background black-content bitmaps ordered bottom→top.
-     */
-    private fun extractLayers(
-        contrasted: Bitmap,
+    private fun kmeansLayers(
+        isolated: Bitmap,
         subjectMask: Bitmap,
         layerCount: StencilLayerCount
     ): List<StencilLayer> {
-        val w = contrasted.width
-        val h = contrasted.height
-        val pixels = IntArray(w * h)
-        contrasted.getPixels(pixels, 0, w, 0, 0, w, h)
+        val k = layerCount.count
+        val w = isolated.width
+        val h = isolated.height
 
+        // 1. Convert isolated bitmap → HSV, extract V channel (luminance)
+        val srcMat = Mat()
+        Utils.bitmapToMat(isolated, srcMat)
+        val hsvMat = Mat()
+        Imgproc.cvtColor(srcMat, hsvMat, Imgproc.COLOR_RGBA2RGB)
+        val hsvConverted = Mat()
+        Imgproc.cvtColor(hsvMat, hsvConverted, Imgproc.COLOR_RGB2HSV)
+        srcMat.release(); hsvMat.release()
+
+        val channels = ArrayList<Mat>()
+        Core.split(hsvConverted, channels)
+        hsvConverted.release()
+        val vChannel = channels[2]   // V = luminance (index 2 in HSV)
+        channels[0].release(); channels[1].release()
+
+        // 2. Get subject pixels only (mask out background)
         val maskPixels = IntArray(w * h)
         subjectMask.getPixels(maskPixels, 0, w, 0, 0, w, h)
+        val subjectIndices = maskPixels.indices.filter { maskPixels[it] == Color.WHITE }
 
-        // Classify each pixel into tonal bands, masked to subject only
-        // silhouettePixels: all subject pixels → black on white
-        // midtonePixels:    subject pixels with luminance in midtone band
-        // highlightPixels:  subject pixels with luminance above highlight threshold
-        val silPixels = IntArray(w * h) { Color.WHITE }
-        val midPixels = IntArray(w * h) { Color.WHITE }
-        val hiPixels  = IntArray(w * h) { Color.WHITE }
+        if (subjectIndices.isEmpty()) {
+            vChannel.release()
+            // Fallback: return a single silhouette layer
+            val silPixels = maskPixels.map {
+                if (it == Color.WHITE) Color.BLACK else Color.WHITE
+            }.toIntArray()
+            val silBmp = pixelsToBitmap(silPixels, w, h)
+            return listOf(StencilLayer(StencilLayerType.SILHOUETTE, silBmp))
+        }
 
-        for (i in pixels.indices) {
-            val isSubject = maskPixels[i] == Color.WHITE
-            if (!isSubject) continue
+        // 3. Build CV_32F sample matrix from subject V-values
+        val vBytes = ByteArray(w * h)
+        vChannel.get(0, 0, vBytes)
+        vChannel.release()
 
-            val lum = luminance(pixels[i])
-            // Silhouette — every subject pixel becomes black
-            silPixels[i] = Color.BLACK
+        val samples = Mat(subjectIndices.size, 1, CvType.CV_32F)
+        subjectIndices.forEachIndexed { row, idx ->
+            samples.put(row, 0, floatArrayOf((vBytes[idx].toInt() and 0xFF).toFloat()))
+        }
 
-            if (layerCount.count >= 2) {
-                // Highlight — brightest pixels
-                if (lum >= HIGHLIGHT_THRESHOLD) hiPixels[i] = Color.BLACK
+        // 4. Run K-means
+        val labels = Mat()
+        val centers = Mat()
+        val criteria = TermCriteria(
+            TermCriteria.EPS + TermCriteria.MAX_ITER, 10, 1.0
+        )
+        Core.kmeans(
+            samples, k, labels, criteria, 3,
+            Core.KMEANS_PP_CENTERS, centers
+        )
+        samples.release()
+
+        // 5. Sort cluster indices by centroid value (low luminance = shadows first)
+        val centroidValues = FloatArray(k) { i -> centers.get(i, 0)[0].toFloat() }
+        centers.release()
+        val sortedClusterOrder = centroidValues.indices.sortedBy { centroidValues[it] }
+        // sortedClusterOrder[0] = original cluster index that has the lowest centroid (darkest)
+
+        // Build reverse map: original cluster index → sorted position (0 = darkest)
+        val clusterToSortedPos = IntArray(k)
+        sortedClusterOrder.forEachIndexed { sortedPos, originalCluster ->
+            clusterToSortedPos[originalCluster] = sortedPos
+        }
+
+        // 6. Assign each subject pixel to its sorted cluster position
+        val pixelCluster = IntArray(w * h) { -1 }  // -1 = background
+        subjectIndices.forEachIndexed { row, idx ->
+            val originalCluster = labels.get(row, 0)[0].toInt()
+            pixelCluster[idx] = clusterToSortedPos[originalCluster]
+        }
+        labels.release()
+
+        // 7. Build stencil layers: each sorted position → one layer
+        //    Sorted position 0 = darkest (silhouette base)
+        //    Sorted position k-1 = lightest (highlights)
+        //    Layer rule: pixels at this sorted position OR darker → black (overpaint strategy)
+        val layerTypes = when (k) {
+            1 -> listOf(StencilLayerType.SILHOUETTE)
+            2 -> listOf(StencilLayerType.SILHOUETTE, StencilLayerType.HIGHLIGHT)
+            else -> listOf(StencilLayerType.SILHOUETTE, StencilLayerType.MIDTONE, StencilLayerType.HIGHLIGHT)
+        }
+
+        return layerTypes.mapIndexed { sortedPos, layerType ->
+            val layerPixels = IntArray(w * h) { Color.WHITE }
+            for (i in pixelCluster.indices) {
+                // Paint black if this pixel belongs to this cluster or a darker cluster
+                if (pixelCluster[i] in 0..sortedPos) {
+                    layerPixels[i] = Color.BLACK
+                }
             }
-            if (layerCount.count >= 3) {
-                // Midtone — between the two thresholds
-                if (lum in MIDTONE_THRESHOLD until HIGHLIGHT_THRESHOLD) midPixels[i] = Color.BLACK
-            }
+            StencilLayer(layerType, pixelsToBitmap(layerPixels, w, h))
         }
-
-        val silBmp = pixelsToBitmap(silPixels, w, h)
-        val layers = mutableListOf(StencilLayer(StencilLayerType.SILHOUETTE, silBmp))
-
-        if (layerCount.count >= 3) {
-            layers.add(StencilLayer(StencilLayerType.MIDTONE, pixelsToBitmap(midPixels, w, h)))
-        }
-        if (layerCount.count >= 2) {
-            layers.add(StencilLayer(StencilLayerType.HIGHLIGHT, pixelsToBitmap(hiPixels, w, h)))
-        }
-
-        return layers
-    }
-
-    private fun luminance(argb: Int): Int {
-        val r = Color.red(argb)
-        val g = Color.green(argb)
-        val b = Color.blue(argb)
-        return (0.299 * r + 0.587 * g + 0.114 * b).toInt()
     }
 
     private fun pixelsToBitmap(pixels: IntArray, w: Int, h: Int): Bitmap {
@@ -253,7 +233,7 @@ class StencilProcessor @Inject constructor(
         return bmp
     }
 
-    // ── Stage 6 ───────────────────────────────────────────────────────────────
+    // ── Stage 4 ───────────────────────────────────────────────────────────────
 
     /**
      * Applies a morphological closing operation (dilation → erosion) to all
@@ -276,7 +256,7 @@ class StencilProcessor @Inject constructor(
 
         // Invert so black content (stencil) = white in OpenCV binary image
         val inverted = Mat()
-        org.opencv.core.Core.bitwise_not(grayMat, inverted)
+        Core.bitwise_not(grayMat, inverted)
 
         val kernel = Imgproc.getStructuringElement(
             Imgproc.MORPH_RECT,
@@ -287,7 +267,7 @@ class StencilProcessor @Inject constructor(
 
         // Re-invert back to black-content-on-white
         val result = Mat()
-        org.opencv.core.Core.bitwise_not(closed, result)
+        Core.bitwise_not(closed, result)
 
         val rgbaMat = Mat()
         Imgproc.cvtColor(result, rgbaMat, Imgproc.COLOR_GRAY2RGBA)
@@ -301,7 +281,7 @@ class StencilProcessor @Inject constructor(
         return out
     }
 
-    // ── Stage 7 ───────────────────────────────────────────────────────────────
+    // ── Stage 5 ───────────────────────────────────────────────────────────────
 
     /**
      * Injects identical crosshair registration marks at all 4 corners of the subject's

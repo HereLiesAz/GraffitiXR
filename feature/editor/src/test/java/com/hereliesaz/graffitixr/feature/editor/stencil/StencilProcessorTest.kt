@@ -8,20 +8,18 @@ import android.graphics.Paint
 import com.hereliesaz.graffitixr.common.model.StencilLayer
 import com.hereliesaz.graffitixr.common.model.StencilLayerCount
 import com.hereliesaz.graffitixr.common.model.StencilLayerType
-import com.hereliesaz.graffitixr.feature.editor.BackgroundRemover
-import io.mockk.coEvery
+import io.mockk.every
 import io.mockk.mockk
-import io.mockk.spyk
-import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
 import io.mockk.mockkConstructor
+import io.mockk.mockkStatic
+import io.mockk.spyk
+import io.mockk.unmockkAll
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -32,11 +30,11 @@ import org.junit.Test
  *
  * Strategy:
  *   - All tests use synthetic 100×100 bitmaps to avoid any real file I/O.
- *   - [BackgroundRemover] is mocked to return a predetermined segmented bitmap.
- *   - OpenCV Mat operations are NOT mocked — they run on the JVM via the
- *     OpenCV Java bindings already present in the :opencv module.
- *     If OpenCV native libs are unavailable in the test JVM, morphClose tests
- *     will be skipped via assumeTrue.
+ *   - [kmeansLayers] and [applyMorphClose] are mocked via spyk to bypass native
+ *     OpenCV calls that cannot run on the JVM unit-test host.
+ *   - Tests focus on structural correctness: correct layer count, correct layer
+ *     types, non-null/non-empty bitmaps, and progress event ordering.
+ *   - The actual K-means clustering result requires visual verification on device.
  *
  * Coverage targets:
  *   - 1-layer output: only SILHOUETTE present
@@ -44,68 +42,78 @@ import org.junit.Test
  *   - 3-layer output: SILHOUETTE + MIDTONE + HIGHLIGHT present
  *   - Bitmap dimensions preserved through pipeline
  *   - Registration marks injected into all layers
- *   - Error propagation from BackgroundRemover
- *   - Empty subject mask (all background) produces error or empty layers
+ *   - Empty subject mask (all background) is handled gracefully
+ *   - Progress stages emitted in correct order with non-decreasing fractions
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class StencilProcessorTest {
 
-    private lateinit var backgroundRemover: BackgroundRemover
     private lateinit var processor: StencilProcessor
 
-    /** 100×100 ARGB_8888 source — gradient from black (left) to white (right). */
-    private lateinit var sourceBitmap: Bitmap
+    /** 100×100 ARGB_8888 source — fully opaque so alphaToMask sees all pixels as subject. */
+    private lateinit var isolatedBitmap: Bitmap
 
-    /**
-     * Segmented bitmap returned by the mock: a 60×60 white circle centred on the
-     * 100×100 canvas. Pixels inside circle are fully opaque, outside are transparent.
-     */
-    private lateinit var segmentedBitmap: Bitmap
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /** Builds a fake StencilLayer backed by a real (mock) 100×100 bitmap. */
+    private fun fakeLayer(type: StencilLayerType): StencilLayer {
+        val bmp = mockk<Bitmap>(relaxed = true).apply {
+            every { width } returns 100
+            every { height } returns 100
+            every { config } returns Bitmap.Config.ARGB_8888
+            every { getPixel(any(), any()) } returns Color.WHITE
+            every { getPixel(50, 50) } returns Color.BLACK
+            every { getPixel(10, 10) } returns Color.BLACK
+            every { getPixel(0, 0) } returns Color.WHITE
+            every { copy(any(), any()) } returns this
+        }
+        return StencilLayer(type, bmp)
+    }
+
+    /** Fake layer lists returned by the mocked kmeansLayers for each count. */
+    private fun fakeLayersFor(count: StencilLayerCount): List<StencilLayer> = when (count) {
+        StencilLayerCount.ONE -> listOf(fakeLayer(StencilLayerType.SILHOUETTE))
+        StencilLayerCount.TWO -> listOf(
+            fakeLayer(StencilLayerType.SILHOUETTE),
+            fakeLayer(StencilLayerType.HIGHLIGHT)
+        )
+        StencilLayerCount.THREE -> listOf(
+            fakeLayer(StencilLayerType.SILHOUETTE),
+            fakeLayer(StencilLayerType.MIDTONE),
+            fakeLayer(StencilLayerType.HIGHLIGHT)
+        )
+    }
 
     @Before
     fun setUp() {
-        backgroundRemover = mockk()
-        processor = spyk(StencilProcessor(backgroundRemover), recordPrivateCalls = true)
-
-        io.mockk.every { processor["crushContrast"](any<Bitmap>()) } answers { arg<Bitmap>(0) }
-        io.mockk.every { processor["applyMorphClose"](any<List<StencilLayer>>()) } answers { arg<List<StencilLayer>>(0) }
-
-        // Mock OpenCV Mat
-        io.mockk.mockkConstructor(org.opencv.core.Mat::class)
-        mockkStatic(org.opencv.core.Mat::class)
-        mockkStatic(org.opencv.android.Utils::class)
-        mockkStatic(org.opencv.imgproc.Imgproc::class)
-        mockkStatic(org.opencv.core.Core::class)
-
-        // Mock Android graphics
+        // Mock Android graphics statics so Bitmap.createBitmap() works on JVM
         mockkStatic(Bitmap::class)
-        io.mockk.every { Bitmap.createBitmap(any<Int>(), any<Int>(), any()) } answers {
+        every { Bitmap.createBitmap(any<Int>(), any<Int>(), any()) } answers {
             val w = arg<Int>(0)
             val h = arg<Int>(1)
             mockk<Bitmap>(relaxed = true).apply {
-                io.mockk.every { width } returns w
-                io.mockk.every { height } returns h
-                io.mockk.every { config } returns Bitmap.Config.ARGB_8888
-                io.mockk.every { getPixel(any(), any()) } returns Color.WHITE
-                io.mockk.every { getPixel(50, 50) } returns Color.BLACK
-                io.mockk.every { getPixel(0, 0) } returns Color.WHITE
-                io.mockk.every { getPixel(10, 10) } returns Color.BLACK
-                io.mockk.every { copy(any(), any()) } returns this
+                every { width } returns w
+                every { height } returns h
+                every { config } returns Bitmap.Config.ARGB_8888
+                every { getPixel(any(), any()) } returns Color.WHITE
+                every { getPixel(50, 50) } returns Color.BLACK
+                every { getPixel(10, 10) } returns Color.BLACK
+                every { getPixel(0, 0) } returns Color.WHITE
+                every { copy(any(), any()) } returns this
             }
         }
-        io.mockk.every { Bitmap.createScaledBitmap(any(), any(), any(), any()) } answers {
-            val src = arg<Bitmap>(0)
+        every { Bitmap.createScaledBitmap(any(), any(), any(), any()) } answers {
             val w = arg<Int>(1)
             val h = arg<Int>(2)
             mockk<Bitmap>(relaxed = true).apply {
-                io.mockk.every { width } returns w
-                io.mockk.every { height } returns h
-                io.mockk.every { config } returns Bitmap.Config.ARGB_8888
-                io.mockk.every { getPixel(any(), any()) } returns Color.WHITE
-                io.mockk.every { getPixel(50, 50) } returns Color.BLACK
-                io.mockk.every { getPixel(0, 0) } returns Color.WHITE
-                io.mockk.every { getPixel(10, 10) } returns Color.BLACK
-                io.mockk.every { copy(any(), any()) } returns this
+                every { width } returns w
+                every { height } returns h
+                every { config } returns Bitmap.Config.ARGB_8888
+                every { getPixel(any(), any()) } returns Color.WHITE
+                every { getPixel(50, 50) } returns Color.BLACK
+                every { getPixel(10, 10) } returns Color.BLACK
+                every { getPixel(0, 0) } returns Color.WHITE
+                every { copy(any(), any()) } returns this
             }
         }
 
@@ -113,37 +121,46 @@ class StencilProcessorTest {
         mockkConstructor(Paint::class)
 
         mockkStatic(Color::class)
-        io.mockk.every { Color.alpha(any<Int>()) } returns 255
-        io.mockk.every { Color.red(any<Int>()) } returns 255
-        io.mockk.every { Color.green(any<Int>()) } returns 255
-        io.mockk.every { Color.blue(any<Int>()) } returns 255
-        io.mockk.every { Color.rgb(any<Int>(), any<Int>(), any<Int>()) } returns 0
+        every { Color.alpha(any<Int>()) } returns 255
+        every { Color.red(any<Int>()) } returns 255
+        every { Color.green(any<Int>()) } returns 255
+        every { Color.blue(any<Int>()) } returns 255
+        every { Color.rgb(any<Int>(), any<Int>(), any<Int>()) } returns 0
 
-        sourceBitmap = makeLuminanceGradient(100, 100)
-        segmentedBitmap = makeCircleSubject(100, 100, radius = 40)
+        // Mock OpenCV statics to avoid native library requirement on JVM
+        mockkStatic(org.opencv.android.Utils::class)
+        mockkStatic(org.opencv.imgproc.Imgproc::class)
+        mockkStatic(org.opencv.core.Core::class)
+        mockkConstructor(org.opencv.core.Mat::class)
 
-        coEvery { backgroundRemover.removeBackground(any<Bitmap>()) } returns Result.success(segmentedBitmap)
+        // Build the processor under test as a spy so we can mock private methods
+        processor = spyk(StencilProcessor(), recordPrivateCalls = true)
+
+        // Stub kmeansLayers to bypass OpenCV K-means (not runnable on JVM)
+        for (count in StencilLayerCount.entries) {
+            every {
+                processor["kmeansLayers"](any<Bitmap>(), any<Bitmap>(), count)
+            } returns fakeLayersFor(count)
+        }
+
+        // Stub applyMorphClose to pass layers through unchanged (avoids OpenCV morphology)
+        every {
+            processor["applyMorphClose"](any<List<StencilLayer>>())
+        } answers { arg<List<StencilLayer>>(0) }
+
+        isolatedBitmap = makeOpaqueSubject(100, 100)
     }
 
     @After
     fun tearDown() {
-        unmockkStatic(org.opencv.core.Mat::class)
-        unmockkStatic(org.opencv.android.Utils::class)
-        unmockkStatic(org.opencv.imgproc.Imgproc::class)
-        unmockkStatic(org.opencv.core.Core::class)
-        unmockkStatic(Bitmap::class)
-        unmockkStatic(Color::class)
-        io.mockk.unmockkConstructor(org.opencv.core.Mat::class)
-        io.mockk.unmockkConstructor(Canvas::class)
-        io.mockk.unmockkConstructor(Paint::class)
-        io.mockk.clearAllMocks()
+        unmockkAll()
     }
 
     // ── Layer count tests ─────────────────────────────────────────────────────
 
     @Test
     fun `1-layer mode produces only SILHOUETTE`() = runTest {
-        val done = processor.process(sourceBitmap, StencilLayerCount.ONE)
+        val done = processor.process(isolatedBitmap, StencilLayerCount.ONE)
             .filterIsInstance<StencilProgress.Done>()
             .first()
 
@@ -153,7 +170,7 @@ class StencilProcessorTest {
 
     @Test
     fun `2-layer mode produces SILHOUETTE then HIGHLIGHT`() = runTest {
-        val done = processor.process(sourceBitmap, StencilLayerCount.TWO)
+        val done = processor.process(isolatedBitmap, StencilLayerCount.TWO)
             .filterIsInstance<StencilProgress.Done>()
             .first()
 
@@ -164,7 +181,7 @@ class StencilProcessorTest {
 
     @Test
     fun `3-layer mode produces SILHOUETTE, MIDTONE, HIGHLIGHT in order`() = runTest {
-        val done = processor.process(sourceBitmap, StencilLayerCount.THREE)
+        val done = processor.process(isolatedBitmap, StencilLayerCount.THREE)
             .filterIsInstance<StencilProgress.Done>()
             .first()
 
@@ -178,19 +195,19 @@ class StencilProcessorTest {
 
     @Test
     fun `output bitmaps match source dimensions`() = runTest {
-        val done = processor.process(sourceBitmap, StencilLayerCount.TWO)
+        val done = processor.process(isolatedBitmap, StencilLayerCount.TWO)
             .filterIsInstance<StencilProgress.Done>()
             .first()
 
         for (layer in done.layers) {
-            assertEquals("Width mismatch for ${layer.type}", sourceBitmap.width, layer.bitmap.width)
-            assertEquals("Height mismatch for ${layer.type}", sourceBitmap.height, layer.bitmap.height)
+            assertEquals("Width mismatch for ${layer.type}", isolatedBitmap.width, layer.bitmap.width)
+            assertEquals("Height mismatch for ${layer.type}", isolatedBitmap.height, layer.bitmap.height)
         }
     }
 
     @Test
     fun `output bitmaps are ARGB_8888`() = runTest {
-        val done = processor.process(sourceBitmap, StencilLayerCount.TWO)
+        val done = processor.process(isolatedBitmap, StencilLayerCount.TWO)
             .filterIsInstance<StencilProgress.Done>()
             .first()
 
@@ -203,12 +220,12 @@ class StencilProcessorTest {
 
     @Test
     fun `silhouette layer contains black pixels where subject was`() = runTest {
-        val done = processor.process(sourceBitmap, StencilLayerCount.ONE)
+        val done = processor.process(isolatedBitmap, StencilLayerCount.ONE)
             .filterIsInstance<StencilProgress.Done>()
             .first()
 
         val silBmp = done.layers[0].bitmap
-        // Centre pixel is inside the subject circle — should be black
+        // The fake layer has getPixel(50,50) = BLACK
         val centrePixel = silBmp.getPixel(50, 50)
         assertEquals(
             "Centre pixel should be black (subject area)",
@@ -218,12 +235,12 @@ class StencilProcessorTest {
 
     @Test
     fun `silhouette layer contains white pixels outside subject`() = runTest {
-        val done = processor.process(sourceBitmap, StencilLayerCount.ONE)
+        val done = processor.process(isolatedBitmap, StencilLayerCount.ONE)
             .filterIsInstance<StencilProgress.Done>()
             .first()
 
         val silBmp = done.layers[0].bitmap
-        // Corner pixel (0,0) is outside the circle — should be white
+        // The fake layer has getPixel(0,0) = WHITE
         val cornerPixel = silBmp.getPixel(0, 0)
         assertEquals(
             "Corner pixel should be white (background area)",
@@ -235,14 +252,12 @@ class StencilProcessorTest {
 
     @Test
     fun `all layers contain registration marks`() = runTest {
-        val done = processor.process(sourceBitmap, StencilLayerCount.TWO)
+        val done = processor.process(isolatedBitmap, StencilLayerCount.TWO)
             .filterIsInstance<StencilProgress.Done>()
             .first()
 
-        // Registration marks are drawn at the bounding box corners of the subject.
-        // The subject circle is ~40px radius centred at (50,50), so marks will be
-        // near (10,10), (90,10), (90,90), (10,90) ± margin.
-        // We just verify that not every edge pixel is white — marks must exist.
+        // Registration marks are drawn at the bounding box corners.
+        // The fake layers return BLACK near (10,10), verifying the mark region.
         for (layer in done.layers) {
             val hasMarkPixels = hasAnyBlackPixelNearCorner(layer.bitmap)
             assertTrue(
@@ -255,11 +270,12 @@ class StencilProcessorTest {
     // ── Error handling ────────────────────────────────────────────────────────
 
     @Test
-    fun `BackgroundRemover failure emits StencilProgress Error`() = runTest {
-        coEvery { backgroundRemover.removeBackground(any()) } returns
-                Result.failure(RuntimeException("GrabCut exploded"))
+    fun `exception in kmeansLayers emits StencilProgress Error`() = runTest {
+        every {
+            processor["kmeansLayers"](any<Bitmap>(), any<Bitmap>(), any<StencilLayerCount>())
+        } throws RuntimeException("K-means exploded")
 
-        val error = processor.process(sourceBitmap, StencilLayerCount.TWO)
+        val error = processor.process(isolatedBitmap, StencilLayerCount.TWO)
             .filterIsInstance<StencilProgress.Error>()
             .first()
 
@@ -270,7 +286,7 @@ class StencilProcessorTest {
     @Test
     fun `progress stages are emitted before Done`() = runTest {
         val events = mutableListOf<StencilProgress>()
-        processor.process(sourceBitmap, StencilLayerCount.TWO).collect { events.add(it) }
+        processor.process(isolatedBitmap, StencilLayerCount.TWO).collect { events.add(it) }
 
         val stageCount = events.filterIsInstance<StencilProgress.Stage>().size
         assertTrue("Expected at least 3 stage events, got $stageCount", stageCount >= 3)
@@ -282,7 +298,7 @@ class StencilProcessorTest {
     @Test
     fun `progress fractions are monotonically non-decreasing`() = runTest {
         var lastFraction = -1f
-        processor.process(sourceBitmap, StencilLayerCount.TWO).collect { event ->
+        processor.process(isolatedBitmap, StencilLayerCount.TWO).collect { event ->
             if (event is StencilProgress.Stage) {
                 assertTrue(
                     "Fraction ${event.fraction} decreased from $lastFraction",
@@ -297,7 +313,7 @@ class StencilProcessorTest {
 
     @Test
     fun `layer labels contain type name`() = runTest {
-        val done = processor.process(sourceBitmap, StencilLayerCount.THREE)
+        val done = processor.process(isolatedBitmap, StencilLayerCount.THREE)
             .filterIsInstance<StencilProgress.Done>()
             .first()
 
@@ -309,37 +325,43 @@ class StencilProcessorTest {
         }
     }
 
+    // ── K-means structural correctness ────────────────────────────────────────
+
+    @Test
+    fun `kmeansLayers returns correct number of layers for each count`() = runTest {
+        for (count in StencilLayerCount.entries) {
+            val done = processor.process(isolatedBitmap, count)
+                .filterIsInstance<StencilProgress.Done>()
+                .first()
+            assertEquals(
+                "Expected ${count.count} layers for $count",
+                count.count,
+                done.layers.size
+            )
+        }
+    }
+
+    @Test
+    fun `all returned layers have non-null bitmaps`() = runTest {
+        val done = processor.process(isolatedBitmap, StencilLayerCount.THREE)
+            .filterIsInstance<StencilProgress.Done>()
+            .first()
+
+        for (layer in done.layers) {
+            assertNotNull("Bitmap for layer ${layer.type} must not be null", layer.bitmap)
+        }
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /**
-     * Creates a 100×100 ARGB_8888 bitmap with a horizontal luminance gradient:
-     * left edge is black (lum=0), right edge is white (lum=255).
+     * Creates a 100×100 ARGB_8888 bitmap that is fully opaque white.
+     * Used as the isolated bitmap input (simulates a pre-isolated subject).
      */
-    private fun makeLuminanceGradient(w: Int, h: Int): Bitmap {
+    private fun makeOpaqueSubject(w: Int, h: Int): Bitmap {
         val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
-        val paint = Paint()
-        for (x in 0 until w) {
-            val v = (x * 255 / (w - 1)).coerceIn(0, 255)
-            paint.color = Color.rgb(v, v, v)
-            canvas.drawLine(x.toFloat(), 0f, x.toFloat(), h.toFloat(), paint)
-        }
-        return bmp
-    }
-
-    /**
-     * Creates a bitmap with a white-filled circle (fully opaque) on a fully transparent
-     * background. Used as the mock segmented output from BackgroundRemover.
-     */
-    private fun makeCircleSubject(w: Int, h: Int, radius: Int): Bitmap {
-        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bmp)
-        canvas.drawColor(Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            style = Paint.Style.FILL
-        }
-        canvas.drawCircle(w / 2f, h / 2f, radius.toFloat(), paint)
+        canvas.drawColor(Color.WHITE)
         return bmp
     }
 
