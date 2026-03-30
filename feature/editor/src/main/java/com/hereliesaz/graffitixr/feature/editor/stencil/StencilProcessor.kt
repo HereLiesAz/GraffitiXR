@@ -340,6 +340,13 @@ class StencilProcessor @Inject constructor(
         Imgproc.threshold(alphaMat, mask, 0.0, 255.0, Imgproc.THRESH_BINARY)
         val meanColor = Core.mean(hsv, mask)
 
+        // We know it's either Black (0,0,0), Gray (128,128,128), or White (255,255,255)
+        // Just fill the RGB channels based on where closedAlpha > 0
+        // Or simpler, since the input had transparent background and a single color,
+        // we can just recreate the image using the original color and the new alpha
+
+        // This is a bit complex in OpenCV. A simpler way is to bitwise_and the color.
+        val colorMat = Mat(srcMat.size(), srcMat.type(), org.opencv.core.Scalar(meanColor.`val`[0], meanColor.`val`[1], meanColor.`val`[2], 255.0))
         val out = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
 
         // Simpler way using Android Bitmap
