@@ -782,7 +782,9 @@ class MainActivity : ComponentActivity() {
         azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = Color.White, shape = AzButtonShape.NONE, info = navStrings.overlayInfo)
         azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = Color.White, shape = AzButtonShape.NONE, info = navStrings.mockupInfo)
         azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, route = EditorMode.TRACE.name, color = Color.White, shape = AzButtonShape.NONE, info = navStrings.traceInfo)
-        azRailSubItem(id = "stencil", hostId = "mode_host", text = navStrings.stencil, route = EditorMode.STENCIL.name, color = Color.White, shape = AzButtonShape.NONE, info = navStrings.stencilInfo)
+        if (editorUiState.layers.any { it.textParams == null }) {
+            azRailSubItem(id = "stencil", hostId = "mode_host", text = navStrings.stencil, route = EditorMode.STENCIL.name, color = Color.White, shape = AzButtonShape.NONE, info = navStrings.stencilInfo)
+        }
 
         azDivider()
 
@@ -847,6 +849,7 @@ class MainActivity : ComponentActivity() {
         if (canEdit) {
             editorUiState.layers.reversed().forEach { layer ->
                 val activeTool = editorUiState.activeTool
+                var forceOpenHiddenMenu by remember(layer.id) { mutableStateOf(false) }
 
                 azRailRelocItem(
                     id = "layer_${layer.id}",
@@ -856,6 +859,8 @@ class MainActivity : ComponentActivity() {
                     info = navStrings.layerInfo,
                     nestedRailAlignment = AzNestedRailAlignment.VERTICAL,
                     keepNestedRailOpen = true,
+                    forceHiddenMenuOpen = forceOpenHiddenMenu,
+                    onHiddenMenuDismiss = { forceOpenHiddenMenu = false },
                     onClick = {
                         editorViewModel.onLayerActivated(layer.id)
                         editorViewModel.setActiveTool(Tool.NONE)
@@ -863,6 +868,13 @@ class MainActivity : ComponentActivity() {
                     onRelocate = { _, _, new -> editorViewModel.onLayerReordered(new.map { it.removePrefix("layer_") }.reversed()) },
                     nestedContent = {
                         val activate = { editorViewModel.onLayerActivated(layer.id) }
+
+                        if (layer.textParams != null) {
+                            azRailItem(id = "edit_text_${layer.id}", text = "Edit", color = Color.White, shape = AzButtonShape.RECTANGLE) {
+                                activate()
+                                forceOpenHiddenMenu = true
+                            }
+                        }
 
                         val addSizeItem: () -> Unit = {
                             azRailItem(
@@ -1142,7 +1154,11 @@ class MainActivity : ComponentActivity() {
                 ) {
                     inputItem(hint = "Rename") { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
                     if (layer.textParams != null) {
-                        inputItem(hint = "Edit text") { text -> editorViewModel.onTextContentChanged(layer.id, text) }
+                        inputItem(
+                            hint = "Edit text",
+                            initialValue = layer.textParams!!.text,
+                            onValueChange = { text -> editorViewModel.onTextContentChanged(layer.id, text) }
+                        )
                     }
                     listItem(text = "Copy Edits") { editorViewModel.copyLayerModifications(layer.id) }
                     listItem(text = "Paste Edits") { editorViewModel.pasteLayerModifications(layer.id) }

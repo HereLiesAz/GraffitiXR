@@ -64,15 +64,23 @@ class EditorViewModelTest {
         mockkStatic(Toast::class)
         every { Toast.makeText(any(), any<String>(), any()) } returns mockk(relaxed = true)
         mockkObject(com.hereliesaz.graffitixr.common.util.ImageUtils)
+        mockkObject(TextRasterizer)
+        mockkObject(GoogleFontCache)
 
         val mockBitmap = mockk<Bitmap>(relaxed = true)
         every { mockBitmap.width } returns 100
         every { mockBitmap.height } returns 100
+        every { mockBitmap.copy(any(), any()) } returns mockBitmap
         every { BitmapFactory.decodeStream(any()) } returns mockBitmap
 
         // Mock ImageUtils so ImageDecoder/BitmapFactory isn't invoked in unit tests
         coEvery { com.hereliesaz.graffitixr.common.util.ImageUtils.getBitmapDimensions(any(), any()) } returns Pair(100, 100)
         coEvery { com.hereliesaz.graffitixr.common.util.ImageUtils.loadBitmapAsync(any(), any()) } returns mockBitmap
+        every { com.hereliesaz.graffitixr.common.util.ImageUtils.bitmapToByteArray(any()) } returns ByteArray(0)
+
+        // Mock TextRasterizer and GoogleFontCache to avoid Android dependencies
+        every { TextRasterizer.rasterize(any(), any(), any(), any(), any()) } returns mockBitmap
+        coEvery { GoogleFontCache.getTypeface(any(), any(), any(), any()) } returns mockk(relaxed = true)
 
         every { Uri.parse(any()) } answers {
             val uriString = it.invocation.args[0] as String
@@ -106,6 +114,8 @@ class EditorViewModelTest {
         unmockkStatic(Uri::class)
         unmockkStatic(Toast::class)
         unmockkObject(com.hereliesaz.graffitixr.common.util.ImageUtils)
+        unmockkObject(TextRasterizer)
+        unmockkObject(GoogleFontCache)
     }
 
     @Test
@@ -366,6 +376,8 @@ class EditorViewModelTest {
         val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
+        println("Layers after adding image: ${viewModel.uiState.value.layers.size}")
+        viewModel.uiState.value.layers.forEach { println("Layer: ${it.name}, textParams: ${it.textParams}") }
         assertTrue(viewModel.uiState.value.layers.any { it.textParams == null })
 
         // 4. Remove image layer -> back to no stencil content
