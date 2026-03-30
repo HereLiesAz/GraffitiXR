@@ -43,7 +43,10 @@
       "Bash(git -C /home/az/StudioProjects/GraffitiXR check-ignore -q .worktrees)",
       "Bash(git -C /home/az/StudioProjects/GraffitiXR add .gitignore)",
       "Bash(git -C /home/az/StudioProjects/GraffitiXR commit -m \"chore: add .worktrees/ to .gitignore\")",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(cp /home/az/.gradle/caches/modules-2/files-2.1/com.github.HereLiesAz/AzNavRail/7.83/34f885a4ab7b52b1ab90801856b9f88100db5aee/AzNavRail-7.83.aar .)",
+      "Bash(unzip -p AzNavRail-7.83.aar classes.jar)",
+      "Bash(awk 'NR>=694' /home/az/StudioProjects/GraffitiXR/.worktrees/feature/stencil-outline-overhaul/app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt)"
     ]
   }
 }

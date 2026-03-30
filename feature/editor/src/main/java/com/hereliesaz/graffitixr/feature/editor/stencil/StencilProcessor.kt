@@ -314,7 +314,7 @@ class StencilProcessor @Inject constructor() {
         alphaBmp.recycle()
 
 
-        srcMat.release(); grayMat.release(); alphaMat.release(); binary.release()
+        srcMat.release(); alphaMat.release(); binary.release()
         kernel.release(); closedAlpha.release(); hsv.release(); mask.release()
         for(c in channels) { c.release() }
 
