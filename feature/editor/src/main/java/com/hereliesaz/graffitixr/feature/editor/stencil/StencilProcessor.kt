@@ -318,9 +318,6 @@ class StencilProcessor @Inject constructor(
         val srcMat = Mat()
         Utils.bitmapToMat(src, srcMat)
 
-        val grayMat = Mat()
-        Imgproc.cvtColor(srcMat, grayMat, Imgproc.COLOR_RGBA2GRAY)
-
         // The stencil features are alpha>0
         val channels = java.util.ArrayList<Mat>()
         Core.split(srcMat, channels)
@@ -342,16 +339,6 @@ class StencilProcessor @Inject constructor(
         val mask = Mat()
         Imgproc.threshold(alphaMat, mask, 0.0, 255.0, Imgproc.THRESH_BINARY)
         val meanColor = Core.mean(hsv, mask)
-
-        val resultAlpha = Mat()
-        closedAlpha.copyTo(resultAlpha)
-
-        val rgbaMat = Mat()
-        srcMat.copyTo(rgbaMat)
-
-        // Apply closed alpha
-        val newChannels = java.util.ArrayList<Mat>()
-        Core.split(rgbaMat, newChannels)
 
         // We know it's either Black (0,0,0), Gray (128,128,128), or White (255,255,255)
         // Just fill the RGB channels based on where closedAlpha > 0
@@ -386,7 +373,7 @@ class StencilProcessor @Inject constructor(
         alphaBmp.recycle()
 
 
-        srcMat.release(); grayMat.release(); alphaMat.release(); binary.release()
+        srcMat.release(); binary.release()
         kernel.release(); closedAlpha.release(); hsv.release(); mask.release()
         for(c in channels) { c.release() }
 

@@ -219,7 +219,7 @@ class StencilPrintEngine @Inject constructor() {
         
         // Cleanup
         tileBmp.recycle()
-        mat.release(); alphaChannel.release(); binary.release(); hierarchy.release()
+        mat.release(); binary.release(); hierarchy.release()
         for (c in channels) { c.release() }
         contours.forEach { it.release() }
     }
