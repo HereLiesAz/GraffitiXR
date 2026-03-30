@@ -2,6 +2,8 @@ package com.hereliesaz.graffitixr.feature.editor.stencil
 
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Color.Companion.Transparent
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -60,7 +63,7 @@ fun StencilScreenContent(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DarkGrey),
+            .background(Transparent),
         contentAlignment = Alignment.Center
     ) {
         // ── Main Preview ─────────────────────────────────────────────────────
@@ -206,8 +209,8 @@ private fun LayerThumbnail(
 fun StencilScreenPreview() {
     val mockBitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888).apply {
         eraseColor(android.graphics.Color.WHITE)
-        val canvas = android.graphics.Canvas(this)
-        val paint = android.graphics.Paint().apply {
+        val canvas = Canvas(this)
+        val paint = Paint().apply {
             color = android.graphics.Color.BLACK
             strokeWidth = 5f
         }

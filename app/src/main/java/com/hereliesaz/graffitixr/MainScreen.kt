@@ -47,6 +47,7 @@ import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import kotlinx.coroutines.coroutineScope
 import android.graphics.Bitmap as AndroidBitmap
 import androidx.core.graphics.createBitmap
+import com.hereliesaz.graffitixr.design.theme.Black
 
 @Composable
 fun MainScreen(
@@ -69,7 +70,7 @@ fun MainScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val rendererRef = remember { mutableStateOf<ArRenderer?>(null) }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    Box(modifier = Modifier.fillMaxSize().background(Black)) {
 
         DisposableEffect(lifecycleOwner) {
             val observer = LifecycleEventObserver { _, event ->
@@ -194,44 +195,18 @@ fun MainScreen(
 
                 EditorMode.MOCKUP, EditorMode.TRACE -> {}
             }
-
-            uiState.backgroundBitmap?.takeIf { uiState.editorMode == EditorMode.MOCKUP }
-                ?.let { bmp ->
-                    Image(
-                        bitmap = bmp.asImageBitmap(),
-                        contentDescription = "Background Mockup",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool) {
-                        if (isWaitingForTap) {
-                            detectTapGestures { offset ->
-                                val nx = offset.x / size.width
-                                val ny = offset.y / size.height
-                                arViewModel.onScreenTap(nx, ny)
-                            }
-                        } else if (!isTouchLocked && !isImageLocked && activeLayer != null) {
-                            if (uiState.activeTool == Tool.NONE) {
-                                detectTapGestures(onDoubleTap = { editorViewModel.onCycleRotationAxis() })
-                            }
-                        }
-                    }
-                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool) {
-                        if (!isTouchLocked && !isImageLocked && activeLayer != null && !isWaitingForTap) {
-                            if (uiState.activeTool == Tool.NONE) {
-                                detectTransformGestures { _, pan, zoom, rotation ->
-                                    editorViewModel.onTransformGesture(pan, zoom, rotation)
-                                }
-                            }
-                        }
-                    }
-            ) {}
         }
+
+        uiState.backgroundBitmap?.takeIf { uiState.editorMode == EditorMode.MOCKUP }
+            ?.let { bmp ->
+                Image(
+                    bitmap = bmp.asImageBitmap(),
+                    contentDescription = "Background Mockup",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+
 
         if (uiState.editorMode != EditorMode.AR && uiState.editorMode != EditorMode.STENCIL) {
             uiState.layers.filter { it.isVisible }.forEach { layer ->
@@ -281,6 +256,35 @@ fun MainScreen(
                     )
                 }
             }
+        }
+
+        if (uiState.editorMode != EditorMode.STENCIL) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool) {
+                        if (isWaitingForTap) {
+                            detectTapGestures { offset ->
+                                val nx = offset.x / size.width
+                                val ny = offset.y / size.height
+                                arViewModel.onScreenTap(nx, ny)
+                            }
+                        } else if (!isTouchLocked && !isImageLocked && activeLayer != null) {
+                            if (uiState.activeTool == Tool.NONE) {
+                                detectTapGestures(onDoubleTap = { editorViewModel.onCycleRotationAxis() })
+                            }
+                        }
+                    }
+                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool) {
+                        if (!isTouchLocked && !isImageLocked && activeLayer != null && !isWaitingForTap) {
+                            if (uiState.activeTool == Tool.NONE) {
+                                detectTransformGestures { _, pan, zoom, rotation ->
+                                    editorViewModel.onTransformGesture(pan, zoom, rotation)
+                                }
+                            }
+                        }
+                    }
+            ) {}
         }
 
         if (!isTouchLocked && !isImageLocked && activeLayer != null) {
