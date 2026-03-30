@@ -38,6 +38,7 @@ import javax.inject.Inject
 import androidx.core.net.toUri
 import androidx.core.graphics.createBitmap
 import com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor
+import com.hereliesaz.graffitixr.common.util.SketchProcessor
 
 data class StrokeCommand(
     val path: List<Offset>,
@@ -63,7 +64,7 @@ class EditorViewModel @Inject constructor(
     private val projectManager: ProjectManager,
     private val exportManager: ExportManager,
     @ApplicationContext private val context: Context,
-    private val backgroundRemover: BackgroundRemover,
+    private val subjectIsolator: SubjectIsolator,
     internal val slamManager: SlamManager,
     private val dispatchers: DispatcherProvider
 ) : ViewModel(), EditorActions {
@@ -552,7 +553,7 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.default) {
             val bitmap = ImageUtils.loadBitmapAsync(context, uri)
             if (bitmap != null) {
-                val result = backgroundRemover.removeBackground(bitmap)
+                val result = subjectIsolator.isolate(bitmap)
                 result.onSuccess { fgBitmap ->
                     val path = projectRepository.saveArtifact(projectId, "bg_removed_${System.currentTimeMillis()}.png", ImageUtils.bitmapToByteArray(fgBitmap))
                     updateLayerUri(layerId, "file://$path".toUri())
@@ -564,7 +565,7 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    override fun onLineDrawingClicked() {
+    override fun onSketchClicked() {
         val state = _uiState.value
         val layerId = state.activeLayerId ?: return
         val layer = state.layers.find { it.id == layerId } ?: return
@@ -577,16 +578,48 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.default) {
             val bitmap = ImageUtils.loadBitmapAsync(context, uri)
             if (bitmap != null) {
-                val resultBitmap = com.hereliesaz.graffitixr.common.util.ImageProcessor.detectEdges(bitmap)
-                if (resultBitmap != null) {
-                    val path = projectRepository.saveArtifact(projectId, "line_art_${System.currentTimeMillis()}.png", ImageUtils.bitmapToByteArray(resultBitmap))
-                    updateLayerUri(layerId, "file://$path".toUri())
+                val sketchBitmap = SketchProcessor.sketchEffect(bitmap, state.sketchThickness)
+                if (sketchBitmap != null) {
+                    val path = projectRepository.saveArtifact(
+                        projectId,
+                        "sketch_${System.currentTimeMillis()}.png",
+                        ImageUtils.bitmapToByteArray(sketchBitmap)
+                    )
+                    val sketchUri = "file://$path".toUri()
+                    val sketchLayer = Layer(
+                        id = java.util.UUID.randomUUID().toString(),
+                        name = "Sketch – ${layer.name}",
+                        uri = sketchUri,
+                        isSketch = true,
+                        isLinked = true,
+                        blendMode = androidx.compose.ui.graphics.BlendMode.Multiply
+                    )
+                    withContext(dispatchers.main) {
+                        _uiState.update { s ->
+                            val idx = s.layers.indexOfFirst { it.id == layerId }
+                            if (idx < 0) return@update s
+                            val newLayers = s.layers.toMutableList().also { list ->
+                                // Mark source layer as linked
+                                list[idx] = list[idx].copy(isLinked = true)
+                                // Insert sketch layer immediately above source
+                                list.add(idx + 1, sketchLayer)
+                            }
+                            s.copy(layers = newLayers, isLoading = false)
+                        }
+                    }
+                    // Load the bitmap into the sketch layer so it renders immediately
+                    updateLayerUri(sketchLayer.id, sketchUri)
+                    return@launch
                 }
             }
             withContext(dispatchers.main) {
                 _uiState.update { it.copy(isLoading = false) }
             }
         }
+    }
+
+    override fun onSketchThicknessChanged(thickness: Int) {
+        _uiState.update { it.copy(sketchThickness = thickness.coerceIn(1, 20)) }
     }
 
     private fun updateLayerUri(id: String, uri: Uri) {

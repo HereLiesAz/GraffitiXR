@@ -18,43 +18,6 @@ import kotlin.math.max
 
 object ImageProcessor {
 
-    fun detectEdges(bitmap: Bitmap): Bitmap? {
-        return try {
-            val srcMat = Mat()
-            Utils.bitmapToMat(bitmap, srcMat)
-
-            val grayMat = Mat()
-            Imgproc.cvtColor(srcMat, grayMat, Imgproc.COLOR_RGBA2GRAY)
-
-            val edgesMat = Mat()
-            Imgproc.Canny(grayMat, edgesMat, 50.0, 150.0)
-
-            // Build RGBA: black lines (R=G=B=0) where edges were detected, transparent elsewhere.
-            val zero = Mat.zeros(edgesMat.size(), CvType.CV_8UC1)
-            val channels = java.util.ArrayList<Mat>(4)
-            channels.add(zero)      // R = 0
-            channels.add(zero)      // G = 0
-            channels.add(zero)      // B = 0
-            channels.add(edgesMat)  // A = edge mask (255 on edge, 0 elsewhere)
-            val dstMat = Mat()
-            Core.merge(channels, dstMat)
-
-            val resultBitmap = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
-            Utils.matToBitmap(dstMat, resultBitmap)
-
-            srcMat.release()
-            grayMat.release()
-            edgesMat.release()
-            zero.release()
-            dstMat.release()
-
-            resultBitmap
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
-        }
-    }
-
     fun unwarpImage(bitmap: Bitmap, points: List<Offset>): Bitmap? {
         if (points.size != 4) return null
 

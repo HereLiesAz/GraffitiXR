@@ -45,7 +45,7 @@ class EditorViewModelTest {
     private val projectRepository: ProjectRepository = mockk(relaxed = true)
     private val currentProjectFlow = kotlinx.coroutines.flow.MutableStateFlow<GraffitiProject?>(null)
     private val context: Context = mockk(relaxed = true)
-    private val backgroundRemover: BackgroundRemover = mockk(relaxed = true)
+    private val subjectIsolator: SubjectIsolator = mockk(relaxed = true)
     private val projectManager: ProjectManager = mockk(relaxed = true)
     private val exportManager: com.hereliesaz.graffitixr.feature.editor.export.ExportManager = mockk(relaxed = true)
     private val slamManager: SlamManager = mockk(relaxed = true)
@@ -61,6 +61,7 @@ class EditorViewModelTest {
         
         // Mock static methods for Bitmap, Uri, and Toast
         mockkStatic(BitmapFactory::class)
+        mockkStatic(android.graphics.Bitmap::class)
         mockkStatic(Uri::class)
         mockkStatic(Toast::class)
         every { Toast.makeText(any(), any<String>(), any()) } returns mockk(relaxed = true)
@@ -73,6 +74,7 @@ class EditorViewModelTest {
         every { mockBitmap.height } returns 100
         every { mockBitmap.copy(any(), any()) } returns mockBitmap
         every { BitmapFactory.decodeStream(any()) } returns mockBitmap
+        every { android.graphics.Bitmap.createBitmap(any<Int>(), any<Int>(), any()) } returns mockBitmap
 
         // Mock ImageUtils so ImageDecoder/BitmapFactory isn't invoked in unit tests
         coEvery { com.hereliesaz.graffitixr.common.util.ImageUtils.getBitmapDimensions(any(), any()) } returns Pair(100, 100)
@@ -106,13 +108,14 @@ class EditorViewModelTest {
             override val unconfined: CoroutineDispatcher = testDispatcher
         }
 
-        viewModel = EditorViewModel(projectRepository, projectManager, exportManager, context, backgroundRemover, slamManager, testDispatcherProvider)
+        viewModel = EditorViewModel(projectRepository, projectManager, exportManager, context, subjectIsolator, slamManager, testDispatcherProvider)
     }
 
     @After
     fun tearDown() {
         Dispatchers.resetMain()
         unmockkStatic(BitmapFactory::class)
+        unmockkStatic(android.graphics.Bitmap::class)
         unmockkStatic(Uri::class)
         unmockkStatic(Toast::class)
         unmockkObject(com.hereliesaz.graffitixr.common.util.ImageUtils)
@@ -187,7 +190,7 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `onRemoveBackgroundClicked calls backgroundRemover and saves artifact`() = runTest {
+    fun `onRemoveBackgroundClicked calls subjectIsolator and saves artifact`() = runTest {
         mockkObject(com.hereliesaz.graffitixr.common.util.ImageProcessor)
         val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
@@ -197,35 +200,39 @@ class EditorViewModelTest {
         viewModel.onLayerActivated(layerId)
         
         val processedBitmap = mockk<Bitmap>(relaxed = true)
-        coEvery { backgroundRemover.removeBackground(any()) } returns Result.success(processedBitmap)
-        
+        coEvery { subjectIsolator.isolate(any()) } returns Result.success(processedBitmap)
+
         viewModel.onRemoveBackgroundClicked()
         testDispatcher.scheduler.advanceUntilIdle()
-        
-        coVerify { backgroundRemover.removeBackground(any()) }
+
+        coVerify { subjectIsolator.isolate(any()) }
         coVerify { projectRepository.saveArtifact(any(), any(), any()) }
         unmockkObject(com.hereliesaz.graffitixr.common.util.ImageProcessor)
     }
 
     @Test
-    fun `onLineDrawingClicked calls ImageProcessor and saves artifact`() = runTest {
-        mockkObject(com.hereliesaz.graffitixr.common.util.ImageProcessor)
+    fun `onSketchClicked calls SketchProcessor and creates linked sketch layer`() = runTest {
+        mockkObject(com.hereliesaz.graffitixr.common.util.SketchProcessor)
         val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
-        
+
         val layerId = viewModel.uiState.value.layers.first().id
         viewModel.onLayerActivated(layerId)
-        
-        val processedBitmap = mockk<Bitmap>(relaxed = true)
-        every { com.hereliesaz.graffitixr.common.util.ImageProcessor.detectEdges(any()) } returns processedBitmap
-        
-        viewModel.onLineDrawingClicked()
+
+        val sketchBitmap = mockk<Bitmap>(relaxed = true)
+        every { com.hereliesaz.graffitixr.common.util.SketchProcessor.sketchEffect(any(), any()) } returns sketchBitmap
+
+        viewModel.onSketchClicked()
         testDispatcher.scheduler.advanceUntilIdle()
-        
-        verify { com.hereliesaz.graffitixr.common.util.ImageProcessor.detectEdges(any()) }
+
+        verify { com.hereliesaz.graffitixr.common.util.SketchProcessor.sketchEffect(any(), any()) }
         coVerify { projectRepository.saveArtifact(any(), any(), any()) }
-        unmockkObject(com.hereliesaz.graffitixr.common.util.ImageProcessor)
+        // A new sketch layer should have been inserted above the source layer
+        val layers = viewModel.uiState.value.layers
+        assertTrue(layers.size >= 2)
+        assertTrue(layers.any { it.isSketch && it.isLinked })
+        unmockkObject(com.hereliesaz.graffitixr.common.util.SketchProcessor)
     }
 
     @Test
