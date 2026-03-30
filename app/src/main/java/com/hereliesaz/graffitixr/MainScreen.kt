@@ -263,7 +263,7 @@ fun MainScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool) {
+                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isWaitingForTap, isTouchLocked) {
                         if (isWaitingForTap) {
                             detectTapGestures { offset ->
                                 val nx = offset.x / size.width
@@ -276,7 +276,7 @@ fun MainScreen(
                             }
                         }
                     }
-                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool) {
+                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isWaitingForTap, isTouchLocked) {
                         if (!isTouchLocked && !isImageLocked && activeLayer != null && !isWaitingForTap) {
                             if (uiState.activeTool == Tool.NONE) {
                                 detectTransformGestures { _, pan, zoom, rotation ->
