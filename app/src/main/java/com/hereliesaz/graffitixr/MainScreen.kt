@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Color.Companion.Transparent
 import com.hereliesaz.graffitixr.common.model.Layer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -70,7 +71,7 @@ fun MainScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val rendererRef = remember { mutableStateOf<ArRenderer?>(null) }
 
-    Box(modifier = Modifier.fillMaxSize().background(Black)) {
+    Box(modifier = Modifier.fillMaxSize().background(Transparent)) {
 
         DisposableEffect(lifecycleOwner) {
             val observer = LifecycleEventObserver { _, event ->
