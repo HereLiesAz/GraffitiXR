@@ -60,9 +60,9 @@ object SketchProcessor {
             //   result_f    = numerator / denominator_f
             //   result      = min(result_f, 255) → CV_8U
 
-            // 255 - blurred  (stays CV_8UC1 because Core.subtract(scalar, mat) saturates)
+            // 255 - blurred via bitwise_not (equivalent for CV_8U, no scalar-first overload available)
             val denominator8u = Mat()
-            Core.subtract(Scalar(255.0), blurred, denominator8u)
+            Core.bitwise_not(blurred, denominator8u)
             blurred.release()
 
             // Clamp denominator to [1, 255] so we never divide by zero

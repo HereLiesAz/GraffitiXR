@@ -45,7 +45,7 @@ class EditorViewModelTest {
     private val projectRepository: ProjectRepository = mockk(relaxed = true)
     private val currentProjectFlow = kotlinx.coroutines.flow.MutableStateFlow<GraffitiProject?>(null)
     private val context: Context = mockk(relaxed = true)
-    private val backgroundRemover: BackgroundRemover = mockk(relaxed = true)
+    private val subjectIsolator: SubjectIsolator = mockk(relaxed = true)
     private val projectManager: ProjectManager = mockk(relaxed = true)
     private val exportManager: com.hereliesaz.graffitixr.feature.editor.export.ExportManager = mockk(relaxed = true)
     private val slamManager: SlamManager = mockk(relaxed = true)
@@ -106,7 +106,7 @@ class EditorViewModelTest {
             override val unconfined: CoroutineDispatcher = testDispatcher
         }
 
-        viewModel = EditorViewModel(projectRepository, projectManager, exportManager, context, backgroundRemover, slamManager, testDispatcherProvider)
+        viewModel = EditorViewModel(projectRepository, projectManager, exportManager, context, subjectIsolator, slamManager, testDispatcherProvider)
     }
 
     @After
@@ -187,7 +187,7 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `onRemoveBackgroundClicked calls backgroundRemover and saves artifact`() = runTest {
+    fun `onRemoveBackgroundClicked calls subjectIsolator and saves artifact`() = runTest {
         mockkObject(com.hereliesaz.graffitixr.common.util.ImageProcessor)
         val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
@@ -197,12 +197,12 @@ class EditorViewModelTest {
         viewModel.onLayerActivated(layerId)
         
         val processedBitmap = mockk<Bitmap>(relaxed = true)
-        coEvery { backgroundRemover.removeBackground(any()) } returns Result.success(processedBitmap)
-        
+        coEvery { subjectIsolator.isolate(any()) } returns Result.success(processedBitmap)
+
         viewModel.onRemoveBackgroundClicked()
         testDispatcher.scheduler.advanceUntilIdle()
-        
-        coVerify { backgroundRemover.removeBackground(any()) }
+
+        coVerify { subjectIsolator.isolate(any()) }
         coVerify { projectRepository.saveArtifact(any(), any(), any()) }
         unmockkObject(com.hereliesaz.graffitixr.common.util.ImageProcessor)
     }

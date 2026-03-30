@@ -63,7 +63,7 @@ class EditorViewModel @Inject constructor(
     private val projectManager: ProjectManager,
     private val exportManager: ExportManager,
     @ApplicationContext private val context: Context,
-    private val backgroundRemover: BackgroundRemover,
+    private val subjectIsolator: SubjectIsolator,
     internal val slamManager: SlamManager,
     private val dispatchers: DispatcherProvider
 ) : ViewModel(), EditorActions {
@@ -552,7 +552,7 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.default) {
             val bitmap = ImageUtils.loadBitmapAsync(context, uri)
             if (bitmap != null) {
-                val result = backgroundRemover.removeBackground(bitmap)
+                val result = subjectIsolator.isolate(bitmap)
                 result.onSuccess { fgBitmap ->
                     val path = projectRepository.saveArtifact(projectId, "bg_removed_${System.currentTimeMillis()}.png", ImageUtils.bitmapToByteArray(fgBitmap))
                     updateLayerUri(layerId, "file://$path".toUri())
