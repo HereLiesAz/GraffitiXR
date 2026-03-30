@@ -141,7 +141,7 @@ fun StencilScreenContent(
         }
 
         // ── Error Feedback ───────────────────────────────────────────────────
-        if (uiState.exportError != null) {
+        uiState.exportError?.let { error ->
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -151,7 +151,7 @@ fun StencilScreenContent(
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(
-                    text = uiState.exportError,
+                    text = error,
                     color = Color.White,
                     modifier = Modifier.padding(16.dp),
                     fontSize = 14.sp
