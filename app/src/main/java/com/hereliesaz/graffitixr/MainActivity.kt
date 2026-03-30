@@ -278,7 +278,7 @@ class MainActivity : ComponentActivity() {
                     )
 
                     if (isRailVisible) {
-                        configureRailItems(
+                        ConfigureRailItems(
                             mainViewModel, editorViewModel, arViewModel, dashboardViewModel, stencilViewModel, context,
                             overlayImagePicker, backgroundImagePicker, editorUiState, arUiState, navStrings,
                             onShowFontPicker = { layerId -> fontPickerLayerId = layerId; showFontPicker = true },
@@ -679,7 +679,7 @@ class MainActivity : ComponentActivity() {
         if (isFinishing) slamManager.destroy()
     }
 
-    private fun AzNavHostScope.configureRailItems(
+    private fun AzNavHostScope.ConfigureRailItems(
         mainViewModel: MainViewModel,
         editorViewModel: EditorViewModel,
         arViewModel: ArViewModel,
