@@ -182,12 +182,21 @@ class ArViewModel @Inject constructor(
                 _isCameraInUseByAr.value = true
                 val newSession = Session(context)
 
-                val filter = CameraConfigFilter(newSession).apply {
-                    targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
-                }
+                val filter = CameraConfigFilter(newSession)
                 val supportedConfigs = newSession.getSupportedCameraConfigs(filter)
-                if (supportedConfigs.isNotEmpty()) {
-                    newSession.cameraConfig = supportedConfigs[0]
+
+                // Prioritize "dual lens" (stereo camera) and hardware depth sensor usage for superior world refinement.
+                val bestConfig = supportedConfigs.find {
+                    it.stereoCameraUsage == CameraConfig.StereoCameraUsage.REQUIRE_AND_USE &&
+                            it.depthSensorUsage == CameraConfig.DepthSensorUsage.REQUIRE_AND_USE
+                } ?: supportedConfigs.find {
+                    it.stereoCameraUsage == CameraConfig.StereoCameraUsage.REQUIRE_AND_USE
+                } ?: supportedConfigs.find {
+                    it.depthSensorUsage == CameraConfig.DepthSensorUsage.REQUIRE_AND_USE
+                } ?: supportedConfigs.firstOrNull()
+
+                if (bestConfig != null) {
+                    newSession.cameraConfig = bestConfig
                 }
 
                 val config = Config(newSession).apply {
@@ -412,6 +421,7 @@ class ArViewModel @Inject constructor(
     fun attachSessionToRenderer(arRenderer: ArRenderer?) {
         this.renderer = arRenderer
         if (arRenderer != null) {
+            arRenderer.stereoProvider = stereoProvider
             arRenderer.scanMode = _uiState.value.arScanMode
             arRenderer.showAnchorBoundary = _uiState.value.showAnchorBoundary
             arRenderer.anchorEstablished = _uiState.value.isAnchorEstablished

@@ -54,6 +54,7 @@ class ArRenderer(
     @Volatile var anchorEstablished: Boolean = false
     /** When true the SLAM/cloud visualization is suppressed — processing continues but nothing is drawn. */
     @Volatile var hideVisualization: Boolean = false
+    var stereoProvider: com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider? = null
 
     @Volatile private var isFlashlightRequested: Boolean = false
 
@@ -307,11 +308,14 @@ class ArRenderer(
                             planes[0].rowStride, planes[1].rowStride, planes[1].pixelStride,
                             frame.timestamp
                         )
+                        // Always feed temporal stereo frames for continuous depth refinement
+                        stereoProvider?.submitFrame(planes[0].buffer, image.width, image.height, frame.timestamp)
                     }
                 } catch (e: Exception) {
                     Timber.w(e, "Failed to feed YUV frame")
                 }
 
+                // 1. Point Cloud acquisition (for visualization in CLOUD_POINTS mode)
                 if (currentScanMode == ArScanMode.CLOUD_POINTS) {
                     try {
                         frame.acquirePointCloud().use { pointCloud ->
@@ -320,30 +324,30 @@ class ArRenderer(
                     } catch (e: Exception) {
                         Timber.w(e, "Failed to acquire point cloud")
                     }
-                } else {
-                    if (depthSupported) {
-                        try {
-                            frame.acquireDepthImage16Bits().use { depthImage ->
-                                val depthPlane = depthImage.planes[0]
+                }
 
-                                val intrArr = floatArrayOf(
-                                    intrinsics.focalLength[0], intrinsics.focalLength[1],
-                                    intrinsics.principalPoint[0], intrinsics.principalPoint[1]
-                                )
-                                val cpuDim = intrinsics.imageDimensions
+                // 2. Depth acquisition (for continuous world refinement in BOTH modes)
+                if (depthSupported) {
+                    try {
+                        frame.acquireDepthImage16Bits().use { depthImage ->
+                            val depthPlane = depthImage.planes[0]
+                            val intrArr = floatArrayOf(
+                                intrinsics.focalLength[0], intrinsics.focalLength[1],
+                                intrinsics.principalPoint[0], intrinsics.principalPoint[1]
+                            )
+                            val cpuDim = intrinsics.imageDimensions
 
-                                slamManager.feedArCoreDepth(
-                                    depthPlane.buffer,
-                                    depthImage.width, depthImage.height,
-                                    depthPlane.rowStride,
-                                    intrArr, cpuDim[0], cpuDim[1]
-                                )
-                            }
-                        } catch (e: NotYetAvailableException) {
-                            // Normal on first frames; no action needed
-                        } catch (e: Exception) {
-                            Timber.w(e, "Failed to feed depth frame")
+                            slamManager.feedArCoreDepth(
+                                depthPlane.buffer,
+                                depthImage.width, depthImage.height,
+                                depthPlane.rowStride,
+                                intrArr, cpuDim[0], cpuDim[1]
+                            )
                         }
+                    } catch (e: com.google.ar.core.exceptions.NotYetAvailableException) {
+                        // Normal on first frames
+                    } catch (e: Exception) {
+                        Timber.w(e, "Failed to feed depth frame")
                     }
                 }
             }
