@@ -41,11 +41,32 @@ enum class StencilLayerCount(val count: Int, val displayLabel: String) {
 enum class StencilPrintDimension { WIDTH, HEIGHT }
 
 /**
+ * The current step of the guided stencil creation wizard.
+ * The AzNavRail shows only items relevant to the active step.
+ */
+enum class StencilWizardStep {
+    PICK_SOURCE,    // Select which image layer to use as input
+    ISOLATE,        // Run SubjectIsolator; confirm segmentation result
+    CHOOSE_LAYERS,  // Pick 1, 2, or 3 stencil layers
+    GENERATE,       // Processing in progress (no user actions)
+    PREVIEW,        // Cycle through generated layers; option to rebuild
+    PRINT_EXPORT    // Print size, PDF, PNG, return to editor
+}
+
+/**
  * Full UI state for the Stencil screen.
  */
 data class StencilUiState(
     /** ID of the editor layer this stencil was built from. Null = none selected yet. */
     val sourceLayerId: String? = null,
+
+    /** Current step in the stencil creation wizard. */
+    val wizardStep: StencilWizardStep = StencilWizardStep.PICK_SOURCE,
+
+    /** The isolated (background-removed) bitmap from the ISOLATE step.
+     *  Always the downsampled version (≤2048px) — not the full-res original.
+     *  Null until the user completes and confirms the ISOLATE step. */
+    val isolatedBitmap: Bitmap? = null,
 
     /** Number of stencil layers to generate. */
     val layerCount: StencilLayerCount = StencilLayerCount.TWO,
