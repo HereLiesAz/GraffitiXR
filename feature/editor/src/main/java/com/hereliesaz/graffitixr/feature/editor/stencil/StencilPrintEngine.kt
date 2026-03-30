@@ -167,7 +167,7 @@ class StencilPrintEngine @Inject constructor() {
         // Create a tile-sized buffer for OpenCV analysis
         val tileBmp = Bitmap.createBitmap(TILE_W, TILE_H, Bitmap.Config.ARGB_8888)
         val tileCanvas = Canvas(tileBmp)
-        tileCanvas.drawColor(Color.WHITE)
+        tileCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
         
         val srcX = (col * STRIDE_H * (sourceW / outputW)).toInt()
         val srcY = (row * STRIDE_V * (sourceH / outputH)).toInt()
@@ -182,12 +182,13 @@ class StencilPrintEngine @Inject constructor() {
         // Convert to OpenCV and find contours
         val mat = Mat()
         Utils.bitmapToMat(tileBmp, mat)
-        val gray = Mat()
-        Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGBA2GRAY)
         
-        // Invert: content is black on white, OpenCV findContours expects white on black
+        val channels = java.util.ArrayList<Mat>()
+        Core.split(mat, channels)
+        val alphaChannel = channels[3]
+
         val binary = Mat()
-        Core.bitwise_not(gray, binary)
+        Imgproc.threshold(alphaChannel, binary, 127.0, 255.0, Imgproc.THRESH_BINARY)
         
         val contours = mutableListOf<MatOfPoint>()
         val hierarchy = Mat()
@@ -218,7 +219,8 @@ class StencilPrintEngine @Inject constructor() {
         
         // Cleanup
         tileBmp.recycle()
-        mat.release(); gray.release(); binary.release(); hierarchy.release()
+        mat.release(); binary.release(); hierarchy.release()
+        for (c in channels) { c.release() }
         contours.forEach { it.release() }
     }
 
@@ -250,7 +252,7 @@ class StencilPrintEngine @Inject constructor() {
         var found = false
         for (y in 0 until h) {
             for (x in 0 until w) {
-                if (Color.red(pixels[y * w + x]) < 128) {
+                if (Color.alpha(pixels[y * w + x]) > 128) {
                     if (x < minX) minX = x; if (x > maxX) maxX = x
                     if (y < minY) minY = y; if (y > maxY) maxY = y
                     found = true

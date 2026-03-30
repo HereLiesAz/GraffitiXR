@@ -70,12 +70,11 @@ fun StencilScreenContent(
         if (uiState.stencilLayers.isNotEmpty()) {
             val activeLayer = uiState.stencilLayers.getOrNull(uiState.activeStencilLayerIndex)
             if (activeLayer != null) {
-                // Background for the stencil sheet (emulating paper)
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(24.dp)
-                        .background(Color.White, RoundedCornerShape(4.dp))
+                        .background(Color.Transparent, RoundedCornerShape(4.dp))
                         .padding(8.dp)
                 ) {
                     Image(
@@ -179,7 +178,7 @@ private fun LayerThumbnail(
         Box(
             modifier = Modifier
                 .size(56.dp)
-                .background(Color.White, RoundedCornerShape(4.dp))
+                .background(Color.Transparent, RoundedCornerShape(4.dp))
                 .border(
                     width = if (isSelected) 2.dp else 1.dp,
                     color = if (isSelected) Cyan else Color.DarkGray,
