@@ -1010,9 +1010,11 @@ class MainActivity : ComponentActivity() {
                                     activate()
                                     editorViewModel.onTextStyleChanged(layer.id, tp.isBold, tp.isItalic, tp.hasOutline, !tp.hasDropShadow)
                                 }
-                                azRailItem(id = "stencil_${layer.id}", text = "Stencil", color = Color.White, shape = AzButtonShape.RECTANGLE) {
-                                    activate()
-                                    editorViewModel.onGenerateStencil(layer.id)
+                                if (layer.stencilType == null) {
+                                    azRailItem(id = "stencil_${layer.id}", text = "Stencil", color = Color.White, shape = AzButtonShape.RECTANGLE) {
+                                        activate()
+                                        editorViewModel.onGenerateStencil(layer.id)
+                                    }
                                 }
                                 azRailItem(id = "blend_${layer.id}", text = "Blend", color = Color.White, shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onCycleBlendMode() })
                                 azRailItem(id = "adj_${layer.id}", text = "Adjust", color = Color.White, shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onAdjustClicked() })
@@ -1020,9 +1022,11 @@ class MainActivity : ComponentActivity() {
                             layer.isSketch -> {
                                 azRailItem(id = "blend_${layer.id}", text = "Blend", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.blendingInfo, onClick = { activate(); editorViewModel.onCycleBlendMode() })
                                 azRailItem(id = "adj_${layer.id}", text = "Adjust", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.adjustInfo, onClick = { activate(); editorViewModel.onAdjustClicked() })
-                                azRailItem(id = "stencil_${layer.id}", text = "Stencil", color = Color.White, shape = AzButtonShape.RECTANGLE) {
-                                    activate()
-                                    editorViewModel.onGenerateStencil(layer.id)
+                                if (layer.stencilType == null) {
+                                    azRailItem(id = "stencil_${layer.id}", text = "Stencil", color = Color.White, shape = AzButtonShape.RECTANGLE) {
+                                        activate()
+                                        editorViewModel.onGenerateStencil(layer.id)
+                                    }
                                 }
                                 azRailItem(
                                     id = "color_${layer.id}",
@@ -1078,9 +1082,11 @@ class MainActivity : ComponentActivity() {
                             else -> {
                                 azRailItem(id = "iso_${layer.id}", text = "Isolate", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.isolateInfo, onClick = { activate(); editorViewModel.onRemoveBackgroundClicked() })
                                 azRailItem(id = "line_${layer.id}", text = "Sketch", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.outlineInfo, onClick = { activate(); editorViewModel.onSketchClicked() })
-                                azRailItem(id = "stencil_${layer.id}", text = "Stencil", color = Color.White, shape = AzButtonShape.RECTANGLE) {
-                                    activate()
-                                    editorViewModel.onGenerateStencil(layer.id)
+                                if (layer.stencilType == null) {
+                                    azRailItem(id = "stencil_${layer.id}", text = "Stencil", color = Color.White, shape = AzButtonShape.RECTANGLE) {
+                                        activate()
+                                        editorViewModel.onGenerateStencil(layer.id)
+                                    }
                                 }
                                 azRailItem(id = "adj_${layer.id}", text = "Adjust", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.adjustInfo, onClick = { activate(); editorViewModel.onAdjustClicked() })
                                 azRailItem(id = "balance_${layer.id}", text = "Balance", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.balanceInfo, onClick = { activate(); editorViewModel.onBalanceClicked() })
