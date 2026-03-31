@@ -12,6 +12,8 @@ import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import com.hereliesaz.graffitixr.feature.editor.stencil.StencilProcessor
+import com.hereliesaz.graffitixr.feature.editor.stencil.StencilPrintEngine
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.*
@@ -46,6 +48,8 @@ class EditorViewModelTest {
     private val currentProjectFlow = kotlinx.coroutines.flow.MutableStateFlow<GraffitiProject?>(null)
     private val context: Context = mockk(relaxed = true)
     private val subjectIsolator: SubjectIsolator = mockk(relaxed = true)
+    private val stencilProcessor: StencilProcessor = mockk(relaxed = true)
+    private val stencilPrintEngine: StencilPrintEngine = mockk(relaxed = true)
     private val projectManager: ProjectManager = mockk(relaxed = true)
     private val exportManager: com.hereliesaz.graffitixr.feature.editor.export.ExportManager = mockk(relaxed = true)
     private val slamManager: SlamManager = mockk(relaxed = true)
@@ -108,7 +112,11 @@ class EditorViewModelTest {
             override val unconfined: CoroutineDispatcher = testDispatcher
         }
 
-        viewModel = EditorViewModel(projectRepository, projectManager, exportManager, context, subjectIsolator, slamManager, testDispatcherProvider)
+        viewModel = EditorViewModel(
+            projectRepository, projectManager, exportManager, context, 
+            subjectIsolator, stencilProcessor, stencilPrintEngine, slamManager, 
+            testDispatcherProvider
+        )
     }
 
     @After
