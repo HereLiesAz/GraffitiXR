@@ -352,6 +352,58 @@ class ArRenderer(
                 }
             }
 
+            // Continuous wall-depth refinement: keep the overlay flush with the ARCore plane estimate.
+            // Runs at ~1 Hz (every 30 frames) to amortise getAllTrackables() overhead.
+            if (anchorEstablished && frameCount % 30 == 0) {
+                try {
+                    refineAnchorFromBestPlane(activeSession, viewMatrix)
+                } catch (e: Exception) {
+                    // Non-fatal: skip this refinement cycle
+                }
+            }
+
+            // Depth-based fallback: sample centre-screen depth every 10 frames
+            if (anchorEstablished && depthSupported && frameCount % 10 == 0) {
+                try {
+                    frame.acquireDepthImage16Bits().use { depthImage ->
+                        val plane = depthImage.planes[0]
+                        val cx = depthImage.width / 2
+                        val cy = depthImage.height / 2
+                        val stride = plane.rowStride
+                        val byteOffset = cy * stride + cx * 2
+                        if (byteOffset + 2 <= plane.buffer.limit()) {
+                            val rawVal = plane.buffer.getShort(byteOffset).toInt() and 0xFFFF
+                            val depthMm = rawVal and 0x1FFF
+                            if (depthMm in 100..15000) {   // 10 cm – 15 m
+                                val depthM = depthMm / 1000f
+                                val cameraMat = FloatArray(16)
+                                android.opengl.Matrix.invertM(cameraMat, 0, viewMatrix, 0)
+                                val hitX = cameraMat[12] + (-cameraMat[8]) * depthM
+                                val hitY = cameraMat[13] + (-cameraMat[9]) * depthM
+                                val hitZ = cameraMat[14] + (-cameraMat[10]) * depthM
+                                val nx = -cameraMat[8]; val ny = -cameraMat[9]; val nz = -cameraMat[10]
+                                var xx = 0f * nz - 1f * ny
+                                var xy = 1f * nx - 0f * nz
+                                var xz = 0f * ny - 0f * nx
+                                val xLen = kotlin.math.sqrt((xx * xx + xy * xy + xz * xz).toDouble()).toFloat()
+                                if (xLen > 0.0001f) {
+                                    xx /= xLen; xy /= xLen; xz /= xLen
+                                    val yx = ny * xz - nz * xy; val yy = nz * xx - nx * xz; val yz = nx * xy - ny * xx
+                                    val depthAnchor = FloatArray(16)
+                                    android.opengl.Matrix.setIdentityM(depthAnchor, 0)
+                                    depthAnchor[0] = xx; depthAnchor[1] = xy; depthAnchor[2] = xz
+                                    depthAnchor[4] = yx; depthAnchor[5] = yy; depthAnchor[6] = yz
+                                    depthAnchor[8] = nx; depthAnchor[9] = ny; depthAnchor[10] = nz
+                                    depthAnchor[12] = hitX; depthAnchor[13] = hitY; depthAnchor[14] = hitZ
+                                    slamManager.updateAnchorTransform(depthAnchor)
+                                }
+                            }
+                        }
+                    }
+                } catch (_: com.google.ar.core.exceptions.NotYetAvailableException) {
+                } catch (e: Exception) { /* Non-fatal */ }
+            }
+
             if (!hideVisualization) {
                 if (currentScanMode == ArScanMode.CLOUD_POINTS) {
                     planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose)
@@ -375,6 +427,81 @@ class ArRenderer(
                 overlayRenderer.drawAnchorBorder(viewMatrix, projMatrix, anchorMatrix)
             }
         }
+    }
+
+    /**
+     * Continuously refines the overlay anchor by finding the best VERTICAL ARCore plane
+     * in the camera's forward direction and updating the SLAM anchor transform to match it.
+     * Called at ~1 Hz from onDrawFrame to keep the overlay flush with the wall as ARCore
+     * refines its plane estimates over time.
+     */
+    private fun refineAnchorFromBestPlane(
+        session: Session,
+        viewMatrix: FloatArray
+    ) {
+        // Extract camera world position and forward vector from the view matrix
+        val cameraMat = FloatArray(16)
+        android.opengl.Matrix.invertM(cameraMat, 0, viewMatrix, 0)
+        val camX = cameraMat[12]; val camY = cameraMat[13]; val camZ = cameraMat[14]
+        val fwdX = -cameraMat[8]; val fwdY = -cameraMat[9]; val fwdZ = -cameraMat[10]
+
+        // Find the vertical plane most directly ahead of the camera (dot product with forward ray)
+        val planes = session.getAllTrackables(com.google.ar.core.Plane::class.java)
+        var bestPlane: com.google.ar.core.Plane? = null
+        var maxDot = 0.7f   // Must be within ~46° of straight ahead
+
+        for (plane in planes) {
+            if (plane.trackingState != TrackingState.TRACKING) continue
+            if (plane.type != com.google.ar.core.Plane.Type.VERTICAL) continue
+            val pose = plane.centerPose
+            val dx = pose.tx() - camX
+            val dy = pose.ty() - camY
+            val dz = pose.tz() - camZ
+            val len = kotlin.math.sqrt((dx * dx + dy * dy + dz * dz).toDouble()).toFloat()
+            if (len < 0.3f || len > 15f) continue   // Valid range: 30 cm – 15 m
+            val dot = (dx * fwdX + dy * fwdY + dz * fwdZ) / len
+            if (dot > maxDot) { maxDot = dot; bestPlane = plane }
+        }
+
+        val plane = bestPlane ?: return
+
+        // Compute plane orientation axes
+        val planeMatrix = FloatArray(16)
+        plane.centerPose.toMatrix(planeMatrix, 0)
+        val nx = planeMatrix[4]; val ny = planeMatrix[5]; val nz = planeMatrix[6]  // plane normal (Y col)
+
+        // Ray–plane intersection: where does the camera's forward ray hit this plane?
+        val nDotD = nx * fwdX + ny * fwdY + nz * fwdZ
+        if (kotlin.math.abs(nDotD) < 0.0001f) return   // Ray parallel to plane
+        val t = ((planeMatrix[12] - camX) * nx +
+                 (planeMatrix[13] - camY) * ny +
+                 (planeMatrix[14] - camZ) * nz) / nDotD
+        if (t < 0.1f) return   // Intersection behind camera
+
+        val hitX = camX + fwdX * t
+        val hitY = camY + fwdY * t
+        val hitZ = camZ + fwdZ * t
+
+        // Build an orthonormal anchor frame: Z = plane normal, X = horizontal, Y = up
+        val zx = nx; val zy = ny; val zz = nz
+        var xx = 0f * zz - 1f * zy   // cross(world_up=[0,1,0], z)
+        var xy = 1f * zx - 0f * zz
+        var xz = 0f * zy - 0f * zx
+        val xLen = kotlin.math.sqrt((xx * xx + xy * xy + xz * xz).toDouble()).toFloat()
+        if (xLen < 0.0001f) return   // Degenerate (plane is horizontal)
+        xx /= xLen; xy /= xLen; xz /= xLen
+        val yx = zy * xz - zz * xy   // Y = Z × X
+        val yy = zz * xx - zx * xz
+        val yz = zx * xy - zy * xx
+
+        val anchorMat = FloatArray(16)
+        android.opengl.Matrix.setIdentityM(anchorMat, 0)
+        anchorMat[0] = xx;   anchorMat[1] = xy;   anchorMat[2] = xz
+        anchorMat[4] = yx;   anchorMat[5] = yy;   anchorMat[6] = yz
+        anchorMat[8] = zx;   anchorMat[9] = zy;   anchorMat[10] = zz
+        anchorMat[12] = hitX; anchorMat[13] = hitY; anchorMat[14] = hitZ
+
+        slamManager.updateAnchorTransform(anchorMat)
     }
 
     fun destroy() {
