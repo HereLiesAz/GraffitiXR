@@ -65,6 +65,7 @@ class EditorViewModel @Inject constructor(
     private val exportManager: ExportManager,
     @ApplicationContext private val context: Context,
     private val subjectIsolator: SubjectIsolator,
+    private val stencilProcessor: StencilProcessor,
     internal val slamManager: SlamManager,
     private val dispatchers: DispatcherProvider
 ) : ViewModel(), EditorActions {
@@ -1198,5 +1199,96 @@ class EditorViewModel @Inject constructor(
         val updated = params.copy(isBold = isBold, isItalic = isItalic, hasOutline = hasOutline, hasDropShadow = hasDropShadow)
         rerasterizeTextLayer(layerId, updated)
         viewModelScope.launch(dispatchers.main) { saveProject() }
+    }
+
+    override fun onGenerateStencil(layerId: String) {
+        val state = _uiState.value
+        val sourceLayer = state.layers.find { it.id == layerId } ?: return
+        val projectId = state.projectId ?: return
+
+        pushHistory()
+        _uiState.update { it.copy(isLoading = true) }
+
+        viewModelScope.launch(dispatchers.default) {
+            // 1. Identify linked group and composite
+            val groupIds = getLinkedGroupIds(layerId)
+            val groupLayers = state.layers.filter { it.id in groupIds }
+            
+            val metrics = context.resources.displayMetrics
+            val w = metrics.widthPixels.takeIf { it > 0 } ?: 1080
+            val h = metrics.heightPixels.takeIf { it > 0 } ?: 1920
+            
+            val composite = exportManager.compositeLayers(groupLayers, w, h)
+            
+            // 2. Determine next stencil type
+            val existingStencils = groupLayers.filter { it.stencilType != null }
+            val (nextType, totalCount) = when {
+                existingStencils.none { it.stencilType == StencilLayerType.SILHOUETTE } -> 
+                    StencilLayerType.SILHOUETTE to StencilLayerCount.ONE
+                existingStencils.none { it.stencilType == StencilLayerType.HIGHLIGHT } -> 
+                    StencilLayerType.HIGHLIGHT to StencilLayerCount.TWO
+                existingStencils.none { it.stencilType == StencilLayerType.MIDTONE } -> 
+                    StencilLayerType.MIDTONE to StencilLayerCount.THREE
+                else -> {
+                    withContext(dispatchers.main) {
+                        _uiState.update { it.copy(isLoading = false) }
+                        Toast.makeText(context, "Maximum stencil layers (3) already generated for this group.", Toast.LENGTH_SHORT).show()
+                    }
+                    return@launch
+                }
+            }
+
+            // 3. Process
+            val isolated = subjectIsolator.isolate(composite).getOrNull() ?: composite
+            
+            stencilProcessor.processSingle(isolated, nextType, totalCount).collect { progress ->
+                when (progress) {
+                    is StencilProgress.Done -> {
+                        val stencilLayer = progress.layers.first()
+                        val filename = "stencil_${nextType.name.lowercase()}_${UUID.randomUUID()}.png"
+                        val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(stencilLayer.bitmap))
+                        val localUri = "file://$path".toUri()
+
+                        val newLayer = Layer(
+                            id = UUID.randomUUID().toString(),
+                            name = "Stencil${nextType.order} ${nextType.label}",
+                            uri = localUri,
+                            bitmap = stencilLayer.bitmap,
+                            isLinked = true,
+                            stencilType = nextType,
+                            stencilSourceId = layerId
+                        )
+
+                        withContext(dispatchers.main) {
+                            baseBitmaps[newLayer.id] = stencilLayer.bitmap.copy(Bitmap.Config.ARGB_8888, false)
+                            layerStrokes[newLayer.id] = mutableListOf()
+                            
+                            _uiState.update { s ->
+                                val idx = s.layers.indexOfFirst { it.id == layerId }
+                                val updatedLayers = s.layers.toMutableList().also { list ->
+                                    // Insert at top of linked group
+                                    var topIdx = idx
+                                    while (topIdx + 1 < list.size && list[topIdx + 1].isLinked) topIdx++
+                                    list.add(topIdx + 1, newLayer)
+                                }
+                                s.copy(layers = updatedLayers, activeLayerId = newLayer.id, isLoading = false)
+                            }
+                            saveProject()
+                        }
+                    }
+                    is StencilProgress.Error -> {
+                        withContext(dispatchers.main) {
+                            _uiState.update { it.copy(isLoading = false) }
+                            Toast.makeText(context, "Stencil error: ${progress.message}", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                    else -> {}
+                }
+            }
+        }
+    }
+
+    override fun onGeneratePoster(layerId: String) {
+        // Handled by MainActivity's interaction with the UI state/dialog
     }
 }

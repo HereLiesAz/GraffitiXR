@@ -80,4 +80,6 @@ interface EditorActions {
     fun onTextColorChanged(layerId: String, colorArgb: Int)
     fun onTextKerningChanged(layerId: String, letterSpacingEm: Float)
     fun onTextStyleChanged(layerId: String, isBold: Boolean, isItalic: Boolean, hasOutline: Boolean, hasDropShadow: Boolean)
+    fun onGenerateStencil(layerId: String)
+    fun onGeneratePoster(layerId: String)
 }
