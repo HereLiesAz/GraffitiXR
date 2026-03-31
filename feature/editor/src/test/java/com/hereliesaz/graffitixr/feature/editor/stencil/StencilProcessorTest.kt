@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -257,22 +258,21 @@ class StencilProcessorTest {
 
     // ── Registration marks ────────────────────────────────────────────────────
 
-    @org.junit.Ignore("TODO: Update stencil assertions for new transparent backgrounds logic")
     @Test
-    fun `all layers contain registration marks`() = runTest {
-        val done = processor.process(isolatedBitmap, StencilLayerCount.TWO)
-            .filterIsInstance<StencilProgress.Done>()
-            .first()
-
-        // Registration marks are drawn at the bounding box corners.
-        // The fake layers return BLACK near (10,10), verifying the mark region.
-        for (layer in done.layers) {
-            val hasMarkPixels = hasAnyBlackPixelNearCorner(layer.bitmap)
-            assertTrue(
-                "Layer ${layer.type} should have registration marks near corners",
-                hasMarkPixels
-            )
-        }
+    fun `StencilProcessor does not expose registration mark methods`() {
+        val methods = StencilProcessor::class.java.declaredMethods.map { it.name }
+        assertFalse(
+            "injectRegistrationMarks should be removed",
+            methods.contains("injectRegistrationMarks")
+        )
+        assertFalse(
+            "computeSubjectBoundingBoxCorners should be removed",
+            methods.contains("computeSubjectBoundingBoxCorners")
+        )
+        assertFalse(
+            "drawRegistrationMarks should be removed",
+            methods.contains("drawRegistrationMarks")
+        )
     }
 
     // ── Error handling ────────────────────────────────────────────────────────
