@@ -105,6 +105,57 @@ class StencilProcessor @Inject constructor() {
         )
     }.flowOn(Dispatchers.Default)
 
+    /**
+     * Extracts a single specific [type] from [isolatedBitmap] based on [totalCount] clusters.
+     */
+    fun processSingle(
+        isolatedBitmap: Bitmap,
+        type: StencilLayerType,
+        totalCount: StencilLayerCount
+    ): Flow<StencilProgress> = flow {
+        emit(StencilProgress.Stage("Preparing image…", 0.05f))
+
+        if (isolatedBitmap.width < 200 || isolatedBitmap.height < 200) {
+            emit(StencilProgress.Error("Source image too small for stencil. (Min 200px)"))
+            return@flow
+        }
+
+        val result = runCatching {
+            emit(StencilProgress.Stage("Building mask…", 0.20f))
+            val subjectMask = alphaToMask(isolatedBitmap)
+
+            emit(StencilProgress.Stage("Analysing tones…", 0.45f))
+            val allLayers = kmeansLayers(isolatedBitmap, subjectMask, totalCount)
+            
+            // Find the specific requested layer
+            val targetLayer = allLayers.find { it.type == type } 
+                ?: throw Exception("Layer type ${type.label} not found for count ${totalCount.count}")
+
+            emit(StencilProgress.Stage("Smoothing edges…", 0.70f))
+            val smoothed = if (type == StencilLayerType.SILHOUETTE) targetLayer 
+                           else targetLayer.copy(bitmap = morphClose(targetLayer.bitmap, type.color))
+
+            emit(StencilProgress.Stage("Adding registration marks…", 0.88f))
+            val bmpWithMarks = smoothed.bitmap.copy(Bitmap.Config.ARGB_8888, true)
+            val corners = computeSubjectBoundingBoxCorners(subjectMask)
+            if (corners != null) {
+                drawRegistrationMarks(bmpWithMarks, corners)
+            }
+            
+            listOf(smoothed.copy(bitmap = bmpWithMarks))
+        }
+
+        result.fold(
+            onSuccess = { layers ->
+                emit(StencilProgress.Stage("Done.", 1.0f))
+                emit(StencilProgress.Done(layers))
+            },
+            onFailure = { e ->
+                emit(StencilProgress.Error(e.message ?: "Unknown error in stencil pipeline"))
+            }
+        )
+    }.flowOn(Dispatchers.Default)
+
     // ── Stage 2 ───────────────────────────────────────────────────────────────
 
     /**
