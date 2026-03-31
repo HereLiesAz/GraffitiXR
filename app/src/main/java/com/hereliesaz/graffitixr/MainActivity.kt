@@ -248,6 +248,12 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                LaunchedEffect(editorUiState.editorMode) {
+                    if (editorUiState.editorMode == EditorMode.STENCIL) {
+                        editorViewModel.setEditorMode(EditorMode.MOCKUP)
+                    }
+                }
+
                 val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                     uri?.let { editorViewModel.onAddLayer(it) }
                 }
@@ -686,7 +692,6 @@ class MainActivity : ComponentActivity() {
         if (isFinishing) slamManager.destroy()
     }
 
-    @Composable
     private fun AzNavHostScope.ConfigureRailItems(
         mainViewModel: MainViewModel,
         editorViewModel: EditorViewModel,
@@ -707,13 +712,7 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-        if (editorUiState.editorMode == EditorMode.STENCIL) {
-            // Deprecated Stencil Mode - redirecting to Mockup
-            LaunchedEffect(Unit) {
-                editorViewModel.setEditorMode(EditorMode.MOCKUP)
-            }
-            return
-        }
+        if (editorUiState.editorMode == EditorMode.STENCIL) return
 
         azRailHostItem(id = "mode_host", text = navStrings.modes, color = Color.White, info = navStrings.modesInfo)
         azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, route = EditorMode.AR.name, color = Color.White, shape = AzButtonShape.NONE, info = navStrings.arModeInfo)
