@@ -7,10 +7,13 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntSize
+import com.hereliesaz.graffitixr.common.model.Tool
 import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.feature.editor.stencil.StencilProcessor
 import com.hereliesaz.graffitixr.feature.editor.stencil.StencilPrintEngine
@@ -45,6 +48,7 @@ class EditorViewModelTest {
 
     private lateinit var viewModel: EditorViewModel
     private val projectRepository: ProjectRepository = mockk(relaxed = true)
+    private val settingsRepository: SettingsRepository = mockk(relaxed = true)
     private val currentProjectFlow = kotlinx.coroutines.flow.MutableStateFlow<GraffitiProject?>(null)
     private val context: Context = mockk(relaxed = true)
     private val subjectIsolator: SubjectIsolator = mockk(relaxed = true)
@@ -62,6 +66,7 @@ class EditorViewModelTest {
         val testProject = GraffitiProject(id = "test-project")
         currentProjectFlow.value = testProject
         every { projectRepository.currentProject } returns currentProjectFlow
+        every { settingsRepository.backgroundColor } returns kotlinx.coroutines.flow.flowOf(0xFF000000.toInt())
         
         // Mock static methods for Bitmap, Uri, and Toast
         mockkStatic(BitmapFactory::class)
@@ -113,8 +118,8 @@ class EditorViewModelTest {
         }
 
         viewModel = EditorViewModel(
-            projectRepository, projectManager, exportManager, context, 
-            subjectIsolator, stencilProcessor, stencilPrintEngine, slamManager, 
+            projectRepository, settingsRepository, projectManager, exportManager, context,
+            subjectIsolator, stencilProcessor, stencilPrintEngine, slamManager,
             testDispatcherProvider
         )
     }
@@ -229,12 +234,12 @@ class EditorViewModelTest {
         viewModel.onLayerActivated(layerId)
 
         val sketchBitmap = mockk<Bitmap>(relaxed = true)
-        every { com.hereliesaz.graffitixr.common.util.SketchProcessor.sketchEffect(any(), any()) } returns sketchBitmap
+        every { com.hereliesaz.graffitixr.common.util.SketchProcessor.sketchEffect(any(), any(), any()) } returns sketchBitmap
 
         viewModel.onSketchClicked()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        verify { com.hereliesaz.graffitixr.common.util.SketchProcessor.sketchEffect(any(), any()) }
+        verify { com.hereliesaz.graffitixr.common.util.SketchProcessor.sketchEffect(any(), any(), any()) }
         coVerify { projectRepository.saveArtifact(any(), any(), any()) }
         // A new sketch layer should have been inserted above the source layer
         val layers = viewModel.uiState.value.layers
@@ -349,6 +354,30 @@ class EditorViewModelTest {
 
         val restoredScale = viewModel.uiState.value.layers.first().scale
         assertEquals(initialScale, restoredScale, 0.01f)
+    }
+
+    @Test
+    fun `onStrokeStart replays all buffered points after bitmap copy`() = runTest {
+        val uri = Uri.parse("content://test/image.png")
+        viewModel.onAddLayer(uri)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val layerId = viewModel.uiState.value.layers.first().id
+        viewModel.onLayerActivated(layerId)
+        viewModel.setActiveTool(Tool.BRUSH)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val canvasSize = IntSize(100, 100)
+
+        viewModel.onStrokeStart(Offset(10f, 10f), canvasSize)
+        viewModel.onStrokePoint(Offset(20f, 20f))
+        viewModel.onStrokePoint(Offset(30f, 30f))
+        viewModel.onStrokePoint(Offset(40f, 40f))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNotNull(state.liveStrokeBitmap)
+        assertTrue("Expected liveStrokeVersion >= 1, got ${state.liveStrokeVersion}", state.liveStrokeVersion >= 1)
     }
 
     @org.junit.Ignore("TODO: Fix visibility condition checks after transparent stencil refactor")

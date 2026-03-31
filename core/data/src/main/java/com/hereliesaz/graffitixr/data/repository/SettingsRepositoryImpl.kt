@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.data.repository
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.hereliesaz.graffitixr.common.model.ArScanMode
@@ -22,6 +23,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val AR_SCAN_MODE = stringPreferencesKey("ar_scan_mode")
     private val SHOW_ANCHOR_BOUNDARY = booleanPreferencesKey("show_anchor_boundary")
     private val IS_IMPERIAL_UNITS = booleanPreferencesKey("is_imperial_units")
+    private val BACKGROUND_COLOR = intPreferencesKey("background_color")
 
     override val isRightHanded: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
@@ -63,6 +65,15 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setImperialUnits(imperial: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[IS_IMPERIAL_UNITS] = imperial
+        }
+    }
+
+    override val backgroundColor: Flow<Int> = context.dataStore.data
+        .map { preferences -> preferences[BACKGROUND_COLOR] ?: 0xFF000000.toInt() }
+
+    override suspend fun setBackgroundColor(argb: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[BACKGROUND_COLOR] = argb
         }
     }
 }

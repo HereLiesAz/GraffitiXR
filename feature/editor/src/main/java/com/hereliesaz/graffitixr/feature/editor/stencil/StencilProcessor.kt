@@ -2,9 +2,7 @@
 package com.hereliesaz.graffitixr.feature.editor.stencil
 
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Paint
 import com.hereliesaz.graffitixr.common.model.StencilLayer
 import com.hereliesaz.graffitixr.common.model.StencilLayerCount
 import com.hereliesaz.graffitixr.common.model.StencilLayerType
@@ -16,8 +14,6 @@ import org.opencv.android.Utils
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
-import org.opencv.core.MatOfFloat
-import org.opencv.core.MatOfInt
 import org.opencv.core.Size
 import org.opencv.core.TermCriteria
 import org.opencv.imgproc.Imgproc
@@ -49,11 +45,6 @@ sealed class StencilProgress {
 class StencilProcessor @Inject constructor() {
 
     companion object {
-        // Registration mark geometry (px at source resolution)
-        private const val REG_MARK_ARM_LENGTH = 40   // crosshair arm length in px
-        private const val REG_MARK_STROKE = 8        // crosshair stroke width in px
-        private const val REG_MARK_MARGIN = 20       // inset from bounding box corner
-
         // Morphological closing kernel size for edge smoothing
         private const val MORPH_KERNEL_SIZE = 5
     }
@@ -87,11 +78,7 @@ class StencilProcessor @Inject constructor() {
 
             // Stage 4: Morphological closing on non-silhouette layers
             emit(StencilProgress.Stage("Smoothing edges…", 0.70f))
-            val smoothed = applyMorphClose(layers)
-
-            // Stage 5: Registration marks
-            emit(StencilProgress.Stage("Adding registration marks…", 0.88f))
-            injectRegistrationMarks(smoothed, subjectMask)
+            applyMorphClose(layers)
         }
 
         result.fold(
@@ -132,17 +119,10 @@ class StencilProcessor @Inject constructor() {
                 ?: throw Exception("Layer type ${type.label} not found for count ${totalCount.count}")
 
             emit(StencilProgress.Stage("Smoothing edges…", 0.70f))
-            val smoothed = if (type == StencilLayerType.SILHOUETTE) targetLayer 
+            val smoothed = if (type == StencilLayerType.SILHOUETTE) targetLayer
                            else targetLayer.copy(bitmap = morphClose(targetLayer.bitmap, type.color))
 
-            emit(StencilProgress.Stage("Adding registration marks…", 0.88f))
-            val bmpWithMarks = smoothed.bitmap.copy(Bitmap.Config.ARGB_8888, true)
-            val corners = computeSubjectBoundingBoxCorners(subjectMask)
-            if (corners != null) {
-                drawRegistrationMarks(bmpWithMarks, corners)
-            }
-            
-            listOf(smoothed.copy(bitmap = bmpWithMarks))
+            listOf(smoothed)
         }
 
         result.fold(
@@ -310,7 +290,7 @@ class StencilProcessor @Inject constructor() {
         Utils.bitmapToMat(src, srcMat)
 
         // The stencil features are defined by alpha > 0
-        val channels = java.util.ArrayList<Mat>()
+        val channels = ArrayList<Mat>()
         Core.split(srcMat, channels)
         val alphaMat = channels[3]
 
@@ -352,79 +332,4 @@ class StencilProcessor @Inject constructor() {
         return out
     }
 
-    // ── Stage 5 ───────────────────────────────────────────────────────────────
-
-    /**
-     * Injects identical crosshair registration marks at all 4 corners of the subject's
-     * bounding box into every layer. Marks are pure black on all layers.
-     *
-     * Physical alignment workflow:
-     *   1. User sprays Layer 1 (Silhouette) — marks are painted onto the surface.
-     *   2. User aligns Layer 2+ sheets by matching the crosshair marks.
-     */
-    private fun injectRegistrationMarks(
-        layers: List<StencilLayer>,
-        subjectMask: Bitmap
-    ): List<StencilLayer> {
-        val corners = computeSubjectBoundingBoxCorners(subjectMask) ?: return layers
-        return layers.map { layer ->
-            val bmp = layer.bitmap.copy(Bitmap.Config.ARGB_8888, true)
-            drawRegistrationMarks(bmp, corners)
-            layer.copy(bitmap = bmp)
-        }
-    }
-
-    /**
-     * Returns the four corner points of the subject's bounding box, inset by [REG_MARK_MARGIN].
-     * Returns null if the mask contains no subject pixels.
-     */
-    private fun computeSubjectBoundingBoxCorners(mask: Bitmap): List<Pair<Int, Int>>? {
-        val w = mask.width
-        val h = mask.height
-        val pixels = IntArray(w * h)
-        mask.getPixels(pixels, 0, w, 0, 0, w, h)
-
-        var minX = w; var maxX = 0; var minY = h; var maxY = 0
-        var found = false
-        for (y in 0 until h) {
-            for (x in 0 until w) {
-                if (pixels[y * w + x] == Color.WHITE) {
-                    if (x < minX) minX = x; if (x > maxX) maxX = x
-                    if (y < minY) minY = y; if (y > maxY) maxY = y
-                    found = true
-                }
-            }
-        }
-        if (!found) return null
-
-        val l = (minX - REG_MARK_MARGIN).coerceAtLeast(REG_MARK_ARM_LENGTH)
-        val t = (minY - REG_MARK_MARGIN).coerceAtLeast(REG_MARK_ARM_LENGTH)
-        val r = (maxX + REG_MARK_MARGIN).coerceAtMost(w - REG_MARK_ARM_LENGTH - 1)
-        val b = (maxY + REG_MARK_MARGIN).coerceAtMost(h - REG_MARK_ARM_LENGTH - 1)
-
-        return listOf(
-            Pair(l, t),  // top-left
-            Pair(r, t),  // top-right
-            Pair(r, b),  // bottom-right
-            Pair(l, b)   // bottom-left
-        )
-    }
-
-    private fun drawRegistrationMarks(bmp: Bitmap, corners: List<Pair<Int, Int>>) {
-        val canvas = Canvas(bmp)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.BLACK
-            strokeWidth = REG_MARK_STROKE.toFloat()
-            style = Paint.Style.STROKE
-            strokeCap = Paint.Cap.SQUARE
-        }
-        val arm = REG_MARK_ARM_LENGTH.toFloat()
-        for ((cx, cy) in corners) {
-            val x = cx.toFloat(); val y = cy.toFloat()
-            // Horizontal arm
-            canvas.drawLine(x - arm, y, x + arm, y, paint)
-            // Vertical arm
-            canvas.drawLine(x, y - arm, x, y + arm, paint)
-        }
-    }
 }

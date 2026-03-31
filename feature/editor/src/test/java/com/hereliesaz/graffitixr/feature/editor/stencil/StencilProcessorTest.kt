@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -41,7 +42,7 @@ import org.junit.Test
  *   - 2-layer output: SILHOUETTE + HIGHLIGHT present, in correct order
  *   - 3-layer output: SILHOUETTE + MIDTONE + HIGHLIGHT present
  *   - Bitmap dimensions preserved through pipeline
- *   - Registration marks injected into all layers
+ *   - Registration mark methods absent from StencilProcessor (removal verified)
  *   - Empty subject mask (all background) is handled gracefully
  *   - Progress stages emitted in correct order with non-decreasing fractions
  */
@@ -257,22 +258,21 @@ class StencilProcessorTest {
 
     // ── Registration marks ────────────────────────────────────────────────────
 
-    @org.junit.Ignore("TODO: Update stencil assertions for new transparent backgrounds logic")
     @Test
-    fun `all layers contain registration marks`() = runTest {
-        val done = processor.process(isolatedBitmap, StencilLayerCount.TWO)
-            .filterIsInstance<StencilProgress.Done>()
-            .first()
-
-        // Registration marks are drawn at the bounding box corners.
-        // The fake layers return BLACK near (10,10), verifying the mark region.
-        for (layer in done.layers) {
-            val hasMarkPixels = hasAnyBlackPixelNearCorner(layer.bitmap)
-            assertTrue(
-                "Layer ${layer.type} should have registration marks near corners",
-                hasMarkPixels
-            )
-        }
+    fun `StencilProcessor does not expose registration mark methods`() {
+        val methods = StencilProcessor::class.java.declaredMethods.map { it.name }
+        assertFalse(
+            "injectRegistrationMarks should be removed",
+            methods.contains("injectRegistrationMarks")
+        )
+        assertFalse(
+            "computeSubjectBoundingBoxCorners should be removed",
+            methods.contains("computeSubjectBoundingBoxCorners")
+        )
+        assertFalse(
+            "drawRegistrationMarks should be removed",
+            methods.contains("drawRegistrationMarks")
+        )
     }
 
     // ── Error handling ────────────────────────────────────────────────────────
@@ -373,25 +373,4 @@ class StencilProcessorTest {
         return bmp
     }
 
-    /**
-     * Returns true if any pixel within 25px of any corner of [bmp] is pure black.
-     * Used to detect registration mark presence without knowing exact coordinates.
-     */
-    private fun hasAnyBlackPixelNearCorner(bmp: Bitmap): Boolean {
-        val w = bmp.width; val h = bmp.height; val r = 25
-        val regions = listOf(
-            Pair(0..r, 0..r),
-            Pair((w - r)..w, 0..r),
-            Pair((w - r)..w, (h - r)..h),
-            Pair(0..r, (h - r)..h)
-        )
-        for ((xs, ys) in regions) {
-            for (x in xs) {
-                for (y in ys) {
-                    if (x < w && y < h && bmp.getPixel(x, y) == Color.BLACK) return true
-                }
-            }
-        }
-        return false
-    }
 }

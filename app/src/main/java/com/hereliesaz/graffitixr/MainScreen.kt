@@ -71,7 +71,8 @@ fun MainScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val rendererRef = remember { mutableStateOf<ArRenderer?>(null) }
 
-    Box(modifier = Modifier.fillMaxSize().background(Transparent)) {
+    val bgColor = if (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY) Transparent else uiState.canvasBackground
+    Box(modifier = Modifier.fillMaxSize().background(bgColor)) {
 
         DisposableEffect(lifecycleOwner) {
             val observer = LifecycleEventObserver { _, event ->

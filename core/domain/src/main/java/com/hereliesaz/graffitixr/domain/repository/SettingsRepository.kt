@@ -34,4 +34,9 @@ interface SettingsRepository {
     val isImperialUnits: Flow<Boolean>
 
     suspend fun setImperialUnits(imperial: Boolean)
+
+    /** Canvas background color as ARGB Int. Default is opaque black (0xFF000000). */
+    val backgroundColor: Flow<Int>
+
+    suspend fun setBackgroundColor(argb: Int)
 }
