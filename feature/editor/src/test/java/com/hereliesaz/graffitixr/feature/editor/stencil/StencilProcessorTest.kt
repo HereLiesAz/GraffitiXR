@@ -42,7 +42,7 @@ import org.junit.Test
  *   - 2-layer output: SILHOUETTE + HIGHLIGHT present, in correct order
  *   - 3-layer output: SILHOUETTE + MIDTONE + HIGHLIGHT present
  *   - Bitmap dimensions preserved through pipeline
- *   - Registration marks injected into all layers
+ *   - Registration mark methods absent from StencilProcessor (removal verified)
  *   - Empty subject mask (all background) is handled gracefully
  *   - Progress stages emitted in correct order with non-decreasing fractions
  */
@@ -373,25 +373,4 @@ class StencilProcessorTest {
         return bmp
     }
 
-    /**
-     * Returns true if any pixel within 25px of any corner of [bmp] is pure black.
-     * Used to detect registration mark presence without knowing exact coordinates.
-     */
-    private fun hasAnyBlackPixelNearCorner(bmp: Bitmap): Boolean {
-        val w = bmp.width; val h = bmp.height; val r = 25
-        val regions = listOf(
-            Pair(0..r, 0..r),
-            Pair((w - r)..w, 0..r),
-            Pair((w - r)..w, (h - r)..h),
-            Pair(0..r, (h - r)..h)
-        )
-        for ((xs, ys) in regions) {
-            for (x in xs) {
-                for (y in ys) {
-                    if (x < w && y < h && bmp.getPixel(x, y) == Color.BLACK) return true
-                }
-            }
-        }
-        return false
-    }
 }

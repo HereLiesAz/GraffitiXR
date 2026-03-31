@@ -290,7 +290,7 @@ class StencilProcessor @Inject constructor() {
         Utils.bitmapToMat(src, srcMat)
 
         // The stencil features are defined by alpha > 0
-        val channels = java.util.ArrayList<Mat>()
+        val channels = ArrayList<Mat>()
         Core.split(srcMat, channels)
         val alphaMat = channels[3]
 
