@@ -37,6 +37,7 @@ import java.util.UUID
 import javax.inject.Inject
 import androidx.core.net.toUri
 import androidx.core.graphics.createBitmap
+import com.hereliesaz.graffitixr.feature.editor.stencil.StencilPrintEngine
 import com.hereliesaz.graffitixr.feature.editor.stencil.StencilProcessor
 import com.hereliesaz.graffitixr.feature.editor.stencil.StencilProgress
 import com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor
@@ -69,6 +70,7 @@ class EditorViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val subjectIsolator: SubjectIsolator,
     private val stencilProcessor: StencilProcessor,
+    private val stencilPrintEngine: StencilPrintEngine,
     internal val slamManager: SlamManager,
     private val dispatchers: DispatcherProvider
 ) : ViewModel(), EditorActions {
@@ -1292,6 +1294,51 @@ class EditorViewModel @Inject constructor(
     }
 
     override fun onGeneratePoster(layerId: String) {
-        // Handled by MainActivity's interaction with the UI state/dialog
+        // This is called from the PosterOptionsDialog
+    }
+
+    fun generatePosterPdf(selectedLayerIds: List<String>, outputSizeMm: Float) {
+        val state = _uiState.value
+        val stencilLayers = state.layers.filter { it.id in selectedLayerIds }
+            .mapNotNull { layer ->
+                layer.stencilType?.let { type ->
+                    layer.bitmap?.let { bmp ->
+                        StencilLayer(type, bmp, layer.name)
+                    }
+                }
+            }
+
+        if (stencilLayers.isEmpty()) return
+
+        _uiState.update { it.copy(isLoading = true) }
+        viewModelScope.launch(dispatchers.io) {
+            val result = stencilPrintEngine.generatePdf(
+                context,
+                stencilLayers,
+                outputSizeMm,
+                StencilOutputDimension.WIDTH // Default to width for now
+            )
+            
+            withContext(dispatchers.main) {
+                _uiState.update { it.copy(isLoading = false) }
+                result.fold(
+                    onSuccess = { uri ->
+                        // Share intent triggered via Activity/UI state or broadcast
+                        // For simplicity, let's just toast or use a callback
+                        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "application/pdf"
+                            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(android.content.Intent.createChooser(intent, "Share Stencil PDF").apply {
+                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        })
+                    },
+                    onFailure = { e ->
+                        Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                )
+            }
+        }
     }
 }
