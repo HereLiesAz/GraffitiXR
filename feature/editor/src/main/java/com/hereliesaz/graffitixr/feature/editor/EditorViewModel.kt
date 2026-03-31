@@ -597,7 +597,14 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.default) {
             val bitmap = ImageUtils.loadBitmapAsync(context, uri)
             if (bitmap != null) {
-                val sketchBitmap = SketchProcessor.sketchEffect(bitmap, state.sketchThickness)
+                val bg = state.canvasBackground
+                val penArgb = android.graphics.Color.argb(
+                    255,
+                    (255 * (1f - bg.red)).toInt().coerceIn(0, 255),
+                    (255 * (1f - bg.green)).toInt().coerceIn(0, 255),
+                    (255 * (1f - bg.blue)).toInt().coerceIn(0, 255)
+                )
+                val sketchBitmap = SketchProcessor.sketchEffect(bitmap, state.sketchThickness, penArgb)
                 if (sketchBitmap != null) {
                     val path = projectRepository.saveArtifact(
                         projectId,
@@ -607,11 +614,11 @@ class EditorViewModel @Inject constructor(
                     val sketchUri = "file://$path".toUri()
                     val sketchLayer = Layer(
                         id = java.util.UUID.randomUUID().toString(),
-                        name = "Sketch – ${layer.name}",
+                        name = "Outline – ${layer.name}",
                         uri = sketchUri,
                         isSketch = true,
                         isLinked = true,
-                        blendMode = androidx.compose.ui.graphics.BlendMode.Multiply
+                        blendMode = androidx.compose.ui.graphics.BlendMode.SrcOver
                     )
                     withContext(dispatchers.main) {
                         _uiState.update { s ->

@@ -234,12 +234,12 @@ class EditorViewModelTest {
         viewModel.onLayerActivated(layerId)
 
         val sketchBitmap = mockk<Bitmap>(relaxed = true)
-        every { com.hereliesaz.graffitixr.common.util.SketchProcessor.sketchEffect(any(), any()) } returns sketchBitmap
+        every { com.hereliesaz.graffitixr.common.util.SketchProcessor.sketchEffect(any(), any(), any()) } returns sketchBitmap
 
         viewModel.onSketchClicked()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        verify { com.hereliesaz.graffitixr.common.util.SketchProcessor.sketchEffect(any(), any()) }
+        verify { com.hereliesaz.graffitixr.common.util.SketchProcessor.sketchEffect(any(), any(), any()) }
         coVerify { projectRepository.saveArtifact(any(), any(), any()) }
         // A new sketch layer should have been inserted above the source layer
         val layers = viewModel.uiState.value.layers

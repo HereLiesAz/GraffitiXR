@@ -13,9 +13,8 @@ import org.opencv.imgproc.Imgproc
 /**
  * Produces a pencil-sketch effect from a bitmap using the dodge-blend algorithm.
  *
- * Output is white-background with dark sketch lines, ARGB_8888.
- * Callers should render the result with MULTIPLY blend mode so the white areas
- * become visually transparent, leaving only the dark lines.
+ * Output is an alpha-channel bitmap: dark sketch lines become opaque in [penColor],
+ * while light areas become transparent. Callers should render with SrcOver blend mode.
  */
 object SketchProcessor {
 
@@ -25,10 +24,13 @@ object SketchProcessor {
      * @param bitmap    Source image (any config; read via OpenCV).
      * @param thickness Controls the Gaussian blur radius. Larger values produce softer/thicker lines.
      *                  Must be >= 1. The actual kernel size will be `(thickness * 2 + 1)` squared.
-     * @return          A new ARGB_8888 bitmap with white background and dark sketch lines,
+     * @param penColor  ARGB color for the sketch lines. Alpha of each output pixel is derived from
+     *                  sketch darkness: dark pixels → opaque [penColor], light pixels → transparent.
+     *                  Defaults to white for backward compatibility.
+     * @return          A new ARGB_8888 bitmap with alpha-channel sketch lines in [penColor],
      *                  or null if processing fails.
      */
-    fun sketchEffect(bitmap: Bitmap, thickness: Int = 5): Bitmap? {
+    fun sketchEffect(bitmap: Bitmap, thickness: Int = 5, penColor: Int = android.graphics.Color.WHITE): Bitmap? {
         return try {
             val clampedThickness = thickness.coerceAtLeast(1)
 
@@ -99,17 +101,25 @@ object SketchProcessor {
             dodgeClamped.convertTo(sketchGray, CvType.CV_8U)
             dodgeClamped.release()
 
-            // Step 5: Convert single-channel grayscale → RGBA for Bitmap output
-            //   Grayscale value becomes all three RGB channels; alpha = 255 (fully opaque).
-            //   White pixels (value=255) will act as "transparent" when MULTIPLY-blended.
-            val sketchRgba = Mat()
-            Imgproc.cvtColor(sketchGray, sketchRgba, Imgproc.COLOR_GRAY2RGBA)
+            // Step 5: Build ARGB output — alpha derived from sketch darkness, color = penColor
+            //   Dark sketch pixels (gray ≈ 0)   → alpha ≈ 255 (fully opaque pen color)
+            //   Light sketch pixels (gray ≈ 255) → alpha ≈ 0   (fully transparent)
+            val w = sketchGray.cols(); val h = sketchGray.rows()
+            val grayBytes = ByteArray(w * h)
+            sketchGray.get(0, 0, grayBytes)
             sketchGray.release()
 
+            val pr = android.graphics.Color.red(penColor)
+            val pg = android.graphics.Color.green(penColor)
+            val pb = android.graphics.Color.blue(penColor)
+            val argbPixels = IntArray(w * h)
+            for (i in argbPixels.indices) {
+                val grayVal = grayBytes[i].toInt() and 0xFF
+                val alpha = (255 - grayVal).coerceIn(0, 255)
+                argbPixels[i] = android.graphics.Color.argb(alpha, pr, pg, pb)
+            }
             val resultBitmap = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
-            Utils.matToBitmap(sketchRgba, resultBitmap)
-            sketchRgba.release()
-
+            resultBitmap.setPixels(argbPixels, 0, w, 0, 0, w, h)
             resultBitmap
         } catch (e: Exception) {
             e.printStackTrace()
