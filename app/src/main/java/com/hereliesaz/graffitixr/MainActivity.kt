@@ -150,7 +150,6 @@ class MainActivity : ComponentActivity() {
                 val editorViewModel: EditorViewModel = hiltViewModel()
                 @Suppress("DEPRECATION")
                 val dashboardViewModel: DashboardViewModel = hiltViewModel()
-                val stencilViewModel: com.hereliesaz.graffitixr.feature.editor.stencil.StencilViewModel = hiltViewModel()
                 val cameraController = rememberCameraController()
 
                 val editorUiState by editorViewModel.uiState.collectAsState()
@@ -282,7 +281,7 @@ class MainActivity : ComponentActivity() {
 
                     if (isRailVisible) {
                         ConfigureRailItems(
-                            mainViewModel, editorViewModel, arViewModel, dashboardViewModel, stencilViewModel, context,
+                            mainViewModel, editorViewModel, arViewModel, dashboardViewModel, context,
                             overlayImagePicker, backgroundImagePicker, editorUiState, arUiState, navStrings,
                             onShowFontPicker = { layerId -> fontPickerLayerId = layerId; showFontPicker = true },
                             layerMenusOpen = layerMenusOpen
@@ -323,12 +322,6 @@ class MainActivity : ComponentActivity() {
                                 composable(EditorMode.OVERLAY.name) { EditorOverlay(editorViewModel, mainUiState) }
                                 composable(EditorMode.MOCKUP.name) { EditorOverlay(editorViewModel, mainUiState) }
                                 composable(EditorMode.TRACE.name) { EditorOverlay(editorViewModel, mainUiState) }
-                                composable(EditorMode.STENCIL.name) {
-                                    LaunchedEffect(Unit) {
-                                        stencilViewModel.initForWizard(editorUiState.layers)
-                                    }
-                                    StencilScreen(stencilViewModel)
-                                }
                             }
 
                             if (mainUiState.isTouchLocked) {
@@ -694,12 +687,12 @@ class MainActivity : ComponentActivity() {
         if (isFinishing) slamManager.destroy()
     }
 
+    @Composable
     private fun AzNavHostScope.ConfigureRailItems(
         mainViewModel: MainViewModel,
         editorViewModel: EditorViewModel,
         arViewModel: ArViewModel,
         dashboardViewModel: DashboardViewModel,
-        stencilViewModel: com.hereliesaz.graffitixr.feature.editor.stencil.StencilViewModel,
         context: android.content.Context,
         overlayPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>,
         backgroundPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>,
@@ -716,64 +709,8 @@ class MainActivity : ComponentActivity() {
         }
 
         if (editorUiState.editorMode == EditorMode.STENCIL) {
-            azRailHostItem(id = "stencil_host", text = "Stencil", color = Color.White, info = navStrings.stencilInfo)
-            azRailSubItem(id = "layers_toggle", hostId = "stencil_host", text = "Layers", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilLayersInfo) {
-                val current = stencilViewModel.uiState.value.layerCount
-                val next = when (current) {
-                    com.hereliesaz.graffitixr.common.model.StencilLayerCount.ONE -> com.hereliesaz.graffitixr.common.model.StencilLayerCount.TWO
-                    com.hereliesaz.graffitixr.common.model.StencilLayerCount.TWO -> com.hereliesaz.graffitixr.common.model.StencilLayerCount.THREE
-                    com.hereliesaz.graffitixr.common.model.StencilLayerCount.THREE -> com.hereliesaz.graffitixr.common.model.StencilLayerCount.ONE
-                }
-                stencilViewModel.onLayerCountChosen(next)
-            }
-            azRailSubItem(id = "rebuild", hostId = "stencil_host", text = "Rebuild", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilRebuildInfo) {
-                stencilViewModel.onRebuild()
-            }
-            azRailSubItem(id = "view_layer", hostId = "stencil_host", text = "View Lyr", color = Color.White, shape = AzButtonShape.RECTANGLE) {
-                val state = stencilViewModel.uiState.value
-                val nextIdx = (state.activeStencilLayerIndex + 1) % state.stencilLayers.size.coerceAtLeast(1)
-                stencilViewModel.setActiveStencilLayer(nextIdx)
-            }
-            
-            azDivider()
-            
-            azRailHostItem(id = "pdf_host", text = "Export", color = Color.White, info = navStrings.stencilPrintInfo)
-            azRailSubItem(id = "pdf_dim", hostId = "pdf_host", text = "W / H", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilPrintDimToggleInfo) {
-                stencilViewModel.toggleOutputDimension()
-            }
-            azRailSubItem(
-                id = "pdf_size",
-                hostId = "pdf_host",
-                text = "Size",
-                color = Color.White,
-                shape = AzButtonShape.RECTANGLE,
-                info = navStrings.stencilPrintSizeInfo,
-                content = AzComposableContent { isEnabled ->
-                    val state by stencilViewModel.uiState.collectAsState()
-                    Box(
-                        modifier = Modifier.fillMaxSize().pointerInput(isEnabled) {
-                            if (!isEnabled) return@pointerInput
-                            detectDragGestures { change, dragAmount ->
-                                change.consume()
-                                stencilViewModel.setOutputSize(state.outputSizeMm - dragAmount.y * 2f)
-                            }
-                        },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("${state.outputSizeMm.toInt()}mm", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            )
-            azRailSubItem(id = "export_pdf", hostId = "pdf_host", text = "PDF", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilExportPdfInfo) {
-                stencilViewModel.exportPdf(context)
-            }
-            azRailSubItem(id = "save_pngs", hostId = "pdf_host", text = "PNG", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilSaveLayersInfo) {
-                stencilViewModel.saveLayersToGallery(context)
-            }
-            
-            azDivider()
-            
-            azRailItem(id = "back_editor", text = "← Editor", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.stencilBackInfo) {
+            // Deprecated Stencil Mode - redirecting to Mockup
+            LaunchedEffect(Unit) {
                 editorViewModel.setEditorMode(EditorMode.MOCKUP)
             }
             return
@@ -784,9 +721,6 @@ class MainActivity : ComponentActivity() {
         azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = Color.White, shape = AzButtonShape.NONE, info = navStrings.overlayInfo)
         azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = Color.White, shape = AzButtonShape.NONE, info = navStrings.mockupInfo)
         azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, route = EditorMode.TRACE.name, color = Color.White, shape = AzButtonShape.NONE, info = navStrings.traceInfo)
-        if (editorUiState.layers.any { it.textParams == null }) {
-            azRailSubItem(id = "stencil", hostId = "mode_host", text = navStrings.stencil, route = EditorMode.STENCIL.name, color = Color.White, shape = AzButtonShape.NONE, info = navStrings.stencilInfo)
-        }
 
         azDivider()
 
