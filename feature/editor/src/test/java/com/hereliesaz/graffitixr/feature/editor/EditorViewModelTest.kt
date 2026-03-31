@@ -13,6 +13,7 @@ import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.feature.editor.stencil.StencilProcessor
 import com.hereliesaz.graffitixr.feature.editor.stencil.StencilPrintEngine
@@ -47,6 +48,7 @@ class EditorViewModelTest {
 
     private lateinit var viewModel: EditorViewModel
     private val projectRepository: ProjectRepository = mockk(relaxed = true)
+    private val settingsRepository: SettingsRepository = mockk(relaxed = true)
     private val currentProjectFlow = kotlinx.coroutines.flow.MutableStateFlow<GraffitiProject?>(null)
     private val context: Context = mockk(relaxed = true)
     private val subjectIsolator: SubjectIsolator = mockk(relaxed = true)
@@ -64,6 +66,7 @@ class EditorViewModelTest {
         val testProject = GraffitiProject(id = "test-project")
         currentProjectFlow.value = testProject
         every { projectRepository.currentProject } returns currentProjectFlow
+        every { settingsRepository.backgroundColor } returns kotlinx.coroutines.flow.flowOf(0xFF000000.toInt())
         
         // Mock static methods for Bitmap, Uri, and Toast
         mockkStatic(BitmapFactory::class)
@@ -115,8 +118,8 @@ class EditorViewModelTest {
         }
 
         viewModel = EditorViewModel(
-            projectRepository, projectManager, exportManager, context, 
-            subjectIsolator, stencilProcessor, stencilPrintEngine, slamManager, 
+            projectRepository, settingsRepository, projectManager, exportManager, context,
+            subjectIsolator, stencilProcessor, stencilPrintEngine, slamManager,
             testDispatcherProvider
         )
     }

@@ -7,19 +7,23 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -65,6 +69,8 @@ fun SettingsScreen(
     onAnchorBoundaryChanged: (Boolean) -> Unit,
     isImperialUnits: Boolean,
     onImperialUnitsChanged: (Boolean) -> Unit,
+    backgroundColor: Int,
+    onBackgroundColorChanged: (Int) -> Unit,
     onCheckForUpdates: () -> Unit,
     onInstallUpdate: () -> Unit,
     onClose: () -> Unit
@@ -176,6 +182,28 @@ fun SettingsScreen(
                                 value = if (isImperialUnits) "Imperial (ft)" else "Metric (m)",
                                 modifier = Modifier.clickable { onImperialUnitsChanged(!isImperialUnits) }
                             )
+                            SettingRow(label = "Canvas Background") {
+                                listOf(
+                                    "Black" to 0xFF000000.toInt(),
+                                    "Dark"  to 0xFF1A1A2E.toInt(),
+                                    "Grey"  to 0xFF2C2C2C.toInt(),
+                                    "White" to 0xFFFFFFFF.toInt(),
+                                    "Navy"  to 0xFF0D1B2A.toInt(),
+                                ).forEach { (label, argb) ->
+                                    val isSelected = backgroundColor == argb
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .background(Color(argb.toLong() and 0xFFFFFFFFL), CircleShape)
+                                            .border(
+                                                width = if (isSelected) 2.dp else 0.5.dp,
+                                                color = if (isSelected) Color.Cyan else Color.Gray,
+                                                shape = CircleShape
+                                            )
+                                            .clickable { onBackgroundColorChanged(argb) }
+                                    )
+                                }
+                            }
                         }
 
                         // Version Section
@@ -271,6 +299,20 @@ fun SettingsItem(label: String, value: String, modifier: Modifier = Modifier) {
     ) {
         Text(text = label, fontWeight = FontWeight.Medium)
         Text(text = value, color = Color.Gray)
+    }
+}
+
+@Composable
+private fun SettingRow(label: String, content: @Composable RowScope.() -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), content = content)
     }
 }
 

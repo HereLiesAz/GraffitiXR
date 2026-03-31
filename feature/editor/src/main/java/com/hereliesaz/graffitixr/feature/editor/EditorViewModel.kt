@@ -22,6 +22,7 @@ import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.common.util.ImageUtils
 import com.hereliesaz.graffitixr.common.util.saveBitmapToGallery
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.feature.editor.export.ExportManager
@@ -66,6 +67,7 @@ sealed class EditCommand {
 @HiltViewModel
 class EditorViewModel @Inject constructor(
     private val projectRepository: ProjectRepository,
+    private val settingsRepository: SettingsRepository,
     private val projectManager: ProjectManager,
     private val exportManager: ExportManager,
     @ApplicationContext private val context: Context,
@@ -109,6 +111,12 @@ class EditorViewModel @Inject constructor(
     private var liquifyOriginalBitmap: Bitmap? = null
 
     init {
+        viewModelScope.launch(dispatchers.main) {
+            settingsRepository.backgroundColor.collect { argb ->
+                _uiState.update { it.copy(canvasBackground = Color(argb.toLong() and 0xFFFFFFFFL)) }
+            }
+        }
+
         viewModelScope.launch(dispatchers.main) {
             projectRepository.currentProject.collect { project ->
                 if (project != null) {

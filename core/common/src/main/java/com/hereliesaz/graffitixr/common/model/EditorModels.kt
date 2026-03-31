@@ -103,5 +103,6 @@ data class EditorUiState(
     val liveStrokeLayerId: String? = null,
     val liveStrokeBitmap: Bitmap? = null,
     // Incremented after each stroke segment so Compose re-reads the modified pixels.
-    val liveStrokeVersion: Int = 0
+    val liveStrokeVersion: Int = 0,
+    val canvasBackground: Color = Color.Black,
 )
