@@ -29,7 +29,6 @@ import com.hereliesaz.graffitixr.common.model.StencilLayerType
 import com.hereliesaz.graffitixr.common.model.StencilOutputDimension
 import com.hereliesaz.graffitixr.common.model.StencilUiState
 import com.hereliesaz.graffitixr.design.theme.Cyan
-import com.hereliesaz.graffitixr.design.theme.DarkGrey
 import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
 
 @Composable
