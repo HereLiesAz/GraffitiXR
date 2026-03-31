@@ -37,8 +37,11 @@ import java.util.UUID
 import javax.inject.Inject
 import androidx.core.net.toUri
 import androidx.core.graphics.createBitmap
+import com.hereliesaz.graffitixr.feature.editor.stencil.StencilProcessor
+import com.hereliesaz.graffitixr.feature.editor.stencil.StencilProgress
 import com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor
 import com.hereliesaz.graffitixr.common.util.SketchProcessor
+import kotlinx.coroutines.flow.collect
 
 data class StrokeCommand(
     val path: List<Offset>,
