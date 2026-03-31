@@ -405,7 +405,7 @@ No new external dependencies required. Everything uses:
 1. Handle source layer has no detectable subject (ML Kit confidence all < 0.5)
    → show error state in UI: "No subject detected. Try a photo with a clear foreground."
 2. Handle very small images (< 200px) → show error: "Source image too small for stencil."
-3. Handle print size so large it generates > 50 pages → warn user, suggest reducing size
+3. Handle print suuuuuuuuuuuuuuuuuuuuuuuuuuuu ize so large it generates > 50 pages → warn user, suggest reducing size
 4. Progress indicator during pipeline (show stage name + bar)
 5. Share sheet integration for PDF export (Android `FileProvider` + `Intent.ACTION_SEND`)
 6. Accessibility: content descriptions on all layer thumbnails and rail items
