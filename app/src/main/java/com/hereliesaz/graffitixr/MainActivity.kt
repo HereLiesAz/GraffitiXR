@@ -1039,7 +1039,7 @@ class MainActivity : ComponentActivity() {
                             }
                             else -> {
                                 azRailItem(id = "iso_${layer.id}", text = "Isolate", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.isolateInfo, onClick = { activate(); editorViewModel.onRemoveBackgroundClicked() })
-                                azRailItem(id = "line_${layer.id}", text = "Sketch", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.outlineInfo, onClick = { activate(); editorViewModel.onSketchClicked() })
+                                azRailItem(id = "line_${layer.id}", text = "Outline", color = Color.White, shape = AzButtonShape.RECTANGLE, info = navStrings.outlineInfo, onClick = { activate(); editorViewModel.onSketchClicked() })
                                 if (layer.stencilType == null) {
                                     azRailItem(id = "stencil_${layer.id}", text = "Stencil", color = Color.White, shape = AzButtonShape.RECTANGLE) {
                                         activate()
