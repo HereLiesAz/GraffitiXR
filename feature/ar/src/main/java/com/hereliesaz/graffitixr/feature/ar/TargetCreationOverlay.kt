@@ -102,7 +102,7 @@ fun TargetCreationOverlayUi(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .padding(top = 16.dp)
-                        .background(Color.Black.copy(alpha = 0.5f), MaterialTheme.shapes.small)
+                        .background(Color.White.copy(alpha = 0.5f), MaterialTheme.shapes.small)
                         .padding(8.dp)
                 )
             }
