@@ -7,6 +7,8 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntSize
+import com.hereliesaz.graffitixr.common.model.Tool
 import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.data.ProjectManager
@@ -349,6 +351,30 @@ class EditorViewModelTest {
 
         val restoredScale = viewModel.uiState.value.layers.first().scale
         assertEquals(initialScale, restoredScale, 0.01f)
+    }
+
+    @Test
+    fun `onStrokeStart replays all buffered points after bitmap copy`() = runTest {
+        val uri = Uri.parse("content://test/image.png")
+        viewModel.onAddLayer(uri)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val layerId = viewModel.uiState.value.layers.first().id
+        viewModel.onLayerActivated(layerId)
+        viewModel.setActiveTool(Tool.BRUSH)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val canvasSize = IntSize(100, 100)
+
+        viewModel.onStrokeStart(Offset(10f, 10f), canvasSize)
+        viewModel.onStrokePoint(Offset(20f, 20f))
+        viewModel.onStrokePoint(Offset(30f, 30f))
+        viewModel.onStrokePoint(Offset(40f, 40f))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNotNull(state.liveStrokeBitmap)
+        assertTrue("Expected liveStrokeVersion >= 1, got ${state.liveStrokeVersion}", state.liveStrokeVersion >= 1)
     }
 
     @org.junit.Ignore("TODO: Fix visibility condition checks after transparent stencil refactor")

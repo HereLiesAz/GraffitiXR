@@ -30,6 +30,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -102,6 +103,10 @@ class EditorViewModel @Inject constructor(
     private var strokeLayerScale: Float = 1f
     private var strokeLayerOffset: Offset = Offset.Zero
     private var strokeLayerRotationZ: Float = 0f
+
+    // Liquify live-preview state — valid only between onStrokeStart and onStrokeEnd for LIQUIFY.
+    private var liquifyJob: kotlinx.coroutines.Job? = null
+    private var liquifyOriginalBitmap: Bitmap? = null
 
     init {
         viewModelScope.launch(dispatchers.main) {
@@ -836,7 +841,12 @@ class EditorViewModel @Inject constructor(
         strokeLayerOffset = layer.offset
         strokeLayerRotationZ = layer.rotationZ
 
-        if (state.activeTool == Tool.LIQUIFY) return  // Liquify finalizes in onStrokeEnd
+        if (state.activeTool == Tool.LIQUIFY) {
+            // Store the original bitmap so live-preview warps can be applied from a clean copy.
+            liquifyOriginalBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, false)
+            _uiState.update { it.copy(liveStrokeLayerId = layerId) }
+            return
+        }
 
         val tool = state.activeTool
         val argb = state.activeColor.toArgb()
@@ -844,26 +854,43 @@ class EditorViewModel @Inject constructor(
         val feathering = state.brushFeathering
 
         // Copy the bitmap on a background thread (can be ~10-50 ms for large images).
+        // After the copy is done, replay ALL points collected so far (including any that
+        // arrived while the copy was in flight) so no input is lost.
         viewModelScope.launch(dispatchers.default) {
             val workBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
             val workCanvas = Canvas(workBitmap)
             val paint = buildStrokePaint(tool, argb, brushSize, feathering)
 
-            val mapped = ImageProcessor.mapScreenToBitmap(
-                listOf(startPoint), canvasSize.width, canvasSize.height, workBitmap.width, workBitmap.height,
+            // Snapshot the collected points at this moment — may include points that arrived
+            // during the bitmap-copy phase.
+            val catchUpPoints = strokeCollectedPoints.toList()
+            val mappedAll = ImageProcessor.mapScreenToBitmap(
+                catchUpPoints, canvasSize.width, canvasSize.height, workBitmap.width, workBitmap.height,
                 strokeLayerScale, strokeLayerOffset, strokeLayerRotationZ
-            ).first()
-            workCanvas.drawPoint(mapped.x, mapped.y, paint)
+            )
+
+            if (mappedAll.size == 1) {
+                workCanvas.drawPoint(mappedAll[0].x, mappedAll[0].y, paint)
+            } else {
+                val seg = android.graphics.Path()
+                seg.moveTo(mappedAll[0].x, mappedAll[0].y)
+                for (i in 1 until mappedAll.size) {
+                    seg.lineTo(mappedAll[i].x, mappedAll[i].y)
+                }
+                workCanvas.drawPath(seg, paint)
+            }
+
+            val lastMapped = mappedAll.last()
 
             withContext(dispatchers.main) {
                 strokeWorkingBitmap = workBitmap
                 strokeWorkingCanvas = workCanvas
                 strokePaint = paint
-                strokePrevBitmapPoint = mapped
+                strokePrevBitmapPoint = lastMapped
                 _uiState.update { it.copy(
                     liveStrokeLayerId = layerId,
                     liveStrokeBitmap = workBitmap,
-                    liveStrokeVersion = it.liveStrokeVersion + 1
+                    liveStrokeVersion = it.liveStrokeVersion + catchUpPoints.size
                 )}
             }
         }
@@ -872,6 +899,43 @@ class EditorViewModel @Inject constructor(
     /** Called for every drag update. Draws only the new segment onto the working bitmap. */
     fun onStrokePoint(currentPoint: Offset) {
         strokeCollectedPoints.add(currentPoint)
+
+        // Liquify live preview: cancel any pending warp job and start a fresh one from the
+        // original bitmap so each drag frame shows the full accumulated warp.
+        if (_uiState.value.activeTool == Tool.LIQUIFY) {
+            val layerId = strokeLayerId ?: return
+            val origBmp = liquifyOriginalBitmap ?: return
+            val points = strokeCollectedPoints.toList()
+            val canvasW = strokeCanvasW
+            val canvasH = strokeCanvasH
+            val brushSize = _uiState.value.brushSize
+            val argb = _uiState.value.activeColor.toArgb()
+            val capturedScale = strokeLayerScale
+            val capturedOffset = strokeLayerOffset
+            val capturedRotZ = strokeLayerRotationZ
+            val feathering = _uiState.value.brushFeathering
+
+            liquifyJob?.cancel()
+            liquifyJob = viewModelScope.launch(dispatchers.default) {
+                val warpBitmap = origBmp.copy(Bitmap.Config.ARGB_8888, true)
+                val mappedPoints = ImageProcessor.mapScreenToBitmap(
+                    points, canvasW, canvasH, warpBitmap.width, warpBitmap.height,
+                    capturedScale, capturedOffset, capturedRotZ
+                )
+                ImageProcessor.applyToolToBitmap(
+                    warpBitmap, mappedPoints, Tool.LIQUIFY, brushSize, argb, 0.5f, true, feathering
+                )
+                if (isActive) {
+                    withContext(dispatchers.main) {
+                        _uiState.update { it.copy(
+                            liveStrokeBitmap = warpBitmap,
+                            liveStrokeVersion = it.liveStrokeVersion + 1
+                        )}
+                    }
+                }
+            }
+            return
+        }
 
         val canvas = strokeWorkingCanvas ?: return
         val paint = strokePaint ?: return
@@ -965,6 +1029,11 @@ class EditorViewModel @Inject constructor(
         strokePrevBitmapPoint = null
         strokeCollectedPoints = mutableListOf()
         strokeLayerId = null
+
+        // Clean up Liquify live-preview state.
+        liquifyJob?.cancel()
+        liquifyJob = null
+        liquifyOriginalBitmap = null
     }
 
     private fun buildStrokePaint(tool: Tool, argbColor: Int, brushSize: Float, feathering: Float): Paint =
