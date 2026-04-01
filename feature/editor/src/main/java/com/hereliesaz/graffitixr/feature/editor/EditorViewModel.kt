@@ -594,6 +594,35 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    fun setSegmentationInfluence(value: Float) {
+        val clamped = value.coerceIn(0f, 1f)
+        _uiState.update { it.copy(segmentationInfluence = clamped) }
+
+        val confidence = rawSegmentationConfidence ?: return
+        val source = segmentationSourceBitmap ?: return
+        val targetId = segmentationTargetLayerId ?: return
+
+        viewModelScope.launch(dispatchers.default) {
+            val newBitmap = subjectIsolator.applyConfidenceThreshold(source, confidence, clamped, 0.1f)
+            withContext(dispatchers.main) {
+                _uiState.update { state ->
+                    state.copy(
+                        layers = state.layers.map { layer ->
+                            if (layer.id == targetId) layer.copy(bitmap = newBitmap) else layer
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    fun dismissSegmentationSlider() {
+        rawSegmentationConfidence = null
+        segmentationSourceBitmap = null
+        segmentationTargetLayerId = null
+        _uiState.update { it.copy(isSegmenting = false) }
+    }
+
     override fun onSketchClicked() {
         val state = _uiState.value
         val layerId = state.activeLayerId ?: return

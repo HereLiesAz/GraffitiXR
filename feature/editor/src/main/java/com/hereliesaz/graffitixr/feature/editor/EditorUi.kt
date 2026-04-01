@@ -116,7 +116,11 @@ fun EditorUi(
                 onRedo = actions::onRedoClicked,
                 onMagicAlign = actions::onMagicClicked,
                 onAdjustmentStart = actions::onAdjustmentStart,
-                onAdjustmentEnd = actions::onAdjustmentEnd
+                onAdjustmentEnd = actions::onAdjustmentEnd,
+                showSegmentationSlider = uiState.isSegmenting,
+                segmentationInfluence = uiState.segmentationInfluence,
+                onSegmentationInfluenceChange = { actions.setSegmentationInfluence(it) },
+                onSegmentationDismiss = { actions.dismissSegmentationSlider() }
             )
         }
     }

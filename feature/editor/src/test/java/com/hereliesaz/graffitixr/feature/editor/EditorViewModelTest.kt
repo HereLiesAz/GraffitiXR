@@ -213,7 +213,15 @@ class EditorViewModelTest {
         viewModel.onLayerActivated(layerId)
         
         val processedBitmap = mockk<Bitmap>(relaxed = true)
-        coEvery { subjectIsolator.isolate(any()) } returns Result.success(processedBitmap)
+        every { processedBitmap.width } returns 100
+        every { processedBitmap.height } returns 100
+        val isolationResult = IsolationResult(
+            isolatedBitmap = processedBitmap,
+            rawConfidence = FloatArray(100 * 100) { 0.8f },
+            width = 100,
+            height = 100
+        )
+        coEvery { subjectIsolator.isolate(any()) } returns Result.success(isolationResult)
 
         viewModel.onRemoveBackgroundClicked()
         testDispatcher.scheduler.advanceUntilIdle()
@@ -378,6 +386,13 @@ class EditorViewModelTest {
         val state = viewModel.uiState.value
         assertNotNull(state.liveStrokeBitmap)
         assertTrue("Expected liveStrokeVersion >= 1, got ${state.liveStrokeVersion}", state.liveStrokeVersion >= 1)
+    }
+
+    @Test
+    fun `setSegmentationInfluence updates state and does not crash when no confidence stored`() = runTest {
+        viewModel.setSegmentationInfluence(0.3f)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(0.3f, viewModel.uiState.value.segmentationInfluence, 0.001f)
     }
 
     @org.junit.Ignore("TODO: Fix visibility condition checks after transparent stencil refactor")
