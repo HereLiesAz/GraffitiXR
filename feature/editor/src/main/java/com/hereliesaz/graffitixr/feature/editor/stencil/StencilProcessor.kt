@@ -166,7 +166,7 @@ class StencilProcessor @Inject constructor() {
      * V-channel (luminance). Returns one [StencilLayer] per cluster, sorted darkest first
      * (overpaint strategy: each layer includes all pixels at this darkness or darker).
      */
-    private fun kmeansLayers(
+    fun kmeansLayers(
         isolated: Bitmap,
         subjectMask: Bitmap,
         layerCount: StencilLayerCount,
@@ -295,7 +295,7 @@ class StencilProcessor @Inject constructor() {
      * non-silhouette layers to smooth jagged cut edges.
      * Silhouette is left unchanged — its outer boundary doesn't need smoothing.
      */
-    private fun applyMorphClose(layers: List<StencilLayer>): List<StencilLayer> {
+    fun applyMorphClose(layers: List<StencilLayer>): List<StencilLayer> {
         return layers.map { layer ->
             if (layer.type == StencilLayerType.SILHOUETTE) return@map layer
             layer.copy(bitmap = morphClose(layer.bitmap, layer.type.color))

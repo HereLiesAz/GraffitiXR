@@ -51,16 +51,16 @@ class StencilProcessorTest {
 
     private lateinit var processor: StencilProcessor
 
-    /** 100×100 ARGB_8888 source — fully opaque so alphaToMask sees all pixels as subject. */
+    /** 400×400 ARGB_8888 source — fully opaque so alphaToMask sees all pixels as subject. */
     private lateinit var isolatedBitmap: Bitmap
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /** Builds a fake StencilLayer backed by a real (mock) 100×100 bitmap. */
+    /** Builds a fake StencilLayer backed by a real (mock) 400×400 bitmap. */
     private fun fakeLayer(type: StencilLayerType): StencilLayer {
         val bmp = mockk<Bitmap>(relaxed = true).apply {
-            every { width } returns 100
-            every { height } returns 100
+            every { width } returns 400
+            every { height } returns 400
             every { config } returns Bitmap.Config.ARGB_8888
             every { getPixel(any(), any()) } returns Color.WHITE
             every { getPixel(50, 50) } returns Color.BLACK
@@ -139,7 +139,7 @@ class StencilProcessorTest {
 
         // Stub kmeansLayers to bypass OpenCV K-means (not runnable on JVM)
         every {
-            processor["kmeansLayers"](any<Bitmap>(), any<Bitmap>(), any<StencilLayerCount>(), any<Float>())
+            processor.kmeansLayers(any(), any(), any(), any())
         } answers {
             val count = arg<StencilLayerCount>(2)
             fakeLayersFor(count)
@@ -147,10 +147,10 @@ class StencilProcessorTest {
 
         // Stub applyMorphClose to pass layers through unchanged (avoids OpenCV morphology)
         every {
-            processor["applyMorphClose"](any<List<StencilLayer>>())
+            processor.applyMorphClose(any<List<StencilLayer>>())
         } answers { arg<List<StencilLayer>>(0) }
 
-        isolatedBitmap = makeOpaqueSubject(100, 100)
+        isolatedBitmap = makeOpaqueSubject(400, 400)
     }
 
     @After
@@ -281,7 +281,7 @@ class StencilProcessorTest {
     @Test
     fun `exception in kmeansLayers emits StencilProgress Error`() = runTest {
         every {
-            processor["kmeansLayers"](any<Bitmap>(), any<Bitmap>(), any<StencilLayerCount>(), any<Float>())
+            processor.kmeansLayers(any(), any(), any(), any())
         } throws RuntimeException("K-means exploded")
 
         val error = processor.process(isolatedBitmap, StencilLayerCount.TWO)
@@ -301,9 +301,6 @@ class StencilProcessorTest {
         assertTrue("Expected at least 3 stage events, got $stageCount", stageCount >= 3)
 
         val lastEvent = events.last()
-        if (lastEvent is StencilProgress.Error) {
-            error("Pipeline failed with: ${lastEvent.message}")
-        }
         assertTrue("Final event should be Done, but was $lastEvent", lastEvent is StencilProgress.Done)
     }
 
@@ -367,7 +364,7 @@ class StencilProcessorTest {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /**
-     * Creates a 100×100 ARGB_8888 bitmap that is fully opaque white.
+     * Creates a 400×400 ARGB_8888 bitmap that is fully opaque white.
      * Used as the isolated bitmap input (simulates a pre-isolated subject).
      */
     private fun makeOpaqueSubject(w: Int, h: Int): Bitmap {
