@@ -506,9 +506,11 @@ class ArViewModel @Inject constructor(
                     isCaptureRequested = false
                 )
             }
-            viewModelScope.launch(Dispatchers.Default) {
-                val maskedBmp = rotatedBmp.isolateMarkings()
+            viewModelScope.launch {
+                val maskedBmp = withContext(Dispatchers.Default) { rotatedBmp.isolateMarkings() }
                 _uiState.update { it.copy(tempCaptureBitmap = maskedBmp, annotatedCaptureBitmap = null) }
+                val annotated = withContext(Dispatchers.Default) { slamManager.annotateKeypoints(maskedBmp) }
+                _uiState.update { it.copy(annotatedCaptureBitmap = annotated) }
             }
             return
         }
@@ -539,6 +541,10 @@ class ArViewModel @Inject constructor(
                 targetPhysicalExtent = extent,
                 isCaptureRequested = false
             )
+        }
+        viewModelScope.launch {
+            val annotated = withContext(Dispatchers.Default) { slamManager.annotateKeypoints(rotatedBmp) }
+            _uiState.update { it.copy(annotatedCaptureBitmap = annotated) }
         }
     }
 

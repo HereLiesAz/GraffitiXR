@@ -259,6 +259,54 @@ class ArViewModelTest {
         verify { session.pause() }
     }
 
+    // ==================== ORB Annotation Tests ====================
+
+    @Test
+    fun `onTargetCaptured normal path annotates keypoints asynchronously`() = runTest {
+        val rawBmp = mockk<Bitmap>(relaxed = true)
+        val annotatedBmp = mockk<Bitmap>(relaxed = true)
+        every { slamManager.annotateKeypoints(any()) } returns annotatedBmp
+
+        viewModel.onTargetCaptured(
+            bitmap = rawBmp, depthBuffer = null,
+            colorW = 100, colorH = 100,
+            depthBufW = 0, depthBufH = 0, depthBufStride = 0,
+            intrinsics = null, viewMatrix = FloatArray(16), displayRotation = 0
+        )
+        // withContext(Dispatchers.Default) runs on a real thread pool; give it time to finish,
+        // then advance testDispatcher to process the resulting state-update continuation.
+        testDispatcher.scheduler.advanceUntilIdle()
+        Thread.sleep(200)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(annotatedBmp, viewModel.uiState.value.annotatedCaptureBitmap)
+    }
+
+    @Test
+    fun `onTargetCaptured tap path annotates keypoints asynchronously`() = runTest {
+        val rawBmp = mockk<Bitmap>(relaxed = true)
+        val annotatedBmp = mockk<Bitmap>(relaxed = true)
+        every { slamManager.annotateKeypoints(any()) } returns annotatedBmp
+        viewModel.onScreenTap(0.5f, 0.5f)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onTargetCaptured(
+            bitmap = rawBmp, depthBuffer = null,
+            colorW = 100, colorH = 100,
+            depthBufW = 0, depthBufH = 0, depthBufStride = 0,
+            intrinsics = null, viewMatrix = FloatArray(16), displayRotation = 0
+        )
+        // Tap path has TWO withContext(Default) calls (isolateMarkings + annotateKeypoints);
+        // each requires a sleep to let the real Default dispatcher thread complete.
+        repeat(2) {
+            testDispatcher.scheduler.advanceUntilIdle()
+            Thread.sleep(200)
+        }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(annotatedBmp, viewModel.uiState.value.annotatedCaptureBitmap)
+    }
+
     private fun setPrivateField(obj: Any, fieldName: String, value: Any?) {
         val field = obj.javaClass.getDeclaredField(fieldName)
         field.isAccessible = true
