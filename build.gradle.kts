@@ -11,7 +11,7 @@ buildscript {
         "org.apache.commons:commons-lang3:3.20.0",
         "org.apache.httpcomponents:httpclient:4.5.14",
         "com.google.guava:guava:33.4.0-jre",
-        "com.google.android.gms:play-services-basement:18.0.2"
+        "com.google.android.gms:play-services-basement:18.10.0"
     )
 
     val protobufModules = listOf(
