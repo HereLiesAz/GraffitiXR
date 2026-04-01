@@ -114,9 +114,11 @@ class StencilProcessor @Inject constructor() {
             emit(StencilProgress.Stage("Analysing tones…", 0.45f))
             val allLayers = kmeansLayers(isolatedBitmap, subjectMask, totalCount)
             
-            // Find the specific requested layer
-            val targetLayer = allLayers.find { it.type == type } 
-                ?: throw Exception("Layer type ${type.label} not found for count ${totalCount.count}")
+            // Find the specific requested layer; fall back to silhouette if
+            // k-means collapsed (e.g. uniform luminance) and the tone wasn't produced.
+            val targetLayer = allLayers.find { it.type == type }
+                ?: allLayers.firstOrNull()
+                ?: throw Exception("No layers produced for count ${totalCount.count}")
 
             emit(StencilProgress.Stage("Smoothing edges…", 0.70f))
             val smoothed = if (type == StencilLayerType.SILHOUETTE) targetLayer
