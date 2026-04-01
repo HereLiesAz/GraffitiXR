@@ -47,7 +47,8 @@ Controls visual style defaults.
 ```kotlin
 azTheme(
     defaultShape = AzButtonShape.RECTANGLE, // Default shape for all items
-    activeColor = MaterialTheme.colorScheme.primary // Color for active state
+    activeColor = MaterialTheme.colorScheme.primary, // Color for active state
+    translucentBackground = Color.Black.copy(alpha = 0.5f) // Set the background color for menus/overlays!
 )
 ```
 
@@ -59,6 +60,7 @@ azAdvanced(
     isLoading = isLoading,               // Boolean: Show global loading overlay
     enableRailDragging = true,           // Boolean: Enable FAB Mode (detach rail)
     helpEnabled = showHelp,              // Boolean: Show Help Overlay
+    helpList = mapOf("home" to "Home screen") // Map<String, String>: Extra help texts
     onDismissHelp = { showHelp = false }
 )
 ```
@@ -89,7 +91,7 @@ azMenuItem(
 azMenuItem(id = "multi-line", text = "This is a\nmulti-line item", route = "multi-line")
 
 // Help trigger rail item
-azHelpRailItem(id = "help-trigger", text = "Help")
+azHelpRailItem(id = "help-trigger", text = "Get Help")
 
 // Help trigger as a sub-item
 azHelpSubItem(id = "help-sub-trigger", hostId = "rail-host", text = "Get Help Here")
@@ -102,6 +104,11 @@ azRailItem(id = "icon-item", text = "Icon", content = android.R.drawable.ic_menu
 
 // Rail item with specific shape override
 azRailItem(id = "none-shape", text = "No Shape", shape = AzButtonShape.NONE)
+
+// Rail item with Custom Composable Content Size
+azRailItem(id = "wide-composable", text = "Wide", content = AzComposableContent {
+    Box(Modifier.width(120.dp).background(Color.Blue))
+}) // Will not clip to rail width!
 
 // Disabled item
 azRailItem(id = "profile", text = "Profile", disabled = true, route = "profile")
@@ -218,6 +225,8 @@ azRailRelocItem(
     id = "reloc-1",
     hostId = "rail-host", // Cluster ID
     text = "Reloc Item 1",
+    forceHiddenMenuOpen = false, // Programmatic control for hidden context menu
+    onHiddenMenuDismiss = { /* Menu was closed! */ },
     onRelocate = { from, to, newOrder -> /* handle reorder */ }
 ) {
     // Hidden Context Menu (Tap to open)
@@ -230,6 +239,8 @@ azRailRelocItem(
 ## 6. Nested Rails (Popups)
 
 Secondary rails that open in a popup overlay. Do NOT assign a route to the parent item.
+
+**Dynamic Bumping Effect:** When a vertical nested rail is opened, the main navigation rail will dynamically decrease its width (shrinking to the button width) to simulate the nested rail bumping it out of the way. Closing the nested rail restores the main rail to its original width.
 
 ```kotlin
 // Vertical Nested Rail
@@ -335,14 +346,14 @@ AzForm(
     formName = "loginForm",
     onSubmit = { formData -> /* Map<String, String> */ }
 ) {
-    entry(entryName = "username", hint = "Username")
+    entry(entryName = "username", hint = "Username", initialValue = "AzRailFan") // Pre-filled!
     entry(entryName = "password", hint = "Password", secret = true) // Password mask
     entry(entryName = "bio", hint = "Biography", multiline = true)  // Multi-line
 }
 ```
 
 ### AzRoller
-Slot-machine style selector (reorderable/draggable items).
+Slot-machine style selector.
 
 ```kotlin
 AzRoller(
@@ -352,19 +363,6 @@ AzRoller(
 )
 ```
 
-### AzLoad
-Standalone loading screens.
-
-```kotlin
-AzLoad(
-    text = "Loading project...",
-    progress = 0.5f // Optional progress indicator
-)
-```
-
-### System Overlay Features
-AzNavRail supports System Overlay features for advanced drawing and composition over the top level.
-
 ### AzButton / AzToggle / AzCycler
 Standalone versions of rail components for general UI use.
 
@@ -373,6 +371,3 @@ AzButton(text = "Button", onClick = {}, shape = AzButtonShape.SQUARE)
 AzToggle(isChecked = true, onToggle = {}, toggleOnText = "On", toggleOffText = "Off")
 AzCycler(options = listOf("1", "2"), selectedOption = "1", onCycle = {})
 ```
-
----
-*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*
