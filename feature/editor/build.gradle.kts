@@ -61,6 +61,7 @@ dependencies {
     implementation(libs.androidx.camera.view)
 
     implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.mlkit.subject.segmentation)
 
     implementation(libs.hilt.android)
     implementation(libs.androidx.ink.brush)

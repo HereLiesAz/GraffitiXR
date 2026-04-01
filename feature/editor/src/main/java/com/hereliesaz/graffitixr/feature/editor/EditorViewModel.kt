@@ -92,6 +92,10 @@ class EditorViewModel @Inject constructor(
     private var copiedLayerState: Layer? = null
     private var anchorHalfExtentMeters: Pair<Float, Float>? = null
 
+    private var rawSegmentationConfidence: FloatArray? = null
+    private var segmentationSourceBitmap: Bitmap? = null
+    private var segmentationTargetLayerId: String? = null
+
     // Real-time stroke state — valid only between onStrokeStart and onStrokeEnd.
     private var strokeWorkingBitmap: Bitmap? = null
     private var strokeWorkingCanvas: Canvas? = null
@@ -573,9 +577,15 @@ class EditorViewModel @Inject constructor(
             val bitmap = ImageUtils.loadBitmapAsync(context, uri)
             if (bitmap != null) {
                 val result = subjectIsolator.isolate(bitmap)
-                result.onSuccess { fgBitmap ->
-                    val path = projectRepository.saveArtifact(projectId, "bg_removed_${System.currentTimeMillis()}.png", ImageUtils.bitmapToByteArray(fgBitmap))
+                result.onSuccess { isolationResult ->
+                    val path = projectRepository.saveArtifact(projectId, "bg_removed_${System.currentTimeMillis()}.png", ImageUtils.bitmapToByteArray(isolationResult.isolatedBitmap))
                     updateLayerUri(layerId, "file://$path".toUri())
+                    rawSegmentationConfidence = isolationResult.rawConfidence
+                    segmentationSourceBitmap = bitmap
+                    segmentationTargetLayerId = layerId
+                    withContext(dispatchers.main) {
+                        _uiState.update { it.copy(isSegmenting = true, segmentationInfluence = 0.5f) }
+                    }
                 }
             }
             withContext(dispatchers.main) {
@@ -1328,7 +1338,7 @@ class EditorViewModel @Inject constructor(
             }
 
             // 3. Process
-            val isolated = subjectIsolator.isolate(composite).getOrNull() ?: composite
+            val isolated = subjectIsolator.isolate(composite).getOrNull()?.isolatedBitmap ?: composite
             
             stencilProcessor.processSingle(isolated, nextType, totalCount).collect { progress ->
                 when (progress) {

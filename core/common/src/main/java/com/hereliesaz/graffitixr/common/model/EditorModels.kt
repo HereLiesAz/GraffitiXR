@@ -105,4 +105,6 @@ data class EditorUiState(
     // Incremented after each stroke segment so Compose re-reads the modified pixels.
     val liveStrokeVersion: Int = 0,
     val canvasBackground: Color = Color.Black,
+    val isSegmenting: Boolean = false,
+    val segmentationInfluence: Float = 0.5f,
 )

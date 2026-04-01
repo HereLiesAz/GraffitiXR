@@ -1,42 +1,84 @@
-// FILE: feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/SubjectIsolator.kt
 package com.hereliesaz.graffitixr.feature.editor
 
+import android.content.Context
 import android.graphics.Bitmap
-import com.hereliesaz.graffitixr.common.util.ImageProcessor
+import com.google.android.gms.tasks.Tasks
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
+import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Single source of truth for GrabCut-based subject isolation. Both the "Isolate" button in the
- * editor and the stencil wizard use this class so segmentation behaviour can never silently diverge.
- */
 @Singleton
-class SubjectIsolator @Inject constructor() {
+class SubjectIsolator @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
+    private val segmenter = SubjectSegmentation.getClient(
+        SubjectSegmenterOptions.Builder()
+            .enableMultipleSubjects(
+                SubjectSegmenterOptions.SubjectResultOptions.Builder()
+                    .enableConfidenceMask()
+                    .build()
+            )
+            .build()
+    )
 
-    suspend fun isolate(bitmap: Bitmap): Result<Bitmap> =
-        withContext(Dispatchers.Default) {
-            try {
-                val downsampled = downsample(bitmap)
-                val result = ImageProcessor.removeBackground(downsampled)
-                if (result != null) Result.success(result)
-                else Result.failure(Exception("Segmentation failed — GrabCut returned null"))
-            } catch (e: Exception) {
-                Result.failure(e)
+    suspend fun isolate(bitmap: Bitmap): Result<IsolationResult> = withContext(Dispatchers.Default) {
+        runCatching {
+            val scaled = downsample(bitmap, 2048)
+            val image = InputImage.fromBitmap(scaled, 0)
+            val segResult = Tasks.await(segmenter.process(image))
+            val subjects = segResult.subjects
+            val w = scaled.width; val h = scaled.height
+            val mergedConf = FloatArray(w * h)
+            for (subject in subjects) {
+                val subjectConf = subject.confidenceMask ?: continue
+                for (i in mergedConf.indices) {
+                    if (subjectConf[i] > mergedConf[i]) mergedConf[i] = subjectConf[i]
+                }
             }
+            val isolated = applyConfidenceThreshold(scaled, mergedConf, threshold = 0.5f)
+            IsolationResult(isolatedBitmap = isolated, rawConfidence = mergedConf, width = w, height = h)
         }
-
-    private fun downsample(src: Bitmap): Bitmap {
-        val maxDim = maxOf(src.width, src.height)
-        if (maxDim <= MAX_INPUT_PX) return src.copy(Bitmap.Config.ARGB_8888, false)
-        val scale = MAX_INPUT_PX.toFloat() / maxDim
-        val w = (src.width * scale).toInt()
-        val h = (src.height * scale).toInt()
-        return Bitmap.createScaledBitmap(src, w, h, true)
     }
 
-    companion object {
-        private const val MAX_INPUT_PX = 2048
+    fun applyConfidenceThreshold(
+        source: Bitmap,
+        confidence: FloatArray,
+        threshold: Float,
+        featherRange: Float = 0.1f
+    ): Bitmap {
+        val w = source.width; val h = source.height
+        val pixels = IntArray(w * h)
+        source.getPixels(pixels, 0, w, 0, 0, w, h)
+        for (i in pixels.indices) {
+            val conf = confidence[i]
+            val alpha = when {
+                conf >= threshold -> 255
+                conf <= threshold - featherRange -> 0
+                else -> ((conf - (threshold - featherRange)) / featherRange * 255f).toInt().coerceIn(0, 255)
+            }
+            pixels[i] = (pixels[i] and 0x00FFFFFF) or (alpha shl 24)
+        }
+        val result = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        result.setPixels(pixels, 0, w, 0, 0, w, h)
+        return result
+    }
+
+    private fun downsample(bitmap: Bitmap, maxDim: Int): Bitmap {
+        val max = maxOf(bitmap.width, bitmap.height)
+        if (max <= maxDim) return bitmap
+        val scale = maxDim.toFloat() / max
+        return Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
     }
 }
+
+data class IsolationResult(
+    val isolatedBitmap: Bitmap,
+    val rawConfidence: FloatArray,
+    val width: Int,
+    val height: Int
+)
