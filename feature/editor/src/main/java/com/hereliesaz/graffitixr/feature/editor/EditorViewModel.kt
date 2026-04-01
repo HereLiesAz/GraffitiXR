@@ -92,6 +92,10 @@ class EditorViewModel @Inject constructor(
     private var copiedLayerState: Layer? = null
     private var anchorHalfExtentMeters: Pair<Float, Float>? = null
 
+    private var rawSegmentationConfidence: FloatArray? = null
+    private var segmentationSourceBitmap: Bitmap? = null
+    private var segmentationTargetLayerId: String? = null
+
     // Real-time stroke state — valid only between onStrokeStart and onStrokeEnd.
     private var strokeWorkingBitmap: Bitmap? = null
     private var strokeWorkingCanvas: Canvas? = null
@@ -573,15 +577,50 @@ class EditorViewModel @Inject constructor(
             val bitmap = ImageUtils.loadBitmapAsync(context, uri)
             if (bitmap != null) {
                 val result = subjectIsolator.isolate(bitmap)
-                result.onSuccess { fgBitmap ->
-                    val path = projectRepository.saveArtifact(projectId, "bg_removed_${System.currentTimeMillis()}.png", ImageUtils.bitmapToByteArray(fgBitmap))
+                result.onSuccess { isolationResult ->
+                    val path = projectRepository.saveArtifact(projectId, "bg_removed_${System.currentTimeMillis()}.png", ImageUtils.bitmapToByteArray(isolationResult.isolatedBitmap))
                     updateLayerUri(layerId, "file://$path".toUri())
+                    rawSegmentationConfidence = isolationResult.rawConfidence
+                    segmentationSourceBitmap = bitmap
+                    segmentationTargetLayerId = layerId
+                    withContext(dispatchers.main) {
+                        _uiState.update { it.copy(isSegmenting = true, segmentationInfluence = 0.5f) }
+                    }
                 }
             }
             withContext(dispatchers.main) {
                 _uiState.update { it.copy(isLoading = false) }
             }
         }
+    }
+
+    fun setSegmentationInfluence(value: Float) {
+        val clamped = value.coerceIn(0f, 1f)
+        _uiState.update { it.copy(segmentationInfluence = clamped) }
+
+        val confidence = rawSegmentationConfidence ?: return
+        val source = segmentationSourceBitmap ?: return
+        val targetId = segmentationTargetLayerId ?: return
+
+        viewModelScope.launch(dispatchers.default) {
+            val newBitmap = subjectIsolator.applyConfidenceThreshold(source, confidence, clamped, 0.1f)
+            withContext(dispatchers.main) {
+                _uiState.update { state ->
+                    state.copy(
+                        layers = state.layers.map { layer ->
+                            if (layer.id == targetId) layer.copy(bitmap = newBitmap) else layer
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    fun dismissSegmentationSlider() {
+        rawSegmentationConfidence = null
+        segmentationSourceBitmap = null
+        segmentationTargetLayerId = null
+        _uiState.update { it.copy(isSegmenting = false) }
     }
 
     override fun onSketchClicked() {
@@ -1328,7 +1367,7 @@ class EditorViewModel @Inject constructor(
             }
 
             // 3. Process
-            val isolated = subjectIsolator.isolate(composite).getOrNull() ?: composite
+            val isolated = subjectIsolator.isolate(composite).getOrNull()?.isolatedBitmap ?: composite
             
             stencilProcessor.processSingle(isolated, nextType, totalCount).collect { progress ->
                 when (progress) {

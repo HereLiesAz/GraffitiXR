@@ -5,13 +5,21 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.graffitixr.common.model.OverlayLayer
@@ -53,6 +61,10 @@ fun AdjustmentsPanel(
     onMagicAlign: () -> Unit,
     onAdjustmentStart: () -> Unit,
     onAdjustmentEnd: () -> Unit,
+    showSegmentationSlider: Boolean = false,
+    segmentationInfluence: Float = 0.5f,
+    onSegmentationInfluenceChange: (Float) -> Unit = {},
+    onSegmentationDismiss: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Hide entirely during capture or if touch is locked
@@ -93,6 +105,19 @@ fun AdjustmentsPanel(
         // Image-specific adjustment knobs
         // These are only shown if an image is actually present to adjust.
         if (hasImage) {
+            AnimatedVisibility(
+                visible = showSegmentationSlider,
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+            ) {
+                SegmentationInfluenceRow(
+                    influence = segmentationInfluence,
+                    onInfluenceChange = onSegmentationInfluenceChange,
+                    onDismiss = onSegmentationDismiss,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
             AnimatedVisibility(
                 visible = showColorBalance,
                 enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
@@ -146,5 +171,47 @@ fun AdjustmentsPanel(
                 modifier = Modifier.fillMaxWidth()
             )
         }
+    }
+}
+
+@Composable
+fun SegmentationInfluenceRow(
+    influence: Float,
+    onInfluenceChange: (Float) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            "Edge",
+            color = Color.White,
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.width(36.dp)
+        )
+        Slider(
+            value = influence,
+            onValueChange = onInfluenceChange,
+            valueRange = 0f..1f,
+            modifier = Modifier.weight(1f),
+            colors = SliderDefaults.colors(
+                thumbColor = Color.Cyan,
+                activeTrackColor = Color.Cyan,
+                inactiveTrackColor = Color.DarkGray
+            )
+        )
+        Text(
+            "Done",
+            color = Color.Cyan,
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier
+                .clickable { onDismiss() }
+                .padding(4.dp)
+        )
     }
 }
