@@ -16,15 +16,17 @@ import javax.inject.Singleton
 class SubjectIsolator @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-    private val segmenter = SubjectSegmentation.getClient(
-        SubjectSegmenterOptions.Builder()
-            .enableMultipleSubjects(
-                SubjectSegmenterOptions.SubjectResultOptions.Builder()
-                    .enableConfidenceMask()
-                    .build()
-            )
-            .build()
-    )
+    private val segmenter by lazy {
+        SubjectSegmentation.getClient(
+            SubjectSegmenterOptions.Builder()
+                .enableMultipleSubjects(
+                    SubjectSegmenterOptions.SubjectResultOptions.Builder()
+                        .enableConfidenceMask()
+                        .build()
+                )
+                .build()
+        )
+    }
 
     suspend fun isolate(bitmap: Bitmap): Result<IsolationResult> = withContext(Dispatchers.Default) {
         runCatching {
