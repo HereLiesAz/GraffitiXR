@@ -61,6 +61,7 @@ public:
     bool loadSuperPoint(const std::vector<uchar>& onnxBytes);
 
     void clearMap();
+    void pruneByConfidence(float threshold);
     void setViewportSize(int width, int height);
     void setRelocEnabled(bool enabled);
 

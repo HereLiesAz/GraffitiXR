@@ -28,6 +28,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -166,7 +167,7 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    private fun updateSessionStateLocked() {
+    private suspend fun updateSessionStateLocked() {
         val shouldBeRunning = isActivityResumed && isInArMode && !isDestroying
 
         if (shouldBeRunning && !isSessionResumed) {
@@ -219,7 +220,7 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    private fun resumeArSessionInternal() {
+    private suspend fun resumeArSessionInternal() {
         val s = session ?: return
         try {
             s.resume()
@@ -253,7 +254,7 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    private fun pauseArSessionInternal() {
+    private suspend fun pauseArSessionInternal() {
         if (!isSessionResumed) return
         isSessionResumed = false
         try {
@@ -264,8 +265,8 @@ class ArViewModel @Inject constructor(
             e.printStackTrace()
         }
         stopAutoSave()
-        saveMapNow()
-        saveCloudPointsNow()
+        saveMapBlocking()
+        saveCloudPointsBlocking()
     }
 
     private suspend fun performFullCleanupLocked() {
@@ -288,10 +289,12 @@ class ArViewModel @Inject constructor(
     private suspend fun saveMapBlocking() {
         val project = projectRepository.currentProject.value ?: return
         if (slamManager.getSplatCount() <= 0) return
+        while (isSaving.get()) { delay(50) }
         withContext(Dispatchers.IO) {
             try {
                 val root = File(appContext.filesDir, "projects/${project.id}")
                 if (!root.exists()) root.mkdirs()
+                slamManager.pruneByConfidence(0.6f)
                 slamManager.saveModel(File(root, "map.bin").absolutePath)
                 lastSavedSplatCount.set(slamManager.getSplatCount())
                 loadedProjectId = project.id
@@ -301,7 +304,8 @@ class ArViewModel @Inject constructor(
 
     private suspend fun saveCloudPointsBlocking() {
         val project = projectRepository.currentProject.value ?: return
-        if (_uiState.value.arScanMode != ArScanMode.CLOUD_POINTS) return
+        val currentMode = settingsRepository.arScanMode.first()
+        if (currentMode != ArScanMode.CLOUD_POINTS) return
         val r = renderer ?: return
         withContext(Dispatchers.IO) {
             try { r.saveCloudPoints(cloudPointsPath(project.id)) }
@@ -318,6 +322,7 @@ class ArViewModel @Inject constructor(
             try {
                 val root = File(appContext.filesDir, "projects/${project.id}")
                 if (!root.exists()) root.mkdirs()
+                slamManager.pruneByConfidence(0.6f)
                 slamManager.saveModel(File(root, "map.bin").absolutePath)
                 lastSavedSplatCount.set(slamManager.getSplatCount())
                 loadedProjectId = project.id
@@ -362,9 +367,10 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    private fun loadCloudPointsIfExists() {
+    private suspend fun loadCloudPointsIfExists() {
         val project = projectRepository.currentProject.value ?: return
-        if (_uiState.value.arScanMode != com.hereliesaz.graffitixr.common.model.ArScanMode.CLOUD_POINTS) return
+        val currentMode = settingsRepository.arScanMode.first()
+        if (currentMode != ArScanMode.CLOUD_POINTS) return
 
         val path = cloudPointsPath(project.id)
         if (java.io.File(path).exists()) {
@@ -396,6 +402,12 @@ class ArViewModel @Inject constructor(
                 val current = slamManager.getSplatCount()
                 if (current > 0 && current != lastSavedSplatCount.get()) {
                     saveMapNow()
+                }
+                if (_uiState.value.arScanMode == ArScanMode.CLOUD_POINTS) {
+                    val project = projectRepository.currentProject.value ?: continue
+                    val r = renderer ?: continue
+                    try { r.saveCloudPoints(cloudPointsPath(project.id)) }
+                    catch (e: Exception) { Timber.e(e, "Auto-save cloud points failed") }
                 }
             }
         }

@@ -110,6 +110,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearMap(JNIEnv* e
 }
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativePruneByConfidence(
+        JNIEnv* env, jobject thiz, jfloat threshold) {
+    if (gSlamEngine) gSlamEngine->pruneByConfidence(threshold);
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetViewportSize(JNIEnv* env, jobject thiz, jint width, jint height) {
     if (gSlamEngine) gSlamEngine->setViewportSize(width, height);
 }

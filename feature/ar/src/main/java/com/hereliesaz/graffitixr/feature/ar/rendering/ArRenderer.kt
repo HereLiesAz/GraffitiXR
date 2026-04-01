@@ -448,7 +448,7 @@ class ArRenderer(
         // Find the vertical plane most directly ahead of the camera (dot product with forward ray)
         val planes = session.getAllTrackables(com.google.ar.core.Plane::class.java)
         var bestPlane: com.google.ar.core.Plane? = null
-        var maxDot = 0.7f   // Must be within ~46° of straight ahead
+        var maxDot = 0.65f  // Must be within ~49° of straight ahead (matches green threshold)
 
         for (plane in planes) {
             if (plane.trackingState != TrackingState.TRACKING) continue

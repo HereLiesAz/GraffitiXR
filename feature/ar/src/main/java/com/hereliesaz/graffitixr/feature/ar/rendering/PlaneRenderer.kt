@@ -144,7 +144,7 @@ class PlaneRenderer {
 
         if (absDot < 0.3f) {
             return PlaneMatchResult.NO_MATCH
-        } else if (absDot > 0.95f) {
+        } else if (absDot > 0.65f) {
             val dist = calculateDistance(plane.centerPose, cameraPose)
             return if (dist < 3.0f) {
                 PlaneMatchResult.MATCH

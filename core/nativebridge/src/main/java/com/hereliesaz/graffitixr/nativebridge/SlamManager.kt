@@ -50,6 +50,7 @@ class SlamManager @Inject constructor() {
     fun setViewportSize(width: Int, height: Int) = nativeSetViewportSize(width, height)
 
     fun clearMap() = nativeClearMap()
+    fun pruneByConfidence(threshold: Float) = nativePruneByConfidence(threshold)
 
     fun setRelocEnabled(enabled: Boolean) = nativeSetRelocEnabled(enabled)
 
@@ -181,6 +182,7 @@ class SlamManager @Inject constructor() {
     private external fun nativeGetLastSplatTrace(): String
     private external fun nativeSetArCoreTrackingState(isTracking: Boolean)
     private external fun nativeClearMap()
+    private external fun nativePruneByConfidence(threshold: Float)
     private external fun nativeSaveModel(path: String)
     private external fun nativeLoadModel(path: String)
     private external fun nativeLoadSuperPoint(assetManager: AssetManager): Boolean

@@ -82,6 +82,7 @@ static const char* kFragmentShader =
         "in float vConfidence;\n"
         "out vec4 oColor;\n"
         "void main() {\n"
+        "  if (vConfidence < 0.6) discard;\n"
         "  vec2 d = gl_PointCoord - 0.5;\n"
         "  float r2 = dot(d, d) * 4.0;\n"
         "  if (r2 > 1.0) discard;\n"
@@ -996,6 +997,33 @@ void MobileGS::pruneMap() {
         };
         mVoxelGrid[key] = i;
     }
+}
+
+void MobileGS::pruneByConfidence(float threshold) {
+    std::lock_guard<std::mutex> mapLock(mMapMutex);
+    if (splatData.empty()) return;
+
+    size_t validCount = 0;
+    for (size_t i = 0; i < splatData.size(); i++) {
+        if (splatData[i].confidence >= threshold) {
+            if (validCount != i) splatData[validCount] = splatData[i];
+            validCount++;
+        }
+    }
+
+    if (validCount == splatData.size()) return;
+
+    splatData.resize(validCount);
+    mVoxelGrid.clear();
+    for (size_t i = 0; i < splatData.size(); ++i) {
+        VoxelKey key{
+            static_cast<int>(std::floor(splatData[i].x / VOXEL_SIZE)),
+            static_cast<int>(std::floor(splatData[i].y / VOXEL_SIZE)),
+            static_cast<int>(std::floor(splatData[i].z / VOXEL_SIZE))
+        };
+        mVoxelGrid[key] = i;
+    }
+    mPointCount = static_cast<int>(validCount);
 }
 
 void MobileGS::updateCamera(float* viewMat, float* projMat) {
