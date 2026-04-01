@@ -57,7 +57,8 @@ class StencilProcessor @Inject constructor() {
      */
     fun process(
         isolatedBitmap: Bitmap,
-        layerCount: StencilLayerCount
+        layerCount: StencilLayerCount,
+        influence: Float = 0.5f
     ): Flow<StencilProgress> = flow {
 
         emit(StencilProgress.Stage("Preparing image…", 0.05f))
@@ -74,7 +75,7 @@ class StencilProcessor @Inject constructor() {
 
             // Stage 3: K-means clustering on luminance channel
             emit(StencilProgress.Stage("Analysing tones…", 0.45f))
-            val layers = kmeansLayers(isolatedBitmap, subjectMask, layerCount)
+            val layers = kmeansLayers(isolatedBitmap, subjectMask, layerCount, influence)
 
             // Stage 4: Morphological closing on non-silhouette layers
             emit(StencilProgress.Stage("Smoothing edges…", 0.70f))
@@ -98,7 +99,8 @@ class StencilProcessor @Inject constructor() {
     fun processSingle(
         isolatedBitmap: Bitmap,
         type: StencilLayerType,
-        totalCount: StencilLayerCount
+        totalCount: StencilLayerCount,
+        influence: Float = 0.5f
     ): Flow<StencilProgress> = flow {
         emit(StencilProgress.Stage("Preparing image…", 0.05f))
 
@@ -112,7 +114,7 @@ class StencilProcessor @Inject constructor() {
             val subjectMask = alphaToMask(isolatedBitmap)
 
             emit(StencilProgress.Stage("Analysing tones…", 0.45f))
-            val allLayers = kmeansLayers(isolatedBitmap, subjectMask, totalCount)
+            val allLayers = kmeansLayers(isolatedBitmap, subjectMask, totalCount, influence)
             
             // Find the specific requested layer; fall back to silhouette if
             // k-means collapsed (e.g. uniform luminance) and the tone wasn't produced.
@@ -167,7 +169,8 @@ class StencilProcessor @Inject constructor() {
     private fun kmeansLayers(
         isolated: Bitmap,
         subjectMask: Bitmap,
-        layerCount: StencilLayerCount
+        layerCount: StencilLayerCount,
+        influence: Float
     ): List<StencilLayer> {
         val k = layerCount.count
         val w = isolated.width
@@ -187,6 +190,18 @@ class StencilProcessor @Inject constructor() {
         hsvConverted.release()
         val vChannel = channels[2]   // V = luminance (index 2 in HSV)
         channels[0].release(); channels[1].release()
+
+        // 1.5 Detail Simplification: Median Blur (ksize must be odd)
+        val ksizeRaw = (15 - (influence * 14).toInt())
+        val ksize = if (ksizeRaw % 2 == 0) ksizeRaw + 1 else ksizeRaw
+        if (ksize > 1) {
+            Imgproc.medianBlur(vChannel, vChannel, ksize)
+        }
+
+        // 1.6 Tonal Bias: Shift brightness (alpha=1.0, beta=bias)
+        // influence = 0.0 -> -40; influence = 0.5 -> 0; influence = 1.0 -> +40
+        val bias = (influence - 0.5f) * 80.0
+        vChannel.convertTo(vChannel, -1, 1.0, bias)
 
         // 2. Get subject pixels only (mask out background)
         val maskPixels = IntArray(w * h)

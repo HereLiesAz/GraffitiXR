@@ -645,7 +645,7 @@ class EditorViewModel @Inject constructor(
                 val isolated = if (confidence != null && source != null)
                     subjectIsolator.applyConfidenceThreshold(source, confidence, influence, 0.1f)
                 else source ?: return@launch
-                runStencilPipeline(isolated, stencilType, stencilCount, stencilSourceLayerId, stencilProjectId)
+                runStencilPipeline(isolated, stencilType, stencilCount, stencilSourceLayerId, stencilProjectId, influence)
             }
         }
     }
@@ -1409,7 +1409,7 @@ class EditorViewModel @Inject constructor(
                 }
             } else {
                 // Isolation failed — run stencil on the raw composite immediately
-                runStencilPipeline(composite, nextType, totalCount, layerId, projectId)
+                runStencilPipeline(composite, nextType, totalCount, layerId, projectId, 0.5f)
             }
         }
     }
@@ -1419,9 +1419,10 @@ class EditorViewModel @Inject constructor(
         type: StencilLayerType,
         count: StencilLayerCount,
         sourceLayerId: String,
-        projectId: String
+        projectId: String,
+        influence: Float
     ) {
-        stencilProcessor.processSingle(isolated, type, count).collect { progress ->
+        stencilProcessor.processSingle(isolated, type, count, influence).collect { progress ->
             when (progress) {
                 is StencilProgress.Done -> {
                     val stencilLayer = progress.layers.first()

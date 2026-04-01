@@ -138,10 +138,11 @@ class StencilProcessorTest {
         processor = spyk(StencilProcessor(), recordPrivateCalls = true)
 
         // Stub kmeansLayers to bypass OpenCV K-means (not runnable on JVM)
-        for (count in StencilLayerCount.entries) {
-            every {
-                processor["kmeansLayers"](any<Bitmap>(), any<Bitmap>(), count)
-            } returns fakeLayersFor(count)
+        every {
+            processor["kmeansLayers"](any<Bitmap>(), any<Bitmap>(), any<StencilLayerCount>(), any<Float>())
+        } answers {
+            val count = arg<StencilLayerCount>(2)
+            fakeLayersFor(count)
         }
 
         // Stub applyMorphClose to pass layers through unchanged (avoids OpenCV morphology)
@@ -280,7 +281,7 @@ class StencilProcessorTest {
     @Test
     fun `exception in kmeansLayers emits StencilProgress Error`() = runTest {
         every {
-            processor["kmeansLayers"](any<Bitmap>(), any<Bitmap>(), any<StencilLayerCount>())
+            processor["kmeansLayers"](any<Bitmap>(), any<Bitmap>(), any<StencilLayerCount>(), any<Float>())
         } throws RuntimeException("K-means exploded")
 
         val error = processor.process(isolatedBitmap, StencilLayerCount.TWO)
@@ -300,7 +301,10 @@ class StencilProcessorTest {
         assertTrue("Expected at least 3 stage events, got $stageCount", stageCount >= 3)
 
         val lastEvent = events.last()
-        assertTrue("Final event should be Done", lastEvent is StencilProgress.Done)
+        if (lastEvent is StencilProgress.Error) {
+            error("Pipeline failed with: ${lastEvent.message}")
+        }
+        assertTrue("Final event should be Done, but was $lastEvent", lastEvent is StencilProgress.Done)
     }
 
     @Test

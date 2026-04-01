@@ -189,7 +189,7 @@ fun SegmentationInfluenceRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
-            "Edge",
+            "Detail",
             color = Color.White,
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.width(36.dp)
