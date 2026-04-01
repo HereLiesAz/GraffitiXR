@@ -98,9 +98,17 @@ import com.hereliesaz.graffitixr.feature.editor.EditorUi
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor as EditorImageProcessor
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import com.hereliesaz.graffitixr.common.model.RelocState
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import javax.inject.Inject
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.alpha
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -458,6 +466,16 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier
                                         .align(Alignment.TopStart)
                                         .padding(top = 16.dp, start = 16.dp)
+                                )
+                            }
+
+                            if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings) {
+                                RelocStatusBadge(
+                                    isAnchorEstablished = arUiState.isAnchorEstablished,
+                                    paintingProgress = arUiState.paintingProgress,
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(top = 16.dp, end = 16.dp)
                                 )
                             }
 
@@ -1483,6 +1501,56 @@ private fun DistanceBadge(
             color = Color.White,
             style = MaterialTheme.typography.labelMedium
         )
+    }
+}
+
+@Composable
+private fun RelocStatusBadge(
+    isAnchorEstablished: Boolean,
+    paintingProgress: Float,
+    modifier: Modifier = Modifier
+) {
+    val relocState = when {
+        !isAnchorEstablished -> RelocState.IDLE
+        paintingProgress > 0f -> RelocState.TRACKING
+        else -> RelocState.SEARCHING
+    }
+    if (relocState == RelocState.IDLE) return
+
+    val infiniteTransition = rememberInfiniteTransition(label = "reloc_pulse")
+    val pulseAlpha by if (relocState == RelocState.SEARCHING) {
+        infiniteTransition.animateFloat(
+            initialValue = 0.4f, targetValue = 1f, label = "pulse",
+            animationSpec = infiniteRepeatable(
+                animation = tween(700, easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse
+            )
+        )
+    } else {
+        remember { mutableStateOf(1f) }
+    }
+
+    val dotColor = if (relocState == RelocState.TRACKING) Color(0xFF66BB6A) else Color(0xFFFFCA28)
+    val label = when (relocState) {
+        RelocState.SEARCHING -> "Scanning\u2026"
+        RelocState.TRACKING  -> "${(paintingProgress * 100).toInt()}% matched"
+        else                 -> ""
+    }
+
+    Row(
+        modifier = modifier
+            .background(Color(0xCC000000), RoundedCornerShape(20.dp))
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .alpha(pulseAlpha)
+                .background(dotColor, CircleShape)
+        )
+        Text(label, fontSize = 12.sp, color = Color.White)
     }
 }
 

@@ -115,6 +115,19 @@ enum class ArScanMode {
 
 enum class ScanPhase { AMBIENT, WALL, COMPLETE }
 
+/**
+ * Derived state for the teleological SLAM relocalization loop.
+ * Computed in the UI from [ArUiState.isAnchorEstablished] + [ArUiState.paintingProgress].
+ */
+enum class RelocState {
+    /** No fingerprint loaded — target not yet confirmed. */
+    IDLE,
+    /** Fingerprint active, PnP running, but no features matched yet. */
+    SEARCHING,
+    /** At least some artwork features are visible and matched. */
+    TRACKING
+}
+
 enum class BlendMode {
     SrcOver, Multiply, Screen, Overlay, Darken, Lighten, ColorDodge, ColorBurn,
     HardLight, SoftLight, Difference, Exclusion, Hue, Saturation, Color, Luminosity,
