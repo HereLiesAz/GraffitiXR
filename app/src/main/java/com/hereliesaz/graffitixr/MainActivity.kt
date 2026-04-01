@@ -108,7 +108,11 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.Icon
 import androidx.compose.ui.draw.alpha
+import kotlinx.coroutines.delay
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -484,6 +488,10 @@ class MainActivity : ComponentActivity() {
                                     diagLog = arUiState.diagLog,
                                     modifier = Modifier.align(Alignment.TopStart)
                                 )
+                            }
+
+                            if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings) {
+                                AnchorLockFlash(isAnchorEstablished = arUiState.isAnchorEstablished)
                             }
 
                             if (mainUiState.isCapturingTarget) {
@@ -1551,6 +1559,46 @@ private fun RelocStatusBadge(
                 .background(dotColor, CircleShape)
         )
         Text(label, fontSize = 12.sp, color = Color.White)
+    }
+}
+
+@Composable
+private fun AnchorLockFlash(isAnchorEstablished: Boolean) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(isAnchorEstablished) {
+        if (isAnchorEstablished) {
+            visible = true
+            delay(2000L)
+            visible = false
+        }
+    }
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(200)),
+        exit  = fadeOut(tween(500))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0x2200CC44)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Icon(
+                    imageVector = Icons.Filled.CheckCircle,
+                    contentDescription = null,
+                    tint = Color(0xFF66BB6A),
+                    modifier = Modifier.size(48.dp)
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Anchor locked",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
     }
 }
 
