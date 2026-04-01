@@ -51,16 +51,16 @@ class StencilProcessorTest {
 
     private lateinit var processor: StencilProcessor
 
-    /** 400×400 ARGB_8888 source — fully opaque so alphaToMask sees all pixels as subject. */
+    /** 200×200 ARGB_8888 source — fully opaque so alphaToMask sees all pixels as subject. */
     private lateinit var isolatedBitmap: Bitmap
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /** Builds a fake StencilLayer backed by a real (mock) 400×400 bitmap. */
+    /** Builds a fake StencilLayer backed by a real (mock) 200×200 bitmap. */
     private fun fakeLayer(type: StencilLayerType): StencilLayer {
         val bmp = mockk<Bitmap>(relaxed = true).apply {
-            every { width } returns 400
-            every { height } returns 400
+            every { width } returns 200
+            every { height } returns 200
             every { config } returns Bitmap.Config.ARGB_8888
             every { getPixel(any(), any()) } returns Color.WHITE
             every { getPixel(50, 50) } returns Color.BLACK
@@ -150,7 +150,7 @@ class StencilProcessorTest {
             processor.applyMorphClose(any<List<StencilLayer>>())
         } answers { arg<List<StencilLayer>>(0) }
 
-        isolatedBitmap = makeOpaqueSubject(400, 400)
+        isolatedBitmap = makeOpaqueSubject(200, 200)
     }
 
     @After
@@ -364,7 +364,7 @@ class StencilProcessorTest {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /**
-     * Creates a 400×400 ARGB_8888 bitmap that is fully opaque white.
+     * Creates a 200×200 ARGB_8888 bitmap that is fully opaque white.
      * Used as the isolated bitmap input (simulates a pre-isolated subject).
      */
     private fun makeOpaqueSubject(w: Int, h: Int): Bitmap {
