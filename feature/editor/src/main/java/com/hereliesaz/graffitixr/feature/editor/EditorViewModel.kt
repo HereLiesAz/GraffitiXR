@@ -1369,7 +1369,7 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(isStencilGenerating = true) }
 
         viewModelScope.launch(dispatchers.default) {
-            // 1. Identify linked group and composite
+            // 1. Identify linked group
             val groupIds = getLinkedGroupIds(layerId)
             val groupLayers = state.layers.filter { it.id in groupIds }
             
@@ -1377,15 +1377,31 @@ class EditorViewModel @Inject constructor(
             val w = metrics.widthPixels.takeIf { it > 0 } ?: 1080
             val h = metrics.heightPixels.takeIf { it > 0 } ?: 1920
             
-            val composite = exportManager.compositeLayers(groupLayers, w, h)
-            
-            // 2. Determine next stencil type
+            // 2. Determine next stencil type and generate anchor-relative composite
             val existingStencils = groupLayers.filter { it.stencilType != null }
             val (nextType, totalCount) = when {
                 existingStencils.none { it.stencilType == StencilLayerType.SILHOUETTE } -> {
+                    val composite = exportManager.compositeToLayerSpace(sourceLayer, groupLayers, w, h)
+                    
                     // Initial stencil generation: Assess subject contrast
                     val assessedCount = stencilProcessor.assessSubjectContrast(composite)
-                    StencilLayerType.SILHOUETTE to assessedCount
+                    
+                    // Isolate subject, then show the segmentation slider
+                    val isolationResult = subjectIsolator.isolate(composite).getOrNull()
+                    if (isolationResult != null) {
+                        rawSegmentationConfidence = isolationResult.rawConfidence
+                        segmentationSourceBitmap = composite
+                        pendingStencilType = StencilLayerType.SILHOUETTE
+                        pendingStencilCount = assessedCount
+                        pendingStencilSourceLayerId = layerId
+                        pendingStencilProjectId = projectId
+                        withContext(dispatchers.main) {
+                            _uiState.update { it.copy(isStencilGenerating = false, isSegmenting = true, segmentationInfluence = 0.5f) }
+                        }
+                    } else {
+                        runStencilPipeline(composite, StencilLayerType.SILHOUETTE, assessedCount, layerId, projectId, 0.5f)
+                    }
+                    return@launch
                 }
                 existingStencils.none { it.stencilType == StencilLayerType.HIGHLIGHT } -> 
                     StencilLayerType.HIGHLIGHT to StencilLayerCount.TWO
@@ -1400,24 +1416,9 @@ class EditorViewModel @Inject constructor(
                 }
             }
 
-            // 3. Isolate subject, then show the segmentation slider so the artist can
-            //    tune the edge threshold before the stencil pipeline runs.
-            val isolationResult = subjectIsolator.isolate(composite).getOrNull()
-            if (isolationResult != null) {
-                rawSegmentationConfidence = isolationResult.rawConfidence
-                segmentationSourceBitmap = composite
-                // segmentationTargetLayerId stays null — no existing layer to update while sliding
-                pendingStencilType = nextType
-                pendingStencilCount = totalCount
-                pendingStencilSourceLayerId = layerId
-                pendingStencilProjectId = projectId
-                withContext(dispatchers.main) {
-                    _uiState.update { it.copy(isStencilGenerating = false, isSegmenting = true, segmentationInfluence = 0.5f) }
-                }
-            } else {
-                // Isolation failed — run stencil on the raw composite immediately
-                runStencilPipeline(composite, nextType, totalCount, layerId, projectId, 0.5f)
-            }
+            // For subsequent layers (Highlight/Midtone), use the same anchor-relative approach
+            val composite = exportManager.compositeToLayerSpace(sourceLayer, groupLayers, w, h)
+            runStencilPipeline(composite, nextType, totalCount, layerId, projectId, 0.5f)
         }
     }
 
