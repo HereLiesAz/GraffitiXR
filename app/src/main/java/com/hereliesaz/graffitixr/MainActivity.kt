@@ -445,6 +445,7 @@ class MainActivity : ComponentActivity() {
 
                             // Error: camera permission permanently denied
                             if (editorUiState.editorMode == EditorMode.AR
+                                && permissionRequestedAtLeastOnce
                                 && !arUiState.hasCameraPermission
                                 && !showLibrary && !showSettings
                             ) {
