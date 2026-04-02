@@ -73,6 +73,7 @@ interface EditorActions {
 
     fun onFlattenAllLayers()
     fun onToggleLinkLayer(layerId: String)
+    fun onToggleVisibility(layerId: String)
 
     fun onAddTextLayer()
     fun onTextContentChanged(layerId: String, text: String)
@@ -83,4 +84,7 @@ interface EditorActions {
     fun onTextStyleChanged(layerId: String, isBold: Boolean, isItalic: Boolean, hasOutline: Boolean, hasDropShadow: Boolean)
     fun onGenerateStencil(layerId: String)
     fun onGeneratePoster(layerId: String)
+
+    fun onCancelSegmentation()
+    fun onConfirmSegmentation()
 }

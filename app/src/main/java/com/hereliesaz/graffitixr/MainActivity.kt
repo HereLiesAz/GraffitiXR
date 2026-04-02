@@ -121,6 +121,7 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.core.net.toUri
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -322,7 +323,13 @@ class MainActivity : ComponentActivity() {
                     azAdvanced(
                         helpEnabled = true,
                         helpList = mapOf(
-                            "help_sub" to "Select a tool from the Design menu to edit your layers. To transform (scale, rotate, move) a layer, close the layer's tools. Double tap the screen to cycle between X, Y, and Z rotation axes."
+                            "help_sub" to "Select a tool from the Design menu to edit your layers. To transform (scale, rotate, move) a layer, close the layer's tools. Double tap the screen to cycle between X, Y, and Z rotation axes.",
+                            "mode_host" to "Click to open a list of options of how you want to use this app.",
+                            "design_host" to "Click to import images, draw a sketch, or add text. Long-press a layer to open its options. Tap it to edit the layer.",
+                            "project_host" to "Opens a list of app-related options, like New, Save, Load, Export, and Settinigs.",
+                            "flashlight" to "Turns your flashlight on or off.",
+                            "lock" to "Keeps your layers from moving or editing.",
+
                         )
                     )
 
@@ -1191,7 +1198,17 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     listItem(text = "Duplicate") { editorViewModel.onLayerDuplicated(layer.id) }
-                    listItem(text = if (layer.isLinked) "Unlink Layer" else "Link Layer") { editorViewModel.onToggleLinkLayer(layer.id) }
+                    
+                    // Check if part of a linked group (contiguous links)
+                    val layers = editorUiState.layers
+                    val idx = layers.indexOfFirst { it.id == layer.id }
+                    val isPartToUnlink = if (idx >= 0) {
+                        (idx > 0 && layers[idx].isLinked) || 
+                        (idx + 1 < layers.size && layers[idx + 1].isLinked)
+                    } else false
+
+                    listItem(text = if (isPartToUnlink) "Unlink Layer" else "Link Layer") { editorViewModel.onToggleLinkLayer(layer.id) }
+                    listItem(text = if (layer.isVisible) "Hide Layer" else "Show Layer") { editorViewModel.onToggleVisibility(layer.id) }
                     listItem(text = "Flatten All") { editorViewModel.onFlattenAllLayers() }
                     listItem(text = "Delete") { editorViewModel.onLayerRemoved(layer.id) }
                 }
@@ -1225,7 +1242,6 @@ private fun DepthApiUnsupportedBanner(modifier: Modifier = Modifier) {
         Text(
             text = "This device doesn't support the Depth API.\nSwitch to Cloud Points mode in Settings.",
             color = HotPink,
-            style = MaterialTheme.typography.bodySmall,
             textAlign = TextAlign.Center
         )
     }
@@ -1246,13 +1262,11 @@ private fun ArCoreUnavailableOverlay(modifier: Modifier = Modifier) {
             Text(
                 text = "ARCore is required",
                 color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = "This device does not have ARCore installed or is not supported. Install ARCore from the Play Store to use AR features.",
                 color = Color.LightGray,
-                style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center
             )
             Button(
@@ -1260,12 +1274,12 @@ private fun ArCoreUnavailableOverlay(modifier: Modifier = Modifier) {
                     try {
                         context.startActivity(
                             Intent(Intent.ACTION_VIEW,
-                                Uri.parse("market://details?id=com.google.ar.core"))
+                                "market://details?id=com.google.ar.core".toUri())
                         )
                     } catch (e: ActivityNotFoundException) {
                         context.startActivity(
                             Intent(Intent.ACTION_VIEW,
-                                Uri.parse("https://play.google.com/store/apps/details?id=com.google.ar.core"))
+                                "https://play.google.com/store/apps/details?id=com.google.ar.core".toUri())
                         )
                     }
                 }
@@ -1291,7 +1305,6 @@ private fun CameraPermissionDeniedBanner(modifier: Modifier = Modifier) {
             Text(
                 text = "Camera permission is required for AR mode.",
                 color = Color.White,
-                style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center
             )
             Button(
@@ -1328,14 +1341,12 @@ private fun TapTargetOverlay(
                 Text(
                     text = "TARGET CREATION",
                     color = Color(0xFF007788),
-                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
                     text = "Tap directly on your painted reference marks on the screen. The app will immediately isolate them.",
                     color = Color(0xFF222222),
-                    style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Start
                 )
             }
@@ -1345,7 +1356,7 @@ private fun TapTargetOverlay(
             onClick = onCancel,
             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray)
         ) {
-            Text("Cancel", style = MaterialTheme.typography.labelSmall)
+            Text("Cancel")
         }
     }
 }
@@ -1409,13 +1420,12 @@ private fun DiagPopup(
                 Text(
                     if (copied) "COPIED ✓" else "DEPTH DIAG  (tap to copy)",
                     color = if (copied) Color.Green else Color.Cyan,
-                    style = MaterialTheme.typography.labelSmall,
+
                     fontFamily = FontFamily.Monospace
                 )
                 Text(
                     "✕",
                     color = Color.Gray,
-                    style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier
                         .padding(start = 12.dp)
                         .pointerInput(Unit) {
@@ -1426,9 +1436,7 @@ private fun DiagPopup(
             Text(
                 text = diagLog ?: "Waiting for first frame…",
                 color = Color.White,
-                style = MaterialTheme.typography.labelSmall,
                 fontFamily = FontFamily.Monospace,
-                lineHeight = MaterialTheme.typography.labelSmall.lineHeight
             )
         }
     }
@@ -1476,7 +1484,6 @@ private fun ScanCoachingOverlay(
                     Text(
                         text = text,
                         color = Color.White,
-                        style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -1497,7 +1504,7 @@ private fun ScanCoachingOverlay(
                     Text(
                         text = phaseLabel,
                         color = Color.Cyan,
-                        style = MaterialTheme.typography.labelSmall,
+
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -1515,7 +1522,7 @@ private fun ScanCoachingOverlay(
                         Text(
                             text = "${ambientSectorsCovered * 30}° / 360°",
                             color = Color.LightGray,
-                            style = MaterialTheme.typography.labelSmall
+
                         )
                     } else {
                         LinearProgressIndicator(
@@ -1527,7 +1534,7 @@ private fun ScanCoachingOverlay(
                         Text(
                             text = "${splatCount / 1000}k / 50k",
                             color = Color.LightGray,
-                            style = MaterialTheme.typography.labelSmall
+
                         )
                     }
                 }
@@ -1556,7 +1563,6 @@ private fun PlaneConfirmOverlay(
                 Text(
                     text = "Is the artwork on the correct wall?",
                     color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center
                 )
                 Spacer(Modifier.height(16.dp))
@@ -1601,7 +1607,6 @@ private fun PlaneRealignmentOverlay(
                 Text(
                     text = "Re-detect Wall Surface",
                     color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Center
                 )
                 Spacer(Modifier.height(12.dp))
@@ -1615,7 +1620,6 @@ private fun PlaneRealignmentOverlay(
                         "3. Hold steady facing the artwork, then tap below\n\n" +
                         "The orange border will jump to the newly detected surface.",
                     color = Color.White.copy(alpha = 0.85f),
-                    style = MaterialTheme.typography.bodySmall,
                     textAlign = TextAlign.Start
                 )
                 Spacer(Modifier.height(16.dp))
@@ -1659,7 +1663,6 @@ private fun DistanceBadge(
         Text(
             text = label,
             color = Color.White,
-            style = MaterialTheme.typography.labelMedium
         )
     }
 }
@@ -1784,7 +1787,7 @@ private fun PaintingProgressIndicator(
             Text(
                 text = "$pct%",
                 color = Color.White,
-                style = MaterialTheme.typography.labelSmall
+
             )
         }
     }

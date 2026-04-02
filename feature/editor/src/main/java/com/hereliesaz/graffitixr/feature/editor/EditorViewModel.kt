@@ -636,7 +636,7 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun dismissSegmentationSlider() {
+    override fun onConfirmSegmentation() {
         val stencilSourceLayerId = pendingStencilSourceLayerId
         val stencilProjectId = pendingStencilProjectId
         val confidence = rawSegmentationConfidence
@@ -662,6 +662,19 @@ class EditorViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    override fun onCancelSegmentation() {
+        rawSegmentationConfidence = null
+        segmentationSourceBitmap = null
+        segmentationTargetLayerId = null
+        pendingStencilSourceLayerId = null
+        pendingStencilProjectId = null
+        _uiState.update { it.copy(isSegmenting = false, segmentationPreview = null) }
+    }
+
+    fun dismissSegmentationSlider() {
+        onConfirmSegmentation()
     }
 
     override fun onSketchClicked() {
@@ -697,7 +710,7 @@ class EditorViewModel @Inject constructor(
                         name = "Outline – ${layer.name}",
                         uri = sketchUri,
                         isSketch = true,
-                        isLinked = true,
+                        isLinked = false,
                         blendMode = androidx.compose.ui.graphics.BlendMode.SrcOver,
                         scale = layer.scale,
                         offset = layer.offset,
@@ -711,10 +724,11 @@ class EditorViewModel @Inject constructor(
                             val idx = s.layers.indexOfFirst { it.id == layerId }
                             if (idx < 0) return@update s
                             val newLayers = s.layers.toMutableList().also { list ->
-                                // Mark source layer as linked
-                                list[idx] = list[idx].copy(isLinked = true)
-                                // Insert sketch layer immediately above source
-                                list.add(idx + 1, sketchLayer)
+                                // Find top of the linked group to avoid splitting it
+                                var topIdx = idx
+                                while (topIdx + 1 < list.size && list[topIdx + 1].isLinked) topIdx++
+                                // Insert sketch layer above the group
+                                list.add(topIdx + 1, sketchLayer)
                             }
                             s.copy(layers = newLayers, isLoading = false)
                         }
@@ -1252,8 +1266,31 @@ class EditorViewModel @Inject constructor(
 
     override fun onToggleLinkLayer(layerId: String) {
         pushHistory()
+        val groupIds = getLinkedGroupIds(layerId)
+        val isPartToUnlink = groupIds.size > 1
+        
         _uiState.update { state ->
-            state.copy(layers = state.layers.map { if (it.id == layerId) it.copy(isLinked = !it.isLinked) else it })
+            val updatedLayers = state.layers.map { layer ->
+                if (isPartToUnlink) {
+                    // Dissolve the group
+                    if (layer.id in groupIds) layer.copy(isLinked = false) else layer
+                } else {
+                    // Start linking to below
+                    if (layer.id == layerId) layer.copy(isLinked = true) else layer
+                }
+            }
+            state.copy(layers = updatedLayers)
+        }
+        saveProject()
+    }
+
+    override fun onToggleVisibility(layerId: String) {
+        pushHistory()
+        _uiState.update { state ->
+            val updatedLayers = state.layers.map {
+                if (it.id == layerId) it.copy(isVisible = !it.isVisible) else it
+            }
+            state.copy(layers = updatedLayers)
         }
         saveProject()
     }
@@ -1447,7 +1484,7 @@ class EditorViewModel @Inject constructor(
                             name = "Stencil ${type.label}",
                             uri = localUri,
                             bitmap = stencilLayer.bitmap,
-                            isLinked = true,
+                            isLinked = false,
                             stencilType = type,
                             stencilSourceId = sourceLayerId,
                             scale = sourceLayer?.scale ?: 1.0f,

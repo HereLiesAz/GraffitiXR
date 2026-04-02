@@ -121,7 +121,8 @@ fun EditorUi(
                 showSegmentationSlider = uiState.isSegmenting,
                 segmentationInfluence = uiState.segmentationInfluence,
                 onSegmentationInfluenceChange = { actions.setSegmentationInfluence(it) },
-                onSegmentationDismiss = { actions.dismissSegmentationSlider() }
+                onSegmentationDismiss = { actions.onConfirmSegmentation() },
+                onSegmentationCancel = { actions.onCancelSegmentation() }
             )
         }
     }

@@ -5,16 +5,22 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -23,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.graffitixr.common.model.OverlayLayer
+import com.hereliesaz.graffitixr.design.theme.HotPink
 
 data class AdjustmentsState(
     val hideUiForCapture: Boolean = false,
@@ -65,6 +72,7 @@ fun AdjustmentsPanel(
     segmentationInfluence: Float = 0.5f,
     onSegmentationInfluenceChange: (Float) -> Unit = {},
     onSegmentationDismiss: () -> Unit = {},
+    onSegmentationCancel: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Hide entirely during capture or if touch is locked
@@ -114,6 +122,7 @@ fun AdjustmentsPanel(
                     influence = segmentationInfluence,
                     onInfluenceChange = onSegmentationInfluenceChange,
                     onDismiss = onSegmentationDismiss,
+                    onCancel = onSegmentationCancel,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -177,39 +186,66 @@ fun SegmentationInfluenceRow(
     influence: Float,
     onInfluenceChange: (Float) -> Unit,
     onDismiss: () -> Unit,
+    onCancel: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(
-            "Detail",
-            color = Color.White,
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.width(36.dp)
-        )
-        Slider(
-            value = influence,
-            onValueChange = onInfluenceChange,
-            valueRange = 0f..1f,
-            modifier = Modifier.weight(1f),
-            colors = SliderDefaults.colors(
-                thumbColor = Color.Cyan,
-                activeTrackColor = Color.Cyan,
-                inactiveTrackColor = Color.DarkGray
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Cancel button
+            Surface(
+                shape = CircleShape,
+                color = HotPink,
+                shadowElevation = 4.dp
+            ) {
+                IconButton(onClick = onCancel) {
+                    Icon(Icons.Default.Close, contentDescription = "Cancel", tint = Color.White)
+                }
+            }
+
+            // Confirm button
+            Surface(
+                shape = CircleShape,
+                color = HotPink,
+                shadowElevation = 4.dp
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Check, contentDescription = "Done", tint = Color.White)
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "Detail",
+                color = Color.White,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.width(36.dp)
             )
-        )
-        Text(
-            "Done",
-            color = Color.Cyan,
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier
-                .clickable { onDismiss() }
-                .padding(4.dp)
-        )
+            Slider(
+                value = influence,
+                onValueChange = onInfluenceChange,
+                valueRange = 0f..1f,
+                modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(
+                    thumbColor = HotPink,
+                    activeTrackColor = HotPink,
+                    inactiveTrackColor = Color.DarkGray
+                )
+            )
+        }
     }
 }

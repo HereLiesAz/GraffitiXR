@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.hereliesaz.graffitixr.design.theme.HotPink
 import kotlin.math.roundToInt
 
 @Composable
@@ -44,14 +45,14 @@ fun UndoRedoRow(
             Surface(
                 shape = CircleShape,
                 // Light background when enabled, dark when disabled
-                color = if (canUndo) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface.copy(alpha = 0.3f),
+                color = if (canUndo) HotPink else HotPink.copy(alpha = 0.3f),
                 shadowElevation = 4.dp
             ) {
                 IconButton(onClick = onUndo, enabled = canUndo) {
                     Icon(
                         Icons.AutoMirrored.Filled.Undo,
                         contentDescription = "Undo",
-                        tint = if (canUndo) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        tint = if (canUndo) Color.White else Color.White.copy(alpha = 0.38f)
                     )
                 }
             }
@@ -68,11 +69,11 @@ fun UndoRedoRow(
         // Aligned with the second knob (Green/Brightness) - Magic Wand
         Surface(
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
+            color = HotPink,
             shadowElevation = 4.dp
         ) {
             IconButton(onClick = onMagicClicked) {
-                Icon(Icons.Filled.AutoFixHigh, contentDescription = "Magic Align")
+                Icon(Icons.Filled.AutoFixHigh, contentDescription = "Magic Align", tint = Color.White)
             }
         }
 
@@ -89,14 +90,14 @@ fun UndoRedoRow(
             Surface(
                 shape = CircleShape,
                 // Light background when enabled, dark when disabled
-                color = if (canRedo) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface.copy(alpha = 0.3f),
+                color = if (canRedo) HotPink else HotPink.copy(alpha = 0.3f),
                 shadowElevation = 4.dp
             ) {
                 IconButton(onClick = onRedo, enabled = canRedo) {
                     Icon(
                         Icons.AutoMirrored.Filled.Redo,
                         contentDescription = "Redo",
-                        tint = if (canRedo) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        tint = if (canRedo) Color.White else Color.White.copy(alpha = 0.38f)
                     )
                 }
             }
