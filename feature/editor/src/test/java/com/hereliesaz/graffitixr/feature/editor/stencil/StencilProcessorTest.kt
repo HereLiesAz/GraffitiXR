@@ -6,8 +6,8 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import com.hereliesaz.graffitixr.common.model.StencilLayer
-import com.hereliesaz.graffitixr.common.model.StencilLayerCount
 import com.hereliesaz.graffitixr.common.model.StencilLayerType
+import com.hereliesaz.graffitixr.common.model.TonalPolarity
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkConstructor
@@ -71,19 +71,11 @@ class StencilProcessorTest {
         return StencilLayer(type, bmp)
     }
 
-    /** Fake layer lists returned by the mocked kmeansLayers for each count. */
-    private fun fakeLayersFor(count: StencilLayerCount): List<StencilLayer> = when (count) {
-        StencilLayerCount.ONE -> listOf(fakeLayer(StencilLayerType.SILHOUETTE))
-        StencilLayerCount.TWO -> listOf(
-            fakeLayer(StencilLayerType.SILHOUETTE),
-            fakeLayer(StencilLayerType.HIGHLIGHT)
-        )
-        StencilLayerCount.THREE -> listOf(
-            fakeLayer(StencilLayerType.SILHOUETTE),
-            fakeLayer(StencilLayerType.MIDTONE),
-            fakeLayer(StencilLayerType.HIGHLIGHT)
-        )
-    }
+    /** Fake layer list returned by the mocked kmeansLayers — always a binary pair. */
+    private fun fakeBinaryPair(): List<StencilLayer> = listOf(
+        fakeLayer(StencilLayerType.SILHOUETTE),
+        fakeLayer(StencilLayerType.HIGHLIGHT)
+    )
 
     @Before
     fun setUp() {
@@ -137,12 +129,12 @@ class StencilProcessorTest {
         // Build the processor under test as a spy so we can mock private methods
         processor = spyk(StencilProcessor(), recordPrivateCalls = true)
 
-        // Stub kmeansLayers to bypass OpenCV K-means (not runnable on JVM)
+        // Stub kmeansLayers to bypass OpenCV K-means (not runnable on JVM).
+        // The pipeline always produces a binary pair (Base + Detail), so always return two layers.
         every {
             processor.kmeansLayers(any(), any(), any(), any())
         } answers {
-            val count = arg<StencilLayerCount>(2)
-            fakeLayersFor(count)
+            fakeBinaryPair()
         }
 
         // Stub applyMorphClose to pass layers through unchanged (avoids OpenCV morphology)
