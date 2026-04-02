@@ -1473,18 +1473,6 @@ class EditorViewModel @Inject constructor(
             }
         }
     }
-                    }
-                }
-                is StencilProgress.Error -> {
-                    withContext(dispatchers.main) {
-                        _uiState.update { it.copy(isStencilGenerating = false) }
-                        Toast.makeText(context, "Stencil error: ${progress.message}", Toast.LENGTH_LONG).show()
-                    }
-                }
-                else -> {}
-            }
-        }
-    }
 
     override fun onGeneratePoster(layerId: String) {
         // This is called from the PosterOptionsDialog
