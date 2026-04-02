@@ -105,7 +105,7 @@ Each ARCore tracking frame in `ArRenderer.onDrawFrame`:
 - **UI:** Jetpack Compose only (no XML layouts); AzNavRail (`com.github.HereLiesAZ:AzNavRail`) for navigation — a vertical thumb-driven rail, right-side by default
 - **Dependencies:** All versions managed in `gradle/libs.versions.toml` (version catalog); never hardcode versions in module `build.gradle.kts`
 - **Protobuf dual-version:** Root `build.gradle.kts` intentionally forces Protobuf `3.25.5` in the buildscript classpath (AGP 9.0.1 requirement) and `4.28.2` in the app runtime. Do not align these — the split is required.
-- **Versioning:** Update `version.properties` for Major/Minor; build number auto-increments from git commit count
+- **Versioning:** Update `version.properties` for Major/Minor/Patch; build number auto-increments from git commit count
 - **ARCore types in `:app`:** The `Session` class must not appear in `:app` module code — use `ArViewModel.attachSessionToRenderer(renderer)` to assign sessions without leaking the ARCore dependency
 - **Bitmap utilities:** Use `ImageUtils` from `:core:common` for all bitmap loading/saving operations (both sync and async variants available)
 

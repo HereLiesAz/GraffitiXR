@@ -33,7 +33,8 @@ if (isReleaseBuild) {
 
 val verMajor = versionProps.getProperty("versionMajor", "1")
 val verMinor = versionProps.getProperty("versionMinor", "0")
-val currentVersionName = "$verMajor.$verMinor"
+val verPatch = versionProps.getProperty("versionPatch", "0")
+val currentVersionName = "$verMajor.$verMinor.$verPatch"
 
 android {
     namespace = "com.hereliesaz.graffitixr"

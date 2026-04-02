@@ -308,6 +308,74 @@ class MainActivity : ComponentActivity() {
                     Color(1f - canvasBg.red, 1f - canvasBg.green, 1f - canvasBg.blue, alpha = 1f)
                 }
 
+                val allHelpItems = remember(editorUiState.layers, editorUiState.activeLayerId, editorUiState.activeTool) {
+                    val base = mutableMapOf(
+                        // ─── Mode Menu ──────────────────────────────────────────────────
+                        "mode_host" to "Mode Switcher: Switch between app modes. Instructions: Tap to expand, then select AR, Overlay, Mockup, or Lightbox.",
+                        "ar" to "AR Mode: Project design onto a wall using spatial mapping. Instructions: Scan environment until wall is detected, then tap to place the anchor.",
+                        "overlay" to "Overlay Mode: Display design over live camera without spatial tracking. Instructions: Manually scale and move the design to fit your frame.",
+                        "mockup" to "Mockup Mode: Preview design on a static photo. Instructions: Use 'Wall' to set a background image, then arrange layers on top.",
+                        "trace" to "Lightbox Mode: High-brightness tracing surface. Instructions: Place paper over the screen and trace. Triple-tap anywhere to exit.",
+
+                        // ─── Target Menu ────────────────────────────────────────────────
+                        "target_host" to "Target Management: Tools for AR anchors. Instructions: Tap to access tools for creating or re-aligning the mural's position.",
+                        "create" to "Create Anchor: Photograph a mark on the wall to lock projection. Instructions: Point at a distinct texture and tap. The app will track this mark.",
+
+                        // ─── Design Menu ────────────────────────────────────────────────
+                        "design_host" to "Layer Management: Add images, text, or sketches. Instructions: Tap to expand. Long-press any layer button to open its secondary menu.",
+                        "add_img" to "Import Image: Add a sketch or reference photo. Instructions: Select an image from your gallery. It will appear as a new design layer.",
+                        "add_draw" to "New Sketch: Add a blank layer for freehand drawing. Instructions: Select the layer to reveal brush, eraser, and smudge tools.",
+                        "add_text" to "Add Text: Create a typography layer. Instructions: Tap the layer's 'Edit' button to change content and formatting.",
+                        "wall" to "Change Wall: Set background for Mockup mode. Instructions: Select a photo of the physical wall you plan to paint on.",
+
+                        // ─── Project Menu ───────────────────────────────────────────────
+                        "project_host" to "Project Management: Save, load, and export work. Instructions: Tap to access administrative tasks for your mural.",
+                        "new" to "New Project: Start a fresh mural. Instructions: Tap to reset. Warning: This clears all current work. Save first!",
+                        "save" to "Save Project: Store mural and AR map. Instructions: Enter a project name and tap Save to preserve your progress.",
+                        "load" to "Project Library: Access saved murals. Instructions: Browse the library to resume work or import shared project files.",
+                        "export" to "Export Image: Save high-res snapshot. Instructions: Renders all visible layers into a single PNG in your photo gallery.",
+                        "help_sub" to "Interactive Help: Explains button functions. Instructions: Tap to activate (Cyan). While active, tap any button to see its help text.",
+                        "settings" to "App Settings: Configure preferences. Instructions: Open to adjust handedness, units, and scanning parameters.",
+
+                        // ─── Global Tools ───────────────────────────────────────────────
+                        "light" to "Flashlight: Toggle device LED. Instructions: Use this to illuminate dark walls for better AR tracking.",
+                        "lock_trace" to "Lock/Freeze: Prevent accidental changes. Instructions: In Trace mode, disables screen. In other modes, locks layer transforms.",
+                    )
+
+                    // ─── Dynamic Layer Tools ──────────────────────────────────────────
+                    val activeId = editorUiState.activeLayerId
+                    editorUiState.layers.forEach { layer ->
+                        val id = layer.id
+                        // Only add help for the active layer OR if no layer is active (show all)
+                        if (activeId == null || activeId == id) {
+                            base["layer_$id"] = "Layer '${layer.name}': Active mural element. Instructions: Tap to select. Drag button up/down to reorder. Transform on screen with gestures."
+                            base["edit_text_$id"] = "Edit Text: Change words in typography layer. Instructions: Tap to open the keyboard and update the text content."
+                            base["size_$id"] = "Brush/Text Size: Adjust scale and softness. Instructions: Drag up/down for size. Drag left/right for brush feathering."
+                            base["font_$id"] = "Font Picker: Select typography style. Instructions: Tap to browse available fonts and apply them to the text layer."
+                            base["color_$id"] = "Color Tool: Set active color. Instructions: Drag up/down for brightness, left/right for saturation. Tap for full color wheel."
+                            base["kern_$id"] = "Text Kerning: Adjust letter spacing. Instructions: Drag left/right to tighten or loosen the text layout."
+                            base["bold_$id"] = "Bold Toggle: Thick font weight. Instructions: Tap to toggle bold styling on the active text layer."
+                            base["italic_$id"] = "Italic Toggle: Slanted styling. Instructions: Tap to toggle italic styling on the active text layer."
+                            base["outline_$id"] = "Text Outline: Character stroke. Instructions: Tap to toggle a visible outline around the text characters."
+                            base["shadow_$id"] = "Drop Shadow: Text depth. Instructions: Tap to toggle a soft shadow behind the typography for better legibility."
+                            base["stencil_$id"] = "Generate Stencil: Create printable templates. Instructions: Tap to begin multi-layer stencil generation for this image."
+                            base["blend_$id"] = "Blend Mode: Composite style. Instructions: Tap to cycle through modes like Multiply, Screen, and Overlay."
+                            base["adj_$id"] = "Image Adjustments: Fine-tune appearance. Instructions: Tap to reveal sliders for Opacity, Brightness, Contrast, and Saturation."
+                            base["invert_$id"] = "Invert Colors: High-contrast negative. Instructions: Tap to flip colors. Whites become black and vice-versa—useful for tracing."
+                            base["balance_$id"] = "Color Balance: RGB channel tuning. Instructions: Tap to reveal sliders for precise Red, Green, and Blue adjustment."
+                            base["eraser_$id"] = "Eraser Brush: Remove layer content. Instructions: Paint on screen to erase. Use 'Size' button to adjust diameter."
+                            base["blur_$id"] = "Blur/Smudge Tool: Blend colors. Instructions: Paint over regions to soften edges or smudge details together."
+                            base["liquify_$id"] = "Warp Tool: Reshape design. Instructions: Drag on screen to push and pull pixels—great for adjusting proportions."
+                            base["dodge_$id"] = "Dodge Tool: Lighten areas. Instructions: Paint over parts of the layer to increase their luminance."
+                            base["burn_$id"] = "Burn Tool: Darken areas. Instructions: Paint over parts of the layer to decrease their luminance."
+                            base["iso_$id"] = "Isolate Subject: Auto-background removal. Instructions: Tap to extract the main subject from its background using AI."
+                            base["line_$id"] = "Sketch Outline: Line art filter. Instructions: Tap to convert the photo into a black-and-white transparent outline."
+                            base["help_layer_$id"] = "Layer Help: Toggle info for these specific layer tools. Instructions: Tap to activate. Then tap any tool icon to see what it does."
+                        }
+                    }
+                    base
+                }
+
                 AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
 
                     azTheme(
@@ -322,15 +390,7 @@ class MainActivity : ComponentActivity() {
                     )
                     azAdvanced(
                         helpEnabled = true,
-                        helpList = mapOf(
-                            "help_sub" to "Select a tool from the Design menu to edit your layers. To transform (scale, rotate, move) a layer, close the layer's tools. Double tap the screen to cycle between X, Y, and Z rotation axes.",
-                            "mode_host" to "Click to open a list of options of how you want to use this app.",
-                            "design_host" to "Click to import images, draw a sketch, or add text. Long-press a layer to open its options. Tap it to edit the layer.",
-                            "project_host" to "Opens a list of app-related options, like New, Save, Load, Export, and Settinigs.",
-                            "flashlight" to "Turns your flashlight on or off.",
-                            "lock" to "Keeps your layers from moving or editing.",
-
-                        )
+                        helpList = allHelpItems
                     )
 
                     if (isRailVisible) {
@@ -475,12 +535,6 @@ class MainActivity : ComponentActivity() {
 
                             LaunchedEffect(mainUiState.planeConfirmationPending) {
                                 arViewModel.setPlaneConfirmationBorder(mainUiState.planeConfirmationPending)
-                            }
-
-                            // Hide SLAM/cloud visualization once the anchor is confirmed —
-                            // processing continues but the point cloud / splats are not drawn.
-                            LaunchedEffect(arUiState.isAnchorEstablished) {
-                                arViewModel.setVisualizationHidden(arUiState.isAnchorEstablished)
                             }
 
                             LaunchedEffect(arUiState.targetPhysicalExtent) {
@@ -1179,6 +1233,8 @@ class MainActivity : ComponentActivity() {
                                 addSizeItem()
                             }
                         }
+
+                        azHelpRailItem(id = "help_layer_${layer.id}", text = navStrings.help, color = navItemColor, shape = AzButtonShape.RECTANGLE)
                     }
                 ) {
                     inputItem(hint = "Rename") { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
