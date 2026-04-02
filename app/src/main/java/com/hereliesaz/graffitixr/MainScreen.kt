@@ -178,7 +178,11 @@ fun MainScreen(
                             view
                         },
                         update = { view ->
-                            rendererRef.value?.captureRequested = arUiState.isCaptureRequested
+                            rendererRef.value?.let { r ->
+                                r.captureRequested = arUiState.isCaptureRequested
+                                r.isCapturingTarget = mainUiState.isCapturingTarget
+                                r.isInPlaneRealignment = mainUiState.isInPlaneRealignment
+                            }
                         },
                         modifier = Modifier.fillMaxSize()
                     )
@@ -271,9 +275,19 @@ fun MainScreen(
                                 val ny = offset.y / size.height
                                 arViewModel.onScreenTap(nx, ny)
                             }
-                        } else if (!isTouchLocked && !isImageLocked && activeLayer != null) {
+                        } else if (!isTouchLocked && !isImageLocked) {
                             if (uiState.activeTool == Tool.NONE) {
-                                detectTapGestures(onDoubleTap = { editorViewModel.onCycleRotationAxis() })
+                                detectTapGestures(
+                                    onDoubleTap = { editorViewModel.onCycleRotationAxis() },
+                                    onTap = { offset ->
+                                        if (uiState.editorMode == EditorMode.AR && !mainUiState.isCapturingTarget) {
+                                            mainViewModel.startTargetCapture()
+                                            val nx = offset.x / size.width
+                                            val ny = offset.y / size.height
+                                            arViewModel.onScreenTap(nx, ny)
+                                        }
+                                    }
+                                )
                             }
                         }
                     }

@@ -75,6 +75,8 @@ class ArRenderer(
     private var isSurfaceCreated = false
 
     @Volatile var captureRequested: Boolean = false
+    @Volatile var isCapturingTarget: Boolean = false
+    @Volatile var isInPlaneRealignment: Boolean = false
 
     fun attachSession(session: Session?) {
         sessionLock.withLock {
@@ -354,7 +356,9 @@ class ArRenderer(
 
             // Continuous wall-depth refinement: keep the overlay flush with the ARCore plane estimate.
             // Runs at ~1 Hz (every 30 frames) to amortise getAllTrackables() overhead.
-            if (anchorEstablished && frameCount % 30 == 0) {
+            // Only runs BEFORE the anchor is established or during manual realignment to
+            // prevent the image from following the camera gaze once locked to a target.
+            if ((!anchorEstablished || isInPlaneRealignment) && frameCount % 30 == 0) {
                 try {
                     refineAnchorFromBestPlane(activeSession, viewMatrix)
                 } catch (e: Exception) {
@@ -363,7 +367,7 @@ class ArRenderer(
             }
 
             // Depth-based fallback: sample centre-screen depth every 10 frames
-            if (anchorEstablished && depthSupported && frameCount % 10 == 0) {
+            if ((!anchorEstablished || isInPlaneRealignment) && depthSupported && frameCount % 10 == 0) {
                 try {
                     frame.acquireDepthImage16Bits().use { depthImage ->
                         val plane = depthImage.planes[0]
@@ -421,7 +425,7 @@ class ArRenderer(
 
             overlayRenderer.draw(viewMatrix, projMatrix, anchorMatrix)
 
-            val showBorder = anchorEstablished &&
+            val showBorder = anchorEstablished && !isCapturingTarget &&
                 (showAnchorBoundary || (showBorderForConfirmation && !overlayRenderer.hasTexture))
             if (showBorder) {
                 overlayRenderer.drawAnchorBorder(viewMatrix, projMatrix, anchorMatrix)
