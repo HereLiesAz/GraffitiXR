@@ -1079,14 +1079,22 @@ class MainActivity : ComponentActivity() {
                                         shape = AzButtonShape.RECTANGLE,
                                         content = AzComposableContent { _ ->
                                             Box(
-                                                Modifier
+                                                modifier = Modifier
                                                     .fillMaxSize()
                                                     .onGloballyPositioned { coords ->
                                                         if (coords.isAttached) {
                                                             editorViewModel.updateStencilButtonPosition(coords.positionInWindow())
                                                         }
-                                                    }
-                                            )
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = "Stencil",
+                                                    color = navItemColor,
+                                                    textAlign = TextAlign.Center,
+                                                    style = MaterialTheme.typography.labelSmall
+                                                )
+                                            }
                                         }
                                     ) {
                                         activate()
@@ -1107,14 +1115,22 @@ class MainActivity : ComponentActivity() {
                                         shape = AzButtonShape.RECTANGLE,
                                         content = AzComposableContent { _ ->
                                             Box(
-                                                Modifier
+                                                modifier = Modifier
                                                     .fillMaxSize()
                                                     .onGloballyPositioned { coords ->
                                                         if (coords.isAttached) {
                                                             editorViewModel.updateStencilButtonPosition(coords.positionInWindow())
                                                         }
-                                                    }
-                                            )
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = "Stencil",
+                                                    color = navItemColor,
+                                                    textAlign = TextAlign.Center,
+                                                    style = MaterialTheme.typography.labelSmall
+                                                )
+                                            }
                                         }
                                     ) {
                                         activate()
@@ -1141,14 +1157,22 @@ class MainActivity : ComponentActivity() {
                                         shape = AzButtonShape.RECTANGLE,
                                         content = AzComposableContent { _ ->
                                             Box(
-                                                Modifier
+                                                modifier = Modifier
                                                     .fillMaxSize()
                                                     .onGloballyPositioned { coords ->
                                                         if (coords.isAttached) {
                                                             editorViewModel.updateStencilButtonPosition(coords.positionInWindow())
                                                         }
-                                                    }
-                                            )
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = "Stencil",
+                                                    color = navItemColor,
+                                                    textAlign = TextAlign.Center,
+                                                    style = MaterialTheme.typography.labelSmall
+                                                )
+                                            }
                                         }
                                     ) {
                                         activate()
