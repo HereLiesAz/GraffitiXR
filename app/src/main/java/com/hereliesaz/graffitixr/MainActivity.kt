@@ -266,12 +266,15 @@ class MainActivity : ComponentActivity() {
                         !showLibrary &&
                         !showSettings
 
+                var permissionRequestedAtLeastOnce by remember { mutableStateOf(hasCameraPermission) }
+
                 LaunchedEffect(Unit) {
                     if (!hasCameraPermission) {
                         permissionLauncher.launch(
                             arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
                         )
                     }
+                    permissionRequestedAtLeastOnce = true
                 }
 
                 // Keep ArUiState in sync with the runtime camera permission so AR
