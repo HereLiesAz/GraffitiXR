@@ -1,3 +1,4 @@
+import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -10,6 +11,30 @@ plugins {
     alias(libs.plugins.kotlinx.serialization)
 }
 
+// Load version properties
+val versionPropsFile = project.rootProject.file("version.properties")
+val versionProps = Properties().apply {
+    if (versionPropsFile.exists()) {
+        versionPropsFile.inputStream().use { load(it) }
+    }
+}
+
+var currentVersionCode = versionProps.getProperty("versionBuild", "1").toInt()
+
+// Automatically increment versionCode for release builds
+val isReleaseBuild = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
+if (isReleaseBuild) {
+    currentVersionCode++
+    versionProps.setProperty("versionBuild", currentVersionCode.toString())
+    versionPropsFile.outputStream().use {
+        versionProps.store(it, "Auto-incremented by release build")
+    }
+}
+
+val verMajor = versionProps.getProperty("versionMajor", "1")
+val verMinor = versionProps.getProperty("versionMinor", "0")
+val currentVersionName = "$verMajor.$verMinor"
+
 android {
     namespace = "com.hereliesaz.graffitixr"
     compileSdk = 36
@@ -18,8 +43,8 @@ android {
         applicationId = "com.hereliesaz.graffitixr"
         minSdk = 29
         targetSdk = 36
-        versionCode = 5
-        versionName = "1.21"
+        versionCode = currentVersionCode
+        versionName = currentVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -73,8 +98,6 @@ androidComponents {
         variant.outputs.forEach { output ->
             val version = variant.outputs.first().versionName.get()
             val code = variant.outputs.first().versionCode.get()
-            // The APK file name is "app-release-1.0.0.1.apk".
-            // We can rename it by mapping over output property.
             val apkName = "GraffitiXR-${variant.name}-$version.$code.apk"
             (output as? com.android.build.api.variant.impl.VariantOutputImpl)?.outputFileName?.set(apkName)
         }

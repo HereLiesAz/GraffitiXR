@@ -177,22 +177,30 @@ class StencilProcessor @Inject constructor() {
         // ── Step 1: Generate Solid Base ──────────────────────────────────────────
         val baseType = if (polarity == TonalPolarity.DARK) StencilLayerType.SILHOUETTE else StencilLayerType.HIGHLIGHT
         val basePixels = IntArray(w * h) { Color.TRANSPARENT }
+        
+        // Build mask array and subject indices array (primitive) to avoid List<Int> overhead
         val maskPixels = IntArray(w * h)
         subjectMask.getPixels(maskPixels, 0, w, 0, 0, w, h)
         
-        // Find subject pixels for K-means sample building
-        val subjectIndices = maskPixels.indices.filter { maskPixels[it] == Color.WHITE }
+        var subjectCount = 0
+        for (p in maskPixels) if (p == Color.WHITE) subjectCount++
         
-        // Fill base: 100% solid color inside the mask (or whole canvas if empty)
-        if (subjectIndices.isNotEmpty()) {
-            for (idx in subjectIndices) basePixels[idx] = baseType.color
-        } else {
-            // No subject isolated; fill the whole frame as fallback
+        val subjectIndices = IntArray(subjectCount)
+        var subjectIdx = 0
+        for (i in maskPixels.indices) {
+            if (maskPixels[i] == Color.WHITE) {
+                subjectIndices[subjectIdx++] = i
+                basePixels[i] = baseType.color
+            }
+        }
+        
+        // If no subject isolated; fill the whole frame as fallback
+        if (subjectCount == 0) {
             for (i in basePixels.indices) basePixels[i] = baseType.color
         }
         val baseLayer = StencilLayer(baseType, pixelsToBitmap(basePixels, w, h), "Base - ${baseType.label}")
 
-        if (subjectIndices.isEmpty()) return listOf(baseLayer)
+        if (subjectCount == 0) return listOf(baseLayer)
 
         // ── Step 2: Extract Contrast Detail via K-means (K=2) ─────────────────────
         val srcMat = Mat()
@@ -209,29 +217,28 @@ class StencilProcessor @Inject constructor() {
         val vChannel = channels[2]   // V = luminance
         channels[0].release(); channels[1].release()
 
-        // 1.5 Detail Simplification: Median Blur (ksize must be odd)
+        // Detail Simplification: Median Blur
         val ksizeRaw = (15 - (influence * 14).toInt())
         val ksize = if (ksizeRaw % 2 == 0) ksizeRaw + 1 else ksizeRaw
         if (ksize > 1) {
             Imgproc.medianBlur(vChannel, vChannel, ksize)
         }
 
-        // 1.6 Tonal Bias: Shift brightness (alpha=1.0, beta=bias)
-        // influence = 0.0 -> -40; influence = 0.5 -> 0; influence = 1.0 -> +40
+        // Tonal Bias: Shift brightness
         val bias = (influence - 0.5f) * 80.0
         vChannel.convertTo(vChannel, -1, 1.0, bias)
 
-        // 3. Build CV_32F sample matrix from subject V-values
+        // Build sample matrix from subject V-values
         val vBytes = ByteArray(w * h)
         vChannel.get(0, 0, vBytes)
         vChannel.release()
 
-        val samples = Mat(subjectIndices.size, 1, CvType.CV_32F)
-        subjectIndices.forEachIndexed { row, idx ->
-            samples.put(row, 0, floatArrayOf((vBytes[idx].toInt() and 0xFF).toFloat()))
+        val samples = Mat(subjectCount, 1, CvType.CV_32F)
+        for (i in 0 until subjectCount) {
+            samples.put(i, 0, floatArrayOf((vBytes[subjectIndices[i]].toInt() and 0xFF).toFloat()))
         }
 
-        // 4. Run K-means with K=2
+        // Run K-means with K=2
         val k = 2
         val labels = Mat()
         val centers = Mat()
@@ -244,25 +251,23 @@ class StencilProcessor @Inject constructor() {
         )
         samples.release()
 
-        // 5. Select the cluster most contrasting with the base
-        // If base is DARK (Black), we want the Lightest cluster.
-        // If base is LIGHT (White), we want the Darkest cluster.
+        // Select the cluster most contrasting with the base
         val centroidValues = FloatArray(k) { i -> centers.get(i, 0)[0].toFloat() }
         centers.release()
         
         val detailClusterIdx = if (polarity == TonalPolarity.DARK) {
-            centroidValues.indices.maxByOrNull { centroidValues[it] } ?: 0
+            if (centroidValues[0] > centroidValues[1]) 0 else 1
         } else {
-            centroidValues.indices.minByOrNull { centroidValues[it] } ?: 0
+            if (centroidValues[0] < centroidValues[1]) 0 else 1
         }
 
-        // 6. Build Detail Layer
+        // Build Detail Layer
         val detailType = if (polarity == TonalPolarity.DARK) StencilLayerType.HIGHLIGHT else StencilLayerType.SILHOUETTE
         val detailPixels = IntArray(w * h) { Color.TRANSPARENT }
-        subjectIndices.forEachIndexed { row, idx ->
-            val cluster = labels.get(row, 0)[0].toInt()
+        for (i in 0 until subjectCount) {
+            val cluster = labels.get(i, 0)[0].toInt()
             if (cluster == detailClusterIdx) {
-                detailPixels[idx] = detailType.color
+                detailPixels[subjectIndices[i]] = detailType.color
             }
         }
         labels.release()
@@ -292,6 +297,8 @@ class StencilProcessor @Inject constructor() {
     }
 
     private fun morphClose(src: Bitmap, color: Int): Bitmap {
+        val w = src.width
+        val h = src.height
         val srcMat = Mat()
         Utils.bitmapToMat(src, srcMat)
 
@@ -299,6 +306,10 @@ class StencilProcessor @Inject constructor() {
         val channels = ArrayList<Mat>()
         Core.split(srcMat, channels)
         val alphaMat = channels[3]
+        
+        // Release other channels immediately to save memory
+        srcMat.release()
+        channels[0].release(); channels[1].release(); channels[2].release()
 
         val kernel = Imgproc.getStructuringElement(
             Imgproc.MORPH_RECT,
@@ -306,16 +317,13 @@ class StencilProcessor @Inject constructor() {
         )
         val closedAlpha = Mat()
         Imgproc.morphologyEx(alphaMat, closedAlpha, Imgproc.MORPH_CLOSE, kernel)
+        alphaMat.release()
+        kernel.release()
 
-        // Simpler way using Android Bitmap for pixel manipulation
-        val w = src.width
-        val h = src.height
-        val alphaBmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        Utils.matToBitmap(closedAlpha, alphaBmp)
-        
-        val alphaPixels = IntArray(w * h)
-        alphaBmp.getPixels(alphaPixels, 0, w, 0, 0, w, h)
-        alphaBmp.recycle()
+        // Get bytes from Mat directly instead of intermediate Bitmap
+        val alphaBytes = ByteArray(w * h)
+        closedAlpha.get(0, 0, alphaBytes)
+        closedAlpha.release()
 
         val outPixels = IntArray(w * h)
         val r = Color.red(color)
@@ -323,17 +331,12 @@ class StencilProcessor @Inject constructor() {
         val b = Color.blue(color)
 
         for (i in outPixels.indices) {
-            // closedAlpha is grayscale (CV_8UC1), but bitmap conversion will replicate 
-            // the value across R,G,B. We'll take the blue channel.
-            val aValue = Color.blue(alphaPixels[i])
+            val aValue = alphaBytes[i].toInt() and 0xFF
             outPixels[i] = Color.argb(aValue, r, g, b)
         }
 
         val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         out.setPixels(outPixels, 0, w, 0, 0, w, h)
-
-        srcMat.release(); alphaMat.release(); closedAlpha.release(); kernel.release()
-        for(c in channels) { c.release() }
 
         return out
     }

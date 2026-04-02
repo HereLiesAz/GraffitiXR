@@ -35,19 +35,38 @@ class ExportManager @Inject constructor() {
 
     /**
      * Composites [linkedLayers] into the local coordinate space of the [anchor] layer.
-     * The resulting bitmap has the same pixel dimensions as the anchor bitmap.
+     * The resulting bitmap is capped to a maximum dimension of 2048px to prevent OOM.
      */
     fun compositeToLayerSpace(anchor: Layer, linkedLayers: List<Layer>, screenWidth: Int, screenHeight: Int): Bitmap {
         val anchorBitmap = anchor.bitmap ?: return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
-        val result = Bitmap.createBitmap(anchorBitmap.width, anchorBitmap.height, Bitmap.Config.ARGB_8888)
+        
+        // Cap target dimensions to 2048px to avoid OOM
+        val maxDim = 2048
+        var targetWidth = anchorBitmap.width
+        var targetHeight = anchorBitmap.height
+        val aspect = targetWidth.toFloat() / targetHeight.toFloat()
+        
+        if (targetWidth > maxDim || targetHeight > maxDim) {
+            if (aspect > 1f) {
+                targetWidth = maxDim
+                targetHeight = (maxDim / aspect).toInt()
+            } else {
+                targetHeight = maxDim
+                targetWidth = (maxDim * aspect).toInt()
+            }
+        }
+
+        val result = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(result)
 
         val anchorMatrix = getLayerScreenMatrix(anchor, screenWidth, screenHeight)
         val anchorMatrixInv = Matrix()
         if (!anchorMatrix.invert(anchorMatrixInv)) {
-            // Should not happen for valid layer transforms
             return result
         }
+
+        // Scale factor from original anchor pixels to capped target pixels
+        val canvasScale = targetWidth.toFloat() / anchorBitmap.width.toFloat()
 
         linkedLayers.filter { it.isVisible }.forEach { layer ->
             layer.bitmap?.let { b ->
@@ -59,6 +78,9 @@ class ExportManager @Inject constructor() {
                 val layerMatrix = getLayerScreenMatrix(layer, screenWidth, screenHeight)
                 val relativeMatrix = Matrix(anchorMatrixInv)
                 relativeMatrix.postConcat(layerMatrix)
+                
+                // Adjust for capped canvas size
+                relativeMatrix.postScale(canvasScale, canvasScale)
 
                 canvas.drawBitmap(b, relativeMatrix, paint)
             }
