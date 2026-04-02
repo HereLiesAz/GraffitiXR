@@ -45,7 +45,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -126,7 +128,6 @@ class MainActivity : ComponentActivity() {
     var showSaveDialog by mutableStateOf(false)
     var showLibrary by mutableStateOf(true)
     var showSettings by mutableStateOf(false)
-    var showHelpDialog by mutableStateOf(false)
     var showPosterDialog by mutableStateOf(false)
     var posterSourceLayerId by mutableStateOf<String?>(null)
     var hasCameraPermission by mutableStateOf(false)
@@ -294,7 +295,8 @@ class MainActivity : ComponentActivity() {
                     azTheme(
                         activeColor = Cyan,
                         defaultShape = AzButtonShape.RECTANGLE,
-                        headerIconShape = AzHeaderIconShape.ROUNDED
+                        headerIconShape = AzHeaderIconShape.ROUNDED,
+                        translucentBackground = Color.Black.copy(alpha = 0.5f)
                     )
                     azConfig(
                         packButtons = true,
@@ -302,6 +304,9 @@ class MainActivity : ComponentActivity() {
                     )
                     azAdvanced(
                         helpEnabled = showHelp,
+                        helpList = mapOf(
+                            "help_sub" to "Select a tool from the Design menu to edit your layers. To transform (scale, rotate, move) a layer, close the layer's tools. Double tap the screen to cycle between X, Y, and Z rotation axes."
+                        ),
                         onDismissHelp = { showHelp = false }
                     )
 
@@ -311,6 +316,7 @@ class MainActivity : ComponentActivity() {
                             overlayImagePicker, backgroundImagePicker, editorUiState, arUiState, navStrings,
                             navItemColor = navItemColor,
                             onShowFontPicker = { layerId -> fontPickerLayerId = layerId; showFontPicker = true },
+                            onToggleHelp = { showHelp = !showHelp },
                             layerMenusOpen = layerMenusOpen
                         )
                     }
@@ -341,6 +347,26 @@ class MainActivity : ComponentActivity() {
                     }
 
                     onscreen {
+                        if (editorUiState.stencilHintVisible || editorUiState.isStencilGenerating) {
+                            val pos = editorUiState.stencilButtonPosition
+                            val density = LocalDensity.current
+                            val offset = with(density) { IntOffset(pos.x.toInt() + 100.dp.roundToPx(), pos.y.toInt()) }
+
+                            Box(Modifier.offset { offset }) {
+                                if (editorUiState.isStencilGenerating) {
+                                    Text("GENERATING...", color = Color.Cyan, fontWeight = FontWeight.Bold)
+                                } else if (editorUiState.stencilHintVisible) {
+                                    Text(
+                                        "Press again to add a layer.",
+                                        color = Color.White,
+                                        modifier = Modifier
+                                            .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
+                                            .padding(8.dp)
+                                    )
+                                }
+                            }
+                        }
+
                         var fullSize by remember { mutableStateOf(IntSize.Zero) }
 
                         Box(Modifier.fillMaxSize().onSizeChanged { fullSize = it }) {
@@ -630,13 +656,6 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            if (showHelpDialog) {
-                                InfoDialog(
-                                    title = "GraffitiXR Guide",
-                                    content = "Select a tool from the Design menu to edit your layers. To transform (scale, rotate, move) a layer, close the layer's tools. Double tap the screen to cycle between X, Y, and Z rotation axes.",
-                                    onDismiss = { showHelpDialog = false }
-                                )
-                            }
 
                             if (showPosterDialog && posterSourceLayerId != null) {
                                 PosterOptionsDialog(
@@ -743,6 +762,7 @@ class MainActivity : ComponentActivity() {
         navStrings: NavStrings,
         navItemColor: Color = Color.White,
         onShowFontPicker: (String) -> Unit = {},
+        onToggleHelp: () -> Unit = {},
         layerMenusOpen: MutableMap<String, Boolean>
     ) {
         val requestPermissions = {
@@ -812,7 +832,9 @@ class MainActivity : ComponentActivity() {
         azRailSubItem(id = "export", hostId = "project_host", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.exportInfo) {
             editorViewModel.exportImage()
         }
-        azHelpRailItem(id = "help_sub", text = navStrings.help, color = navItemColor, shape = AzButtonShape.NONE)
+        azRailSubItem(id = "help_sub", hostId = "project_host", text = navStrings.help, color = navItemColor, shape = AzButtonShape.NONE) {
+            onToggleHelp()
+        }
         azRailSubItem(id = "settings", hostId = "project_host", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.settingsInfo) {
             showSettings = true
         }
@@ -1050,7 +1072,23 @@ class MainActivity : ComponentActivity() {
                                     editorViewModel.onTextStyleChanged(layer.id, tp.isBold, tp.isItalic, tp.hasOutline, !tp.hasDropShadow)
                                 }
                                 if (layer.stencilType == null) {
-                                    azRailItem(id = "stencil_${layer.id}", text = "Stencil", color = navItemColor, shape = AzButtonShape.RECTANGLE) {
+                                    azRailItem(
+                                        id = "stencil_${layer.id}",
+                                        text = "Stencil",
+                                        color = navItemColor,
+                                        shape = AzButtonShape.RECTANGLE,
+                                        content = AzComposableContent { _ ->
+                                            Box(
+                                                Modifier
+                                                    .fillMaxSize()
+                                                    .onGloballyPositioned { coords ->
+                                                        if (coords.isAttached) {
+                                                            editorViewModel.updateStencilButtonPosition(coords.positionInWindow())
+                                                        }
+                                                    }
+                                            )
+                                        }
+                                    ) {
                                         activate()
                                         editorViewModel.onGenerateStencil(layer.id)
                                     }
@@ -1062,7 +1100,23 @@ class MainActivity : ComponentActivity() {
                                 azRailItem(id = "blend_${layer.id}", text = "Blend", color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.blendingInfo, onClick = { activate(); editorViewModel.onCycleBlendMode() })
                                 azRailItem(id = "adj_${layer.id}", text = "Adjust", color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.adjustInfo, onClick = { activate(); editorViewModel.onAdjustClicked() })
                                 if (layer.stencilType == null) {
-                                    azRailItem(id = "stencil_${layer.id}", text = "Stencil", color = navItemColor, shape = AzButtonShape.RECTANGLE) {
+                                    azRailItem(
+                                        id = "stencil_${layer.id}",
+                                        text = "Stencil",
+                                        color = navItemColor,
+                                        shape = AzButtonShape.RECTANGLE,
+                                        content = AzComposableContent { _ ->
+                                            Box(
+                                                Modifier
+                                                    .fillMaxSize()
+                                                    .onGloballyPositioned { coords ->
+                                                        if (coords.isAttached) {
+                                                            editorViewModel.updateStencilButtonPosition(coords.positionInWindow())
+                                                        }
+                                                    }
+                                            )
+                                        }
+                                    ) {
                                         activate()
                                         editorViewModel.onGenerateStencil(layer.id)
                                     }
@@ -1080,7 +1134,23 @@ class MainActivity : ComponentActivity() {
                                 azRailItem(id = "iso_${layer.id}", text = "Isolate", color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.isolateInfo, onClick = { activate(); editorViewModel.onRemoveBackgroundClicked() })
                                 azRailItem(id = "line_${layer.id}", text = "Outline", color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.outlineInfo, onClick = { activate(); editorViewModel.onSketchClicked() })
                                 if (layer.stencilType == null) {
-                                    azRailItem(id = "stencil_${layer.id}", text = "Stencil", color = navItemColor, shape = AzButtonShape.RECTANGLE) {
+                                    azRailItem(
+                                        id = "stencil_${layer.id}",
+                                        text = "Stencil",
+                                        color = navItemColor,
+                                        shape = AzButtonShape.RECTANGLE,
+                                        content = AzComposableContent { _ ->
+                                            Box(
+                                                Modifier
+                                                    .fillMaxSize()
+                                                    .onGloballyPositioned { coords ->
+                                                        if (coords.isAttached) {
+                                                            editorViewModel.updateStencilButtonPosition(coords.positionInWindow())
+                                                        }
+                                                    }
+                                            )
+                                        }
+                                    ) {
                                         activate()
                                         editorViewModel.onGenerateStencil(layer.id)
                                     }
