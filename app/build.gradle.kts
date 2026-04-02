@@ -76,7 +76,7 @@ androidComponents {
             // The APK file name is "app-release-1.0.0.1.apk".
             // We can rename it by mapping over output property.
             val apkName = "app-${variant.name}-$version.$code.apk"
-            (output as? com.android.build.api.variant.impl.VariantOutputImpl)?.outputFileName?.set(apkName)
+            output.versionName.set(version)
         }
     }
 }
