@@ -230,7 +230,7 @@ class EditorViewModel @Inject constructor(
             is EditCommand.Draw -> {
                 redoStack.addLast(command)
                 val strokes = layerStrokes[command.layerId] ?: return
-                strokes.removeLast()
+                if (strokes.isNotEmpty()) strokes.removeAt(strokes.lastIndex)
                 rebuildLayerBitmap(command.layerId)
             }
             is EditCommand.PropertyChange -> {
