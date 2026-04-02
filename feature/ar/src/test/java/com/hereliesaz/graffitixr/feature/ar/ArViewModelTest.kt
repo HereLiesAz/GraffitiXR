@@ -51,7 +51,9 @@ class ArViewModelTest {
         every { fakeBitmap.width } returns 100
         every { fakeBitmap.height } returns 100
         mockkStatic("com.hereliesaz.graffitixr.common.util.ImageExtKt")
+        // Match both the zero-arg call and the call with an explicit tapPos argument.
         every { any<Bitmap>().isolateMarkings() } returns fakeBitmap
+        every { any<Bitmap>().isolateMarkings(any()) } returns fakeBitmap
         every { settingsRepository.arScanMode } returns flowOf(ArScanMode.CLOUD_POINTS)
         every { settingsRepository.isRightHanded } returns flowOf(true)
         every { settingsRepository.showAnchorBoundary } returns flowOf(false)
