@@ -1356,13 +1356,17 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.main) { saveProject() }
     }
 
+    fun updateStencilButtonPosition(position: Offset) {
+        _uiState.update { it.copy(stencilButtonPosition = position) }
+    }
+
     override fun onGenerateStencil(layerId: String) {
         val state = _uiState.value
         val sourceLayer = state.layers.find { it.id == layerId } ?: return
         val projectId = state.projectId ?: return
 
         pushHistory()
-        _uiState.update { it.copy(isLoading = true) }
+        _uiState.update { it.copy(isStencilGenerating = true) }
 
         viewModelScope.launch(dispatchers.default) {
             // 1. Identify linked group and composite
@@ -1378,15 +1382,18 @@ class EditorViewModel @Inject constructor(
             // 2. Determine next stencil type
             val existingStencils = groupLayers.filter { it.stencilType != null }
             val (nextType, totalCount) = when {
-                existingStencils.none { it.stencilType == StencilLayerType.SILHOUETTE } -> 
-                    StencilLayerType.SILHOUETTE to StencilLayerCount.ONE
+                existingStencils.none { it.stencilType == StencilLayerType.SILHOUETTE } -> {
+                    // Initial stencil generation: Assess subject contrast
+                    val assessedCount = stencilProcessor.assessSubjectContrast(composite)
+                    StencilLayerType.SILHOUETTE to assessedCount
+                }
                 existingStencils.none { it.stencilType == StencilLayerType.HIGHLIGHT } -> 
                     StencilLayerType.HIGHLIGHT to StencilLayerCount.TWO
                 existingStencils.none { it.stencilType == StencilLayerType.MIDTONE } -> 
                     StencilLayerType.MIDTONE to StencilLayerCount.THREE
                 else -> {
                     withContext(dispatchers.main) {
-                        _uiState.update { it.copy(isLoading = false) }
+                        _uiState.update { it.copy(isStencilGenerating = false) }
                         Toast.makeText(context, "Maximum stencil layers (3) already generated for this group.", Toast.LENGTH_SHORT).show()
                     }
                     return@launch
@@ -1405,7 +1412,7 @@ class EditorViewModel @Inject constructor(
                 pendingStencilSourceLayerId = layerId
                 pendingStencilProjectId = projectId
                 withContext(dispatchers.main) {
-                    _uiState.update { it.copy(isLoading = false, isSegmenting = true, segmentationInfluence = 0.5f) }
+                    _uiState.update { it.copy(isStencilGenerating = false, isSegmenting = true, segmentationInfluence = 0.5f) }
                 }
             } else {
                 // Isolation failed — run stencil on the raw composite immediately
@@ -1430,6 +1437,7 @@ class EditorViewModel @Inject constructor(
                     val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(stencilLayer.bitmap))
                     val localUri = "file://$path".toUri()
 
+                    val sourceLayer = _uiState.value.layers.find { it.id == sourceLayerId }
                     val newLayer = Layer(
                         id = UUID.randomUUID().toString(),
                         name = "Stencil${type.order} ${type.label}",
@@ -1437,7 +1445,13 @@ class EditorViewModel @Inject constructor(
                         bitmap = stencilLayer.bitmap,
                         isLinked = true,
                         stencilType = type,
-                        stencilSourceId = sourceLayerId
+                        stencilSourceId = sourceLayerId,
+                        scale = sourceLayer?.scale ?: 1.0f,
+                        offset = sourceLayer?.offset ?: Offset.Zero,
+                        rotationX = sourceLayer?.rotationX ?: 0f,
+                        rotationY = sourceLayer?.rotationY ?: 0f,
+                        rotationZ = sourceLayer?.rotationZ ?: 0f,
+                        warpMesh = sourceLayer?.warpMesh ?: emptyList()
                     )
 
                     withContext(dispatchers.main) {
@@ -1451,14 +1465,23 @@ class EditorViewModel @Inject constructor(
                                 while (topIdx + 1 < list.size && list[topIdx + 1].isLinked) topIdx++
                                 list.add(topIdx + 1, newLayer)
                             }
-                            s.copy(layers = updatedLayers, activeLayerId = newLayer.id, isLoading = false)
+                            s.copy(
+                                layers = updatedLayers,
+                                activeLayerId = newLayer.id,
+                                isStencilGenerating = false,
+                                stencilHintVisible = true
+                            )
+                        }
+                        viewModelScope.launch {
+                            kotlinx.coroutines.delay(3000)
+                            _uiState.update { it.copy(stencilHintVisible = false) }
                         }
                         saveProject()
                     }
                 }
                 is StencilProgress.Error -> {
                     withContext(dispatchers.main) {
-                        _uiState.update { it.copy(isLoading = false) }
+                        _uiState.update { it.copy(isStencilGenerating = false) }
                         Toast.makeText(context, "Stencil error: ${progress.message}", Toast.LENGTH_LONG).show()
                     }
                 }
