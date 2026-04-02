@@ -6,6 +6,7 @@ import android.graphics.Color
 import com.hereliesaz.graffitixr.common.model.StencilLayer
 import com.hereliesaz.graffitixr.common.model.StencilLayerCount
 import com.hereliesaz.graffitixr.common.model.StencilLayerType
+import com.hereliesaz.graffitixr.common.model.TonalPolarity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -50,14 +51,14 @@ class StencilProcessor @Inject constructor() {
     }
 
     /**
-     * Run the full stencil pipeline on [isolatedBitmap].
+     * Run the full binary stencil pipeline on [isolatedBitmap].
      * The bitmap must have background removed (transparent pixels = background).
      * SubjectIsolator is expected to have already downsampled to ≤2048px.
+     * Always returns exactly two layers (Base + Detail).
      * Emits [StencilProgress] events; final event is [StencilProgress.Done] or [StencilProgress.Error].
      */
     fun process(
         isolatedBitmap: Bitmap,
-        layerCount: StencilLayerCount,
         influence: Float = 0.5f
     ): Flow<StencilProgress> = flow {
 
@@ -69,16 +70,20 @@ class StencilProcessor @Inject constructor() {
         }
 
         val result = runCatching {
+            // Stage 1: Assessment
+            emit(StencilProgress.Stage("Analysing brightness…", 0.15f))
+            val polarity = assessTonalPolarity(isolatedBitmap)
+
             // Stage 2: Build subject mask from alpha channel
-            emit(StencilProgress.Stage("Building mask…", 0.20f))
+            emit(StencilProgress.Stage("Building mask…", 0.30f))
             val subjectMask = alphaToMask(isolatedBitmap)
 
-            // Stage 3: K-means clustering on luminance channel
-            emit(StencilProgress.Stage("Analysing tones…", 0.45f))
-            val layers = kmeansLayers(isolatedBitmap, subjectMask, layerCount, influence)
+            // Stage 3: Binary Pair Generation via K-means
+            emit(StencilProgress.Stage("Analysing details…", 0.60f))
+            val layers = kmeansLayers(isolatedBitmap, subjectMask, polarity, influence)
 
-            // Stage 4: Morphological closing on non-silhouette layers
-            emit(StencilProgress.Stage("Smoothing edges…", 0.70f))
+            // Stage 4: Morphological closing on detail layer
+            emit(StencilProgress.Stage("Smoothing edges…", 0.85f))
             applyMorphClose(layers)
         }
 
@@ -94,81 +99,43 @@ class StencilProcessor @Inject constructor() {
     }.flowOn(Dispatchers.Default)
 
     /**
-     * Extracts a single specific [type] from [isolatedBitmap] based on [totalCount] clusters.
+     * Legacy method for single-layer extraction. Now returns the binary pair
+     * but emphasizes the requested [type] in the progress event.
      */
     fun processSingle(
         isolatedBitmap: Bitmap,
-        type: StencilLayerType,
-        totalCount: StencilLayerCount,
+        type: StencilLayerType, // Kept for interface compliance
+        totalCount: StencilLayerCount, // Kept for interface compliance
         influence: Float = 0.5f
-    ): Flow<StencilProgress> = flow {
-        emit(StencilProgress.Stage("Preparing image…", 0.05f))
-
-        if (isolatedBitmap.width < 200 || isolatedBitmap.height < 200) {
-            emit(StencilProgress.Error("Source image too small for stencil. (Min 200px)"))
-            return@flow
-        }
-
-        val result = runCatching {
-            emit(StencilProgress.Stage("Building mask…", 0.20f))
-            val subjectMask = alphaToMask(isolatedBitmap)
-
-            emit(StencilProgress.Stage("Analysing tones…", 0.45f))
-            val allLayers = kmeansLayers(isolatedBitmap, subjectMask, totalCount, influence)
-            
-            // Find the specific requested layer; fall back to silhouette if
-            // k-means collapsed (e.g. uniform luminance) and the tone wasn't produced.
-            val targetLayer = allLayers.find { it.type == type }
-                ?: allLayers.firstOrNull()
-                ?: throw Exception("No layers produced for count ${totalCount.count}")
-
-            emit(StencilProgress.Stage("Smoothing edges…", 0.70f))
-            val smoothed = if (type == StencilLayerType.SILHOUETTE) targetLayer
-                           else targetLayer.copy(bitmap = morphClose(targetLayer.bitmap, type.color))
-
-            listOf(smoothed)
-        }
-
-        result.fold(
-            onSuccess = { layers ->
-                emit(StencilProgress.Stage("Done.", 1.0f))
-                emit(StencilProgress.Done(layers))
-            },
-            onFailure = { e ->
-                emit(StencilProgress.Error(e.message ?: "Unknown error in stencil pipeline"))
-            }
-        )
-    }.flowOn(Dispatchers.Default)
+    ): Flow<StencilProgress> = process(isolatedBitmap, influence)
 
     /**
-     * Assesses whether the [bitmap] subject should be rendered as a high-contrast
-     * shadow (ONE cluster) or a silhouette-plus-highlights (TWO clusters).
+     * Assesses whether the [bitmap] subject is dark-dominant (Luminance ≤ 0.5)
+     * or light-dominant (Luminance > 0.5).
      */
-    fun assessSubjectContrast(bitmap: Bitmap): StencilLayerCount {
+    fun assessTonalPolarity(bitmap: Bitmap): TonalPolarity {
         val w = bitmap.width
         val h = bitmap.height
         val pixels = IntArray(w * h)
         bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
 
-        val luminanceValues = mutableListOf<Float>()
+        var sumLuminance = 0f
+        var count = 0
         for (pixel in pixels) {
             if (android.graphics.Color.alpha(pixel) > 0) {
                 // Luminance = 0.299R + 0.587G + 0.114B
                 val r = android.graphics.Color.red(pixel) / 255f
                 val g = android.graphics.Color.green(pixel) / 255f
                 val b = android.graphics.Color.blue(pixel) / 255f
-                luminanceValues.add(0.299f * r + 0.587f * g + 0.114f * b)
+                sumLuminance += (0.299f * r + 0.587f * g + 0.114f * b)
+                count++
             }
         }
 
-        if (luminanceValues.isEmpty()) return StencilLayerCount.ONE
+        if (count == 0) return TonalPolarity.DARK
 
-        val mean = luminanceValues.average().toFloat()
-        val stdDev = kotlin.math.sqrt(luminanceValues.map { (it - mean) * (it - mean) }.average()).toFloat()
-
-        // Threshold 0.2: Detailed/High-contrast candidates use Shadows Only (ONE cluster)
-        // Flat candidates use Silhouette + Highlights (TWO clusters)
-        return if (stdDev > 0.2f) StencilLayerCount.ONE else StencilLayerCount.TWO
+        val mean = sumLuminance / count
+        return if (mean <= 0.5f) TonalPolarity.DARK else TonalPolarity.LIGHT
     }
 
     // ── Stage 2 ───────────────────────────────────────────────────────────────
@@ -193,21 +160,41 @@ class StencilProcessor @Inject constructor() {
     // ── Stage 3 ───────────────────────────────────────────────────────────────
 
     /**
-     * Clusters subject pixels into [layerCount] tonal groups using K-means on the HSV
-     * V-channel (luminance). Returns one [StencilLayer] per cluster, sorted darkest first
-     * (overpaint strategy: each layer includes all pixels at this darkness or darker).
+     * Clusters subject pixels into a binary tonal pair using K-means on the HSV
+     * V-channel (luminance). Returns exactly two [StencilLayer]s:
+     *   1. A SOLID BASE (Black if [polarity] is DARK, White if LIGHT)
+     *   2. A CONTRAST DETAIL (the cluster most different from the base)
      */
     internal fun kmeansLayers(
         isolated: Bitmap,
         subjectMask: Bitmap,
-        layerCount: StencilLayerCount,
+        polarity: TonalPolarity,
         influence: Float
     ): List<StencilLayer> {
-        val k = layerCount.count
         val w = isolated.width
         val h = isolated.height
 
-        // 1. Convert isolated bitmap → HSV, extract V channel (luminance)
+        // ── Step 1: Generate Solid Base ──────────────────────────────────────────
+        val baseType = if (polarity == TonalPolarity.DARK) StencilLayerType.SILHOUETTE else StencilLayerType.HIGHLIGHT
+        val basePixels = IntArray(w * h) { Color.TRANSPARENT }
+        val maskPixels = IntArray(w * h)
+        subjectMask.getPixels(maskPixels, 0, w, 0, 0, w, h)
+        
+        // Find subject pixels for K-means sample building
+        val subjectIndices = maskPixels.indices.filter { maskPixels[it] == Color.WHITE }
+        
+        // Fill base: 100% solid color inside the mask (or whole canvas if empty)
+        if (subjectIndices.isNotEmpty()) {
+            for (idx in subjectIndices) basePixels[idx] = baseType.color
+        } else {
+            // No subject isolated; fill the whole frame as fallback
+            for (i in basePixels.indices) basePixels[i] = baseType.color
+        }
+        val baseLayer = StencilLayer(baseType, pixelsToBitmap(basePixels, w, h), "Base - ${baseType.label}")
+
+        if (subjectIndices.isEmpty()) return listOf(baseLayer)
+
+        // ── Step 2: Extract Contrast Detail via K-means (K=2) ─────────────────────
         val srcMat = Mat()
         Utils.bitmapToMat(isolated, srcMat)
         val hsvMat = Mat()
@@ -219,7 +206,7 @@ class StencilProcessor @Inject constructor() {
         val channels = ArrayList<Mat>()
         Core.split(hsvConverted, channels)
         hsvConverted.release()
-        val vChannel = channels[2]   // V = luminance (index 2 in HSV)
+        val vChannel = channels[2]   // V = luminance
         channels[0].release(); channels[1].release()
 
         // 1.5 Detail Simplification: Median Blur (ksize must be odd)
@@ -234,21 +221,6 @@ class StencilProcessor @Inject constructor() {
         val bias = (influence - 0.5f) * 80.0
         vChannel.convertTo(vChannel, -1, 1.0, bias)
 
-        // 2. Get subject pixels only (mask out background)
-        val maskPixels = IntArray(w * h)
-        subjectMask.getPixels(maskPixels, 0, w, 0, 0, w, h)
-        val subjectIndices = maskPixels.indices.filter { maskPixels[it] == Color.WHITE }
-
-        if (subjectIndices.isEmpty()) {
-            vChannel.release()
-            // Fallback: return a single silhouette layer
-            val silPixels = maskPixels.map {
-                if (it == Color.WHITE) Color.BLACK else Color.WHITE
-            }.toIntArray()
-            val silBmp = pixelsToBitmap(silPixels, w, h)
-            return listOf(StencilLayer(StencilLayerType.SILHOUETTE, silBmp))
-        }
-
         // 3. Build CV_32F sample matrix from subject V-values
         val vBytes = ByteArray(w * h)
         vChannel.get(0, 0, vBytes)
@@ -259,7 +231,8 @@ class StencilProcessor @Inject constructor() {
             samples.put(row, 0, floatArrayOf((vBytes[idx].toInt() and 0xFF).toFloat()))
         }
 
-        // 4. Run K-means
+        // 4. Run K-means with K=2
+        val k = 2
         val labels = Mat()
         val centers = Mat()
         val criteria = TermCriteria(
@@ -271,46 +244,31 @@ class StencilProcessor @Inject constructor() {
         )
         samples.release()
 
-        // 5. Sort cluster indices by centroid value (low luminance = shadows first)
+        // 5. Select the cluster most contrasting with the base
+        // If base is DARK (Black), we want the Lightest cluster.
+        // If base is LIGHT (White), we want the Darkest cluster.
         val centroidValues = FloatArray(k) { i -> centers.get(i, 0)[0].toFloat() }
         centers.release()
-        val sortedClusterOrder = centroidValues.indices.sortedBy { centroidValues[it] }
-        // sortedClusterOrder[0] = original cluster index that has the lowest centroid (darkest)
-
-        // Build reverse map: original cluster index → sorted position (0 = darkest)
-        val clusterToSortedPos = IntArray(k)
-        sortedClusterOrder.forEachIndexed { sortedPos, originalCluster ->
-            clusterToSortedPos[originalCluster] = sortedPos
+        
+        val detailClusterIdx = if (polarity == TonalPolarity.DARK) {
+            centroidValues.indices.maxByOrNull { centroidValues[it] } ?: 0
+        } else {
+            centroidValues.indices.minByOrNull { centroidValues[it] } ?: 0
         }
 
-        // 6. Assign each subject pixel to its sorted cluster position
-        val pixelCluster = IntArray(w * h) { -1 }  // -1 = background
+        // 6. Build Detail Layer
+        val detailType = if (polarity == TonalPolarity.DARK) StencilLayerType.HIGHLIGHT else StencilLayerType.SILHOUETTE
+        val detailPixels = IntArray(w * h) { Color.TRANSPARENT }
         subjectIndices.forEachIndexed { row, idx ->
-            val originalCluster = labels.get(row, 0)[0].toInt()
-            pixelCluster[idx] = clusterToSortedPos[originalCluster]
+            val cluster = labels.get(row, 0)[0].toInt()
+            if (cluster == detailClusterIdx) {
+                detailPixels[idx] = detailType.color
+            }
         }
         labels.release()
+        val detailLayer = StencilLayer(detailType, pixelsToBitmap(detailPixels, w, h), "Detail - ${detailType.label}")
 
-        // 7. Build stencil layers: each sorted position → one layer
-        //    Sorted position 0 = darkest (silhouette base)
-        //    Sorted position k-1 = lightest (highlights)
-        //    Layer rule: pixels at this sorted position OR darker → black (overpaint strategy)
-        val layerTypes = when (k) {
-            1 -> listOf(StencilLayerType.SILHOUETTE)
-            2 -> listOf(StencilLayerType.SILHOUETTE, StencilLayerType.HIGHLIGHT)
-            else -> listOf(StencilLayerType.SILHOUETTE, StencilLayerType.MIDTONE, StencilLayerType.HIGHLIGHT)
-        }
-
-        return layerTypes.mapIndexed { sortedPos, layerType ->
-            val layerPixels = IntArray(w * h) { Color.TRANSPARENT }
-            for (i in pixelCluster.indices) {
-                // Paint black if this pixel belongs to this cluster or a darker cluster
-                if (pixelCluster[i] in 0..sortedPos) {
-                    layerPixels[i] = layerType.color
-                }
-            }
-            StencilLayer(layerType, pixelsToBitmap(layerPixels, w, h))
-        }
+        return listOf(baseLayer, detailLayer)
     }
 
     private fun pixelsToBitmap(pixels: IntArray, w: Int, h: Int): Bitmap {
