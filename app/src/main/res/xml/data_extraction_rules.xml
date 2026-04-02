@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
     <cloud-backup>
-        <include domain="root" path="."/>
+        <!-- Exclude all data: user project .gxr files must not silently sync to Google Drive -->
+        <exclude domain="root" path="."/>
     </cloud-backup>
     <device-transfer>
         <include domain="root" path="."/>

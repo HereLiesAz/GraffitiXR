@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
-    <include domain="root" path="."/>
+    <!-- Exclude all data: user project .gxr files must not silently sync to Google Drive -->
+    <exclude domain="root" path="."/>
 </full-backup-content>

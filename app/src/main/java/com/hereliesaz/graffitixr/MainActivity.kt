@@ -206,7 +206,10 @@ class MainActivity : ComponentActivity() {
                             try {
                                 val mode = EditorMode.valueOf(route)
                                 if (editorUiState.editorMode != mode) editorViewModel.setEditorMode(mode)
-                            } catch (_: Exception) { }
+                            } catch (_: Exception) {
+                                // Intentional: NavController iterates all destinations including non-EditorMode routes;
+                                // IllegalArgumentException from EditorMode.valueOf() on those routes is expected and safe to discard.
+                            }
                         }
                     }
                 }

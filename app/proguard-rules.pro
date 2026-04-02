@@ -27,8 +27,9 @@
 # which break the ARCore JNI layer and cause "Constructor mismatch" errors.
 -dontrepackage
 -keepattributes Code,StackMapTable
--keepenumtypes com.google.ar.core.**
 -keepclassmembers enum com.google.ar.core.** {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
     <init>(java.lang.String, int);
 }
 

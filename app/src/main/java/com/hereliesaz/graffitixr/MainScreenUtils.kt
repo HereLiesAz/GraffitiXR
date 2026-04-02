@@ -14,6 +14,7 @@ import java.util.Date
 import java.util.Locale
 import android.os.Handler
 import android.os.HandlerThread
+import timber.log.Timber
 
 fun captureScreenshot(window: android.view.Window, onCaptured: (Bitmap) -> Unit) {
     val view = window.decorView
@@ -34,7 +35,7 @@ fun captureScreenshot(window: android.view.Window, onCaptured: (Bitmap) -> Unit)
         }, handler)
         requestSubmitted = true
     } catch (e: Exception) {
-        e.printStackTrace()
+        Timber.e(e, "Screenshot capture failed")
     } finally {
         if (!requestSubmitted) {
             handlerThread.quitSafely()
