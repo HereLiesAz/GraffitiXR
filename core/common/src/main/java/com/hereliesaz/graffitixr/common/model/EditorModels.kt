@@ -107,6 +107,7 @@ data class EditorUiState(
     val canvasBackground: Color = Color.Black,
     val isSegmenting: Boolean = false,
     val segmentationInfluence: Float = 0.5f,
+    val segmentationPreview: Bitmap? = null,
     val isStencilGenerating: Boolean = false,
     val stencilButtonPosition: Offset = Offset.Zero,
     val stencilHintVisible: Boolean = false,

@@ -378,7 +378,7 @@ class EditorViewModel @Inject constructor(
                 layerStrokes[newLayer.id] = mutableListOf()
 
                 withContext(dispatchers.main) {
-                    _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE) }
+                    _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE, activePanel = EditorPanel.NONE) }
                     saveProject()
                 }
             } else {
@@ -415,7 +415,7 @@ class EditorViewModel @Inject constructor(
                 baseBitmaps[newLayer.id] = blankBitmap.copy(Bitmap.Config.ARGB_8888, false)
                 layerStrokes[newLayer.id] = mutableListOf()
 
-                _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE) }
+                _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE, activePanel = EditorPanel.NONE) }
                 saveProject()
             }
         }
@@ -552,7 +552,9 @@ class EditorViewModel @Inject constructor(
 
     fun toggleHandedness() = _uiState.update { it.copy(isRightHanded = !it.isRightHanded) }
     fun toggleDiagOverlay() = _uiState.update { it.copy(showDiagOverlay = !it.showDiagOverlay) }
-    fun setActiveTool(tool: Tool) = _uiState.update { it.copy(activeTool = tool) }
+    fun setActiveTool(tool: Tool) = _uiState.update { 
+        it.copy(activeTool = tool, activePanel = EditorPanel.NONE) 
+    }
 
     override fun onLayerActivated(id: String) = _uiState.update { it.copy(activeLayerId = id, activeTool = Tool.NONE) }
 
@@ -613,17 +615,22 @@ class EditorViewModel @Inject constructor(
 
         val confidence = rawSegmentationConfidence ?: return
         val source = segmentationSourceBitmap ?: return
-        val targetId = segmentationTargetLayerId ?: return
+        val targetId = segmentationTargetLayerId
 
         viewModelScope.launch(dispatchers.default) {
             val newBitmap = subjectIsolator.applyConfidenceThreshold(source, confidence, clamped, 0.1f)
             withContext(dispatchers.main) {
-                _uiState.update { state ->
-                    state.copy(
-                        layers = state.layers.map { layer ->
-                            if (layer.id == targetId) layer.copy(bitmap = newBitmap) else layer
-                        }
-                    )
+                if (targetId != null) {
+                    _uiState.update { state ->
+                        state.copy(
+                            layers = state.layers.map { layer ->
+                                if (layer.id == targetId) layer.copy(bitmap = newBitmap) else layer
+                            }
+                        )
+                    }
+                } else {
+                    // Update live preview for stencil generation
+                    _uiState.update { it.copy(segmentationPreview = newBitmap) }
                 }
             }
         }
@@ -641,7 +648,7 @@ class EditorViewModel @Inject constructor(
         segmentationTargetLayerId = null
         pendingStencilSourceLayerId = null
         pendingStencilProjectId = null
-        _uiState.update { it.copy(isSegmenting = false) }
+        _uiState.update { it.copy(isSegmenting = false, segmentationPreview = null) }
 
         if (stencilSourceLayerId != null && stencilProjectId != null) {
             _uiState.update { it.copy(isLoading = true) }
@@ -784,7 +791,10 @@ class EditorViewModel @Inject constructor(
     }
 
     override fun onGestureEnd() { saveProject(); _uiState.update { it.copy(gestureInProgress = false) } }
-    override fun onGestureStart() { pushHistory(); _uiState.update { it.copy(gestureInProgress = true) } }
+    override fun onGestureStart() { 
+        pushHistory()
+        _uiState.update { it.copy(gestureInProgress = true, activePanel = EditorPanel.NONE) } 
+    }
     override fun toggleImageLock() { pushHistory(); updateActiveLayer { it.copy(isImageLocked = !it.isImageLocked) }; saveProject() }
     override fun onOpacityChanged(v: Float) = updateActiveLayer { it.copy(opacity = v) }
     override fun onBrightnessChanged(v: Float) = updateActiveLayer { it.copy(brightness = v) }
@@ -1276,7 +1286,7 @@ class EditorViewModel @Inject constructor(
             layerStrokes[newLayer.id] = mutableListOf()
 
             withContext(dispatchers.main) {
-                _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE) }
+                _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE, activePanel = EditorPanel.NONE) }
                 saveProject()
             }
         }

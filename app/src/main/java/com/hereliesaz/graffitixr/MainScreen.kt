@@ -46,6 +46,7 @@ import com.hereliesaz.graffitixr.feature.editor.DrawingCanvas
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import kotlinx.coroutines.coroutineScope
+import com.hereliesaz.graffitixr.design.detectSmartOverlayGestures
 import android.graphics.Bitmap as AndroidBitmap
 import androidx.core.graphics.createBitmap
 import com.hereliesaz.graffitixr.design.theme.Black
@@ -281,6 +282,7 @@ fun MainScreen(
                                 detectTapGestures(
                                     onDoubleTap = { editorViewModel.onCycleRotationAxis() },
                                     onTap = { offset ->
+                                        editorViewModel.onDismissPanel()
                                         if (uiState.editorMode == EditorMode.AR && !mainUiState.isCapturingTarget) {
                                             mainViewModel.startTargetCapture()
                                             val nx = offset.x / size.width
@@ -295,9 +297,14 @@ fun MainScreen(
                     .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isWaitingForTap, isTouchLocked) {
                         if (!isTouchLocked && !isImageLocked && activeLayer != null && !isWaitingForTap) {
                             if (uiState.activeTool == Tool.NONE) {
-                                detectTransformGestures { _, pan, zoom, rotation ->
-                                    editorViewModel.onTransformGesture(pan, zoom, rotation)
-                                }
+                                detectSmartOverlayGestures(
+                                    getValidBounds = { androidx.compose.ui.geometry.Rect(0f, 0f, size.width.toFloat(), size.height.toFloat()) },
+                                    onGestureStart = { editorViewModel.onGestureStart() },
+                                    onGestureEnd = { editorViewModel.onGestureEnd() },
+                                    onGesture = { _, pan, zoom, rotation ->
+                                        editorViewModel.onTransformGesture(pan, zoom, rotation)
+                                    }
+                                )
                             }
                         }
                     }
