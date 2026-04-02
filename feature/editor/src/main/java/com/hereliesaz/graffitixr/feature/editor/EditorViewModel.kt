@@ -96,8 +96,6 @@ class EditorViewModel @Inject constructor(
     private var segmentationSourceBitmap: Bitmap? = null
     private var segmentationTargetLayerId: String? = null
     // Stencil-mode segmentation: pending pipeline info set while the slider is visible
-    private var pendingStencilType: StencilLayerType? = null
-    private var pendingStencilCount: StencilLayerCount? = null
     private var pendingStencilSourceLayerId: String? = null
     private var pendingStencilProjectId: String? = null
 
@@ -622,8 +620,6 @@ class EditorViewModel @Inject constructor(
     }
 
     fun dismissSegmentationSlider() {
-        val stencilType = pendingStencilType
-        val stencilCount = pendingStencilCount
         val stencilSourceLayerId = pendingStencilSourceLayerId
         val stencilProjectId = pendingStencilProjectId
         val confidence = rawSegmentationConfidence
@@ -633,19 +629,20 @@ class EditorViewModel @Inject constructor(
         rawSegmentationConfidence = null
         segmentationSourceBitmap = null
         segmentationTargetLayerId = null
-        pendingStencilType = null
-        pendingStencilCount = null
         pendingStencilSourceLayerId = null
         pendingStencilProjectId = null
         _uiState.update { it.copy(isSegmenting = false) }
 
-        if (stencilType != null && stencilCount != null && stencilSourceLayerId != null && stencilProjectId != null) {
+        if (stencilSourceLayerId != null && stencilProjectId != null) {
             _uiState.update { it.copy(isLoading = true) }
             viewModelScope.launch(dispatchers.default) {
                 val isolated = if (confidence != null && source != null)
                     subjectIsolator.applyConfidenceThreshold(source, confidence, influence, 0.1f)
                 else source ?: return@launch
-                runStencilPipeline(isolated, stencilType, stencilCount, stencilSourceLayerId, stencilProjectId, influence)
+                runStencilPipeline(isolated, stencilSourceLayerId, stencilProjectId, influence)
+                withContext(dispatchers.main) {
+                    _uiState.update { it.copy(isLoading = false) }
+                }
             }
         }
     }
@@ -1377,100 +1374,86 @@ class EditorViewModel @Inject constructor(
             val w = metrics.widthPixels.takeIf { it > 0 } ?: 1080
             val h = metrics.heightPixels.takeIf { it > 0 } ?: 1920
             
-            // 2. Determine next stencil type and generate anchor-relative composite
-            val existingStencils = groupLayers.filter { it.stencilType != null }
-            val (nextType, totalCount) = when {
-                existingStencils.none { it.stencilType == StencilLayerType.SILHOUETTE } -> {
-                    val composite = exportManager.compositeToLayerSpace(sourceLayer, groupLayers, w, h)
-                    
-                    // Initial stencil generation: Assess subject contrast
-                    val assessedCount = stencilProcessor.assessSubjectContrast(composite)
-                    
-                    // Isolate subject, then show the segmentation slider
-                    val isolationResult = subjectIsolator.isolate(composite).getOrNull()
-                    if (isolationResult != null) {
-                        rawSegmentationConfidence = isolationResult.rawConfidence
-                        segmentationSourceBitmap = composite
-                        pendingStencilType = StencilLayerType.SILHOUETTE
-                        pendingStencilCount = assessedCount
-                        pendingStencilSourceLayerId = layerId
-                        pendingStencilProjectId = projectId
-                        withContext(dispatchers.main) {
-                            _uiState.update { it.copy(isStencilGenerating = false, isSegmenting = true, segmentationInfluence = 0.5f) }
-                        }
-                    } else {
-                        runStencilPipeline(composite, StencilLayerType.SILHOUETTE, assessedCount, layerId, projectId, 0.5f)
-                    }
-                    return@launch
-                }
-                existingStencils.none { it.stencilType == StencilLayerType.HIGHLIGHT } -> 
-                    StencilLayerType.HIGHLIGHT to StencilLayerCount.TWO
-                existingStencils.none { it.stencilType == StencilLayerType.MIDTONE } -> 
-                    StencilLayerType.MIDTONE to StencilLayerCount.THREE
-                else -> {
-                    withContext(dispatchers.main) {
-                        _uiState.update { it.copy(isStencilGenerating = false) }
-                        Toast.makeText(context, "Maximum stencil layers (3) already generated for this group.", Toast.LENGTH_SHORT).show()
-                    }
-                    return@launch
-                }
-            }
-
-            // For subsequent layers (Highlight/Midtone), use the same anchor-relative approach
+            // 2. Generate anchor-relative composite for analysis
             val composite = exportManager.compositeToLayerSpace(sourceLayer, groupLayers, w, h)
-            runStencilPipeline(composite, nextType, totalCount, layerId, projectId, 0.5f)
+            
+            // 3. Isolate subject, then show the segmentation slider
+            val isolationResult = subjectIsolator.isolate(composite).getOrNull()
+            if (isolationResult != null) {
+                rawSegmentationConfidence = isolationResult.rawConfidence
+                segmentationSourceBitmap = composite
+                pendingStencilSourceLayerId = layerId
+                pendingStencilProjectId = projectId
+                withContext(dispatchers.main) {
+                    _uiState.update { it.copy(isStencilGenerating = false, isSegmenting = true, segmentationInfluence = 0.5f) }
+                }
+            } else {
+                // Isolation failed — run binary stencil on the raw composite immediately
+                runStencilPipeline(composite, layerId, projectId, 0.5f)
+            }
         }
     }
 
     private suspend fun runStencilPipeline(
         isolated: Bitmap,
-        type: StencilLayerType,
-        count: StencilLayerCount,
         sourceLayerId: String,
         projectId: String,
         influence: Float
     ) {
-        stencilProcessor.processSingle(isolated, type, count, influence).collect { progress ->
+        stencilProcessor.process(isolated, influence).collect { progress ->
             when (progress) {
                 is StencilProgress.Done -> {
-                    val stencilLayer = progress.layers.first()
-                    val filename = "stencil_${type.name.lowercase()}_${UUID.randomUUID()}.png"
-                    val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(stencilLayer.bitmap))
-                    val localUri = "file://$path".toUri()
-
                     val sourceLayer = _uiState.value.layers.find { it.id == sourceLayerId }
-                    val newLayer = Layer(
-                        id = UUID.randomUUID().toString(),
-                        name = "Stencil${type.order} ${type.label}",
-                        uri = localUri,
-                        bitmap = stencilLayer.bitmap,
-                        isLinked = true,
-                        stencilType = type,
-                        stencilSourceId = sourceLayerId,
-                        scale = sourceLayer?.scale ?: 1.0f,
-                        offset = sourceLayer?.offset ?: Offset.Zero,
-                        rotationX = sourceLayer?.rotationX ?: 0f,
-                        rotationY = sourceLayer?.rotationY ?: 0f,
-                        rotationZ = sourceLayer?.rotationZ ?: 0f,
-                        warpMesh = sourceLayer?.warpMesh ?: emptyList()
-                    )
+                    val newLayers = progress.layers.map { stencilLayer ->
+                        val type = stencilLayer.type
+                        val filename = "stencil_${type.name.lowercase()}_${UUID.randomUUID()}.png"
+                        val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(stencilLayer.bitmap))
+                        val localUri = "file://$path".toUri()
+
+                        Layer(
+                            id = UUID.randomUUID().toString(),
+                            name = "Stencil ${type.label}",
+                            uri = localUri,
+                            bitmap = stencilLayer.bitmap,
+                            isLinked = true,
+                            stencilType = type,
+                            stencilSourceId = sourceLayerId,
+                            scale = sourceLayer?.scale ?: 1.0f,
+                            offset = sourceLayer?.offset ?: Offset.Zero,
+                            rotationX = sourceLayer?.rotationX ?: 0f,
+                            rotationY = sourceLayer?.rotationY ?: 0f,
+                            rotationZ = sourceLayer?.rotationZ ?: 0f,
+                            warpMesh = sourceLayer?.warpMesh ?: emptyList()
+                        )
+                    }
 
                     withContext(dispatchers.main) {
-                        baseBitmaps[newLayer.id] = stencilLayer.bitmap.copy(Bitmap.Config.ARGB_8888, false)
-                        layerStrokes[newLayer.id] = mutableListOf()
+                        for (layer in newLayers) {
+                            baseBitmaps[layer.id] = layer.bitmap!!.copy(Bitmap.Config.ARGB_8888, false)
+                            layerStrokes[layer.id] = mutableListOf()
+                        }
+
+                        // Set canvas background to match the color of the first generated layer (the Base)
+                        val baseColor = if (progress.layers.first().type.color == android.graphics.Color.BLACK) {
+                            androidx.compose.ui.graphics.Color.Black
+                        } else {
+                            androidx.compose.ui.graphics.Color.White
+                        }
 
                         _uiState.update { s ->
                             val idx = s.layers.indexOfFirst { it.id == sourceLayerId }
                             val updatedLayers = s.layers.toMutableList().also { list ->
                                 var topIdx = idx
                                 while (topIdx + 1 < list.size && list[topIdx + 1].isLinked) topIdx++
-                                list.add(topIdx + 1, newLayer)
+                                // Add all new layers in order
+                                list.addAll(topIdx + 1, newLayers)
                             }
                             s.copy(
                                 layers = updatedLayers,
-                                activeLayerId = newLayer.id,
+                                activeLayerId = newLayers.last().id,
                                 isStencilGenerating = false,
-                                stencilHintVisible = true
+                                stencilHintVisible = true,
+                                canvasBackground = baseColor
                             )
                         }
                         viewModelScope.launch {
@@ -1478,6 +1461,18 @@ class EditorViewModel @Inject constructor(
                             _uiState.update { it.copy(stencilHintVisible = false) }
                         }
                         saveProject()
+                    }
+                }
+                is StencilProgress.Error -> {
+                    withContext(dispatchers.main) {
+                        _uiState.update { it.copy(isStencilGenerating = false) }
+                        Toast.makeText(context, "Stencil failed: ${progress.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+                else -> { /* Progress updates handled by UI if needed */ }
+            }
+        }
+    }
                     }
                 }
                 is StencilProgress.Error -> {
