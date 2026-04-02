@@ -47,7 +47,8 @@ object SketchProcessor {
             Core.bitwise_not(gray, inverted)
 
             // Step 3: Gaussian blur the inverted image
-            val kernelSide = (clampedThickness * 2 + 1).toDouble()
+            // MUCH thicker lines: scale the thickness factor for larger kernels
+            val kernelSide = (clampedThickness * 8 + 1).toDouble()
             val blurred = Mat()
             Imgproc.GaussianBlur(inverted, blurred, Size(kernelSide, kernelSide), 0.0)
             inverted.release()

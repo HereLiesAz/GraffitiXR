@@ -23,6 +23,7 @@ interface EditorActions {
     fun onCycleBlendMode()
 
     fun toggleImageLock()
+    fun onToggleInvert()
 
     fun onLayerActivated(id: String)
     fun onLayerRenamed(id: String, name: String)

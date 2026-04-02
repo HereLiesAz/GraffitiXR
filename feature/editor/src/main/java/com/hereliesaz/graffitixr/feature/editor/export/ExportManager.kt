@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.BlendMode as NativeBlendMode
 import androidx.compose.ui.graphics.BlendMode
 import com.hereliesaz.graffitixr.common.model.Layer
+import com.hereliesaz.graffitixr.feature.editor.createColorMatrix
 import javax.inject.Inject
 
 /**
@@ -21,9 +22,21 @@ class ExportManager @Inject constructor() {
 
         layers.filter { it.isVisible }.forEach { layer ->
             layer.bitmap?.let { b ->
+                val cm = createColorMatrix(
+                    saturation = layer.saturation,
+                    contrast = layer.contrast,
+                    brightness = layer.brightness,
+                    colorBalanceR = layer.colorBalanceR,
+                    colorBalanceG = layer.colorBalanceG,
+                    colorBalanceB = layer.colorBalanceB,
+                    isInverted = layer.isInverted
+                )
                 val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     alpha = (layer.opacity * 255).toInt().coerceIn(0, 255)
                     blendMode = layer.blendMode.toNativeBlendMode()
+                    colorFilter = android.graphics.ColorMatrixColorFilter(
+                        android.graphics.ColorMatrix(cm.values)
+                    )
                 }
 
                 val matrix = getLayerScreenMatrix(layer, screenWidth, screenHeight)
@@ -70,9 +83,21 @@ class ExportManager @Inject constructor() {
 
         linkedLayers.filter { it.isVisible }.forEach { layer ->
             layer.bitmap?.let { b ->
+                val cm = createColorMatrix(
+                    saturation = layer.saturation,
+                    contrast = layer.contrast,
+                    brightness = layer.brightness,
+                    colorBalanceR = layer.colorBalanceR,
+                    colorBalanceG = layer.colorBalanceG,
+                    colorBalanceB = layer.colorBalanceB,
+                    isInverted = layer.isInverted
+                )
                 val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     alpha = (layer.opacity * 255).toInt().coerceIn(0, 255)
                     blendMode = layer.blendMode.toNativeBlendMode()
+                    colorFilter = android.graphics.ColorMatrixColorFilter(
+                        android.graphics.ColorMatrix(cm.values)
+                    )
                 }
 
                 val layerMatrix = getLayerScreenMatrix(layer, screenWidth, screenHeight)
@@ -113,7 +138,7 @@ class ExportManager @Inject constructor() {
 
         // 3. User Transforms (Scale, Rotate, Offset)
         matrix.postScale(layer.scale, layer.scale)
-        matrix.postRotate((layer.rotationZ * 180f / Math.PI.toFloat())) // Standard 2D export only respects Z
+        matrix.postRotate(layer.rotationZ) // Standard 2D export only respects Z
 
         // 4. Move to center of screen + apply pan
         matrix.postTranslate(screenWidth / 2f + layer.offset.x, screenHeight / 2f + layer.offset.y)

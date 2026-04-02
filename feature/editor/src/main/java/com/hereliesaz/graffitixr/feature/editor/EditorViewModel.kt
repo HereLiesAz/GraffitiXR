@@ -796,6 +796,7 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(gestureInProgress = true, activePanel = EditorPanel.NONE) } 
     }
     override fun toggleImageLock() { pushHistory(); updateActiveLayer { it.copy(isImageLocked = !it.isImageLocked) }; saveProject() }
+    override fun onToggleInvert() { pushHistory(); updateActiveLayer { it.copy(isInverted = !it.isInverted) }; saveProject() }
     override fun onOpacityChanged(v: Float) = updateActiveLayer { it.copy(opacity = v) }
     override fun onBrightnessChanged(v: Float) = updateActiveLayer { it.copy(brightness = v) }
     override fun onContrastChanged(v: Float) = updateActiveLayer { it.copy(contrast = v) }

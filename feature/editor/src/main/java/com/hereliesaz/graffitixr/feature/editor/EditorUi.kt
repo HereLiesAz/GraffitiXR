@@ -84,7 +84,8 @@ fun EditorUi(
                     colorBalanceR = it.colorBalanceR,
                     colorBalanceG = it.colorBalanceG,
                     colorBalanceB = it.colorBalanceB,
-                    isImageLocked = it.isImageLocked
+                    isImageLocked = it.isImageLocked,
+                    isInverted = it.isInverted
                 )
             }
 
@@ -112,6 +113,7 @@ fun EditorUi(
                 onColorBalanceRChange = actions::onColorBalanceRChanged,
                 onColorBalanceGChange = actions::onColorBalanceGChanged,
                 onColorBalanceBChange = actions::onColorBalanceBChanged,
+                onToggleInvert = actions::onToggleInvert,
                 onUndo = actions::onUndoClicked,
                 onRedo = actions::onRedoClicked,
                 onMagicAlign = actions::onMagicClicked,
