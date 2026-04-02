@@ -56,6 +56,7 @@ fun AdjustmentsPanel(
     onColorBalanceRChange: (Float) -> Unit,
     onColorBalanceGChange: (Float) -> Unit,
     onColorBalanceBChange: (Float) -> Unit,
+    onToggleInvert: () -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onMagicAlign: () -> Unit,
@@ -79,7 +80,7 @@ fun AdjustmentsPanel(
     // or if there's any history to undo/redo.
     // HOWEVER, we hide the action row (Undo, Redo, Magic) during Target Creation.
     val canShowActionRow = !state.isCapturingTarget
-    val isVisible = showKnobs || showColorBalance || (canShowActionRow && (hasImage || isArMode || hasHistory))
+    val isVisible = showKnobs || showColorBalance || showSegmentationSlider || (canShowActionRow && (hasImage || isArMode || hasHistory))
 
     if (!isVisible) return
 
@@ -157,17 +158,17 @@ fun AdjustmentsPanel(
             }
         }
 
-        // Persistent Action Row: Undo, Redo, and Magic Wand (Magic Align)
-        // These are visible as long as the panel itself is visible.
         if (canShowActionRow) {
             UndoRedoRow(
                 canUndo = true, // Logic handled by ViewModel, but we can pass state if needed
                 canRedo = true, // Logic handled by ViewModel
                 undoCount = state.undoCount,
                 redoCount = state.redoCount,
+                isInverted = activeLayer?.isInverted ?: false,
                 onUndo = onUndo,
                 onRedo = onRedo,
                 onMagicClicked = onMagicAlign,
+                onToggleInvert = onToggleInvert,
                 modifier = Modifier.fillMaxWidth()
             )
         }

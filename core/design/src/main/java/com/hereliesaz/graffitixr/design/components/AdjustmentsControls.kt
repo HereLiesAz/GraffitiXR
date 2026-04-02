@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.InvertColors
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -27,9 +28,11 @@ fun UndoRedoRow(
     canRedo: Boolean,
     undoCount: Int,
     redoCount: Int,
+    isInverted: Boolean,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onMagicClicked: () -> Unit,
+    onToggleInvert: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -61,6 +64,21 @@ fun UndoRedoRow(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(start = 4.dp)
+                )
+            }
+        }
+
+        // Invert Button
+        Surface(
+            shape = CircleShape,
+            color = if (isInverted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
+            shadowElevation = 4.dp
+        ) {
+            IconButton(onClick = onToggleInvert) {
+                Icon(
+                    Icons.Filled.InvertColors,
+                    contentDescription = "Invert Colors",
+                    tint = if (isInverted) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
         }

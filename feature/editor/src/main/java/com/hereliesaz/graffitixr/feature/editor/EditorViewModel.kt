@@ -1405,7 +1405,12 @@ class EditorViewModel @Inject constructor(
                 pendingStencilSourceLayerId = layerId
                 pendingStencilProjectId = projectId
                 withContext(dispatchers.main) {
-                    _uiState.update { it.copy(isStencilGenerating = false, isSegmenting = true, segmentationInfluence = 0.5f) }
+                    _uiState.update { it.copy(
+                        isStencilGenerating = false, 
+                        isSegmenting = true, 
+                        segmentationInfluence = 0.5f,
+                        segmentationPreview = isolationResult.isolatedBitmap
+                    ) }
                 }
             } else {
                 // Isolation failed — run binary stencil on the raw composite immediately

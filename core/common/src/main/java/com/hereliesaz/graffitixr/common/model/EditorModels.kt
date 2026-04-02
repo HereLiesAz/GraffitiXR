@@ -34,6 +34,7 @@ data class Layer(
     val rotationY: Float = 0f,
     val rotationZ: Float = 0f,
     val scale: Float = 1.0f,
+    val isInverted: Boolean = false,
     val stencilType: StencilLayerType? = null,
     val stencilSourceId: String? = null
 )

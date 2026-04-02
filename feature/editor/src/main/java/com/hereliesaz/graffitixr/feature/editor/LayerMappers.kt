@@ -28,7 +28,8 @@ fun Layer.toOverlayLayer(): OverlayLayer {
         warpMesh = warpMesh,
         isSketch = isSketch,
         textParams = textParams,
-        isLinked = isLinked
+        isLinked = isLinked,
+        isInverted = isInverted
     )
 }
 
@@ -55,7 +56,8 @@ fun OverlayLayer.toLayer(): Layer {
         warpMesh = warpMesh ?: emptyList(),
         isSketch = isSketch,
         textParams = textParams,
-        isLinked = isLinked
+        isLinked = isLinked,
+        isInverted = isInverted
     )
 }
 

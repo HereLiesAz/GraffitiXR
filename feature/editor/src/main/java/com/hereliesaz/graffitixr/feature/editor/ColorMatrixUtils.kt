@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.ColorMatrix
  * @param colorBalanceR The red color balance (1.0f is normal).
  * @param colorBalanceG The green color balance (1.0f is normal).
  * @param colorBalanceB The blue color balance (1.0f is normal).
+ * @param isInverted Whether to invert the colors.
  * @return A [ColorMatrix] combining the given adjustments.
  */
 fun createColorMatrix(
@@ -19,7 +20,8 @@ fun createColorMatrix(
     brightness: Float,
     colorBalanceR: Float,
     colorBalanceG: Float,
-    colorBalanceB: Float
+    colorBalanceB: Float,
+    isInverted: Boolean = false
 ): ColorMatrix {
     return ColorMatrix().apply {
         setToSaturation(saturation)
@@ -50,8 +52,21 @@ fun createColorMatrix(
                 0f, 0f, 0f, 1f, 0f
             )
         )
+
+        val invertMatrix = if (isInverted) {
+            ColorMatrix(
+                floatArrayOf(
+                    -1f, 0f, 0f, 0f, 255f,
+                    0f, -1f, 0f, 0f, 255f,
+                    0f, 0f, -1f, 0f, 255f,
+                    0f, 0f, 0f, 1f, 0f
+                )
+            )
+        } else null
+
         timesAssign(contrastMatrix)
         timesAssign(brightnessMatrix)
         timesAssign(colorBalanceMatrix)
+        invertMatrix?.let { timesAssign(it) }
     }
 }

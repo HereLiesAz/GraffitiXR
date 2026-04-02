@@ -51,5 +51,6 @@ data class OverlayLayer(
     val warpMesh: List<Float>? = null,
     val isSketch: Boolean = false,
     val textParams: TextLayerParams? = null,
-    val isLinked: Boolean = false
+    val isLinked: Boolean = false,
+    val isInverted: Boolean = false
 )

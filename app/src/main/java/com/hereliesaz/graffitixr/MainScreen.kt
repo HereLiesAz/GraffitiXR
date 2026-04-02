@@ -241,7 +241,8 @@ fun MainScreen(
                                 brightness = layer.brightness,
                                 colorBalanceR = layer.colorBalanceR,
                                 colorBalanceG = layer.colorBalanceG,
-                                colorBalanceB = layer.colorBalanceB
+                                colorBalanceB = layer.colorBalanceB,
+                                isInverted = layer.isInverted
                             )
                         ),
                         modifier = Modifier
@@ -351,6 +352,21 @@ fun MainScreen(
                 )
             }
         }
+
+        if (uiState.isSegmenting && uiState.segmentationPreview != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.8f))
+            ) {
+                Image(
+                    bitmap = uiState.segmentationPreview.asImageBitmap(),
+                    contentDescription = "Segmentation Preview",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+            }
+        }
     }
 }
 
@@ -371,7 +387,8 @@ private fun compositeLayersForAr(layers: List<Layer>): AndroidBitmap {
             brightness = layer.brightness,
             colorBalanceR = layer.colorBalanceR,
             colorBalanceG = layer.colorBalanceG,
-            colorBalanceB = layer.colorBalanceB
+            colorBalanceB = layer.colorBalanceB,
+            isInverted = layer.isInverted
         )
         paint.colorFilter = android.graphics.ColorMatrixColorFilter(
             android.graphics.ColorMatrix(cm.values)
