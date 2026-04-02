@@ -353,14 +353,15 @@ fun MainScreen(
             }
         }
 
-        if (uiState.isSegmenting && uiState.segmentationPreview != null) {
+        val segmentationPreview = uiState.segmentationPreview
+        if (uiState.isSegmenting && segmentationPreview != null) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.8f))
             ) {
                 Image(
-                    bitmap = uiState.segmentationPreview.asImageBitmap(),
+                    bitmap = segmentationPreview.asImageBitmap(),
                     contentDescription = "Segmentation Preview",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit

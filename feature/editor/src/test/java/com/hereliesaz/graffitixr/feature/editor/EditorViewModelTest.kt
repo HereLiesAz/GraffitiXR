@@ -395,32 +395,66 @@ class EditorViewModelTest {
         assertEquals(0.3f, viewModel.uiState.value.segmentationInfluence, 0.001f)
     }
 
-    @org.junit.Ignore("TODO: Fix visibility condition checks after transparent stencil refactor")
     @Test
     fun `Stencil visibility condition is correct`() = runTest {
+        // Allow init coroutines to run so projectId is populated before any layer operations.
+        testDispatcher.scheduler.advanceUntilIdle()
+
         // 1. Initial empty state -> no stencil content
         assertFalse(viewModel.uiState.value.layers.any { it.textParams == null })
 
-        // 2. Add text layer -> still no stencil content (it.textParams is not null)
+        // 2. Add text layer -> still no stencil content (textParams is non-null for text layers)
         viewModel.onAddTextLayer()
         testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(1, viewModel.uiState.value.layers.size)
         assertFalse(viewModel.uiState.value.layers.any { it.textParams == null })
 
-        // 3. Add image layer -> stencil content exists (it.textParams == null)
+        // 3. Add image layer -> stencil content exists (image layers have textParams == null)
         val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(2, viewModel.uiState.value.layers.size)
         assertTrue(viewModel.uiState.value.layers.any { it.textParams == null })
 
-        // 4. Remove image layer -> back to no stencil content
+        // 4. Remove image layer -> back to only text layer, no stencil content
         val imageLayerId = viewModel.uiState.value.layers.find { it.textParams == null }!!.id
         viewModel.onLayerRemoved(imageLayerId)
         testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(1, viewModel.uiState.value.layers.size)
         assertFalse(viewModel.uiState.value.layers.any { it.textParams == null })
-        
-        // 5. Add sketch layer -> stencil content exists (it.textParams == null)
+
+        // 5. Add blank sketch layer -> stencil content exists again (textParams == null)
         viewModel.onAddBlankLayer()
         testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(2, viewModel.uiState.value.layers.size)
         assertTrue(viewModel.uiState.value.layers.any { it.textParams == null })
+    }
+
+    @Test
+    fun `undo and redo on empty stacks do not crash`() {
+        // Fresh ViewModel has empty undo and redo stacks; neither call should throw.
+        viewModel.onUndoClicked()
+        viewModel.onRedoClicked()
+
+        val state = viewModel.uiState.value
+        assertEquals(0, state.undoCount)
+        assertEquals(0, state.redoCount)
+        assertTrue(state.layers.isEmpty())
+    }
+
+    @Test
+    fun `onLayerRemoved with unknown id does not modify state`() = runTest {
+        val uri = Uri.parse("content://test/image.png")
+        viewModel.onAddLayer(uri)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val layerCountBefore = viewModel.uiState.value.layers.size
+        assertEquals(1, layerCountBefore)
+
+        // Removing a non-existent ID should leave the layer list unchanged.
+        viewModel.onLayerRemoved("non-existent-id")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(layerCountBefore, viewModel.uiState.value.layers.size)
     }
 }
