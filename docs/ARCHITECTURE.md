@@ -1,10 +1,11 @@
+// FILE: docs/ARCHITECTURE.md
 # GraffitiXR Architecture
 
 ## High-Level Overview
 
 GraffitiXR follows a multi-module Clean Architecture pattern, optimized for high-performance native rendering and local-first data persistence.
 
-```mermaid
+~~~mermaid
 graph TD
     App[":app"] --> FeatureAR[":feature:ar"]
     App --> FeatureEditor[":feature:editor"]
@@ -18,7 +19,7 @@ graph TD
     CoreNative --> GLES[OpenGL ES 3.0]
     CoreNative --> OpenCV[OpenCV 4.x]
     CoreData --> CoreDomain
-```
+~~~
 
 **Feature modules must not depend on other feature modules.**
 
@@ -31,13 +32,13 @@ ARCore session lifecycle (`ArViewModel`), camera frame acquisition (`ArRenderer`
 Mural preparation tools. Layer hierarchy, image manipulation.
 
 ### `:core:nativebridge`
-C++17 MobileGS engine and JNI boundary (`GraffitiJNI.cpp`). Handles voxel hashing, Gaussian splatting, DEPTH16 decoding, and OpenGL ES 3.0 rendering.
+C++17 MobileGS engine and JNI boundary (`GraffitiJNI.cpp`). Handles voxel hashing, Gaussian splatting, Teleological PnP Tracking, DEPTH16 decoding, and OpenGL ES 3.0 rendering.
 
 ## Data Flow (AR Pipeline)
 
 Each ARCore tracking frame in `ArRenderer.onDrawFrame`:
 
-```
+~~~
 camera.trackingState ────────────────────────► setArCoreTrackingState(isTracking)
 frame.acquireCameraImage() [RGBA] ───────────► feedColorFrame()   (relocalization / fingerprinting)
 frame.acquireDepthImage16Bits() ─────────────► feedArCoreDepth()
@@ -49,7 +50,7 @@ camera.getViewMatrix/ProjectionMatrix ───────► updateCamera()
                             ┌─────────────────┴──────────────────┐
                      BackgroundRenderer                   slamManager.draw()
                   (camera feed, GLSurfaceView)       (voxel splats, same GLSurfaceView)
-```
+~~~
 
 **Camera ownership:**
 - `EditorMode.AR` → ARCore `Session` owns camera; CameraX is inactive
@@ -58,8 +59,4 @@ camera.getViewMatrix/ProjectionMatrix ───────► updateCamera()
 
 ## Teleological Correction
 
-OpenCV fingerprinting compares the current camera frame against a stored reference fingerprint. On match, `slamManager.updateAnchorTransform()` corrects accumulated drift in the global map transform.
-
-
----
-*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*
+OpenCV fingerprinting compares the current camera frame against a stored reference fingerprint natively inside `MobileGS::runPnPMatch`. On match, the engine automatically corrects accumulated drift in the global map transform without requiring JNI callbacks to Kotlin.

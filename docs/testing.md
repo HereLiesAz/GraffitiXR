@@ -1,55 +1,57 @@
+// FILE: docs/testing.md
 # Testing Strategy
 
 ## 1. Unit Tests (Kotlin)
 
 Unit tests live in `src/test/` inside each module. Run all at once or per-module:
 
-```bash
+~~~bash
 ./gradlew testDebugUnitTest
 ./gradlew :feature:ar:testDebugUnitTest
 ./gradlew :core:data:testDebugUnitTest
-```
+~~~
 
 ### Existing test files
 
 | File | Module | Covers |
 |---|---|---|
-| `TeleologicalTrackerTest` | `:feature:ar` | `trackAndCorrect` PnP result handling, `Mat.release()` (tests currently commented out — pending fix) |
 | `DualAnalyzerTest` | `:feature:ar` | SLAM callback, light throttle, luminosity path |
 | `ArViewModelTest` | `:feature:ar` | Session management, flashlight, GPS, keyframe capture |
 | `EditorViewModelTest` | `:feature:editor` | Layer operations, bitmap dimensions, undo/redo |
 | `ProjectManagerTest` | `:core:data` | `getProjectList`, `deleteProject`, `getMapPath`, `importProjectFromUri` failure paths |
 
+*Note: Teleological PnP tracking was migrated completely to the C++ layer (`MobileGS::runPnPMatch`) to eliminate JVM overhead. As a result, it is tested visually on-device rather than via JVM unit tests.*
+
 ### Mock patterns
 
 **Android Log on JVM** — throws `RuntimeException` unless mocked:
-```kotlin
+~~~kotlin
 mockkStatic(Log::class)
 every { Log.e(any(), any()) } returns 0
 every { Log.e(any(), any(), any()) } returns 0
 every { Log.i(any(), any()) } returns 0
-```
+~~~
 
 **Kotlin objects** (singletons):
-```kotlin
+~~~kotlin
 mockkObject(ImageProcessingUtils)
 mockkObject(BitmapUtils)
 coEvery { BitmapUtils.getBitmapDimensions(any()) } returns Pair(100, 100)
-```
+~~~
 
 **OpenCV `Mat`** — `Mat()` calls native code; instantiating it on JVM causes `UnsatisfiedLinkError`:
-```kotlin
+~~~kotlin
 val mat = mockk<Mat>(relaxed = true)
 every { mat.get(any<Int>(), any<Int>()) } returns doubleArrayOf(1.0)
-```
+~~~
 
 **ARCore `Session`** — cannot be instantiated on JVM. ARCore session tests belong in instrumented (`src/androidTest/`) tests, not JVM unit tests.
 
 **CameraManager** (flashlight):
-```kotlin
+~~~kotlin
 val cameraManager = mockk<CameraManager>(relaxed = true)
 every { context.getSystemService(Context.CAMERA_SERVICE) } returns cameraManager
-```
+~~~
 
 ## 2. Native Tests (C++)
 No automated C++ test runner is integrated. Use visual verification:
@@ -69,7 +71,3 @@ Before a release:
 4.  Project an image.
 5.  Walk 5 metres away and return.
 6.  **Pass Condition:** The image is still on the wall within < 1cm of drift.
-
-
----
-*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

@@ -1,7 +1,8 @@
+// FILE: docs/TODO.md
 # GraffitiXR TODO
 
 ## Phase 1: Core Architecture & Setup `[DONE]`
-- [x] Multi-module project structure.
+-[x] Multi-module project structure.
 - [x] Native C++ engine (`MobileGS`) integration via JNI.
 - [x] AzNavRail navigation system.
 - [x] Local-only project storage (.gxr).
@@ -20,8 +21,8 @@
 - [x] **Light Estimation:** Realistic lighting for virtual projections.
 
 ## Phase 4: Final Polishing & Optimization `[DONE]`
-- [x] **Multi-Lens Depth:** Support for dual-camera depth sensing.
-- [x] **3D Imports:** .glb/.gltf support (Stub improved).
+-[x] **Multi-Lens Depth:** Support for dual-camera depth sensing.
+- [x] **3D Imports:** .obj point-cloud ingestion implemented natively.
 - [x] **Photogrammetry:** Keyframe capture pipeline fully implemented (OpenCV + Pose metadata).
 - [x] **CI/CD:** Static analysis (Checkstyle) and build hardening.
 - [x] **Stencil Mode:** Automatic multi-layer stencil generation.
@@ -39,15 +40,11 @@
 - [x] **ARCore Depth API:** `frame.acquireDepthImage16Bits()` → `feedArCoreDepth` → DEPTH16 decode → `processDepthFrame` (metric override).
 - [x] **Tracking state feedback:** `ArRenderer.onTrackingUpdated: (Boolean)` callback → `arViewModel.setTrackingState(Boolean)` → live TRACKING/SEARCHING chip overlay in `ArViewport` (green=TRACKING, grey=SEARCHING via `arUiState.isScanning`).
 - [x] **Mode-based camera ownership:** AR = ARCore; Overlay = CameraX; `DisposableEffect` pauses ARCore session when leaving AR mode to release camera.
-- [x] **Unit tests:** `TeleologicalTrackerTest`, `DualAnalyzerTest`, `ProjectManagerTest` — covering CV pipeline, SLAM callbacks, and project I/O.
+- [x] **Unit tests:** `DualAnalyzerTest`, `ProjectManagerTest` — covering CV pipeline, SLAM callbacks, and project I/O.
 
 ## Ongoing
 - [ ] UI/UX refinement for one-handed operation.
 - [ ] Performance benchmarking on mid-range devices.
 - [ ] Community feedback loop.
 - [x] LRU culling in `MobileGS::pruneMap()` to handle `MAX_SPLATS` overflow on long scans.
-- [ ] `nativeGetSplatCount()` JNI function to surface live voxel count in the tracking state HUD.
-
-
----
-*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*
+- [x] `nativeGetSplatCount()` JNI function to surface live voxel count in the tracking state HUD.

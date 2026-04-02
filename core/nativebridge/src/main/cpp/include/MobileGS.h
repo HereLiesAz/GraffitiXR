@@ -1,3 +1,4 @@
+
 #pragma once
 #include <opencv2/opencv.hpp>
 #include "SuperPointDetector.h"
@@ -38,7 +39,7 @@ class MobileGS {
 public:
     void initialize(int width, int height);
     void initGl();
-    void resetGlContext(); // Fixes map disappearing on rotate
+    void resetGlContext();
     void updateCamera(float* viewMat, float* projMat);
     void updateMappingCamera(float* viewMat, float* projMat);
     void updateLightLevel(float level);
@@ -72,6 +73,9 @@ public:
 
     void saveModel(const std::string& path);
     void loadModel(const std::string& path);
+
+    // NEW: Imports an external .obj point cloud into the Voxel Hash Map
+    bool importModel3D(const std::string& path);
 
     void draw();
     void destroy();
@@ -167,7 +171,7 @@ private:
     GLuint mPointVbo = 0;
     GLuint mIndexVbo = 0;
     std::atomic<int> mPointCount{0};
-    bool mSplatsVisible{true};  
+    bool mSplatsVisible{true};
 
     GLuint mMeshProgram = 0;
     GLuint mMeshVbo = 0;

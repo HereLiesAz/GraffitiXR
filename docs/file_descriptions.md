@@ -1,3 +1,4 @@
+// FILE: docs/file_descriptions.md
 # File Registry
 
 This document lists key files in the repository and their purposes.
@@ -31,9 +32,9 @@ This document lists key files in the repository and their purposes.
 *   `src/test/.../ProjectManagerTest.kt`: Unit tests for `ProjectManager` (file I/O, zip import failure paths).
 
 ### `:core:nativebridge`
-*   `nativebridge/SlamManager.kt`: Kotlin JNI bridge. All native calls go through here. Key methods: `updateCamera`, `updateAnchorTransform`, `setArCoreTrackingState`, `feedColorFrame`, `feedArCoreDepth`, `feedStereoData`, `draw`.
-*   `src/main/cpp/GraffitiJNI.cpp`: JNI implementation. Contains `computeOpticalFlowDepth` (Lucas-Kanade optical flow, dynamic `kScale = gFocalLengthPx × gTranslationM`), `nativeSetCameraMotion`, `nativeFeedMonocularData`, `nativeFeedArCoreDepth`.
-*   `src/main/cpp/MobileGS.cpp` / `MobileGS.h`: Sparse voxel hash map, `processDepthFrame`, `draw`, `saveModel/loadModel`.
+*   `nativebridge/SlamManager.kt`: Kotlin JNI bridge. All native calls go through here. Key methods: `updateCamera`, `updateAnchorTransform`, `setArCoreTrackingState`, `feedColorFrame`, `feedArCoreDepth`, `feedStereoData`, `draw`, `importModel3D`.
+*   `src/main/cpp/GraffitiJNI.cpp`: JNI implementation. Contains `nativeFeedArCoreDepth`, `nativeImportModel3D`.
+*   `src/main/cpp/MobileGS.cpp` / `MobileGS.h`: Sparse voxel hash map, `processDepthFrame`, `draw`, `runPnPMatch` (Teleological tracking), `importModel3D`, `saveModel/loadModel`.
 *   `src/main/cpp/StereoProcessor.cpp`: Stereo disparity → depth pipeline.
 
 ## Feature Modules
@@ -43,9 +44,7 @@ This document lists key files in the repository and their purposes.
 *   `rendering/ArRenderer.kt`: `GLSurfaceView.Renderer`. Initialises `BackgroundRenderer`; calls `setArCoreTrackingState`, `updateCamera`, `feedArCoreDepth`, `feedColorFrame`, and `slamManager.draw()` each frame. `onTrackingUpdated: (Boolean)` callback reports state to `ArViewModel`.
 *   `rendering/BackgroundRenderer.kt`: OpenGL ES shader that renders ARCore's `EXTERNAL_OES` camera texture full-screen.
 *   `CameraPreview.kt`: CameraX preview composable — used in Overlay mode only.
-*   `computervision/TeleologicalTracker.kt`: OpenCV PnP-based anchor correction.
 *   `computervision/DualAnalyzer.kt`: `ImageAnalysis.Analyzer` for SLAM callbacks and light estimation.
-*   `src/test/.../TeleologicalTrackerTest.kt`: Unit tests for `trackAndCorrect` (PnP result handling, `Mat.release()`).
 *   `src/test/.../DualAnalyzerTest.kt`: Unit tests for SLAM callback, light throttle, luminosity path.
 *   `src/test/.../ArViewModelTest.kt`: Unit tests for session management, flashlight, GPS, keyframe.
 
@@ -56,16 +55,3 @@ This document lists key files in the repository and their purposes.
 ### `:feature:dashboard`
 *   `DashboardViewModel.kt`: Project library, settings navigation, new/open/delete project.
 *   `ProjectLibraryScreen.kt`: Full-screen project list UI.
-
-## Documentation (`docs/`)
-*   `ARCHITECTURE.md`: Module graph, AR pipeline data flow, camera ownership rules.
-*   `NATIVE_ENGINE.md`: MobileGS voxel system, rendering paths, full JNI method table, DEPTH16 encoding.
-*   `SLAM_SETUP.md`: Engine parameters, full sensor input pipeline (calibration → monocular → depth → pose), tuning guide.
-*   `PIPELINE_3D.md`: Per-frame data acquisition, voxel accumulation, Gaussian splatting, occlusion.
-*   `testing.md`: Unit test locations, existing test files, mock patterns, field test procedure.
-*   `screens.md`: Mode-based rendering layers, camera ownership per mode, secondary screens.
-*   `TODO.md`: Phase-by-phase progress tracker including completed AR pipeline wiring.
-
-
----
-*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*

@@ -12,6 +12,7 @@ import com.google.ar.core.CameraConfig
 import com.google.ar.core.CameraConfigFilter
 import com.google.ar.core.Config
 import com.google.ar.core.Session
+import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.ArUiState
@@ -634,29 +635,34 @@ class ArViewModel @Inject constructor(
         intrinsics: FloatArray?,
         depthStride: Int = 0
     ): Pair<Float, Float>? {
-        if (depthBuffer == null || depthBuffer.capacity() == 0
-            || intrinsics == null || intrinsics.size < 2
-            || depthW <= 0 || depthH <= 0 || colorW <= 0 || colorH <= 0) {
-            return Pair(0.5f, 0.5f)
+        if (intrinsics == null || intrinsics.size < 2 || colorW <= 0 || colorH <= 0) {
+            return null
         }
-        val stride = if (depthStride > 0) depthStride else depthW * 2
-        val cx = depthW / 2
-        val cy = depthH / 2
-        val byteOffset = cy * stride + cx * 2
-        if (byteOffset + 2 > depthBuffer.capacity()) return Pair(0.5f, 0.5f)
 
-        val raw = depthBuffer.getShort(byteOffset).toInt() and 0xFFFF
-        val depthMm = raw and 0x1FFF  // lower 13 bits = millimetres (ARCore DEPTH16)
-        if (depthMm < 100) return Pair(0.5f, 0.5f)  // <10 cm — invalid reading
+        var depthM = 2.0f
 
-        val depthM = depthMm / 1000f
-        // Scale colour-camera focal lengths into depth-image pixel space.
-        val fx = intrinsics[0] * (depthW.toFloat() / colorW)
-        val fy = intrinsics[1] * (depthH.toFloat() / colorH)
-        // Physical half-extents covering 40 % of the frame at the measured depth —
-        // a sensible starting size; the artist can scale from there.
-        val halfW = (depthW * 0.2f / fx * depthM).coerceIn(0.2f, 3f)
-        val halfH = (depthH * 0.2f / fy * depthM).coerceIn(0.2f, 3f)
+        if (depthBuffer != null && depthBuffer.capacity() > 0 && depthW > 0 && depthH > 0) {
+            val stride = if (depthStride > 0) depthStride else depthW * 2
+            val cx = depthW / 2
+            val cy = depthH / 2
+            val byteOffset = cy * stride + cx * 2
+
+            if (byteOffset + 2 <= depthBuffer.capacity()) {
+                val raw = depthBuffer.getShort(byteOffset).toInt() and 0xFFFF
+                val depthMm = raw and 0x1FFF
+
+                if (depthMm in 100..15000) {
+                    depthM = depthMm / 1000f
+                }
+            }
+        }
+
+        val fx = intrinsics[0]
+        val fy = intrinsics[1]
+
+        val halfW = (colorW * 0.2f / fx * depthM).coerceIn(0.2f, 5f)
+        val halfH = (colorH * 0.2f / fy * depthM).coerceIn(0.2f, 5f)
+
         return Pair(halfW, halfH)
     }
 

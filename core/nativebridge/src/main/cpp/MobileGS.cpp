@@ -285,7 +285,6 @@ void MobileGS::clearMap() {
     mTargetDescriptors = cv::Mat();
     mTargetKeypoints3D.clear();
 
-    // FIX: Clear artwork data to prevent state leaking between projects
     mArtworkDescriptors = cv::Mat();
     mArtworkKeypoints3D.clear();
     mPaintingProgress.store(0.0f, std::memory_order_relaxed);
@@ -385,7 +384,7 @@ void MobileGS::sortThreadFunc() {
 }
 
 static void camToWorld(const float* V, float xc, float yc, float zc,
-        float& xw, float& yw, float& zw) {
+                       float& xw, float& yw, float& zw) {
     float tx = V[12], ty = V[13], tz = V[14];
     float camX = -(V[0]*tx + V[1]*ty + V[2]*tz);
     float camY = -(V[4]*tx + V[5]*ty + V[6]*tz);
@@ -396,7 +395,7 @@ static void camToWorld(const float* V, float xc, float yc, float zc,
 }
 
 static void camToWorldNormal(const float* V, float nxc, float nyc, float nzc,
-        float& nxw, float& nyw, float& nzw) {
+                             float& nxw, float& nyw, float& nzw) {
     nxw = V[0]*nxc + V[1]*nyc + V[2]*nzc;
     nyw = V[4]*nxc + V[5]*nyc + V[6]*nzc;
     nzw = V[8]*nxc + V[9]*nyc + V[10]*nzc;
@@ -429,7 +428,7 @@ void MobileGS::scheduleRelocCheck(const cv::Mat& colorFrame) {
         colorFrame.copyTo(mRelocColorFrame);
     }
     bool triggerNow = !mIsArCoreTracking ||
-            (mFrameCounter - mLastRelocTriggerFrame >= LOOP_CLOSURE_INTERVAL);
+                      (mFrameCounter - mLastRelocTriggerFrame >= LOOP_CLOSURE_INTERVAL);
     if (triggerNow) {
         mLastRelocTriggerFrame = mFrameCounter;
         mRelocRequested = true;
@@ -506,7 +505,7 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
     std::vector<cv::KeyPoint> kps;
     cv::Mat descs;
     bool usedSP = mSuperPoint.isLoaded() && (targetDesc.type() != CV_8U)
-            && mSuperPoint.detect(gray, kps, descs);
+                  && mSuperPoint.detect(gray, kps, descs);
     if (!usedSP) {
         cv::ORB::create(500)->detectAndCompute(gray, cv::noArray(), kps, descs);
     }
@@ -523,7 +522,7 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
     std::vector<cv::Point2f> imgPts;
     for (const auto& m : knnMatches) {
         if (m.size() == 2 && m[0].distance < 0.75f * m[1].distance
-                && m[0].queryIdx < (int)targetPts.size()) {
+            && m[0].queryIdx < (int)targetPts.size()) {
             objPts.push_back(targetPts[m[0].queryIdx]);
             imgPts.push_back(kps[m[0].trainIdx].pt);
         }
@@ -557,7 +556,7 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
 
     float drift = glm::length(
             glm::vec3(world_T_obj[3]) -
-                    glm::vec3(anchorMat[12], anchorMat[13], anchorMat[14])
+            glm::vec3(anchorMat[12], anchorMat[13], anchorMat[14])
     );
 
     if (drift > DRIFT_THRESHOLD_M || !isTracking) {
@@ -578,8 +577,8 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
             if (m.size() == 2 && m[0].distance < 0.75f * m[1].distance) ++matched;
         }
         float progress = (artworkDesc.rows > 0)
-                ? std::min(1.0f, (float)matched / (float)artworkDesc.rows)
-                : 0.0f;
+                         ? std::min(1.0f, (float)matched / (float)artworkDesc.rows)
+                         : 0.0f;
         mPaintingProgress.store(progress, std::memory_order_relaxed);
     }
 }
@@ -644,7 +643,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
     std::lock_guard<std::mutex> lock(mMutex);
 
     bool misaligned = !mTargetDescriptors.empty() &&
-            (mTargetKeypoints3D.size() != (size_t)mTargetDescriptors.rows);
+                      (mTargetKeypoints3D.size() != (size_t)mTargetDescriptors.rows);
     if (misaligned || (usedSP && !mTargetDescriptors.empty() && mTargetDescriptors.type() == CV_8U)) {
         mTargetDescriptors = cv::Mat();
         mTargetKeypoints3D.clear();
@@ -666,7 +665,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
     if (mTargetKeypoints3D.size() > MAX_FINGERPRINT_KEYPOINTS) {
         size_t excess = mTargetKeypoints3D.size() - MAX_FINGERPRINT_KEYPOINTS;
         mTargetKeypoints3D.erase(mTargetKeypoints3D.begin(),
-                mTargetKeypoints3D.begin() + excess);
+                                 mTargetKeypoints3D.begin() + excess);
         mTargetDescriptors = mTargetDescriptors
                 .rowRange((int)excess, mTargetDescriptors.rows)
                 .clone();
@@ -704,13 +703,13 @@ void MobileGS::mapThreadFunc() {
         FrameData frame;
         {
             std::unique_lock<std::mutex> lock(mQueueMutex);
-            mQueueCv.wait(lock, [this] { return !mFrameQueue.empty() || !mMapRunning; });
+            mQueueCv.wait(lock,[this] { return !mFrameQueue.empty() || !mMapRunning; });
             if (!mMapRunning) break;
             frame = std::move(mFrameQueue.front());
             mFrameQueue.erase(mFrameQueue.begin());
         }
         processDepthFrame(frame.depth, frame.color, frame.viewMatrix, frame.projMatrix,
-                frame.hasIntrinsics ? frame.intrinsics : nullptr, frame.isYuv);
+                          frame.hasIntrinsics ? frame.intrinsics : nullptr, frame.isYuv);
     }
 }
 
@@ -904,11 +903,16 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         }
     }
 
+    std::vector<Splat> localSplatCopy;
+    if (mapModified) {
+        std::lock_guard<std::mutex> mapLock(mMapMutex);
+        localSplatCopy = splatData;
+    }
+
     {
         std::lock_guard<std::mutex> glLock(mGlDataMutex);
         if (mapModified) {
-            std::lock_guard<std::mutex> mapLock(mMapMutex);
-            mPendingSplatData = splatData;
+            mPendingSplatData = std::move(localSplatCopy);
         }
         mPendingMeshVertices = std::move(meshVertices);
         mPendingMeshIndices = std::move(meshIndices);
@@ -980,8 +984,8 @@ void MobileGS::pruneMap() {
     const size_t keepCount = splatData.size() - evictCount;
 
     std::nth_element(splatData.begin(),
-            splatData.begin() + keepCount,
-            splatData.end(),[](const Splat& a, const Splat& b) {
+                     splatData.begin() + keepCount,
+                     splatData.end(),[](const Splat& a, const Splat& b) {
                 return a.confidence > b.confidence;
             });
 
@@ -1017,9 +1021,9 @@ void MobileGS::pruneByConfidence(float threshold) {
     mVoxelGrid.clear();
     for (size_t i = 0; i < splatData.size(); ++i) {
         VoxelKey key{
-            static_cast<int>(std::floor(splatData[i].x / VOXEL_SIZE)),
-            static_cast<int>(std::floor(splatData[i].y / VOXEL_SIZE)),
-            static_cast<int>(std::floor(splatData[i].z / VOXEL_SIZE))
+                static_cast<int>(std::floor(splatData[i].x / VOXEL_SIZE)),
+                static_cast<int>(std::floor(splatData[i].y / VOXEL_SIZE)),
+                static_cast<int>(std::floor(splatData[i].z / VOXEL_SIZE))
         };
         mVoxelGrid[key] = i;
     }
@@ -1074,9 +1078,9 @@ void MobileGS::getAnchorTransform(float* outMat16) const {
 }
 
 void MobileGS::addLayerFeatures(const cv::Mat& composite,
-        const uint8_t* depthData, int depthW, int depthH, int depthStride,
-        const float* intrinsics4,
-        const float* viewMat16) {
+                                const uint8_t* depthData, int depthW, int depthH, int depthStride,
+                                const float* intrinsics4,
+                                const float* viewMat16) {
     if (composite.empty() || !depthData) return;
 
     cv::Mat gray;
@@ -1131,7 +1135,7 @@ void MobileGS::addLayerFeatures(const cv::Mat& composite,
 
     std::lock_guard<std::mutex> lock(mMutex);
     bool misaligned = !mTargetDescriptors.empty() &&
-            (mTargetKeypoints3D.size() != (size_t)mTargetDescriptors.rows);
+                      (mTargetKeypoints3D.size() != (size_t)mTargetDescriptors.rows);
     if (misaligned) {
         mTargetDescriptors = cv::Mat();
         mTargetKeypoints3D.clear();
@@ -1191,9 +1195,9 @@ void MobileGS::loadModel(const std::string& path) {
         splatData.resize(numSplats);
         for(int i=0; i<numSplats; i++) {
             splatData[i] = {legacy[i].x, legacy[i].y, legacy[i].z,
-                    legacy[i].r, legacy[i].g, legacy[i].b, legacy[i].a,
-                    legacy[i].conf,
-                    0.0f, 0.0f, 1.0f, 1.0f};
+                            legacy[i].r, legacy[i].g, legacy[i].b, legacy[i].a,
+                            legacy[i].conf,
+                            0.0f, 0.0f, 1.0f, 1.0f};
         }
     } else {
         return;
@@ -1222,30 +1226,100 @@ void MobileGS::loadModel(const std::string& path) {
     mGlDataDirty = true;
 }
 
+bool MobileGS::importModel3D(const std::string& path) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        LOGE("Failed to open .obj file for import: %s", path.c_str());
+        return false;
+    }
+
+    std::string line;
+    bool mapModified = false;
+    std::vector<Splat> newSplats;
+
+    // Simple .obj parser for vertex ingestion (point clouds)
+    while (std::getline(file, line)) {
+        if (line.length() > 2 && line.substr(0, 2) == "v ") {
+            float x, y, z;
+            if (sscanf(line.c_str(), "v %f %f %f", &x, &y, &z) == 3) {
+                Splat s;
+                s.x = x; s.y = y; s.z = z;
+                s.r = 1.0f; s.g = 1.0f; s.b = 1.0f; s.a = 1.0f; // Default solid white point cloud
+                s.confidence = 1.0f;
+                s.nx = 0.0f; s.ny = 0.0f; s.nz = 1.0f;
+                s.radius = VOXEL_SIZE;
+                newSplats.push_back(s);
+            }
+        }
+    }
+
+    if (!newSplats.empty()) {
+        std::lock_guard<std::mutex> mapLock(mMapMutex);
+        for (const auto& s : newSplats) {
+            if (splatData.size() >= MAX_SPLATS) {
+                pruneMap(); // ensure we have space for the incoming points
+            }
+            if (splatData.size() < MAX_SPLATS) {
+                splatData.push_back(s);
+                VoxelKey key{
+                        static_cast<int>(std::floor(s.x / VOXEL_SIZE)),
+                        static_cast<int>(std::floor(s.y / VOXEL_SIZE)),
+                        static_cast<int>(std::floor(s.z / VOXEL_SIZE))
+                };
+                mVoxelGrid[key] = splatData.size() - 1;
+                mapModified = true;
+            }
+        }
+        mPointCount = static_cast<int>(splatData.size());
+        LOGI("Imported %zu points from %s", newSplats.size(), path.c_str());
+    }
+
+    if (mapModified) {
+        std::lock_guard<std::mutex> glLock(mGlDataMutex);
+        mPendingSplatData = splatData;
+        mGlDataDirty = true;
+    }
+
+    return mapModified;
+}
+
 void MobileGS::draw() {
+    std::vector<Splat> uploadSplats;
+    std::vector<float> uploadMeshVerts;
+    std::vector<uint32_t> uploadMeshInds;
+    bool doUploadGl = false;
+
     {
         std::lock_guard<std::mutex> glLock(mGlDataMutex);
         if (mGlDataDirty) {
-            if (mPointVbo != 0 && !mPendingSplatData.empty()) {
-                glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
-                glBufferData(GL_ARRAY_BUFFER, mPendingSplatData.size() * sizeof(Splat), mPendingSplatData.data(), GL_DYNAMIC_DRAW);
-                glBindBuffer(GL_ARRAY_BUFFER, 0);
-            }
-
-            if (mMeshVbo != 0) {
-                if (!mPendingMeshVertices.empty()) {
-                    glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo);
-                    glBufferData(GL_ARRAY_BUFFER, mPendingMeshVertices.size() * sizeof(float), mPendingMeshVertices.data(), GL_DYNAMIC_DRAW);
-                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mMeshIbo);
-                    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mPendingMeshIndices.size() * sizeof(uint32_t), mPendingMeshIndices.data(), GL_DYNAMIC_DRAW);
-                    glBindBuffer(GL_ARRAY_BUFFER, 0);
-                    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-                    mMeshIndexCount = mPendingMeshIndices.size();
-                } else {
-                    mMeshIndexCount = 0;
-                }
-            }
+            uploadSplats = std::move(mPendingSplatData);
+            uploadMeshVerts = std::move(mPendingMeshVertices);
+            uploadMeshInds = std::move(mPendingMeshIndices);
+            doUploadGl = true;
             mGlDataDirty = false;
+        }
+    }
+
+    if (doUploadGl) {
+        if (mPointVbo != 0 && !uploadSplats.empty()) {
+            glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
+            glBufferData(GL_ARRAY_BUFFER, uploadSplats.size() * sizeof(Splat), uploadSplats.data(), GL_DYNAMIC_DRAW);
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+        }
+
+        if (mMeshVbo != 0) {
+            if (!uploadMeshVerts.empty()) {
+                glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo);
+                glBufferData(GL_ARRAY_BUFFER, uploadMeshVerts.size() * sizeof(float), uploadMeshVerts.data(), GL_DYNAMIC_DRAW);
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mMeshIbo);
+                glBufferData(GL_ELEMENT_ARRAY_BUFFER, uploadMeshInds.size() * sizeof(uint32_t), uploadMeshInds.data(), GL_DYNAMIC_DRAW);
+                glBindBuffer(GL_ARRAY_BUFFER, 0);
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+                mMeshIndexCount = uploadMeshInds.size();
+            } else {
+                mMeshIndexCount = 0;
+            }
         }
     }
 
@@ -1254,14 +1328,24 @@ void MobileGS::draw() {
 
     if (!mProgram || !mCameraReady) return;
 
+    std::vector<uint32_t> uploadIndices;
+    bool doUploadIndices = false;
+    int elementsToDraw = 0;
+
     {
         std::lock_guard<std::mutex> sortLock(mSortMutex);
         if (mIndicesDirty) {
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexVbo);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, mDrawIndices.size() * sizeof(uint32_t), mDrawIndices.data(), GL_DYNAMIC_DRAW);
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+            uploadIndices = mDrawIndices;
+            doUploadIndices = true;
             mIndicesDirty = false;
         }
+        elementsToDraw = std::min(mPointCount.load(), static_cast<int>(mDrawIndices.size()));
+    }
+
+    if (doUploadIndices && mIndexVbo != 0) {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexVbo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, uploadIndices.size() * sizeof(uint32_t), uploadIndices.data(), GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     }
 
     glm::mat4 V = glm::make_mat4(mViewMatrix);
@@ -1308,7 +1392,6 @@ void MobileGS::draw() {
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexVbo);
 
-        int elementsToDraw = std::min(mPointCount.load(), static_cast<int>(mDrawIndices.size()));
         if (elementsToDraw > 0) {
             glDrawElements(GL_POINTS, elementsToDraw, GL_UNSIGNED_INT, (void*)0);
         } else {
@@ -1354,4 +1437,4 @@ void MobileGS::draw() {
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-}
+}}

@@ -1,3 +1,4 @@
+# FILE: core/nativebridge/src/main/cpp/CMakeLists.txt
 cmake_minimum_required(VERSION 3.22.1)
 
 project("graffitixr_native")
@@ -12,7 +13,7 @@ find_package(OpenCV REQUIRED)
 # Set GLM include directory
 set(GLM_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../libs/glm)
 
-# Define the native library
+# Define the native library (Removed VulkanBackend.cpp)
 add_library(graffitixr SHARED
     GraffitiJNI.cpp
     MobileGS.cpp

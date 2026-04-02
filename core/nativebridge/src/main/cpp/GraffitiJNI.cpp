@@ -340,6 +340,18 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadModel(JNIEnv* 
     }
 }
 
+// NEW: 3D Model Imports (Parses external point clouds into the voxel engine)
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeImportModel3D(JNIEnv* env, jobject thiz, jstring pathStr) {
+    if (gSlamEngine) {
+        const char* path = env->GetStringUTFChars(pathStr, nullptr);
+        bool result = gSlamEngine->importModel3D(path);
+        env->ReleaseStringUTFChars(pathStr, path);
+        return result ? JNI_TRUE : JNI_FALSE;
+    }
+    return JNI_FALSE;
+}
+
 JNIEXPORT jboolean JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadSuperPoint(
         JNIEnv* env, jobject thiz, jobject assetManager) {
@@ -385,8 +397,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetTargetFingerpri
 }
 
 static jobject buildFingerprintObject(JNIEnv* env,
-        const std::vector<cv::KeyPoint>& kps,
-        const cv::Mat& descs) {
+                                      const std::vector<cv::KeyPoint>& kps,
+                                      const cv::Mat& descs) {
     if (descs.empty()) return nullptr;
 
     jclass fpClass  = env->FindClass("com/hereliesaz/graffitixr/common/model/Fingerprint");
@@ -402,8 +414,8 @@ static jobject buildFingerprintObject(JNIEnv* env,
     jobject kpList = env->NewObject(listClass, listCtor, (jint)kps.size());
     for (const auto& kp : kps) {
         jobject jkp = env->NewObject(kpClass, kpCtor,
-                kp.pt.x, kp.pt.y, kp.size, kp.angle, kp.response,
-                (jint)kp.octave, (jint)kp.class_id);
+                                     kp.pt.x, kp.pt.y, kp.size, kp.angle, kp.response,
+                                     (jint)kp.octave, (jint)kp.class_id);
         env->CallBooleanMethod(kpList, addMethod, jkp);
         env->DeleteLocalRef(jkp);
     }
@@ -415,8 +427,8 @@ static jobject buildFingerprintObject(JNIEnv* env,
     env->SetByteArrayRegion(jDescArray, 0, descSize, (const jbyte*)descs.data);
 
     return env->NewObject(fpClass, fpCtor,
-            kpList, ptsList, jDescArray,
-            descs.rows, descs.cols, descs.type());
+                          kpList, ptsList, jDescArray,
+                          descs.rows, descs.cols, descs.type());
 }
 
 JNIEXPORT jobject JNICALL
@@ -485,7 +497,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
     for (const auto& kp : kps) {
         int r = std::max(6, (int)(kp.size * 2.0f));
         cv::circle(overlay, cv::Point((int)kp.pt.x, (int)kp.pt.y),
-                r, cv::Scalar(0, 210, 50, 255), cv::FILLED);
+                   r, cv::Scalar(0, 210, 50, 255), cv::FILLED);
     }
     cv::addWeighted(frame, 0.55, overlay, 0.45, 0, frame);
 
@@ -494,13 +506,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
     int baseline = 0;
     cv::Size textSize = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, scale, 2, &baseline);
     cv::rectangle(frame,
-            cv::Point(8, 8),
-            cv::Point(textSize.width + 16, textSize.height + baseline + 16),
-            cv::Scalar(0, 0, 0, 200), cv::FILLED);
+                  cv::Point(8, 8),
+                  cv::Point(textSize.width + 16, textSize.height + baseline + 16),
+                  cv::Scalar(0, 0, 0, 200), cv::FILLED);
     cv::putText(frame, label,
-            cv::Point(12, textSize.height + 12),
-            cv::FONT_HERSHEY_SIMPLEX, scale,
-            cv::Scalar(255, 220, 0, 255), 2);
+                cv::Point(12, textSize.height + 12),
+                cv::FONT_HERSHEY_SIMPLEX, scale,
+                cv::Scalar(255, 220, 0, 255), 2);
 
     matToBitmap(env, frame, bitmap);
 }
@@ -556,7 +568,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAddLayerFeatures(
     jfloat* view = env->GetFloatArrayElements(viewMatArray, nullptr);
 
     gSlamEngine->addLayerFeatures(composite, depthData, depthW, depthH, depthStride,
-            intr, view);
+                                  intr, view);
 
     env->ReleaseFloatArrayElements(intrinsicsArray, intr, JNI_ABORT);
     env->ReleaseFloatArrayElements(viewMatArray, view, JNI_ABORT);

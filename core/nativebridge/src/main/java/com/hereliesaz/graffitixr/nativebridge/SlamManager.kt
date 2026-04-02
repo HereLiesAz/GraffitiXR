@@ -126,11 +126,15 @@ class SlamManager @Inject constructor() {
         nativeSaveModel(path)
     }
 
-    fun loadSuperPoint(assetManager: AssetManager): Boolean = nativeLoadSuperPoint(assetManager)
-
     fun loadModel(path: String) {
         nativeLoadModel(path)
     }
+
+    fun importModel3D(path: String): Boolean {
+        return nativeImportModel3D(path)
+    }
+
+    fun loadSuperPoint(assetManager: AssetManager): Boolean = nativeLoadSuperPoint(assetManager)
 
     fun setTargetFingerprint(descriptorsData: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray) {
         nativeSetTargetFingerprint(descriptorsData, rows, cols, type, points3d)
@@ -185,6 +189,7 @@ class SlamManager @Inject constructor() {
     private external fun nativePruneByConfidence(threshold: Float)
     private external fun nativeSaveModel(path: String)
     private external fun nativeLoadModel(path: String)
+    private external fun nativeImportModel3D(path: String): Boolean
     private external fun nativeLoadSuperPoint(assetManager: AssetManager): Boolean
     private external fun nativeUpdateAnchorTransform(transform: FloatArray)
     private external fun nativeGetAnchorTransform(): FloatArray
