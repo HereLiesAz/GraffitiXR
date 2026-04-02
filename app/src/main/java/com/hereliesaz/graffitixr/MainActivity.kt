@@ -115,6 +115,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Icon
 import androidx.compose.ui.draw.alpha
 import kotlinx.coroutines.delay
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -1249,9 +1250,17 @@ private fun ArCoreUnavailableOverlay(modifier: Modifier = Modifier) {
             )
             Button(
                 onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW,
-                        Uri.parse("market://details?id=com.google.ar.core"))
-                    context.startActivity(intent)
+                    try {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW,
+                                Uri.parse("market://details?id=com.google.ar.core"))
+                        )
+                    } catch (e: ActivityNotFoundException) {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW,
+                                Uri.parse("https://play.google.com/store/apps/details?id=com.google.ar.core"))
+                        )
+                    }
                 }
             ) {
                 Text("Install ARCore")

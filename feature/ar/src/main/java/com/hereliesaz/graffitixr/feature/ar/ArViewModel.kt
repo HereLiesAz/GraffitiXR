@@ -14,9 +14,7 @@ import com.google.ar.core.Config
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
-import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException
-import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException
-import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
+import com.google.ar.core.exceptions.UnavailableException
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.ScanPhase
@@ -217,16 +215,8 @@ class ArViewModel @Inject constructor(
                 viewModelScope.launch(Dispatchers.IO) {
                     slamManager.loadSuperPoint(context.assets)
                 }
-            } catch (e: UnavailableArcoreNotInstalledException) {
-                Timber.e(e, "ARCore not installed")
-                _uiState.update { it.copy(isArCoreAvailable = false) }
-                _isCameraInUseByAr.value = false
-            } catch (e: UnavailableDeviceNotCompatibleException) {
-                Timber.e(e, "Device not compatible with ARCore")
-                _uiState.update { it.copy(isArCoreAvailable = false) }
-                _isCameraInUseByAr.value = false
-            } catch (e: UnavailableUserDeclinedInstallationException) {
-                Timber.e(e, "User declined ARCore installation")
+            } catch (e: UnavailableException) {
+                Timber.e(e, "ARCore unavailable")
                 _uiState.update { it.copy(isArCoreAvailable = false) }
                 _isCameraInUseByAr.value = false
             } catch (e: Exception) {
