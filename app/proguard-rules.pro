@@ -15,15 +15,22 @@
 -dontwarn org.opencv.**
 
 # --- ARCore ---
-# Keep all classes in the com.google.ar.core package as-is.
+# Keep all classes and interfaces in the com.google.ar.core package as-is.
 # Many of these are obfuscated internally (e.g., com.google.ar.core.x)
 # and their bytecode has stack map tables that are easily corrupted
-# by aggressive optimizations in newer AGP/R8 versions.
+# by aggressive optimizations in AGP 9.1.0's R8/D8.
 -keep class com.google.ar.core.** { *; }
 -keep interface com.google.ar.core.** { *; }
 -dontwarn com.google.ar.core.**
+
+# Disable the new AGP 9.1.0 default repackaging and enum unboxing behaviors
+# which break the ARCore JNI layer and cause "Constructor mismatch" errors.
 -dontrepackage
 -keepattributes Code,StackMapTable
+-keepenumtypes com.google.ar.core.**
+-keepclassmembers enum com.google.ar.core.** {
+    <init>(java.lang.String, int);
+}
 
 # --- Native Engine (MobileGS & SlamManager) ---
 # Keep the JNI wrapper class and its native methods
