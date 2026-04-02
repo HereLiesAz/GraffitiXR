@@ -24,7 +24,6 @@ std::string gLastSplatTrace;
 extern JavaVM* gJvm;
 
 static constexpr size_t MAX_SPLATS = 500000;
-static constexpr float VOXEL_SIZE = 0.005f;
 
 struct JniThreadAttacher {
     JNIEnv* env = nullptr;
@@ -320,6 +319,26 @@ void MobileGS::setViewportSize(int width, int height) {
 
 void MobileGS::setRelocEnabled(bool enabled) {
     mRelocEnabled = enabled;
+}
+
+void MobileGS::setVoxelSize(float size) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (std::abs(mVoxelSize - size) < 1e-6f) return;
+    mVoxelSize = size;
+
+    // Re-hash existing points into the new voxel grid resolution
+    std::lock_guard<std::mutex> mapLock(mMapMutex);
+    mVoxelGrid.clear();
+    for (size_t i = 0; i < splatData.size(); ++i) {
+        const auto& s = splatData[i];
+        VoxelKey key{
+                static_cast<int>(std::floor(s.x / mVoxelSize)),
+                static_cast<int>(std::floor(s.y / mVoxelSize)),
+                static_cast<int>(std::floor(s.z / mVoxelSize))
+        };
+        mVoxelGrid[key] = i;
+    }
+    LOGI("Voxel size adjusted to %.4f. Grid re-hashed.", size);
 }
 
 cv::Point3f MobileGS::getCameraWorldPosition() const {
@@ -796,12 +815,12 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 camToWorldNormal(V, n_cam.x, n_cam.y, n_cam.z, nx_w, ny_w, nz_w);
 
                 float localRadius = std::max(cv::norm(v1), cv::norm(v2)) * 0.707f;
-                localRadius = std::clamp(localRadius, VOXEL_SIZE * 0.5f, VOXEL_SIZE * 5.0f);
+                localRadius = std::clamp(localRadius, mVoxelSize * 0.5f, mVoxelSize * 5.0f);
 
                 VoxelKey key{
-                        static_cast<int>(std::floor(xw / VOXEL_SIZE)),
-                        static_cast<int>(std::floor(yw / VOXEL_SIZE)),
-                        static_cast<int>(std::floor(zw / VOXEL_SIZE))
+                        static_cast<int>(std::floor(xw / mVoxelSize)),
+                        static_cast<int>(std::floor(yw / mVoxelSize)),
+                        static_cast<int>(std::floor(zw / mVoxelSize))
                 };
 
                 int colorR = static_cast<int>(r * scaleY);
@@ -967,9 +986,9 @@ void MobileGS::continuousOptimize() {
         mVoxelGrid.clear();
         for (size_t i = 0; i < splatData.size(); ++i) {
             VoxelKey key{
-                    static_cast<int>(std::floor(splatData[i].x / VOXEL_SIZE)),
-                    static_cast<int>(std::floor(splatData[i].y / VOXEL_SIZE)),
-                    static_cast<int>(std::floor(splatData[i].z / VOXEL_SIZE))
+                    static_cast<int>(std::floor(splatData[i].x / mVoxelSize)),
+                    static_cast<int>(std::floor(splatData[i].y / mVoxelSize)),
+                    static_cast<int>(std::floor(splatData[i].z / mVoxelSize))
             };
             mVoxelGrid[key] = i;
         }
@@ -995,9 +1014,9 @@ void MobileGS::pruneMap() {
     for (size_t i = 0; i < splatData.size(); ++i) {
         const auto& s = splatData[i];
         VoxelKey key{
-                static_cast<int>(std::floor(s.x / VOXEL_SIZE)),
-                static_cast<int>(std::floor(s.y / VOXEL_SIZE)),
-                static_cast<int>(std::floor(s.z / VOXEL_SIZE))
+                static_cast<int>(std::floor(s.x / mVoxelSize)),
+                static_cast<int>(std::floor(s.y / mVoxelSize)),
+                static_cast<int>(std::floor(s.z / mVoxelSize))
         };
         mVoxelGrid[key] = i;
     }
@@ -1021,9 +1040,9 @@ void MobileGS::pruneByConfidence(float threshold) {
     mVoxelGrid.clear();
     for (size_t i = 0; i < splatData.size(); ++i) {
         VoxelKey key{
-                static_cast<int>(std::floor(splatData[i].x / VOXEL_SIZE)),
-                static_cast<int>(std::floor(splatData[i].y / VOXEL_SIZE)),
-                static_cast<int>(std::floor(splatData[i].z / VOXEL_SIZE))
+                static_cast<int>(std::floor(splatData[i].x / mVoxelSize)),
+                static_cast<int>(std::floor(splatData[i].y / mVoxelSize)),
+                static_cast<int>(std::floor(splatData[i].z / mVoxelSize))
         };
         mVoxelGrid[key] = i;
     }
@@ -1248,7 +1267,7 @@ bool MobileGS::importModel3D(const std::string& path) {
                 s.r = 1.0f; s.g = 1.0f; s.b = 1.0f; s.a = 1.0f; // Default solid white point cloud
                 s.confidence = 1.0f;
                 s.nx = 0.0f; s.ny = 0.0f; s.nz = 1.0f;
-                s.radius = VOXEL_SIZE;
+                s.radius = mVoxelSize;
                 newSplats.push_back(s);
             }
         }
@@ -1263,9 +1282,9 @@ bool MobileGS::importModel3D(const std::string& path) {
             if (splatData.size() < MAX_SPLATS) {
                 splatData.push_back(s);
                 VoxelKey key{
-                        static_cast<int>(std::floor(s.x / VOXEL_SIZE)),
-                        static_cast<int>(std::floor(s.y / VOXEL_SIZE)),
-                        static_cast<int>(std::floor(s.z / VOXEL_SIZE))
+                        static_cast<int>(std::floor(s.x / mVoxelSize)),
+                        static_cast<int>(std::floor(s.y / mVoxelSize)),
+                        static_cast<int>(std::floor(s.z / mVoxelSize))
                 };
                 mVoxelGrid[key] = splatData.size() - 1;
                 mapModified = true;

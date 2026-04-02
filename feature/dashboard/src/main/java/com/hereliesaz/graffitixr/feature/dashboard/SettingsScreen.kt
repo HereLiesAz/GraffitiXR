@@ -169,7 +169,7 @@ fun SettingsScreen(
                             }
                             SettingsItem(
                                 label = "AR Scan Mode",
-                                value = if (arScanMode == ArScanMode.CLOUD_POINTS) "Cloud Points" else "Gaussian Splats",
+                                value = if (arScanMode == ArScanMode.CLOUD_POINTS) "Canvas" else "Mural",
                                 modifier = Modifier.clickable { onArScanModeChanged(nextMode) }
                             )
                             SettingsItem(

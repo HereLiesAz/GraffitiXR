@@ -53,6 +53,7 @@ class SlamManager @Inject constructor() {
     fun pruneByConfidence(threshold: Float) = nativePruneByConfidence(threshold)
 
     fun setRelocEnabled(enabled: Boolean) = nativeSetRelocEnabled(enabled)
+    fun setVoxelSize(size: Float) = nativeSetVoxelSize(size)
 
     fun initGl() {
         nativeInitGl()
@@ -200,6 +201,7 @@ class SlamManager @Inject constructor() {
         intrinsics: FloatArray, viewMatrix: FloatArray
     )
     private external fun nativeSetRelocEnabled(enabled: Boolean)
+    private external fun nativeSetVoxelSize(size: Float)
     private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int, intrinsics: FloatArray, intrW: Int, intrH: Int)
     private external fun nativeFeedYuvFrame(
         yBuffer: ByteBuffer,

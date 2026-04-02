@@ -125,6 +125,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetRelocEnabled(JN
     if (gSlamEngine) gSlamEngine->setRelocEnabled(enabled);
 }
 
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetVoxelSize(JNIEnv* env, jobject thiz, jfloat size) {
+    if (gSlamEngine) gSlamEngine->setVoxelSize(size);
+}
+
 float gLastViewMatrix[16];
 float gLastProjMatrix[16];
 float gLastMappingViewMatrix[16];

@@ -319,6 +319,7 @@ class MainActivity : ComponentActivity() {
 
                         // ─── Target Menu ────────────────────────────────────────────────
                         "target_host" to "Target Management: Tools for AR anchors. Instructions: Tap to access tools for creating or re-aligning the mural's position.",
+                        "scan_mode_toggle" to "Scan Resolution: Switch between Mural (large scale) and Canvas (small scale). Mural uses Gaussian Splats for walls; Canvas uses Point Clouds for detailed desk-scale art.",
                         "create" to "Create Anchor: Photograph a mark on the wall to lock projection. Instructions: Point at a distinct texture and tap. The app will track this mark.",
 
                         // ─── Design Menu ────────────────────────────────────────────────
@@ -829,6 +830,19 @@ class MainActivity : ComponentActivity() {
         if (isArMode) {
             azRailHostItem(id = "target_host", text = navStrings.grid, color = navItemColor, info = navStrings.gridInfo)
 
+            val isMural = arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS
+            val scanModeLabel = if (isMural) navStrings.mural else navStrings.canvas
+            azRailSubItem(
+                id = "scan_mode_toggle",
+                hostId = "target_host",
+                text = scanModeLabel,
+                color = if (isMural) Cyan else navItemColor,
+                shape = AzButtonShape.NONE,
+                info = navStrings.scanModeToggleInfo
+            ) {
+                arViewModel.setArScanMode(if (isMural) ArScanMode.CLOUD_POINTS else ArScanMode.GAUSSIAN_SPLATS)
+            }
+
             azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.createInfo) {
                 if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
             }
@@ -1296,7 +1310,7 @@ private fun DepthApiUnsupportedBanner(modifier: Modifier = Modifier) {
             .padding(horizontal = 20.dp, vertical = 10.dp)
     ) {
         Text(
-            text = "This device doesn't support the Depth API.\nSwitch to Cloud Points mode in Settings.",
+            text = "This device doesn't support the Depth API.\nSwitch to Canvas mode in Settings.",
             color = HotPink,
             textAlign = TextAlign.Center
         )

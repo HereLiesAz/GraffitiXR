@@ -65,6 +65,7 @@ public:
     void pruneByConfidence(float threshold);
     void setViewportSize(int width, int height);
     void setRelocEnabled(bool enabled);
+    void setVoxelSize(float size);
 
     int getSplatCount() const { return mPointCount; }
     void setSplatsVisible(bool visible) { mSplatsVisible = visible; }
@@ -197,4 +198,5 @@ private:
 
     int mScreenWidth = 1920;
     int mScreenHeight = 1080;
+    float mVoxelSize = 0.005f;
 };

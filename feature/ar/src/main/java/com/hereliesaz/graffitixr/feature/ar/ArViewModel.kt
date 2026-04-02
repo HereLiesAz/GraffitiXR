@@ -101,6 +101,11 @@ class ArViewModel @Inject constructor(
             settingsRepository.arScanMode.collect { mode ->
                 _uiState.update { it.copy(arScanMode = mode) }
                 renderer?.scanMode = mode
+                
+                // Attune voxel size: Mural (Splats) = 8mm, Canvas (Points) = 2mm
+                val voxelSize = if (mode == ArScanMode.GAUSSIAN_SPLATS) 0.008f else 0.002f
+                slamManager.setVoxelSize(voxelSize)
+
                 visitedSectors.fill(false)
                 _uiState.update { it.copy(scanPhase = ScanPhase.AMBIENT, ambientSectorsCovered = 0) }
             }
