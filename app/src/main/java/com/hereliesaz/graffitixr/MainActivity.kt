@@ -1092,7 +1092,6 @@ class MainActivity : ComponentActivity() {
                                                     text = "Stencil",
                                                     color = navItemColor,
                                                     textAlign = TextAlign.Center,
-                                                    style = MaterialTheme.typography.labelSmall
                                                 )
                                             }
                                         }
@@ -1128,7 +1127,6 @@ class MainActivity : ComponentActivity() {
                                                     text = "Stencil",
                                                     color = navItemColor,
                                                     textAlign = TextAlign.Center,
-                                                    style = MaterialTheme.typography.labelSmall
                                                 )
                                             }
                                         }
@@ -1170,7 +1168,6 @@ class MainActivity : ComponentActivity() {
                                                     text = "Stencil",
                                                     color = navItemColor,
                                                     textAlign = TextAlign.Center,
-                                                    style = MaterialTheme.typography.labelSmall
                                                 )
                                             }
                                         }
