@@ -42,6 +42,11 @@ enum class StencilLayerCount(val count: Int, val displayLabel: String) {
 enum class StencilOutputDimension { WIDTH, HEIGHT }
 
 /**
+ * Tonal polarity of the subject image.
+ */
+enum class TonalPolarity { DARK, LIGHT }
+
+/**
  * The current step of the guided stencil creation wizard.
  * The AzNavRail shows only items relevant to the active step.
  */
