@@ -279,7 +279,6 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val navStrings = remember { NavStrings() }
-                var showHelp by remember { mutableStateOf(false) }
                 var showFontPicker by remember { mutableStateOf(false) }
                 var fontPickerLayerId by remember { mutableStateOf<String?>(null) }
                 val layerMenusOpen = remember { mutableStateMapOf<String, Boolean>() }
@@ -303,11 +302,10 @@ class MainActivity : ComponentActivity() {
                         dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
                     )
                     azAdvanced(
-                        helpEnabled = showHelp,
+                        helpEnabled = true,
                         helpList = mapOf(
                             "help_sub" to "Select a tool from the Design menu to edit your layers. To transform (scale, rotate, move) a layer, close the layer's tools. Double tap the screen to cycle between X, Y, and Z rotation axes."
-                        ),
-                        onDismissHelp = { showHelp = false }
+                        )
                     )
 
                     if (isRailVisible) {
@@ -316,7 +314,6 @@ class MainActivity : ComponentActivity() {
                             overlayImagePicker, backgroundImagePicker, editorUiState, arUiState, navStrings,
                             navItemColor = navItemColor,
                             onShowFontPicker = { layerId -> fontPickerLayerId = layerId; showFontPicker = true },
-                            onToggleHelp = { showHelp = !showHelp },
                             layerMenusOpen = layerMenusOpen
                         )
                     }
@@ -762,7 +759,6 @@ class MainActivity : ComponentActivity() {
         navStrings: NavStrings,
         navItemColor: Color = Color.White,
         onShowFontPicker: (String) -> Unit = {},
-        onToggleHelp: () -> Unit = {},
         layerMenusOpen: MutableMap<String, Boolean>
     ) {
         val requestPermissions = {
@@ -832,9 +828,7 @@ class MainActivity : ComponentActivity() {
         azRailSubItem(id = "export", hostId = "project_host", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.exportInfo) {
             editorViewModel.exportImage()
         }
-        azRailSubItem(id = "help_sub", hostId = "project_host", text = navStrings.help, color = navItemColor, shape = AzButtonShape.NONE) {
-            onToggleHelp()
-        }
+        azHelpSubItem(id = "help_sub", hostId = "project_host", text = navStrings.help, color = navItemColor, shape = AzButtonShape.NONE)
         azRailSubItem(id = "settings", hostId = "project_host", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.settingsInfo) {
             showSettings = true
         }
