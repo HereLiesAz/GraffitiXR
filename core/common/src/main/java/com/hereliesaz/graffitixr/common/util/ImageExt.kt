@@ -7,8 +7,12 @@ import android.graphics.Bitmap
  * Deconstructs the visual reality of a poorly lit wall, stripping away the
  * chaotic noise of the background to isolate only the high-contrast markings.
  * Uses a Bradley-Roth adaptive threshold to outsmart uneven lighting.
+ *
+ * If [tapPos] is provided, the threshold becomes significantly more discerning
+ * the further a pixel is from the tap location, ensuring only highly relevant
+ * features are retained.
  */
-fun Bitmap.isolateMarkings(): Bitmap {
+fun Bitmap.isolateMarkings(tapPos: Pair<Float, Float>? = null): Bitmap {
     val w = this.width
     val h = this.height
     val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
@@ -31,7 +35,11 @@ fun Bitmap.isolateMarkings(): Bitmap {
     }
 
     val radius = w / 16
-    val thresholdOffset = 15
+    val baseThresholdOffset = 25 // Increased from 15 for more discerning default
+
+    val tapX = tapPos?.first?.let { it * w }
+    val tapY = tapPos?.second?.let { it * h }
+    val maxDist = Math.sqrt((w * w + h * h).toDouble()).toFloat()
 
     for (y in 0 until h) {
         for (x in 0 until w) {
@@ -49,8 +57,18 @@ fun Bitmap.isolateMarkings(): Bitmap {
             val sum = d - b - c + a
             val avg = sum / count
 
+            // Distance-based discernment boost
+            val distFactor = if (tapX != null && tapY != null) {
+                val dx = x - tapX
+                val dy = y - tapY
+                val dist = Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
+                1f + (dist / maxDist) * 3f // Threshold offset increases up to 4x further away
+            } else 1f
+
+            val effectiveOffset = (baseThresholdOffset * distFactor).toInt()
+
             val i = y * w + x
-            if (luma[i] < avg - thresholdOffset) {
+            if (luma[i] < avg - effectiveOffset) {
                 pixels[i] = pixels[i] or -0x1000000 // Opaque mark
             } else {
                 pixels[i] = 0x00000000 // Transparent void

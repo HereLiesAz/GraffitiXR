@@ -95,7 +95,19 @@ data class ArUiState(
     // Distance from camera to anchor in metres, or -1f when not in front of camera / not established.
     val distanceToAnchorMeters: Float = -1f,
     // Whether to display distances in imperial units (feet) rather than metric.
-    val isImperialUnits: Boolean = false
+    val isImperialUnits: Boolean = false,
+
+    // True once ARCore has been confirmed installed and supported on this device.
+    // False while unverified or when ARCore is missing / not supported.
+    val isArCoreAvailable: Boolean = true,
+
+    // Mirrors the runtime camera permission state so AR overlays can react without
+    // threading the raw permission flag all the way into every composable.
+    val hasCameraPermission: Boolean = false,
+
+    // Relative direction to the anchor in camera-local space (for offscreen indicators).
+    // X > 0 is right, Y > 0 is up, Z < 0 is in front.
+    val anchorRelativeDirection: Triple<Float, Float, Float>? = null
 )
 
 enum class Tool {

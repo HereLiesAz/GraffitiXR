@@ -115,6 +115,11 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.Icon
 import androidx.compose.ui.draw.alpha
 import kotlinx.coroutines.delay
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -268,6 +273,12 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // Keep ArUiState in sync with the runtime camera permission so AR
+                // overlays can react to it without receiving the raw flag directly.
+                LaunchedEffect(hasCameraPermission) {
+                    arViewModel.setCameraPermission(hasCameraPermission)
+                }
+
                 LaunchedEffect(editorUiState.editorMode) {
                     if (editorUiState.editorMode == EditorMode.STENCIL) {
                         editorViewModel.setEditorMode(EditorMode.MOCKUP)
@@ -418,6 +429,28 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
+                            // Error: ARCore not installed or device not supported
+                            if (editorUiState.editorMode == EditorMode.AR
+                                && !arUiState.isArCoreAvailable
+                                && !showLibrary && !showSettings
+                            ) {
+                                ArCoreUnavailableOverlay(
+                                    modifier = Modifier.align(Alignment.Center)
+                                )
+                            }
+
+                            // Error: camera permission permanently denied
+                            if (editorUiState.editorMode == EditorMode.AR
+                                && !arUiState.hasCameraPermission
+                                && !showLibrary && !showSettings
+                            ) {
+                                CameraPermissionDeniedBanner(
+                                    modifier = Modifier
+                                        .align(Alignment.TopCenter)
+                                        .padding(top = 16.dp)
+                                )
+                            }
+
                             if (mainUiState.isWaitingForTap && !showLibrary && !showSettings) {
                                 TapTargetOverlay(
                                     onCancel = {
@@ -521,6 +554,12 @@ class MainActivity : ComponentActivity() {
                                 AnchorLockFlash(isAnchorEstablished = arUiState.isAnchorEstablished)
                             }
 
+                            OffscreenIndicators(
+                                uiState = editorUiState,
+                                arUiState = arUiState,
+                                screenSize = fullSize
+                            )
+
                             if (mainUiState.isCapturingTarget) {
                                 TargetCreationUi(
                                     uiState = arUiState,
@@ -566,74 +605,12 @@ class MainActivity : ComponentActivity() {
                                     onUpdateUnwarpPoints = { arViewModel.setUnwarpPoints(it) },
                                     onSetActiveUnwarpPoint = { arViewModel.setActiveUnwarpPoint(it) },
                                     onSetMagnifierPosition = { arViewModel.setMagnifierPosition(it) },
-                                    onUpdateMaskPath = { path -> path?.let { arViewModel.updateMaskPath(it) } }
+                                    onUpdateMaskPath = { path -> path?.let { arViewModel.updateMaskPath(it) } },
+                                    onBeginErase = { arViewModel.beginErase() },
+                                    onEraseAtPoint = { nx, ny -> arViewModel.eraseAtPoint(nx, ny) },
+                                    onUndoErase = { arViewModel.undoErase() },
+                                    onRedoErase = { arViewModel.redoErase() }
                                 )
-
-                                if (mainUiState.captureStep == CaptureStep.REVIEW && fullSize != IntSize.Zero) {
-                                    val latestArViewModel by rememberUpdatedState(arViewModel)
-                                    val latestArUiState by rememberUpdatedState(arUiState)
-
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .fillMaxHeight(0.8f)
-                                            .pointerInput(Unit) {
-                                                var dragBmpW = 1
-                                                var dragBmpH = 1
-                                                detectDragGestures(
-                                                    onDragStart = { _ ->
-                                                        val bmp = latestArUiState.tempCaptureBitmap
-                                                        dragBmpW = bmp?.width ?: 1
-                                                        dragBmpH = bmp?.height ?: 1
-                                                        latestArViewModel.beginErase()
-                                                    },
-                                                    onDrag = { change, _ ->
-                                                        change.consume()
-                                                        val mapped = EditorImageProcessor.mapScreenToBitmap(
-                                                            listOf(change.position),
-                                                            fullSize.width, fullSize.height,
-                                                            dragBmpW, dragBmpH
-                                                        )
-                                                        if (mapped.isNotEmpty()) {
-                                                            val pt = mapped.first()
-                                                            latestArViewModel.eraseAtPoint(
-                                                                pt.x / dragBmpW.toFloat(),
-                                                                pt.y / dragBmpH.toFloat()
-                                                            )
-                                                        }
-                                                    }
-                                                )
-                                            }
-                                    ) {
-                                        Text(
-                                            text = "Drag over marks to remove them.",
-                                            color = HotPink,
-                                            modifier = Modifier
-                                                .align(Alignment.TopCenter)
-                                                .padding(top = 100.dp)
-                                                .background(Color(0xBB000000), RoundedCornerShape(8.dp))
-                                                .border(1.dp, Color.Cyan, RoundedCornerShape(8.dp))
-                                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                                        )
-                                        Row(
-                                            modifier = Modifier
-                                                .align(Alignment.BottomCenter)
-                                                .padding(bottom = 12.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                        ) {
-                                            OutlinedButton(
-                                                onClick = { arViewModel.undoErase() },
-                                                enabled = arUiState.canUndoErase,
-                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = HotPink)
-                                            ) { Text("Undo") }
-                                            OutlinedButton(
-                                                onClick = { arViewModel.redoErase() },
-                                                enabled = arUiState.canRedoErase,
-                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = HotPink)
-                                            ) { Text("Redo") }
-                                        }
-                                    }
-                                }
                             }
 
                             if (showSaveDialog) {
@@ -1243,6 +1220,76 @@ private fun DepthApiUnsupportedBanner(modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.bodySmall,
             textAlign = TextAlign.Center
         )
+    }
+}
+
+@Composable
+private fun ArCoreUnavailableOverlay(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    Card(
+        modifier = modifier.padding(24.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xEE1A1A1A))
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "ARCore is required",
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "This device does not have ARCore installed or is not supported. Install ARCore from the Play Store to use AR features.",
+                color = Color.LightGray,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center
+            )
+            Button(
+                onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW,
+                        Uri.parse("market://details?id=com.google.ar.core"))
+                    context.startActivity(intent)
+                }
+            ) {
+                Text("Install ARCore")
+            }
+        }
+    }
+}
+
+@Composable
+private fun CameraPermissionDeniedBanner(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    Box(
+        modifier = modifier
+            .background(Color(0xEE550000), RoundedCornerShape(12.dp))
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "Camera permission is required for AR mode.",
+                color = Color.White,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center
+            )
+            Button(
+                onClick = {
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", context.packageName, null)
+                    }
+                    context.startActivity(intent)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFCC2200))
+            ) {
+                Text("Open Settings")
+            }
+        }
     }
 }
 

@@ -14,6 +14,9 @@ import com.google.ar.core.Config
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
+import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException
+import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException
+import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.ScanPhase
@@ -214,11 +217,27 @@ class ArViewModel @Inject constructor(
                 viewModelScope.launch(Dispatchers.IO) {
                     slamManager.loadSuperPoint(context.assets)
                 }
+            } catch (e: UnavailableArcoreNotInstalledException) {
+                Timber.e(e, "ARCore not installed")
+                _uiState.update { it.copy(isArCoreAvailable = false) }
+                _isCameraInUseByAr.value = false
+            } catch (e: UnavailableDeviceNotCompatibleException) {
+                Timber.e(e, "Device not compatible with ARCore")
+                _uiState.update { it.copy(isArCoreAvailable = false) }
+                _isCameraInUseByAr.value = false
+            } catch (e: UnavailableUserDeclinedInstallationException) {
+                Timber.e(e, "User declined ARCore installation")
+                _uiState.update { it.copy(isArCoreAvailable = false) }
+                _isCameraInUseByAr.value = false
             } catch (e: Exception) {
-                e.printStackTrace()
+                Timber.e(e, "ARCore session init failed")
                 _isCameraInUseByAr.value = false
             }
         }
+    }
+
+    fun setCameraPermission(granted: Boolean) {
+        _uiState.update { it.copy(hasCameraPermission = granted) }
     }
 
     private suspend fun resumeArSessionInternal() {
@@ -444,7 +463,7 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    fun setTrackingState(isTracking: Boolean, splatCount: Int, isDepthApiSupported: Boolean, cameraYaw: Float = 0f, distanceToAnchorMeters: Float = -1f) {
+    fun setTrackingState(isTracking: Boolean, splatCount: Int, isDepthApiSupported: Boolean, cameraYaw: Float = 0f, distanceToAnchorMeters: Float = -1f, anchorRelativeDirection: Triple<Float, Float, Float>? = null) {
         val progress = if (isTracking) slamManager.getPaintingProgress() else _uiState.value.paintingProgress
 
         val sector = (((cameraYaw % 360f) + 360f) % 360f / 30f).toInt().coerceIn(0, 11)
@@ -470,8 +489,9 @@ class ArViewModel @Inject constructor(
                     lightLevel = state.lightLevel,
                     scanPhase = newPhase,
                     sectorsCovered = sectorsCovered
-                )
-                ,distanceToAnchorMeters = distanceToAnchorMeters
+                ),
+                distanceToAnchorMeters = distanceToAnchorMeters,
+                anchorRelativeDirection = anchorRelativeDirection
             )
         }
     }
@@ -520,7 +540,7 @@ class ArViewModel @Inject constructor(
                 )
             }
             viewModelScope.launch {
-                val maskedBmp = withContext(Dispatchers.Default) { rotatedBmp.isolateMarkings() }
+                val maskedBmp = withContext(Dispatchers.Default) { rotatedBmp.isolateMarkings(tapPos) }
                 _uiState.update { it.copy(tempCaptureBitmap = maskedBmp, annotatedCaptureBitmap = null) }
                 val annotated = withContext(Dispatchers.Default) { slamManager.annotateKeypoints(maskedBmp) }
                 _uiState.update { it.copy(annotatedCaptureBitmap = annotated) }

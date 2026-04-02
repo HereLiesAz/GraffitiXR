@@ -356,12 +356,22 @@ class EditorViewModel @Inject constructor(
                 val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(bitmap))
                 val localUri = "file://$path".toUri()
 
+                val metrics = context.resources.displayMetrics
+                val screenW = metrics.widthPixels.toFloat()
+                val screenH = metrics.heightPixels.toFloat()
+                
+                // Calculate initial scale to fit the screen
+                val scaleW = screenW * 0.9f / bitmap.width
+                val scaleH = screenH * 0.9f / bitmap.height
+                val initialScale = minOf(scaleW, scaleH, 1.0f)
+
                 val newLayer = Layer(
                     id = UUID.randomUUID().toString(),
                     name = "Layer ${_uiState.value.layers.size + 1}",
                     uri = localUri,
                     bitmap = bitmap,
-                    isVisible = true
+                    isVisible = true,
+                    scale = initialScale
                 )
 
                 baseBitmaps[newLayer.id] = bitmap.copy(Bitmap.Config.ARGB_8888, false)

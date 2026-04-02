@@ -1,109 +1,132 @@
-
 package com.hereliesaz.graffitixr
 
-import android.content.ContentValues
-import android.graphics.Bitmap
-import android.provider.MediaStore
-import android.view.PixelCopy
-import androidx.compose.ui.graphics.BlendMode
-import com.hereliesaz.graffitixr.common.model.BlendMode as ModelBlendMode
-import java.io.File
-import java.io.FileOutputStream
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import android.os.Handler
-import android.os.HandlerThread
-import timber.log.Timber
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.scale
+import com.hereliesaz.graffitixr.common.model.ArUiState
+import com.hereliesaz.graffitixr.common.model.EditorMode
+import com.hereliesaz.graffitixr.common.model.EditorUiState
+import com.hereliesaz.graffitixr.design.theme.HotPink
+import com.hereliesaz.graffitixr.design.theme.Cyan
+import kotlin.math.atan2
 
-fun captureScreenshot(window: android.view.Window, onCaptured: (Bitmap) -> Unit) {
-    val view = window.decorView
-    val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-    val handlerThread = HandlerThread("PixelCopyThread").apply { start() }
-    val handler = Handler(handlerThread.looper)
+@Composable
+fun OffscreenIndicators(
+    uiState: EditorUiState,
+    arUiState: ArUiState,
+    screenSize: IntSize,
+    modifier: Modifier = Modifier
+) {
+    if (screenSize.width <= 0 || screenSize.height <= 0) return
 
-    var requestSubmitted = false
-    try {
-        PixelCopy.request(window, android.graphics.Rect(0, 0, view.width, view.height), bitmap, { copyResult ->
-            try {
-                if (copyResult == PixelCopy.SUCCESS) {
-                    onCaptured(bitmap)
-                }
-            } finally {
-                handlerThread.quitSafely()
+    // 1. Indicator for Active Layer (HotPink)
+    val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
+    if (activeLayer != null) {
+        val centerX = screenSize.width / 2f
+        val centerY = screenSize.height / 2f
+        
+        val layerCenterX = centerX + activeLayer.offset.x
+        val layerCenterY = centerY + activeLayer.offset.y
+        
+        if (layerCenterX < 0 || layerCenterX > screenSize.width || layerCenterY < 0 || layerCenterY > screenSize.height) {
+            DirectionalIndicator(
+                angle = Math.toDegrees(atan2((layerCenterY - centerY).toDouble(), (layerCenterX - centerX).toDouble())).toFloat(),
+                label = "Active Layer",
+                color = HotPink,
+                modifier = modifier
+            )
+        }
+    }
+
+    // 2. Indicator for Target (Cyan) - AR Mode only
+    if (uiState.editorMode == EditorMode.AR && arUiState.isAnchorEstablished) {
+        val relDir = arUiState.anchorRelativeDirection
+        if (relDir != null) {
+            val (lx, ly, lz) = relDir
+            
+            // If lz > 0, it's behind the camera. 
+            // If lz < 0, it's in front.
+            // We want the indicator if it's offscreen.
+            
+            val isOffscreen = lz > 0 || Math.abs(lx) > 0.8f || Math.abs(ly) > 0.8f
+            
+            if (isOffscreen) {
+                // localY is UP, so we negate it for screen-space (down is positive)
+                val angle = Math.toDegrees(atan2(-ly.toDouble(), lx.toDouble())).toFloat()
+                DirectionalIndicator(
+                    angle = angle,
+                    label = "Wall Target",
+                    color = Cyan,
+                    modifier = modifier,
+                    distance = if (lz > 0) "BEHIND" else null
+                )
             }
-        }, handler)
-        requestSubmitted = true
-    } catch (e: Exception) {
-        Timber.e(e, "Screenshot capture failed")
-    } finally {
-        if (!requestSubmitted) {
-            handlerThread.quitSafely()
         }
     }
 }
 
-fun saveExportedImage(context: android.content.Context, bitmap: Bitmap) {
-    val filename = "GraffitiXR_Export_${System.currentTimeMillis()}.png"
-    val contentValues = ContentValues().apply {
-        put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
-        put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
-        put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/GraffitiXR")
-    }
-
-    val resolver = context.contentResolver
-    val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
-
-    uri?.let {
-        resolver.openOutputStream(it)?.use { stream ->
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
+@Composable
+private fun DirectionalIndicator(
+    angle: Float,
+    label: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+    distance: String? = null
+) {
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .rotate(angle)
+                .offset(y = (-150).dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(color, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowUpward,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Column(
+                modifier = Modifier.rotate(-angle), // Keep text upright
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = label,
+                    color = color,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                if (distance != null) {
+                    Text(
+                        text = distance,
+                        color = color,
+                        fontSize = 8.sp
+                    )
+                }
+            }
         }
-    }
-}
-
-fun saveBitmapToCache(context: android.content.Context, bitmap: Bitmap): android.net.Uri? {
-    val filename = "Target_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.jpg"
-    val file = File(context.cacheDir, filename)
-    FileOutputStream(file).use { out ->
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
-    }
-    return androidx.core.content.FileProvider.getUriForFile(
-        context,
-        "${context.packageName}.fileprovider",
-        file
-    )
-}
-
-fun mapBlendMode(mode: ModelBlendMode): BlendMode {
-    return when(mode) {
-        ModelBlendMode.SrcOver -> BlendMode.SrcOver
-        ModelBlendMode.Multiply -> BlendMode.Multiply
-        ModelBlendMode.Screen -> BlendMode.Screen
-        ModelBlendMode.Overlay -> BlendMode.Overlay
-        ModelBlendMode.Darken -> BlendMode.Darken
-        ModelBlendMode.Lighten -> BlendMode.Lighten
-        ModelBlendMode.ColorDodge -> BlendMode.ColorDodge
-        ModelBlendMode.ColorBurn -> BlendMode.ColorBurn
-        ModelBlendMode.HardLight -> BlendMode.Hardlight
-        ModelBlendMode.SoftLight -> BlendMode.Softlight
-        ModelBlendMode.Difference -> BlendMode.Difference
-        ModelBlendMode.Exclusion -> BlendMode.Exclusion
-        ModelBlendMode.Hue -> BlendMode.Hue
-        ModelBlendMode.Saturation -> BlendMode.Saturation
-        ModelBlendMode.Color -> BlendMode.Color
-        ModelBlendMode.Luminosity -> BlendMode.Luminosity
-        ModelBlendMode.Clear -> BlendMode.Clear
-        ModelBlendMode.Src -> BlendMode.Src
-        ModelBlendMode.Dst -> BlendMode.Dst
-        ModelBlendMode.DstOver -> BlendMode.DstOver
-        ModelBlendMode.SrcIn -> BlendMode.SrcIn
-        ModelBlendMode.DstIn -> BlendMode.DstIn
-        ModelBlendMode.SrcOut -> BlendMode.SrcOut
-        ModelBlendMode.DstOut -> BlendMode.DstOut
-        ModelBlendMode.SrcAtop -> BlendMode.SrcAtop
-        ModelBlendMode.DstAtop -> BlendMode.DstAtop
-        ModelBlendMode.Xor -> BlendMode.Xor
-        ModelBlendMode.Plus -> BlendMode.Plus
-        ModelBlendMode.Modulate -> BlendMode.Modulate
     }
 }

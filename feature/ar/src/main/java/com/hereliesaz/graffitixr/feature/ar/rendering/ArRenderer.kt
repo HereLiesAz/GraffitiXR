@@ -31,7 +31,7 @@ class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
     private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int) -> Unit,
-    private val onTrackingUpdated: (Boolean, Int, Boolean, Float, Float) -> Unit,
+    private val onTrackingUpdated: (Boolean, Int, Boolean, Float, Float, Triple<Float, Float, Float>?) -> Unit,
     private val onLightUpdated: (Float) -> Unit,
     private val onDiag: (String) -> Unit = {}
 ) : GLSurfaceView.Renderer {
@@ -227,6 +227,9 @@ class ArRenderer(
 
             val currentScanMode = scanMode
             val anchorMatrix = slamManager.getAnchorTransform()
+            
+            var relDir: Triple<Float, Float, Float>? = null
+            
             val distanceMeters = run {
                 if (!anchorEstablished) return@run -1f
                 val camPose = FloatArray(16)
@@ -235,6 +238,16 @@ class ArRenderer(
                 val dy = anchorMatrix[13] - camPose[13]
                 val dz = anchorMatrix[14] - camPose[14]
                 val len = kotlin.math.sqrt((dx * dx + dy * dy + dz * dz).toDouble()).toFloat()
+                
+                if (len > 0.01f) {
+                    // Compute direction in camera local space
+                    // Camera direction is -Z in local space
+                    val localX = dx * viewMatrix[0] + dy * viewMatrix[1] + dz * viewMatrix[2]
+                    val localY = dx * viewMatrix[4] + dy * viewMatrix[5] + dz * viewMatrix[6]
+                    val localZ = dx * viewMatrix[8] + dy * viewMatrix[9] + dz * viewMatrix[10]
+                    relDir = Triple(localX / len, localY / len, localZ / len)
+                }
+
                 // Only report distance when anchor is in front of the camera
                 val fwdDot = dx * (-viewMatrix[8]) + dy * (-viewMatrix[9]) + dz * (-viewMatrix[10])
                 if (len > 0.01f && fwdDot > 0f) len else -1f
@@ -246,7 +259,7 @@ class ArRenderer(
                 } else {
                     slamManager.getSplatCount()
                 }
-                onTrackingUpdated(isTracking, count, depthSupported, yawDeg, distanceMeters)
+                onTrackingUpdated(isTracking, count, depthSupported, yawDeg, distanceMeters, relDir)
             }
 
             if (captureRequested) {

@@ -282,6 +282,69 @@ class ArViewModelTest {
         assertEquals(annotatedBmp, viewModel.uiState.value.annotatedCaptureBitmap)
     }
 
+    // ==================== Scan Mode Tests ====================
+
+    @Test
+    fun `setArScanMode to GAUSSIAN_SPLATS updates arScanMode in uiState`() = runTest {
+        every { settingsRepository.arScanMode } returns MutableStateFlow(ArScanMode.CLOUD_POINTS)
+        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, context)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        every { settingsRepository.arScanMode } returns MutableStateFlow(ArScanMode.GAUSSIAN_SPLATS)
+        // Simulate what setArScanMode does: push the new mode through the settings flow
+        val modeFlow = MutableStateFlow(ArScanMode.CLOUD_POINTS)
+        every { settingsRepository.arScanMode } returns modeFlow
+        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, context)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        modeFlow.value = ArScanMode.GAUSSIAN_SPLATS
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(ArScanMode.GAUSSIAN_SPLATS, viewModel.uiState.value.arScanMode)
+    }
+
+    @Test
+    fun `setArScanMode to CLOUD_POINTS updates arScanMode in uiState`() = runTest {
+        val modeFlow = MutableStateFlow(ArScanMode.GAUSSIAN_SPLATS)
+        every { settingsRepository.arScanMode } returns modeFlow
+        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, context)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        modeFlow.value = ArScanMode.CLOUD_POINTS
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(ArScanMode.CLOUD_POINTS, viewModel.uiState.value.arScanMode)
+    }
+
+    // ==================== Tracking Lost Tests ====================
+
+    @Test
+    fun `setTrackingState false reflects isScanning false in uiState`() = runTest {
+        viewModel.setTrackingState(true, 100, true)
+        assertTrue(viewModel.uiState.value.isScanning)
+
+        viewModel.setTrackingState(false, 0, true)
+        assertFalse(viewModel.uiState.value.isScanning)
+    }
+
+    @Test
+    fun `setTrackingState false with isDepthApiSupported true reflects correctly`() = runTest {
+        viewModel.setTrackingState(false, 0, true)
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isScanning)
+        assertTrue(state.isDepthApiSupported)
+    }
+
+    @Test
+    fun `setTrackingState false with zero splats reflects correctly`() = runTest {
+        viewModel.setTrackingState(false, 0, true)
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isScanning)
+        assertEquals(0, state.splatCount)
+    }
+
     @Test
     fun `onTargetCaptured tap path annotates keypoints asynchronously`() = runTest {
         val rawBmp = mockk<Bitmap>(relaxed = true)

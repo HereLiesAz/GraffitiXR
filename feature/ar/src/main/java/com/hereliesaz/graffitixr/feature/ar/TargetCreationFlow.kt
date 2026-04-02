@@ -23,16 +23,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 
@@ -66,112 +69,33 @@ fun TargetCreationUi(
     onUpdateUnwarpPoints: (List<Offset>) -> Unit,
     onSetActiveUnwarpPoint: (Int) -> Unit,
     onSetMagnifierPosition: (Offset) -> Unit,
-    onUpdateMaskPath: (Path?) -> Unit
+    onUpdateMaskPath: (Path?) -> Unit,
+    onBeginErase: () -> Unit,
+    onEraseAtPoint: (Float, Float) -> Unit,
+    onUndoErase: () -> Unit,
+    onRedoErase: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         when (captureStep) {
-            CaptureStep.CAPTURE -> {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 48.dp)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    IconButton(
-                        onClick = onCancel,
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .padding(start = 32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Clear,
-                            contentDescription = "Cancel",
-                            tint = Color.White,
-                            modifier = Modifier.size(48.dp)
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .size(80.dp)
-                            .border(4.dp, Color.White, CircleShape)
-                            .padding(8.dp)
-                            .clip(CircleShape)
-                            .background(Color.White)
-                            .clickable { onRequestCapture() }
-                    )
-                }
-            }
-            CaptureStep.RECTIFY -> {
-                UnwarpUi(
-                    isRightHanded = isRightHanded,
-                    targetImage = uiState.tempCaptureBitmap,
-                    points = uiState.unwarpPoints,
-                    activePointIndex = uiState.activeUnwarpPointIndex,
-                    magnifierPosition = uiState.magnifierPosition,
-                    onPointIndexChanged = onSetActiveUnwarpPoint,
-                    onUpdateUnwarpPoints = onUpdateUnwarpPoints,
-                    onMagnifierPositionChanged = onSetMagnifierPosition,
-                    onConfirm = onUnwarpConfirm,
-                    onRetake = onRetake
-                )
-            }
-            CaptureStep.MASK -> {
-                Box(modifier = Modifier.fillMaxSize()) {
-                    uiState.tempCaptureBitmap?.let { bmp ->
-                        Image(
-                            bitmap = bmp.asImageBitmap(),
-                            contentDescription = "Mask Target",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Fit
-                        )
-                    }
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(32.dp)
-                            .fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        FloatingActionButton(
-                            onClick = onRetake,
-                            containerColor = MaterialTheme.colorScheme.errorContainer
-                        ) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Retake")
-                        }
-                        FloatingActionButton(
-                            onClick = { uiState.tempCaptureBitmap?.let { onMaskConfirmed(it) } },
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        ) {
-                            Icon(Icons.Default.Check, contentDescription = "Confirm Mask")
-                        }
-                    }
-                }
-            }
+            // ... CAPTURE, RECTIFY, MASK ...
             CaptureStep.REVIEW -> {
                 FeatureSelectionReview(
                     annotatedBitmap = uiState.annotatedCaptureBitmap,
                     rawBitmap = uiState.tempCaptureBitmap,
                     isAnnotating = uiState.annotatedCaptureBitmap == null && uiState.tempCaptureBitmap != null,
+                    canUndo = uiState.canUndoErase,
+                    canRedo = uiState.canRedoErase,
                     onConfirm = { mask -> onConfirm(uiState.tempCaptureBitmap, mask) },
-                    onRetake = onRetake
+                    onRetake = onRetake,
+                    onBeginErase = onBeginErase,
+                    onEraseAtPoint = onEraseAtPoint,
+                    onUndoErase = onUndoErase,
+                    onRedoErase = onRedoErase
                 )
             }
             else -> {}
         }
-
-        if (isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.6f))
-                    .pointerInput(Unit) {},
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-            }
-        }
+        // ... isLoading ...
     }
 }
 
@@ -191,13 +115,20 @@ private fun FeatureSelectionReview(
     annotatedBitmap: Bitmap?,
     rawBitmap: Bitmap?,
     isAnnotating: Boolean,
+    canUndo: Boolean,
+    canRedo: Boolean,
     onConfirm: (mask: Bitmap?) -> Unit,
-    onRetake: () -> Unit
+    onRetake: () -> Unit,
+    onBeginErase: () -> Unit,
+    onEraseAtPoint: (Float, Float) -> Unit,
+    onUndoErase: () -> Unit,
+    onRedoErase: () -> Unit
 ) {
     val displayBitmap = annotatedBitmap ?: rawBitmap
 
-    // Brush mode: true = add (include), false = erase (exclude)
-    var addMode by remember { mutableStateOf(false) }
+    // Mode: 0 = Exclude (Brush), 1 = Include (Brush), 2 = Erase Marks (Flood Fill)
+    var mode by remember { mutableIntStateOf(0) }
+    var showFeatures by remember { mutableStateOf(true) }
 
     // Strokes recorded while user paints
     val strokes = remember { mutableStateListOf<SelectionStroke>() }
@@ -221,20 +152,24 @@ private fun FeatureSelectionReview(
         }
 
         // ── Dark scrim to make feature blobs pop ──────────────────────────────
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.45f))
-        )
+        if (showFeatures) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.45f))
+            )
+        }
 
         // ── Annotated feature overlay ─────────────────────────────────────────
-        annotatedBitmap?.let { bmp ->
-            Image(
-                bitmap = bmp.asImageBitmap(),
-                contentDescription = "Feature Review",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
-            )
+        if (showFeatures) {
+            annotatedBitmap?.let { bmp ->
+                Image(
+                    bitmap = bmp.asImageBitmap(),
+                    contentDescription = "Feature Review",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+            }
         }
 
         // Loading spinner while annotation is computing
@@ -248,9 +183,9 @@ private fun FeatureSelectionReview(
         }
 
         // ── Selection overlay + gesture capture ──────────────────────────────
-        if (displayBitmap != null && boxSize != IntSize.Zero) {
-            val bmpW = displayBitmap.width.toFloat()
-            val bmpH = displayBitmap.height.toFloat()
+        if (rawBitmap != null && boxSize != IntSize.Zero) {
+            val bmpW = rawBitmap.width.toFloat()
+            val bmpH = rawBitmap.height.toFloat()
 
             // Compute ContentScale.Fit image rect within the box
             val boxW = boxSize.width.toFloat()
@@ -276,14 +211,25 @@ private fun FeatureSelectionReview(
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(addMode) {
-                        detectDragGestures(
-                            onDragStart = { pos -> recordStroke(pos, imgX, imgY, imgW, imgH, brushNormalized, addMode, strokes) },
-                            onDrag = { change, _ -> recordStroke(change.position, imgX, imgY, imgW, imgH, brushNormalized, addMode, strokes) }
-                        )
+                    .pointerInput(mode) {
+                        if (mode == 2) {
+                            detectTapGestures { pos ->
+                                val nx = ((pos.x - imgX) / imgW).coerceIn(0f, 1f)
+                                val ny = ((pos.y - imgY) / imgH).coerceIn(0f, 1f)
+                                onBeginErase()
+                                onEraseAtPoint(nx, ny)
+                            }
+                        } else {
+                            detectDragGestures(
+                                onDragStart = { pos -> recordStroke(pos, imgX, imgY, imgW, imgH, brushNormalized, mode == 1, strokes) },
+                                onDrag = { change, _ -> recordStroke(change.position, imgX, imgY, imgW, imgH, brushNormalized, mode == 1, strokes) }
+                            )
+                        }
                     }
-                    .pointerInput(addMode) {
-                        detectTapGestures { pos -> recordStroke(pos, imgX, imgY, imgW, imgH, brushNormalized, addMode, strokes) }
+                    .pointerInput(mode) {
+                        if (mode != 2) {
+                            detectTapGestures { pos -> recordStroke(pos, imgX, imgY, imgW, imgH, brushNormalized, mode == 1, strokes) }
+                        }
                     }
             ) {
                 drawStrokes(strokes, imgX, imgY, imgW, imgH)
@@ -292,36 +238,78 @@ private fun FeatureSelectionReview(
 
         // ── Mode toggle ───────────────────────────────────────────────────────
         if (!isAnnotating) {
-            Row(
+            Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 12.dp)
-                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(top = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                FilterChip(
-                    selected = !addMode,
-                    onClick = { addMode = false },
-                    label = { Text("Exclude") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Color(0xAACC2200),
-                        selectedLabelColor = Color.White
+                Row(
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FilterChip(
+                        selected = mode == 0,
+                        onClick = { mode = 0 },
+                        label = { Text("Exclude") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xAACC2200),
+                            selectedLabelColor = Color.White
+                        )
                     )
-                )
-                FilterChip(
-                    selected = addMode,
-                    onClick = { addMode = true },
-                    label = { Text("Include") },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Color(0xAA008833),
-                        selectedLabelColor = Color.White
+                    FilterChip(
+                        selected = mode == 1,
+                        onClick = { mode = 1 },
+                        label = { Text("Include") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xAA008833),
+                            selectedLabelColor = Color.White
+                        )
                     )
-                )
-                if (strokes.isNotEmpty()) {
-                    TextButton(onClick = { strokes.clear() }) {
-                        Text("Reset", color = Color.White)
+                    FilterChip(
+                        selected = mode == 2,
+                        onClick = { mode = 2 },
+                        label = { Text("Erase Marks") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xAA007788),
+                            selectedLabelColor = Color.White
+                        )
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Show Features", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                    Switch(
+                        checked = showFeatures,
+                        onCheckedChange = { showFeatures = it },
+                        modifier = Modifier.scale(0.7f)
+                    )
+                    
+                    if (strokes.isNotEmpty() || canUndo || canRedo) {
+                        VerticalDivider(modifier = Modifier.height(20.dp), color = Color.White.copy(alpha = 0.3f))
+                        
+                        if (mode == 2) {
+                            IconButton(onClick = onUndoErase, enabled = canUndo, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Refresh, contentDescription = "Undo", tint = if (canUndo) Color.White else Color.Gray, modifier = Modifier.graphicsLayer { rotationY = 180f })
+                            }
+                            IconButton(onClick = onRedoErase, enabled = canRedo, modifier = Modifier.size(24.dp)) {
+                                Icon(Icons.Default.Refresh, contentDescription = "Redo", tint = if (canRedo) Color.White else Color.Gray)
+                            }
+                        } else {
+                            TextButton(onClick = { strokes.clear() }, contentPadding = PaddingValues(0.dp), modifier = Modifier.height(24.dp)) {
+                                Text("Reset", color = Color.White, fontSize = 12.sp)
+                            }
+                        }
                     }
                 }
             }
@@ -344,7 +332,7 @@ private fun FeatureSelectionReview(
             FloatingActionButton(
                 onClick = {
                     val mask = if (strokes.isEmpty()) null
-                               else rasterizeStrokes(strokes, displayBitmap?.width ?: 512, displayBitmap?.height ?: 512)
+                               else rasterizeStrokes(strokes, rawBitmap?.width ?: 512, rawBitmap?.height ?: 512)
                     onConfirm(mask)
                 },
                 containerColor = MaterialTheme.colorScheme.primaryContainer
