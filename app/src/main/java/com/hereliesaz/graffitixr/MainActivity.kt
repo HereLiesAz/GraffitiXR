@@ -326,6 +326,7 @@ class MainActivity : ComponentActivity() {
                             isCameraActive = !showLibrary,
                             isWaitingForTap = mainUiState.isWaitingForTap,
                             mainUiState = mainUiState,
+                            mainViewModel = mainViewModel,
                             editorViewModel = editorViewModel,
                             arViewModel = arViewModel,
                             slamManager = slamManager,

@@ -58,6 +58,7 @@ fun MainScreen(
     isCameraActive: Boolean,
     isWaitingForTap: Boolean,
     mainUiState: MainUiState,
+    mainViewModel: MainViewModel,
     editorViewModel: EditorViewModel,
     arViewModel: ArViewModel,
     slamManager: SlamManager,
