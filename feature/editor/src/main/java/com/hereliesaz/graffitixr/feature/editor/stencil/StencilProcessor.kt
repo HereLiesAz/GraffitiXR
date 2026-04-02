@@ -140,6 +140,37 @@ class StencilProcessor @Inject constructor() {
         )
     }.flowOn(Dispatchers.Default)
 
+    /**
+     * Assesses whether the [bitmap] subject should be rendered as a high-contrast
+     * shadow (ONE cluster) or a silhouette-plus-highlights (TWO clusters).
+     */
+    fun assessSubjectContrast(bitmap: Bitmap): StencilLayerCount {
+        val w = bitmap.width
+        val h = bitmap.height
+        val pixels = IntArray(w * h)
+        bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
+
+        val luminanceValues = mutableListOf<Float>()
+        for (pixel in pixels) {
+            if (android.graphics.Color.alpha(pixel) > 0) {
+                // Luminance = 0.299R + 0.587G + 0.114B
+                val r = android.graphics.Color.red(pixel) / 255f
+                val g = android.graphics.Color.green(pixel) / 255f
+                val b = android.graphics.Color.blue(pixel) / 255f
+                luminanceValues.add(0.299f * r + 0.587f * g + 0.114f * b)
+            }
+        }
+
+        if (luminanceValues.isEmpty()) return StencilLayerCount.ONE
+
+        val mean = luminanceValues.average().toFloat()
+        val stdDev = kotlin.math.sqrt(luminanceValues.map { (it - mean) * (it - mean) }.average()).toFloat()
+
+        // Threshold 0.2: Detailed/High-contrast candidates use Shadows Only (ONE cluster)
+        // Flat candidates use Silhouette + Highlights (TWO clusters)
+        return if (stdDev > 0.2f) StencilLayerCount.ONE else StencilLayerCount.TWO
+    }
+
     // ── Stage 2 ───────────────────────────────────────────────────────────────
 
     /**
