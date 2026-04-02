@@ -119,9 +119,15 @@ enum class CaptureStep {
 }
 
 enum class ArScanMode {
-    /** Use ARCore's built-in feature-point cloud (reliable, no depth API required). */
+    /** 
+     * User-facing: "Canvas". Optimized for smaller desk-scale art.
+     * Use ARCore's built-in feature-point cloud (reliable, no depth API required). 
+     */
     CLOUD_POINTS,
-    /** Use the MobileGS depth-to-voxel-splat pipeline (richer spatial map, but slower to build). */
+    /** 
+     * User-facing: "Mural". Optimized for large-scale walls.
+     * Use the MobileGS depth-to-voxel-splat pipeline (richer spatial map, but slower to build). 
+     */
     GAUSSIAN_SPLATS
 }
 
