@@ -38,8 +38,24 @@ class SubjectIsolator @Inject constructor(
             val mergedConf = FloatArray(w * h)
             for (subject in subjects) {
                 val subjectConf = subject.confidenceMask ?: continue
-                for (i in mergedConf.indices) {
-                    if (subjectConf[i] > mergedConf[i]) mergedConf[i] = subjectConf[i]
+                val sw = subject.width
+                val sh = subject.height
+                val sx = subject.startX
+                val sy = subject.startY
+                
+                // Reset buffer position to start
+                subjectConf.rewind()
+                
+                for (y in 0 until sh) {
+                    for (x in 0 until sw) {
+                        val conf = subjectConf.get()
+                        val globalX = sx + x
+                        val globalY = sy + y
+                        if (globalX in 0 until w && globalY in 0 until h) {
+                            val globalIdx = globalY * w + globalX
+                            if (conf > mergedConf[globalIdx]) mergedConf[globalIdx] = conf
+                        }
+                    }
                 }
             }
             val isolated = applyConfidenceThreshold(scaled, mergedConf, threshold = 0.5f)

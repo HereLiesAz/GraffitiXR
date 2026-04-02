@@ -698,7 +698,13 @@ class EditorViewModel @Inject constructor(
                         uri = sketchUri,
                         isSketch = true,
                         isLinked = true,
-                        blendMode = androidx.compose.ui.graphics.BlendMode.SrcOver
+                        blendMode = androidx.compose.ui.graphics.BlendMode.SrcOver,
+                        scale = layer.scale,
+                        offset = layer.offset,
+                        rotationX = layer.rotationX,
+                        rotationY = layer.rotationY,
+                        rotationZ = layer.rotationZ,
+                        warpMesh = layer.warpMesh
                     )
                     withContext(dispatchers.main) {
                         _uiState.update { s ->

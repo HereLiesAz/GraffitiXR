@@ -1082,10 +1082,12 @@ class MainActivity : ComponentActivity() {
                                 }
                                 azRailItem(id = "blend_${layer.id}", text = "Blend", color = navItemColor, shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onCycleBlendMode() })
                                 azRailItem(id = "adj_${layer.id}", text = "Adjust", color = navItemColor, shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onAdjustClicked() })
+                                azRailItem(id = "invert_${layer.id}", text = navStrings.invert, color = if (layer.isInverted) Cyan else navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.invertInfo, onClick = { activate(); editorViewModel.onToggleInvert() })
                             }
                             layer.isSketch -> {
                                 azRailItem(id = "blend_${layer.id}", text = "Blend", color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.blendingInfo, onClick = { activate(); editorViewModel.onCycleBlendMode() })
                                 azRailItem(id = "adj_${layer.id}", text = "Adjust", color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.adjustInfo, onClick = { activate(); editorViewModel.onAdjustClicked() })
+                                azRailItem(id = "invert_${layer.id}", text = navStrings.invert, color = if (layer.isInverted) Cyan else navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.invertInfo, onClick = { activate(); editorViewModel.onToggleInvert() })
                                 if (layer.stencilType == null) {
                                     azRailItem(
                                         id = "stencil_${layer.id}",
@@ -1127,6 +1129,7 @@ class MainActivity : ComponentActivity() {
                             else -> {
                                 azRailItem(id = "iso_${layer.id}", text = "Isolate", color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.isolateInfo, onClick = { activate(); editorViewModel.onRemoveBackgroundClicked() })
                                 azRailItem(id = "line_${layer.id}", text = "Outline", color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.outlineInfo, onClick = { activate(); editorViewModel.onSketchClicked() })
+                                azRailItem(id = "invert_${layer.id}", text = navStrings.invert, color = if (layer.isInverted) Cyan else navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.invertInfo, onClick = { activate(); editorViewModel.onToggleInvert() })
                                 if (layer.stencilType == null) {
                                     azRailItem(
                                         id = "stencil_${layer.id}",

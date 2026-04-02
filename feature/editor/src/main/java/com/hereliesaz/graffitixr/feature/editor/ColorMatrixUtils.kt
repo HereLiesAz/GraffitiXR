@@ -27,9 +27,9 @@ fun createColorMatrix(
         setToSaturation(saturation)
         val contrastMatrix = ColorMatrix(
             floatArrayOf(
-                contrast, 0f, 0f, 0f, (1 - contrast) * 128,
-                0f, contrast, 0f, 0f, (1 - contrast) * 128,
-                0f, 0f, contrast, 0f, (1 - contrast) * 128,
+                contrast, 0f, 0f, 0f, (1 - contrast) * 128f,
+                0f, contrast, 0f, 0f, (1 - contrast) * 128f,
+                0f, 0f, contrast, 0f, (1 - contrast) * 128f,
                 0f, 0f, 0f, 1f, 0f
             )
         )

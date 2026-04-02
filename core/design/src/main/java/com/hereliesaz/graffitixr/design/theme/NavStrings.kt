@@ -32,6 +32,8 @@ data class NavStrings(
     val wallInfo: String = "Replace the background wall photo used in Mockup mode.",
     val isolate: String = "Isolate",
     val isolateInfo: String = "Automatically remove the background from this layer, leaving only the subject on a transparent background.",
+    val invert: String = "Invert",
+    val invertInfo: String = "Create a negative of the current layer. Blacks become whites, and colors are flipped to their opposites — useful for stencil and overlay analysis.",
     val outline: String = "Outline",
     val outlineInfo: String = "Convert this layer to black line art on a transparent background — ideal for creating stencil templates.",
     val adjust: String = "Adjust",

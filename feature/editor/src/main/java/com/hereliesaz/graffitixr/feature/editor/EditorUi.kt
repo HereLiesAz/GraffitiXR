@@ -113,7 +113,6 @@ fun EditorUi(
                 onColorBalanceRChange = actions::onColorBalanceRChanged,
                 onColorBalanceGChange = actions::onColorBalanceGChanged,
                 onColorBalanceBChange = actions::onColorBalanceBChanged,
-                onToggleInvert = actions::onToggleInvert,
                 onUndo = actions::onUndoClicked,
                 onRedo = actions::onRedoClicked,
                 onMagicAlign = actions::onMagicClicked,

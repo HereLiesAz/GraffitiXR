@@ -56,7 +56,6 @@ fun AdjustmentsPanel(
     onColorBalanceRChange: (Float) -> Unit,
     onColorBalanceGChange: (Float) -> Unit,
     onColorBalanceBChange: (Float) -> Unit,
-    onToggleInvert: () -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onMagicAlign: () -> Unit,
@@ -164,11 +163,9 @@ fun AdjustmentsPanel(
                 canRedo = true, // Logic handled by ViewModel
                 undoCount = state.undoCount,
                 redoCount = state.redoCount,
-                isInverted = activeLayer?.isInverted ?: false,
                 onUndo = onUndo,
                 onRedo = onRedo,
                 onMagicClicked = onMagicAlign,
-                onToggleInvert = onToggleInvert,
                 modifier = Modifier.fillMaxWidth()
             )
         }
