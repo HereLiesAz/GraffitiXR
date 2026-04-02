@@ -15,8 +15,15 @@
 -dontwarn org.opencv.**
 
 # --- ARCore ---
+# Keep all classes in the com.google.ar.core package as-is.
+# Many of these are obfuscated internally (e.g., com.google.ar.core.x)
+# and their bytecode has stack map tables that are easily corrupted
+# by aggressive optimizations in newer AGP/R8 versions.
 -keep class com.google.ar.core.** { *; }
+-keep interface com.google.ar.core.** { *; }
 -dontwarn com.google.ar.core.**
+-dontrepackage
+-keepattributes Code,StackMapTable
 
 # --- Native Engine (MobileGS & SlamManager) ---
 # Keep the JNI wrapper class and its native methods
