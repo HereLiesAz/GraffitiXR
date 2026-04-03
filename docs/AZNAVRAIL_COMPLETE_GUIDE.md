@@ -47,8 +47,7 @@ Controls visual style defaults.
 ```kotlin
 azTheme(
     defaultShape = AzButtonShape.RECTANGLE, // Default shape for all items
-    activeColor = MaterialTheme.colorScheme.primary, // Color for active state
-    translucentBackground = Color.Black.copy(alpha = 0.5f) // Set the background color for menus/overlays!
+    activeColor = MaterialTheme.colorScheme.primary // Color for active state
 )
 ```
 
@@ -66,6 +65,18 @@ azAdvanced(
 ```
 
 ---
+
+
+### D. Item Customization (Colors & Text)
+Most navigation items (`azRailItem`, `azMenuItem`, toggles, cyclers, etc.) support overriding their display text and colors when shown in the menu versus the rail:
+- `menuText`: Optional alternate text to display when the item is expanded in the side menu (overrides `text`).
+- `menuToggleOnText`, `menuToggleOffText`: Optional alternate text for toggles when in the menu.
+- `menuOptions`: Optional alternate list of strings for cyclers when in the menu.
+- `textColor`: Custom color for the text itself.
+- `fillColor`: Custom color for the button's translucent background surface. By default, the `fillColor` is Black (with 25% opacity), unless the item's main color is Black, in which case it is White (with 25% opacity) to ensure proper contrast.
+
+### E. Menu Font Size & Theming
+The expanded menu text font size (and the footer items text size) is strictly controlled by your app's `MaterialTheme.typography.titleLarge`. To adjust the text size inside the side menu drawer, simply customize the `titleLarge` attribute in your app's typography theme!
 
 ## 3. Navigation Items (DSL)
 
@@ -104,11 +115,6 @@ azRailItem(id = "icon-item", text = "Icon", content = android.R.drawable.ic_menu
 
 // Rail item with specific shape override
 azRailItem(id = "none-shape", text = "No Shape", shape = AzButtonShape.NONE)
-
-// Rail item with Custom Composable Content Size
-azRailItem(id = "wide-composable", text = "Wide", content = AzComposableContent {
-    Box(Modifier.width(120.dp).background(Color.Blue))
-}) // Will not clip to rail width!
 
 // Disabled item
 azRailItem(id = "profile", text = "Profile", disabled = true, route = "profile")
@@ -225,8 +231,6 @@ azRailRelocItem(
     id = "reloc-1",
     hostId = "rail-host", // Cluster ID
     text = "Reloc Item 1",
-    forceHiddenMenuOpen = false, // Programmatic control for hidden context menu
-    onHiddenMenuDismiss = { /* Menu was closed! */ },
     onRelocate = { from, to, newOrder -> /* handle reorder */ }
 ) {
     // Hidden Context Menu (Tap to open)
@@ -346,7 +350,7 @@ AzForm(
     formName = "loginForm",
     onSubmit = { formData -> /* Map<String, String> */ }
 ) {
-    entry(entryName = "username", hint = "Username", initialValue = "AzRailFan") // Pre-filled!
+    entry(entryName = "username", hint = "Username")
     entry(entryName = "password", hint = "Password", secret = true) // Password mask
     entry(entryName = "bio", hint = "Biography", multiline = true)  // Multi-line
 }
@@ -370,4 +374,44 @@ Standalone versions of rail components for general UI use.
 AzButton(text = "Button", onClick = {}, shape = AzButtonShape.SQUARE)
 AzToggle(isChecked = true, onToggle = {}, toggleOnText = "On", toggleOffText = "Off")
 AzCycler(options = listOf("1", "2"), selectedOption = "1", onCycle = {})
+```
+
+
+## Tutorial Framework
+
+AzNavRail features a powerful tutorial framework allowing you to script interactive scenes, dim the screen, and highlight specific items via an easy-to-use DSL. Tutorials are passed in `azAdvanced` or `azSettings`. When a tutorial is associated with an item ID, tapping that item's Help card will launch the tutorial sequence.
+
+```kotlin
+import com.hereliesaz.aznavrail.tutorial.AzHighlight
+import com.hereliesaz.aznavrail.tutorial.azTutorial
+
+azAdvanced(
+    helpEnabled = true,
+    tutorials = mapOf(
+        "my-item-id" to azTutorial {
+            // A scene displays custom composable content underneath the tutorial overlay
+            scene(
+                id = "scene1",
+                content = {
+                    Box(Modifier.fillMaxSize().background(Color.DarkGray)) {
+                        Text("Scripted App Screen", color = Color.White)
+                    }
+                }
+            ) {
+                // Cards display textual instructions with next/skip actions
+                card(
+                    title = "Welcome",
+                    text = "Welcome to the tutorial.",
+                    highlight = AzHighlight.FullScreen
+                )
+                card(
+                    title = "Highlighting",
+                    text = "Notice the highlighted item.",
+                    highlight = AzHighlight.Item("my-item-id"),
+                    actionText = "Finish"
+                )
+            }
+        }
+    )
+)
 ```
