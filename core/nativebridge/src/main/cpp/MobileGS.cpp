@@ -773,6 +773,8 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
 
     bool mapModified = false;
     int step = (depth.cols > 320) ? 2 : 1;
+    // TUNE: Always use high-detail step=1 for Canvas mode (small voxels) to capture fine geometry
+    if (mVoxelSize < 0.004f) step = 1;
 
     auto unproject = [&](int r, int c, float d) {
         return cv::Point3f(
@@ -866,7 +868,10 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 if(len > 0) { s.nx/=len; s.ny/=len; s.nz/=len; }
 
                 s.radius = s.radius * alpha + nu.radius * (1.0f - alpha);
-                s.confidence = std::min(1.0f, s.confidence + 0.05f);
+
+                // TUNE: Faster confidence build-up for small-scale art to lock geometry in place
+                float confGain = (mVoxelSize < 0.004f) ? 0.12f : 0.05f;
+                s.confidence = std::min(1.0f, s.confidence + confGain);
             } else {
                 splatData.push_back(update.second);
                 mVoxelGrid[update.first] = splatData.size() - 1;
@@ -969,7 +974,9 @@ void MobileGS::continuousOptimize() {
     size_t validCount = 0;
 
     for (size_t i = 0; i < splatData.size(); i++) {
-        splatData[i].confidence -= 0.005f;
+        // TUNE: Slower decay for small-scale art to prevent "shimmering" or loss of detail
+        float decay = (mVoxelSize < 0.004f) ? 0.001f : 0.005f;
+        splatData[i].confidence -= decay;
 
         if (splatData[i].confidence > 0.0f) {
             if (validCount != i) {
@@ -1232,9 +1239,9 @@ void MobileGS::loadModel(const std::string& path) {
         for (size_t i = 0; i < splatData.size(); ++i) {
             const auto& s = splatData[i];
             VoxelKey key{
-                    static_cast<int>(std::floor(s.x / VOXEL_SIZE)),
-                    static_cast<int>(std::floor(s.y / VOXEL_SIZE)),
-                    static_cast<int>(std::floor(s.z / VOXEL_SIZE))
+                    static_cast<int>(std::floor(s.x / mVoxelSize)),
+                    static_cast<int>(std::floor(s.y / mVoxelSize)),
+                    static_cast<int>(std::floor(s.z / mVoxelSize))
             };
             mVoxelGrid[key] = i;
         }

@@ -308,7 +308,7 @@ class MainActivity : ComponentActivity() {
                     Color(1f - canvasBg.red, 1f - canvasBg.green, 1f - canvasBg.blue, alpha = 1f)
                 }
 
-                val allHelpItems = remember(editorUiState.layers, editorUiState.activeLayerId, editorUiState.activeTool) {
+                val mainHelpItems = remember(editorUiState.layers) {
                     val base = mutableMapOf(
                         // ─── Mode Menu ──────────────────────────────────────────────────
                         "mode_host" to "Mode Switcher: Switch between app modes. Instructions: Tap to expand, then select AR, Overlay, Mockup, or Lightbox.",
@@ -335,44 +335,46 @@ class MainActivity : ComponentActivity() {
                         "save" to "Save Project: Store mural and AR map. Instructions: Enter a project name and tap Save to preserve your progress.",
                         "load" to "Project Library: Access saved murals. Instructions: Browse the library to resume work or import shared project files.",
                         "export" to "Export Image: Save high-res snapshot. Instructions: Renders all visible layers into a single PNG in your photo gallery.",
-                        "help_sub" to "Interactive Help: Explains button functions. Instructions: Tap to activate (Cyan). While active, tap any button to see its help text.",
                         "settings" to "App Settings: Configure preferences. Instructions: Open to adjust handedness, units, and scanning parameters.",
 
                         // ─── Global Tools ───────────────────────────────────────────────
                         "light" to "Flashlight: Toggle device LED. Instructions: Use this to illuminate dark walls for better AR tracking.",
                         "lock_trace" to "Lock/Freeze: Prevent accidental changes. Instructions: In Trace mode, disables screen. In other modes, locks layer transforms.",
+                        "help_main" to "Interactive Help: Explains button functions. Instructions: Tap to activate (Cyan). While active, tap any button to see its help text."
                     )
 
-                    // ─── Dynamic Layer Tools ──────────────────────────────────────────
-                    val activeId = editorUiState.activeLayerId
+                    editorUiState.layers.forEach { layer ->
+                        base["layer_${layer.id}"] = "Layer '${layer.name}': Active mural element. Instructions: Tap to select. Drag button up/down to reorder. Transform on screen with gestures."
+                    }
+                    base
+                }
+
+                val nestedHelpItems = remember(editorUiState.layers) {
+                    val base = mutableMapOf<String, String>()
                     editorUiState.layers.forEach { layer ->
                         val id = layer.id
-                        // Only add help for the active layer OR if no layer is active (show all)
-                        if (activeId == null || activeId == id) {
-                            base["layer_$id"] = "Layer '${layer.name}': Active mural element. Instructions: Tap to select. Drag button up/down to reorder. Transform on screen with gestures."
-                            base["edit_text_$id"] = "Edit Text: Change words in typography layer. Instructions: Tap to open the keyboard and update the text content."
-                            base["size_$id"] = "Brush/Text Size: Adjust scale and softness. Instructions: Drag up/down for size. Drag left/right for brush feathering."
-                            base["font_$id"] = "Font Picker: Select typography style. Instructions: Tap to browse available fonts and apply them to the text layer."
-                            base["color_$id"] = "Color Tool: Set active color. Instructions: Drag up/down for brightness, left/right for saturation. Tap for full color wheel."
-                            base["kern_$id"] = "Text Kerning: Adjust letter spacing. Instructions: Drag left/right to tighten or loosen the text layout."
-                            base["bold_$id"] = "Bold Toggle: Thick font weight. Instructions: Tap to toggle bold styling on the active text layer."
-                            base["italic_$id"] = "Italic Toggle: Slanted styling. Instructions: Tap to toggle italic styling on the active text layer."
-                            base["outline_$id"] = "Text Outline: Character stroke. Instructions: Tap to toggle a visible outline around the text characters."
-                            base["shadow_$id"] = "Drop Shadow: Text depth. Instructions: Tap to toggle a soft shadow behind the typography for better legibility."
-                            base["stencil_$id"] = "Generate Stencil: Create printable templates. Instructions: Tap to begin multi-layer stencil generation for this image."
-                            base["blend_$id"] = "Blend Mode: Composite style. Instructions: Tap to cycle through modes like Multiply, Screen, and Overlay."
-                            base["adj_$id"] = "Image Adjustments: Fine-tune appearance. Instructions: Tap to reveal sliders for Opacity, Brightness, Contrast, and Saturation."
-                            base["invert_$id"] = "Invert Colors: High-contrast negative. Instructions: Tap to flip colors. Whites become black and vice-versa—useful for tracing."
-                            base["balance_$id"] = "Color Balance: RGB channel tuning. Instructions: Tap to reveal sliders for precise Red, Green, and Blue adjustment."
-                            base["eraser_$id"] = "Eraser Brush: Remove layer content. Instructions: Paint on screen to erase. Use 'Size' button to adjust diameter."
-                            base["blur_$id"] = "Blur/Smudge Tool: Blend colors. Instructions: Paint over regions to soften edges or smudge details together."
-                            base["liquify_$id"] = "Warp Tool: Reshape design. Instructions: Drag on screen to push and pull pixels—great for adjusting proportions."
-                            base["dodge_$id"] = "Dodge Tool: Lighten areas. Instructions: Paint over parts of the layer to increase their luminance."
-                            base["burn_$id"] = "Burn Tool: Darken areas. Instructions: Paint over parts of the layer to decrease their luminance."
-                            base["iso_$id"] = "Isolate Subject: Auto-background removal. Instructions: Tap to extract the main subject from its background using AI."
-                            base["line_$id"] = "Sketch Outline: Line art filter. Instructions: Tap to convert the photo into a black-and-white transparent outline."
-                            base["help_layer_$id"] = "Layer Help: Toggle info for these specific layer tools. Instructions: Tap to activate. Then tap any tool icon to see what it does."
-                        }
+                        base["edit_text_$id"] = "Edit Text: Change words in typography layer. Instructions: Tap to open the keyboard and update the text content."
+                        base["size_$id"] = "Brush/Text Size: Adjust scale and softness. Instructions: Drag up/down for size. Drag left/right for brush feathering."
+                        base["font_$id"] = "Font Picker: Select typography style. Instructions: Tap to browse available fonts and apply them to the text layer."
+                        base["color_$id"] = "Color Tool: Set active color. Instructions: Drag up/down for brightness, left/right for saturation. Tap for full color wheel."
+                        base["kern_$id"] = "Text Kerning: Adjust letter spacing. Instructions: Drag left/right to tighten or loosen the text layout."
+                        base["bold_$id"] = "Bold Toggle: Thick font weight. Instructions: Tap to toggle bold styling on the active text layer."
+                        base["italic_$id"] = "Italic Toggle: Slanted styling. Instructions: Tap to toggle italic styling on the active text layer."
+                        base["outline_$id"] = "Text Outline: Character stroke. Instructions: Tap to toggle a visible outline around the text characters."
+                        base["shadow_$id"] = "Drop Shadow: Text depth. Instructions: Tap to toggle a soft shadow behind the typography for better legibility."
+                        base["stencil_$id"] = "Generate Stencil: Create printable templates. Instructions: Tap to begin multi-layer stencil generation for this image."
+                        base["blend_$id"] = "Blend Mode: Composite style. Instructions: Tap to cycle through modes like Multiply, Screen, and Overlay."
+                        base["adj_$id"] = "Image Adjustments: Fine-tune appearance. Instructions: Tap to reveal sliders for Opacity, Brightness, Contrast, and Saturation."
+                        base["invert_$id"] = "Invert Colors: High-contrast negative. Instructions: Tap to flip colors. Whites become black and vice-versa—useful for tracing."
+                        base["balance_$id"] = "Color Balance: RGB channel tuning. Instructions: Tap to reveal sliders for precise Red, Green, and Blue adjustment."
+                        base["eraser_$id"] = "Eraser Brush: Remove layer content. Instructions: Paint on screen to erase. Use 'Size' button to adjust diameter."
+                        base["blur_$id"] = "Blur/Smudge Tool: Blend colors. Instructions: Paint over regions to soften edges or smudge details together."
+                        base["liquify_$id"] = "Warp Tool: Reshape design. Instructions: Drag on screen to push and pull pixels—great for adjusting proportions."
+                        base["dodge_$id"] = "Dodge Tool: Lighten areas. Instructions: Paint over parts of the layer to increase their luminance."
+                        base["burn_$id"] = "Burn Tool: Darken areas. Instructions: Paint over parts of the layer to decrease their luminance."
+                        base["iso_$id"] = "Isolate Subject: Auto-background removal. Instructions: Tap to extract the main subject from its background using AI."
+                        base["line_$id"] = "Sketch Outline: Line art filter. Instructions: Tap to convert the photo into a black-and-white transparent outline."
+                        base["help_layer_$id"] = "Layer Help: Toggle info for these specific layer tools. Instructions: Tap to activate. Then tap any tool icon to see what it does."
                     }
                     base
                 }
@@ -391,7 +393,7 @@ class MainActivity : ComponentActivity() {
                     )
                     azAdvanced(
                         helpEnabled = true,
-                        helpList = allHelpItems
+                        helpList = if (editorUiState.activeLayerId != null) nestedHelpItems else mainHelpItems
                     )
 
                     if (isRailVisible) {
@@ -817,31 +819,31 @@ class MainActivity : ComponentActivity() {
 
         if (editorUiState.editorMode == EditorMode.STENCIL) return
 
+        val isArMode = editorUiState.editorMode == EditorMode.AR
+
         azRailHostItem(id = "mode_host", text = navStrings.modes, color = navItemColor, info = navStrings.modesInfo)
         azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.arModeInfo)
         azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.overlayInfo)
         azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.mockupInfo)
         azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.traceInfo)
 
-        azDivider()
+        if (isArMode) {
+            azRailToggle(
+                id = "scan_mode_toggle",
+                isChecked = arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS,
+                toggleOnText = navStrings.mural,
+                toggleOffText = navStrings.canvas,
+                info = navStrings.scanModeToggleInfo,
+                color = Cyan
+            ) {
+                arViewModel.setArScanMode(if (arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS) ArScanMode.CLOUD_POINTS else ArScanMode.GAUSSIAN_SPLATS)
+            }
+        }
 
-        val isArMode = editorUiState.editorMode == EditorMode.AR
+        azDivider()
 
         if (isArMode) {
             azRailHostItem(id = "target_host", text = navStrings.grid, color = navItemColor, info = navStrings.gridInfo)
-
-            val isMural = arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS
-            val scanModeLabel = if (isMural) navStrings.mural else navStrings.canvas
-            azRailSubItem(
-                id = "scan_mode_toggle",
-                hostId = "target_host",
-                text = scanModeLabel,
-                color = if (isMural) Cyan else navItemColor,
-                shape = AzButtonShape.NONE,
-                info = navStrings.scanModeToggleInfo
-            ) {
-                arViewModel.setArScanMode(if (isMural) ArScanMode.CLOUD_POINTS else ArScanMode.GAUSSIAN_SPLATS)
-            }
 
             azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.createInfo) {
                 if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
@@ -889,7 +891,6 @@ class MainActivity : ComponentActivity() {
         azRailSubItem(id = "export", hostId = "project_host", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.exportInfo) {
             editorViewModel.exportImage()
         }
-        azHelpSubItem(id = "help_sub", hostId = "project_host", text = navStrings.help, color = navItemColor, shape = AzButtonShape.NONE)
         azRailSubItem(id = "settings", hostId = "project_host", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.settingsInfo) {
             showSettings = true
         }
@@ -1299,6 +1300,7 @@ class MainActivity : ComponentActivity() {
         }
         azRailItem(id = "lock_trace", text = lockText, color = navItemColor, info = navStrings.lockInfo, onClick = lockAction)
 
+        azHelpRailItem(id = "help_main", text = navStrings.help, color = navItemColor, shape = AzButtonShape.RECTANGLE)
     }
 }
 
