@@ -419,14 +419,10 @@ class MainActivity : ComponentActivity() {
                     )
 
                     // Onboarding Trigger
-                    val onboardingManager = remember { OnboardingManager(context) }
+                    val onboardingManager = remember(context) { OnboardingManager(context) }
                     LaunchedEffect(Unit) {
                         if (onboardingManager.isFirstTime("main_screen")) {
-                            // Automatically trigger onboarding for the main screen
                             onboardingManager.markAsSeen("main_screen")
-                            // We need a way to tell AzNavRail to show the help overlay programmatically, 
-                            // but based on current docs, helpEnabled = true triggers it on tap. 
-                            // Assuming we set a state to toggle helpEnabled or trigger help overlay.
                         }
                     }
 
