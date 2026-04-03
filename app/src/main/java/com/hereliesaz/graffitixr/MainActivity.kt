@@ -391,10 +391,44 @@ class MainActivity : ComponentActivity() {
                         packButtons = true,
                         dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
                     )
+                val helpViewModel: HelpViewModel = hiltViewModel()
+                val activeHelpList by helpViewModel.activeHelpList.collectAsState()
+
+                // Logic to switch active help list based on UI context
+                LaunchedEffect(editorUiState.activeLayerId) {
+                    val helpList = if (editorUiState.activeLayerId != null) nestedHelpItems else mainHelpItems
+                    helpViewModel.setActiveHelpList(helpList)
+                }
+
+                AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
+
+                    azTheme(
+                        activeColor = Cyan,
+                        defaultShape = AzButtonShape.RECTANGLE,
+                        headerIconShape = AzHeaderIconShape.ROUNDED,
+                        translucentBackground = Color.Black.copy(alpha = 0.5f)
+                    )
+                    azConfig(
+                        packButtons = true,
+                        dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
+                    )
                     azAdvanced(
                         helpEnabled = true,
-                        helpList = if (editorUiState.activeLayerId != null) nestedHelpItems else mainHelpItems
+                        helpList = activeHelpList,
+                        onDismissHelp = { /* Handle dismissal if needed */ }
                     )
+
+                    // Onboarding Trigger
+                    val onboardingManager = remember { OnboardingManager(context) }
+                    LaunchedEffect(Unit) {
+                        if (onboardingManager.isFirstTime("main_screen")) {
+                            // Automatically trigger onboarding for the main screen
+                            onboardingManager.markAsSeen("main_screen")
+                            // We need a way to tell AzNavRail to show the help overlay programmatically, 
+                            // but based on current docs, helpEnabled = true triggers it on tap. 
+                            // Assuming we set a state to toggle helpEnabled or trigger help overlay.
+                        }
+                    }
 
                     if (isRailVisible) {
                         ConfigureRailItems(
