@@ -413,9 +413,11 @@ class ArViewModel @Inject constructor(
         autoSaveJob?.cancel()
         autoSaveJob = viewModelScope.launch(Dispatchers.IO) {
             while (true) {
-                delay(10_000)
+                // Throttle auto-save to once every 60 seconds to reduce disk I/O and battery drain.
+                delay(60_000)
                 val current = slamManager.getSplatCount()
-                if (current > 0 && current != lastSavedSplatCount.get()) {
+                // Throttled: only save if map has significantly changed (> 500 new/updated splats)
+                if (current > 0 && kotlin.math.abs(current - lastSavedSplatCount.get()) > 500) {
                     saveMapNow()
                 }
                 if (_uiState.value.arScanMode == ArScanMode.CLOUD_POINTS) {

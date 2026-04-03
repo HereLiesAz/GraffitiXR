@@ -385,8 +385,21 @@ void MobileGS::sortThreadFunc() {
 
         if (currentCount == 0) continue;
 
-        std::vector<uint32_t> indices(currentCount);
-        std::iota(indices.begin(), indices.end(), 0);
+        // Perform basic culling: ignore points behind the camera or too far (> 15m) to reduce GPU draw calls and sorting overhead.
+        std::vector<uint32_t> indices;
+        indices.reserve(currentCount);
+
+        glm::vec3 camFwd = -glm::vec3(mViewMatrix[8], mViewMatrix[9], mViewMatrix[10]);
+        glm::vec3 camPosVec = glm::vec3(camPos.x, camPos.y, camPos.z);
+
+        for (int i = 0; i < currentCount; ++i) {
+            glm::vec3 p(positions[i].x, positions[i].y, positions[i].z);
+            glm::vec3 delta = p - camPosVec;
+            float distSq = glm::dot(delta, delta);
+            if (distSq > 225.0f) continue; // Further than 15m
+            if (glm::dot(delta, camFwd) < -0.5f) continue; // Far behind the camera (0.5m buffer)
+            indices.push_back(i);
+        }
 
         std::sort(indices.begin(), indices.end(), [&](uint32_t a, uint32_t b) {
             cv::Point3f da = positions[a] - camPos;
@@ -456,7 +469,7 @@ void MobileGS::scheduleRelocCheck(const cv::Mat& colorFrame) {
 }
 
 void MobileGS::relocThreadFunc() {
-    setpriority(PRIO_PROCESS, 0, 10);
+    setpriority(PRIO_PROCESS, 0, 15); // Reduced priority to minimize interference with high-speed rendering threads
     JniThreadAttacher attacher;
 
     while (mRelocRunning) {
@@ -716,7 +729,7 @@ void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float
 }
 
 void MobileGS::mapThreadFunc() {
-    setpriority(PRIO_PROCESS, 0, 10);
+    setpriority(PRIO_PROCESS, 0, 15); // Reduced priority to minimize interference with high-speed rendering threads
     JniThreadAttacher attacher;
     while (mMapRunning) {
         FrameData frame;
@@ -733,6 +746,7 @@ void MobileGS::mapThreadFunc() {
 }
 
 void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv) {
+    auto startTime = std::chrono::high_resolution_clock::now();
     bool isTrackingState = false;
     {
         std::lock_guard<std::mutex> lock(mMutex);
@@ -943,7 +957,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         mGlDataDirty = true;
     }
 
-    if (++mFrameCounter % 30 == 0) {
+    if (++mFrameCounter % 90 == 0) {
         continuousOptimize();
         {
             std::lock_guard<std::mutex> sortLock(mSortMutex);
@@ -963,6 +977,12 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         }
         mRelocCv.notify_one();
         mLastFingerprintUpdateFrame = mFrameCounter;
+    }
+
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+    if (mFrameCounter % 100 == 0) {
+        LOGI("MobileGS: processDepthFrame took %lld ms (avg over last 100 frames)", duration);
     }
 }
 

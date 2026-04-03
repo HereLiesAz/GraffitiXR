@@ -253,13 +253,16 @@ class ArRenderer(
                 if (len > 0.01f && fwdDot > 0f) len else -1f
             }
 
-            backgroundScope.launch {
-                val count = if (currentScanMode == ArScanMode.CLOUD_POINTS) {
-                    pointCloudRenderer.accumulatedPointCount
-                } else {
-                    slamManager.getSplatCount()
+            // Throttle UI updates to 15Hz to match SLAM processing frequency and reduce state churn.
+            if (frameCount % 4 == 0) {
+                backgroundScope.launch {
+                    val count = if (currentScanMode == ArScanMode.CLOUD_POINTS) {
+                        pointCloudRenderer.accumulatedPointCount
+                    } else {
+                        slamManager.getSplatCount()
+                    }
+                    onTrackingUpdated(isTracking, count, depthSupported, yawDeg, distanceMeters, relDir)
                 }
-                onTrackingUpdated(isTracking, count, depthSupported, yawDeg, distanceMeters, relDir)
             }
 
             if (captureRequested) {
@@ -313,7 +316,9 @@ class ArRenderer(
                 }
             }
 
-            if (frameCount++ % 2 == 0) {
+            // Throttle frame feeding to 15Hz (every 4 frames at 60Hz) to halve processing-related power draw.
+            // When tracking is stable and the device is stationary, we could throttle even further.
+            if (frameCount++ % 4 == 0) {
                 try {
                     frame.acquireCameraImage().use { image ->
                         val planes = image.planes
