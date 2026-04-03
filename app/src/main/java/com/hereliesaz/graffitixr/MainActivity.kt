@@ -122,6 +122,7 @@ import android.provider.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.core.net.toUri
+import timber.log.Timber
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -384,7 +385,8 @@ class MainActivity : ComponentActivity() {
 
                 // Logic to switch active help list based on UI context
                 LaunchedEffect(editorUiState.activeLayerId) {
-                    android.util.Log.d("GraffitiXR_Help", "Active layer ID changed to: ${editorUiState.activeLayerId}")
+                    Timber.tag("GraffitiXR_Help")
+                        .d("Active layer ID changed to: ${editorUiState.activeLayerId}")
                     val helpList = if (editorUiState.activeLayerId != null) nestedHelpItems else mainHelpItems
                     helpViewModel.setActiveHelpList(helpList)
                 }
