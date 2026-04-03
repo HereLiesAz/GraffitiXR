@@ -887,7 +887,9 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 float confGain = (mVoxelSize < 0.004f) ? 0.12f : 0.05f;
                 s.confidence = std::min(1.0f, s.confidence + confGain);
             } else {
-                splatData.push_back(update.second);
+                Splat s = update.second;
+                s.confidence = 0.1f; // Initial confidence boost
+                splatData.push_back(s);
                 mVoxelGrid[update.first] = splatData.size() - 1;
             }
         }

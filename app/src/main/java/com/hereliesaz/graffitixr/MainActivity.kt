@@ -384,6 +384,7 @@ class MainActivity : ComponentActivity() {
 
                 // Logic to switch active help list based on UI context
                 LaunchedEffect(editorUiState.activeLayerId) {
+                    android.util.Log.d("GraffitiXR_Help", "Active layer ID changed to: ${editorUiState.activeLayerId}")
                     val helpList = if (editorUiState.activeLayerId != null) nestedHelpItems else mainHelpItems
                     helpViewModel.setActiveHelpList(helpList)
                 }
