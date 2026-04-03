@@ -388,8 +388,15 @@ class MainActivity : ComponentActivity() {
                     helpViewModel.setActiveHelpList(helpList)
                 }
 
-                AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
+                // Onboarding Manager
+                val onboardingManager = remember(context) { OnboardingManager(context) }
+                LaunchedEffect(Unit) {
+                    if (onboardingManager.isFirstTime("main_screen")) {
+                        onboardingManager.markAsSeen("main_screen")
+                    }
+                }
 
+                AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
                     azTheme(
                         activeColor = Cyan,
                         defaultShape = AzButtonShape.RECTANGLE,
