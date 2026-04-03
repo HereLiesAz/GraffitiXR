@@ -379,18 +379,6 @@ class MainActivity : ComponentActivity() {
                     base
                 }
 
-                AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
-
-                    azTheme(
-                        activeColor = Cyan,
-                        defaultShape = AzButtonShape.RECTANGLE,
-                        headerIconShape = AzHeaderIconShape.ROUNDED,
-                        translucentBackground = Color.Black.copy(alpha = 0.5f)
-                    )
-                    azConfig(
-                        packButtons = true,
-                        dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
-                    )
                 val helpViewModel: HelpViewModel = hiltViewModel()
                 val activeHelpList by helpViewModel.activeHelpList.collectAsState()
 
@@ -417,14 +405,6 @@ class MainActivity : ComponentActivity() {
                         helpList = activeHelpList,
                         onDismissHelp = { /* Handle dismissal if needed */ }
                     )
-
-                    // Onboarding Trigger
-                    val onboardingManager = remember(context) { OnboardingManager(context) }
-                    LaunchedEffect(Unit) {
-                        if (onboardingManager.isFirstTime("main_screen")) {
-                            onboardingManager.markAsSeen("main_screen")
-                        }
-                    }
 
                     if (isRailVisible) {
                         ConfigureRailItems(
