@@ -81,7 +81,7 @@ static const char* kFragmentShader =
         "in float vConfidence;\n"
         "out vec4 oColor;\n"
         "void main() {\n"
-        "  if (vConfidence < 0.6) discard;\n"
+        "  if (vConfidence < 0.1) discard;\n"
         "  vec2 d = gl_PointCoord - 0.5;\n"
         "  float r2 = dot(d, d) * 4.0;\n"
         "  if (r2 > 1.0) discard;\n"
@@ -392,13 +392,17 @@ void MobileGS::sortThreadFunc() {
         glm::vec3 camFwd = -glm::vec3(mViewMatrix[8], mViewMatrix[9], mViewMatrix[10]);
         glm::vec3 camPosVec = glm::vec3(camPos.x, camPos.y, camPos.z);
 
-        for (int i = 0; i < currentCount; ++i) {
-            glm::vec3 p(positions[i].x, positions[i].y, positions[i].z);
-            glm::vec3 delta = p - camPosVec;
-            float distSq = glm::dot(delta, delta);
-            if (distSq > 225.0f) continue; // Further than 15m
-            if (glm::dot(delta, camFwd) < -0.5f) continue; // Far behind the camera (0.5m buffer)
-            indices.push_back(i);
+        {
+            std::lock_guard<std::mutex> mapLock(mMapMutex);
+            for (int i = 0; i < currentCount; ++i) {
+                if (splatData[i].confidence < MIN_RENDER_CONFIDENCE) continue;
+                glm::vec3 p(positions[i].x, positions[i].y, positions[i].z);
+                glm::vec3 delta = p - camPosVec;
+                float distSq = glm::dot(delta, delta);
+                if (distSq > 225.0f) continue; // Further than 15m
+                if (glm::dot(delta, camFwd) < -0.5f) continue; // Far behind the camera (0.5m buffer)
+                indices.push_back(i);
+            }
         }
 
         std::sort(indices.begin(), indices.end(), [&](uint32_t a, uint32_t b) {
@@ -1442,8 +1446,6 @@ void MobileGS::draw() {
 
         if (elementsToDraw > 0) {
             glDrawElements(GL_POINTS, elementsToDraw, GL_UNSIGNED_INT, (void*)0);
-        } else {
-            glDrawArrays(GL_POINTS, 0, mPointCount);
         }
 
         glDisableVertexAttribArray(0);
