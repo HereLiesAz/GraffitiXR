@@ -333,7 +333,9 @@ class ArRenderer(
                         val rotatedBitmap = if (rotationNeeded != 0) {
                             val matrix = android.graphics.Matrix()
                             matrix.postRotate(rotationNeeded.toFloat())
-                            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+                            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true).also {
+                                bitmap.recycle()
+                            }
                         } else {
                             bitmap
                         }
