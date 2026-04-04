@@ -15,8 +15,13 @@ fun getTutorials(): Map<String, AzTutorial> {
             scene(id = "ar_intro", content = { Box(Modifier.fillMaxSize()) }) {
                 card(
                     title = "AR Projection Mode",
-                    text = "Project your designs onto walls using spatial mapping. Scan your surroundings until a wall is detected, then tap to place your design.",
+                    text = "Project designs using spatial mapping. Scan surroundings until wall is detected, then tap to place.",
                     highlight = AzHighlight.Item("ar")
+                )
+                card(
+                    title = "Exporting Work",
+                    text = "Need a high-res file? Use the Export tool to capture your AR scene as a high-quality image.",
+                    highlight = AzHighlight.Item("export")
                 )
             }
         },
@@ -24,7 +29,7 @@ fun getTutorials(): Map<String, AzTutorial> {
             scene(id = "overlay_intro", content = { Box(Modifier.fillMaxSize()) }) {
                 card(
                     title = "Overlay Mode",
-                    text = "Project your design directly onto your camera feed. Perfect for quick mockups without spatial mapping.",
+                    text = "Direct projection onto camera feed for quick mockups.",
                     highlight = AzHighlight.Item("overlay")
                 )
             }
@@ -33,7 +38,7 @@ fun getTutorials(): Map<String, AzTutorial> {
             scene(id = "mockup_intro", content = { Box(Modifier.fillMaxSize()) }) {
                 card(
                     title = "Mockup Mode",
-                    text = "See your design on a static photo. Select a wall image and layer your mural on top.",
+                    text = "Preview design on a photo. Select a wall image, then layer your mural on top.",
                     highlight = AzHighlight.Item("mockup")
                 )
             }
@@ -42,8 +47,17 @@ fun getTutorials(): Map<String, AzTutorial> {
             scene(id = "trace_intro", content = { Box(Modifier.fillMaxSize()) }) {
                 card(
                     title = "Lightbox Mode",
-                    text = "Turn your phone into a high-brightness light source for tracing designs onto paper.",
+                    text = "High-brightness tracing surface. Place paper over the screen and trace.",
                     highlight = AzHighlight.Item("trace")
+                )
+            }
+        },
+        "stencil" to azTutorial {
+            scene(id = "stencil_intro", content = { Box(Modifier.fillMaxSize()) }) {
+                card(
+                    title = "Stencil Generation",
+                    text = "Transform your sketches into printable templates using advanced stencil filters.",
+                    highlight = AzHighlight.Item("stencil") // Assuming 'stencil' exists in helplist
                 )
             }
         }

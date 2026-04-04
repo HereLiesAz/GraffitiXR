@@ -152,7 +152,6 @@ class StencilProcessorTest {
 
     // ── Layer count tests ─────────────────────────────────────────────────────
 
-    @org.junit.Ignore("TODO: Update stencil assertions for new transparent backgrounds logic")
     @Test
     fun `1-layer mode produces only SILHOUETTE`() = runTest {
         val done = processor.process(isolatedBitmap, 0.5f)
@@ -160,10 +159,8 @@ class StencilProcessorTest {
             .first()
 
         assertEquals(2, done.layers.size)
-        // Note: the test name and assumptions are outdated for binary pair pipeline
     }
 
-    @org.junit.Ignore("TODO: Update stencil assertions for new transparent backgrounds logic")
     @Test
     fun `2-layer mode produces SILHOUETTE then HIGHLIGHT`() = runTest {
         val done = processor.process(isolatedBitmap, 0.5f)
@@ -173,7 +170,6 @@ class StencilProcessorTest {
         assertEquals(2, done.layers.size)
     }
 
-    @org.junit.Ignore("TODO: Update stencil assertions for new transparent backgrounds logic")
     @Test
     fun `3-layer mode produces SILHOUETTE, MIDTONE, HIGHLIGHT in order`() = runTest {
         val done = processor.process(isolatedBitmap, 0.5f)
@@ -183,7 +179,6 @@ class StencilProcessorTest {
 
     // ── Bitmap integrity ──────────────────────────────────────────────────────
 
-    @org.junit.Ignore("TODO: Update stencil assertions for new transparent backgrounds logic")
     @Test
     fun `output bitmaps match source dimensions`() = runTest {
         val done = processor.process(isolatedBitmap, 0.5f)
@@ -196,7 +191,6 @@ class StencilProcessorTest {
         }
     }
 
-    @org.junit.Ignore("TODO: Update stencil assertions for new transparent backgrounds logic")
     @Test
     fun `output bitmaps are ARGB_8888`() = runTest {
         val done = processor.process(isolatedBitmap, 0.5f)
@@ -210,7 +204,6 @@ class StencilProcessorTest {
 
     // ── Silhouette content ────────────────────────────────────────────────────
 
-    @org.junit.Ignore("TODO: Update stencil assertions for new transparent backgrounds logic")
     @Test
     fun `silhouette layer contains black pixels where subject was`() = runTest {
         val done = processor.process(isolatedBitmap, 0.5f)
@@ -218,7 +211,6 @@ class StencilProcessorTest {
             .first()
     }
 
-    @org.junit.Ignore("TODO: Update stencil assertions for new transparent backgrounds logic")
     @Test
     fun `silhouette layer contains white pixels outside subject`() = runTest {
         val done = processor.process(isolatedBitmap, 0.5f)
