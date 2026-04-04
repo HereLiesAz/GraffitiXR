@@ -144,7 +144,7 @@ class StencilProcessor @Inject constructor() {
      * Converts the alpha channel of [segmented] into a binary ARGB_8888 mask bitmap.
      * White (0xFFFFFFFF) = subject pixel (alpha > 0), black (0xFF000000) = background.
      */
-    private fun alphaToMask(segmented: Bitmap): Bitmap {
+    fun alphaToMask(segmented: Bitmap): Bitmap {
         val w = segmented.width
         val h = segmented.height
         val pixels = IntArray(w * h)

@@ -520,15 +520,25 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun exportImage() {
+    fun exportImage(backgroundBitmap: Bitmap? = null) {
         viewModelScope.launch(dispatchers.default) {
             _uiState.update { it.copy(isLoading = true) }
             try {
                 val metrics = context.resources.displayMetrics
+                val bgBmp = backgroundBitmap ?: if (_uiState.value.editorMode == EditorMode.MOCKUP) _uiState.value.backgroundBitmap else null
+                val bgColor = if (_uiState.value.editorMode == EditorMode.TRACE) {
+                    val c = _uiState.value.canvasBackground
+                    android.graphics.Color.argb((c.alpha * 255).toInt(), (c.red * 255).toInt(), (c.green * 255).toInt(), (c.blue * 255).toInt())
+                } else {
+                    android.graphics.Color.TRANSPARENT
+                }
+
                 val compositeBitmap = exportManager.compositeLayers(
                     _uiState.value.layers,
                     metrics.widthPixels,
-                    metrics.heightPixels
+                    metrics.heightPixels,
+                    backgroundBitmap = bgBmp,
+                    backgroundColor = bgColor
                 )
 
                 val success = saveBitmapToGallery(context, compositeBitmap)
@@ -619,18 +629,34 @@ class EditorViewModel @Inject constructor(
 
         viewModelScope.launch(dispatchers.default) {
             val newBitmap = subjectIsolator.applyConfidenceThreshold(source, confidence, clamped, 0.1f)
+
+            val finalPreview = if (pendingStencilSourceLayerId != null) {
+                val polarity = stencilProcessor.assessTonalPolarity(newBitmap)
+                val mask = stencilProcessor.alphaToMask(newBitmap)
+                val stencilLayers = stencilProcessor.kmeansLayers(newBitmap, mask, polarity, clamped)
+
+                val combined = Bitmap.createBitmap(newBitmap.width, newBitmap.height, Bitmap.Config.ARGB_8888)
+                val canvas = android.graphics.Canvas(combined)
+                stencilLayers.forEach { stencilLayer ->
+                    canvas.drawBitmap(stencilLayer.bitmap, 0f, 0f, null)
+                }
+                combined
+            } else {
+                newBitmap
+            }
+
             withContext(dispatchers.main) {
                 if (targetId != null) {
                     _uiState.update { state ->
                         state.copy(
                             layers = state.layers.map { layer ->
-                                if (layer.id == targetId) layer.copy(bitmap = newBitmap) else layer
+                                if (layer.id == targetId) layer.copy(bitmap = finalPreview) else layer
                             }
                         )
                     }
                 } else {
                     // Update live preview for stencil generation
-                    _uiState.update { it.copy(segmentationPreview = newBitmap) }
+                    _uiState.update { it.copy(segmentationPreview = finalPreview) }
                 }
             }
         }
