@@ -199,4 +199,6 @@ private:
     int mScreenWidth = 1920;
     int mScreenHeight = 1080;
     float mVoxelSize = 0.005f;
+
+    static constexpr float MIN_RENDER_CONFIDENCE = 0.1f;
 };

@@ -73,7 +73,9 @@ static const char* kVertexShader =
         "  vConfidence = aConfidence;\n"
         "}\n";
 
-static const char* kFragmentShader =
+static std::string getFragmentShaderSource(float minConfidence) {
+    char buffer[1024];
+    snprintf(buffer, sizeof(buffer),
         "#version 300 es\n"
         "precision mediump float;\n"
         "in vec4 vColor;\n"
@@ -81,14 +83,17 @@ static const char* kFragmentShader =
         "in float vConfidence;\n"
         "out vec4 oColor;\n"
         "void main() {\n"
-        "  if (vConfidence < 0.6) discard;\n"
+        "  // Threshold synced with MobileGS::MIN_RENDER_CONFIDENCE to immediately render new points\n"
+        "  if (vConfidence < %f) discard;\n"
         "  vec2 d = gl_PointCoord - 0.5;\n"
         "  float r2 = dot(d, d) * 4.0;\n"
         "  if (r2 > 1.0) discard;\n"
         "  float shading = 0.8 + 0.2 * vNdotV;\n"
         "  oColor = vec4(vColor.rgb * shading, 1.0);\n"
         "  gl_FragDepth = gl_FragCoord.z + (r2 * 0.001);\n"
-        "}\n";
+        "}\n", minConfidence);
+    return std::string(buffer);
+}
 
 // --- MESH (WIREFRAME) SHADERS ---
 static const char* kMeshVertexShader =
@@ -232,7 +237,8 @@ void MobileGS::destroy() {
 
 void MobileGS::initShaders() {
     GLuint vertexShader = compileShader(GL_VERTEX_SHADER, kVertexShader);
-    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, kFragmentShader);
+    std::string fragSource = getFragmentShaderSource(MIN_RENDER_CONFIDENCE);
+    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragSource.c_str());
     if (vertexShader && fragmentShader) {
         mProgram = glCreateProgram();
         glAttachShader(mProgram, vertexShader);
@@ -392,13 +398,17 @@ void MobileGS::sortThreadFunc() {
         glm::vec3 camFwd = -glm::vec3(mViewMatrix[8], mViewMatrix[9], mViewMatrix[10]);
         glm::vec3 camPosVec = glm::vec3(camPos.x, camPos.y, camPos.z);
 
-        for (int i = 0; i < currentCount; ++i) {
-            glm::vec3 p(positions[i].x, positions[i].y, positions[i].z);
-            glm::vec3 delta = p - camPosVec;
-            float distSq = glm::dot(delta, delta);
-            if (distSq > 225.0f) continue; // Further than 15m
-            if (glm::dot(delta, camFwd) < -0.5f) continue; // Far behind the camera (0.5m buffer)
-            indices.push_back(i);
+        {
+            std::lock_guard<std::mutex> mapLock(mMapMutex);
+            for (int i = 0; i < currentCount; ++i) {
+                if (splatData[i].confidence < MIN_RENDER_CONFIDENCE) continue;
+                glm::vec3 p(positions[i].x, positions[i].y, positions[i].z);
+                glm::vec3 delta = p - camPosVec;
+                float distSq = glm::dot(delta, delta);
+                if (distSq > 225.0f) continue; // Further than 15m
+                if (glm::dot(delta, camFwd) < -0.5f) continue; // Far behind the camera (0.5m buffer)
+                indices.push_back(i);
+            }
         }
 
         std::sort(indices.begin(), indices.end(), [&](uint32_t a, uint32_t b) {
@@ -1442,8 +1452,6 @@ void MobileGS::draw() {
 
         if (elementsToDraw > 0) {
             glDrawElements(GL_POINTS, elementsToDraw, GL_UNSIGNED_INT, (void*)0);
-        } else {
-            glDrawArrays(GL_POINTS, 0, mPointCount);
         }
 
         glDisableVertexAttribArray(0);
