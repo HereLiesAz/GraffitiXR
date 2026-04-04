@@ -33,7 +33,8 @@ data class MainUiState(
     // True when the user tapped "Re-detect" and is being walked through realignment.
     val isInPlaneRealignment: Boolean = false,
     // True when the current capture was initiated via the tap-to-target path (Phase 4).
-    val captureOriginatedFromTap: Boolean = false
+    val captureOriginatedFromTap: Boolean = false,
+    val tutorialCompleted: Map<String, Boolean> = emptyMap()
 )
 
 @HiltViewModel
@@ -181,6 +182,14 @@ class MainViewModel @Inject constructor(
                 isCapturingTarget = false,
                 captureStep = CaptureStep.NONE,
                 captureOriginatedFromTap = false
+            )
+        }
+    }
+
+    fun markTutorialCompleted(tutorialId: String) {
+        _uiState.update { currentState ->
+            currentState.copy(
+                tutorialCompleted = currentState.tutorialCompleted + (tutorialId to true)
             )
         }
     }

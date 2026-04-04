@@ -399,6 +399,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                val tutorials = getTutorials()
                 AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
                     azTheme(
                         activeColor = Cyan,
@@ -413,7 +414,8 @@ class MainActivity : ComponentActivity() {
                     azAdvanced(
                         helpEnabled = true,
                         helpList = activeHelpList,
-                        onDismissHelp = { /* Handle dismissal if needed */ }
+                        onDismissHelp = { /* Handle dismissal if needed */ },
+                        tutorials = tutorials
                     )
 
                     if (isRailVisible) {
