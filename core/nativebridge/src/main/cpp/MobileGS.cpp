@@ -81,7 +81,7 @@ static const char* kFragmentShader =
         "in float vConfidence;\n"
         "out vec4 oColor;\n"
         "void main() {\n"
-        "  if (vConfidence < 0.6) discard;\n"
+        "  if (vConfidence < 0.2) discard;\n"
         "  vec2 d = gl_PointCoord - 0.5;\n"
         "  float r2 = dot(d, d) * 4.0;\n"
         "  if (r2 > 1.0) discard;\n"
