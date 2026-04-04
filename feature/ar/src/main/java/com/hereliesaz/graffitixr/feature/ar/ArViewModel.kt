@@ -91,6 +91,7 @@ class ArViewModel @Inject constructor(
                 val established = project?.fingerprint != null
                 _uiState.update { it.copy(isAnchorEstablished = established) }
                 renderer?.anchorEstablished = established
+                renderer?.hideVisualization = established
                 if (project?.id != loadedProjectId) {
                     loadedProjectId = null
                 }
@@ -301,7 +302,7 @@ class ArViewModel @Inject constructor(
         _isCameraInUseByAr.value = false
     }
 
-    private suspend fun saveMapBlocking() {
+    suspend fun saveMapBlocking() {
         val project = projectRepository.currentProject.value ?: return
         if (slamManager.getSplatCount() <= 0) return
         while (isSaving.get()) { delay(50) }
@@ -317,7 +318,7 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    private suspend fun saveCloudPointsBlocking() {
+    suspend fun saveCloudPointsBlocking() {
         val project = projectRepository.currentProject.value ?: return
         val currentMode = settingsRepository.arScanMode.first()
         if (currentMode != ArScanMode.CLOUD_POINTS) return
@@ -793,10 +794,21 @@ class ArViewModel @Inject constructor(
             )
         }
         renderer?.anchorEstablished = true
+        renderer?.hideVisualization = true
     }
 
     fun requestCapture() {
         _uiState.update { it.copy(isCaptureRequested = true) }
+    }
+
+    fun requestExport(onCaptured: (android.graphics.Bitmap) -> Unit) {
+        val r = renderer
+        if (r != null) {
+            r.onExportCaptured = onCaptured
+            r.exportRequested = true
+        } else {
+            Timber.e("requestExport called but renderer is null")
+        }
     }
 
     fun onCaptureRequestHandled() {
