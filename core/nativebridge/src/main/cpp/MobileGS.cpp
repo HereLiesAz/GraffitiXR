@@ -73,7 +73,9 @@ static const char* kVertexShader =
         "  vConfidence = aConfidence;\n"
         "}\n";
 
-static const char* kFragmentShader =
+static std::string getFragmentShaderSource(float minConfidence) {
+    char buffer[1024];
+    snprintf(buffer, sizeof(buffer),
         "#version 300 es\n"
         "precision mediump float;\n"
         "in vec4 vColor;\n"
@@ -81,14 +83,17 @@ static const char* kFragmentShader =
         "in float vConfidence;\n"
         "out vec4 oColor;\n"
         "void main() {\n"
-        "  if (vConfidence < 0.1) discard;\n"
+        "  // Threshold synced with MobileGS::MIN_RENDER_CONFIDENCE to immediately render new points\n"
+        "  if (vConfidence < %f) discard;\n"
         "  vec2 d = gl_PointCoord - 0.5;\n"
         "  float r2 = dot(d, d) * 4.0;\n"
         "  if (r2 > 1.0) discard;\n"
         "  float shading = 0.8 + 0.2 * vNdotV;\n"
         "  oColor = vec4(vColor.rgb * shading, 1.0);\n"
         "  gl_FragDepth = gl_FragCoord.z + (r2 * 0.001);\n"
-        "}\n";
+        "}\n", minConfidence);
+    return std::string(buffer);
+}
 
 // --- MESH (WIREFRAME) SHADERS ---
 static const char* kMeshVertexShader =
@@ -232,7 +237,8 @@ void MobileGS::destroy() {
 
 void MobileGS::initShaders() {
     GLuint vertexShader = compileShader(GL_VERTEX_SHADER, kVertexShader);
-    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, kFragmentShader);
+    std::string fragSource = getFragmentShaderSource(MIN_RENDER_CONFIDENCE);
+    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragSource.c_str());
     if (vertexShader && fragmentShader) {
         mProgram = glCreateProgram();
         glAttachShader(mProgram, vertexShader);
