@@ -155,37 +155,30 @@ class StencilProcessorTest {
     @org.junit.Ignore("TODO: Update stencil assertions for new transparent backgrounds logic")
     @Test
     fun `1-layer mode produces only SILHOUETTE`() = runTest {
-        val done = processor.process(isolatedBitmap, StencilLayerCount.ONE)
+        val done = processor.process(isolatedBitmap, 0.5f)
             .filterIsInstance<StencilProgress.Done>()
             .first()
 
-        assertEquals(1, done.layers.size)
-        assertEquals(StencilLayerType.SILHOUETTE, done.layers[0].type)
+        assertEquals(2, done.layers.size)
+        // Note: the test name and assumptions are outdated for binary pair pipeline
     }
 
     @org.junit.Ignore("TODO: Update stencil assertions for new transparent backgrounds logic")
     @Test
     fun `2-layer mode produces SILHOUETTE then HIGHLIGHT`() = runTest {
-        val done = processor.process(isolatedBitmap, StencilLayerCount.TWO)
+        val done = processor.process(isolatedBitmap, 0.5f)
             .filterIsInstance<StencilProgress.Done>()
             .first()
 
         assertEquals(2, done.layers.size)
-        assertEquals(StencilLayerType.SILHOUETTE, done.layers[0].type)
-        assertEquals(StencilLayerType.HIGHLIGHT, done.layers[1].type)
     }
 
     @org.junit.Ignore("TODO: Update stencil assertions for new transparent backgrounds logic")
     @Test
     fun `3-layer mode produces SILHOUETTE, MIDTONE, HIGHLIGHT in order`() = runTest {
-        val done = processor.process(isolatedBitmap, StencilLayerCount.THREE)
+        val done = processor.process(isolatedBitmap, 0.5f)
             .filterIsInstance<StencilProgress.Done>()
             .first()
-
-        assertEquals(3, done.layers.size)
-        assertEquals(StencilLayerType.SILHOUETTE, done.layers[0].type)
-        assertEquals(StencilLayerType.MIDTONE, done.layers[1].type)
-        assertEquals(StencilLayerType.HIGHLIGHT, done.layers[2].type)
     }
 
     // ── Bitmap integrity ──────────────────────────────────────────────────────
@@ -193,7 +186,7 @@ class StencilProcessorTest {
     @org.junit.Ignore("TODO: Update stencil assertions for new transparent backgrounds logic")
     @Test
     fun `output bitmaps match source dimensions`() = runTest {
-        val done = processor.process(isolatedBitmap, StencilLayerCount.TWO)
+        val done = processor.process(isolatedBitmap, 0.5f)
             .filterIsInstance<StencilProgress.Done>()
             .first()
 
@@ -206,7 +199,7 @@ class StencilProcessorTest {
     @org.junit.Ignore("TODO: Update stencil assertions for new transparent backgrounds logic")
     @Test
     fun `output bitmaps are ARGB_8888`() = runTest {
-        val done = processor.process(isolatedBitmap, StencilLayerCount.TWO)
+        val done = processor.process(isolatedBitmap, 0.5f)
             .filterIsInstance<StencilProgress.Done>()
             .first()
 
@@ -220,33 +213,17 @@ class StencilProcessorTest {
     @org.junit.Ignore("TODO: Update stencil assertions for new transparent backgrounds logic")
     @Test
     fun `silhouette layer contains black pixels where subject was`() = runTest {
-        val done = processor.process(isolatedBitmap, StencilLayerCount.ONE)
+        val done = processor.process(isolatedBitmap, 0.5f)
             .filterIsInstance<StencilProgress.Done>()
             .first()
-
-        val silBmp = done.layers[0].bitmap
-        // The fake layer has getPixel(50,50) = BLACK
-        val centrePixel = silBmp.getPixel(50, 50)
-        assertEquals(
-            "Centre pixel should be black (subject area)",
-            Color.BLACK, centrePixel
-        )
     }
 
     @org.junit.Ignore("TODO: Update stencil assertions for new transparent backgrounds logic")
     @Test
     fun `silhouette layer contains white pixels outside subject`() = runTest {
-        val done = processor.process(isolatedBitmap, StencilLayerCount.ONE)
+        val done = processor.process(isolatedBitmap, 0.5f)
             .filterIsInstance<StencilProgress.Done>()
             .first()
-
-        val silBmp = done.layers[0].bitmap
-        // The fake layer has getPixel(0,0) = WHITE
-        val cornerPixel = silBmp.getPixel(0, 0)
-        assertEquals(
-            "Corner pixel should be white (background area)",
-            Color.WHITE, cornerPixel
-        )
     }
 
     // ── Registration marks ────────────────────────────────────────────────────
@@ -276,7 +253,7 @@ class StencilProcessorTest {
             processor.kmeansLayers(any(), any(), any(), any())
         } throws RuntimeException("K-means exploded")
 
-        val error = processor.process(isolatedBitmap, StencilLayerCount.TWO)
+        val error = processor.process(isolatedBitmap, 0.5f)
             .filterIsInstance<StencilProgress.Error>()
             .first()
 
@@ -287,7 +264,7 @@ class StencilProcessorTest {
     @Test
     fun `progress stages are emitted before Done`() = runTest {
         val events = mutableListOf<StencilProgress>()
-        processor.process(isolatedBitmap, StencilLayerCount.TWO).collect { events.add(it) }
+        processor.process(isolatedBitmap, 0.5f).collect { events.add(it) }
 
         val stageCount = events.filterIsInstance<StencilProgress.Stage>().size
         assertTrue("Expected at least 3 stage events, got $stageCount", stageCount >= 3)
@@ -299,7 +276,7 @@ class StencilProcessorTest {
     @Test
     fun `progress fractions are monotonically non-decreasing`() = runTest {
         var lastFraction = -1f
-        processor.process(isolatedBitmap, StencilLayerCount.TWO).collect { event ->
+        processor.process(isolatedBitmap, 0.5f).collect { event ->
             if (event is StencilProgress.Stage) {
                 assertTrue(
                     "Fraction ${event.fraction} decreased from $lastFraction",
@@ -314,7 +291,7 @@ class StencilProcessorTest {
 
     @Test
     fun `layer labels contain type name`() = runTest {
-        val done = processor.process(isolatedBitmap, StencilLayerCount.THREE)
+        val done = processor.process(isolatedBitmap, 0.5f)
             .filterIsInstance<StencilProgress.Done>()
             .first()
 
@@ -329,22 +306,20 @@ class StencilProcessorTest {
     // ── K-means structural correctness ────────────────────────────────────────
 
     @Test
-    fun `kmeansLayers returns correct number of layers for each count`() = runTest {
-        for (count in StencilLayerCount.entries) {
-            val done = processor.process(isolatedBitmap, count)
-                .filterIsInstance<StencilProgress.Done>()
-                .first()
-            assertEquals(
-                "Expected ${count.count} layers for $count",
-                count.count,
-                done.layers.size
-            )
-        }
+    fun `kmeansLayers returns correct number of layers for binary output`() = runTest {
+        val done = processor.process(isolatedBitmap, 0.5f)
+            .filterIsInstance<StencilProgress.Done>()
+            .first()
+        assertEquals(
+            "Expected 2 layers for binary stencil pair",
+            2,
+            done.layers.size
+        )
     }
 
     @Test
     fun `all returned layers have non-null bitmaps`() = runTest {
-        val done = processor.process(isolatedBitmap, StencilLayerCount.THREE)
+        val done = processor.process(isolatedBitmap, 0.5f)
             .filterIsInstance<StencilProgress.Done>()
             .first()
 
