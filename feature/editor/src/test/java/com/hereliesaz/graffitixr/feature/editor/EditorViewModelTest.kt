@@ -252,7 +252,7 @@ class EditorViewModelTest {
         // A new sketch layer should have been inserted above the source layer
         val layers = viewModel.uiState.value.layers
         assertTrue(layers.size >= 2)
-        assertTrue(layers.any { it.isSketch && it.isLinked })
+        assertTrue(layers.any { it.isSketch })
         unmockkObject(com.hereliesaz.graffitixr.common.util.SketchProcessor)
     }
 

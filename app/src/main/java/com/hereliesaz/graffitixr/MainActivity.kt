@@ -709,8 +709,12 @@ class MainActivity : ComponentActivity() {
                                     initialName = editorUiState.projectId ?: "New Project",
                                     onDismissRequest = { showSaveDialog = false },
                                     onSaveRequest = { name ->
-                                        editorViewModel.saveProject(name)
-                                        showSaveDialog = false
+                                        lifecycleScope.launch {
+                                            arViewModel.saveMapBlocking()
+                                            arViewModel.saveCloudPointsBlocking()
+                                            editorViewModel.saveProject(name)
+                                            showSaveDialog = false
+                                        }
                                     }
                                 )
                             }
@@ -845,9 +849,6 @@ class MainActivity : ComponentActivity() {
 
         azRailHostItem(id = "mode_host", text = navStrings.modes, color = navItemColor, info = navStrings.modesInfo)
         azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.arModeInfo)
-        azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.overlayInfo)
-        azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.mockupInfo)
-        azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.traceInfo)
 
         if (isArMode) {
             azRailToggle(
@@ -861,6 +862,10 @@ class MainActivity : ComponentActivity() {
                 arViewModel.setArScanMode(if (arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS) ArScanMode.CLOUD_POINTS else ArScanMode.GAUSSIAN_SPLATS)
             }
         }
+
+        azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.overlayInfo)
+        azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.mockupInfo)
+        azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.traceInfo)
 
         azDivider()
 
@@ -911,7 +916,13 @@ class MainActivity : ComponentActivity() {
             showLibrary = true
         }
         azRailSubItem(id = "export", hostId = "project_host", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.exportInfo) {
-            editorViewModel.exportImage()
+            if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
+                arViewModel.requestExport { bgBitmap ->
+                    editorViewModel.exportImage(bgBitmap)
+                }
+            } else {
+                editorViewModel.exportImage(null)
+            }
         }
         azRailSubItem(id = "settings", hostId = "project_host", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.settingsInfo) {
             showSettings = true

@@ -78,6 +78,9 @@ class ArRenderer(
     @Volatile var isCapturingTarget: Boolean = false
     @Volatile var isInPlaneRealignment: Boolean = false
 
+    @Volatile var exportRequested: Boolean = false
+    var onExportCaptured: ((Bitmap) -> Unit)? = null
+
     fun attachSession(session: Session?) {
         sessionLock.withLock {
             this.session = session
@@ -313,6 +316,35 @@ class ArRenderer(
                     }
                 } catch (e: Exception) {
                     Timber.e(e, "Failed to capture target frame")
+                }
+            }
+
+            if (exportRequested) {
+                exportRequested = false
+                try {
+                    frame.acquireCameraImage().use { image ->
+                        val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(image)
+                        val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
+                        bitmap.copyPixelsFromBuffer(rgbaBuffer)
+
+                        val displayDegrees = displayRotationHelper.getRotation() * 90
+                        val rotationNeeded = (sensorOrientation - displayDegrees + 360) % 360
+
+                        val rotatedBitmap = if (rotationNeeded != 0) {
+                            val matrix = android.graphics.Matrix()
+                            matrix.postRotate(rotationNeeded.toFloat())
+                            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true).also {
+                                bitmap.recycle()
+                            }
+                        } else {
+                            bitmap
+                        }
+
+                        onExportCaptured?.invoke(rotatedBitmap)
+                        onExportCaptured = null
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to capture export frame")
                 }
             }
 

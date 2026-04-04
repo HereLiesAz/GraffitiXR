@@ -16,9 +16,39 @@ import javax.inject.Inject
  */
 class ExportManager @Inject constructor() {
 
-    fun compositeLayers(layers: List<Layer>, screenWidth: Int, screenHeight: Int): Bitmap {
+    fun compositeLayers(
+        layers: List<Layer>,
+        screenWidth: Int,
+        screenHeight: Int,
+        backgroundBitmap: Bitmap? = null,
+        backgroundColor: Int = android.graphics.Color.TRANSPARENT
+    ): Bitmap {
         val result = Bitmap.createBitmap(screenWidth, screenHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(result)
+
+        if (backgroundColor != android.graphics.Color.TRANSPARENT) {
+            canvas.drawColor(backgroundColor)
+        }
+
+        backgroundBitmap?.let { bg ->
+            val bgAspect = bg.width.toFloat() / bg.height.toFloat()
+            val screenAspect = screenWidth.toFloat() / screenHeight.toFloat()
+
+            var renderWidth = screenWidth.toFloat()
+            var renderHeight = screenHeight.toFloat()
+
+            if (bgAspect > screenAspect) {
+                renderWidth = renderHeight * bgAspect
+            } else {
+                renderHeight = renderWidth / bgAspect
+            }
+
+            val matrix = Matrix()
+            matrix.postScale(renderWidth / bg.width, renderHeight / bg.height)
+            matrix.postTranslate((screenWidth - renderWidth) / 2f, (screenHeight - renderHeight) / 2f)
+
+            canvas.drawBitmap(bg, matrix, null)
+        }
 
         layers.filter { it.isVisible }.forEach { layer ->
             layer.bitmap?.let { b ->
