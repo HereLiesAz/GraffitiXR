@@ -30,6 +30,11 @@ fun getGraffitiTutorials(): Map<String, AzTutorial> {
                     highlight = AzHighlight.FullScreen
                 )
                 card(
+                    title = "Step 3: Add Your Artwork",
+                    text = "Press 'Design' to access your layer tools. Use 'Image' to import photos, 'Draw' to sketch, or 'Text' to type.",
+                    highlight = AzHighlight.FullScreen
+                )
+                card(
                     title = "Tip: Texture Matters",
                     text = "Blank white walls, smooth concrete, and single-colour surfaces won't track. Aim your anchor point at graffiti, rough plaster, or any distinct mark.",
                     highlight = AzHighlight.FullScreen
@@ -47,12 +52,12 @@ fun getGraffitiTutorials(): Map<String, AzTutorial> {
                     highlight = AzHighlight.Item("overlay")
                 )
                 card(
-                    title = "Add Your Artwork",
-                    text = "Tap Design → Image to import a photo or sketch from your gallery. It appears as a layer on top of the camera feed.",
+                    title = "Step 1: Add Your Artwork",
+                    text = "Press 'Design' to access layer tools. Use 'Image' to import photos, 'Draw' to sketch, or 'Text' to type.",
                     highlight = AzHighlight.FullScreen
                 )
                 card(
-                    title = "Position It",
+                    title = "Step 2: Position It",
                     text = "Pinch to scale, drag to reposition. The overlay stays fixed to your screen — step back to see how it fits the wall.",
                     highlight = AzHighlight.FullScreen
                 )
@@ -69,13 +74,13 @@ fun getGraffitiTutorials(): Map<String, AzTutorial> {
                     highlight = AzHighlight.Item("mockup")
                 )
                 card(
-                    title = "Step 1: Add the Wall",
-                    text = "Tap Design → Wall to import a photo of the wall you plan to paint. This becomes the background.",
+                    title = "Step 1: Set the Wall",
+                    text = "Open 'Design' and tap 'Wall' to choose or take a photo of your surface. Do this first!",
                     highlight = AzHighlight.FullScreen
                 )
                 card(
-                    title = "Step 2: Add Your Design",
-                    text = "Tap Design → Image to add your artwork on top. Pinch and drag to size and position it on the wall photo.",
+                    title = "Step 2: Add Your Artwork",
+                    text = "Use 'Image', 'Draw', or 'Text' to add layers on top of the wall. Pinch and drag to size and position them.",
                     highlight = AzHighlight.FullScreen
                 )
             }
@@ -91,13 +96,18 @@ fun getGraffitiTutorials(): Map<String, AzTutorial> {
                     highlight = AzHighlight.Item("trace")
                 )
                 card(
-                    title = "How to Use It",
-                    text = "Lay a sheet of paper directly over the screen. Trace the design with a pencil or pen. Use the Image layer to set what gets displayed.",
+                    title = "Step 1: Open Design Menu",
+                    text = "Tap 'Design' to access layer tools.",
                     highlight = AzHighlight.FullScreen
                 )
                 card(
-                    title = "Exiting Lightbox",
-                    text = "Triple-tap anywhere on the screen to exit. Screen brightness is controlled by your device's display brightness slider.",
+                    title = "Step 2: Add Content",
+                    text = "Use 'Image' to import photos, 'Draw' to sketch, or 'Text' to type.",
+                    highlight = AzHighlight.FullScreen
+                )
+                card(
+                    title = "Step 3: Tracing",
+                    text = "Lay paper over the screen and trace. Triple-tap anywhere to exit.",
                     highlight = AzHighlight.FullScreen
                 )
             }

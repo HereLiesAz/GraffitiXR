@@ -66,6 +66,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.core.content.FileProvider
+import java.io.File
 import com.google.android.gms.common.GoogleApiAvailability
 import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.*
@@ -140,6 +142,7 @@ class MainActivity : ComponentActivity() {
     var showPosterDialog by mutableStateOf(false)
     var posterSourceLayerId by mutableStateOf<String?>(null)
     var hasCameraPermission by mutableStateOf(false)
+    var showWallSourceDialog by mutableStateOf(false)
 
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p ->
         hasCameraPermission = p[Manifest.permission.CAMERA] ?: false
@@ -176,6 +179,8 @@ class MainActivity : ComponentActivity() {
                 @Suppress("DEPRECATION")
                 val settingsViewModel: SettingsViewModel = hiltViewModel()
                 val cameraController = rememberCameraController()
+
+                var cameraUri by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
 
                 val editorUiState by editorViewModel.uiState.collectAsState()
                 val mainUiState by mainViewModel.uiState.collectAsState()
@@ -335,6 +340,11 @@ class MainActivity : ComponentActivity() {
                 }
                 val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                     uri?.let { editorViewModel.setBackgroundImage(it) }
+                }
+                val takePictureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+                    if (success) {
+                        cameraUri?.let { editorViewModel.setBackgroundImage(Uri.parse(it)) }
+                    }
                 }
 
                 // Task 6: Auto-open image picker once anchor is established and no layers exist yet.
@@ -815,6 +825,27 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
+                            if (showWallSourceDialog) {
+                                WallSourceDialog(
+                                    onDismiss = { showWallSourceDialog = false },
+                                    onGallery = {
+                                        showWallSourceDialog = false
+                                        backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                    },
+                                    onCamera = {
+                                        showWallSourceDialog = false
+                                            val tmpFile = File(context.cacheDir, "temp_wall_capture.jpg")
+                                            val tmpFile = File(context.cacheDir, "wall_camera_${System.currentTimeMillis()}.jpg")
+                                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tmpFile)
+                                            cameraUri = uri.toString()
+                                            takePictureLauncher.launch(uri)
+                                            permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+                                            permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
+                                        }
+                                    }
+                                )
+                            }
+
                             if (showLibrary) {
                                 val dashboardState by dashboardViewModel.uiState.collectAsState()
                                 LaunchedEffect(Unit) { dashboardViewModel.loadAvailableProjects() }
@@ -971,7 +1002,7 @@ class MainActivity : ComponentActivity() {
 
             if (editorUiState.editorMode == EditorMode.MOCKUP) {
                 azRailSubItem(id = "wall", hostId = "design_host", text = navStrings.wall, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.wallInfo) {
-                    backgroundPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    showWallSourceDialog = true
                 }
             }
 
@@ -1416,6 +1447,29 @@ class MainActivity : ComponentActivity() {
 
         azHelpRailItem(id = "help_main", text = navStrings.help, color = navItemColor, shape = AzButtonShape.RECTANGLE)
     }
+}
+
+@Composable
+private fun WallSourceDialog(
+    onDismiss: () -> Unit,
+    onGallery: () -> Unit,
+    onCamera: () -> Unit
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Choose Wall Photo") },
+        text = { Text("How would you like to set the background wall?") },
+        confirmButton = {
+            Button(onClick = onCamera) {
+                Text("Take Photo")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onGallery) {
+                Text("Choose from Gallery")
+            }
+        }
+    )
 }
 
 @Composable
