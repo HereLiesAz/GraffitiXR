@@ -1,0 +1,655 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+
+    <string name="app_name">GraffitiXR</string>
+
+
+    <string name="nav_modes">モード</string>
+
+    <string name="nav_modes_info">ARプロジェクション、オーバーレイ、モックアップ、ライトボックスモードを切り替えます。</string>
+
+
+    <string name="nav_ar_mode">AR</string>
+
+    <string name="nav_ar_mode_info">拡張現実を使用してアートワークを実際の壁に投影します。まず壁をスキャンしてアンカーを配置し、次にデザインレイヤーを追加します。</string>
+
+
+    <string name="nav_overlay">オーバーレイ</string>
+
+    <string name="nav_overlay_info">ARアンカーを使用せずに、ライブカメラフィード上にデザインをレイヤーします。素早いフレーミングや配置の確認に最適です。</string>
+
+
+    <string name="nav_mockup">モックアップ</string>
+
+    <string name="nav_mockup_info">壁の写真に合成されたデザインをプレビューします。カメラやスキャンは不要です。</string>
+
+
+    <string name="nav_trace">ライトボックス</string>
+
+    <string name="nav_trace_info">デザインをライトテーブルのオーバーレイとして使用し、物理的な表面に参照線をトレースします。</string>
+
+    <string name="nav_trace_mode">ライトボックス</string>
+
+
+    <string name="nav_canvas">キャンバス</string>
+
+    <string name="nav_mural">壁画</string>
+
+    <string name="nav_scan_mode_toggle_info">キャンバス（小規模なデスク上のアート向け）と壁画（大規模な壁とガウシアンスプラッティング向け）のスキャンモードを切り替えます。</string>
+
+
+    <string name="nav_stencil">ステンシル</string>
+
+    <string name="nav_stencil_info">アートワークから印刷可能な複数レイヤーのステンシルを生成します。各レイヤーはUSレターサイズの輪郭のみのタイルとして印刷されます。</string>
+
+
+    <string name="nav_grid">ターゲット</string>
+
+    <string name="nav_grid_info">ARアンカーターゲットを作成および管理します。壁に描かれた参照マークを撮影して、投影を所定の位置に固定します。</string>
+
+
+    <string name="nav_surveyor">測量</string>
+
+    <string name="nav_surveyor_info">壁の表面をマッピングしてARトラッキングの精度を向上させます。</string>
+
+
+    <string name="nav_create">作成</string>
+
+    <string name="nav_create_info">壁の参照マークを撮影して新しいARアンカーを作成します。アプリはこのマークを追跡して投影の配置を維持します。</string>
+
+
+    <string name="nav_refine">調整</string>
+
+    <string name="nav_refine_info">既存のARアンカーターゲットの位置を微調整します。</string>
+
+
+    <string name="nav_update">進捗</string>
+
+    <string name="nav_update_info">壁画の完了した部分をマークして、ペイントの進捗を追跡します。</string>
+
+
+    <string name="nav_design">デザイン</string>
+
+    <string name="nav_design_info">デザインレイヤーを追加および管理します。各レイヤーはインポートされた画像またはフリーハンドの描画にすることができます。</string>
+
+
+    <string name="nav_open">開く</string>
+
+    <string name="nav_open_info">ギャラリーから画像を新しいレイヤーとして追加します。</string>
+
+
+    <string name="nav_wall">壁</string>
+
+    <string name="nav_wall_info">モックアップモードで使用される背景の壁の写真を置き換えます。</string>
+
+
+    <string name="nav_isolate">切り抜き</string>
+
+    <string name="nav_isolate_info">このレイヤーから背景を自動的に削除し、透明な背景に被写体のみを残します。</string>
+
+
+    <string name="nav_invert">反転</string>
+
+    <string name="nav_invert_info">現在のレイヤーのネガを作成します。黒は白になり、色は反対色に反転します — ステンシルやオーバーレイの分析に便利です。</string>
+
+
+    <string name="nav_outline">輪郭</string>
+
+    <string name="nav_outline_info">このレイヤーを透明な背景の黒い線画に変換します — ステンシルテンプレートの作成に最適です。</string>
+
+
+    <string name="nav_adjust">調整</string>
+
+    <string name="nav_adjust_info">このレイヤーの明るさ、コントラスト、彩度、カラーバランスを微調整します。</string>
+
+
+    <string name="nav_balance">カラー</string>
+
+    <string name="nav_balance_info">赤、緑、青のチャンネルスライダーを使用してレイヤーの色を調整します。</string>
+
+
+    <string name="nav_blending">ブレンド</string>
+
+    <string name="nav_blending_info">ブレンドモード（通常、乗算、スクリーン、オーバーレイなど）を切り替えて、このレイヤーが下のレイヤーとどのように合成されるかを制御します。</string>
+
+
+    <string name="nav_settings">設定</string>
+
+    <string name="nav_settings_info">利き手、ARスキャンモード、単位、その他のアプリの設定を構成します。</string>
+
+
+    <string name="nav_project">プロジェクト</string>
+
+    <string name="nav_project_info">プロジェクトの管理: 作成、保存、読み込み、エクスポート。</string>
+
+
+    <string name="nav_new">新規</string>
+
+    <string name="nav_new_info">新しい空のプロジェクトを開始します。保存されていない変更は失われます。</string>
+
+
+    <string name="nav_save">保存</string>
+
+    <string name="nav_save_info">現在のプロジェクトをデバイスに保存します。</string>
+
+
+    <string name="nav_load">読み込み</string>
+
+    <string name="nav_load_info">プロジェクトライブラリを開いて、以前に保存したプロジェクトを読み込みます。</string>
+
+
+    <string name="nav_export">エクスポート</string>
+
+    <string name="nav_export_info">すべての表示レイヤーを統合した画像をフォトギャラリーにエクスポートします。</string>
+
+
+    <string name="nav_help">ヘルプ</string>
+
+    <string name="nav_help_info">ヘルプがアクティブなときにボタンをタップすると、その機能が表示されます。</string>
+
+
+    <string name="nav_light">ライト</string>
+
+    <string name="nav_light_info">デバイスのフラッシュライトを切り替えて、暗い場所での作業中に壁を照らします。</string>
+
+
+    <string name="nav_lock">ロック</string>
+
+    <string name="nav_lock_info">タッチスクリーンをロックして、スプレー中の誤操作を防ぎます。どこでも3回タップするとロックが解除されます。</string>
+
+
+
+    <string name="info_brush">このレイヤーにフリーハンドのストロークを描画します。サイズボタンを上下にドラッグしてブラシの直径を変更し、左右にドラッグしてぼかし（エッジの柔らかさ）を調整します。</string>
+
+    <string name="info_eraser">丸いブラシでこのレイヤーの一部を消去します。サイズボタンを上下にドラッグして直径を変更し、左右にドラッグしてぼかしを調整します。</string>
+
+    <string name="info_blur">このレイヤーの領域を塗り広げて柔らかくします。領域をドラッグしてぼかします。</string>
+
+    <string name="info_liquify">ピクセルを任意の方向に押し出して歪ませます。領域をドラッグして歪ませます — 比率の調整に便利です。</string>
+
+    <string name="info_dodge">特定の領域をペイントして明るくします。</string>
+
+    <string name="info_burn">特定の領域をペイントして暗くします。</string>
+
+    <string name="info_size">上下にドラッグしてブラシの直径を変更します。左右にドラッグしてぼかしを調整します — ぼかしを広くすると、スプレー缶のような柔らかいエッジになります。</string>
+
+    <string name="info_color">アクティブなブラシの色を表示します。上下にドラッグして明るさを調整し、左右にドラッグして彩度を調整します。タップするとフルカラーホイールが開きます。</string>
+
+    <string name="info_draw">フリーハンド描画用の新しい空白の透明レイヤーを追加します。</string>
+
+    <string name="info_keyframe">現在のARカメラのポーズをキーフレームとして保存します。離れて戻ってきた後のドリフトの修正と投影の再配置に使用されます。</string>
+
+    <string name="info_layer">このレイヤー。タップしてアクティブにします。水平レールを開いてツールにアクセスします。長押ししてドラッグすると並べ替えます。</string>
+
+
+
+    <string name="stencil_layers">レイヤー</string>
+
+    <string name="stencil_layers_info">生成するステンシルレイヤーの数を選択します: 1 (シルエットのみ)、2 (シルエット + ハイライト)、または 3 (シルエット + ミッドトーン + ハイライト)。</string>
+
+
+    <string name="stencil_rebuild">再構築</string>
+
+    <string name="stencil_rebuild_info">現在のソースレイヤーでステンシル生成パイプラインを再実行します。</string>
+
+
+    <string name="stencil_print">印刷</string>
+
+    <string name="stencil_print_info">実際の印刷サイズを設定し、USレターサイズ用のタイル状のPDFを生成します。</string>
+
+
+    <string name="stencil_print_size">サイズ</string>
+
+    <string name="stencil_print_size_info">上下にドラッグして、ステンシルの実際の幅または高さをセンチメートル単位で設定します。ページ数はリアルタイムで更新されます。</string>
+
+
+    <string name="stencil_print_dim_toggle">幅 / 高さ</string>
+
+    <string name="stencil_print_dim_toggle_info">出力の幅と高さのどちらをロックするかを切り替えるにはタップします。</string>
+
+
+    <string name="stencil_export_pdf">PDFを印刷</string>
+
+    <string name="stencil_export_pdf_info">印刷して切り取る準備ができたすべてのステンシルレイヤーのタイル状PDFを生成します。各タイルには組み立て時の位置合わせ用に3mmの重なりが含まれています。</string>
+
+
+    <string name="stencil_save_layers">PNGを保存</string>
+
+    <string name="stencil_save_layers_info">各ステンシルレイヤーを個別のPNG画像としてギャラリーに保存します。</string>
+
+
+    <string name="stencil_back">← エディター</string>
+
+    <string name="stencil_back_info">メインエディターに戻ります。ステンシルレイヤーはセッションに保持されます。</string>
+
+
+    <string name="nav_text">テキスト</string>
+
+    <string name="nav_draw">描画</string>
+
+    <string name="nav_edit">編集</string>
+
+    <string name="nav_font">フォント</string>
+
+    <string name="nav_size">サイズ</string>
+
+    <string name="nav_color">カラー</string>
+
+    <string name="nav_kern">カーニング</string>
+
+    <string name="nav_bold">太字</string>
+
+    <string name="nav_italic">斜体</string>
+
+    <string name="nav_shadow">シャドウ</string>
+
+    <string name="nav_eraser">消しゴム</string>
+
+    <string name="nav_blur">ぼかし</string>
+
+    <string name="nav_liquify">ゆがみ</string>
+
+    <string name="nav_dodge">覆い焼き</string>
+
+    <string name="nav_burn">焼き込み</string>
+
+
+
+    <string name="pro_tip">プロのヒント</string>
+    <string name="double_tap_hint">ダブルタップして回転軸を切り替えます。</string>
+    <string name="ok_button">OK</string>
+
+    <string name="generating">生成中...</string>
+
+    <string name="stencil_hint">もう一度押すとレイヤーが追加されます。</string>
+
+    <string name="rename_hint">名前の変更</string>
+
+    <string name="edit_text_hint">テキストを編集</string>
+
+    <string name="copy_edits">編集をコピー</string>
+
+    <string name="paste_edits">編集を貼り付け</string>
+
+    <string name="generate_poster">ポスターを生成</string>
+
+    <string name="duplicate">複製</string>
+
+    <string name="unlink_layer">レイヤーのリンク解除</string>
+
+    <string name="link_layer">レイヤーをリンク</string>
+
+    <string name="hide_layer">レイヤーを非表示</string>
+
+    <string name="show_layer">レイヤーを表示</string>
+
+    <string name="flatten_all">すべてを統合</string>
+
+    <string name="delete">削除</string>
+    <string name="new_project_name">新規プロジェクト</string>
+
+    <string name="lock_button">ロック</string>
+
+    <string name="freeze_button">フリーズ</string>
+
+
+    <string name="wall_source_title">壁の写真を選択</string>
+
+    <string name="wall_source_text">背景の壁をどのように設定しますか？</string>
+
+    <string name="take_photo">写真を撮る</string>
+
+    <string name="choose_from_gallery">ギャラリーから選択</string>
+
+
+    <string name="depth_unsupported">このデバイスはDepth APIをサポートしていません。
+設定でキャンバスモードに切り替えてください。</string>
+
+
+    <string name="arcore_required_title">ARCoreが必要です</string>
+
+    <string name="arcore_required_text">このデバイスにはARCoreがインストールされていないか、サポートされていません。AR機能を使用するにはPlayストアからARCoreをインストールしてください。</string>
+
+    <string name="install_arcore">ARCoreをインストール</string>
+
+
+    <string name="camera_permission_required">ARモードにはカメラの権限が必要です。</string>
+
+    <string name="open_settings">設定を開く</string>
+
+
+    <string name="target_creation_title">ターゲット作成</string>
+
+    <string name="target_creation_text">画面上の描かれた参照マークを直接タップします。アプリは直ちにそれらを分離します。</string>
+
+    <string name="cancel">キャンセル</string>
+
+
+    <string name="diag_copied">コピーしました ✓</string>
+
+    <string name="diag_title">深度診断 (タップしてコピー)</string>
+
+    <string name="diag_waiting">最初のフレームを待機中…</string>
+
+
+    <string name="scan_step_1">ステップ 1: 周囲をマッピング</string>
+
+    <string name="scan_step_2">ステップ 2: ターゲットの壁をスキャン</string>
+
+
+    <string name="plane_confirm_question">アートワークは正しい壁に配置されていますか？</string>
+
+    <string name="looks_correct">正しい</string>
+
+    <string name="redetect">再検出</string>
+
+
+    <string name="plane_realignment_title">壁の表面を再検出</string>
+
+    <string name="plane_realignment_text">アンカーは撮影時の立ち位置から配置されます。ARCoreは元の位置の真正面に追跡された垂直面を選択します。
+
+1. 撮影時のおおよその位置に戻ります
+2. カメラを壁画の壁に沿ってゆっくりとパンし、ARCoreが平らな表面として認識できるようにします
+3. アートワークに向かってしっかりと持ち、下をタップします
+
+オレンジ色の境界線が新しく検出された表面にジャンプします。</string>
+
+    <string name="use_this_wall">この壁を使用</string>
+
+
+    <string name="scanning_dots">スキャン中…</string>
+
+    <string name="matched_percent">%1$d%% マッチ</string>
+
+    <string name="anchor_locked">アンカーがロックされました</string>
+
+
+    <string name="choose_font">フォントを選択</string>
+
+
+    <string name="cancel_button">キャンセル</string>
+    <string name="done_button">完了</string>
+    <string name="apply_button">適用</string>
+    <string name="close_button">閉じる</string>
+    <string name="next_button">次へ</string>
+    <string name="save_button">保存</string>
+    <string name="retake_button">再撮影</string>
+    <string name="capture_button">キャプチャ</string>
+
+
+    <string name="adj_detail">詳細</string>
+    <string name="adj_opacity">不透明度</string>
+    <string name="adj_brightness">明るさ</string>
+    <string name="adj_contrast">コントラスト</string>
+    <string name="adj_saturation">彩度</string>
+    <string name="adj_red">赤</string>
+    <string name="adj_green">緑</string>
+    <string name="adj_blue">青</string>
+    <string name="adj_undo">元に戻す</string>
+    <string name="adj_redo">やり直し</string>
+    <string name="adj_magic_align">マジックアライン</string>
+
+
+    <string name="status_create_grid">ターゲットを作成して開始します。</string>
+    <string name="status_scan_surfaces">周囲の表面をスキャンします。</string>
+    <string name="status_tap_surface">表面をタップしてアンカーを配置します。</string>
+    <string name="status_looking_grid">ターゲットを探しています...</string>
+    <string name="status_ready">準備完了。 (%1$d pts)</string>
+    <string name="unlock_hint">3回タップしてロック解除</string>
+
+
+    <string name="lib_app_title">GraffitiXR</string>
+    <string name="lib_app_description">ARまたは基本的なカメラオーバーレイを使用して、アートワークを実際の壁やキャンバスに投影します。
+
+写真上のモックアップをすばやく作成して、完成した作品がどのように見えるかを示します。
+
+または、デバイスをライトボックスとして使用して、画像を紙にトレースします。</string>
+    <string name="lib_new_project">新規</string>
+    <string name="lib_import_project">インポート</string>
+    <string name="lib_no_projects">プロジェクトはまだありません</string>
+    <string name="lib_no_projects_hint">上の「新規」をタップして、最初の壁画を開始します。
+
+エディターに移動し、以下を行うことができます:
+  ・  「デザイン」メニューからアートワークを追加
+  ・  ARモードに切り替えて実際の壁に投影
+  ・  オーバーレイを使用してライブカメラ上にデザインを浮かせます
+  ・  モックアップを使用して壁の写真でプレビュー
+  ・  ライトボックスを使用してデザインを紙にトレース</string>
+    <string name="lib_project_thumbnail">プロジェクトのサムネイル</string>
+    <string name="lib_delete_project_desc">プロジェクト %1$s を削除</string>
+
+
+    <string name="settings_title">設定</string>
+    <string name="settings_preferences_section">環境設定</string>
+    <string name="settings_hand_label">利き手</string>
+    <string name="settings_hand_right">右</string>
+    <string name="settings_hand_left">左</string>
+    <string name="settings_diag_label">深度診断オーバーレイ</string>
+    <string name="settings_on">オン</string>
+    <string name="settings_off">オフ</string>
+    <string name="settings_scan_mode_label">ARスキャンモード</string>
+    <string name="settings_scan_mode_point_cloud">ポイントクラウド</string>
+    <string name="settings_scan_mode_gaussian_splat">ガウシアンスプラット</string>
+    <string name="settings_anchor_boundary_label">アンカーの境界を表示</string>
+    <string name="settings_units_label">距離の単位</string>
+    <string name="settings_units_imperial">ヤード・ポンド法 (ft)</string>
+    <string name="settings_units_metric">メートル法 (m)</string>
+    <string name="settings_canvas_bg_label">キャンバスの背景</string>
+    <string name="settings_info_section">アプリ情報</string>
+    <string name="settings_version_label">バージョン</string>
+    <string name="settings_updates_section">アップデート</string>
+    <string name="settings_check_updates_label">試験運用版のアップデートを確認</string>
+    <string name="settings_install_update_label">アップデートをインストール</string>
+    <string name="settings_permissions_section">権限</string>
+    <string name="settings_camera_access">カメラのアクセス権</string>
+    <string name="settings_photo_access">写真ライブラリのアクセス権</string>
+    <string name="settings_notifications">通知</string>
+    <string name="settings_granted">許可済み</string>
+    <string name="settings_denied">拒否</string>
+    <string name="settings_open_app_settings">アプリの設定を開く</string>
+    <string name="settings_copyright">GraffitiXR © 2025</string>
+
+
+    <string name="layers_title">レイヤー</string>
+    <string name="brush_size_title">ブラシのサイズ</string>
+    <string name="save_project_hint">プロジェクト名</string>
+
+
+    <string name="target_guide_desc">ターゲット配置ガイド</string>
+    <string name="target_captured_desc">キャプチャされたターゲット</string>
+    <string name="target_review_desc">抽出されたターゲットの確認</string>
+    <string name="target_unwarp_hint">コーナーをドラッグして歪みを修正</string>
+    <string name="target_review_title">抽出されたマークの確認</string>
+
+    <string name="target_exclude">除外</string>
+    <string name="target_include">含める</string>
+    <string name="target_erase_marks">マークを消去</string>
+    <string name="target_show_features">特徴を表示</string>
+    <string name="reset_button">リセット</string>
+
+    <string name="poster_title">ポスターを生成</string>
+    <string name="poster_select_layers">含めるレイヤーを選択:</string>
+    <string name="poster_physical_size">実際のサイズ (幅 mm):</string>
+    <string name="poster_generate_pdf">PDFを生成</string>
+
+
+    <string name="scan_hint_recover">デバイスをゆっくり動かしてトラッキングを復元</string>
+    <string name="scan_hint_ambient">ゆっくりと360°回転して周囲をマッピングします (%1$d°)</string>
+    <string name="scan_hint_too_dark">暗すぎます。フラッシュライトをオンにしてください。</string>
+    <string name="scan_hint_build_map">左右に歩いてマップを構築します</string>
+    <string name="scan_hint_closer">壁に近づいてください</string>
+    <string name="scan_hint_higher_lower">上下をスキャンします</string>
+
+
+    <string name="desc_bg_mockup">背景のモックアップ</string>
+    <string name="desc_segmentation_preview">セグメンテーションのプレビュー</string>
+
+
+
+    <string name="help_mode_host">モード切り替え: アプリのモードを切り替えます。手順: タップして展開し、AR、オーバーレイ、モックアップ、またはライトボックスを選択します。</string>
+
+    <string name="help_ar">ARモード: 空間マッピングを使用して壁にデザインを投影します。手順: 壁が検出されるまで周囲をスキャンし、タップしてアンカーを配置します。</string>
+
+    <string name="help_overlay">オーバーレイモード: 空間トラッキングなしでライブカメラ上にデザインを表示します。手順: 手動で拡大縮小および移動してフレームに合わせます。</string>
+
+    <string name="help_mockup">モックアップモード: 静止画でデザインをプレビューします。手順:「壁」を使用して背景画像を設定し、その上にレイヤーを配置します。</string>
+
+    <string name="help_trace">ライトボックスモード: 高輝度のトレース面。手順: 画面の上に紙を置き、トレースします。どこでも3回タップすると終了します。</string>
+
+    <string name="help_target_host">ターゲット管理: ARアンカー用のツール。手順: タップして、壁画の位置を作成または再調整するツールにアクセスします。</string>
+
+    <string name="help_scan_mode_toggle">スキャン解像度: 壁画（大規模）とキャンバス（小規模）を切り替えます。壁画は壁にガウシアンスプラットを使用し、キャンバスは詳細なデスク上のアートにポイントクラウドを使用します。</string>
+
+    <string name="help_create">アンカーの作成: 壁のマークを撮影して投影を固定します。手順: はっきりしたテクスチャを指してタップします。アプリはこのマークを追跡します。</string>
+
+    <string name="help_design_host">レイヤー管理: 画像、テキスト、またはスケッチを追加します。手順: タップして展開します。任意のレイヤーボタンを長押ししてサブメニューを開きます。</string>
+
+    <string name="help_add_img">画像のインポート: スケッチや参考写真を追加します。手順: ギャラリーから画像を選択します。新しいデザインレイヤーとして表示されます。</string>
+
+    <string name="help_add_draw">新しいスケッチ: フリーハンド描画用の空白のレイヤーを追加します。手順: レイヤーを選択して、ブラシ、消しゴム、ぼかしツールを表示します。</string>
+
+    <string name="help_add_text">テキストの追加: タイポグラフィレイヤーを作成します。手順: レイヤーの「編集」ボタンをタップして、内容と書式を変更します。</string>
+
+    <string name="help_wall">壁の変更: モックアップモードの背景を設定します。手順: ペイントする予定の物理的な壁の写真を選択します。</string>
+
+    <string name="help_project_host">プロジェクト管理: 作業の保存、読み込み、エクスポート。手順: タップして壁画の管理タスクにアクセスします。</string>
+
+    <string name="help_new">新規プロジェクト: 新しい壁画を開始します。手順: タップしてリセットします。警告: これにより現在のすべての作業がクリアされます。最初に保存してください！</string>
+
+    <string name="help_save">プロジェクトの保存: 壁画とARマップを保存します。手順: プロジェクト名を入力し、「保存」をタップして進捗を保持します。</string>
+
+    <string name="help_load">プロジェクトライブラリ: 保存された壁画にアクセスします。手順: ライブラリを参照して作業を再開するか、共有プロジェクトファイルをインポートします。</string>
+
+    <string name="help_export">画像のエクスポート: 高解像度のスナップショットを保存します。手順: 表示されているすべてのレイヤーをフォトギャラリーの1つのPNGにレンダリングします。</string>
+
+    <string name="help_settings">アプリの設定: 環境設定を構成します。手順: 開いて利き手、単位、およびスキャンパラメータを調整します。</string>
+
+    <string name="help_light">フラッシュライト: デバイスのLEDを切り替えます。手順: これを使用して暗い壁を照らし、ARトラッキングを改善します。</string>
+
+    <string name="help_lock_trace">ロック/フリーズ: 誤操作を防ぎます。手順: トレースモードでは、画面を無効にします。他のモードでは、レイヤーの変形をロックします。</string>
+
+    <string name="help_help_main">インタラクティブヘルプ: ボタンの機能を説明します。手順: タップしてアクティブにします（シアン）。アクティブなときに任意のボタンをタップしてヘルプテキストを表示します。</string>
+
+    <string name="help_layer">レイヤー \'%1$s\': アクティブな壁画要素。手順: タップして選択します。ボタンを上下にドラッグして並べ替えます。ジェスチャーで画面上で変形します。</string>
+
+
+
+    <string name="help_edit_text">テキストの編集: タイポグラフィレイヤーの単語を変更します。手順: タップしてキーボードを開き、テキストの内容を更新します。</string>
+
+    <string name="help_size">ブラシ/テキストのサイズ: スケールと柔らかさを調整します。手順: 上下にドラッグしてサイズを変更します。左右にドラッグしてブラシのぼかしを変更します。</string>
+
+    <string name="help_font">フォントピッカー: タイポグラフィのスタイルを選択します。手順: タップして利用可能なフォントを参照し、テキストレイヤーに適用します。</string>
+
+    <string name="help_color">カラーツール: アクティブな色を設定します。手順: 上下にドラッグして明るさを、左右にドラッグして彩度を調整します。タップしてフルカラーホイールを表示します。</string>
+
+    <string name="help_kern">テキストのカーニング: 文字間隔を調整します。手順: 左右にドラッグしてテキストのレイアウトを狭めたり広げたりします。</string>
+
+    <string name="help_bold">太字切り替え: 太いフォントウェイト。手順: タップして、アクティブなテキストレイヤーの太字スタイルを切り替えます。</string>
+
+    <string name="help_italic">斜体切り替え: 斜めのスタイル。手順: タップして、アクティブなテキストレイヤーの斜体スタイルを切り替えます。</string>
+
+    <string name="help_outline">テキストの輪郭: 文字のストローク。手順: タップして、テキストの文字の周りに表示される輪郭を切り替えます。</string>
+
+    <string name="help_shadow">ドロップシャドウ: テキストの奥行き。手順: タップして、タイポグラフィの背後にある柔らかいシャドウを切り替えて読みやすくします。</string>
+
+    <string name="help_stencil_gen">ステンシルの生成: 印刷可能なテンプレートを作成します。手順: タップして、この画像の複数レイヤーのステンシル生成を開始します。</string>
+
+    <string name="help_blend">ブレンドモード: 合成スタイル。手順: タップして、乗算、スクリーン、オーバーレイなどのモードを切り替えます。</string>
+
+    <string name="help_adj">画像の調整: 外観を微調整します。手順: タップして、不透明度、明るさ、コントラスト、彩度のスライダーを表示します。</string>
+
+    <string name="help_invert">色の反転: 高コントラストのネガ。手順: タップして色を反転させます。白は黒になり、その逆も同様です — トレースに便利です。</string>
+
+    <string name="help_balance">カラーバランス: RGBチャンネルの調整。手順: タップして、正確な赤、緑、青の調整用のスライダーを表示します。</string>
+
+    <string name="help_eraser">消しゴムブラシ: レイヤーの内容を削除します。手順: 画面上にペイントして消去します。「サイズ」ボタンを使用して直径を調整します。</string>
+
+    <string name="help_blur">ぼかしツール: 色をブレンドします。手順: 領域をペイントしてエッジを柔らかくしたり、詳細をにじませたりします。</string>
+
+    <string name="help_liquify">ゆがみツール: デザインの形状を変更します。手順: 画面をドラッグしてピクセルを押し引きします — 比率の調整に最適です。</string>
+
+    <string name="help_dodge">覆い焼きツール: 領域を明るくします。手順: レイヤーの一部をペイントして輝度を上げます。</string>
+
+    <string name="help_burn">焼き込みツール: 領域を暗くします。手順: レイヤーの一部をペイントして輝度を下げます。</string>
+
+    <string name="help_iso">被写体の切り抜き: 自動背景削除。手順: タップしてAIを使用して背景からメインの被写体を抽出します。</string>
+
+    <string name="help_line">スケッチの輪郭: 線画フィルター。手順: タップして写真を白黒の透明な輪郭に変換します。</string>
+
+    <string name="help_help_layer">レイヤーヘルプ: これらの特定のレイヤーツールの情報を切り替えます。手順: タップしてアクティブにします。次に、任意のツールアイコンをタップしてその機能を表示します。</string>
+
+
+
+    <string name="unit_feet">ft</string>
+
+    <string name="unit_centimeters">cm</string>
+
+    <string name="unit_meters">m</string>
+
+    <string name="tut_ar_title">ARプロジェクション</string>
+    <string name="tut_ar_text">携帯電話の深度センサーと空間トラッキングを使用して、デザインを実際の壁に投影します。</string>
+    <string name="tut_ar_step1_title">ステップ 1: スキャン</string>
+    <string name="tut_ar_step1_text">壁に向けてゆっくりと左右に動かします。エンジンが表面をマッピングすると、色付きのスプラットが表示されます。スプラットが壁の領域を覆うまで待ちます。</string>
+    <string name="tut_ar_step2_title">ステップ 2: タップして配置</string>
+    <string name="tut_ar_step2_text">画面をタップするだけです。アプリが壁を撮影し、トラッキング機能を抽出して、アンカーを瞬時にロックします。</string>
+    <string name="tut_ar_step3_title">ステップ 3: アートワークの追加</string>
+    <string name="tut_ar_step3_text">「デザイン」を押してレイヤーツールにアクセスします。「画像」を使用して写真をインポートするか、「描画」でスケッチするか、「テキスト」で入力します。</string>
+    <string name="tut_ar_tip_title">ヒント: テクスチャが重要</string>
+    <string name="tut_ar_tip_text">真っ白な壁、滑らかなコンクリート、単色の表面は追跡されません。アンカーポイントをグラフィティ、粗い漆喰、または目立つマークに向けます。</string>
+
+
+    <string name="tut_overlay_title">ライブオーバーレイ</string>
+    <string name="tut_overlay_text">デザインがライブカメラビュー上に浮かびます — 表面のスキャンは不要です。</string>
+    <string name="tut_overlay_step1_title">ステップ 1: アートワークの追加</string>
+    <string name="tut_overlay_step1_text">「デザイン」を押してレイヤーツールにアクセスします。「画像」を使用して写真をインポートするか、「描画」でスケッチするか、「テキスト」で入力します。</string>
+    <string name="tut_overlay_step2_title">ステップ 2: 配置</string>
+    <string name="tut_overlay_step2_text">ピンチして拡大縮小し、ドラッグして位置を変更します。オーバーレイは画面に固定されたままです — 一歩下がって壁にどのようにフィットするか確認してください。</string>
+
+
+    <string name="tut_mockup_title">写真のモックアップ</string>
+    <string name="tut_mockup_text">ブラシを手に取る前に、写真上でデザインをプレビューします。</string>
+    <string name="tut_mockup_step1_title">ステップ 1: 壁の設定</string>
+    <string name="tut_mockup_step1_text">「デザイン」を開き、「壁」をタップして表面の写真を選択するか撮影します。これを最初に行ってください！</string>
+    <string name="tut_mockup_step2_title">ステップ 2: アートワークの追加</string>
+    <string name="tut_mockup_step2_text">「画像」、「描画」、または「テキスト」を使用して、壁の上にレイヤーを追加します。ピンチしてドラッグし、サイズと位置を調整します。</string>
+
+
+    <string name="tut_trace_title">ライトボックスモード</string>
+    <string name="tut_trace_text">画面を明るいライトボックスに変えて、デザインを紙にトレースします。</string>
+    <string name="tut_trace_step1_title">ステップ 1: デザインメニューを開く</string>
+    <string name="tut_trace_step1_text">「デザイン」をタップしてレイヤーツールにアクセスします。</string>
+    <string name="tut_trace_step2_title">ステップ 2: コンテンツの追加</string>
+    <string name="tut_trace_step2_text">「画像」を使用して写真をインポートするか、「描画」でスケッチするか、「テキスト」で入力します。</string>
+    <string name="tut_trace_step3_title">ステップ 3: トレース</string>
+    <string name="tut_trace_step3_text">画面の上に紙を置き、トレースします。どこでも3回タップすると終了します。</string>
+
+
+    <string name="tut_create_anchor_title">アンカーの作成</string>
+    <string name="tut_create_anchor_text">投影を壁の特定の場所に固定します。一度設定すると、歩き回ってもデザインは所定の位置に留まります。</string>
+    <string name="tut_surface_req_title">表面の要件</string>
+    <string name="tut_surface_req_text">壁には目に見えるテクスチャが必要です — グラフィティ、粗い漆喰、レンガ、またはステッカーが適しています。滑らか、空白、または単色の壁はアンカーを保持しません。</string>
+    <string name="tut_blobs_title">ブロブの意味</string>
+    <string name="tut_blobs_text">タップした後、緑色のブロブが短時間表示されます。これらはアプリが抽出したトラッキングキーポイントです。ブロブが多いほどロックが強くなります。</string>
+    <string name="tut_import_img_title">画像のインポート</string>
+    <string name="tut_import_img_text">ギャラリーからスケッチ、写真、またはリファレンスを追加します。他のレイヤーの上に積み重ねられた新しいレイヤーとして表示されます。</string>
+    <string name="tut_scale_pos_title">拡大縮小と配置</string>
+    <string name="tut_scale_pos_text">2本指でピンチしてサイズを変更します。1本指でドラッグして位置を変更します。レイヤーはARモードで投影された壁の表面にスナップします。</string>
+    <string name="tut_lock_freeze_title">ロック / フリーズ</string>
+    <string name="tut_lock_freeze_text">ライトボックス（トレース）モードの場合: タッチを無効にして、誤って何かを動かすことなく画面上に紙を置くことができます。</string>
+    <string name="tut_in_other_modes_title">他のモードの場合</string>
+    <string name="tut_in_other_modes_text">AR、オーバーレイ、モックアップモードの場合: レイヤーの変形をロックして、デザインが誤って移動したり縮尺されたりしないようにします。</string>
+    <string name="tut_stencil_gen_title">ステンシルの生成</string>
+    <string name="tut_stencil_gen_text">画像を印刷可能なスプレーペイントステンシルに変換します。各ステンシルはデザインの1つのカラーレイヤーを表します。</string>
+    <string name="tut_how_many_layers_title">レイヤーの数</string>
+    <string name="tut_how_many_layers_text">3色のデザインは3枚のステンシルシートを生成します。色が多いほどシートが多くなります。シンプルな高コントラストの画像が最高の結果をもたらします。</string>
+    <string name="tut_exporting_title">エクスポート</string>
+    <string name="tut_exporting_text">各ステンシルはPDFとしてエクスポートされます。100%のスケール（スケーリングなし）で印刷して、正確な実寸を取得します。</string>
+    <string name="tut_opacity_brightness_title">不透明度と明るさ</string>
+    <string name="tut_opacity_brightness_text">不透明度はレイヤーの透明度を制御します。明るさは全体的な明るさをシフトします — レイヤーを壁のトーンに合わせるのに便利です。</string>
+    <string name="tut_contrast_saturation_title">コントラストと彩度</string>
+    <string name="tut_contrast_saturation_text">コントラストは暗部と明部を分離します — ステンシルの輪郭を際立たせるのに最適です。彩度は色の強度を制御します。グレースケールにするにはゼロにドラッグします。</string>
+    <string name="tut_isolate_subject_title">被写体の切り抜き</string>
+    <string name="tut_isolate_subject_text">AIを使用して自動的に背景を削除し、画像のメインの被写体のみを残します。</string>
+    <string name="tut_best_results_title">最高の結果</string>
+    <string name="tut_best_results_text">無地または対照的な背景に対して明確な被写体がある写真に最適です。背景が複雑なシーンでは、消しゴムを使用した手動のタッチアップが必要になる場合があります。</string>
+</resources>
