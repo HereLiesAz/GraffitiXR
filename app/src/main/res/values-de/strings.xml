@@ -24,7 +24,7 @@
     <string name="nav_mockup_info">Sehen Sie sich eine Vorschau Ihres Designs an, das in ein Foto einer Wand eingefügt ist. Keine Kamera oder Scannen erforderlich.</string>
 
     <!-- Label for the Trace mode, which locks the screen for manual tracing. -->
-    <string name="nav_trace">Pause</string>
+    <string name="nav_trace">Leuchtkasten</string>
     <!-- Description of Trace mode, explaining its use as a light-table for physical tracing. -->
     <string name="nav_trace_info">Verwenden Sie Ihr Design als Leuchttisch-Overlay, um Referenzlinien auf eine physische Oberfläche zu übertragen.</string>
     <!-- Alternative name for Trace mode, often referred to as Lightbox. -->
