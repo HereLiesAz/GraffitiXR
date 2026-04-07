@@ -39,4 +39,9 @@ interface SettingsRepository {
     val backgroundColor: Flow<Int>
 
     suspend fun setBackgroundColor(argb: Int)
+
+    /** Set of tutorial keys the user has completed. Keys: "tut_ar", "tut_overlay", "tut_mockup", "tut_trace", "tut_design", "tut_project". */
+    val completedTutorials: Flow<Set<String>>
+
+    suspend fun markTutorialComplete(key: String)
 }

@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
@@ -24,6 +25,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val SHOW_ANCHOR_BOUNDARY = booleanPreferencesKey("show_anchor_boundary")
     private val IS_IMPERIAL_UNITS = booleanPreferencesKey("is_imperial_units")
     private val BACKGROUND_COLOR = intPreferencesKey("background_color")
+    private val COMPLETED_TUTORIALS = stringSetPreferencesKey("completed_tutorials")
 
     override val isRightHanded: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
@@ -74,6 +76,16 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setBackgroundColor(argb: Int) {
         context.dataStore.edit { preferences ->
             preferences[BACKGROUND_COLOR] = argb
+        }
+    }
+
+    override val completedTutorials: Flow<Set<String>> = context.dataStore.data
+        .map { preferences -> preferences[COMPLETED_TUTORIALS] ?: emptySet() }
+
+    override suspend fun markTutorialComplete(key: String) {
+        context.dataStore.edit { preferences ->
+            val current = preferences[COMPLETED_TUTORIALS] ?: emptySet()
+            preferences[COMPLETED_TUTORIALS] = current + key
         }
     }
 }

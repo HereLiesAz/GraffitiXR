@@ -180,6 +180,7 @@ class MainActivity : ComponentActivity() {
                 val mainUiState by mainViewModel.uiState.collectAsState()
                 val arUiState by arViewModel.uiState.collectAsState()
                 val dashboardNavigation by dashboardViewModel.navigationTrigger.collectAsState()
+                val completedTutorials by settingsViewModel.completedTutorials.collectAsState()
 
                 var isProcessing by remember { mutableStateOf(false) }
 
@@ -194,6 +195,24 @@ class MainActivity : ComponentActivity() {
                         } else if (isWaitingForTap) {
                             mainViewModel.confirmTapCapture()
                         }
+                    }
+                }
+
+                // Task 5: AR tap → auto-confirm. Skip the REVIEW step when the capture
+                // originated from a screen tap (not the manual "Create Anchor" rail button).
+                LaunchedEffect(currentCaptureStep, mainUiState.captureOriginatedFromTap) {
+                    if (currentCaptureStep == CaptureStep.REVIEW && mainUiState.captureOriginatedFromTap) {
+                        arViewModel.setInitialAnchorFromCapture()
+                        mainViewModel.onConfirmTargetCreation(
+                            bitmap        = arUiState.tempCaptureBitmap,
+                            selectionMask = null,
+                            depthBuffer   = arUiState.targetDepthBuffer,
+                            depthW        = arUiState.targetDepthBufferWidth,
+                            depthH        = arUiState.targetDepthBufferHeight,
+                            depthStride   = arUiState.targetDepthStride,
+                            intrinsics    = arUiState.targetIntrinsics,
+                            viewMatrix    = arUiState.targetCaptureViewMatrix
+                        )
                     }
                 }
 
@@ -241,6 +260,19 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(arUiState.isAnchorEstablished) {
                     if (!arUiState.isAnchorEstablished && mainViewModel.uiState.value.planeConfirmationPending) {
                         mainViewModel.confirmPlane()
+                    }
+                }
+
+                // Task 4e: Mark tutorials complete on meaningful actions.
+                LaunchedEffect(arUiState.isAnchorEstablished) {
+                    if (arUiState.isAnchorEstablished) {
+                        settingsViewModel.markTutorialComplete("tut_ar")
+                    }
+                }
+                LaunchedEffect(editorUiState.layers.size) {
+                    if (editorUiState.layers.isNotEmpty()) {
+                        settingsViewModel.markTutorialComplete("tut_design")
+                        settingsViewModel.markTutorialComplete("tut_${editorUiState.editorMode.name.lowercase()}")
                     }
                 }
 
@@ -302,6 +334,17 @@ class MainActivity : ComponentActivity() {
                 }
                 val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                     uri?.let { editorViewModel.setBackgroundImage(it) }
+                }
+
+                // Task 6: Auto-open image picker once anchor is established and no layers exist yet.
+                // Guard on !planeConfirmationPending so it fires after plane confirm, not during.
+                LaunchedEffect(arUiState.isAnchorEstablished, mainUiState.planeConfirmationPending) {
+                    if (arUiState.isAnchorEstablished
+                        && !mainUiState.planeConfirmationPending
+                        && editorUiState.layers.isEmpty()
+                    ) {
+                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
                 }
 
                 val navStrings = remember { NavStrings() }
@@ -406,6 +449,15 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val tutorials = getTutorials(editorUiState.layers)
+
+                // Task 4: Help overlay state + welcome card auto-show.
+                var helpActive by remember { mutableStateOf(false) }
+                var showWelcomeCard by remember { mutableStateOf(false) }
+                LaunchedEffect(editorUiState.editorMode) {
+                    val key = "tut_${editorUiState.editorMode.name.lowercase()}"
+                    showWelcomeCard = key !in completedTutorials
+                }
+
                 AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
                     azTheme(
                         activeColor = Cyan,
@@ -418,9 +470,9 @@ class MainActivity : ComponentActivity() {
                         dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
                     )
                     azAdvanced(
-                        helpEnabled = true,
+                        helpEnabled = helpActive,
                         helpList = activeHelpList,
-                        onDismissHelp = { /* Handle dismissal if needed */ },
+                        onDismissHelp = { helpActive = false },
                         tutorials = tutorials
                     )
 
@@ -707,6 +759,26 @@ class MainActivity : ComponentActivity() {
                                     onEraseAtPoint = { nx, ny -> arViewModel.eraseAtPoint(nx, ny) },
                                     onUndoErase = { arViewModel.undoErase() },
                                     onRedoErase = { arViewModel.redoErase() }
+                                )
+                            }
+
+                            // Task 4: First-visit welcome card per mode.
+                            if (showWelcomeCard && !showLibrary && !showSettings && !mainUiState.isCapturingTarget) {
+                                val currentMode = editorUiState.editorMode
+                                ModeWelcomeCard(
+                                    mode = currentMode,
+                                    onShowHelp = {
+                                        helpActive = true
+                                        showWelcomeCard = false
+                                    },
+                                    onDismiss = {
+                                        showWelcomeCard = false
+                                        val key = "tut_${currentMode.name.lowercase()}"
+                                        settingsViewModel.markTutorialComplete(key)
+                                    },
+                                    modifier = Modifier
+                                        .align(Alignment.TopCenter)
+                                        .padding(top = 16.dp)
                                 )
                             }
 
