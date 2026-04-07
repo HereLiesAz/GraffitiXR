@@ -2,20 +2,15 @@
 
 ## Supported Versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+The following versions of GraffitiXR are currently being supported with security updates.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+| 1.x.x   | :white_check_mark: |
+| < 1.0   | :x:                |
 
 ## Reporting a Vulnerability
 
-Use this section to tell people how to report a vulnerability.
+If you discover a security vulnerability within GraffitiXR, please open an issue on GitHub or contact us privately through the GitHub security advisory feature. We will review and respond to reports as quickly as possible, usually within 48 hours.
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+Once a vulnerability has been reviewed and accepted, we will coordinate a timeline to release a patch. We appreciate your efforts in helping keep GraffitiXR secure!
