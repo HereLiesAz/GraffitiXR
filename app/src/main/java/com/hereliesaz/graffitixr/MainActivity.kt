@@ -834,14 +834,10 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onCamera = {
                                         showWallSourceDialog = false
-                                            val tmpFile = File(context.cacheDir, "temp_wall_capture.jpg")
-                                            val tmpFile = File(context.cacheDir, "wall_camera_${System.currentTimeMillis()}.jpg")
-                                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tmpFile)
-                                            cameraUri = uri.toString()
-                                            takePictureLauncher.launch(uri)
-                                            permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
-                                            permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
-                                        }
+                                        val tmpFile = File(context.cacheDir, "wall_camera_${System.currentTimeMillis()}.jpg")
+                                        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tmpFile)
+                                        cameraUri = uri.toString()
+                                        takePictureLauncher.launch(uri)
                                     }
                                 )
                             }
@@ -1447,7 +1443,6 @@ class MainActivity : ComponentActivity() {
 
         azHelpRailItem(id = "help_main", text = navStrings.help, color = navItemColor, shape = AzButtonShape.RECTANGLE)
     }
-}
 
 @Composable
 private fun WallSourceDialog(
@@ -1470,6 +1465,7 @@ private fun WallSourceDialog(
             }
         }
     )
+}
 }
 
 @Composable
@@ -2076,4 +2072,5 @@ private fun FontPickerDialog(
         },
         confirmButton = {}
     )
+}
 }

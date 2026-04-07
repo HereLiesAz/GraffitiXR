@@ -65,3 +65,5 @@ build_output*.txt
 gha-creds-*.json
 /project_source_*.txt
 .worktrees/
+/.agent/
+/.claude/
