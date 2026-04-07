@@ -1,0 +1,637 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+
+    <string name="app_name">GraffitiXR</string>
+
+
+    <string name="nav_modes">Módok</string>
+
+    <string name="nav_modes_info">Váltás az AR Vetítés, Rétegzés, Makett és Rajzolás módok között.</string>
+
+
+    <string name="nav_ar_mode">AR</string>
+
+    <string name="nav_ar_mode_info">Vetítsd a művedet egy valódi falra a kiterjesztett valóság segítségével. Először szkenneld be a falat a horgony elhelyezéséhez, majd add hozzá a tervezési rétegeket.</string>
+
+
+    <string name="nav_overlay">Rétegzés</string>
+
+    <string name="nav_overlay_info">Helyezd a tervedet az élő kameraképre AR horgonyzás nélkül. Kiváló a gyors keretezéshez és elhelyezés ellenőrzéséhez.</string>
+
+
+    <string name="nav_mockup">Makett</string>
+
+    <string name="nav_mockup_info">Tekintsd meg a tervedet egy fal fotójára kompozitálva. Nincs szükség kamerára vagy szkennelésre.</string>
+
+
+    <string name="nav_trace">Rajzolás</string>
+
+    <string name="nav_trace_info">Használd a tervedet világítótábla rátétként, hogy referenciavonalakat rajzolj egy fizikai felületre.</string>
+
+    <string name="nav_trace_mode">Világítótábla</string>
+
+
+    <string name="nav_canvas">Vászon</string>
+
+    <string name="nav_mural">Falfestmény</string>
+
+    <string name="nav_scan_mode_toggle_info">Váltás a Vászon (kisebb, asztali méretű művészetre optimalizálva) és a Falfestmény (nagy méretű falakra és Gauss-splattingra optimalizálva) között.</string>
+
+
+    <string name="nav_stencil">Sablon</string>
+
+    <string name="nav_stencil_info">Generálj nyomtatható, többrétegű sablonokat a művedből. Minden réteg csak körvonalakat tartalmazó csempeként nyomtatódik US Letter papírméretben.</string>
+
+
+    <string name="nav_grid">Célpont</string>
+
+    <string name="nav_grid_info">AR horgony célpontok létrehozása és kezelése. Fényképezz le festett referenciajelöléseket a falon, hogy a vetítést a helyére rögzítsd.</string>
+
+
+    <string name="nav_surveyor">Felmérés</string>
+
+    <string name="nav_surveyor_info">Térképezd fel a falfelületet az AR követési pontosság javítása érdekében.</string>
+
+
+    <string name="nav_create">Létrehozás</string>
+
+    <string name="nav_create_info">Fényképezz le egy referenciajelölést a falon egy új AR horgony létrehozásához. Az alkalmazás követni fogja ezt a jelölést, hogy a vetítés egyvonalban maradjon.</string>
+
+
+    <string name="nav_refine">Finomítás</string>
+
+    <string name="nav_refine_info">Egy meglévő AR horgony célpont pozíciójának finomhangolása.</string>
+
+
+    <string name="nav_update">Folyamat</string>
+
+    <string name="nav_update_info">Jelöld meg a falfestményed elkészült részeit a festési folyamat nyomon követéséhez.</string>
+
+
+    <string name="nav_design">Tervezés</string>
+
+    <string name="nav_design_info">Tervezési rétegek hozzáadása és kezelése. Minden réteg lehet egy importált kép vagy egy szabadkézi rajz.</string>
+
+
+    <string name="nav_open">Megnyitás</string>
+
+    <string name="nav_open_info">Adj hozzá egy képet a galériádból új rétegként.</string>
+
+
+    <string name="nav_wall">Fal</string>
+
+    <string name="nav_wall_info">Cseréld le a Makett módban használt háttérfal fotóját.</string>
+
+
+    <string name="nav_isolate">Kizárás</string>
+
+    <string name="nav_isolate_info">Automatikusan távolítsd el a hátteret erről a rétegről, így csak a téma marad egy átlátszó háttéren.</string>
+
+
+    <string name="nav_invert">Invertálás</string>
+
+    <string name="nav_invert_info">Hozd létre az aktuális réteg negatívját. A feketék fehérek lesznek, a színek pedig az ellentettjükre fordulnak - hasznos a sablon és a rétegzés elemzéséhez.</string>
+
+
+    <string name="nav_outline">Körvonal</string>
+
+    <string name="nav_outline_info">Alakítsd ezt a réteget fekete vonalrajzzá átlátszó háttéren - ideális sablonok létrehozásához.</string>
+
+
+    <string name="nav_adjust">Igazítás</string>
+
+    <string name="nav_adjust_info">Finomhangold a fényerőt, kontrasztot, telítettséget és színegyensúlyt ehhez a réteghez.</string>
+
+
+    <string name="nav_balance">Szín</string>
+
+    <string name="nav_balance_info">Színezd a réteg színeit piros, zöld és kék csatornacsúszkák segítségével.</string>
+
+
+    <string name="nav_blending">Keverés</string>
+
+    <string name="nav_blending_info">Lapozz a keverési módok között (Normál, Szorzás, Képernyő, Rétegzés...), hogy szabályozd, hogyan kompozitálódik ez a réteg az alatta lévőkkel.</string>
+
+
+    <string name="nav_settings">Beállítások</string>
+
+    <string name="nav_settings_info">Konfiguráld a kezességet, az AR szkennelési módot, a mértékegységeket és az alkalmazás egyéb beállításait.</string>
+
+
+    <string name="nav_project">Projekt</string>
+
+    <string name="nav_project_info">Kezeld a projektedet: létrehozás, mentés, betöltés és exportálás.</string>
+
+
+    <string name="nav_new">Új</string>
+
+    <string name="nav_new_info">Kezdj egy friss, üres projektet. Minden nem mentett változás elvész.</string>
+
+
+    <string name="nav_save">Mentés</string>
+
+    <string name="nav_save_info">Mentsd a jelenlegi projektet az eszközödre.</string>
+
+
+    <string name="nav_load">Betöltés</string>
+
+    <string name="nav_load_info">Nyisd meg a projektkönyvtárat egy korábban mentett projekt betöltéséhez.</string>
+
+
+    <string name="nav_export">Exportálás</string>
+
+    <string name="nav_export_info">Exportálj egy lapos, egyesített képet az összes látható rétegről a fotógalériádba.</string>
+
+
+    <string name="nav_help">Súgó</string>
+
+    <string name="nav_help_info">Koppints bármelyik gombra, miközben a Súgó aktív, hogy megtudd, mit csinál.</string>
+
+
+    <string name="nav_light">Fény</string>
+
+    <string name="nav_light_info">Kapcsold be az eszköz zseblámpáját, hogy megvilágítsd a falat, miközben gyenge fényviszonyok között dolgozol.</string>
+
+
+    <string name="nav_lock">Zárolás</string>
+
+    <string name="nav_lock_info">Zárold az érintőképernyőt, hogy megelőzd a véletlen módosításokat permetezés közben. Koppints háromszor bárhová a feloldáshoz.</string>
+
+
+
+    <string name="info_brush">Fess szabadkézi vonásokat erre a rétegre. Húzd fel/le a Méret gombot az ecset átmérőjének megváltoztatásához; húzd balra/jobbra a tollasodás (perem lágysága) beállításához.</string>
+
+    <string name="info_eraser">Radírozd le a réteg egyes részeit egy kerek ecsettel. Húzd fel/le a Méret gombot az átmérő megváltoztatásához; húzd balra/jobbra a tollasodás beállításához.</string>
+
+    <string name="info_blur">Kend el és lágyítsd a réteg területeit. Húzz át egy régiót a homályosításhoz.</string>
+
+    <string name="info_liquify">Told és torzítsd a képpontokat bármely irányba. Húzz át egy területet annak torzításához - hasznos az arányok beállításához.</string>
+
+    <string name="info_dodge">Világosíts fel bizonyos területeket úgy, hogy átfested őket.</string>
+
+    <string name="info_burn">Sötétíts el bizonyos területeket úgy, hogy átfested őket.</string>
+
+    <string name="info_size">Húzd fel/le az ecset átmérőjének megváltoztatásához. Húzd balra/jobbra a tollasodás beállításához - a szélesebb toll puhább, inkább spray-szerű éleket ad.</string>
+
+    <string name="info_color">Megmutatja az aktív ecset színét. Húzd fel/le a világosság beállításához; húzd balra/jobbra a telítettség beállításához. Koppints a teljes színkör megnyitásához.</string>
+
+    <string name="info_draw">Adj hozzá egy új, üres átlátszó réteget a szabadkézi rajzoláshoz.</string>
+
+    <string name="info_keyframe">Mentsd a jelenlegi AR kamera pózt kulcsképként. A sodródás korrigálására és a vetítés újraigazítására szolgál, miután eltávolodtál és visszatértél.</string>
+
+    <string name="info_layer">Ez a réteg. Koppints az aktiválásához. Nyisd meg a vízszintes sínt az eszközök eléréséhez. Nyomd hosszan és húzd az átrendezéshez.</string>
+
+
+
+    <string name="stencil_layers">Rétegek</string>
+
+    <string name="stencil_layers_info">Válaszd ki, hány sablonréteget szeretnél generálni: 1 (csak sziluett), 2 (sziluett + kiemelés), vagy 3 (sziluett + középtónus + kiemelés).</string>
+
+
+    <string name="stencil_rebuild">Újraépítés</string>
+
+    <string name="stencil_rebuild_info">Futtasd újra a sablongenerálási folyamatot a jelenlegi forrásrétegen.</string>
+
+
+    <string name="stencil_print">Nyomtatás</string>
+
+    <string name="stencil_print_info">Állítsd be a valós nyomtatási méretet, és generálj egy csempézett PDF-et US Letter papírhoz.</string>
+
+
+    <string name="stencil_print_size">Méret</string>
+
+    <string name="stencil_print_size_info">Húzd fel/le a sablon valós szélességének vagy magasságának centiméterben történő beállításához. Az oldalszám élőben frissül.</string>
+
+
+    <string name="stencil_print_dim_toggle">Sz / M</string>
+
+    <string name="stencil_print_dim_toggle_info">Koppints a kimenet szélességének vagy magasságának rögzítése közötti váltáshoz.</string>
+
+
+    <string name="stencil_export_pdf">PDF Nyomtatás</string>
+
+    <string name="stencil_export_pdf_info">Generálj egy csempézett PDF-et az összes sablonrétegről, készen a nyomtatásra és vágásra. Minden csempe 3 mm-es átfedést tartalmaz az összeszereléshez.</string>
+
+
+    <string name="stencil_save_layers">PNG Mentése</string>
+
+    <string name="stencil_save_layers_info">Ments minden sablonréteget külön PNG képként a galériádba.</string>
+
+
+    <string name="stencil_back">← Szerkesztő</string>
+
+    <string name="stencil_back_info">Visszatérés a főszerkesztőhöz. A sablonrétegek megmaradnak a munkamenetben.</string>
+
+
+    <string name="nav_text">Szöveg</string>
+
+    <string name="nav_draw">Rajz</string>
+
+    <string name="nav_edit">Szerkesztés</string>
+
+    <string name="nav_font">Betűtípus</string>
+
+    <string name="nav_size">Méret</string>
+
+    <string name="nav_color">Szín</string>
+
+    <string name="nav_kern">Alávágás</string>
+
+    <string name="nav_bold">Félkövér</string>
+
+    <string name="nav_italic">Dőlt</string>
+
+    <string name="nav_shadow">Árnyék</string>
+
+    <string name="nav_eraser">Radír</string>
+
+    <string name="nav_blur">Homályosítás</string>
+
+    <string name="nav_liquify">Cseppfolyósítás</string>
+
+    <string name="nav_dodge">Világosítás</string>
+
+    <string name="nav_burn">Sötétítés</string>
+
+
+
+    <string name="pro_tip">Profi Tipp</string>
+    <string name="double_tap_hint">Koppints duplán a forgástengely váltásához.</string>
+    <string name="ok_button">OK</string>
+
+    <string name="generating">GENERÁLÁS...</string>
+
+    <string name="stencil_hint">Nyomd meg újra a réteg hozzáadásához.</string>
+
+    <string name="rename_hint">Átnevezés</string>
+
+    <string name="edit_text_hint">Szöveg szerkesztése</string>
+
+    <string name="copy_edits">Szerkesztések másolása</string>
+
+    <string name="paste_edits">Szerkesztések beillesztése</string>
+
+    <string name="generate_poster">Poszter generálása</string>
+
+    <string name="duplicate">Kettőzés</string>
+
+    <string name="unlink_layer">Réteg leválasztása</string>
+
+    <string name="link_layer">Réteg összekapcsolása</string>
+
+    <string name="hide_layer">Réteg elrejtése</string>
+
+    <string name="show_layer">Réteg megjelenítése</string>
+
+    <string name="flatten_all">Összes lapítása</string>
+
+    <string name="delete">Törlés</string>
+    <string name="new_project_name">Új Projekt</string>
+
+    <string name="lock_button">Zárolás</string>
+
+    <string name="freeze_button">Fagyasztás</string>
+
+
+    <string name="wall_source_title">Válassz falfotót</string>
+
+    <string name="wall_source_text">Hogyan szeretnéd beállítani a háttérfalat?</string>
+
+    <string name="take_photo">Fénykép készítése</string>
+
+    <string name="choose_from_gallery">Választás a Galériából</string>
+
+
+    <string name="depth_unsupported">Ez az eszköz nem támogatja a Mélységi API-t.\nVálts Vászon módra a Beállításokban.</string>
+
+
+    <string name="arcore_required_title">ARCore szükséges</string>
+
+    <string name="arcore_required_text">Ez az eszköz nem rendelkezik ARCore telepítéssel, vagy nem támogatott. Telepítsd az ARCore-t a Play Áruházból az AR funkciók használatához.</string>
+
+    <string name="install_arcore">ARCore telepítése</string>
+
+
+    <string name="camera_permission_required">A kamera engedélyezése szükséges az AR módhoz.</string>
+
+    <string name="open_settings">Beállítások megnyitása</string>
+
+
+    <string name="target_creation_title">CÉLPONT LÉTREHOZÁSA</string>
+
+    <string name="target_creation_text">Koppints közvetlenül a festett referenciajelölésekre a képernyőn. Az alkalmazás azonnal elszigeteli őket.</string>
+
+    <string name="cancel">Mégse</string>
+
+
+    <string name="diag_copied">MÁSOLVA ✓</string>
+
+    <string name="diag_title">MÉLYSÉGI DIAGN. (koppints a másoláshoz)</string>
+
+    <string name="diag_waiting">Várakozás az első képkockára...</string>
+
+
+    <string name="scan_step_1">1. lépés: Térképezd fel a környezeted</string>
+
+    <string name="scan_step_2">2. lépés: Szkenneld a célfalat</string>
+
+
+    <string name="plane_confirm_question">A mű a megfelelő falon van?</string>
+
+    <string name="looks_correct">Helyesnek tűnik</string>
+
+    <string name="redetect">Újraészlelés</string>
+
+
+    <string name="plane_realignment_title">Falfelület újraészlelése</string>
+
+    <string name="plane_realignment_text">A horgony onnan van elhelyezve, ahol a rögzítéskor álltál. Az ARCore azt a nyomon követett függőleges felületet választja, amely a leginkább közvetlenül az eredeti pozíció előtt van.\n\n1. Térj vissza körülbelül arra a helyre, ahol a rögzítés során álltál\n2. Lassan pásztázd a kamerát a falfestményed felett, hogy az ARCore sík felületként regisztrálhassa\n3. Tartsd stabilan a műalkotással szemben, majd koppints alább\n\nA narancssárga szegély az újonnan észlelt felületre ugrik.</string>
+
+    <string name="use_this_wall">Ezt a falat használd</string>
+
+
+    <string name="scanning_dots">Scanning\u2026</string>
+
+    <string name="matched_percent">%1$d%% egyezik</string>
+
+    <string name="anchor_locked">Horgony rögzítve</string>
+
+
+    <string name="choose_font">Válassz betűtípust</string>
+
+
+    <string name="cancel_button">Mégse</string>
+    <string name="done_button">Kész</string>
+    <string name="apply_button">Alkalmaz</string>
+    <string name="close_button">Bezár</string>
+    <string name="next_button">Tovább</string>
+    <string name="save_button">Mentés</string>
+    <string name="retake_button">Újrafényképezés</string>
+    <string name="capture_button">Rögzítés</string>
+
+
+    <string name="adj_detail">Részlet</string>
+    <string name="adj_opacity">Átlátszatlanság</string>
+    <string name="adj_brightness">Fényerő</string>
+    <string name="adj_contrast">Kontraszt</string>
+    <string name="adj_saturation">Telítettség</string>
+    <string name="adj_red">Piros</string>
+    <string name="adj_green">Zöld</string>
+    <string name="adj_blue">Kék</string>
+    <string name="adj_undo">Visszavonás</string>
+    <string name="adj_redo">Újra</string>
+    <string name="adj_magic_align">Varázslatos igazítás</string>
+
+
+    <string name="status_create_grid">Hozz létre egy Rácsot a kezdéshez.</string>
+    <string name="status_scan_surfaces">Szkenneld a körülötted lévő felületeket.</string>
+    <string name="status_tap_surface">Koppints egy felületre a horgony elhelyezéséhez.</string>
+    <string name="status_looking_grid">A Rácsod keresése...</string>
+    <string name="status_ready">Kész. (%1$d pont)</string>
+    <string name="unlock_hint">Koppints 4-szer a feloldáshoz</string>
+
+
+    <string name="lib_app_title">GraffitiXR</string>
+    <string name="lib_app_description">Vetítsd a művedet egy valódi falra vagy vászonra AR vagy egy alapvető kameraréteg segítségével. \n\nGyorsan készíts egy makettet egy fotón, hogy megmutasd, hogyan fog kinézni az elkészült munka. \n\nVagy rajzolj át egy képet papírra úgy, hogy az eszközödet világítótáblaként használod.</string>
+    <string name="lib_new_project">Új</string>
+    <string name="lib_import_project">Importálás</string>
+    <string name="lib_no_projects">Még nincsenek projektek</string>
+    <string name="lib_no_projects_hint">Tap New above to start your first mural.\n\nYou\'ll be taken into the editor where you can:\n  \u2022  Add artwork from the Design menu\n  \u2022  Switch to AR mode to project onto a real wall\n  \u2022  Use Overlay to float your design on the live camera\n  \u2022  Use Mockup to preview on a wall photo\n  \u2022  Use Lightbox to trace your design onto paper</string>
+    <string name="lib_project_thumbnail">Projekt miniatűr</string>
+    <string name="lib_delete_project_desc">%1$s projekt törlése</string>
+
+
+    <string name="settings_title">Beállítások</string>
+    <string name="settings_preferences_section">Beállítások</string>
+    <string name="settings_hand_label">Domináns Kéz</string>
+    <string name="settings_hand_right">Jobb</string>
+    <string name="settings_hand_left">Bal</string>
+    <string name="settings_diag_label">Mélységdiagnosztikai Rátét</string>
+    <string name="settings_on">Be</string>
+    <string name="settings_off">Ki</string>
+    <string name="settings_scan_mode_label">AR Szkennelési Mód</string>
+    <string name="settings_scan_mode_point_cloud">Pontfelhő</string>
+    <string name="settings_scan_mode_gaussian_splat">Gauss-splat</string>
+    <string name="settings_anchor_boundary_label">Horgony határának mutatása</string>
+    <string name="settings_units_label">Távolság mértékegysége</string>
+    <string name="settings_units_imperial">Birodalmi (ft)</string>
+    <string name="settings_units_metric">Metrikus (m)</string>
+    <string name="settings_canvas_bg_label">Vászon Háttér</string>
+    <string name="settings_info_section">Alkalmazás Információ</string>
+    <string name="settings_version_label">Verzió</string>
+    <string name="settings_updates_section">Frissítések</string>
+    <string name="settings_check_updates_label">Kísérleti frissítések keresése</string>
+    <string name="settings_install_update_label">Frissítés telepítése</string>
+    <string name="settings_permissions_section">Engedélyek</string>
+    <string name="settings_camera_access">Kamera hozzáférés</string>
+    <string name="settings_photo_access">Fotótár hozzáférés</string>
+    <string name="settings_notifications">Értesítések</string>
+    <string name="settings_granted">Engedélyezve</string>
+    <string name="settings_denied">Megtagadva</string>
+    <string name="settings_open_app_settings">Alkalmazásbeállítások megnyitása</string>
+    <string name="settings_copyright">GraffitiXR © 2025</string>
+
+
+    <string name="layers_title">Rétegek</string>
+    <string name="brush_size_title">Ecsetméret</string>
+    <string name="save_project_hint">Projekt neve</string>
+
+
+    <string name="target_guide_desc">Célpont illesztési útmutató</string>
+    <string name="target_captured_desc">Rögzített célpont</string>
+    <string name="target_review_desc">Kinyert célpont áttekintése</string>
+    <string name="target_unwarp_hint">Húzd a sarkokat a kiegyenesítéshez</string>
+    <string name="target_review_title">Kinyert jelölések áttekintése</string>
+
+    <string name="target_exclude">Kizárás</string>
+    <string name="target_include">Belefoglalás</string>
+    <string name="target_erase_marks">Jelölések törlése</string>
+    <string name="target_show_features">Funkciók megjelenítése</string>
+    <string name="reset_button">Visszaállítás</string>
+
+    <string name="poster_title">POSZTER GENERÁLÁSA</string>
+    <string name="poster_select_layers">Válaszd ki a belefoglalandó rétegeket:</string>
+    <string name="poster_physical_size">Fizikai méret (szélesség mm-ben):</string>
+    <string name="poster_generate_pdf">PDF GENERÁLÁSA</string>
+
+
+    <string name="scan_hint_recover">Mozgasd lassan az eszközt a követés helyreállításához</string>
+    <string name="scan_hint_ambient">Lassan forogj 360°-ot a környezeted feltérképezéséhez (%1$d°)</string>
+    <string name="scan_hint_too_dark">Túl sötét. Kapcsold be a zseblámpát.</string>
+    <string name="scan_hint_build_map">Sétálj balra és jobbra a térkép felépítéséhez</string>
+    <string name="scan_hint_closer">Menj közelebb a falhoz</string>
+    <string name="scan_hint_higher_lower">Szkennelj magasabbra és alacsonyabbra</string>
+
+
+    <string name="desc_bg_mockup">Háttér makett</string>
+    <string name="desc_segmentation_preview">Szegmentálási előnézet</string>
+
+
+
+    <string name="help_mode_host">Módváltó: Váltás az alkalmazásmódok között. Utasítások: Koppints a kibontáshoz, majd válaszd ki az AR, Rétegzés, Makett vagy Világítótábla lehetőséget.</string>
+
+    <string name="help_ar">AR Mód: Tervezés vetítése falra térbeli térképezéssel. Utasítások: Szkenneld a környezetet, amíg a falat nem észleli, majd koppints a horgony elhelyezéséhez.</string>
+
+    <string name="help_overlay">Rétegzés Mód: Terv megjelenítése élő kamerán térbeli követés nélkül. Utasítások: Méretezd és mozgasd manuálisan a tervet, hogy illeszkedjen a kerethez.</string>
+
+    <string name="help_mockup">Makett Mód: A terv előnézete egy statikus fotón. Utasítások: Használd a \'Fal\' lehetőséget háttérkép beállításához, majd rendezd a rétegeket felülre.</string>
+
+    <string name="help_trace">Világítótábla Mód: Nagy fényerejű rajzoló felület. Utasítások: Helyezz papírt a képernyőre és rajzolj. Koppints háromszor bárhová a kilépéshez.</string>
+
+    <string name="help_target_host">Célpont Kezelés: Eszközök az AR horgonyokhoz. Utasítások: Koppints a falfestmény pozíciójának létrehozásához vagy újraigazításához szükséges eszközök eléréséhez.</string>
+
+    <string name="help_scan_mode_toggle">Szkennelési Felbontás: Váltás a Falfestmény (nagy lépték) és a Vászon (kis lépték) között. A falfestmény Gauss-splatteket használ a falakhoz; a Vászon Pontfelhőket használ a részletes asztali méretű művészethez.</string>
+
+    <string name="help_create">Horgony Létrehozása: Fényképezz le egy jelölést a falon a vetítés rögzítéséhez. Utasítások: Mutass egy jellegzetes textúrára, és koppints. Az alkalmazás követni fogja ezt a jelölést.</string>
+
+    <string name="help_design_host">Réteg Kezelés: Képek, szöveg vagy vázlatok hozzáadása. Utasítások: Koppints a kibontáshoz. Nyomd hosszan bármelyik réteg gombot a másodlagos menü megnyitásához.</string>
+
+    <string name="help_add_img">Kép Importálása: Vázlat vagy referenciafotó hozzáadása. Utasítások: Válassz egy képet a galériádból. Új tervezési rétegként fog megjelenni.</string>
+
+    <string name="help_add_draw">Új Vázlat: Üres réteg hozzáadása szabadkézi rajzoláshoz. Utasítások: Válaszd ki a réteget az ecset, a radír és a maszatolási eszközök megjelenítéséhez.</string>
+
+    <string name="help_add_text">Szöveg Hozzáadása: Hozz létre egy tipográfiai réteget. Utasítások: Koppints a réteg \'Szerkesztés\' gombjára a tartalom és a formázás módosításához.</string>
+
+    <string name="help_wall">Fal Módosítása: Háttér beállítása Makett módhoz. Utasítások: Válassz egy fotót a fizikai falról, amelyre festeni tervezel.</string>
+
+    <string name="help_project_host">Projekt Kezelés: Mentsd, töltsd be és exportáld a munkát. Utasítások: Koppints a falfestmény adminisztratív feladatainak eléréséhez.</string>
+
+    <string name="help_new">Új Projekt: Kezdj egy friss falfestményt. Utasítások: Koppints a visszaállításhoz. Figyelmeztetés: Ez törli az összes jelenlegi munkát. Először ments!</string>
+
+    <string name="help_save">Projekt Mentése: Tárold a falfestményt és az AR térképet. Utasítások: Add meg a projekt nevét, és koppints a Mentés gombra a haladás megőrzéséhez.</string>
+
+    <string name="help_load">Projekt Könyvtár: Hozzáférés a mentett falfestményekhez. Utasítások: Böngéssz a könyvtárban a munka folytatásához vagy a megosztott projektfájlok importálásához.</string>
+
+    <string name="help_export">Kép Exportálása: Ments nagy felbontású pillanatképet. Utasítások: Az összes látható réteget egyetlen PNG formátumban jeleníti meg a fotógalériádban.</string>
+
+    <string name="help_settings">Alkalmazás Beállítások: Preferenciák konfigurálása. Utasítások: Nyisd meg a kezesség, az egységek és a szkennelési paraméterek beállításához.</string>
+
+    <string name="help_light">Zseblámpa: Kapcsold be az eszköz LED-jét. Utasítások: Használd ezt sötét falak megvilágítására a jobb AR követés érdekében.</string>
+
+    <string name="help_lock_trace">Zárolás/Fagyasztás: Véletlen változtatások megelőzése. Utasítások: Rajzolás módban letiltja a képernyőt. Más módokban zárolja a réteg transzformációit.</string>
+
+    <string name="help_help_main">Interaktív Súgó: Elmagyarázza a gombok funkcióit. Utasítások: Koppints az aktiváláshoz (Cián). Amíg aktív, koppints bármelyik gombra a súgószöveg megtekintéséhez.</string>
+
+    <string name="help_layer">\'%1$s\' Réteg: Aktív falfestmény elem. Utasítások: Koppints a kiválasztáshoz. Húzd a gombot fel/le az átrendezéshez. Alakítsd át a képernyőn gesztusokkal.</string>
+
+
+
+    <string name="help_edit_text">Szöveg Szerkesztése: Szavak módosítása a tipográfiai rétegben. Utasítások: Koppints a billentyűzet megnyitásához és a szöveg tartalmának frissítéséhez.</string>
+
+    <string name="help_size">Ecset/Szöveg Méret: Állítsd be a léptéket és a puhaságot. Utasítások: Húzd fel/le a mérethez. Húzd balra/jobbra az ecset tollasodásához.</string>
+
+    <string name="help_font">Betűtípus Választó: Válassz tipográfiai stílust. Utasítások: Koppints a rendelkezésre álló betűtípusok böngészéséhez és alkalmazásához a szövegrétegen.</string>
+
+    <string name="help_color">Szín Eszköz: Aktív szín beállítása. Utasítások: Húzd fel/le a fényerőhöz, balra/jobbra a telítettséghez. Koppints a teljes színkörhöz.</string>
+
+    <string name="help_kern">Szöveg Alávágás: Betűközök beállítása. Utasítások: Húzd balra/jobbra a szöveg elrendezésének szűkítéséhez vagy lazításához.</string>
+
+    <string name="help_bold">Félkövér Váltó: Vastag betűvastagság. Utasítások: Koppints a félkövér stílus bekapcsolásához az aktív szövegrétegen.</string>
+
+    <string name="help_italic">Dőlt Váltó: Ferde stílus. Utasítások: Koppints a dőlt stílus bekapcsolásához az aktív szövegrétegen.</string>
+
+    <string name="help_outline">Szöveg Körvonal: Karakter vonás. Utasítások: Koppints egy látható körvonal bekapcsolásához a szövegkarakterek körül.</string>
+
+    <string name="help_shadow">Vetett Árnyék: Szövegmélység. Utasítások: Koppints egy puha árnyék bekapcsolásához a tipográfia mögött a jobb olvashatóság érdekében.</string>
+
+    <string name="help_stencil_gen">Sablon Generálása: Nyomtatható sablonok létrehozása. Utasítások: Koppints a többrétegű sablon generálásának megkezdéséhez a képhez.</string>
+
+    <string name="help_blend">Keverési Mód: Kompozit stílus. Utasítások: Koppints a módok, például a Szorzás, a Képernyő és a Rétegzés közötti váltáshoz.</string>
+
+    <string name="help_adj">Képigazítások: Finomhangold a megjelenést. Utasítások: Koppints a csúszkák megjelenítéséhez az Átlátszatlanság, a Fényerő, a Kontraszt és a Telítettség érdekében.</string>
+
+    <string name="help_invert">Színek Invertálása: Nagy kontrasztú negatív. Utasítások: Koppints a színek megfordításához. A fehérek feketévé válnak és fordítva – hasznos a rajzoláshoz.</string>
+
+    <string name="help_balance">Színegyensúly: RGB csatorna hangolás. Utasítások: Koppints a csúszkák megjelenítéséhez a pontos Piros, Zöld és Kék beállításhoz.</string>
+
+    <string name="help_eraser">Radírecset: Távolítsd el a réteg tartalmát. Utasítások: Fess a képernyőn a törléshez. Használd a \'Méret\' gombot az átmérő beállításához.</string>
+
+    <string name="help_blur">Homályosító/Maszatoló Eszköz: Keverd össze a színeket. Utasítások: Fess a régiókon, hogy lágyítsd a széleket, vagy maszatold össze a részleteket.</string>
+
+    <string name="help_liquify">Torzító Eszköz: Terv átalakítása. Utasítások: Húzd a képernyőn a képpontok tolásához és húzásához – nagyszerű az arányok beállításához.</string>
+
+    <string name="help_dodge">Világosító Eszköz: Világosíts területeket. Utasítások: Fess a réteg bizonyos részeire a fénysűrűségük növeléséhez.</string>
+
+    <string name="help_burn">Sötétítő Eszköz: Sötétíts területeket. Utasítások: Fess a réteg bizonyos részeire a fénysűrűségük csökkentéséhez.</string>
+
+    <string name="help_iso">Téma Kizárása: Automatikus háttér-eltávolítás. Utasítások: Koppints a fő téma MI segítségével történő kivonásához a hátteréből.</string>
+
+    <string name="help_line">Vázlat Körvonal: Vonalrajz szűrő. Utasítások: Koppints a fotó fekete-fehér átlátszó körvonallá alakításához.</string>
+
+    <string name="help_help_layer">Réteg Súgó: Kapcsold be az információkat ezekhez a speciális rétegeszközökhöz. Utasítások: Koppints az aktiváláshoz. Ezután koppints bármelyik eszköz ikonra, hogy megtudd, mit csinál.</string>
+
+
+
+    <string name="unit_feet">ft</string>
+
+    <string name="unit_centimeters">cm</string>
+
+    <string name="unit_meters">m</string>
+
+    <string name="tut_ar_title">AR Vetítés</string>
+    <string name="tut_ar_text">Kivetíti a tervedet egy valódi falra a telefon mélységérzékelője és a térbeli követés segítségével.</string>
+    <string name="tut_ar_step1_title">1. lépés: Szkennelés</string>
+    <string name="tut_ar_step1_text">Mutass a falra, és mozogj lassan oldalra. Színes splattek jelennek meg, ahogy a motor feltérképezi a felületet. Várj, amíg a splattek beborítják a falfelületet.</string>
+    <string name="tut_ar_step2_title">2. lépés: Koppints az elhelyezéshez</string>
+    <string name="tut_ar_step2_text">Csak koppints a képernyőre. Az alkalmazás lefényképezi a falat, kinyeri a követési funkciókat, és azonnal rögzíti a horgonyt.</string>
+    <string name="tut_ar_step3_title">3. lépés: Add hozzá a művedet</string>
+    <string name="tut_ar_step3_text">Nyomd meg a \'Tervezés\' gombot a rétegeszközök eléréséhez. Használd a \'Kép\' lehetőséget fotók importálásához, a \'Rajz\' lehetőséget a vázlatkészítéshez, vagy a \'Szöveg\' lehetőséget a gépeléshez.</string>
+    <string name="tut_ar_tip_title">Tipp: A textúra számít</string>
+    <string name="tut_ar_tip_text">Az üres fehér falak, a sima beton és az egyszínű felületek nem követhetők. Irányítsd a horgonypontot graffitire, durva vakolatra vagy bármilyen jellegzetes jelre.</string>
+
+
+    <string name="tut_overlay_title">Élő Rétegzés</string>
+    <string name="tut_overlay_text">A terved az élő kameranézet felett lebeg - nincs szükség felületszkennelésre.</string>
+    <string name="tut_overlay_step1_title">1. lépés: Add hozzá a művedet</string>
+    <string name="tut_overlay_step1_text">Nyomd meg a \'Tervezés\' gombot a rétegeszközök eléréséhez. Használd a \'Kép\' lehetőséget fotók importálásához, a \'Rajz\' lehetőséget a vázlatkészítéshez, vagy a \'Szöveg\' lehetőséget a gépeléshez.</string>
+    <string name="tut_overlay_step2_title">2. lépés: Pozicionáld</string>
+    <string name="tut_overlay_step2_text">Csippents a méretezéshez, húzd az áthelyezéshez. A rétegzés a képernyődhöz rögzülve marad – lépj hátra, hogy lásd, hogyan illeszkedik a falhoz.</string>
+
+
+    <string name="tut_mockup_title">Fotó Makett</string>
+    <string name="tut_mockup_text">Tekintsd meg a terved előnézetét egy fotón, mielőtt egyáltalán ecsetet fognál.</string>
+    <string name="tut_mockup_step1_title">1. lépés: Állítsd be a falat</string>
+    <string name="tut_mockup_step1_text">Nyisd meg a \'Tervezés\' menüt, és koppints a \'Fal\' lehetőségre a felületed fotójának kiválasztásához vagy elkészítéséhez. Ezt tedd először!</string>
+    <string name="tut_mockup_step2_title">2. lépés: Add hozzá a művedet</string>
+    <string name="tut_mockup_step2_text">Használd a \'Kép\', \'Rajz\' vagy \'Szöveg\' lehetőséget, hogy rétegeket adj a fal tetejére. Csippents és húzd a méretezésükhöz és pozicionálásukhoz.</string>
+
+
+    <string name="tut_trace_title">Világítótábla Mód</string>
+    <string name="tut_trace_text">Fényes világítótáblává változtatja a képernyődet, amellyel a tervedet papírra rajzolhatod.</string>
+    <string name="tut_trace_step1_title">1. lépés: Tervezés Menü megnyitása</string>
+    <string name="tut_trace_step1_text">Koppints a \'Tervezés\' gombra a rétegeszközök eléréséhez.</string>
+    <string name="tut_trace_step2_title">2. lépés: Tartalom hozzáadása</string>
+    <string name="tut_trace_step2_text">Használd a \'Kép\' lehetőséget fotók importálásához, a \'Rajz\' lehetőséget a vázlatkészítéshez, vagy a \'Szöveg\' lehetőséget a gépeléshez.</string>
+    <string name="tut_trace_step3_title">3. lépés: Rajzolás</string>
+    <string name="tut_trace_step3_text">Helyezz papírt a képernyőre és rajzolj. Koppints háromszor bárhová a kilépéshez.</string>
+
+
+    <string name="tut_create_anchor_title">Horgony létrehozása</string>
+    <string name="tut_create_anchor_text">A vetítést a fal egy bizonyos pontjához rögzíti. Miután beállítottad, a terv a helyén marad, még akkor is, ha sétálsz.</string>
+    <string name="tut_surface_req_title">Felületi követelmények</string>
+    <string name="tut_surface_req_text">A falnak látható textúrával kell rendelkeznie - graffiti, durva vakolat, tégla vagy matricák mind jól működnek. Sima, üres vagy egyszínű falak nem tartanak meg egy horgonyt.</string>
+    <string name="tut_blobs_title">Mit jelentenek a foltok</string>
+    <string name="tut_blobs_text">Koppintás után röviden zöld foltokat fogsz látni. Ezek azok a követési kulcspontok, amelyeket az alkalmazás kinyert. Több folt = erősebb rögzítés.</string>
+    <string name="tut_import_img_title">Kép Importálása</string>
+    <string name="tut_import_img_text">Adj hozzá egy vázlatot, fotót vagy referenciát a galériádból. Új rétegként jelenik meg, a többi tetején.</string>
+    <string name="tut_scale_pos_title">Méretezés és Pozicionálás</string>
+    <string name="tut_scale_pos_text">Csippents két ujjal a méretezéshez. Húzd egy ujjal a pozicionáláshoz. A réteg AR módban a kivetített falfelületre illeszkedik.</string>
+    <string name="tut_lock_freeze_title">Zárolás / Fagyasztás</string>
+    <string name="tut_lock_freeze_text">Világítótábla (Rajzolás) módban: letiltja az érintést, így papírt tehetsz a képernyőre anélkül, hogy véletlenül elmozdítanál valamit.</string>
+    <string name="tut_in_other_modes_title">Más Módokban</string>
+    <string name="tut_in_other_modes_text">AR, Rétegzés és Makett módokban: zárolja a réteg transzformációit, így a terveket nem lehet véletlenül mozgatni vagy méretezni.</string>
+    <string name="tut_stencil_gen_title">Sablon Generálása</string>
+    <string name="tut_stencil_gen_text">Átalakítja a képedet nyomtatható festékszóró sablonokká. Minden sablon a terv egy színrétegét képviseli.</string>
+    <string name="tut_how_many_layers_title">Hány réteg?</string>
+    <string name="tut_how_many_layers_text">Egy 3 színű terv 3 sablonlapot eredményez. Több szín = több lap. Az egyszerű, nagy kontrasztú képek adják a legjobb eredményt.</string>
+    <string name="tut_exporting_title">Exportálás</string>
+    <string name="tut_exporting_text">Minden sablon PDF formátumban exportálódik. Nyomtass 100%-os méretarányban (méretezés nélkül) a pontos életnagyságú méretek eléréséhez.</string>
+    <string name="tut_opacity_brightness_title">Átlátszatlanság és Fényerő</string>
+    <string name="tut_opacity_brightness_text">Az átlátszatlanság szabályozza a réteg átlátszóságát. A fényerő az általános világosságot tolja el – hasznos a réteg fal tónusához való illesztéséhez.</string>
+    <string name="tut_contrast_saturation_title">Kontraszt és Telítettség</string>
+    <string name="tut_contrast_saturation_text">A kontraszt elválasztja a sötéteket a világosaktól - kiválóan alkalmas a sablon körvonalainak kiemelésére. A telítettség a színintenzitást szabályozza; húzd nullára a szürkeárnyalathoz.</string>
+    <string name="tut_isolate_subject_title">Téma Kizárása</string>
+    <string name="tut_isolate_subject_text">A mesterséges intelligenciát használja a háttér automatikus eltávolítására, így csak a kép fő témája marad.</string>
+    <string name="tut_best_results_title">Legjobb Eredmények</string>
+    <string name="tut_best_results_text">A legjobban azokon a fotókon működik, amelyeken tiszta téma van sima vagy kontrasztos háttér előtt. A zsúfolt hátterű összetett jelenetek manuális javítást igényelhetnek a radírral.</string>
+</resources>
