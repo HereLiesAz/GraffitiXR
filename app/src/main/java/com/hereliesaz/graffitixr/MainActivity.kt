@@ -143,7 +143,6 @@ class MainActivity : ComponentActivity() {
     var posterSourceLayerId by mutableStateOf<String?>(null)
     var hasCameraPermission by mutableStateOf(false)
     var showWallSourceDialog by mutableStateOf(false)
-    var cameraUri by mutableStateOf<Uri?>(null)
 
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p ->
         hasCameraPermission = p[Manifest.permission.CAMERA] ?: false
@@ -180,6 +179,8 @@ class MainActivity : ComponentActivity() {
                 @Suppress("DEPRECATION")
                 val settingsViewModel: SettingsViewModel = hiltViewModel()
                 val cameraController = rememberCameraController()
+
+                var cameraUri by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
 
                 val editorUiState by editorViewModel.uiState.collectAsState()
                 val mainUiState by mainViewModel.uiState.collectAsState()
@@ -342,7 +343,7 @@ class MainActivity : ComponentActivity() {
                 }
                 val takePictureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
                     if (success) {
-                        cameraUri?.let { editorViewModel.setBackgroundImage(it) }
+                        cameraUri?.let { editorViewModel.setBackgroundImage(Uri.parse(it)) }
                     }
                 }
 
@@ -836,7 +837,7 @@ class MainActivity : ComponentActivity() {
                                         if (hasCameraPermission) {
                                             val tmpFile = File(context.cacheDir, "wall_camera_${System.currentTimeMillis()}.jpg")
                                             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tmpFile)
-                                            cameraUri = uri
+                                            cameraUri = uri.toString()
                                             takePictureLauncher.launch(uri)
                                         } else {
                                             permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
