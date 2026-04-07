@@ -1447,6 +1447,29 @@ class MainActivity : ComponentActivity() {
 
         azHelpRailItem(id = "help_main", text = navStrings.help, color = navItemColor, shape = AzButtonShape.RECTANGLE)
     }
+
+@Composable
+private fun WallSourceDialog(
+    onDismiss: () -> Unit,
+    onGallery: () -> Unit,
+    onCamera: () -> Unit
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Choose Wall Photo") },
+        text = { Text("How would you like to set the background wall?") },
+        confirmButton = {
+            Button(onClick = onCamera) {
+                Text("Take Photo")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onGallery) {
+                Text("Choose from Gallery")
+            }
+        }
+    )
+}
 }
 
 @Composable
@@ -2076,4 +2099,5 @@ private fun FontPickerDialog(
         },
         confirmButton = {}
     )
+}
 }

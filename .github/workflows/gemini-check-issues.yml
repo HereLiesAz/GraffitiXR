@@ -37,5 +37,5 @@ jobs:
             Be conservative — only close an issue when the code unambiguously addresses the reported problem.
           gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}

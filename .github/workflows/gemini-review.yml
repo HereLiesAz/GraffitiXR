@@ -45,7 +45,7 @@ jobs:
         uses: 'google-github-actions/run-gemini-cli@v0' # ratchet:exclude
         id: 'gemini_pr_review'
         env:
-          GITHUB_TOKEN: '${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}'
+          GH_TOKEN: '${{ steps.mint_identity_token.outputs.token || secrets.GH_TOKEN || github.token }}'
           ISSUE_TITLE: '${{ github.event.pull_request.title || github.event.issue.title }}'
           ISSUE_BODY: '${{ github.event.pull_request.body || github.event.issue.body }}'
           PULL_REQUEST_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
@@ -91,7 +91,7 @@ jobs:
                     "pull_request_review_write"
                   ],
                   "env": {
-                    "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+                    "GITHUB_PERSONAL_ACCESS_TOKEN": "${GH_TOKEN}"
                   }
                 }
               },
