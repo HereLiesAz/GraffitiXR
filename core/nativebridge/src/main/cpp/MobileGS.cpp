@@ -968,7 +968,11 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         mGlDataDirty = true;
     }
 
-    if (++mFrameCounter % 90 == 0) {
+    ++mFrameCounter;
+    // First sort fires after 10 frames so indices are ready quickly;
+    // subsequent sorts fire every 30 frames (~2s at 15Hz depth feed).
+    const bool doSort = (mFrameCounter == 10) || (mFrameCounter > 10 && (mFrameCounter % 30 == 0));
+    if (doSort) {
         continuousOptimize();
         {
             std::lock_guard<std::mutex> sortLock(mSortMutex);
@@ -1437,6 +1441,10 @@ void MobileGS::draw() {
 
         if (elementsToDraw > 0) {
             glDrawElements(GL_POINTS, elementsToDraw, GL_UNSIGNED_INT, (void*)0);
+        } else {
+            // Sorted indices not ready yet — draw all splats unsorted as fallback
+            // so the scene isn't blank while the first sort is in progress.
+            glDrawArrays(GL_POINTS, 0, mPointCount);
         }
 
         glDisableVertexAttribArray(0);
