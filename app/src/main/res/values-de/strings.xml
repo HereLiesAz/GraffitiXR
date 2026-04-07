@@ -388,7 +388,7 @@
     <string name="status_tap_surface">Tippen Sie auf eine Oberfläche, um einen Anker zu platzieren.</string>
     <string name="status_looking_grid">Suche nach Ihrem Raster...</string>
     <string name="status_ready">Bereit. (%1$d Pkt.)</string>
-    <string name="unlock_hint">Tippen Sie 4 Mal zum Entsperren</string>
+    <string name="unlock_hint">Tippen Sie 3 Mal zum Entsperren</string>
 
     <!-- Library Screen -->
     <string name="lib_app_title">GraffitiXR</string>
