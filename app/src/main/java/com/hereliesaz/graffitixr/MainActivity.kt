@@ -834,10 +834,14 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onCamera = {
                                         showWallSourceDialog = false
-                                        val tmpFile = File(context.cacheDir, "wall_camera_${System.currentTimeMillis()}.jpg")
-                                        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tmpFile)
-                                        cameraUri = uri.toString()
-                                        takePictureLauncher.launch(uri)
+                                        if (hasCameraPermission) {
+                                            val tmpFile = File(context.cacheDir, "wall_camera_${System.currentTimeMillis()}.jpg")
+                                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tmpFile)
+                                            cameraUri = uri.toString()
+                                            takePictureLauncher.launch(uri)
+                                        } else {
+                                            permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
+                                        }
                                     }
                                 )
                             }
@@ -1466,6 +1470,29 @@ private fun WallSourceDialog(
         }
     )
 }
+}
+
+@Composable
+private fun WallSourceDialog(
+    onDismiss: () -> Unit,
+    onGallery: () -> Unit,
+    onCamera: () -> Unit
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Choose Wall Photo") },
+        text = { Text("How would you like to set the background wall?") },
+        confirmButton = {
+            Button(onClick = onCamera) {
+                Text("Take Photo")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onGallery) {
+                Text("Choose from Gallery")
+            }
+        }
+    )
 }
 
 @Composable
