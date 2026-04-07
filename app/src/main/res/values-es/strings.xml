@@ -388,7 +388,7 @@
     <string name="status_tap_surface">Toca una superficie para colocar el anclaje.</string>
     <string name="status_looking_grid">Buscando tu Cuadrícula...</string>
     <string name="status_ready">Listo. (%1$d pts)</string>
-    <string name="unlock_hint">Toca 4 veces para desbloquear</string>
+    <string name="unlock_hint">Toca 3 veces para desbloquear</string>
 
     <!-- Library Screen -->
     <string name="lib_app_title">GraffitiXR</string>
