@@ -395,7 +395,7 @@
     <string name="status_tap_surface">点按一个表面以放置锚点。</string>
     <string name="status_looking_grid">正在寻找您的网格...</string>
     <string name="status_ready">准备就绪。(%1$d 点)</string>
-    <string name="unlock_hint">连按 4 次解锁</string>
+    <string name="unlock_hint">连按三次解锁</string>
 
 
     <string name="lib_app_title">GraffitiXR</string>
