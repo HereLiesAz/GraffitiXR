@@ -20,13 +20,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.hereliesaz.graffitixr.common.model.Layer
+import com.hereliesaz.graffitixr.design.theme.AppStrings
 
 @Composable
 fun PosterOptionsDialog(
     sourceLayerId: String,
     layers: List<Layer>,
     onDismiss: () -> Unit,
-    onGenerate: (Float, List<String>) -> Unit
+    onGenerate: (Float, List<String>) -> Unit,
+    strings: AppStrings
 ) {
     val stencilLayers = layers.filter { it.stencilSourceId == sourceLayerId || it.id == sourceLayerId }
         .filter { it.stencilType != null }
@@ -49,7 +51,7 @@ fun PosterOptionsDialog(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "GENERATE POSTER",
+                    text = strings.editor.posterTitle,
                     style = MaterialTheme.typography.titleLarge,
                     color = Color.White,
                     fontWeight = FontWeight.Bold
@@ -57,7 +59,7 @@ fun PosterOptionsDialog(
                 
                 Spacer(Modifier.height(16.dp))
                 
-                Text("Select layers to include:", color = Color.Gray, fontSize = 14.sp)
+                Text(strings.editor.posterSelectLayers, color = Color.Gray, fontSize = 14.sp)
                 
                 LazyColumn(
                     modifier = Modifier
@@ -89,7 +91,7 @@ fun PosterOptionsDialog(
                 
                 Spacer(Modifier.height(16.dp))
                 
-                Text("Physical Size (Width in mm):", color = Color.Gray, fontSize = 14.sp)
+                Text(strings.editor.posterPhysicalSize, color = Color.Gray, fontSize = 14.sp)
                 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -118,13 +120,13 @@ fun PosterOptionsDialog(
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     AzButton(
-                        text = "CANCEL",
+                        text = strings.common.cancel,
                         onClick = onDismiss,
                         color = Color.Gray,
                         shape = AzButtonShape.RECTANGLE
                     )
                     AzButton(
-                        text = "GENERATE PDF",
+                        text = strings.editor.posterGeneratePdf,
                         onClick = { onGenerate(outputSizeMm, selectedLayerIds.toList()) },
                         enabled = selectedLayerIds.isNotEmpty(),
                         color = Color.Cyan,

@@ -841,7 +841,8 @@ class MainActivity : ComponentActivity() {
                                     onGenerate = { size, selectedIds ->
                                         editorViewModel.generatePosterPdf(selectedIds, size)
                                         showPosterDialog = false
-                                    }
+                                    },
+                                    strings = strings
                                 )
                             }
 

@@ -81,7 +81,11 @@ fun rememberAppStrings(): AppStrings {
             lock = stringResource(R.string.lock_button),
             freeze = stringResource(R.string.freeze_button),
             saveProjectHint = stringResource(R.string.save_project_hint),
-            chooseFont = stringResource(R.string.choose_font)
+            chooseFont = stringResource(R.string.choose_font),
+            posterTitle = stringResource(R.string.poster_title),
+            posterSelectLayers = stringResource(R.string.poster_select_layers),
+            posterPhysicalSize = stringResource(R.string.poster_physical_size),
+            posterGeneratePdf = stringResource(R.string.poster_generate_pdf)
         ),
         ar = AppStrings.Ar(
             depthUnsupported = stringResource(R.string.depth_unsupported),
@@ -259,7 +263,11 @@ data class AppStrings(
         val lock: String,
         val freeze: String,
         val saveProjectHint: String,
-        val chooseFont: String
+        val chooseFont: String,
+        val posterTitle: String,
+        val posterSelectLayers: String,
+        val posterPhysicalSize: String,
+        val posterGeneratePdf: String
     )
     data class Ar(
         val depthUnsupported: String,

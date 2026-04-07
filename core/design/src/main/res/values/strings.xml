@@ -449,6 +449,11 @@
     <string name="target_show_features">Show Features</string>
     <string name="reset_button">Reset</string>
 
+    <string name="poster_title">GENERATE POSTER</string>
+    <string name="poster_select_layers">Select layers to include:</string>
+    <string name="poster_physical_size">Physical Size (Width in mm):</string>
+    <string name="poster_generate_pdf">GENERATE PDF</string>
+
     <!-- Scan Hints -->
     <string name="scan_hint_recover">Move device slowly to recover tracking</string>
     <string name="scan_hint_ambient">Slowly rotate 360° to map your surroundings (%1$d°)</string>
