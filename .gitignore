@@ -67,3 +67,4 @@ gha-creds-*.json
 .worktrees/
 /.agent/
 /.claude/
+
