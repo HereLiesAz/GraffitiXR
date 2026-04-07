@@ -855,7 +855,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 cv::Vec3b col = colorRGB.at<cv::Vec3b>(colorR, colorC);
                 float r_f = col[0]/255.0f, g_f = col[1]/255.0f, b_f = col[2]/255.0f;
 
-                newVoxelUpdates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.1f, nx_w, ny_w, nz_w, localRadius}});
+                newVoxelUpdates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.2f, nx_w, ny_w, nz_w, localRadius}});
                 mapModified = true;
             }
         }
@@ -897,7 +897,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 s.confidence = std::min(1.0f, s.confidence + confGain);
             } else {
                 Splat s = update.second;
-                s.confidence = 0.1f; // Initial confidence boost
+                s.confidence = 0.2f; // Initial confidence boost
                 splatData.push_back(s);
                 mVoxelGrid[update.first] = splatData.size() - 1;
             }
@@ -970,8 +970,8 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
 
     ++mFrameCounter;
     // First sort fires after 10 frames so indices are ready quickly;
-    // subsequent sorts fire every 30 frames (~2s at 15Hz depth feed).
-    const bool doSort = (mFrameCounter == 10) || (mFrameCounter > 10 && (mFrameCounter % 30 == 0));
+    // subsequent sorts fire every 60 frames (~4s at 15Hz depth feed).
+    const bool doSort = (mFrameCounter == 10) || (mFrameCounter > 10 && (mFrameCounter % 60 == 0));
     if (doSort) {
         continuousOptimize();
         {
@@ -1009,8 +1009,8 @@ void MobileGS::continuousOptimize() {
     size_t validCount = 0;
 
     for (size_t i = 0; i < splatData.size(); i++) {
-        // TUNE: Slower decay for small-scale art to prevent "shimmering" or loss of detail
-        float decay = (mVoxelSize < 0.004f) ? 0.001f : 0.005f;
+        // TUNE: Slower decay to prevent loss of detail when scanning complex surfaces
+        float decay = (mVoxelSize < 0.004f) ? 0.0005f : 0.002f;
         splatData[i].confidence -= decay;
 
         if (splatData[i].confidence > 0.0f) {
@@ -1353,6 +1353,7 @@ void MobileGS::draw() {
             glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
             glBufferData(GL_ARRAY_BUFFER, uploadSplats.size() * sizeof(Splat), uploadSplats.data(), GL_DYNAMIC_DRAW);
             glBindBuffer(GL_ARRAY_BUFFER, 0);
+            mLastVboPointCount = static_cast<int>(uploadSplats.size());
         }
 
         if (mMeshVbo != 0) {
@@ -1441,10 +1442,10 @@ void MobileGS::draw() {
 
         if (elementsToDraw > 0) {
             glDrawElements(GL_POINTS, elementsToDraw, GL_UNSIGNED_INT, (void*)0);
-        } else {
+        } else if (mLastVboPointCount > 0) {
             // Sorted indices not ready yet — draw all splats unsorted as fallback
             // so the scene isn't blank while the first sort is in progress.
-            glDrawArrays(GL_POINTS, 0, mPointCount);
+            glDrawArrays(GL_POINTS, 0, mLastVboPointCount);
         }
 
         glDisableVertexAttribArray(0);
