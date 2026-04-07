@@ -6,7 +6,7 @@
     <!-- Label for the navigation item that opens the mode selection menu. -->
     <string name="nav_modes">Modos</string>
     <!-- Description for the modes menu, explaining its purpose of switching app modes. -->
-    <string name="nav_modes_info">Cambia entre los modos de Proyección AR, Superposición, Maqueta y Calco.</string>
+    <string name="nav_modes_info">Cambia entre los modos de Proyección AR, Superposición, Maqueta y Mesa de Luz.</string>
 
     <!-- Label for the Augmented Reality (AR) projection mode. -->
     <string name="nav_ar_mode">AR</string>
