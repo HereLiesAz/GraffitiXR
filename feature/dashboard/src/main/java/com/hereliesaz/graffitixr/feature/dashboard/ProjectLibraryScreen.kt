@@ -83,7 +83,7 @@ fun ProjectLibraryScreen(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Project your artwork onto a real wall or a canvas using AR or a basic camera overlay. /n Quickly create a mockup on a photo to show how the completed work will look. /n Or trace an image onto paper by using your device as a lightbox.",
+                    text = "Project your artwork onto a real wall or a canvas using AR or a basic camera overlay. \n Quickly create a mockup on a photo to show how the completed work will look. \n Or trace an image onto paper by using your device as a lightbox.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = Color.White.copy(alpha = 0.7f),
                     textAlign = TextAlign.Justify

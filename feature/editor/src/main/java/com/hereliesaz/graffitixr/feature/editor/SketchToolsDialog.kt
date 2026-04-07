@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import com.hereliesaz.aznavrail.AzButton
+import com.hereliesaz.aznavrail.model.AzButtonShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -106,9 +108,9 @@ fun ColorPickerDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    AzButton(text = "Cancel", onClick = onDismiss, shape = AzButtonShape.RECTANGLE)
                     Spacer(Modifier.width(8.dp))
-                    Button(onClick = { onSelectColor(selectedColor) }) { Text("Apply") }
+                    AzButton(text = "Apply", onClick = { onSelectColor(selectedColor) }, shape = AzButtonShape.RECTANGLE)
                 }
             }
         }
@@ -237,7 +239,7 @@ fun SizePickerDialog(
 
                 Slider(value = currentSize, onValueChange = onSizeChange, valueRange = 5f..150f)
 
-                Button(onClick = onDismiss, modifier = Modifier.padding(top = 16.dp)) { Text("Done") }
+                AzButton(text = "Done", onClick = onDismiss, modifier = Modifier.padding(top = 16.dp), shape = AzButtonShape.RECTANGLE)
             }
         }
     }

@@ -23,11 +23,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -1459,14 +1456,10 @@ private fun WallSourceDialog(
         title = { Text("Choose Wall Photo") },
         text = { Text("How would you like to set the background wall?") },
         confirmButton = {
-            Button(onClick = onCamera) {
-                Text("Take Photo")
-            }
+            AzButton(text = "Take Photo", onClick = onCamera, shape = AzButtonShape.RECTANGLE)
         },
         dismissButton = {
-            OutlinedButton(onClick = onGallery) {
-                Text("Choose from Gallery")
-            }
+            AzButton(text = "Choose from Gallery", onClick = onGallery, shape = AzButtonShape.RECTANGLE)
         }
     )
 }
@@ -1483,14 +1476,10 @@ private fun WallSourceDialog(
         title = { Text("Choose Wall Photo") },
         text = { Text("How would you like to set the background wall?") },
         confirmButton = {
-            Button(onClick = onCamera) {
-                Text("Take Photo")
-            }
+            AzButton(text = "Take Photo", onClick = onCamera, shape = AzButtonShape.RECTANGLE)
         },
         dismissButton = {
-            OutlinedButton(onClick = onGallery) {
-                Text("Choose from Gallery")
-            }
+            AzButton(text = "Choose from Gallery", onClick = onGallery, shape = AzButtonShape.RECTANGLE)
         }
     )
 }
@@ -1532,7 +1521,8 @@ private fun ArCoreUnavailableOverlay(modifier: Modifier = Modifier) {
                 color = Color.LightGray,
                 textAlign = TextAlign.Center
             )
-            Button(
+            AzButton(
+                text = "Install ARCore",
                 onClick = {
                     try {
                         context.startActivity(
@@ -1545,10 +1535,9 @@ private fun ArCoreUnavailableOverlay(modifier: Modifier = Modifier) {
                                 "https://play.google.com/store/apps/details?id=com.google.ar.core".toUri())
                         )
                     }
-                }
-            ) {
-                Text("Install ARCore")
-            }
+                },
+                shape = AzButtonShape.RECTANGLE
+            )
         }
     }
 }
@@ -1570,17 +1559,17 @@ private fun CameraPermissionDeniedBanner(modifier: Modifier = Modifier) {
                 color = Color.White,
                 textAlign = TextAlign.Center
             )
-            Button(
+            AzButton(
+                text = "Open Settings",
                 onClick = {
                     val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                         data = Uri.fromParts("package", context.packageName, null)
                     }
                     context.startActivity(intent)
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFCC2200))
-            ) {
-                Text("Open Settings")
-            }
+                color = Color(0xFFCC2200),
+                shape = AzButtonShape.RECTANGLE
+            )
         }
     }
 }
@@ -1615,12 +1604,12 @@ private fun TapTargetOverlay(
             }
         }
         Spacer(Modifier.height(16.dp))
-        OutlinedButton(
+        AzButton(
+            text = "Cancel",
             onClick = onCancel,
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray)
-        ) {
-            Text("Cancel")
-        }
+            color = Color.Gray,
+            shape = AzButtonShape.RECTANGLE
+        )
     }
 }
 
@@ -1832,18 +1821,18 @@ private fun PlaneConfirmOverlay(
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Button(
+                    AzButton(
+                        text = "Looks correct",
                         onClick = onConfirm,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
-                    ) {
-                        Text("Looks correct")
-                    }
-                    OutlinedButton(
+                        color = Color(0xFF2E7D32),
+                        shape = AzButtonShape.RECTANGLE
+                    )
+                    AzButton(
+                        text = "Re-detect",
                         onClick = onRedetect,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF8C00))
-                    ) {
-                        Text("Re-detect")
-                    }
+                        color = Color(0xFFFF8C00),
+                        shape = AzButtonShape.RECTANGLE
+                    )
                 }
             }
         }
@@ -1887,18 +1876,18 @@ private fun PlaneRealignmentOverlay(
                 )
                 Spacer(Modifier.height(16.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(
+                    AzButton(
+                        text = "Use This Wall",
                         onClick = onTryThisPlane,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
-                    ) {
-                        Text("Use This Wall")
-                    }
-                    OutlinedButton(
+                        color = Color(0xFF2E7D32),
+                        shape = AzButtonShape.RECTANGLE
+                    )
+                    AzButton(
+                        text = "Cancel",
                         onClick = onCancel,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF8C00))
-                    ) {
-                        Text("Cancel")
-                    }
+                        color = Color(0xFFFF8C00),
+                        shape = AzButtonShape.RECTANGLE
+                    )
                 }
             }
         }

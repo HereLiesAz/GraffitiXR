@@ -8,7 +8,8 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import com.hereliesaz.aznavrail.AzButton
+import com.hereliesaz.aznavrail.model.AzButtonShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -94,26 +95,26 @@ fun MaskingUi(
 
         // Buttons
         Box(Modifier.fillMaxSize().padding(16.dp)) {
-            Button(
+            AzButton(
+                text = "Auto Mask",
                 onClick = onAutoMask,
-                modifier = Modifier.align(Alignment.BottomStart)
-            ) {
-                Text("Auto Mask")
-            }
+                modifier = Modifier.align(Alignment.BottomStart),
+                shape = AzButtonShape.RECTANGLE
+            )
 
-            Button(
+            AzButton(
+                text = "Done (No Mask)",
                 onClick = { onConfirm(targetImage) },
-                modifier = Modifier.align(Alignment.BottomCenter)
-            ) {
-                Text("Done (No Mask)")
-            }
+                modifier = Modifier.align(Alignment.BottomCenter),
+                shape = AzButtonShape.RECTANGLE
+            )
 
-            Button(
+            AzButton(
+                text = "Cancel",
                 onClick = onRetake,
-                modifier = Modifier.align(Alignment.TopStart)
-            ) {
-                Text("Cancel")
-            }
+                modifier = Modifier.align(Alignment.TopStart),
+                shape = AzButtonShape.RECTANGLE
+            )
         }
     }
 }

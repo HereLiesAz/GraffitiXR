@@ -7,8 +7,8 @@ import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
+import com.hereliesaz.aznavrail.AzButton
+import com.hereliesaz.aznavrail.model.AzButtonShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -58,11 +58,11 @@ fun TraceControls(
                 }
             }
     ) {
-        Button(
+        AzButton(
+            text = "Rotate Axis: $axisName",
             onClick = onRotateAxis,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp)
-        ) {
-            Text("Rotate Axis: $axisName")
-        }
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+            shape = AzButtonShape.RECTANGLE
+        )
     }
 }

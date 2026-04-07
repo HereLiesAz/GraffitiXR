@@ -2,7 +2,8 @@ package com.hereliesaz.graffitixr.design.components
 
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.hereliesaz.aznavrail.AzButton
+import com.hereliesaz.aznavrail.model.AzButtonShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
@@ -22,9 +23,7 @@ fun DoubleTapHintDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = onDismissRequest) {
-                Text("OK")
-            }
+            AzButton(text = "OK", onClick = onDismissRequest, shape = AzButtonShape.RECTANGLE)
         }
     )
 }

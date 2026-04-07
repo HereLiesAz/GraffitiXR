@@ -4,11 +4,9 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Camera
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
+import com.hereliesaz.aznavrail.AzButton
+import com.hereliesaz.aznavrail.model.AzButtonShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -117,40 +115,26 @@ fun TargetCreationOverlayUi(
                 .padding(bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            FilledTonalButton(
+            AzButton(
+                text = if (step == CaptureStep.CAPTURE) "Cancel" else "Retake",
                 onClick = onCancel,
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Default.Close, contentDescription = "Cancel")
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(if (step == CaptureStep.CAPTURE) "Cancel" else "Retake")
-            }
+                modifier = Modifier.weight(1f),
+                shape = AzButtonShape.RECTANGLE
+            )
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            Button(
+            AzButton(
+                text = when (step) {
+                    CaptureStep.CAPTURE -> "Capture"
+                    CaptureStep.RECTIFY -> "Next"
+                    CaptureStep.REVIEW -> "Save"
+                    else -> ""
+                },
                 onClick = onPrimaryAction,
-                modifier = Modifier.weight(1f)
-            ) {
-                when (step) {
-                    CaptureStep.CAPTURE -> {
-                        Icon(Icons.Default.Camera, contentDescription = "Capture")
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Capture")
-                    }
-                    CaptureStep.RECTIFY -> {
-                        Icon(Icons.Default.Check, contentDescription = "Next")
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Next")
-                    }
-                    CaptureStep.REVIEW -> {
-                        Icon(Icons.Default.Check, contentDescription = "Confirm")
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Save")
-                    }
-                    else -> {}
-                }
-            }
+                modifier = Modifier.weight(1f),
+                shape = AzButtonShape.RECTANGLE
+            )
         }
     }
 }

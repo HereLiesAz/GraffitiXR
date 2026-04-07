@@ -7,6 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import com.hereliesaz.aznavrail.AzButton
+import com.hereliesaz.aznavrail.model.AzButtonShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -98,18 +100,17 @@ fun FreezePreviewScreen(
                 .fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            FloatingActionButton(
+            AzButton(
+                text = "Unfreeze",
                 onClick = onUnfreeze,
-                containerColor = MaterialTheme.colorScheme.errorContainer
-            ) {
-                Text("Unfreeze")
-            }
-            FloatingActionButton(
+                color = MaterialTheme.colorScheme.error,
+                shape = AzButtonShape.CIRCLE
+            )
+            AzButton(
+                text = "Got it",
                 onClick = onDismiss,
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            ) {
-                Text("Got it")
-            }
+                shape = AzButtonShape.CIRCLE
+            )
         }
     }
 }

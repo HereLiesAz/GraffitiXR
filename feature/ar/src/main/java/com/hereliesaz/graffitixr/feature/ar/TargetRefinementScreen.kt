@@ -4,10 +4,9 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
+import com.hereliesaz.aznavrail.AzButton
+import com.hereliesaz.aznavrail.model.AzButtonShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,23 +56,18 @@ fun TargetRefinementScreen(
                 .padding(32.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Button(
+            AzButton(
+                text = "Retake",
                 onClick = onRetake,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-            ) {
-                Icon(Icons.Default.Refresh, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Retake")
-            }
+                color = MaterialTheme.colorScheme.error,
+                shape = AzButtonShape.RECTANGLE
+            )
 
-            Button(
+            AzButton(
+                text = "Use Target",
                 onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-            ) {
-                Icon(Icons.Default.Check, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Use Target")
-            }
+                shape = AzButtonShape.RECTANGLE
+            )
         }
     }
 }

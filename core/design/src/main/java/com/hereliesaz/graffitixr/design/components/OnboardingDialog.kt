@@ -3,7 +3,8 @@ package com.hereliesaz.graffitixr.design.components
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.hereliesaz.aznavrail.AzButton
+import com.hereliesaz.aznavrail.model.AzButtonShape
 import androidx.compose.runtime.Composable
 import com.hereliesaz.graffitixr.common.model.EditorMode
 
@@ -36,9 +37,7 @@ fun OnboardingDialog(
         title = { Text(text = title, style = MaterialTheme.typography.headlineMedium) },
         text = { Text(text = description, style = MaterialTheme.typography.bodyLarge) },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Got it")
-            }
+            AzButton(text = "Got it", onClick = onDismiss, shape = AzButtonShape.RECTANGLE)
         }
     )
 }

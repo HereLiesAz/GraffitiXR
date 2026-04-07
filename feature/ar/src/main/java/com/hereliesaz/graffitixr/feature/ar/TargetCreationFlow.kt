@@ -20,6 +20,8 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
+import com.hereliesaz.aznavrail.AzButton
+import com.hereliesaz.aznavrail.model.AzButtonShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -321,9 +323,7 @@ private fun FeatureSelectionReview(
                                 Icon(Icons.Default.Refresh, contentDescription = "Redo", tint = if (canRedo) Color.White else Color.Gray)
                             }
                         } else {
-                            TextButton(onClick = { strokes.clear() }, contentPadding = PaddingValues(0.dp), modifier = Modifier.height(24.dp)) {
-                                Text("Reset", color = Color.White, fontSize = 12.sp)
-                            }
+                            AzButton(text = "Reset", onClick = { strokes.clear() }, modifier = Modifier.height(24.dp), shape = AzButtonShape.RECTANGLE)
                         }
                     }
                 }

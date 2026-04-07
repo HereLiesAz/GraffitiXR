@@ -5,7 +5,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.hereliesaz.aznavrail.AzButton
+import com.hereliesaz.aznavrail.model.AzButtonShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,17 +42,21 @@ fun CurvesDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                onCurvesApplied(points)
-                onDismissRequest()
-            }) {
-                Text("Apply")
-            }
+            AzButton(
+                text = "Apply",
+                onClick = {
+                    onCurvesApplied(points)
+                    onDismissRequest()
+                },
+                shape = AzButtonShape.RECTANGLE
+            )
         },
         dismissButton = {
-            TextButton(onClick = onDismissRequest) {
-                Text("Cancel")
-            }
+            AzButton(
+                text = "Cancel",
+                onClick = onDismissRequest,
+                shape = AzButtonShape.RECTANGLE
+            )
         }
     )
 }

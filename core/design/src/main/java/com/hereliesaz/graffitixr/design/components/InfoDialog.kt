@@ -2,7 +2,8 @@ package com.hereliesaz.graffitixr.design.components
 
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import com.hereliesaz.aznavrail.AzButton
+import com.hereliesaz.aznavrail.model.AzButtonShape
 import androidx.compose.runtime.Composable
 
 /**
@@ -23,9 +24,7 @@ fun InfoDialog(
         title = { Text(text = title) },
         text = { Text(text = content) },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Close")
-            }
+            AzButton(text = "Close", onClick = onDismiss, shape = AzButtonShape.RECTANGLE)
         }
     )
 }

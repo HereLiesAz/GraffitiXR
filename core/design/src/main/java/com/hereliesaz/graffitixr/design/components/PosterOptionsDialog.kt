@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
+import com.hereliesaz.aznavrail.AzButton
+import com.hereliesaz.aznavrail.model.AzButtonShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -115,16 +117,19 @@ fun PosterOptionsDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("CANCEL", color = Color.Gray)
-                    }
-                    Button(
+                    AzButton(
+                        text = "CANCEL",
+                        onClick = onDismiss,
+                        color = Color.Gray,
+                        shape = AzButtonShape.RECTANGLE
+                    )
+                    AzButton(
+                        text = "GENERATE PDF",
                         onClick = { onGenerate(outputSizeMm, selectedLayerIds.toList()) },
                         enabled = selectedLayerIds.isNotEmpty(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.Cyan, contentColor = Color.Black)
-                    ) {
-                        Text("GENERATE PDF")
-                    }
+                        color = Color.Cyan,
+                        shape = AzButtonShape.RECTANGLE
+                    )
                 }
             }
         }
