@@ -14,7 +14,7 @@
     <string name="nav_ar_mode_info">Projicera ditt konstverk på en riktig vägg med hjälp av förstärkt verklighet. Skanna väggen först för att placera ankaret och lägg sedan till dina designlager.</string>
 
 
-    <string name="nav_overlay">Täcka över</string>
+    <string name="nav_overlay">Överlagring</string>
 
     <string name="nav_overlay_info">Lägg din design i lager över livekameraflödet utan AR-förankring. Perfekt för snabb inramning och placeringskontroller.</string>
 
