@@ -83,6 +83,8 @@ import com.hereliesaz.graffitixr.design.components.InfoDialog
 import com.hereliesaz.graffitixr.design.components.PosterOptionsDialog
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
+import androidx.compose.ui.res.stringResource
+import com.hereliesaz.graffitixr.design.R as DesignR
 import com.hereliesaz.graffitixr.design.theme.Cyan
 import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
 import com.hereliesaz.graffitixr.design.theme.HotPink
@@ -122,6 +124,10 @@ import android.provider.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.core.net.toUri
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import com.hereliesaz.graffitixr.design.theme.rememberNavStrings
 import timber.log.Timber
 
 @AndroidEntryPoint
@@ -355,7 +361,8 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                val navStrings = remember { NavStrings() }
+                val strings = rememberAppStrings()
+                val navStrings = strings.nav
                 var showFontPicker by remember { mutableStateOf(false) }
                 var fontPickerLayerId by remember { mutableStateOf<String?>(null) }
                 val layerMenusOpen = remember { mutableStateMapOf<String, Boolean>() }
@@ -367,42 +374,42 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val mainHelpItems = remember(editorUiState.layers) {
-                    val base = mutableMapOf(
+                    val base = mutableMapOf<String, String>(
                         // ─── Mode Menu ──────────────────────────────────────────────────
-                        "mode_host" to "Mode Switcher: Switch between app modes. Instructions: Tap to expand, then select AR, Overlay, Mockup, or Lightbox.",
-                        "ar" to "AR Mode: Project design onto a wall using spatial mapping. Instructions: Scan environment until wall is detected, then tap to place the anchor.",
-                        "overlay" to "Overlay Mode: Display design over live camera without spatial tracking. Instructions: Manually scale and move the design to fit your frame.",
-                        "mockup" to "Mockup Mode: Preview design on a static photo. Instructions: Use 'Wall' to set a background image, then arrange layers on top.",
-                        "trace" to "Lightbox Mode: High-brightness tracing surface. Instructions: Place paper over the screen and trace. Triple-tap anywhere to exit.",
+                        "mode_host" to strings.help.modeHost,
+                        "ar" to strings.help.ar,
+                        "overlay" to strings.help.overlay,
+                        "mockup" to strings.help.mockup,
+                        "trace" to strings.help.trace,
 
                         // ─── Target Menu ────────────────────────────────────────────────
-                        "target_host" to "Target Management: Tools for AR anchors. Instructions: Tap to access tools for creating or re-aligning the mural's position.",
-                        "scan_mode_toggle" to "Scan Resolution: Switch between Mural (large scale) and Canvas (small scale). Mural uses Gaussian Splats for walls; Canvas uses Point Clouds for detailed desk-scale art.",
-                        "create" to "Create Anchor: Photograph a mark on the wall to lock projection. Instructions: Point at a distinct texture and tap. The app will track this mark.",
+                        "target_host" to strings.help.targetHost,
+                        "scan_mode_toggle" to strings.help.scanModeToggle,
+                        "create" to strings.help.create,
 
                         // ─── Design Menu ────────────────────────────────────────────────
-                        "design_host" to "Layer Management: Add images, text, or sketches. Instructions: Tap to expand. Long-press any layer button to open its secondary menu.",
-                        "add_img" to "Import Image: Add a sketch or reference photo. Instructions: Select an image from your gallery. It will appear as a new design layer.",
-                        "add_draw" to "New Sketch: Add a blank layer for freehand drawing. Instructions: Select the layer to reveal brush, eraser, and smudge tools.",
-                        "add_text" to "Add Text: Create a typography layer. Instructions: Tap the layer's 'Edit' button to change content and formatting.",
-                        "wall" to "Change Wall: Set background for Mockup mode. Instructions: Select a photo of the physical wall you plan to paint on.",
+                        "design_host" to strings.help.designHost,
+                        "add_img" to strings.help.addImg,
+                        "add_draw" to strings.help.addDraw,
+                        "add_text" to strings.help.addText,
+                        "wall" to strings.help.wall,
 
                         // ─── Project Menu ───────────────────────────────────────────────
-                        "project_host" to "Project Management: Save, load, and export work. Instructions: Tap to access administrative tasks for your mural.",
-                        "new" to "New Project: Start a fresh mural. Instructions: Tap to reset. Warning: This clears all current work. Save first!",
-                        "save" to "Save Project: Store mural and AR map. Instructions: Enter a project name and tap Save to preserve your progress.",
-                        "load" to "Project Library: Access saved murals. Instructions: Browse the library to resume work or import shared project files.",
-                        "export" to "Export Image: Save high-res snapshot. Instructions: Renders all visible layers into a single PNG in your photo gallery.",
-                        "settings" to "App Settings: Configure preferences. Instructions: Open to adjust handedness, units, and scanning parameters.",
+                        "project_host" to strings.help.projectHost,
+                        "new" to strings.help.newProject,
+                        "save" to strings.help.saveProject,
+                        "load" to strings.help.loadProject,
+                        "export" to strings.help.exportImage,
+                        "settings" to strings.help.appSettings,
 
                         // ─── Global Tools ───────────────────────────────────────────────
-                        "light" to "Flashlight: Toggle device LED. Instructions: Use this to illuminate dark walls for better AR tracking.",
-                        "lock_trace" to "Lock/Freeze: Prevent accidental changes. Instructions: In Trace mode, disables screen. In other modes, locks layer transforms.",
-                        "help_main" to "Interactive Help: Explains button functions. Instructions: Tap to activate (Cyan). While active, tap any button to see its help text."
+                        "light" to strings.help.flashlight,
+                        "lock_trace" to strings.help.lockTrace,
+                        "help_main" to strings.help.helpMain
                     )
 
                     editorUiState.layers.forEach { layer ->
-                        base["layer_${layer.id}"] = "Layer '${layer.name}': Active mural element. Instructions: Tap to select. Drag button up/down to reorder. Transform on screen with gestures."
+                        base["layer_${layer.id}"] = strings.help.layer(layer.name)
                     }
                     base
                 }
@@ -411,33 +418,36 @@ class MainActivity : ComponentActivity() {
                     val base = mutableMapOf<String, String>()
                     editorUiState.layers.forEach { layer ->
                         val id = layer.id
-                        base["edit_text_$id"] = "Edit Text: Change words in typography layer. Instructions: Tap to open the keyboard and update the text content."
-                        base["size_$id"] = "Brush/Text Size: Adjust scale and softness. Instructions: Drag up/down for size. Drag left/right for brush feathering."
-                        base["font_$id"] = "Font Picker: Select typography style. Instructions: Tap to browse available fonts and apply them to the text layer."
-                        base["color_$id"] = "Color Tool: Set active color. Instructions: Drag up/down for brightness, left/right for saturation. Tap for full color wheel."
-                        base["kern_$id"] = "Text Kerning: Adjust letter spacing. Instructions: Drag left/right to tighten or loosen the text layout."
-                        base["bold_$id"] = "Bold Toggle: Thick font weight. Instructions: Tap to toggle bold styling on the active text layer."
-                        base["italic_$id"] = "Italic Toggle: Slanted styling. Instructions: Tap to toggle italic styling on the active text layer."
-                        base["outline_$id"] = "Text Outline: Character stroke. Instructions: Tap to toggle a visible outline around the text characters."
-                        base["shadow_$id"] = "Drop Shadow: Text depth. Instructions: Tap to toggle a soft shadow behind the typography for better legibility."
-                        base["stencil_$id"] = "Generate Stencil: Create printable templates. Instructions: Tap to begin multi-layer stencil generation for this image."
-                        base["blend_$id"] = "Blend Mode: Composite style. Instructions: Tap to cycle through modes like Multiply, Screen, and Overlay."
-                        base["adj_$id"] = "Image Adjustments: Fine-tune appearance. Instructions: Tap to reveal sliders for Opacity, Brightness, Contrast, and Saturation."
-                        base["invert_$id"] = "Invert Colors: High-contrast negative. Instructions: Tap to flip colors. Whites become black and vice-versa—useful for tracing."
-                        base["balance_$id"] = "Color Balance: RGB channel tuning. Instructions: Tap to reveal sliders for precise Red, Green, and Blue adjustment."
-                        base["eraser_$id"] = "Eraser Brush: Remove layer content. Instructions: Paint on screen to erase. Use 'Size' button to adjust diameter."
-                        base["blur_$id"] = "Blur/Smudge Tool: Blend colors. Instructions: Paint over regions to soften edges or smudge details together."
-                        base["liquify_$id"] = "Warp Tool: Reshape design. Instructions: Drag on screen to push and pull pixels—great for adjusting proportions."
-                        base["dodge_$id"] = "Dodge Tool: Lighten areas. Instructions: Paint over parts of the layer to increase their luminance."
-                        base["burn_$id"] = "Burn Tool: Darken areas. Instructions: Paint over parts of the layer to decrease their luminance."
-                        base["iso_$id"] = "Isolate Subject: Auto-background removal. Instructions: Tap to extract the main subject from its background using AI."
-                        base["line_$id"] = "Sketch Outline: Line art filter. Instructions: Tap to convert the photo into a black-and-white transparent outline."
-                        base["help_layer_$id"] = "Layer Help: Toggle info for these specific layer tools. Instructions: Tap to activate. Then tap any tool icon to see what it does."
+                        base["edit_text_$id"] = strings.help.editText
+                        base["size_$id"] = strings.help.size
+                        base["font_$id"] = strings.help.font
+                        base["color_$id"] = strings.help.color
+                        base["kern_$id"] = strings.help.kern
+                        base["bold_$id"] = strings.help.bold
+                        base["italic_$id"] = strings.help.italic
+                        base["outline_$id"] = strings.help.outline
+                        base["shadow_$id"] = strings.help.shadow
+                        base["stencil_$id"] = strings.help.stencilGen
+                        base["blend_$id"] = strings.help.blend
+                        base["adj_$id"] = strings.help.adj
+                        base["invert_$id"] = strings.help.invert
+                        base["balance_$id"] = strings.help.balance
+                        base["eraser_$id"] = strings.help.eraser
+                        base["blur_$id"] = strings.help.blur
+                        base["liquify_$id"] = strings.help.liquify
+                        base["dodge_$id"] = strings.help.dodge
+                        base["burn_$id"] = strings.help.burn
+                        base["iso_$id"] = strings.help.iso
+                        base["line_$id"] = strings.help.line
+                        base["help_layer_$id"] = strings.help.helpLayer
                     }
                     base
                 }
 
-                val helpViewModel: HelpViewModel = hiltViewModel()
+                val helpViewModel: HelpViewModel =
+                    hiltViewModel(checkNotNull<ViewModelStoreOwner>(LocalViewModelStoreOwner.current) {
+                        "No ViewModelStoreOwner was provided via LocalViewModelStoreOwner"
+                    }, null)
                 val activeHelpList by helpViewModel.activeHelpList.collectAsState()
 
                 // Logic to switch active help list based on UI context
@@ -456,7 +466,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                val tutorials = getTutorials(editorUiState.layers)
+                val tutorials = getTutorials(editorUiState.layers, strings)
 
                 AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
                     azTheme(
@@ -479,7 +489,7 @@ class MainActivity : ComponentActivity() {
                     if (isRailVisible) {
                         ConfigureRailItems(
                             mainViewModel, editorViewModel, arViewModel, dashboardViewModel, context,
-                            overlayImagePicker, backgroundImagePicker, editorUiState, arUiState, navStrings,
+                            overlayImagePicker, backgroundImagePicker, editorUiState, arUiState, strings,
                             navItemColor = navItemColor,
                             onShowFontPicker = { layerId -> fontPickerLayerId = layerId; showFontPicker = true },
                             layerMenusOpen = layerMenusOpen
@@ -542,10 +552,10 @@ class MainActivity : ComponentActivity() {
 
                             Box(Modifier.offset { offset }) {
                                 if (editorUiState.isStencilGenerating) {
-                                    Text("GENERATING...", color = Color.Cyan, fontWeight = FontWeight.Bold)
+                                    Text(stringResource(DesignR.string.generating), color = Color.Cyan, fontWeight = FontWeight.Bold)
                                 } else if (editorUiState.stencilHintVisible) {
                                     Text(
-                                        "Press again to add a layer.",
+                                        stringResource(DesignR.string.stencil_hint),
                                         color = Color.White,
                                         modifier = Modifier
                                             .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
@@ -795,7 +805,8 @@ class MainActivity : ComponentActivity() {
                                             editorViewModel.saveProject(name)
                                             showSaveDialog = false
                                         }
-                                    }
+                                    },
+                                    strings = strings
                                 )
                             }
 
@@ -805,7 +816,8 @@ class MainActivity : ComponentActivity() {
                                         fontPickerLayerId?.let { editorViewModel.onTextFontChanged(it, fontName) }
                                         showFontPicker = false
                                     },
-                                    onDismiss = { showFontPicker = false }
+                                    onDismiss = { showFontPicker = false },
+                                    strings = strings
                                 )
                             }
 
@@ -839,7 +851,8 @@ class MainActivity : ComponentActivity() {
                                         } else {
                                             permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
                                         }
-                                    }
+                                    },
+                                    strings = strings
                                 )
                             }
 
@@ -860,7 +873,8 @@ class MainActivity : ComponentActivity() {
                                     onImportProject = { uri ->
                                         dashboardViewModel.importProject(uri)
                                     },
-                                    onClose = { showLibrary = false }
+                                    onClose = { showLibrary = false },
+                                    strings = strings
                                 )
                             }
 
@@ -884,7 +898,8 @@ class MainActivity : ComponentActivity() {
                                     onBackgroundColorChanged = { argb -> settingsViewModel.setBackgroundColor(argb) },
                                     onCheckForUpdates = { dashboardViewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
                                     onInstallUpdate = { dashboardViewModel.installUpdate(this@MainActivity) },
-                                    onClose = { showSettings = false }
+                                    onClose = { showSettings = false },
+                                    strings = strings
                                 )
                             }
                         }
@@ -933,11 +948,12 @@ class MainActivity : ComponentActivity() {
         backgroundPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>,
         editorUiState: EditorUiState,
         arUiState: ArUiState,
-        navStrings: NavStrings,
+        strings: AppStrings,
         navItemColor: Color = Color.White,
         onShowFontPicker: (String) -> Unit = {},
         layerMenusOpen: MutableMap<String, Boolean>
     ) {
+        val navStrings = strings.nav
         val requestPermissions = {
             permissionLauncher.launch(
                 arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
@@ -1387,23 +1403,23 @@ class MainActivity : ComponentActivity() {
                         azHelpRailItem(id = "help_layer_${layer.id}", text = navStrings.help, color = navItemColor, shape = AzButtonShape.RECTANGLE)
                     }
                 ) {
-                    inputItem(hint = "Rename") { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
+                    inputItem(hint = context.getString(DesignR.string.rename_hint)) { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
                     if (layer.textParams != null) {
                         inputItem(
-                            hint = "Edit text",
+                            hint = context.getString(DesignR.string.edit_text_hint),
                             initialValue = layer.textParams!!.text,
                             onValueChange = { text -> editorViewModel.onTextContentChanged(layer.id, text) }
                         )
                     }
-                    listItem(text = "Copy Edits") { editorViewModel.copyLayerModifications(layer.id) }
-                    listItem(text = "Paste Edits") { editorViewModel.pasteLayerModifications(layer.id) }
+                    listItem(text = context.getString(DesignR.string.copy_edits)) { editorViewModel.copyLayerModifications(layer.id) }
+                    listItem(text = context.getString(DesignR.string.paste_edits)) { editorViewModel.pasteLayerModifications(layer.id) }
                     if (layer.stencilType != null) {
-                        listItem(text = "Generate Poster") { 
+                        listItem(text = context.getString(DesignR.string.generate_poster)) { 
                             posterSourceLayerId = layer.stencilSourceId ?: layer.id
                             showPosterDialog = true 
                         }
                     }
-                    listItem(text = "Duplicate") { editorViewModel.onLayerDuplicated(layer.id) }
+                    listItem(text = context.getString(DesignR.string.duplicate)) { editorViewModel.onLayerDuplicated(layer.id) }
                     
                     // Check if part of a linked group (contiguous links)
                     val layers = editorUiState.layers
@@ -1413,10 +1429,10 @@ class MainActivity : ComponentActivity() {
                         (idx + 1 < layers.size && layers[idx + 1].isLinked)
                     } else false
 
-                    listItem(text = if (isPartToUnlink) "Unlink Layer" else "Link Layer") { editorViewModel.onToggleLinkLayer(layer.id) }
-                    listItem(text = if (layer.isVisible) "Hide Layer" else "Show Layer") { editorViewModel.onToggleVisibility(layer.id) }
-                    listItem(text = "Flatten All") { editorViewModel.onFlattenAllLayers() }
-                    listItem(text = "Delete") { editorViewModel.onLayerRemoved(layer.id) }
+                    listItem(text = if (isPartToUnlink) context.getString(DesignR.string.unlink_layer) else context.getString(DesignR.string.link_layer)) { editorViewModel.onToggleLinkLayer(layer.id) }
+                    listItem(text = if (layer.isVisible) context.getString(DesignR.string.hide_layer) else context.getString(DesignR.string.show_layer)) { editorViewModel.onToggleVisibility(layer.id) }
+                    listItem(text = context.getString(DesignR.string.flatten_all)) { editorViewModel.onFlattenAllLayers() }
+                    listItem(text = context.getString(DesignR.string.delete)) { editorViewModel.onLayerRemoved(layer.id) }
                 }
             }
         }
@@ -1427,7 +1443,7 @@ class MainActivity : ComponentActivity() {
             azRailItem(id = "light", text = navStrings.light, color = navItemColor, info = navStrings.lightInfo, onClick = { arViewModel.toggleFlashlight() })
         }
 
-        val lockText = if (editorUiState.editorMode == EditorMode.TRACE) "Lock" else "Freeze"
+        val lockText = if (editorUiState.editorMode == EditorMode.TRACE) context.getString(DesignR.string.lock_button) else context.getString(DesignR.string.freeze_button)
         val lockAction: () -> Unit = if (editorUiState.editorMode == EditorMode.TRACE) {
             { mainViewModel.setTouchLocked(true) }
         } else {
@@ -1453,13 +1469,13 @@ private fun WallSourceDialog(
 ) {
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Choose Wall Photo") },
-        text = { Text("How would you like to set the background wall?") },
+        title = { Text(stringResource(DesignR.string.wall_source_title)) },
+        text = { Text(stringResource(DesignR.string.wall_source_text)) },
         confirmButton = {
-            AzButton(text = "Take Photo", onClick = onCamera, shape = AzButtonShape.RECTANGLE)
+            AzButton(text = stringResource(DesignR.string.take_photo), onClick = onCamera, shape = AzButtonShape.RECTANGLE)
         },
         dismissButton = {
-            AzButton(text = "Choose from Gallery", onClick = onGallery, shape = AzButtonShape.RECTANGLE)
+            AzButton(text = stringResource(DesignR.string.choose_from_gallery), onClick = onGallery, shape = AzButtonShape.RECTANGLE)
         }
     )
 }
@@ -1473,13 +1489,13 @@ private fun WallSourceDialog(
 ) {
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Choose Wall Photo") },
-        text = { Text("How would you like to set the background wall?") },
+        title = { Text(stringResource(DesignR.string.wall_source_title)) },
+        text = { Text(stringResource(DesignR.string.wall_source_text)) },
         confirmButton = {
-            AzButton(text = "Take Photo", onClick = onCamera, shape = AzButtonShape.RECTANGLE)
+            AzButton(text = stringResource(DesignR.string.take_photo), onClick = onCamera, shape = AzButtonShape.RECTANGLE)
         },
         dismissButton = {
-            AzButton(text = "Choose from Gallery", onClick = onGallery, shape = AzButtonShape.RECTANGLE)
+            AzButton(text = stringResource(DesignR.string.choose_from_gallery), onClick = onGallery, shape = AzButtonShape.RECTANGLE)
         }
     )
 }
@@ -1492,7 +1508,7 @@ private fun DepthApiUnsupportedBanner(modifier: Modifier = Modifier) {
             .padding(horizontal = 20.dp, vertical = 10.dp)
     ) {
         Text(
-            text = "This device doesn't support the Depth API.\nSwitch to Canvas mode in Settings.",
+            text = stringResource(DesignR.string.depth_unsupported),
             color = HotPink,
             textAlign = TextAlign.Center
         )
@@ -1512,17 +1528,17 @@ private fun ArCoreUnavailableOverlay(modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "ARCore is required",
+                text = stringResource(DesignR.string.arcore_required_title),
                 color = Color.White,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "This device does not have ARCore installed or is not supported. Install ARCore from the Play Store to use AR features.",
+                text = stringResource(DesignR.string.arcore_required_text),
                 color = Color.LightGray,
                 textAlign = TextAlign.Center
             )
             AzButton(
-                text = "Install ARCore",
+                text = stringResource(DesignR.string.install_arcore),
                 onClick = {
                     try {
                         context.startActivity(
@@ -1555,12 +1571,12 @@ private fun CameraPermissionDeniedBanner(modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "Camera permission is required for AR mode.",
+                text = stringResource(DesignR.string.camera_permission_required),
                 color = Color.White,
                 textAlign = TextAlign.Center
             )
             AzButton(
-                text = "Open Settings",
+                text = stringResource(DesignR.string.open_settings),
                 onClick = {
                     val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                         data = Uri.fromParts("package", context.packageName, null)

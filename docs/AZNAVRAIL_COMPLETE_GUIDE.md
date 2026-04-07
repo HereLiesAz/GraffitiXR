@@ -1,3 +1,4 @@
+
 # AzNavRail Complete Guide (Sample App Edition)
 
 This guide documents the complete configuration and usage of the AzNavRail library as demonstrated in the official **Sample App**. It serves as the definitive reference for setting up layouts, configuring the rail, and implementing all supported components.
@@ -47,7 +48,8 @@ Controls visual style defaults.
 ```kotlin
 azTheme(
     defaultShape = AzButtonShape.RECTANGLE, // Default shape for all items
-    activeColor = MaterialTheme.colorScheme.primary // Color for active state
+    activeColor = MaterialTheme.colorScheme.primary, // Color for active state
+    translucentBackground = Color.Black.copy(alpha = 0.5f) // Set the background color for menus/overlays!
 )
 ```
 
@@ -59,24 +61,15 @@ azAdvanced(
     isLoading = isLoading,               // Boolean: Show global loading overlay
     enableRailDragging = true,           // Boolean: Enable FAB Mode (detach rail)
     helpEnabled = showHelp,              // Boolean: Show Help Overlay
-    helpList = mapOf("home" to "Home screen") // Map<String, String>: Extra help texts
+    helpList = mapOf("home" to "Home screen"), // Map<String, String>: Extra help texts
     onDismissHelp = { showHelp = false }
 )
 ```
 
+> **Note on Help Overlay:**
+> The `HelpOverlay` displays a short, truncated entry for each item to conserve space. Tapping a help card expands it to reveal the full description and any extra text provided in `helpList`. Furthermore, `helpList` can be supplied dynamically to `AzNestedRail` components for distinct, localized help data.
+
 ---
-
-
-### D. Item Customization (Colors & Text)
-Most navigation items (`azRailItem`, `azMenuItem`, toggles, cyclers, etc.) support overriding their display text and colors when shown in the menu versus the rail:
-- `menuText`: Optional alternate text to display when the item is expanded in the side menu (overrides `text`).
-- `menuToggleOnText`, `menuToggleOffText`: Optional alternate text for toggles when in the menu.
-- `menuOptions`: Optional alternate list of strings for cyclers when in the menu.
-- `textColor`: Custom color for the text itself.
-- `fillColor`: Custom color for the button's translucent background surface. By default, the `fillColor` is Black (with 25% opacity), unless the item's main color is Black, in which case it is White (with 25% opacity) to ensure proper contrast.
-
-### E. Menu Font Size & Theming
-The expanded menu text font size (and the footer items text size) is strictly controlled by your app's `MaterialTheme.typography.titleLarge`. To adjust the text size inside the side menu drawer, simply customize the `titleLarge` attribute in your app's typography theme!
 
 ## 3. Navigation Items (DSL)
 
@@ -115,6 +108,11 @@ azRailItem(id = "icon-item", text = "Icon", content = android.R.drawable.ic_menu
 
 // Rail item with specific shape override
 azRailItem(id = "none-shape", text = "No Shape", shape = AzButtonShape.NONE)
+
+// Rail item with Custom Composable Content Size
+azRailItem(id = "wide-composable", text = "Wide", content = AzComposableContent {
+    Box(Modifier.width(120.dp).background(Color.Blue))
+}) // Will not clip to rail width!
 
 // Disabled item
 azRailItem(id = "profile", text = "Profile", disabled = true, route = "profile")
@@ -231,6 +229,8 @@ azRailRelocItem(
     id = "reloc-1",
     hostId = "rail-host", // Cluster ID
     text = "Reloc Item 1",
+    forceHiddenMenuOpen = false, // Programmatic control for hidden context menu
+    onHiddenMenuDismiss = { /* Menu was closed! */ },
     onRelocate = { from, to, newOrder -> /* handle reorder */ }
 ) {
     // Hidden Context Menu (Tap to open)
@@ -350,7 +350,7 @@ AzForm(
     formName = "loginForm",
     onSubmit = { formData -> /* Map<String, String> */ }
 ) {
-    entry(entryName = "username", hint = "Username")
+    entry(entryName = "username", hint = "Username", initialValue = "AzRailFan") // Pre-filled!
     entry(entryName = "password", hint = "Password", secret = true) // Password mask
     entry(entryName = "bio", hint = "Biography", multiline = true)  // Multi-line
 }
@@ -414,4 +414,24 @@ azAdvanced(
         }
     )
 )
+```
+
+### Programmatic Control (AzTutorialController)
+
+You can programmatically initiate, end, and check the completion status of tutorials using the `AzTutorialController`, accessible via a `CompositionLocal` anywhere within the `AzNavHost` hierarchy.
+
+```kotlin
+import com.hereliesaz.aznavrail.tutorial.LocalAzTutorialController
+
+@Composable
+fun MyScreen() {
+    val tutorialController = LocalAzTutorialController.current
+
+    // Check if the tutorial was completed
+    val hasReadTutorial = tutorialController.isTutorialRead("my-item-id")
+
+    Button(onClick = { tutorialController.startTutorial("my-item-id") }) {
+        Text("Replay Tutorial")
+    }
+}
 ```

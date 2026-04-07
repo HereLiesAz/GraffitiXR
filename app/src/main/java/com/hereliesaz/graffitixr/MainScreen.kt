@@ -221,7 +221,7 @@ fun MainScreen(
             ?.let { bmp ->
                 Image(
                     bitmap = bmp.asImageBitmap(),
-                    contentDescription = "Background Mockup",
+                    contentDescription = stringResource(DesignR.string.desc_bg_mockup),
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )

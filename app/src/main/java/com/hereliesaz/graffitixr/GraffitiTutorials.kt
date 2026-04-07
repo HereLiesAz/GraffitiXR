@@ -7,7 +7,10 @@ import com.hereliesaz.aznavrail.tutorial.AzHighlight
 import com.hereliesaz.aznavrail.tutorial.AzTutorial
 import com.hereliesaz.aznavrail.tutorial.azTutorial
 
-fun getGraffitiTutorials(): Map<String, AzTutorial> {
+import android.content.Context
+import com.hereliesaz.graffitixr.design.R as DesignR
+
+fun getGraffitiTutorials(context: Context): Map<String, AzTutorial> {
     return mapOf(
         "ar_mode" to azTutorial {
             scene(
@@ -15,28 +18,28 @@ fun getGraffitiTutorials(): Map<String, AzTutorial> {
                 content = { Box(Modifier.fillMaxSize()) }
             ) {
                 card(
-                    title = "AR Projection",
-                    text = "Projects your design onto a real wall using the phone's depth sensor and spatial tracking.",
+                    title = context.getString(DesignR.string.tut_ar_title),
+                    text = context.getString(DesignR.string.tut_ar_text),
                     highlight = AzHighlight.Item("ar")
                 )
                 card(
-                    title = "Step 1: Scan",
-                    text = "Point at the wall and move slowly side-to-side. Coloured splats appear as the engine maps the surface. Wait until splats cover the wall area.",
+                    title = context.getString(DesignR.string.tut_ar_step1_title),
+                    text = context.getString(DesignR.string.tut_ar_step1_text),
                     highlight = AzHighlight.FullScreen
                 )
                 card(
-                    title = "Step 2: Tap to Place",
-                    text = "Just tap the screen. The app photographs the wall, extracts tracking features, and locks the anchor instantly.",
+                    title = context.getString(DesignR.string.tut_ar_step2_title),
+                    text = context.getString(DesignR.string.tut_ar_step2_text),
                     highlight = AzHighlight.FullScreen
                 )
                 card(
-                    title = "Step 3: Add Your Artwork",
-                    text = "Press 'Design' to access your layer tools. Use 'Image' to import photos, 'Draw' to sketch, or 'Text' to type.",
+                    title = context.getString(DesignR.string.tut_ar_step3_title),
+                    text = context.getString(DesignR.string.tut_ar_step3_text),
                     highlight = AzHighlight.FullScreen
                 )
                 card(
-                    title = "Tip: Texture Matters",
-                    text = "Blank white walls, smooth concrete, and single-colour surfaces won't track. Aim your anchor point at graffiti, rough plaster, or any distinct mark.",
+                    title = context.getString(DesignR.string.tut_ar_tip_title),
+                    text = context.getString(DesignR.string.tut_ar_tip_text),
                     highlight = AzHighlight.FullScreen
                 )
             }
@@ -47,18 +50,18 @@ fun getGraffitiTutorials(): Map<String, AzTutorial> {
                 content = { Box(Modifier.fillMaxSize()) }
             ) {
                 card(
-                    title = "Live Overlay",
-                    text = "Your design floats over the live camera view — no surface scanning needed.",
+                    title = context.getString(DesignR.string.tut_overlay_title),
+                    text = context.getString(DesignR.string.tut_overlay_text),
                     highlight = AzHighlight.Item("overlay")
                 )
                 card(
-                    title = "Step 1: Add Your Artwork",
-                    text = "Press 'Design' to access layer tools. Use 'Image' to import photos, 'Draw' to sketch, or 'Text' to type.",
+                    title = context.getString(DesignR.string.tut_overlay_step1_title),
+                    text = context.getString(DesignR.string.tut_overlay_step1_text),
                     highlight = AzHighlight.FullScreen
                 )
                 card(
-                    title = "Step 2: Position It",
-                    text = "Pinch to scale, drag to reposition. The overlay stays fixed to your screen — step back to see how it fits the wall.",
+                    title = context.getString(DesignR.string.tut_overlay_step2_title),
+                    text = context.getString(DesignR.string.tut_overlay_step2_text),
                     highlight = AzHighlight.FullScreen
                 )
             }
@@ -69,18 +72,18 @@ fun getGraffitiTutorials(): Map<String, AzTutorial> {
                 content = { Box(Modifier.fillMaxSize()) }
             ) {
                 card(
-                    title = "Photo Mockup",
-                    text = "Preview your design on a photo before you ever pick up a brush.",
+                    title = context.getString(DesignR.string.tut_mockup_title),
+                    text = context.getString(DesignR.string.tut_mockup_text),
                     highlight = AzHighlight.Item("mockup")
                 )
                 card(
-                    title = "Step 1: Set the Wall",
-                    text = "Open 'Design' and tap 'Wall' to choose or take a photo of your surface. Do this first!",
+                    title = context.getString(DesignR.string.tut_mockup_step1_title),
+                    text = context.getString(DesignR.string.tut_mockup_step1_text),
                     highlight = AzHighlight.FullScreen
                 )
                 card(
-                    title = "Step 2: Add Your Artwork",
-                    text = "Use 'Image', 'Draw', or 'Text' to add layers on top of the wall. Pinch and drag to size and position them.",
+                    title = context.getString(DesignR.string.tut_mockup_step2_title),
+                    text = context.getString(DesignR.string.tut_mockup_step2_text),
                     highlight = AzHighlight.FullScreen
                 )
             }
@@ -91,23 +94,23 @@ fun getGraffitiTutorials(): Map<String, AzTutorial> {
                 content = { Box(Modifier.fillMaxSize()) }
             ) {
                 card(
-                    title = "Lightbox Mode",
-                    text = "Turns your screen into a bright lightbox for tracing your design onto paper.",
+                    title = context.getString(DesignR.string.tut_trace_title),
+                    text = context.getString(DesignR.string.tut_trace_text),
                     highlight = AzHighlight.Item("trace")
                 )
                 card(
-                    title = "Step 1: Open Design Menu",
-                    text = "Tap 'Design' to access layer tools.",
+                    title = context.getString(DesignR.string.tut_trace_step1_title),
+                    text = context.getString(DesignR.string.tut_trace_step1_text),
                     highlight = AzHighlight.FullScreen
                 )
                 card(
-                    title = "Step 2: Add Content",
-                    text = "Use 'Image' to import photos, 'Draw' to sketch, or 'Text' to type.",
+                    title = context.getString(DesignR.string.tut_trace_step2_title),
+                    text = context.getString(DesignR.string.tut_trace_step2_text),
                     highlight = AzHighlight.FullScreen
                 )
                 card(
-                    title = "Step 3: Tracing",
-                    text = "Lay paper over the screen and trace. Triple-tap anywhere to exit.",
+                    title = context.getString(DesignR.string.tut_trace_step3_title),
+                    text = context.getString(DesignR.string.tut_trace_step3_text),
                     highlight = AzHighlight.FullScreen
                 )
             }
