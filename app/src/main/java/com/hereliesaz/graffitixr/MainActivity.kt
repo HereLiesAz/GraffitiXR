@@ -834,7 +834,7 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onCamera = {
                                         showWallSourceDialog = false
-                                        if (hasCameraPermission) {
+                                            val tmpFile = File(context.cacheDir, "temp_wall_capture.jpg")
                                             val tmpFile = File(context.cacheDir, "wall_camera_${System.currentTimeMillis()}.jpg")
                                             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tmpFile)
                                             cameraUri = uri.toString()
