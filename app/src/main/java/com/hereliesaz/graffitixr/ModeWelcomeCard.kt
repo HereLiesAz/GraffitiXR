@@ -57,6 +57,14 @@ private fun contentFor(mode: EditorMode): WelcomeContent = when (mode) {
             "Brightness is controlled by your device's display brightness"
         )
     )
+    else -> WelcomeContent(
+        title = "Getting Started",
+        bullets = listOf(
+            "Tap Design \u2192 Image to add artwork",
+            "Use the rail on the side to switch modes",
+            "Tap the Help button for more details on any tool"
+        )
+    )
 }
 
 @Composable
