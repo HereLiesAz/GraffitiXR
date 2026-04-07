@@ -1,6 +1,6 @@
 # GraffitiXR
 
-GraffitiXR är en Android-app för gatukonstnärer. Det finns massor av appar som överlagrar en bild på din kameravy så att du virtuellt kan spåra den, men när jag målar en väggmålning baserat på en skiss som jag har sparat på min telefon, kan användningen av ett stativ verkligen ebba ut. Vi är överallt. Jag, jag stoppade min telefon i fickan. Inte ens apparna som använder AR för att hålla bilden stadig och på ett ställe klarar av fickans avgrundsmörker.
+GraffitiXR är en Android-app för gatukonstnärer. Det finns massor av appar som överlagrar en bild på din kameravy så att du virtuellt kan spåra den, men när jag målar en väggmålning baserat på en skiss som jag har sparat på min telefon, kan användningen av ett stativ verkligen vara ett hinder. Jag var överallt. Jag stoppade min telefon i fickan. Inte ens apparna som använder AR för att hålla bilden stadig och på ett ställe klarar av fickans totala mörker.
 Så jag gör något bättre genom att återanvända (vad de som är insatta kallar) rutnätsmetoden. Jag tänkte alltid, "Varför kan dessa specifika doodles inte sparas, som ett ihållande ankare, så att överlägget alltid är helt enkelt på rätt plats?"
 Så nu, det är vad de där doodlesna gör.
 Jag var tvungen att uppfinna en anpassad Gaussian Splatting-motor som fungerar på Android utan hjälp av molnet - för graffiti är, du vet, olagligt.
