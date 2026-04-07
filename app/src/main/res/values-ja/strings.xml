@@ -24,7 +24,7 @@
     <string name="nav_mockup_info">壁の写真に合成されたデザインをプレビューします。カメラやスキャンは不要です。</string>
 
 
-    <string name="nav_trace">トレース</string>
+    <string name="nav_trace">ライトボックス</string>
 
     <string name="nav_trace_info">デザインをライトテーブルのオーバーレイとして使用し、物理的な表面に参照線をトレースします。</string>
 
