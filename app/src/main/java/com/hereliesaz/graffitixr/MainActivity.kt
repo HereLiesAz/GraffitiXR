@@ -291,6 +291,12 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                LaunchedEffect(Unit) {
+                    arViewModel.unfreezeRequested.collect {
+                        editorViewModel.toggleImageLock()
+                    }
+                }
+
                 val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                     uri?.let { editorViewModel.onAddLayer(it) }
                 }
@@ -1329,7 +1335,14 @@ class MainActivity : ComponentActivity() {
         val lockAction: () -> Unit = if (editorUiState.editorMode == EditorMode.TRACE) {
             { mainViewModel.setTouchLocked(true) }
         } else {
-            { editorViewModel.toggleImageLock() } 
+            {
+                editorViewModel.toggleImageLock()
+                val visibleLayers = editorUiState.layers.filter { it.isVisible && it.bitmap != null }
+                if (visibleLayers.isNotEmpty()) {
+                    val composite = compositeLayersForAr(visibleLayers)
+                    arViewModel.onFreezeRequested(composite)
+                }
+            }
         }
         azRailItem(id = "lock_trace", text = lockText, color = navItemColor, info = navStrings.lockInfo, onClick = lockAction)
 

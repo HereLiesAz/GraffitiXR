@@ -41,6 +41,7 @@ import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.Tool
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.CameraPreview
+import com.hereliesaz.graffitixr.feature.ar.FreezePreviewScreen
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.editor.DrawingCanvas
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
@@ -204,6 +205,16 @@ fun MainScreen(
 
                 EditorMode.MOCKUP, EditorMode.TRACE -> {}
             }
+        }
+
+        // Freeze preview — shown when user freezes layers in AR mode
+        arUiState.freezePreviewBitmap?.let { annotated ->
+            FreezePreviewScreen(
+                annotatedBitmap = annotated,
+                showDepthWarning = arUiState.freezeDepthWarning,
+                onDismiss = { arViewModel.onFreezeDismissed() },
+                onUnfreeze = { arViewModel.onUnfreezeRequested() }
+            )
         }
 
         uiState.backgroundBitmap?.takeIf { uiState.editorMode == EditorMode.MOCKUP }

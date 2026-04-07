@@ -173,7 +173,7 @@ class EditorViewModel @Inject constructor(
                             }
 
                             project.fingerprint?.let { fp ->
-                                slamManager.setTargetFingerprint(
+                                slamManager.restoreWallFingerprint(
                                     fp.descriptorsData,
                                     fp.descriptorsRows,
                                     fp.descriptorsCols,
