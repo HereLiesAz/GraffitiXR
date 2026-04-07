@@ -121,8 +121,10 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.core.os.LocaleListCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
@@ -187,6 +189,14 @@ class MainActivity : ComponentActivity() {
                 val arUiState by arViewModel.uiState.collectAsState()
                 val dashboardNavigation by dashboardViewModel.navigationTrigger.collectAsState()
                 val completedTutorials by settingsViewModel.completedTutorials.collectAsState()
+                val language by settingsViewModel.language.collectAsState()
+
+                LaunchedEffect(language) {
+                    val appLocales = LocaleListCompat.forLanguageTags(language.code)
+                    if (AppCompatDelegate.getApplicationLocales() != appLocales) {
+                        AppCompatDelegate.setApplicationLocales(appLocales)
+                    }
+                }
 
                 var isProcessing by remember { mutableStateOf(false) }
 
@@ -303,7 +313,6 @@ class MainActivity : ComponentActivity() {
                         !mainUiState.isTouchLocked &&
                         !mainUiState.isCapturingTarget &&
                         !mainUiState.planeConfirmationPending &&
-                        !showLibrary &&
                         !showSettings
 
                 var permissionRequestedAtLeastOnce by remember { mutableStateOf(hasCameraPermission) }
@@ -489,7 +498,8 @@ class MainActivity : ComponentActivity() {
                             overlayImagePicker, backgroundImagePicker, editorUiState, arUiState, strings,
                             navItemColor = navItemColor,
                             onShowFontPicker = { layerId -> fontPickerLayerId = layerId; showFontPicker = true },
-                            layerMenusOpen = layerMenusOpen
+                            layerMenusOpen = layerMenusOpen,
+                            showLibrary = showLibrary
                         )
                     }
 
@@ -888,6 +898,8 @@ class MainActivity : ComponentActivity() {
                                     currentVersion = BuildConfig.VERSION_NAME,
                                     updateStatus = dashboardUiState.updateStatusMessage,
                                     isCheckingForUpdate = dashboardUiState.isCheckingForUpdate,
+                                    currentLanguage = language,
+                                    onLanguageChanged = { settingsViewModel.setLanguage(it) },
                                     isRightHanded = editorUiState.isRightHanded,
                                     onHandednessChanged = { editorViewModel.toggleHandedness() },
                                     showDiagOverlay = editorUiState.showDiagOverlay,
@@ -956,7 +968,8 @@ class MainActivity : ComponentActivity() {
         strings: AppStrings,
         navItemColor: Color = Color.White,
         onShowFontPicker: (String) -> Unit = {},
-        layerMenusOpen: MutableMap<String, Boolean>
+        layerMenusOpen: MutableMap<String, Boolean>,
+        showLibrary: Boolean
     ) {
         val navStrings = strings.nav
         val requestPermissions = {
@@ -967,76 +980,78 @@ class MainActivity : ComponentActivity() {
 
         if (editorUiState.editorMode == EditorMode.STENCIL) return
 
-        val isArMode = editorUiState.editorMode == EditorMode.AR
+        if (!showLibrary) {
+            val isArMode = editorUiState.editorMode == EditorMode.AR
 
-        azRailHostItem(id = "mode_host", text = navStrings.modes, color = navItemColor, info = navStrings.modesInfo)
-        azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.arModeInfo)
+            azRailHostItem(id = "mode_host", text = navStrings.modes, color = navItemColor, info = navStrings.modesInfo)
+            azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.arModeInfo)
 
-        if (isArMode) {
-            azRailSubToggle(
-                id = "scan_mode_toggle",
-                hostId = "mode_host",
-                isChecked = arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS,
-                toggleOnText = navStrings.mural,
-                toggleOffText = navStrings.canvas,
-                info = navStrings.scanModeToggleInfo,
-                color = Cyan
-            ) {
-                arViewModel.setArScanMode(if (arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS) ArScanMode.CLOUD_POINTS else ArScanMode.GAUSSIAN_SPLATS)
-            }
-        }
-
-        azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.overlayInfo)
-        azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.mockupInfo)
-        azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.traceInfo)
-
-        azDivider()
-
-        if (isArMode) {
-            azRailHostItem(id = "target_host", text = navStrings.grid, color = navItemColor, info = navStrings.gridInfo)
-
-            azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.createInfo) {
-                if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
-            }
-
-            azDivider()
-        }
-
-        val canEdit = if (isArMode)
-            arUiState.scanPhase == ScanPhase.COMPLETE || arUiState.isAnchorEstablished
-        else true
-
-        if (canEdit) {
-            azRailHostItem(id = "design_host", text = navStrings.design, color = navItemColor, info = navStrings.designInfo)
-            azRailSubItem(id = "add_img", hostId = "design_host", text = navStrings.image, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.openInfo) {
-                overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            }
-            azRailSubItem(id = "add_draw", hostId = "design_host", text = navStrings.draw, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.drawInfo) {
-                editorViewModel.onAddBlankLayer()
-            }
-            azRailSubItem(id = "add_text", hostId = "design_host", text = navStrings.text, color = navItemColor, shape = AzButtonShape.NONE) {
-                editorViewModel.onAddTextLayer()
-            }
-
-            if (editorUiState.editorMode == EditorMode.MOCKUP) {
-                azRailSubItem(id = "wall", hostId = "design_host", text = navStrings.wall, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.wallInfo) {
-                    showWallSourceDialog = true
+            if (isArMode) {
+                azRailSubToggle(
+                    id = "scan_mode_toggle",
+                    hostId = "mode_host",
+                    isChecked = arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS,
+                    toggleOnText = navStrings.mural,
+                    toggleOffText = navStrings.canvas,
+                    info = navStrings.scanModeToggleInfo,
+                    color = Cyan
+                ) {
+                    arViewModel.setArScanMode(if (arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS) ArScanMode.CLOUD_POINTS else ArScanMode.GAUSSIAN_SPLATS)
                 }
             }
 
+            azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.overlayInfo)
+            azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.mockupInfo)
+            azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.traceInfo)
+
             azDivider()
+
+            if (isArMode) {
+                azRailHostItem(id = "target_host", text = navStrings.grid, color = navItemColor, info = navStrings.gridInfo)
+
+                azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.createInfo) {
+                    if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
+                }
+
+                azDivider()
+            }
+
+            val canEdit = if (isArMode)
+                arUiState.scanPhase == ScanPhase.COMPLETE || arUiState.isAnchorEstablished
+            else true
+
+            if (canEdit) {
+                azRailHostItem(id = "design_host", text = navStrings.design, color = navItemColor, info = navStrings.designInfo)
+                azRailSubItem(id = "add_img", hostId = "design_host", text = navStrings.image, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.openInfo) {
+                    overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
+                azRailSubItem(id = "add_draw", hostId = "design_host", text = navStrings.draw, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.drawInfo) {
+                    editorViewModel.onAddBlankLayer()
+                }
+                azRailSubItem(id = "add_text", hostId = "design_host", text = navStrings.text, color = navItemColor, shape = AzButtonShape.NONE) {
+                    editorViewModel.onAddTextLayer()
+                }
+
+                if (editorUiState.editorMode == EditorMode.MOCKUP) {
+                    azRailSubItem(id = "wall", hostId = "design_host", text = navStrings.wall, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.wallInfo) {
+                        showWallSourceDialog = true
+                    }
+                }
+
+                azDivider()
+            }
         }
 
         azRailHostItem(id = "project_host", text = navStrings.project, color = navItemColor, info = navStrings.projectInfo)
         azRailSubItem(id = "new", hostId = "project_host", text = navStrings.new, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.newInfo) {
             dashboardViewModel.onNewProject(editorUiState.isRightHanded)
-            showLibrary = false
+            this@MainActivity.showLibrary = false
         }
         azRailSubItem(id = "save", hostId = "project_host", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.saveInfo) {
             showSaveDialog = true
         }
         azRailSubItem(id = "load", hostId = "project_host", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.loadInfo) {
-            showLibrary = true
+            this@MainActivity.showLibrary = true
         }
         azRailSubItem(id = "export", hostId = "project_host", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.exportInfo) {
             if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
@@ -1053,419 +1068,427 @@ class MainActivity : ComponentActivity() {
 
         azDivider()
 
-        if (canEdit) {
-            editorUiState.layers.reversed().forEach { layer ->
-                val activeTool = editorUiState.activeTool
-                val forceOpenHiddenMenu = layerMenusOpen[layer.id] ?: false
+        if (!showLibrary) {
+            val isArMode = editorUiState.editorMode == EditorMode.AR
+            val canEdit = if (isArMode)
+                arUiState.scanPhase == ScanPhase.COMPLETE || arUiState.isAnchorEstablished
+            else true
 
-                azRailRelocItem(
-                    id = "layer_${layer.id}",
-                    hostId = "design_host",
-                    text = layer.name,
-                    color = if (layer.isLinked) Cyan else navItemColor,
-                    info = navStrings.layerInfo,
-                    nestedRailAlignment = AzNestedRailAlignment.VERTICAL,
-                    keepNestedRailOpen = true,
-                    forceHiddenMenuOpen = forceOpenHiddenMenu,
-                    onHiddenMenuDismiss = { layerMenusOpen[layer.id] = false },
-                    onClick = {
-                        editorViewModel.onLayerActivated(layer.id)
-                        editorViewModel.setActiveTool(Tool.NONE)
-                    },
-                    onRelocate = { _, _, new -> editorViewModel.onLayerReordered(new.map { it.removePrefix("layer_") }.reversed()) },
-                    nestedContent = {
-                        val activate = { editorViewModel.onLayerActivated(layer.id) }
+            if (canEdit) {
+                editorUiState.layers.reversed().forEach { layer ->
+                    val activeTool = editorUiState.activeTool
+                    val forceOpenHiddenMenu = layerMenusOpen[layer.id] ?: false
 
-                        if (layer.textParams != null) {
-                            azRailItem(id = "edit_text_${layer.id}", text = navStrings.edit, color = navItemColor, shape = AzButtonShape.RECTANGLE) {
-                                activate()
-                                layerMenusOpen[layer.id] = true
-                            }
-                        }
+                    azRailRelocItem(
+                        id = "layer_${layer.id}",
+                        hostId = "design_host",
+                        text = layer.name,
+                        color = if (layer.isLinked) Cyan else navItemColor,
+                        info = navStrings.layerInfo,
+                        nestedRailAlignment = AzNestedRailAlignment.VERTICAL,
+                        keepNestedRailOpen = true,
+                        forceHiddenMenuOpen = forceOpenHiddenMenu,
+                        onHiddenMenuDismiss = { layerMenusOpen[layer.id] = false },
+                        onClick = {
+                            editorViewModel.onLayerActivated(layer.id)
+                            editorViewModel.setActiveTool(Tool.NONE)
+                        },
+                        onRelocate = { _, _, new -> editorViewModel.onLayerReordered(new.map { it.removePrefix("layer_") }.reversed()) },
+                        nestedContent = {
+                            val activate = { editorViewModel.onLayerActivated(layer.id) }
 
-                        val addSizeItem: () -> Unit = {
-                            azRailItem(
-                                id = "size_${layer.id}",
-                                text = navStrings.size,
-                                color = navItemColor,
-                                shape = AzButtonShape.RECTANGLE,
-                                info = navStrings.sizeInfo,
-                                content = AzComposableContent { isEnabled ->
-                                    val liveState by editorViewModel.uiState.collectAsState()
-                                    var itemRadiusPx by remember { mutableFloatStateOf(100f) }
-                                    val density = LocalDensity.current
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .onSizeChanged { size -> itemRadiusPx = size.width / 2f }
-                                            .pointerInput(isEnabled) {
-                                                if (!isEnabled) return@pointerInput
-                                                detectDragGestures { change, dragAmount ->
-                                                    change.consume()
-                                                    // Vertical drag → size, horizontal drag → feathering
-                                                    if (kotlin.math.abs(dragAmount.y) >= kotlin.math.abs(dragAmount.x)) {
-                                                        val currentSize = editorViewModel.uiState.value.brushSize
-                                                        editorViewModel.setBrushSize(
-                                                            (currentSize - dragAmount.y * 0.5f).coerceIn(1f, itemRadiusPx)
-                                                        )
-                                                    } else {
-                                                        val currentFeather = editorViewModel.uiState.value.brushFeathering
-                                                        editorViewModel.setBrushFeathering(
-                                                            (currentFeather + dragAmount.x * 0.005f).coerceIn(0f, 1f)
-                                                        )
-                                                    }
-                                                }
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        val sizeDp = with(density) {
-                                            liveState.brushSize.coerceIn(1f, itemRadiusPx).toDp()
-                                        }
-                                        val checkerModifier = Modifier.drawBehind {
-                                            val squareSize = 6.dp.toPx()
-                                            val cols = (size.width / squareSize).toInt() + 1
-                                            val rows = (size.height / squareSize).toInt() + 1
-                                            for (row in 0 until rows) {
-                                                for (col in 0 until cols) {
-                                                    val isEven = (row + col) % 2 == 0
-                                                    drawRect(
-                                                        color = if (isEven) Color.LightGray else Color.Gray,
-                                                        topLeft = Offset(col * squareSize, row * squareSize),
-                                                        size = Size(squareSize, squareSize)
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        // Solid inner circle = hard core; outer ring (darker) = feathering amount
-                                        Box(contentAlignment = Alignment.Center) {
-                                            if (liveState.brushFeathering > 0.05f) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(sizeDp)
-                                                        .clip(CircleShape)
-                                                        .then(checkerModifier)
-                                                        .background(Color.Black.copy(alpha = 0.5f))
-                                                )
-                                            }
-                                            val hardCoreDp = with(density) {
-                                                (liveState.brushSize * (1f - liveState.brushFeathering * 0.7f)).coerceIn(2f, itemRadiusPx).toDp()
-                                            }
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(hardCoreDp)
-                                                    .clip(CircleShape)
-                                                    .then(checkerModifier)
-                                            )
-                                        }
-                                    }
-                                }
-                            )
-                        }
-
-                        when {
-                            layer.textParams != null -> {
-                                val tp = layer.textParams!!
-                                azRailItem(id = "font_${layer.id}", text = navStrings.font, color = navItemColor, shape = AzButtonShape.RECTANGLE) {
+                            if (layer.textParams != null) {
+                                azRailItem(id = "edit_text_${layer.id}", text = navStrings.edit, color = navItemColor, shape = AzButtonShape.RECTANGLE) {
                                     activate()
-                                    onShowFontPicker(layer.id)
+                                    layerMenusOpen[layer.id] = true
                                 }
+                            }
+
+                            val addSizeItem: () -> Unit = {
                                 azRailItem(
                                     id = "size_${layer.id}",
                                     text = navStrings.size,
                                     color = navItemColor,
                                     shape = AzButtonShape.RECTANGLE,
+                                    info = navStrings.sizeInfo,
                                     content = AzComposableContent { isEnabled ->
                                         val liveState by editorViewModel.uiState.collectAsState()
-                                        val displaySize = liveState.layers.find { it.id == layer.id }?.textParams?.fontSizeDp ?: 150f
+                                        var itemRadiusPx by remember { mutableFloatStateOf(100f) }
+                                        val density = LocalDensity.current
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxSize()
+                                                .onSizeChanged { size -> itemRadiusPx = size.width / 2f }
                                                 .pointerInput(isEnabled) {
                                                     if (!isEnabled) return@pointerInput
                                                     detectDragGestures { change, dragAmount ->
                                                         change.consume()
-                                                        val current = editorViewModel.uiState.value.layers
-                                                            .find { it.id == layer.id }?.textParams?.fontSizeDp ?: 150f
-                                                        editorViewModel.onTextSizeChanged(layer.id, (current - dragAmount.y * 0.5f).coerceIn(8f, 300f))
+                                                        // Vertical drag → size, horizontal drag → feathering
+                                                        if (kotlin.math.abs(dragAmount.y) >= kotlin.math.abs(dragAmount.x)) {
+                                                            val currentSize = editorViewModel.uiState.value.brushSize
+                                                            editorViewModel.setBrushSize(
+                                                                (currentSize - dragAmount.y * 0.5f).coerceIn(1f, itemRadiusPx)
+                                                            )
+                                                        } else {
+                                                            val currentFeather = editorViewModel.uiState.value.brushFeathering
+                                                            editorViewModel.setBrushFeathering(
+                                                                (currentFeather + dragAmount.x * 0.005f).coerceIn(0f, 1f)
+                                                            )
+                                                        }
                                                     }
                                                 },
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Text(
-                                                text = "${displaySize.toInt()}pt",
-                                                color = navItemColor,
-                                                fontSize = 28.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    }
-                                )
-                                azRailItem(
-                                    id = "color_${layer.id}",
-                                    text = navStrings.color,
-                                    color = navItemColor,
-                                    shape = AzButtonShape.RECTANGLE,
-                                    onClick = { activate(); editorViewModel.onColorClicked() },
-                                    content = AzComposableContent { isEnabled ->
-                                        val liveState by editorViewModel.uiState.collectAsState()
-                                        val currentColor = liveState.layers.find { it.id == layer.id }?.textParams?.colorArgb
-                                            ?: 0xFFFFFFFF.toInt()
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .pointerInput(isEnabled) {
-                                                    if (!isEnabled) return@pointerInput
-                                                    detectDragGestures { change, dragAmount ->
-                                                        change.consume()
-                                                        val hsv = FloatArray(3)
-                                                        android.graphics.Color.colorToHSV(currentColor, hsv)
-                                                        hsv[2] = (hsv[2] - dragAmount.y * 0.002f).coerceIn(0f, 1f)
-                                                        hsv[1] = (hsv[1] + dragAmount.x * 0.002f).coerceIn(0f, 1f)
-                                                        editorViewModel.onTextColorChanged(layer.id, android.graphics.Color.HSVToColor(hsv))
+                                            val sizeDp = with(density) {
+                                                liveState.brushSize.coerceIn(1f, itemRadiusPx).toDp()
+                                            }
+                                            val checkerModifier = Modifier.drawBehind {
+                                                val squareSize = 6.dp.toPx()
+                                                val cols = (size.width / squareSize).toInt() + 1
+                                                val rows = (size.height / squareSize).toInt() + 1
+                                                for (row in 0 until rows) {
+                                                    for (col in 0 until cols) {
+                                                        val isEven = (row + col) % 2 == 0
+                                                        drawRect(
+                                                            color = if (isEven) Color.LightGray else Color.Gray,
+                                                            topLeft = Offset(col * squareSize, row * squareSize),
+                                                            size = Size(squareSize, squareSize)
+                                                        )
                                                     }
-                                                },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(28.dp)
-                                                    .background(Color(currentColor), CircleShape)
-                                                    .border(1.dp, navItemColor.copy(alpha = 0.5f), CircleShape)
-                                            )
-                                        }
-                                    }
-                                )
-                                azRailItem(
-                                    id = "kern_${layer.id}",
-                                    text = navStrings.kern,
-                                    color = navItemColor,
-                                    shape = AzButtonShape.RECTANGLE,
-                                    content = AzComposableContent { isEnabled ->
-                                        val liveState by editorViewModel.uiState.collectAsState()
-                                        val displayKern = liveState.layers.find { it.id == layer.id }?.textParams?.letterSpacingEm ?: 0f
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .pointerInput(isEnabled) {
-                                                    if (!isEnabled) return@pointerInput
-                                                    detectDragGestures { change, dragAmount ->
-                                                        change.consume()
-                                                        val current = editorViewModel.uiState.value.layers
-                                                            .find { it.id == layer.id }?.textParams?.letterSpacingEm ?: 0f
-                                                        editorViewModel.onTextKerningChanged(layer.id, (current + dragAmount.x * 0.003f).coerceIn(-0.2f, 1f))
-                                                    }
-                                                },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = String.format("%.2f", displayKern),
-                                                color = navItemColor,
-                                                fontSize = 28.sp,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    }
-                                )
-                                azRailItem(id = "bold_${layer.id}", text = navStrings.bold, color = if (tp.isBold) Cyan else navItemColor, shape = AzButtonShape.RECTANGLE) {
-                                    activate()
-                                    editorViewModel.onTextStyleChanged(layer.id, !tp.isBold, tp.isItalic, tp.hasOutline, tp.hasDropShadow)
-                                }
-                                azRailItem(id = "italic_${layer.id}", text = navStrings.italic, color = if (tp.isItalic) Cyan else navItemColor, shape = AzButtonShape.RECTANGLE) {
-                                    activate()
-                                    editorViewModel.onTextStyleChanged(layer.id, tp.isBold, !tp.isItalic, tp.hasOutline, tp.hasDropShadow)
-                                }
-                                azRailItem(id = "outline_${layer.id}", text = navStrings.outline, color = if (tp.hasOutline) Cyan else navItemColor, shape = AzButtonShape.RECTANGLE) {
-                                    activate()
-                                    editorViewModel.onTextStyleChanged(layer.id, tp.isBold, tp.isItalic, !tp.hasOutline, tp.hasDropShadow)
-                                }
-                                azRailItem(id = "shadow_${layer.id}", text = navStrings.shadow, color = if (tp.hasDropShadow) Cyan else navItemColor, shape = AzButtonShape.RECTANGLE) {
-                                    activate()
-                                    editorViewModel.onTextStyleChanged(layer.id, tp.isBold, tp.isItalic, tp.hasOutline, !tp.hasDropShadow)
-                                }
-                                if (layer.stencilType == null) {
-                                    azRailItem(
-                                        id = "stencil_${layer.id}",
-                                        text = navStrings.stencil,
-                                        color = navItemColor,
-                                        shape = AzButtonShape.RECTANGLE,
-                                        content = AzComposableContent { _ ->
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .onGloballyPositioned { coords ->
-                                                        if (coords.isAttached) {
-                                                            editorViewModel.updateStencilButtonPosition(coords.positionInWindow())
-                                                        }
-                                                    },
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = navStrings.stencil,
-                                                    color = navItemColor,
-                                                    textAlign = TextAlign.Center,
-                                                )
+                                                }
                                             }
-                                        }
-                                    ) {
-                                        activate()
-                                        editorViewModel.onGenerateStencil(layer.id)
-                                    }
-                                }
-                                azRailItem(id = "blend_${layer.id}", text = navStrings.build, color = navItemColor, shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onCycleBlendMode() })
-                                azRailItem(id = "adj_${layer.id}", text = navStrings.adjust, color = navItemColor, shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onAdjustClicked() })
-                                azRailItem(id = "invert_${layer.id}", text = navStrings.invert, color = if (layer.isInverted) Cyan else navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.invertInfo, onClick = { activate(); editorViewModel.onToggleInvert() })
-                            }
-                            layer.isSketch -> {
-                                azRailItem(id = "blend_${layer.id}", text = navStrings.build, color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.blendingInfo, onClick = { activate(); editorViewModel.onCycleBlendMode() })
-                                azRailItem(id = "adj_${layer.id}", text = navStrings.adjust, color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.adjustInfo, onClick = { activate(); editorViewModel.onAdjustClicked() })
-                                azRailItem(id = "invert_${layer.id}", text = navStrings.invert, color = if (layer.isInverted) Cyan else navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.invertInfo, onClick = { activate(); editorViewModel.onToggleInvert() })
-                                if (layer.stencilType == null) {
-                                    azRailItem(
-                                        id = "stencil_${layer.id}",
-                                        text = navStrings.stencil,
-                                        color = navItemColor,
-                                        shape = AzButtonShape.RECTANGLE,
-                                        content = AzComposableContent { _ ->
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .onGloballyPositioned { coords ->
-                                                        if (coords.isAttached) {
-                                                            editorViewModel.updateStencilButtonPosition(coords.positionInWindow())
-                                                        }
-                                                    },
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = navStrings.stencil,
-                                                    color = navItemColor,
-                                                    textAlign = TextAlign.Center,
-                                                )
-                                            }
-                                        }
-                                    ) {
-                                        activate()
-                                        editorViewModel.onGenerateStencil(layer.id)
-                                    }
-                                }
-                                azRailItem(id = "balance_${layer.id}", text = navStrings.balance, color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.balanceInfo, onClick = { activate(); editorViewModel.onBalanceClicked() })
-                                // --- Brush tools at bottom ---
-                                azRailItem(id = "eraser_${layer.id}", text = navStrings.eraser, color = if (activeTool == Tool.ERASER) Cyan else navItemColor, info = navStrings.eraserInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.ERASER) })
-                                azRailItem(id = "blur_${layer.id}", text = navStrings.blur, color = if (activeTool == Tool.BLUR) Cyan else navItemColor, info = navStrings.blurInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BLUR) })
-                                azRailItem(id = "liquify_${layer.id}", text = navStrings.liquify, color = if (activeTool == Tool.LIQUIFY) Cyan else navItemColor, info = navStrings.liquifyInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) })
-                                azRailItem(id = "dodge_${layer.id}", text = navStrings.dodge, color = if (activeTool == Tool.DODGE) Cyan else navItemColor, info = navStrings.dodgeInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.DODGE) })
-                                azRailItem(id = "burn_${layer.id}", text = navStrings.burn, color = if (activeTool == Tool.BURN) Cyan else navItemColor, info = navStrings.burnInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BURN) })
-                                addSizeItem()
-                            }
-                            else -> {
-                                azRailItem(id = "iso_${layer.id}", text = navStrings.isolate, color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.isolateInfo, onClick = { activate(); editorViewModel.onRemoveBackgroundClicked() })
-                                azRailItem(id = "line_${layer.id}", text = navStrings.outline, color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.outlineInfo, onClick = { activate(); editorViewModel.onSketchClicked() })
-                                azRailItem(id = "invert_${layer.id}", text = navStrings.invert, color = if (layer.isInverted) Cyan else navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.invertInfo, onClick = { activate(); editorViewModel.onToggleInvert() })
-                                if (layer.stencilType == null) {
-                                    azRailItem(
-                                        id = "stencil_${layer.id}",
-                                        text = navStrings.stencil,
-                                        color = navItemColor,
-                                        shape = AzButtonShape.RECTANGLE,
-                                        content = AzComposableContent { _ ->
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .onGloballyPositioned { coords ->
-                                                        if (coords.isAttached) {
-                                                            editorViewModel.updateStencilButtonPosition(coords.positionInWindow())
-                                                        }
-                                                    },
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = navStrings.stencil,
-                                                    color = navItemColor,
-                                                    textAlign = TextAlign.Center,
-                                                )
-                                            }
-                                        }
-                                    ) {
-                                        activate()
-                                        editorViewModel.onGenerateStencil(layer.id)
-                                    }
-                                }
-                                azRailItem(id = "adj_${layer.id}", text = navStrings.adjust, color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.adjustInfo, onClick = { activate(); editorViewModel.onAdjustClicked() })
-                                azRailItem(id = "balance_${layer.id}", text = navStrings.balance, color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.balanceInfo, onClick = { activate(); editorViewModel.onBalanceClicked() })
-                                azRailItem(id = "blend_${layer.id}", text = navStrings.build, color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.blendingInfo, onClick = { activate(); editorViewModel.onCycleBlendMode() })
 
-                                // --- Brush tools at bottom ---
-                                azRailItem(id = "eraser_${layer.id}", text = navStrings.eraser, color = if (activeTool == Tool.ERASER) Cyan else navItemColor, info = navStrings.eraserInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.ERASER) })
-                                azRailItem(id = "blur_${layer.id}", text = navStrings.blur, color = if (activeTool == Tool.BLUR) Cyan else navItemColor, info = navStrings.blurInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BLUR) })
-                                azRailItem(id = "liquify_${layer.id}", text = navStrings.liquify, color = if (activeTool == Tool.LIQUIFY) Cyan else navItemColor, info = navStrings.liquifyInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) })
-                                azRailItem(id = "dodge_${layer.id}", text = navStrings.dodge, color = if (activeTool == Tool.DODGE) Cyan else navItemColor, info = navStrings.dodgeInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.DODGE) })
-                                azRailItem(id = "burn_${layer.id}", text = navStrings.burn, color = if (activeTool == Tool.BURN) Cyan else navItemColor, info = navStrings.burnInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BURN) })
-                                addSizeItem()
+                                            // Solid inner circle = hard core; outer ring (darker) = feathering amount
+                                            Box(contentAlignment = Alignment.Center) {
+                                                if (liveState.brushFeathering > 0.05f) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(sizeDp)
+                                                            .clip(CircleShape)
+                                                            .then(checkerModifier)
+                                                            .background(Color.Black.copy(alpha = 0.5f))
+                                                    )
+                                                }
+                                                val hardCoreDp = with(density) {
+                                                    (liveState.brushSize * (1f - liveState.brushFeathering * 0.7f)).coerceIn(2f, itemRadiusPx).toDp()
+                                                }
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(hardCoreDp)
+                                                        .clip(CircleShape)
+                                                        .then(checkerModifier)
+                                                )
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+
+                            when {
+                                layer.textParams != null -> {
+                                    val tp = layer.textParams!!
+                                    azRailItem(id = "font_${layer.id}", text = navStrings.font, color = navItemColor, shape = AzButtonShape.RECTANGLE) {
+                                        activate()
+                                        onShowFontPicker(layer.id)
+                                    }
+                                    azRailItem(
+                                        id = "size_${layer.id}",
+                                        text = navStrings.size,
+                                        color = navItemColor,
+                                        shape = AzButtonShape.RECTANGLE,
+                                        content = AzComposableContent { isEnabled ->
+                                            val liveState by editorViewModel.uiState.collectAsState()
+                                            val displaySize = liveState.layers.find { it.id == layer.id }?.textParams?.fontSizeDp ?: 150f
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .pointerInput(isEnabled) {
+                                                        if (!isEnabled) return@pointerInput
+                                                        detectDragGestures { change, dragAmount ->
+                                                            change.consume()
+                                                            val current = editorViewModel.uiState.value.layers
+                                                                .find { it.id == layer.id }?.textParams?.fontSizeDp ?: 150f
+                                                            editorViewModel.onTextSizeChanged(layer.id, (current - dragAmount.y * 0.5f).coerceIn(8f, 300f))
+                                                        }
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = "${displaySize.toInt()}pt",
+                                                    color = navItemColor,
+                                                    fontSize = 28.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    )
+                                    azRailItem(
+                                        id = "color_${layer.id}",
+                                        text = navStrings.color,
+                                        color = navItemColor,
+                                        shape = AzButtonShape.RECTANGLE,
+                                        onClick = { activate(); editorViewModel.onColorClicked() },
+                                        content = AzComposableContent { isEnabled ->
+                                            val liveState by editorViewModel.uiState.collectAsState()
+                                            val currentColor = liveState.layers.find { it.id == layer.id }?.textParams?.colorArgb
+                                                ?: 0xFFFFFFFF.toInt()
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .pointerInput(isEnabled) {
+                                                        if (!isEnabled) return@pointerInput
+                                                        detectDragGestures { change, dragAmount ->
+                                                            change.consume()
+                                                            val hsv = FloatArray(3)
+                                                            android.graphics.Color.colorToHSV(currentColor, hsv)
+                                                            hsv[2] = (hsv[2] - dragAmount.y * 0.002f).coerceIn(0f, 1f)
+                                                            hsv[1] = (hsv[1] + dragAmount.x * 0.002f).coerceIn(0f, 1f)
+                                                            editorViewModel.onTextColorChanged(layer.id, android.graphics.Color.HSVToColor(hsv))
+                                                        }
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(28.dp)
+                                                        .background(Color(currentColor), CircleShape)
+                                                        .border(1.dp, navItemColor.copy(alpha = 0.5f), CircleShape)
+                                                )
+                                            }
+                                        }
+                                    )
+                                    azRailItem(
+                                        id = "kern_${layer.id}",
+                                        text = navStrings.kern,
+                                        color = navItemColor,
+                                        shape = AzButtonShape.RECTANGLE,
+                                        content = AzComposableContent { isEnabled ->
+                                            val liveState by editorViewModel.uiState.collectAsState()
+                                            val displayKern = liveState.layers.find { it.id == layer.id }?.textParams?.letterSpacingEm ?: 0f
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .pointerInput(isEnabled) {
+                                                        if (!isEnabled) return@pointerInput
+                                                        detectDragGestures { change, dragAmount ->
+                                                            change.consume()
+                                                            val current = editorViewModel.uiState.value.layers
+                                                                .find { it.id == layer.id }?.textParams?.letterSpacingEm ?: 0f
+                                                            editorViewModel.onTextKerningChanged(layer.id, (current + dragAmount.x * 0.003f).coerceIn(-0.2f, 1f))
+                                                        }
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = String.format("%.2f", displayKern),
+                                                    color = navItemColor,
+                                                    fontSize = 28.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    )
+                                    azRailItem(id = "bold_${layer.id}", text = navStrings.bold, color = if (tp.isBold) Cyan else navItemColor, shape = AzButtonShape.RECTANGLE) {
+                                        activate()
+                                        editorViewModel.onTextStyleChanged(layer.id, !tp.isBold, tp.isItalic, tp.hasOutline, tp.hasDropShadow)
+                                    }
+                                    azRailItem(id = "italic_${layer.id}", text = navStrings.italic, color = if (tp.isItalic) Cyan else navItemColor, shape = AzButtonShape.RECTANGLE) {
+                                        activate()
+                                        editorViewModel.onTextStyleChanged(layer.id, tp.isBold, !tp.isItalic, tp.hasOutline, tp.hasDropShadow)
+                                    }
+                                    azRailItem(id = "outline_${layer.id}", text = navStrings.outline, color = if (tp.hasOutline) Cyan else navItemColor, shape = AzButtonShape.RECTANGLE) {
+                                        activate()
+                                        editorViewModel.onTextStyleChanged(layer.id, tp.isBold, tp.isItalic, !tp.hasOutline, tp.hasDropShadow)
+                                    }
+                                    azRailItem(id = "shadow_${layer.id}", text = navStrings.shadow, color = if (tp.hasDropShadow) Cyan else navItemColor, shape = AzButtonShape.RECTANGLE) {
+                                        activate()
+                                        editorViewModel.onTextStyleChanged(layer.id, tp.isBold, tp.isItalic, tp.hasOutline, !tp.hasDropShadow)
+                                    }
+                                    if (layer.stencilType == null) {
+                                        azRailItem(
+                                            id = "stencil_${layer.id}",
+                                            text = navStrings.stencil,
+                                            color = navItemColor,
+                                            shape = AzButtonShape.RECTANGLE,
+                                            content = AzComposableContent { _ ->
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .onGloballyPositioned { coords ->
+                                                            if (coords.isAttached) {
+                                                                editorViewModel.updateStencilButtonPosition(coords.positionInWindow())
+                                                            }
+                                                        },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = navStrings.stencil,
+                                                        color = navItemColor,
+                                                        textAlign = TextAlign.Center,
+                                                    )
+                                                }
+                                            }
+                                        ) {
+                                            activate()
+                                            editorViewModel.onGenerateStencil(layer.id)
+                                        }
+                                    }
+                                    azRailItem(id = "blend_${layer.id}", text = navStrings.build, color = navItemColor, shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onCycleBlendMode() })
+                                    azRailItem(id = "adj_${layer.id}", text = navStrings.adjust, color = navItemColor, shape = AzButtonShape.RECTANGLE, onClick = { activate(); editorViewModel.onAdjustClicked() })
+                                    azRailItem(id = "invert_${layer.id}", text = navStrings.invert, color = if (layer.isInverted) Cyan else navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.invertInfo, onClick = { activate(); editorViewModel.onToggleInvert() })
+                                }
+                                layer.isSketch -> {
+                                    azRailItem(id = "blend_${layer.id}", text = navStrings.build, color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.blendingInfo, onClick = { activate(); editorViewModel.onCycleBlendMode() })
+                                    azRailItem(id = "adj_${layer.id}", text = navStrings.adjust, color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.adjustInfo, onClick = { activate(); editorViewModel.onAdjustClicked() })
+                                    azRailItem(id = "invert_${layer.id}", text = navStrings.invert, color = if (layer.isInverted) Cyan else navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.invertInfo, onClick = { activate(); editorViewModel.onToggleInvert() })
+                                    if (layer.stencilType == null) {
+                                        azRailItem(
+                                            id = "stencil_${layer.id}",
+                                            text = navStrings.stencil,
+                                            color = navItemColor,
+                                            shape = AzButtonShape.RECTANGLE,
+                                            content = AzComposableContent { _ ->
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .onGloballyPositioned { coords ->
+                                                            if (coords.isAttached) {
+                                                                editorViewModel.updateStencilButtonPosition(coords.positionInWindow())
+                                                            }
+                                                        },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = navStrings.stencil,
+                                                        color = navItemColor,
+                                                        textAlign = TextAlign.Center,
+                                                    )
+                                                }
+                                            }
+                                        ) {
+                                            activate()
+                                            editorViewModel.onGenerateStencil(layer.id)
+                                        }
+                                    }
+                                    azRailItem(id = "balance_${layer.id}", text = navStrings.balance, color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.balanceInfo, onClick = { activate(); editorViewModel.onBalanceClicked() })
+                                    // --- Brush tools at bottom ---
+                                    azRailItem(id = "eraser_${layer.id}", text = navStrings.eraser, color = if (activeTool == Tool.ERASER) Cyan else navItemColor, info = navStrings.eraserInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.ERASER) })
+                                    azRailItem(id = "blur_${layer.id}", text = navStrings.blur, color = if (activeTool == Tool.BLUR) Cyan else navItemColor, info = navStrings.blurInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BLUR) })
+                                    azRailItem(id = "liquify_${layer.id}", text = navStrings.liquify, color = if (activeTool == Tool.LIQUIFY) Cyan else navItemColor, info = navStrings.liquifyInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) })
+                                    azRailItem(id = "dodge_${layer.id}", text = navStrings.dodge, color = if (activeTool == Tool.DODGE) Cyan else navItemColor, info = navStrings.dodgeInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.DODGE) })
+                                    azRailItem(id = "burn_${layer.id}", text = navStrings.burn, color = if (activeTool == Tool.BURN) Cyan else navItemColor, info = navStrings.burnInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BURN) })
+                                    addSizeItem()
+                                }
+                                else -> {
+                                    azRailItem(id = "iso_${layer.id}", text = navStrings.isolate, color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.isolateInfo, onClick = { activate(); editorViewModel.onRemoveBackgroundClicked() })
+                                    azRailItem(id = "line_${layer.id}", text = navStrings.outline, color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.outlineInfo, onClick = { activate(); editorViewModel.onSketchClicked() })
+                                    azRailItem(id = "invert_${layer.id}", text = navStrings.invert, color = if (layer.isInverted) Cyan else navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.invertInfo, onClick = { activate(); editorViewModel.onToggleInvert() })
+                                    if (layer.stencilType == null) {
+                                        azRailItem(
+                                            id = "stencil_${layer.id}",
+                                            text = navStrings.stencil,
+                                            color = navItemColor,
+                                            shape = AzButtonShape.RECTANGLE,
+                                            content = AzComposableContent { _ ->
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .onGloballyPositioned { coords ->
+                                                            if (coords.isAttached) {
+                                                                editorViewModel.updateStencilButtonPosition(coords.positionInWindow())
+                                                            }
+                                                        },
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = navStrings.stencil,
+                                                        color = navItemColor,
+                                                        textAlign = TextAlign.Center,
+                                                    )
+                                                }
+                                            }
+                                        ) {
+                                            activate()
+                                            editorViewModel.onGenerateStencil(layer.id)
+                                        }
+                                    }
+                                    azRailItem(id = "adj_${layer.id}", text = navStrings.adjust, color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.adjustInfo, onClick = { activate(); editorViewModel.onAdjustClicked() })
+                                    azRailItem(id = "balance_${layer.id}", text = navStrings.balance, color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.balanceInfo, onClick = { activate(); editorViewModel.onBalanceClicked() })
+                                    azRailItem(id = "blend_${layer.id}", text = navStrings.build, color = navItemColor, shape = AzButtonShape.RECTANGLE, info = navStrings.blendingInfo, onClick = { activate(); editorViewModel.onCycleBlendMode() })
+
+                                    // --- Brush tools at bottom ---
+                                    azRailItem(id = "eraser_${layer.id}", text = navStrings.eraser, color = if (activeTool == Tool.ERASER) Cyan else navItemColor, info = navStrings.eraserInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.ERASER) })
+                                    azRailItem(id = "blur_${layer.id}", text = navStrings.blur, color = if (activeTool == Tool.BLUR) Cyan else navItemColor, info = navStrings.blurInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BLUR) })
+                                    azRailItem(id = "liquify_${layer.id}", text = navStrings.liquify, color = if (activeTool == Tool.LIQUIFY) Cyan else navItemColor, info = navStrings.liquifyInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) })
+                                    azRailItem(id = "dodge_${layer.id}", text = navStrings.dodge, color = if (activeTool == Tool.DODGE) Cyan else navItemColor, info = navStrings.dodgeInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.DODGE) })
+                                    azRailItem(id = "burn_${layer.id}", text = navStrings.burn, color = if (activeTool == Tool.BURN) Cyan else navItemColor, info = navStrings.burnInfo, onClick = { activate(); editorViewModel.setActiveTool(Tool.BURN) })
+                                    addSizeItem()
+                                }
+                            }
+
+                            azHelpRailItem(id = "help_layer_${layer.id}", text = navStrings.help, color = navItemColor, shape = AzButtonShape.RECTANGLE)
+                        }
+                    ) {
+                        inputItem(hint = strings.editor.renameHint) { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
+                        if (layer.textParams != null) {
+                            inputItem(
+                                hint = strings.editor.editTextHint,
+                                initialValue = layer.textParams!!.text,
+                                onValueChange = { text -> editorViewModel.onTextContentChanged(layer.id, text) }
+                            )
+                        }
+                        listItem(text = strings.editor.copyEdits) { editorViewModel.copyLayerModifications(layer.id) }
+                        listItem(text = strings.editor.pasteEdits) { editorViewModel.pasteLayerModifications(layer.id) }
+                        if (layer.stencilType != null) {
+                            listItem(text = strings.editor.generatePoster) {
+                                posterSourceLayerId = layer.stencilSourceId ?: layer.id
+                                showPosterDialog = true
                             }
                         }
+                        listItem(text = strings.editor.duplicate) { editorViewModel.onLayerDuplicated(layer.id) }
 
-                        azHelpRailItem(id = "help_layer_${layer.id}", text = navStrings.help, color = navItemColor, shape = AzButtonShape.RECTANGLE)
-                    }
-                ) {
-                    inputItem(hint = strings.editor.renameHint) { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
-                    if (layer.textParams != null) {
-                        inputItem(
-                            hint = strings.editor.editTextHint,
-                            initialValue = layer.textParams!!.text,
-                            onValueChange = { text -> editorViewModel.onTextContentChanged(layer.id, text) }
-                        )
-                    }
-                    listItem(text = strings.editor.copyEdits) { editorViewModel.copyLayerModifications(layer.id) }
-                    listItem(text = strings.editor.pasteEdits) { editorViewModel.pasteLayerModifications(layer.id) }
-                    if (layer.stencilType != null) {
-                        listItem(text = strings.editor.generatePoster) { 
-                            posterSourceLayerId = layer.stencilSourceId ?: layer.id
-                            showPosterDialog = true 
-                        }
-                    }
-                    listItem(text = strings.editor.duplicate) { editorViewModel.onLayerDuplicated(layer.id) }
-                    
-                    // Check if part of a linked group (contiguous links)
-                    val layers = editorUiState.layers
-                    val idx = layers.indexOfFirst { it.id == layer.id }
-                    val isPartToUnlink = if (idx >= 0) {
-                        (idx > 0 && layers[idx].isLinked) || 
-                        (idx + 1 < layers.size && layers[idx + 1].isLinked)
-                    } else false
+                        // Check if part of a linked group (contiguous links)
+                        val layers = editorUiState.layers
+                        val idx = layers.indexOfFirst { it.id == layer.id }
+                        val isPartToUnlink = if (idx >= 0) {
+                            (idx > 0 && layers[idx].isLinked) ||
+                                    (idx + 1 < layers.size && layers[idx + 1].isLinked)
+                        } else false
 
-                    listItem(text = if (isPartToUnlink) strings.editor.unlinkLayer else strings.editor.linkLayer) { editorViewModel.onToggleLinkLayer(layer.id) }
-                    listItem(text = if (layer.isVisible) strings.editor.hideLayer else strings.editor.showLayer) { editorViewModel.onToggleVisibility(layer.id) }
-                    listItem(text = strings.editor.flattenAll) { editorViewModel.onFlattenAllLayers() }
-                    listItem(text = strings.editor.delete) { editorViewModel.onLayerRemoved(layer.id) }
+                        listItem(text = if (isPartToUnlink) strings.editor.unlinkLayer else strings.editor.linkLayer) { editorViewModel.onToggleLinkLayer(layer.id) }
+                        listItem(text = if (layer.isVisible) strings.editor.hideLayer else strings.editor.showLayer) { editorViewModel.onToggleVisibility(layer.id) }
+                        listItem(text = strings.editor.flattenAll) { editorViewModel.onFlattenAllLayers() }
+                        listItem(text = strings.editor.delete) { editorViewModel.onLayerRemoved(layer.id) }
+                    }
                 }
             }
-        }
 
-        azDivider()
+            azDivider()
 
-        if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
-            azRailItem(id = "light", text = navStrings.light, color = navItemColor, info = navStrings.lightInfo, onClick = { arViewModel.toggleFlashlight() })
-        }
+            if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
+                azRailItem(id = "light", text = navStrings.light, color = navItemColor, info = navStrings.lightInfo, onClick = { arViewModel.toggleFlashlight() })
+            }
 
-        val lockText = if (editorUiState.editorMode == EditorMode.TRACE) strings.editor.lock else strings.editor.freeze
-        val lockAction: () -> Unit = if (editorUiState.editorMode == EditorMode.TRACE) {
-            { mainViewModel.setTouchLocked(true) }
-        } else {
-            {
-                editorViewModel.toggleImageLock()
-                val visibleLayers = editorUiState.layers.filter { it.isVisible && it.bitmap != null }
-                if (visibleLayers.isNotEmpty()) {
-                    val composite = compositeLayersForAr(visibleLayers)
-                    arViewModel.onFreezeRequested(composite)
+            val lockText = if (editorUiState.editorMode == EditorMode.TRACE) strings.editor.lock else strings.editor.freeze
+            val lockAction: () -> Unit = if (editorUiState.editorMode == EditorMode.TRACE) {
+                { mainViewModel.setTouchLocked(true) }
+            } else {
+                {
+                    editorViewModel.toggleImageLock()
+                    val visibleLayers = editorUiState.layers.filter { it.isVisible && it.bitmap != null }
+                    if (visibleLayers.isNotEmpty()) {
+                        val composite = compositeLayersForAr(visibleLayers)
+                        arViewModel.onFreezeRequested(composite)
+                    }
                 }
             }
+            azRailItem(id = "lock_trace", text = lockText, color = navItemColor, info = navStrings.lockInfo, onClick = lockAction)
         }
-        azRailItem(id = "lock_trace", text = lockText, color = navItemColor, info = navStrings.lockInfo, onClick = lockAction)
 
         azHelpRailItem(id = "help_main", text = navStrings.help, color = navItemColor, shape = AzButtonShape.RECTANGLE)
     }
 }
+
 
 @Composable
 private fun WallSourceDialog(

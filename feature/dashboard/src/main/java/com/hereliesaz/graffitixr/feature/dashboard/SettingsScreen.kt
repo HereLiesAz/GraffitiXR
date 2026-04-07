@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
@@ -50,12 +51,16 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.AzLoad
 import com.hereliesaz.graffitixr.common.model.AppLanguage
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.design.theme.AppStrings
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 
 @Composable
 fun SettingsScreen(
@@ -110,6 +115,39 @@ fun SettingsScreen(
         context.startActivity(intent)
     }
 
+    var showLanguageDialog by remember { mutableStateOf(false) }
+
+    if (showLanguageDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            title = { Text(strings.settings.languageLabel) },
+            text = {
+                Box(modifier = Modifier.fillMaxWidth().height(300.dp)) {
+                    LazyColumn {
+                        items(AppLanguage.entries.size) { index ->
+                            val lang = AppLanguage.entries[index]
+                            Text(
+                                text = lang.displayName,
+                                fontSize = 18.sp,
+                                color = if (lang == currentLanguage) MaterialTheme.colorScheme.primary else Color.Unspecified,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        onLanguageChanged(lang)
+                                        showLanguageDialog = false
+                                    }
+                                    .padding(12.dp)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                AzButton(text = strings.common.done, onClick = { showLanguageDialog = false })
+            }
+        )
+    }
+
 
     Box(
         modifier = Modifier
@@ -158,6 +196,11 @@ fun SettingsScreen(
                         // Preferences Section
                         item {
                             SettingsSectionTitle(strings.settings.preferences)
+                            SettingsItem(
+                                label = strings.settings.languageLabel,
+                                value = currentLanguage.displayName,
+                                modifier = Modifier.clickable { showLanguageDialog = true }
+                            )
                             SettingsItem(
                                 label = strings.settings.dominantHand,
                                 value = if (isRightHanded) strings.settings.handRight else strings.settings.handLeft,
