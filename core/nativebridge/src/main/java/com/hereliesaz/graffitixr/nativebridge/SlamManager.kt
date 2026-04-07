@@ -35,7 +35,23 @@ class SlamManager @Inject constructor() {
 
     fun getAnchorTransform(): FloatArray = nativeGetAnchorTransform()
 
-    fun addLayerFeatures(
+    fun setWallFingerprint(
+        bitmap: Bitmap,
+        mask: Bitmap?,
+        depthBuffer: ByteBuffer,
+        depthW: Int, depthH: Int, depthStride: Int,
+        intrinsics: FloatArray,
+        viewMatrix: FloatArray
+    ): Fingerprint? {
+        if (!depthBuffer.isDirect) return null
+        return nativeSetWallFingerprint(bitmap, mask, depthBuffer, depthW, depthH, depthStride, intrinsics, viewMatrix)
+    }
+
+    fun restoreWallFingerprint(descriptorsData: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray) {
+        nativeRestoreWallFingerprint(descriptorsData, rows, cols, type, points3d)
+    }
+
+    fun setArtworkFingerprint(
         bitmap: Bitmap,
         depthBuffer: ByteBuffer,
         depthW: Int, depthH: Int, depthStride: Int,
@@ -43,7 +59,7 @@ class SlamManager @Inject constructor() {
         viewMatrix: FloatArray
     ) {
         if (depthBuffer.isDirect) {
-            nativeAddLayerFeatures(bitmap, depthBuffer, depthW, depthH, depthStride, intrinsics, viewMatrix)
+            nativeSetArtworkFingerprint(bitmap, depthBuffer, depthW, depthH, depthStride, intrinsics, viewMatrix)
         }
     }
 
@@ -137,24 +153,11 @@ class SlamManager @Inject constructor() {
 
     fun loadSuperPoint(assetManager: AssetManager): Boolean = nativeLoadSuperPoint(assetManager)
 
-    fun setTargetFingerprint(descriptorsData: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray) {
-        nativeSetTargetFingerprint(descriptorsData, rows, cols, type, points3d)
-    }
-
     fun destroy() {
         if (isInitialized) {
             nativeDestroy()
             isInitialized = false
         }
-    }
-
-    fun generateFingerprint(bitmap: Bitmap): Fingerprint? {
-        return nativeGenerateFingerprint(bitmap)
-    }
-
-    fun generateFingerprintMasked(bitmap: Bitmap, mask: Bitmap?): Fingerprint? {
-        return if (mask != null) nativeGenerateFingerprintMasked(bitmap, mask)
-        else nativeGenerateFingerprint(bitmap)
     }
 
     fun annotateKeypoints(bitmap: Bitmap): Bitmap {
@@ -195,7 +198,16 @@ class SlamManager @Inject constructor() {
     private external fun nativeUpdateAnchorTransform(transform: FloatArray)
     private external fun nativeGetAnchorTransform(): FloatArray
     private external fun nativeGetPaintingProgress(): Float
-    private external fun nativeAddLayerFeatures(
+    private external fun nativeSetWallFingerprint(
+        bitmap: Bitmap, mask: Bitmap?,
+        depthBuffer: ByteBuffer,
+        depthW: Int, depthH: Int, depthStride: Int,
+        intrinsics: FloatArray, viewMatrix: FloatArray
+    ): Fingerprint?
+    private external fun nativeRestoreWallFingerprint(
+        descriptorsData: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray
+    )
+    private external fun nativeSetArtworkFingerprint(
         bitmap: Bitmap, depthBuffer: ByteBuffer,
         depthW: Int, depthH: Int, depthStride: Int,
         intrinsics: FloatArray, viewMatrix: FloatArray
@@ -215,10 +227,7 @@ class SlamManager @Inject constructor() {
         timestampNs: Long
     )
     private external fun nativeFeedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int, timestampNs: Long)
-    private external fun nativeSetTargetFingerprint(descriptorsData: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray)
     private external fun nativeDestroy()
-    private external fun nativeGenerateFingerprint(bitmap: Bitmap): Fingerprint?
-    private external fun nativeGenerateFingerprintMasked(bitmap: Bitmap, mask: Bitmap): Fingerprint?
     private external fun nativeAnnotateKeypoints(bitmap: Bitmap)
     private external fun nativeFeedStereoData(leftBuffer: ByteBuffer, rightBuffer: ByteBuffer, width: Int, height: Int, timestamp: Long)
 }

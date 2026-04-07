@@ -287,9 +287,8 @@ void MobileGS::clearMap() {
     splatData.clear();
     mVoxelGrid.clear();
     mPointCount = 0;
-    mTargetDescriptors = cv::Mat();
-    mTargetKeypoints3D.clear();
-
+    mWallDescriptors = cv::Mat();
+    mWallKeypoints3D.clear();
     mArtworkDescriptors = cv::Mat();
     mArtworkKeypoints3D.clear();
     mPaintingProgress.store(0.0f, std::memory_order_relaxed);
@@ -529,9 +528,9 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
     cv::Mat artworkDesc;
     {
         std::lock_guard<std::mutex> lk(mMutex);
-    if (mTargetDescriptors.empty() || mTargetKeypoints3D.empty()) return;
-        targetDesc = mTargetDescriptors.clone();
-        targetPts  = mTargetKeypoints3D;
+        if (mWallDescriptors.empty() || mWallKeypoints3D.empty()) return;
+        targetDesc = mWallDescriptors.clone();
+        targetPts  = mWallKeypoints3D;
         memcpy(projMat,   mMappingProjMatrix, 16 * sizeof(float));
         memcpy(anchorMat, mAnchorMatrix,       16 * sizeof(float));
         memcpy(viewMat,   mMappingViewMatrix, 16 * sizeof(float));
@@ -684,32 +683,32 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
 
     std::lock_guard<std::mutex> lock(mMutex);
 
-    bool misaligned = !mTargetDescriptors.empty() &&
-                      (mTargetKeypoints3D.size() != (size_t)mTargetDescriptors.rows);
-    if (misaligned || (usedSP && !mTargetDescriptors.empty() && mTargetDescriptors.type() == CV_8U)) {
-        mTargetDescriptors = cv::Mat();
-        mTargetKeypoints3D.clear();
+    bool misaligned = !mWallDescriptors.empty() &&
+                      (mWallKeypoints3D.size() != (size_t)mWallDescriptors.rows);
+    if (misaligned || (usedSP && !mWallDescriptors.empty() && mWallDescriptors.type() == CV_8U)) {
+        mWallDescriptors = cv::Mat();
+        mWallKeypoints3D.clear();
     }
 
-    mTargetKeypoints3D.insert(mTargetKeypoints3D.end(), newPts.begin(), newPts.end());
+    mWallKeypoints3D.insert(mWallKeypoints3D.end(), newPts.begin(), newPts.end());
 
-    if (mTargetDescriptors.empty()) {
-        mTargetDescriptors = newDescs.clone();
+    if (mWallDescriptors.empty()) {
+        mWallDescriptors = newDescs.clone();
     } else {
-        if (mTargetDescriptors.type() == newDescs.type()) {
-            cv::vconcat(mTargetDescriptors, newDescs, mTargetDescriptors);
+        if (mWallDescriptors.type() == newDescs.type()) {
+            cv::vconcat(mWallDescriptors, newDescs, mWallDescriptors);
         } else {
-            mTargetDescriptors = newDescs.clone();
-            mTargetKeypoints3D = newPts;
+            mWallDescriptors = newDescs.clone();
+            mWallKeypoints3D = newPts;
         }
     }
 
-    if (mTargetKeypoints3D.size() > MAX_FINGERPRINT_KEYPOINTS) {
-        size_t excess = mTargetKeypoints3D.size() - MAX_FINGERPRINT_KEYPOINTS;
-        mTargetKeypoints3D.erase(mTargetKeypoints3D.begin(),
-                                 mTargetKeypoints3D.begin() + excess);
-        mTargetDescriptors = mTargetDescriptors
-                .rowRange((int)excess, mTargetDescriptors.rows)
+    if (mWallKeypoints3D.size() > MAX_FINGERPRINT_KEYPOINTS) {
+        size_t excess = mWallKeypoints3D.size() - MAX_FINGERPRINT_KEYPOINTS;
+        mWallKeypoints3D.erase(mWallKeypoints3D.begin(),
+                                 mWallKeypoints3D.begin() + excess);
+        mWallDescriptors = mWallDescriptors
+                .rowRange((int)excess, mWallDescriptors.rows)
                 .clone();
     }
 }
@@ -1115,10 +1114,10 @@ void MobileGS::updateLightLevel(float level) {
     }
 }
 
-void MobileGS::setTargetFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d) {
+void MobileGS::restoreWallFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d) {
     std::lock_guard<std::mutex> lock(mMutex);
-    mTargetDescriptors = descriptors.clone();
-    mTargetKeypoints3D = points3d;
+    mWallDescriptors = descriptors.clone();
+    mWallKeypoints3D = points3d;
 }
 
 bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) {
@@ -1135,10 +1134,10 @@ void MobileGS::getAnchorTransform(float* outMat16) const {
     memcpy(outMat16, mAnchorMatrix, 16 * sizeof(float));
 }
 
-void MobileGS::addLayerFeatures(const cv::Mat& composite,
-                                const uint8_t* depthData, int depthW, int depthH, int depthStride,
-                                const float* intrinsics4,
-                                const float* viewMat16) {
+void MobileGS::setArtworkFingerprint(const cv::Mat& composite,
+                                     const uint8_t* depthData, int depthW, int depthH, int depthStride,
+                                     const float* intrinsics4,
+                                     const float* viewMat16) {
     if (composite.empty() || !depthData) return;
 
     cv::Mat gray;
@@ -1157,7 +1156,6 @@ void MobileGS::addLayerFeatures(const cv::Mat& composite,
 
     const float fx = intrinsics4[0], fy = intrinsics4[1];
     const float cx = intrinsics4[2], cy = intrinsics4[3];
-
     const float scaleX = (float)depthW / composite.cols;
     const float scaleY = (float)depthH / composite.rows;
 
@@ -1192,21 +1190,8 @@ void MobileGS::addLayerFeatures(const cv::Mat& composite,
     if (newPts.empty()) return;
 
     std::lock_guard<std::mutex> lock(mMutex);
-    bool misaligned = !mTargetDescriptors.empty() &&
-                      (mTargetKeypoints3D.size() != (size_t)mTargetDescriptors.rows);
-    if (misaligned) {
-        mTargetDescriptors = cv::Mat();
-        mTargetKeypoints3D.clear();
-    }
-    mTargetKeypoints3D.insert(mTargetKeypoints3D.end(), newPts.begin(), newPts.end());
-    if (mTargetDescriptors.empty()) {
-        mTargetDescriptors = newDescs.clone();
-    } else if (mTargetDescriptors.type() == newDescs.type()) {
-        cv::vconcat(mTargetDescriptors, newDescs, mTargetDescriptors);
-    }
-
-    mArtworkDescriptors  = newDescs.clone();
-    mArtworkKeypoints3D  = newPts;
+    mArtworkDescriptors = newDescs.clone();
+    mArtworkKeypoints3D = newPts;
     mPaintingProgress.store(0.0f, std::memory_order_relaxed);
 }
 

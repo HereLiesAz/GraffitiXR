@@ -59,12 +59,6 @@ public:
                                const float* intrinsics4,
                                const float* viewMat16);
 
-    void setTargetFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
-    void addLayerFeatures(const cv::Mat& composite,
-                          const uint8_t* depthData, int depthW, int depthH, int depthStride,
-                          const float* intrinsics4,
-                          const float* viewMat16);
-
     bool loadSuperPoint(const std::vector<uchar>& onnxBytes);
 
     void clearMap();
@@ -131,9 +125,6 @@ private:
 
     cv::Mat mWallDescriptors;
     std::vector<cv::Point3f> mWallKeypoints3D;
-
-    cv::Mat mTargetDescriptors;
-    std::vector<cv::Point3f> mTargetKeypoints3D;
 
     cv::Mat mArtworkDescriptors;
     std::vector<cv::Point3f> mArtworkKeypoints3D;

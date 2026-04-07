@@ -379,34 +379,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadSuperPoint(
     return ok ? JNI_TRUE : JNI_FALSE;
 }
 
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetTargetFingerprint(
-        JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type, jfloatArray ptsArray) {
-    if (gSlamEngine) {
-        jbyte* descData = env->GetByteArrayElements(descArray, nullptr);
-        cv::Mat descriptors(rows, cols, type, descData);
-
-        jsize ptsLen = env->GetArrayLength(ptsArray);
-        jfloat* ptsData = env->GetFloatArrayElements(ptsArray, nullptr);
-
-        std::vector<cv::Point3f> points3d;
-        for (int i = 0; i < ptsLen; i += 3) {
-            points3d.push_back(cv::Point3f(ptsData[i], ptsData[i+1], ptsData[i+2]));
-        }
-
-        // gSlamEngine->setTargetFingerprint(descriptors, points3d);
-
-        env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
-        env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
-    }
-}
-
 static jobject buildFingerprintObject(JNIEnv* env,
                                       const std::vector<cv::KeyPoint>& kps,
-                                      const cv::Mat& descs) {
+                                      const cv::Mat& descs,
+                                      const std::vector<cv::Point3f>& pts3d = {}) {
     if (descs.empty()) return nullptr;
 
-    jclass fpClass  = env->FindClass("com/hereliesaz/graffitixr/common/model/Fingerprint");
+    jclass fpClass   = env->FindClass("com/hereliesaz/graffitixr/common/model/Fingerprint");
     jmethodID fpCtor = env->GetMethodID(fpClass, "<init>", "(Ljava/util/List;Ljava/util/List;[BIII)V");
 
     jclass kpClass   = env->FindClass("org/opencv/core/KeyPoint");
@@ -425,9 +404,18 @@ static jobject buildFingerprintObject(JNIEnv* env,
         env->DeleteLocalRef(jkp);
     }
 
-    jobject ptsList = env->NewObject(listClass, listCtor, 0);
+    jclass floatClass      = env->FindClass("java/lang/Float");
+    jmethodID floatValueOf = env->GetStaticMethodID(floatClass, "valueOf", "(F)Ljava/lang/Float;");
+    jobject ptsList = env->NewObject(listClass, listCtor, (jint)(pts3d.size() * 3));
+    for (const auto& p : pts3d) {
+        for (float v : {p.x, p.y, p.z}) {
+            jobject jf = env->CallStaticObjectMethod(floatClass, floatValueOf, v);
+            env->CallBooleanMethod(ptsList, addMethod, jf);
+            env->DeleteLocalRef(jf);
+        }
+    }
 
-    jsize descSize = descs.total() * descs.elemSize();
+    jsize descSize = (jsize)(descs.total() * descs.elemSize());
     jbyteArray jDescArray = env->NewByteArray(descSize);
     env->SetByteArrayRegion(jDescArray, 0, descSize, (const jbyte*)descs.data);
 
@@ -437,26 +425,12 @@ static jobject buildFingerprintObject(JNIEnv* env,
 }
 
 JNIEXPORT jobject JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGenerateFingerprint(
-        JNIEnv* env, jobject thiz, jobject bitmap) {
-
-    cv::Mat frame;
-    bitmapToMat(env, bitmap, frame);
-    if (frame.empty()) return nullptr;
-
-    cv::Mat gray;
-    cv::cvtColor(frame, gray, cv::COLOR_RGBA2GRAY);
-
-    std::vector<cv::KeyPoint> kps;
-    cv::Mat descs;
-    cv::ORB::create(500)->detectAndCompute(gray, cv::noArray(), kps, descs);
-
-    return buildFingerprintObject(env, kps, descs);
-}
-
-JNIEXPORT jobject JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGenerateFingerprintMasked(
-        JNIEnv* env, jobject thiz, jobject bitmap, jobject maskBitmap) {
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallFingerprint(
+        JNIEnv* env, jobject thiz,
+        jobject bitmap, jobject maskBitmap,
+        jobject depthBuffer, jint depthW, jint depthH, jint depthStride,
+        jfloatArray intrinsicsArray, jfloatArray viewMatArray) {
+    if (!gSlamEngine) return nullptr;
 
     cv::Mat frame;
     bitmapToMat(env, bitmap, frame);
@@ -480,8 +454,77 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGenerateFingerprin
     std::vector<cv::KeyPoint> kps;
     cv::Mat descs;
     cv::ORB::create(500)->detectAndCompute(gray, orbMask, kps, descs);
+    if (descs.empty()) return nullptr;
 
-    return buildFingerprintObject(env, kps, descs);
+    auto* rawDepth = static_cast<const uint8_t*>(env->GetDirectBufferAddress(depthBuffer));
+    if (!rawDepth) return nullptr;
+
+    jfloat* intr = env->GetFloatArrayElements(intrinsicsArray, nullptr);
+    jfloat* view = env->GetFloatArrayElements(viewMatArray, nullptr);
+    const float fx = intr[0], fy = intr[1], cx_f = intr[2], cy_f = intr[3];
+    const float scaleX = (float)depthW / (float)frame.cols;
+    const float scaleY = (float)depthH / (float)frame.rows;
+
+    std::vector<cv::Point3f> wallPts;
+    cv::Mat wallDescs;
+
+    for (int i = 0; i < (int)kps.size(); ++i) {
+        int du = (int)(kps[i].pt.x * scaleX);
+        int dv = (int)(kps[i].pt.y * scaleY);
+        if (du < 0 || du >= depthW || dv < 0 || dv >= depthH) continue;
+
+        const uint16_t raw = *reinterpret_cast<const uint16_t*>(
+                rawDepth + dv * depthStride + du * 2);
+        const uint16_t depthMm = raw & 0x1FFFu;
+        if (depthMm == 0) continue;
+
+        float d = (float)depthMm / 1000.0f;
+        if (d > 5.0f) continue;
+
+        float u = kps[i].pt.x;
+        float v = kps[i].pt.y;
+        float xc = (u - cx_f) * d / fx;
+        float yc = -(v - cy_f) * d / fy;
+        float zc = -d;
+
+        float xw = view[0]*xc + view[4]*yc + view[8]*zc  + view[12];
+        float yw = view[1]*xc + view[5]*yc + view[9]*zc  + view[13];
+        float zw = view[2]*xc + view[6]*yc + view[10]*zc + view[14];
+
+        wallPts.push_back(cv::Point3f(xw, yw, zw));
+        wallDescs.push_back(descs.row(i));
+    }
+
+    env->ReleaseFloatArrayElements(intrinsicsArray, intr, JNI_ABORT);
+    env->ReleaseFloatArrayElements(viewMatArray, view, JNI_ABORT);
+
+    if (wallPts.empty()) return nullptr;
+
+    gSlamEngine->restoreWallFingerprint(wallDescs, wallPts);
+
+    return buildFingerprintObject(env, kps, wallDescs, wallPts);
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerprint(
+        JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type, jfloatArray ptsArray) {
+    if (!gSlamEngine) return;
+
+    jbyte* descData = env->GetByteArrayElements(descArray, nullptr);
+    cv::Mat descriptors(rows, cols, type, descData);
+
+    jsize ptsLen = env->GetArrayLength(ptsArray);
+    jfloat* ptsData = env->GetFloatArrayElements(ptsArray, nullptr);
+
+    std::vector<cv::Point3f> points3d;
+    for (int i = 0; i < ptsLen; i += 3) {
+        points3d.push_back(cv::Point3f(ptsData[i], ptsData[i+1], ptsData[i+2]));
+    }
+
+    gSlamEngine->restoreWallFingerprint(descriptors, points3d);
+
+    env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
+    env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
 }
 
 JNIEXPORT void JNICALL
@@ -553,7 +596,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetAnchorTransform
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAddLayerFeatures(
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArtworkFingerprint(
         JNIEnv* env, jobject,
         jobject bitmap,
         jobject depthBuffer, jint depthW, jint depthH, jint depthStride,
@@ -572,8 +615,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAddLayerFeatures(
     jfloat* intr = env->GetFloatArrayElements(intrinsicsArray, nullptr);
     jfloat* view = env->GetFloatArrayElements(viewMatArray, nullptr);
 
-    // gSlamEngine->addLayerFeatures(composite, depthData, depthW, depthH, depthStride,
-    //                               intr, view);
+    gSlamEngine->setArtworkFingerprint(composite, depthData, depthW, depthH, depthStride,
+                                       intr, view);
 
     env->ReleaseFloatArrayElements(intrinsicsArray, intr, JNI_ABORT);
     env->ReleaseFloatArrayElements(viewMatArray, view, JNI_ABORT);
