@@ -2,7 +2,7 @@
 
 ## Versioner som stöds
 
-Använd det här avsnittet för att berätta för andra om vilka versioner av ditt projekt är
+Använd det här avsnittet för att berätta för andra om vilka versioner av ditt projekt som
 stöds för närvarande med säkerhetsuppdateringar.
 | Version | Stöds |
 | ------- | ------------------ |
