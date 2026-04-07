@@ -1,0 +1,637 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+
+    <string name="app_name">GraffitiXR</string>
+
+
+    <string name="nav_modes">Modi</string>
+
+    <string name="nav_modes_info">Schakel tussen de modi AR-projectie, overlay, mockup en trace.</string>
+
+
+    <string name="nav_ar_mode">AR</string>
+
+    <string name="nav_ar_mode_info">Projecteer uw kunstwerk op een echte muur met behulp van augmented reality. Scan eerst de muur om het anker te plaatsen en voeg vervolgens uw ontwerplagen toe.</string>
+
+
+    <string name="nav_overlay">Overlay</string>
+
+    <string name="nav_overlay_info">Leg uw ontwerp over de live camerafeed zonder AR-verankering. Ideaal voor snelle inlijsting en plaatsingscontroles.</string>
+
+
+    <string name="nav_mockup">Mock-up</string>
+
+    <string name="nav_mockup_info">Bekijk een voorbeeld van uw ontwerp, samengesteld op een foto van een muur. Geen camera of scannen vereist.</string>
+
+
+    <string name="nav_trace">Spoor</string>
+
+    <string name="nav_trace_info">Gebruik uw ontwerp als een lichttafel-overlay om referentielijnen op een fysiek oppervlak te tekenen.</string>
+
+    <string name="nav_trace_mode">Lichtbak</string>
+
+
+    <string name="nav_canvas">Canvas</string>
+
+    <string name="nav_mural">Muurschildering</string>
+
+    <string name="nav_scan_mode_toggle_info">Schakel tussen Canvas (geoptimaliseerd voor kleinere kunst op bureauschaal) en Mural (geoptimaliseerd voor grootschalige muren en Gaussiaanse splatting).</string>
+
+
+    <string name="nav_stencil">Stencil</string>
+
+    <string name="nav_stencil_info">Genereer afdrukbare meerlaagse stencils van uw illustraties. Elke laag wordt afgedrukt als tegels met alleen een omtrek die geschikt zijn voor US Letter-papier.</string>
+
+
+    <string name="nav_grid">Doel</string>
+
+    <string name="nav_grid_info">Creëer en beheer AR-ankerdoelen. Maak een foto van geschilderde referentiemarkeringen op de muur om de projectie op zijn plaats te vergrendelen.</string>
+
+
+    <string name="nav_surveyor">Vragenlijst</string>
+
+    <string name="nav_surveyor_info">Breng het muuroppervlak in kaart om de nauwkeurigheid van AR-tracking te verbeteren.</string>
+
+
+    <string name="nav_create">Creëren</string>
+
+    <string name="nav_create_info">Fotografeer een referentiemarkering op de muur om een ​​nieuw AR-anker te creëren. De app volgt deze markering om uw projectie uitgelijnd te houden.</string>
+
+
+    <string name="nav_refine">Verfijnen</string>
+
+    <string name="nav_refine_info">Verfijn de positie van een bestaand AR-ankerdoel.</string>
+
+
+    <string name="nav_update">Voortgang</string>
+
+    <string name="nav_update_info">Markeer voltooide delen van uw muurschildering om de voortgang van het schilderen te volgen.</string>
+
+
+    <string name="nav_design">Ontwerp</string>
+
+    <string name="nav_design_info">Ontwerplagen toevoegen en beheren. Elke laag kan een geïmporteerde afbeelding of een tekening uit de vrije hand zijn.</string>
+
+
+    <string name="nav_open">Open</string>
+
+    <string name="nav_open_info">Voeg een afbeelding uit je galerij toe als nieuwe laag.</string>
+
+
+    <string name="nav_wall">Muur</string>
+
+    <string name="nav_wall_info">Vervang de achtergrondmuurfoto die in de Mockup-modus wordt gebruikt.</string>
+
+
+    <string name="nav_isolate">Isoleren</string>
+
+    <string name="nav_isolate_info">Verwijder automatisch de achtergrond uit deze laag, zodat alleen het onderwerp op een transparante achtergrond overblijft.</string>
+
+
+    <string name="nav_invert">Omkeren</string>
+
+    <string name="nav_invert_info">Maak een negatief van de huidige laag. Zwart wordt wit en kleuren worden omgedraaid naar hun tegenpolen – handig voor stencil- en overlay-analyse.</string>
+
+
+    <string name="nav_outline">Overzicht</string>
+
+    <string name="nav_outline_info">Converteer deze laag naar zwarte lijntekeningen op een transparante achtergrond — ideaal voor het maken van stencilsjablonen.</string>
+
+
+    <string name="nav_adjust">Aanpassen</string>
+
+    <string name="nav_adjust_info">Verfijn de helderheid, het contrast, de verzadiging en de kleurbalans voor deze laag.</string>
+
+
+    <string name="nav_balance">Kleur</string>
+
+    <string name="nav_balance_info">Tint de laagkleuren met behulp van de rode, groene en blauwe kanaalschuifregelaars.</string>
+
+
+    <string name="nav_blending">Mengen</string>
+
+    <string name="nav_blending_info">Blader door de overvloeimodi (Normaal, Vermenigvuldigen, Scherm, Overlay...) om te bepalen hoe deze laag wordt samengesteld met de onderliggende lagen.</string>
+
+
+    <string name="nav_settings">Instellingen</string>
+
+    <string name="nav_settings_info">Configureer handigheid, AR-scanmodus, eenheden en andere app-voorkeuren.</string>
+
+
+    <string name="nav_project">Project</string>
+
+    <string name="nav_project_info">Beheer uw project: maak, bewaar, laad en exporteer.</string>
+
+
+    <string name="nav_new">Nieuw</string>
+
+    <string name="nav_new_info">Start een nieuw leeg project. Alle niet-opgeslagen wijzigingen gaan verloren.</string>
+
+
+    <string name="nav_save">Redden</string>
+
+    <string name="nav_save_info">Sla het huidige project op uw apparaat op.</string>
+
+
+    <string name="nav_load">Laden</string>
+
+    <string name="nav_load_info">Open de projectbibliotheek om een ​​eerder opgeslagen project te laden.</string>
+
+
+    <string name="nav_export">Exporteren</string>
+
+    <string name="nav_export_info">Exporteer een platte samengevoegde afbeelding van alle zichtbare lagen naar uw fotogalerij.</string>
+
+
+    <string name="nav_help">Hulp</string>
+
+    <string name="nav_help_info">Tik op een willekeurige knop terwijl Help actief is om te zien wat deze doet.</string>
+
+
+    <string name="nav_light">Licht</string>
+
+    <string name="nav_light_info">Schakel de zaklamp van het apparaat in om uw muur te verlichten terwijl u bij weinig licht werkt.</string>
+
+
+    <string name="nav_lock">Slot</string>
+
+    <string name="nav_lock_info">Vergrendel het touchscreen om onbedoelde wijzigingen tijdens het spuiten te voorkomen. Tik driemaal ergens om te ontgrendelen.</string>
+
+
+
+    <string name="info_brush">Schilder met de vrije hand streken op deze laag. Sleep de knop Grootte omhoog/omlaag om de penseeldiameter te wijzigen; sleep naar links/rechts om de doezeling (randzachtheid) aan te passen.</string>
+
+    <string name="info_eraser">Gum delen van deze laag weg met een ronde borstel. Sleep de knop Grootte omhoog/omlaag om de diameter te wijzigen; sleep naar links/rechts om de doezeling aan te passen.</string>
+
+    <string name="info_blur">Smeer en verzacht delen van deze laag. Sleep over een gebied om het te vervagen.</string>
+
+    <string name="info_liquify">Duw en vervorm pixels in elke richting. Sleep over een gebied om het te vervormen: handig om de verhoudingen aan te passen.</string>
+
+    <string name="info_dodge">Verlicht specifieke gebieden door eroverheen te schilderen.</string>
+
+    <string name="info_burn">Maak specifieke gebieden donkerder door eroverheen te schilderen.</string>
+
+    <string name="info_size">Sleep omhoog/omlaag om de borsteldiameter te wijzigen. Sleep naar links/rechts om de doezeling aan te passen; een bredere doezelaar geeft zachtere, meer spuitbusachtige randen.</string>
+
+    <string name="info_color">Toont de actieve penseelkleur. Sleep omhoog/omlaag om de lichtheid aan te passen; sleep naar links/rechts om de verzadiging aan te passen. Tik om het volledige kleurenwiel te openen.</string>
+
+    <string name="info_draw">Voeg een nieuwe lege transparante laag toe voor tekenen uit de vrije hand.</string>
+
+    <string name="info_keyframe">Sla de huidige AR-camerapositie op als keyframe. Wordt gebruikt om de drift te corrigeren en de projectie opnieuw uit te lijnen na het weggaan en terugkeren.</string>
+
+    <string name="info_layer">Deze laag. Tik om het te activeren. Open de horizontale rail om toegang te krijgen tot het gereedschap. Houd ingedrukt en sleep om de volgorde te wijzigen.</string>
+
+
+
+    <string name="stencil_layers">Lagen</string>
+
+    <string name="stencil_layers_info">Kies hoeveel stencillagen u wilt genereren: 1 (alleen silhouet), 2 (silhouet + hoogtepunt) of 3 (silhouet + middentoon + hoogtepunt).</string>
+
+
+    <string name="stencil_rebuild">Herbouwen</string>
+
+    <string name="stencil_rebuild_info">Voer de pijplijn voor het genereren van stencils opnieuw uit op de huidige bronlaag.</string>
+
+
+    <string name="stencil_print">Afdrukken</string>
+
+    <string name="stencil_print_info">Configureer het afdrukformaat in de echte wereld en genereer een naast elkaar geplaatste PDF voor US Letter-papier.</string>
+
+
+    <string name="stencil_print_size">Maat</string>
+
+    <string name="stencil_print_size_info">Sleep omhoog/omlaag om de werkelijke breedte of hoogte van het stencil in centimeters in te stellen. Live updates van het aantal pagina\'s.</string>
+
+
+    <string name="stencil_print_dim_toggle">W / H</string>
+
+    <string name="stencil_print_dim_toggle_info">Tik om te schakelen tussen het vergrendelen van de breedte of de hoogte van de uitvoer.</string>
+
+
+    <string name="stencil_export_pdf">PDF afdrukken</string>
+
+    <string name="stencil_export_pdf_info">Genereer een samengevoegde PDF van alle stencillagen, klaar om af te drukken en te snijden. Elke tegel heeft een overlap van 3 mm voor de uitlijning van de montage.</string>
+
+
+    <string name="stencil_save_layers">PNG\'s opslaan</string>
+
+    <string name="stencil_save_layers_info">Sla elke stencillaag op als een afzonderlijke PNG-afbeelding in uw galerij.</string>
+
+
+    <string name="stencil_back">← Redacteur</string>
+
+    <string name="stencil_back_info">Keer terug naar de hoofdeditor. Uw stencillagen blijven behouden in de sessie.</string>
+
+
+    <string name="nav_text">Tekst</string>
+
+    <string name="nav_draw">Tekenen</string>
+
+    <string name="nav_edit">Bewerking</string>
+
+    <string name="nav_font">Lettertype</string>
+
+    <string name="nav_size">Maat</string>
+
+    <string name="nav_color">Kleur</string>
+
+    <string name="nav_kern">Kern</string>
+
+    <string name="nav_bold">Vetgedrukt</string>
+
+    <string name="nav_italic">Cursief</string>
+
+    <string name="nav_shadow">Schaduw</string>
+
+    <string name="nav_eraser">Gom</string>
+
+    <string name="nav_blur">Vervagen</string>
+
+    <string name="nav_liquify">Uitvloeien</string>
+
+    <string name="nav_dodge">Slimmigheidje</string>
+
+    <string name="nav_burn">Brandwond</string>
+
+
+
+    <string name="pro_tip">Pro-tip</string>
+    <string name="double_tap_hint">Dubbeltik om van rotatie-as te wisselen.</string>
+    <string name="ok_button">OK</string>
+
+    <string name="generating">GENEREREN...</string>
+
+    <string name="stencil_hint">Druk nogmaals op om een ​​laag toe te voegen.</string>
+
+    <string name="rename_hint">Hernoemen</string>
+
+    <string name="edit_text_hint">Tekst bewerken</string>
+
+    <string name="copy_edits">Kopieer bewerkingen</string>
+
+    <string name="paste_edits">Bewerkingen plakken</string>
+
+    <string name="generate_poster">Genereer een poster</string>
+
+    <string name="duplicate">Duplicaat</string>
+
+    <string name="unlink_layer">Laag ontkoppelen</string>
+
+    <string name="link_layer">Linklaag</string>
+
+    <string name="hide_layer">Laag verbergen</string>
+
+    <string name="show_layer">Laag tonen</string>
+
+    <string name="flatten_all">Maak alles plat</string>
+
+    <string name="delete">Verwijderen</string>
+    <string name="new_project_name">Nieuw project</string>
+
+    <string name="lock_button">Slot</string>
+
+    <string name="freeze_button">Bevriezen</string>
+
+
+    <string name="wall_source_title">Kies Muurfoto</string>
+
+    <string name="wall_source_text">Hoe wil je de achtergrondmuur plaatsen?</string>
+
+    <string name="take_photo">Maak een foto</string>
+
+    <string name="choose_from_gallery">Kies uit Galerij</string>
+
+
+    <string name="depth_unsupported">Dit apparaat ondersteunt de Depth API niet.\nSchakel naar Canvas-modus in Instellingen.</string>
+
+
+    <string name="arcore_required_title">ARCore is vereist</string>
+
+    <string name="arcore_required_text">Op dit apparaat is geen ARCore geïnstalleerd of wordt niet ondersteund. Installeer ARCore vanuit de Play Store om AR-functies te gebruiken.</string>
+
+    <string name="install_arcore">Installeer ARCore</string>
+
+
+    <string name="camera_permission_required">Voor de AR-modus is cameratoestemming vereist.</string>
+
+    <string name="open_settings">Instellingen openen</string>
+
+
+    <string name="target_creation_title">DOEL CREATIE</string>
+
+    <string name="target_creation_text">Tik rechtstreeks op uw geschilderde referentiemerken op het scherm. De app zal ze onmiddellijk isoleren.</string>
+
+    <string name="cancel">Annuleren</string>
+
+
+    <string name="diag_copied">GEKOPIEERD ✓</string>
+
+    <string name="diag_title">DIEPTEDIAG (tik om te kopiëren)</string>
+
+    <string name="diag_waiting">Wachten op het eerste frame…</string>
+
+
+    <string name="scan_step_1">Stap 1: Breng uw omgeving in kaart</string>
+
+    <string name="scan_step_2">Stap 2: Scan de doelmuur</string>
+
+
+    <string name="plane_confirm_question">Hangt het kunstwerk op de juiste muur?</string>
+
+    <string name="looks_correct">Ziet er correct uit</string>
+
+    <string name="redetect">Opnieuw detecteren</string>
+
+
+    <string name="plane_realignment_title">Detecteer het muuroppervlak opnieuw</string>
+
+    <string name="plane_realignment_text">Het anker wordt geplaatst vanaf de plek waar u stond toen u de vangst deed. ARCore kiest het gevolgde verticale oppervlak het meest direct voor die oorspronkelijke positie.\n\n1. Keer terug naar ongeveer waar u stond tijdens het vastleggen\n2. Draai de camera langzaam over uw muurschildering zodat ARCore deze als een vlak oppervlak kan registreren\n3. Blijf stabiel met je gezicht naar het kunstwerk gericht en tik vervolgens hieronder\n\nDe oranje rand springt naar het nieuw gedetecteerde oppervlak.</string>
+
+    <string name="use_this_wall">Gebruik deze muur</string>
+
+
+    <string name="scanning_dots">Scannen\u2026</string>
+
+    <string name="matched_percent">%1$d%% komt overeen</string>
+
+    <string name="anchor_locked">Anker vergrendeld</string>
+
+
+    <string name="choose_font">Kies Lettertype</string>
+
+
+    <string name="cancel_button">Annuleren</string>
+    <string name="done_button">Klaar</string>
+    <string name="apply_button">Toepassen</string>
+    <string name="close_button">Dichtbij</string>
+    <string name="next_button">Volgende</string>
+    <string name="save_button">Redden</string>
+    <string name="retake_button">Opnieuw nemen</string>
+    <string name="capture_button">Vastlegging</string>
+
+
+    <string name="adj_detail">Detail</string>
+    <string name="adj_opacity">Dekking</string>
+    <string name="adj_brightness">Helderheid</string>
+    <string name="adj_contrast">Contrast</string>
+    <string name="adj_saturation">Verzadiging</string>
+    <string name="adj_red">Rood</string>
+    <string name="adj_green">Groente</string>
+    <string name="adj_blue">Blauw</string>
+    <string name="adj_undo">Ongedaan maken</string>
+    <string name="adj_redo">Opnieuw uitvoeren</string>
+    <string name="adj_magic_align">Magisch uitlijnen</string>
+
+
+    <string name="status_create_grid">Maak een raster om te beginnen.</string>
+    <string name="status_scan_surfaces">Scan oppervlakken om u heen.</string>
+    <string name="status_tap_surface">Tik op een oppervlak om het anker te plaatsen.</string>
+    <string name="status_looking_grid">Op zoek naar jouw raster...</string>
+    <string name="status_ready">Klaar. (%1$d punten)</string>
+    <string name="unlock_hint">Tik 4 keer om te ontgrendelen</string>
+
+
+    <string name="lib_app_title">GraffitiXR</string>
+    <string name="lib_app_description">Projecteer uw kunstwerk op een echte muur of een canvas met behulp van AR of een eenvoudige camera-overlay. \n\nMaak snel een mockup op een foto om te laten zien hoe het voltooide werk eruit zal zien. \n\nOf trek een afbeelding over op papier door uw apparaat als lightbox te gebruiken.</string>
+    <string name="lib_new_project">Nieuw</string>
+    <string name="lib_import_project">Importeren</string>
+    <string name="lib_no_projects">Nog geen projecten</string>
+    <string name="lib_no_projects_hint">Tik hierboven op Nieuw om uw eerste muurschildering te starten.\n\nU wordt naar de editor geleid waar u het volgende kunt doen:\n  \u2022 Voeg illustraties toe via het Ontwerpmenu\n  \u2022 Schakel over naar de AR-modus om op een echte muur te projecteren\n  \u2022 Gebruik Overlay om uw ontwerp op de live camera te laten verschijnen\n  \u2022 Gebruik Mockup om een voorbeeld op een muurfoto te bekijken\n  \u2022 Gebruik Lightbox om uw ontwerp op papier over te trekken</string>
+    <string name="lib_project_thumbnail">Projectminiatuur</string>
+    <string name="lib_delete_project_desc">Verwijder project %1$s</string>
+
+
+    <string name="settings_title">Instellingen</string>
+    <string name="settings_preferences_section">Voorkeuren</string>
+    <string name="settings_hand_label">Dominante hand</string>
+    <string name="settings_hand_right">Rechts</string>
+    <string name="settings_hand_left">Links</string>
+    <string name="settings_diag_label">Dieptediagnostische overlay</string>
+    <string name="settings_on">Op</string>
+    <string name="settings_off">Uit</string>
+    <string name="settings_scan_mode_label">AR-scanmodus</string>
+    <string name="settings_scan_mode_point_cloud">Puntenwolk</string>
+    <string name="settings_scan_mode_gaussian_splat">Gaussiaanse splat</string>
+    <string name="settings_anchor_boundary_label">Ankergrens weergeven</string>
+    <string name="settings_units_label">Afstandseenheden</string>
+    <string name="settings_units_imperial">Imperiaal (ft)</string>
+    <string name="settings_units_metric">Metrisch (m)</string>
+    <string name="settings_canvas_bg_label">Doek Achtergrond</string>
+    <string name="settings_info_section">App-informatie</string>
+    <string name="settings_version_label">Versie</string>
+    <string name="settings_updates_section">Updates</string>
+    <string name="settings_check_updates_label">Controleer op experimentele updates</string>
+    <string name="settings_install_update_label">Update installeren</string>
+    <string name="settings_permissions_section">Machtigingen</string>
+    <string name="settings_camera_access">Cameratoegang</string>
+    <string name="settings_photo_access">Toegang tot fotobibliotheek</string>
+    <string name="settings_notifications">Meldingen</string>
+    <string name="settings_granted">Toegekend</string>
+    <string name="settings_denied">Geweigerd</string>
+    <string name="settings_open_app_settings">Open App-instellingen</string>
+    <string name="settings_copyright">GraffitiXR © 2025</string>
+
+
+    <string name="layers_title">Lagen</string>
+    <string name="brush_size_title">Penseelgrootte</string>
+    <string name="save_project_hint">Projectnaam</string>
+
+
+    <string name="target_guide_desc">Gids voor doeluitlijning</string>
+    <string name="target_captured_desc">Gevangen doel</string>
+    <string name="target_review_desc">Bekijk het geëxtraheerde doel</string>
+    <string name="target_unwarp_hint">Versleep hoeken om de vervorming te herstellen</string>
+    <string name="target_review_title">Bekijk de geëxtraheerde markeringen</string>
+
+    <string name="target_exclude">Uitsluiten</string>
+    <string name="target_include">Erbij betrekken</string>
+    <string name="target_erase_marks">Wis markeringen</string>
+    <string name="target_show_features">Kenmerken tonen</string>
+    <string name="reset_button">Opnieuw instellen</string>
+
+    <string name="poster_title">GENEREER POSTER</string>
+    <string name="poster_select_layers">Selecteer lagen om op te nemen:</string>
+    <string name="poster_physical_size">Fysieke maat (breedte in mm):</string>
+    <string name="poster_generate_pdf">GENEREER PDF</string>
+
+
+    <string name="scan_hint_recover">Beweeg het apparaat langzaam om de tracking te herstellen</string>
+    <string name="scan_hint_ambient">Draai langzaam 360° om uw omgeving in kaart te brengen (%1$d°)</string>
+    <string name="scan_hint_too_dark">Te donker. Zet de zaklamp aan.</string>
+    <string name="scan_hint_build_map">Loop naar links en rechts om een ​​kaart te bouwen</string>
+    <string name="scan_hint_closer">Ga dichter bij de muur staan</string>
+    <string name="scan_hint_higher_lower">Scan hoger en lager</string>
+
+
+    <string name="desc_bg_mockup">Achtergrondmodel</string>
+    <string name="desc_segmentation_preview">Segmentatievoorbeeld</string>
+
+
+
+    <string name="help_mode_host">Modusschakelaar: schakel tussen app-modi. Instructies: Tik om uit te vouwen en selecteer vervolgens AR, Overlay, Mockup of Lightbox.</string>
+
+    <string name="help_ar">AR-modus: Projecteer ontwerp op een muur met behulp van ruimtelijke kaarten. Instructies: Scan de omgeving totdat de muur wordt gedetecteerd en tik vervolgens om het anker te plaatsen.</string>
+
+    <string name="help_overlay">Overlaymodus: weergaveontwerp via livecamera zonder ruimtelijke tracking. Instructies: Schaal en verplaats het ontwerp handmatig zodat het in uw frame past.</string>
+
+    <string name="help_mockup">Mockup-modus: bekijk een voorbeeld van het ontwerp op een statische foto. Instructies: Gebruik \'Muur\' om een ​​achtergrondafbeelding in te stellen en plaats vervolgens de lagen erbovenop.</string>
+
+    <string name="help_trace">Lightbox-modus: traceeroppervlak met hoge helderheid. Instructies: Plaats papier over het scherm en trek over. Tik driemaal ergens om af te sluiten.</string>
+
+    <string name="help_target_host">Doelbeheer: hulpmiddelen voor AR-ankers. Instructies: Tik om toegang te krijgen tot hulpmiddelen voor het maken of opnieuw uitlijnen van de positie van de muurschildering.</string>
+
+    <string name="help_scan_mode_toggle">Scanresolutie: Schakel tussen Muurschildering (grootschalig) en Canvas (kleinschalig). Muurschildering gebruikt Gaussiaanse markeringen voor muren; Canvas gebruikt puntenwolken voor gedetailleerde kunst op bureauschaal.</string>
+
+    <string name="help_create">Anker maken: Maak een foto van een markering op de muur om de projectie te vergrendelen. Instructies: Wijs naar een duidelijke textuur en tik erop. De app houdt deze markering bij.</string>
+
+    <string name="help_design_host">Laagbeheer: voeg afbeeldingen, tekst of schetsen toe. Instructies: Tik om uit te vouwen. Druk lang op een laagknop om het secundaire menu te openen.</string>
+
+    <string name="help_add_img">Afbeelding importeren: Voeg een schets- of referentiefoto toe. Instructies: Selecteer een afbeelding uit uw galerij. Het zal verschijnen als een nieuwe ontwerplaag.</string>
+
+    <string name="help_add_draw">Nieuwe schets: voeg een lege laag toe voor tekenen uit de vrije hand. Instructies: Selecteer de laag om de gereedschappen Penseel, Gum en Uitsmeren weer te geven.</string>
+
+    <string name="help_add_text">Tekst toevoegen: Maak een typografielaag. Instructies: Tik op de knop \'Bewerken\' van de laag om de inhoud en opmaak te wijzigen.</string>
+
+    <string name="help_wall">Wand wijzigen: stel de achtergrond in voor de Mockup-modus. Instructies: Selecteer een foto van de fysieke muur waarop u wilt schilderen.</string>
+
+    <string name="help_project_host">Projectbeheer: werk opslaan, laden en exporteren. Instructies: Tik om toegang te krijgen tot administratieve taken voor uw muurschildering.</string>
+
+    <string name="help_new">Nieuw project: start een nieuwe muurschildering. Instructies: Tik om te resetten. Waarschuwing: hiermee wordt al het huidige werk gewist. Bespaar eerst!</string>
+
+    <string name="help_save">Project opslaan: muurschildering en AR-kaart opslaan. Instructies: Voer een projectnaam in en tik op Opslaan om uw voortgang te bewaren.</string>
+
+    <string name="help_load">Projectbibliotheek: toegang tot opgeslagen muurschilderingen. Instructies: Blader door de bibliotheek om het werk te hervatten of gedeelde projectbestanden te importeren.</string>
+
+    <string name="help_export">Afbeelding exporteren: momentopname met hoge resolutie opslaan. Instructies: Rendert alle zichtbare lagen in één PNG in uw fotogalerij.</string>
+
+    <string name="help_settings">App-instellingen: Configureer voorkeuren. Instructies: Openen om handigheid, eenheden en scanparameters aan te passen.</string>
+
+    <string name="help_light">Zaklamp: Schakel apparaat-LED in. Instructies: Gebruik dit om donkere muren te verlichten voor betere AR-tracking.</string>
+
+    <string name="help_lock_trace">Vergrendelen/bevriezen: Voorkom onbedoelde wijzigingen. Instructies: Schakelt in de Trace-modus het scherm uit. In andere modi worden laagtransformaties vergrendeld.</string>
+
+    <string name="help_help_main">Interactieve Help: legt de knopfuncties uit. Instructies: Tik om te activeren (cyaan). Terwijl actief, tikt u op een willekeurige knop om de helptekst ervan te bekijken.</string>
+
+    <string name="help_layer">Laag \'%1$s\': Actief muurschilderingelement. Instructies: Tik om te selecteren. Sleep de knop omhoog/omlaag om de volgorde te wijzigen. Transformeer op het scherm met gebaren.</string>
+
+
+
+    <string name="help_edit_text">Tekst bewerken: verander woorden in de typografielaag. Instructies: Tik om het toetsenbord te openen en de tekstinhoud bij te werken.</string>
+
+    <string name="help_size">Penseel-/tekstgrootte: pas de schaal en zachtheid aan. Instructies: Sleep omhoog/omlaag voor de maat. Sleep naar links/rechts voor penseelbevedering.</string>
+
+    <string name="help_font">Lettertypekiezer: Selecteer typografiestijl. Instructies: Tik om door de beschikbare lettertypen te bladeren en deze op de tekstlaag toe te passen.</string>
+
+    <string name="help_color">Kleurtool: actieve kleur instellen. Instructies: Sleep omhoog/omlaag voor helderheid, naar links/rechts voor verzadiging. Tik voor het volledige kleurenwiel.</string>
+
+    <string name="help_kern">Tekstspatiëring: Pas de letterafstand aan. Instructies: Sleep naar links/rechts om de tekstlay-out strakker of losser te maken.</string>
+
+    <string name="help_bold">Vet schakelen: dik lettertype. Instructies: Tik om de vetgedrukte stijl op de actieve tekstlaag in of uit te schakelen.</string>
+
+    <string name="help_italic">Cursief schakelen: schuine styling. Instructies: Tik om de cursieve stijl op de actieve tekstlaag in of uit te schakelen.</string>
+
+    <string name="help_outline">Tekstoverzicht: tekenstreek. Instructies: Tik om te schakelen tussen een zichtbare omtrek rond de teksttekens.</string>
+
+    <string name="help_shadow">Slagschaduw: tekstdiepte. Instructies: Tik om een ​​zachte schaduw achter de typografie in te schakelen voor een betere leesbaarheid.</string>
+
+    <string name="help_stencil_gen">Genereer stencil: maak afdrukbare sjablonen. Instructies: Tik op om het genereren van meerlaagse stencils voor deze afbeelding te starten.</string>
+
+    <string name="help_blend">Mengmodus: samengestelde stijl. Instructies: Tik om door modi zoals Vermenigvuldigen, Scherm en Overlay te bladeren.</string>
+
+    <string name="help_adj">Beeldaanpassingen: Pas het uiterlijk aan. Instructies: Tik om schuifregelaars voor Dekking, Helderheid, Contrast en Verzadiging weer te geven.</string>
+
+    <string name="help_invert">Kleuren omkeren: negatief met hoog contrast. Instructies: Tik om kleuren om te draaien. Blanken worden zwart en omgekeerd – handig voor tracering.</string>
+
+    <string name="help_balance">Kleurbalans: RGB-kanaalafstemming. Instructies: Tik om schuifregelaars weer te geven voor nauwkeurige aanpassing van Rood, Groen en Blauw.</string>
+
+    <string name="help_eraser">Gumpenseel: verwijder de laaginhoud. Instructies: Verf op het scherm om te wissen. Gebruik de knop \'Grootte\' om de diameter aan te passen.</string>
+
+    <string name="help_blur">Gereedschap Vervagen/vlekken: kleuren mengen. Instructies: Verf over gebieden om randen te verzachten of details samen te vegen.</string>
+
+    <string name="help_liquify">Verdraaitool: ontwerp opnieuw vormgeven. Instructies: Sleep op het scherm om pixels te duwen en te trekken, ideaal voor het aanpassen van de verhoudingen.</string>
+
+    <string name="help_dodge">Dodge Tool: gebieden lichter maken. Instructies: Verf delen van de laag om de helderheid ervan te vergroten.</string>
+
+    <string name="help_burn">Gereedschap Branden: gebieden donkerder maken. Instructies: Verf over delen van de laag om de helderheid ervan te verminderen.</string>
+
+    <string name="help_iso">Isoleer onderwerp: automatische achtergrondverwijdering. Instructies: Tik om het hoofdonderwerp uit de achtergrond te halen met behulp van AI.</string>
+
+    <string name="help_line">Schetsoverzicht: lijntekeningenfilter. Instructies: Tik op om de foto om te zetten in een zwart-wit transparante omtrek.</string>
+
+    <string name="help_help_layer">Hulp voor lagen: schakel informatie voor deze specifieke laaggereedschappen in. Instructies: Tik om te activeren. Tik vervolgens op een gereedschapspictogram om te zien wat het doet.</string>
+
+
+
+    <string name="unit_feet">ft</string>
+
+    <string name="unit_centimeters">cm</string>
+
+    <string name="unit_meters">M</string>
+
+    <string name="tut_ar_title">AR-projectie</string>
+    <string name="tut_ar_text">Projecteert uw ontwerp op een echte muur met behulp van de dieptesensor en ruimtelijke tracking van de telefoon.</string>
+    <string name="tut_ar_step1_title">Stap 1: Scannen</string>
+    <string name="tut_ar_step1_text">Wijs naar de muur en beweeg langzaam heen en weer. Er verschijnen gekleurde vlekken terwijl de motor het oppervlak in kaart brengt. Wacht tot de splats het muurgedeelte bedekken.</string>
+    <string name="tut_ar_step2_title">Stap 2: Tik om te plaatsen</string>
+    <string name="tut_ar_step2_text">Tik gewoon op het scherm. De app fotografeert de muur, extraheert trackingfuncties en vergrendelt het anker onmiddellijk.</string>
+    <string name="tut_ar_step3_title">Stap 3: Voeg uw kunstwerk toe</string>
+    <string name="tut_ar_step3_text">Druk op \'Ontwerpen\' om toegang te krijgen tot uw laaggereedschappen. Gebruik \'Afbeelding\' om foto\'s te importeren, \'Tekenen\' om te schetsen of \'Tekst\' om te typen.</string>
+    <string name="tut_ar_tip_title">Tip: textuur is belangrijk</string>
+    <string name="tut_ar_tip_text">Blanke witte muren, glad beton en effen oppervlakken laten zich niet volgen. Richt uw ankerpunt op graffiti, ruw gips of een ander duidelijk merkteken.</string>
+
+
+    <string name="tut_overlay_title">Live-overlay</string>
+    <string name="tut_overlay_text">Uw ontwerp zweeft over het live camerabeeld – er is geen oppervlaktescan nodig.</string>
+    <string name="tut_overlay_step1_title">Stap 1: Voeg uw kunstwerk toe</string>
+    <string name="tut_overlay_step1_text">Druk op \'Ontwerpen\' om toegang te krijgen tot laaggereedschappen. Gebruik \'Afbeelding\' om foto\'s te importeren, \'Tekenen\' om te schetsen of \'Tekst\' om te typen.</string>
+    <string name="tut_overlay_step2_title">Stap 2: Plaats het</string>
+    <string name="tut_overlay_step2_text">Knijp om te schalen, sleep om te verplaatsen. De overlay blijft op uw scherm zitten. Doe een stap achteruit om te zien hoe deze op de muur past.</string>
+
+
+    <string name="tut_mockup_title">Fotomodel</string>
+    <string name="tut_mockup_text">Bekijk een voorbeeld van uw ontwerp op een foto voordat u ooit een penseel oppakt.</string>
+    <string name="tut_mockup_step1_title">Stap 1: Plaats de muur</string>
+    <string name="tut_mockup_step1_text">Open \'Ontwerp\' en tik op \'Muur\' om een ​​foto van uw oppervlak te kiezen of te maken. Doe dit eerst!</string>
+    <string name="tut_mockup_step2_title">Stap 2: Voeg uw kunstwerk toe</string>
+    <string name="tut_mockup_step2_text">Gebruik \'Afbeelding\', \'Tekenen\' of \'Tekst\' om lagen bovenop de muur toe te voegen. Knijp en sleep ze op maat en positioneer ze.</string>
+
+
+    <string name="tut_trace_title">Lightbox-modus</string>
+    <string name="tut_trace_text">Verandert uw scherm in een heldere lichtbak waarmee u uw ontwerp op papier kunt overtrekken.</string>
+    <string name="tut_trace_step1_title">Stap 1: Open het ontwerpmenu</string>
+    <string name="tut_trace_step1_text">Tik op \'Ontwerp\' om toegang te krijgen tot laagtools.</string>
+    <string name="tut_trace_step2_title">Stap 2: inhoud toevoegen</string>
+    <string name="tut_trace_step2_text">Gebruik \'Afbeelding\' om foto\'s te importeren, \'Tekenen\' om te schetsen of \'Tekst\' om te typen.</string>
+    <string name="tut_trace_step3_title">Stap 3: Traceren</string>
+    <string name="tut_trace_step3_text">Leg papier over het scherm en teken het over. Tik driemaal ergens om af te sluiten.</string>
+
+
+    <string name="tut_create_anchor_title">Anker maken</string>
+    <string name="tut_create_anchor_text">Vergrendelt uw projectie op een specifieke plek op de muur. Eenmaal ingesteld blijft het ontwerp op zijn plaats, zelfs als je rondloopt.</string>
+    <string name="tut_surface_req_title">Oppervlaktevereisten</string>
+    <string name="tut_surface_req_text">De muur heeft een zichtbare textuur nodig: graffiti, ruw gips, baksteen of stickers werken allemaal goed. Gladde, blanco of effen muren houden geen anker vast.</string>
+    <string name="tut_blobs_title">Wat de klodders betekenen</string>
+    <string name="tut_blobs_text">Nadat je hebt getikt, zie je kort groene vlekken. Dat zijn de tracking-keypoints die de app heeft geëxtraheerd. Meer klodders = sterker slot.</string>
+    <string name="tut_import_img_title">Afbeelding importeren</string>
+    <string name="tut_import_img_text">Voeg een schets, foto of referentie uit uw galerij toe. Het verschijnt als een nieuwe laag die bovenop de andere is gestapeld.</string>
+    <string name="tut_scale_pos_title">Schaal en positie</string>
+    <string name="tut_scale_pos_text">Knijp met twee vingers om het formaat te wijzigen. Sleep met één vinger om te herpositioneren. De laag klikt in de AR-modus vast op het geprojecteerde muuroppervlak.</string>
+    <string name="tut_lock_freeze_title">Vergrendelen/bevriezen</string>
+    <string name="tut_lock_freeze_text">In Lightbox-modus (Trace): schakelt aanraking uit, zodat u papier op het scherm kunt leggen zonder per ongeluk iets te verplaatsen.</string>
+    <string name="tut_in_other_modes_title">In andere modi</string>
+    <string name="tut_in_other_modes_text">In AR-, Overlay- en Mockup-modi: vergrendelt laagtransformaties zodat ontwerpen niet per ongeluk kunnen worden verplaatst of geschaald.</string>
+    <string name="tut_stencil_gen_title">Genereer een sjabloon</string>
+    <string name="tut_stencil_gen_text">Converteert uw afbeelding naar afdrukbare spuitverfstencils. Elk stencil vertegenwoordigt één kleurlaag van het ontwerp.</string>
+    <string name="tut_how_many_layers_title">Hoeveel lagen?</string>
+    <string name="tut_how_many_layers_text">Een 3-kleuren ontwerp levert 3 stencilvellen op. Meer kleuren = meer vellen. Eenvoudige afbeeldingen met hoog contrast geven de beste resultaten.</string>
+    <string name="tut_exporting_title">Exporteren</string>
+    <string name="tut_exporting_text">Elk stencil wordt geëxporteerd als PDF. Print op 100% schaal (geen schaalverdeling) voor nauwkeurige, levensgrote afmetingen.</string>
+    <string name="tut_opacity_brightness_title">Dekking en helderheid</string>
+    <string name="tut_opacity_brightness_text">De dekking bepaalt hoe transparant de laag is. Helderheid verschuift de algehele lichtheid – handig om de laag aan te passen aan de tint van uw muur.</string>
+    <string name="tut_contrast_saturation_title">Contrast en verzadiging</string>
+    <string name="tut_contrast_saturation_text">Contrast scheidt donkere en lichte tinten — ideaal om stencilcontouren te laten opvallen. Verzadiging regelt de kleurintensiteit; sleep naar nul voor grijstinten.</string>
+    <string name="tut_isolate_subject_title">Isoleer onderwerp</string>
+    <string name="tut_isolate_subject_text">Gebruikt AI om de achtergrond automatisch te verwijderen, waardoor alleen het hoofdonderwerp van de afbeelding overblijft.</string>
+    <string name="tut_best_results_title">Beste resultaten</string>
+    <string name="tut_best_results_text">Werkt het beste op foto\'s met een duidelijk onderwerp tegen een effen of contrasterende achtergrond. Complexe scènes met drukke achtergronden moeten mogelijk handmatig worden bijgewerkt met de gum.</string>
+</resources>
