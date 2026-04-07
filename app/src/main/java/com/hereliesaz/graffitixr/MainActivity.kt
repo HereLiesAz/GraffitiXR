@@ -508,8 +508,12 @@ class MainActivity : ComponentActivity() {
                     onscreen {
                         // Auto-show the mode tutorial on first visit using the v8.0 controller API.
                         // DataStore (completedTutorials) persists "seen" state across app restarts.
+                        // showLibrary is included as a key so the effect re-fires when the library
+                        // closes — without this guard the tutorial fires while the library is still
+                        // covering the editor, marking it "complete" before the user ever sees it.
                         val tutorialController = LocalAzTutorialController.current
-                        LaunchedEffect(editorUiState.editorMode, completedTutorials) {
+                        LaunchedEffect(editorUiState.editorMode, completedTutorials, showLibrary) {
+                            if (showLibrary) return@LaunchedEffect
                             val tutorialId = when (editorUiState.editorMode) {
                                 EditorMode.AR      -> "ar_mode"
                                 EditorMode.OVERLAY -> "overlay_mode"

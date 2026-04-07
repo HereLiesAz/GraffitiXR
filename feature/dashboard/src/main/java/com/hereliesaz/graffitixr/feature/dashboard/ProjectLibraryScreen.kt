@@ -14,9 +14,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -65,6 +68,28 @@ fun ProjectLibraryScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // App intro header — always visible above the action buttons
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "GraffitiXR",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Project your artwork onto real walls using AR, preview on photos, or trace on a lightbox.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center
+                )
+            }
+
             // New & Import Project Buttons
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
@@ -87,11 +112,31 @@ fun ProjectLibraryScreen(
             }
 
             if (projects.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 32.dp, start = 16.dp, end = 16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Top
+                ) {
                     Text(
-                        text = "No saved projects found.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.Gray
+                        text = "No projects yet",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Tap New above to start your first mural.\n\n" +
+                            "You'll be taken into the editor where you can:\n" +
+                            "  \u2022  Add artwork from the Design menu\n" +
+                            "  \u2022  Switch to AR mode to project onto a real wall\n" +
+                            "  \u2022  Use Overlay to float your design on the live camera\n" +
+                            "  \u2022  Use Mockup to preview on a wall photo\n" +
+                            "  \u2022  Use Lightbox to trace your design onto paper",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.65f),
+                        textAlign = TextAlign.Center
                     )
                 }
             } else {
