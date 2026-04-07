@@ -395,7 +395,7 @@
     <string name="status_tap_surface">表面をタップしてアンカーを配置します。</string>
     <string name="status_looking_grid">ターゲットを探しています...</string>
     <string name="status_ready">準備完了。 (%1$d pts)</string>
-    <string name="unlock_hint">4回タップしてロック解除</string>
+    <string name="unlock_hint">3回タップしてロック解除</string>
 
 
     <string name="lib_app_title">GraffitiXR</string>
