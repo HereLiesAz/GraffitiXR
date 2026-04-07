@@ -363,7 +363,7 @@
     <string name="cancel_button">Avboka</string>
     <string name="done_button">Gjort</string>
     <string name="apply_button">Tillämpas</string>
-    <string name="close_button">Nära</string>
+    <string name="close_button">Stäng</string>
     <string name="next_button">Nästa</string>
     <string name="save_button">Spara</string>
     <string name="retake_button">Ta om</string>
