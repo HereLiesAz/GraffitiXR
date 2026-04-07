@@ -403,6 +403,7 @@
     <!-- Settings Screen -->
     <string name="settings_title">Settings</string>
     <string name="settings_preferences_section">Preferences</string>
+    <string name="settings_language_label">Language</string>
     <string name="settings_hand_label">Dominant Hand</string>
     <string name="settings_hand_right">Right</string>
     <string name="settings_hand_left">Left</string>

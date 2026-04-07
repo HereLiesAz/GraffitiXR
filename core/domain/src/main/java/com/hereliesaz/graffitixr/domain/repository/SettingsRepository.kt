@@ -1,12 +1,23 @@
 package com.hereliesaz.graffitixr.domain.repository
 
 import com.hereliesaz.graffitixr.common.model.ArScanMode
+import com.hereliesaz.graffitixr.common.model.AppLanguage
 import kotlinx.coroutines.flow.Flow
 
 /**
  * Interface for managing application-wide settings.
  */
 interface SettingsRepository {
+    /**
+     * A flow emitting the current user preference for app language.
+     */
+    val language: Flow<AppLanguage>
+
+    /**
+     * Updates the user's language preference.
+     */
+    suspend fun setLanguage(language: AppLanguage)
+
     /**
      * A flow emitting the current user preference for handedness.
      * True for right-handed (default), False for left-handed.

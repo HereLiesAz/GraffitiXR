@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.hereliesaz.graffitixr.common.model.AppLanguage
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -20,12 +21,25 @@ class SettingsRepositoryImpl @Inject constructor(
     @param:ApplicationContext private val context: Context
 ) : SettingsRepository {
 
+    private val LANGUAGE = stringPreferencesKey("language")
     private val IS_RIGHT_HANDED = booleanPreferencesKey("is_right_handed")
     private val AR_SCAN_MODE = stringPreferencesKey("ar_scan_mode")
     private val SHOW_ANCHOR_BOUNDARY = booleanPreferencesKey("show_anchor_boundary")
     private val IS_IMPERIAL_UNITS = booleanPreferencesKey("is_imperial_units")
     private val BACKGROUND_COLOR = intPreferencesKey("background_color")
     private val COMPLETED_TUTORIALS = stringSetPreferencesKey("completed_tutorials")
+
+    override val language: Flow<AppLanguage> = context.dataStore.data
+        .map { preferences ->
+            val code = preferences[LANGUAGE] ?: ""
+            AppLanguage.entries.find { it.code == code } ?: AppLanguage.SYSTEM
+        }
+
+    override suspend fun setLanguage(language: AppLanguage) {
+        context.dataStore.edit { preferences ->
+            preferences[LANGUAGE] = language.code
+        }
+    }
 
     override val isRightHanded: Flow<Boolean> = context.dataStore.data
         .map { preferences ->

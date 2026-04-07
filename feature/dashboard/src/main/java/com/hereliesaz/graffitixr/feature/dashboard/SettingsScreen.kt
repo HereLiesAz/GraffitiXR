@@ -51,7 +51,9 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.AzLoad
+import com.hereliesaz.graffitixr.common.model.AppLanguage
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.design.theme.AppStrings
 
@@ -60,6 +62,8 @@ fun SettingsScreen(
     currentVersion: String,
     updateStatus: String?,
     isCheckingForUpdate: Boolean,
+    currentLanguage: AppLanguage,
+    onLanguageChanged: (AppLanguage) -> Unit,
     isRightHanded: Boolean,
     onHandednessChanged: (Boolean) -> Unit,
     showDiagOverlay: Boolean,

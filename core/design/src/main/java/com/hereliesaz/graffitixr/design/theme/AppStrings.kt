@@ -35,6 +35,7 @@ fun rememberAppStrings(): AppStrings {
         settings = AppStrings.Settings(
             title = stringResource(R.string.settings_title),
             preferences = stringResource(R.string.settings_preferences_section),
+            languageLabel = stringResource(R.string.settings_language_label),
             dominantHand = stringResource(R.string.settings_hand_label),
             handRight = stringResource(R.string.settings_hand_right),
             handLeft = stringResource(R.string.settings_hand_left),
@@ -217,6 +218,7 @@ data class AppStrings(
     data class Settings(
         val title: String,
         val preferences: String,
+        val languageLabel: String,
         val dominantHand: String,
         val handRight: String,
         val handLeft: String,
