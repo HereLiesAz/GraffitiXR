@@ -396,7 +396,7 @@
     <string name="lib_new_project">Új</string>
     <string name="lib_import_project">Importálás</string>
     <string name="lib_no_projects">Még nincsenek projektek</string>
-    <string name="lib_no_projects_hint">Tap New above to start your first mural.\n\nYou\'ll be taken into the editor where you can:\n  \u2022  Add artwork from the Design menu\n  \u2022  Switch to AR mode to project onto a real wall\n  \u2022  Use Overlay to float your design on the live camera\n  \u2022  Use Mockup to preview on a wall photo\n  \u2022  Use Lightbox to trace your design onto paper</string>
+    <string name="lib_no_projects_hint">Koppints az Új gombra fent az első falfestményed megkezdéséhez.\n\nA szerkesztőbe kerülsz, ahol a következőket teheted:\n  \u2022  Műalkotás hozzáadása a Tervezés menüből\n  \u2022  Válts AR módba, hogy valódi falra vetíts\n  \u2022  Használd a Rétegzést, hogy a tervedet az élő kamerán lebegtesd\n  \u2022  Használd a Makettet az előnézethez egy falfotón\n  \u2022  Használd a Világítótáblát a terved papírra rajzolásához</string>
     <string name="lib_project_thumbnail">Projekt miniatűr</string>
     <string name="lib_delete_project_desc">%1$s projekt törlése</string>
 
