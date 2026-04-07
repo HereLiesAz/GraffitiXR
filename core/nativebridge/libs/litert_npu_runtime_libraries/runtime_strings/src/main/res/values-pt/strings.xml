@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Label for the MediaTek NPU (Neural Processing Unit) runtime support. -->
+    <string name="title_mediatek_runtime">Tempo de Execução NPU MediaTek</string>
+    <!-- Label for Qualcomm NPU runtime, version 69. -->
+    <string name="title_qualcomm_runtime_v69">Tempo de Execução NPU Qualcomm v69</string>
+    <!-- Label for Qualcomm NPU runtime, version 73. -->
+    <string name="title_qualcomm_runtime_v73">Tempo de Execução NPU Qualcomm v73</string>
+    <!-- Label for Qualcomm NPU runtime, version 75. -->
+    <string name="title_qualcomm_runtime_v75">Tempo de Execução NPU Qualcomm v75</string>
+    <!-- Label for Qualcomm NPU runtime, version 79. -->
+    <string name="title_qualcomm_runtime_v79">Tempo de Execução NPU Qualcomm v79</string>
+    <!-- Label for Qualcomm NPU runtime, version 81. -->
+    <string name="title_qualcomm_runtime_v81">Tempo de Execução NPU Qualcomm v81</string>
+    <!-- Label for the Google Tensor NPU runtime support. -->
+    <string name="title_google_tensor_runtime">Tempo de Execução NPU Google Tensor</string>
+</resources>
