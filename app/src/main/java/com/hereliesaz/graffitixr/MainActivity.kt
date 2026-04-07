@@ -1960,7 +1960,6 @@ private fun RelocStatusBadge(
     val label = when (relocState) {
         RelocState.SEARCHING -> "Scanning\u2026"
         RelocState.TRACKING  -> "${(paintingProgress * 100).toInt()}% matched"
-        else                 -> ""
     }
 
     Row(
