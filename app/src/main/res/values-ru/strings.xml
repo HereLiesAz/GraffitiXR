@@ -1,0 +1,637 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+
+    <string name="app_name">ГраффитиXR</string>
+
+
+    <string name="nav_modes">Режимы</string>
+
+    <string name="nav_modes_info">Переключайтесь между режимами AR Projection, Overlay, Mockup и Trace.</string>
+
+
+    <string name="nav_ar_mode">АР</string>
+
+    <string name="nav_ar_mode_info">Спроецируйте свое произведение искусства на настоящую стену, используя дополненную реальность. </string>
+
+
+    <string name="nav_overlay">Наложение</string>
+
+    <string name="nav_overlay_info">Наложите свой дизайн на прямую трансляцию с камеры без привязки к AR. </string>
+
+
+    <string name="nav_mockup">Макет</string>
+
+    <string name="nav_mockup_info">Предварительный просмотр вашего дизайна, наложенного на фотографию стены. </string>
+
+
+    <string name="nav_trace">След</string>
+
+    <string name="nav_trace_info">Используйте свой дизайн в качестве наложения светового стола, чтобы проследить опорные линии на физической поверхности.</string>
+
+    <string name="nav_trace_mode">Лайтбокс</string>
+
+
+    <string name="nav_canvas">Холст</string>
+
+    <string name="nav_mural">Фреска</string>
+
+    <string name="nav_scan_mode_toggle_info">Переключайтесь между холстом (оптимизировано для небольших произведений искусства на столе) и настенной росписью (оптимизировано для крупномасштабных стен и гауссовских брызг).</string>
+
+
+    <string name="nav_stencil">Трафарет</string>
+
+    <string name="nav_stencil_info">Создавайте печатные многослойные трафареты на основе своих работ. </string>
+
+
+    <string name="nav_grid">Цель</string>
+
+    <string name="nav_grid_info">Создавайте и управляйте якорными целями AR. </string>
+
+
+    <string name="nav_surveyor">Опрос</string>
+
+    <string name="nav_surveyor_info">Нанесите на карту поверхность стены, чтобы повысить точность отслеживания AR.</string>
+
+
+    <string name="nav_create">Создавать</string>
+
+    <string name="nav_create_info">Сфотографируйте ориентир на стене, чтобы создать новый якорь AR. </string>
+
+
+    <string name="nav_refine">Уточнить</string>
+
+    <string name="nav_refine_info">Точная настройка положения существующей якорной цели AR.</string>
+
+
+    <string name="nav_update">Прогресс</string>
+
+    <string name="nav_update_info">Отмечайте завершенные участки фрески, чтобы отслеживать ход рисования.</string>
+
+
+    <string name="nav_design">Дизайн</string>
+
+    <string name="nav_design_info">Добавляйте слои дизайна и управляйте ими. </string>
+
+
+    <string name="nav_open">Открыть</string>
+
+    <string name="nav_open_info">Добавьте изображение из вашей галереи в качестве нового слоя.</string>
+
+
+    <string name="nav_wall">Стена</string>
+
+    <string name="nav_wall_info">Замените фоновую фотографию стены, используемую в режиме макета.</string>
+
+
+    <string name="nav_isolate">Изолировать</string>
+
+    <string name="nav_isolate_info">Автоматически удалите фон из этого слоя, оставив только объект на прозрачном фоне.</string>
+
+
+    <string name="nav_invert">Инвертировать</string>
+
+    <string name="nav_invert_info">Создайте негатив текущего слоя. </string>
+
+
+    <string name="nav_outline">Контур</string>
+
+    <string name="nav_outline_info">Преобразуйте этот слой в черные линии на прозрачном фоне — идеально подходит для создания шаблонов трафаретов.</string>
+
+
+    <string name="nav_adjust">Регулировать</string>
+
+    <string name="nav_adjust_info">Точная настройка яркости, контрастности, насыщенности и цветового баланса для этого слоя.</string>
+
+
+    <string name="nav_balance">Цвет</string>
+
+    <string name="nav_balance_info">Оттените цвета слоя с помощью ползунков красного, зеленого и синего каналов.</string>
+
+
+    <string name="nav_blending">Смешивать</string>
+
+    <string name="nav_blending_info">Переключайте режимы наложения («Обычный», «Умножение», «Экран», «Наложение…»), чтобы контролировать, как этот слой объединяется со слоями ниже.</string>
+
+
+    <string name="nav_settings">Настройки</string>
+
+    <string name="nav_settings_info">Настройте руку, режим сканирования AR, единицы измерения и другие настройки приложения.</string>
+
+
+    <string name="nav_project">Проект</string>
+
+    <string name="nav_project_info">Управляйте своим проектом: создавайте, сохраняйте, загружайте и экспортируйте.</string>
+
+
+    <string name="nav_new">Новый</string>
+
+    <string name="nav_new_info">Запустите новый пустой проект. </string>
+
+
+    <string name="nav_save">Сохранять</string>
+
+    <string name="nav_save_info">Сохраните текущий проект на свое устройство.</string>
+
+
+    <string name="nav_load">Нагрузка</string>
+
+    <string name="nav_load_info">Откройте библиотеку проектов, чтобы загрузить ранее сохраненный проект.</string>
+
+
+    <string name="nav_export">Экспорт</string>
+
+    <string name="nav_export_info">Экспортируйте плоское объединенное изображение всех видимых слоев в свою фотогалерею.</string>
+
+
+    <string name="nav_help">Помощь</string>
+
+    <string name="nav_help_info">Нажмите любую кнопку, пока активна «Справка», чтобы увидеть, что она делает.</string>
+
+
+    <string name="nav_light">Свет</string>
+
+    <string name="nav_light_info">Включите фонарик устройства, чтобы осветить стену во время работы в условиях низкой освещенности.</string>
+
+
+    <string name="nav_lock">Замок</string>
+
+    <string name="nav_lock_info">Заблокируйте сенсорный экран, чтобы предотвратить случайные изменения во время распыления. </string>
+
+
+
+    <string name="info_brush">На этом слое нарисуйте штрихи от руки. </string>
+
+    <string name="info_eraser">Сотрите части этого слоя круглой кистью. </string>
+
+    <string name="info_blur">Размажьте и смягчите участки этого слоя. </string>
+
+    <string name="info_liquify">Толкайте и деформируйте пиксели в любом направлении. </string>
+
+    <string name="info_dodge">Осветлите определенные области, закрасив их.</string>
+
+    <string name="info_burn">Затемните определенные области, закрасив их.</string>
+
+    <string name="info_size">Перетащите вверх/вниз, чтобы изменить диаметр кисти. </string>
+
+    <string name="info_color">Показывает активный цвет кисти. </string>
+
+    <string name="info_draw">Добавьте новый пустой прозрачный слой для рисования от руки.</string>
+
+    <string name="info_keyframe">Сохраните текущую позу камеры AR как ключевой кадр. </string>
+
+    <string name="info_layer">Этот слой. </string>
+
+
+
+    <string name="stencil_layers">Слои</string>
+
+    <string name="stencil_layers_info">Выберите, сколько слоев трафарета нужно создать: 1 (только силуэт), 2 (силуэт + выделение) или 3 (силуэт + средние тона + выделение).</string>
+
+
+    <string name="stencil_rebuild">Восстановить</string>
+
+    <string name="stencil_rebuild_info">Повторно запустите конвейер генерации трафарета на текущем исходном слое.</string>
+
+
+    <string name="stencil_print">Распечатать</string>
+
+    <string name="stencil_print_info">Настройте реальный размер печати и создайте мозаичный PDF-файл для бумаги формата US Letter.</string>
+
+
+    <string name="stencil_print_size">Размер</string>
+
+    <string name="stencil_print_size_info">Перетащите вверх/вниз, чтобы установить реальную ширину или высоту трафарета в сантиметрах. </string>
+
+
+    <string name="stencil_print_dim_toggle">Ж/Ч</string>
+
+    <string name="stencil_print_dim_toggle_info">Нажмите, чтобы переключиться между блокировкой ширины или высоты вывода.</string>
+
+
+    <string name="stencil_export_pdf">Распечатать PDF</string>
+
+    <string name="stencil_export_pdf_info">Создайте мозаичный PDF-файл со всеми слоями трафарета, готовый к печати и вырезанию. </string>
+
+
+    <string name="stencil_save_layers">Сохранить PNG</string>
+
+    <string name="stencil_save_layers_info">Сохраните каждый слой трафарета как отдельное изображение PNG в своей галерее.</string>
+
+
+    <string name="stencil_back">← Редактор</string>
+
+    <string name="stencil_back_info">Вернитесь в главный редактор. </string>
+
+
+    <string name="nav_text">Текст</string>
+
+    <string name="nav_draw">Рисовать</string>
+
+    <string name="nav_edit">Редактировать</string>
+
+    <string name="nav_font">Шрифт</string>
+
+    <string name="nav_size">Размер</string>
+
+    <string name="nav_color">Цвет</string>
+
+    <string name="nav_kern">Керн</string>
+
+    <string name="nav_bold">Смелый</string>
+
+    <string name="nav_italic">Курсив</string>
+
+    <string name="nav_shadow">Тень</string>
+
+    <string name="nav_eraser">Ластик</string>
+
+    <string name="nav_blur">Размытие</string>
+
+    <string name="nav_liquify">Преобразовать</string>
+
+    <string name="nav_dodge">Уклоняться</string>
+
+    <string name="nav_burn">Гореть</string>
+
+
+
+    <string name="pro_tip">Совет профессионала</string>
+    <string name="double_tap_hint">Дважды нажмите, чтобы переключить ось вращения.</string>
+    <string name="ok_button">ХОРОШО</string>
+
+    <string name="generating">ГЕНЕРИРУЕМ...</string>
+
+    <string name="stencil_hint">Нажмите еще раз, чтобы добавить слой.</string>
+
+    <string name="rename_hint">Переименовать</string>
+
+    <string name="edit_text_hint">Редактировать текст</string>
+
+    <string name="copy_edits">Копировать изменения</string>
+
+    <string name="paste_edits">Вставить изменения</string>
+
+    <string name="generate_poster">Создать плакат</string>
+
+    <string name="duplicate">Дублировать</string>
+
+    <string name="unlink_layer">Отсоединить слой</string>
+
+    <string name="link_layer">Слой связи</string>
+
+    <string name="hide_layer">Скрыть слой</string>
+
+    <string name="show_layer">Показать слой</string>
+
+    <string name="flatten_all">Сгладить все</string>
+
+    <string name="delete">Удалить</string>
+    <string name="new_project_name">Новый проект</string>
+
+    <string name="lock_button">Замок</string>
+
+    <string name="freeze_button">Заморозить</string>
+
+
+    <string name="wall_source_title">Выберите фото стены</string>
+
+    <string name="wall_source_text">Как бы вы хотели установить фоновую стену?</string>
+
+    <string name="take_photo">Сфотографироваться</string>
+
+    <string name="choose_from_gallery">Выбрать из галереи</string>
+
+
+    <string name="depth_unsupported">Это устройство не поддерживает Depth API.\nПереключитесь в режим Canvas в настройках.</string>
+
+
+    <string name="arcore_required_title">Требуется ARCore</string>
+
+    <string name="arcore_required_text">На этом устройстве не установлен ARCore или он не поддерживается. </string>
+
+    <string name="install_arcore">Установить ARCore</string>
+
+
+    <string name="camera_permission_required">Для режима AR требуется разрешение камеры.</string>
+
+    <string name="open_settings">Открыть настройки</string>
+
+
+    <string name="target_creation_title">СОЗДАНИЕ ЦЕЛИ</string>
+
+    <string name="target_creation_text">Нажмите прямо на нарисованные контрольные отметки на экране. </string>
+
+    <string name="cancel">Отмена</string>
+
+
+    <string name="diag_copied">КОПИИРОВАНО ✓</string>
+
+    <string name="diag_title">ДИАГНОСТИКА ГЛУБИНЫ (нажмите, чтобы скопировать)</string>
+
+    <string name="diag_waiting">Жду первого кадра…</string>
+
+
+    <string name="scan_step_1">Шаг 1. Составьте карту своего окружения</string>
+
+    <string name="scan_step_2">Шаг 2. Сканируйте целевую стену</string>
+
+
+    <string name="plane_confirm_question">Картина находится на той стене?</string>
+
+    <string name="looks_correct">Выглядит правильно</string>
+
+    <string name="redetect">Повторное обнаружение</string>
+
+
+    <string name="plane_realignment_title">Повторное определение поверхности стены</string>
+
+    <string name="plane_realignment_text">Якорь устанавливается с того места, где вы стояли во время захвата. </string>
+
+    <string name="use_this_wall">Используйте эту стену</string>
+
+
+    <string name="scanning_dots">Сканирование\u2026</string>
+
+    <string name="matched_percent">%1$d%% соответствует</string>
+
+    <string name="anchor_locked">Якорь заблокирован</string>
+
+
+    <string name="choose_font">Выберите шрифт</string>
+
+
+    <string name="cancel_button">Отмена</string>
+    <string name="done_button">Сделанный</string>
+    <string name="apply_button">Применять</string>
+    <string name="close_button">Закрывать</string>
+    <string name="next_button">Следующий</string>
+    <string name="save_button">Сохранять</string>
+    <string name="retake_button">Пересдать</string>
+    <string name="capture_button">Захватывать</string>
+
+
+    <string name="adj_detail">Деталь</string>
+    <string name="adj_opacity">Непрозрачность</string>
+    <string name="adj_brightness">Яркость</string>
+    <string name="adj_contrast">Контраст</string>
+    <string name="adj_saturation">Насыщенность</string>
+    <string name="adj_red">Красный</string>
+    <string name="adj_green">Зеленый</string>
+    <string name="adj_blue">Синий</string>
+    <string name="adj_undo">Отменить</string>
+    <string name="adj_redo">Повторить</string>
+    <string name="adj_magic_align">Волшебное выравнивание</string>
+
+
+    <string name="status_create_grid">Для начала создайте сетку.</string>
+    <string name="status_scan_surfaces">Сканируйте поверхности вокруг вас.</string>
+    <string name="status_tap_surface">Коснитесь поверхности, чтобы разместить якорь.</string>
+    <string name="status_looking_grid">Ищем свою сетку...</string>
+    <string name="status_ready">Готовый. </string>
+    <string name="unlock_hint">Нажмите 4 раза, чтобы разблокировать</string>
+
+
+    <string name="lib_app_title">ГраффитиXR</string>
+    <string name="lib_app_description">Спроецируйте свое произведение искусства на настоящую стену или холст с помощью дополненной реальности или обычного наложения камеры. </string>
+    <string name="lib_new_project">Новый</string>
+    <string name="lib_import_project">Импорт</string>
+    <string name="lib_no_projects">Пока нет проектов</string>
+    <string name="lib_no_projects_hint">Нажмите «Создать» выше, чтобы создать свою первую фреску.\n\nВы попадете в редактор, где сможете:\n \u2022 Добавить иллюстрацию из меню «Дизайн».\n \u2022 Переключиться в режим AR для проецирования на настоящую стену.\n \u2022 Используйте «Наложение», чтобы разместить свой дизайн на камере в реальном времени.\n \u2022 Используйте «Мокап», чтобы просмотреть фотографию на стене.\n \u2022 Используйте «Лайтбокс», чтобы перенести свой дизайн на бумагу.</string>
+    <string name="lib_project_thumbnail">Миниатюра проекта</string>
+    <string name="lib_delete_project_desc">Удалить проект %1$s</string>
+
+
+    <string name="settings_title">Настройки</string>
+    <string name="settings_preferences_section">Предпочтения</string>
+    <string name="settings_hand_label">Доминирующая рука</string>
+    <string name="settings_hand_right">Верно</string>
+    <string name="settings_hand_left">Левый</string>
+    <string name="settings_diag_label">Наложение диагностики глубины</string>
+    <string name="settings_on">На</string>
+    <string name="settings_off">Выключенный</string>
+    <string name="settings_scan_mode_label">Режим AR-сканирования</string>
+    <string name="settings_scan_mode_point_cloud">Облако точек</string>
+    <string name="settings_scan_mode_gaussian_splat">Гауссовский сплат</string>
+    <string name="settings_anchor_boundary_label">Показать границу привязки</string>
+    <string name="settings_units_label">Единицы расстояния</string>
+    <string name="settings_units_imperial">Империал (футы)</string>
+    <string name="settings_units_metric">Метрическая (м)</string>
+    <string name="settings_canvas_bg_label">Холст фон</string>
+    <string name="settings_info_section">Информация о приложении</string>
+    <string name="settings_version_label">Версия</string>
+    <string name="settings_updates_section">Обновления</string>
+    <string name="settings_check_updates_label">Проверьте наличие экспериментальных обновлений</string>
+    <string name="settings_install_update_label">Установить обновление</string>
+    <string name="settings_permissions_section">Разрешения</string>
+    <string name="settings_camera_access">Доступ к камере</string>
+    <string name="settings_photo_access">Доступ к фотобиблиотеке</string>
+    <string name="settings_notifications">Уведомления</string>
+    <string name="settings_granted">Предоставленный</string>
+    <string name="settings_denied">Отклонен</string>
+    <string name="settings_open_app_settings">Откройте настройки приложения</string>
+    <string name="settings_copyright">ГраффитиXR © 2025</string>
+
+
+    <string name="layers_title">Слои</string>
+    <string name="brush_size_title">Размер кисти</string>
+    <string name="save_project_hint">Название проекта</string>
+
+
+    <string name="target_guide_desc">Руководство по выравниванию цели</string>
+    <string name="target_captured_desc">Захваченная цель</string>
+    <string name="target_review_desc">Просмотрите извлеченную цель</string>
+    <string name="target_unwarp_hint">Перетащите углы, чтобы развернуть</string>
+    <string name="target_review_title">Просмотрите извлеченные метки</string>
+
+    <string name="target_exclude">Исключать</string>
+    <string name="target_include">Включать</string>
+    <string name="target_erase_marks">Стереть метки</string>
+    <string name="target_show_features">Показать функции</string>
+    <string name="reset_button">Перезагрузить</string>
+
+    <string name="poster_title">СОЗДАТЬ ПЛАКАТ</string>
+    <string name="poster_select_layers">Выберите слои для включения:</string>
+    <string name="poster_physical_size">Физический размер (ширина в мм):</string>
+    <string name="poster_generate_pdf">СОЗДАТЬ PDF</string>
+
+
+    <string name="scan_hint_recover">Медленно перемещайте устройство, чтобы восстановить отслеживание.</string>
+    <string name="scan_hint_ambient">Медленно поверните на 360°, чтобы составить карту вашего окружения (%1$d°).</string>
+    <string name="scan_hint_too_dark">Слишком темно. </string>
+    <string name="scan_hint_build_map">Идите влево и вправо, чтобы построить карту.</string>
+    <string name="scan_hint_closer">Подойдите ближе к стене</string>
+    <string name="scan_hint_higher_lower">Сканируйте выше и ниже</string>
+
+
+    <string name="desc_bg_mockup">Фоновый макет</string>
+    <string name="desc_segmentation_preview">Предварительный просмотр сегментации</string>
+
+
+
+    <string name="help_mode_host">Переключатель режима: переключение между режимами приложения. </string>
+
+    <string name="help_ar">Режим AR: проецируйте дизайн на стену с помощью пространственного картографирования. </string>
+
+    <string name="help_overlay">Режим наложения: отображение дизайна поверх камеры в реальном времени без пространственного отслеживания. </string>
+
+    <string name="help_mockup">Режим макета: предварительный просмотр дизайна на статичной фотографии. </string>
+
+    <string name="help_trace">Режим Lightbox: поверхность трассировки высокой яркости. </string>
+
+    <string name="help_target_host">Управление целями: инструменты для якорей AR. </string>
+
+    <string name="help_scan_mode_toggle">Разрешение сканирования: переключение между «Фреска» (крупный масштаб) и «Холст» (маленький масштаб). </string>
+
+    <string name="help_create">Создать якорь: сфотографируйте отметку на стене, чтобы зафиксировать проекцию. </string>
+
+    <string name="help_design_host">Управление слоями: добавляйте изображения, текст или эскизы. </string>
+
+    <string name="help_add_img">Импортировать изображение: добавьте эскиз или эталонную фотографию. </string>
+
+    <string name="help_add_draw">Новый эскиз: добавьте пустой слой для рисования от руки. </string>
+
+    <string name="help_add_text">Добавить текст: создайте типографский слой. </string>
+
+    <string name="help_wall">Изменить стену: установите фон для режима макета. </string>
+
+    <string name="help_project_host">Управление проектами: сохранение, загрузка и экспорт работ. </string>
+
+    <string name="help_new">Новый проект: начните новую фреску. </string>
+
+    <string name="help_save">Сохранить проект: хранить фреску и карту AR. </string>
+
+    <string name="help_load">Библиотека проектов: доступ к сохраненным фрескам. </string>
+
+    <string name="help_export">Экспортировать изображение: сохранить снимок в высоком разрешении. </string>
+
+    <string name="help_settings">Настройки приложения: настройка предпочтений. </string>
+
+    <string name="help_light">Фонарик: переключить светодиод устройства. </string>
+
+    <string name="help_lock_trace">Блокировка/заморозка: предотвращение случайных изменений. </string>
+
+    <string name="help_help_main">Интерактивная справка: поясняет функции кнопок. </string>
+
+    <string name="help_layer">Слой \'%1$s\': активный элемент росписи. </string>
+
+
+
+    <string name="help_edit_text">Редактировать текст: изменить слова на типографском слое. </string>
+
+    <string name="help_size">Размер кисти/текста: отрегулируйте масштаб и мягкость. </string>
+
+    <string name="help_font">Выбор шрифта: выберите стиль оформления. </string>
+
+    <string name="help_color">Инструмент «Цвет»: установите активный цвет. </string>
+
+    <string name="help_kern">Кернинг текста: регулировка интервала между буквами. </string>
+
+    <string name="help_bold">Переключатель жирного шрифта: толстый шрифт. </string>
+
+    <string name="help_italic">Переключатель курсива: наклонный стиль. </string>
+
+    <string name="help_outline">Контур текста: обводка символа. </string>
+
+    <string name="help_shadow">Тень: глубина текста. </string>
+
+    <string name="help_stencil_gen">Создать трафарет: создание шаблонов для печати. </string>
+
+    <string name="help_blend">Режим наложения: Композитный стиль. </string>
+
+    <string name="help_adj">Регулировка изображения: точная настройка внешнего вида. </string>
+
+    <string name="help_invert">Инвертировать цвета: высококонтрастный негатив. </string>
+
+    <string name="help_balance">Цветовой баланс: настройка канала RGB. </string>
+
+    <string name="help_eraser">Кисть-ластик: удаление содержимого слоя. </string>
+
+    <string name="help_blur">Инструмент «Размытие/Размазывание»: смешайте цвета. </string>
+
+    <string name="help_liquify">Инструмент «Деформация»: изменение формы дизайна. </string>
+
+    <string name="help_dodge">Инструмент Dodge: осветляет области. </string>
+
+    <string name="help_burn">Инструмент «Затемнитель»: затемнение областей. </string>
+
+    <string name="help_iso">Изолировать субъект: автоматическое удаление фона. </string>
+
+    <string name="help_line">Контур эскиза: фильтр линейного искусства. </string>
+
+    <string name="help_help_layer">Справка по слою: переключение информации для этих конкретных инструментов слоя. </string>
+
+
+
+    <string name="unit_feet">футы</string>
+
+    <string name="unit_centimeters">см</string>
+
+    <string name="unit_meters">м</string>
+
+    <string name="tut_ar_title">AR-проекция</string>
+    <string name="tut_ar_text">Проецирует ваш дизайн на настоящую стену, используя датчик глубины телефона и пространственное отслеживание.</string>
+    <string name="tut_ar_step1_title">Шаг 1: Сканирование</string>
+    <string name="tut_ar_step1_text">Наведите курсор на стену и медленно двигайтесь из стороны в сторону. </string>
+    <string name="tut_ar_step2_title">Шаг 2: Нажмите, чтобы разместить</string>
+    <string name="tut_ar_step2_text">Просто коснитесь экрана. </string>
+    <string name="tut_ar_step3_title">Шаг 3: Добавьте свою работу</string>
+    <string name="tut_ar_step3_text">Нажмите «Дизайн», чтобы получить доступ к инструментам слоя. </string>
+    <string name="tut_ar_tip_title">Совет: текстура имеет значение</string>
+    <string name="tut_ar_tip_text">Пустые белые стены, гладкий бетон и однотонные поверхности не будут отслеживаться. </string>
+
+
+    <string name="tut_overlay_title">Живое наложение</string>
+    <string name="tut_overlay_text">Ваш дизайн плавает над изображением камеры в реальном времени — сканирование поверхности не требуется.</string>
+    <string name="tut_overlay_step1_title">Шаг 1: добавьте свою работу</string>
+    <string name="tut_overlay_step1_text">Нажмите «Дизайн», чтобы получить доступ к инструментам слоя. </string>
+    <string name="tut_overlay_step2_title">Шаг 2: Разместите его</string>
+    <string name="tut_overlay_step2_text">Сведите пальцы, чтобы масштабировать, перетащите, чтобы изменить положение. </string>
+
+
+    <string name="tut_mockup_title">Фото Мокап</string>
+    <string name="tut_mockup_text">Прежде чем взять в руки кисть, просмотрите свой дизайн на фотографии.</string>
+    <string name="tut_mockup_step1_title">Шаг 1: Установите стену</string>
+    <string name="tut_mockup_step1_text">Откройте «Дизайн» и нажмите «Стена», чтобы выбрать или сфотографировать поверхность. </string>
+    <string name="tut_mockup_step2_title">Шаг 2: Добавьте свою работу</string>
+    <string name="tut_mockup_step2_text">Используйте «Изображение», «Рисование» или «Текст», чтобы добавить слои поверх стены. </string>
+
+
+    <string name="tut_trace_title">Режим лайтбокса</string>
+    <string name="tut_trace_text">Превращает ваш экран в яркий лайтбокс для переноса вашего дизайна на бумагу.</string>
+    <string name="tut_trace_step1_title">Шаг 1. Откройте меню «Дизайн».</string>
+    <string name="tut_trace_step1_text">Нажмите «Дизайн», чтобы получить доступ к инструментам слоев.</string>
+    <string name="tut_trace_step2_title">Шаг 2: Добавьте контент</string>
+    <string name="tut_trace_step2_text">Используйте «Изображение» для импорта фотографий, «Рисование» для эскизов или «Текст» для ввода.</string>
+    <string name="tut_trace_step3_title">Шаг 3: Отслеживание</string>
+    <string name="tut_trace_step3_text">Положите бумагу на экран и обведите. </string>
+
+
+    <string name="tut_create_anchor_title">Создать якорь</string>
+    <string name="tut_create_anchor_text">Привязывает проекцию к определенному месту на стене. </string>
+    <string name="tut_surface_req_title">Требования к поверхности</string>
+    <string name="tut_surface_req_text">Стене нужна видимая текстура — граффити, грубая штукатурка, кирпич или наклейки подойдут. </string>
+    <string name="tut_blobs_title">Что означают капли</string>
+    <string name="tut_blobs_text">После нажатия вы ненадолго увидите зеленые пятна. </string>
+    <string name="tut_import_img_title">Импортировать изображение</string>
+    <string name="tut_import_img_text">Добавьте эскиз, фотографию или ссылку из своей галереи. </string>
+    <string name="tut_scale_pos_title">Масштаб и положение</string>
+    <string name="tut_scale_pos_text">Сведите два пальца, чтобы изменить размер. </string>
+    <string name="tut_lock_freeze_title">Блокировка/заморозка</string>
+    <string name="tut_lock_freeze_text">В режиме Lightbox (Trace): отключает сенсорное управление, чтобы вы могли положить бумагу на экран, не перемещая ничего случайно.</string>
+    <string name="tut_in_other_modes_title">В других режимах</string>
+    <string name="tut_in_other_modes_text">В режимах AR, Overlay и Mockup: блокирует преобразования слоев, чтобы дизайн нельзя было случайно переместить или масштабировать.</string>
+    <string name="tut_stencil_gen_title">Создать трафарет</string>
+    <string name="tut_stencil_gen_text">Преобразует ваше изображение в трафареты с аэрозольной краской, которые можно распечатать. </string>
+    <string name="tut_how_many_layers_title">Сколько слоев?</string>
+    <string name="tut_how_many_layers_text">При трехцветном дизайне получается 3 листа трафарета. </string>
+    <string name="tut_exporting_title">Экспорт</string>
+    <string name="tut_exporting_text">Каждый трафарет экспортируется в формате PDF. </string>
+    <string name="tut_opacity_brightness_title">Непрозрачность и яркость</string>
+    <string name="tut_opacity_brightness_text">Непрозрачность контролирует прозрачность слоя. </string>
+    <string name="tut_contrast_saturation_title">Контраст и насыщенность</string>
+    <string name="tut_contrast_saturation_text">Контраст отделяет темные участки от светлых — отлично подходит для выделения контуров трафарета. </string>
+    <string name="tut_isolate_subject_title">Изолировать субъект</string>
+    <string name="tut_isolate_subject_text">Использует искусственный интеллект для автоматического удаления фона, оставляя только основной объект изображения.</string>
+    <string name="tut_best_results_title">Лучшие результаты</string>
+    <string name="tut_best_results_text">Лучше всего работает на фотографиях с четким объектом на однотонном или контрастном фоне. </string>
+</resources>
