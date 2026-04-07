@@ -200,5 +200,7 @@ private:
     int mScreenHeight = 1080;
     float mVoxelSize = 0.005f;
 
-    static constexpr float MIN_RENDER_CONFIDENCE = 0.1f;
+    int mLastVboPointCount = 0;
+
+    static constexpr float MIN_RENDER_CONFIDENCE = 0.01f;
 };
