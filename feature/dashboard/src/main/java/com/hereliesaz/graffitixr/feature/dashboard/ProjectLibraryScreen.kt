@@ -66,7 +66,7 @@ fun ProjectLibraryScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // App intro header — always visible above the action buttons
             Column(
@@ -77,16 +77,16 @@ fun ProjectLibraryScreen(
             ) {
                 Text(
                     text = "GraffitiXR",
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.headlineLarge,
                     color = Color.White,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Project your artwork onto real walls using AR, preview on photos, or trace on a lightbox.",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = "Project your artwork onto a real wall or a canvas using AR or a basic camera overlay. /n Quickly create a mockup on a photo to show how the completed work will look. /n Or trace an image onto paper by using your device as a lightbox.",
+                    style = MaterialTheme.typography.bodyLarge,
                     color = Color.White.copy(alpha = 0.7f),
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Justify
                 )
             }
 
