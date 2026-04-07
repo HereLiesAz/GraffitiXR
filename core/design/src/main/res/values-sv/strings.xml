@@ -404,7 +404,7 @@
     <string name="settings_title">Inställningar</string>
     <string name="settings_preferences_section">Inställningar</string>
     <string name="settings_hand_label">Dominant Hand</string>
-    <string name="settings_hand_right">Rätt</string>
+    <string name="settings_hand_right">Höger</string>
     <string name="settings_hand_left">Vänster</string>
     <string name="settings_diag_label">Djupdiagnostiköverlägg</string>
     <string name="settings_on">På</string>
