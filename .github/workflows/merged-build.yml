@@ -161,27 +161,17 @@ jobs:
           export BUILD_NUMBER=$(git rev-list --count HEAD)
           
           # Extract version info from properties file
-<<<<<<< Updated upstream
+  
           MAJOR=$(grep 'versionMajor=' version.properties | cut -d'=' -f2 | tr -d '\r ')
           MINOR=$(grep 'versionMinor=' version.properties | cut -d'=' -f2 | tr -d '\r ')
-=======
-          MAJOR=$(grep 'versionMajor=' version.properties | cut -d'=' -f2 | tr -d '\r '
-)
-          MINOR=$(grep 'versionMinor=' version.properties | cut -d'=' -f2 | tr -d '\r '
-)
->>>>>>> Stashed changes
 
           # Calculate Patch version programmatically based on commits since Minor update
           MINOR_COMMIT=$(git blame -L '/versionMinor=/',+1 version.properties | awk '{print $1}' | tr -d '^')
           if [ -n "$MINOR_COMMIT" ]; then
             PATCH=$(git rev-list --count $MINOR_COMMIT..HEAD)
           else
-<<<<<<< Updated upstream
+    
             PATCH=$(grep 'versionPatch=' version.properties | cut -d'=' -f2 | tr -d '\r ')
-=======
-            PATCH=$(grep 'versionPatch=' version.properties | cut -d'=' -f2 | tr -d '\r '
-)
->>>>>>> Stashed changes
           fi
 
           VERSION_NAME="$MAJOR.$MINOR.$PATCH.$BUILD_NUMBER"

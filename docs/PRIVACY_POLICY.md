@@ -1,6 +1,6 @@
 # Privacy Policy for GraffitiXR
 
-**Last Updated:** [Current Date]
+**Last Updated:** 2026-04-07
 
 HereLiesAZ built the GraffitiXR app as an Open Source app. This SERVICE is provided by HereLiesAZ at no cost and is intended for use as is.
 
@@ -53,7 +53,7 @@ This policy is effective as of 2024-01-01
 
 ## Contact Us
 
-If you have any questions or suggestions about our Privacy Policy, do not hesitate to contact us at [Insert Contact Email or GitHub Repository Link].
+If you have any questions or suggestions about our Privacy Policy, do not hesitate to contact us at https://github.com/HereLiesAz/GraffitiXR/issues.
 
 
 ---
