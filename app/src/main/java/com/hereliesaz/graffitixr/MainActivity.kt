@@ -69,6 +69,7 @@ import androidx.navigation.compose.rememberNavController
 import com.google.android.gms.common.GoogleApiAvailability
 import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.*
+import com.hereliesaz.aznavrail.tutorial.LocalAzTutorialController
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.ScanPhase
@@ -450,14 +451,6 @@ class MainActivity : ComponentActivity() {
 
                 val tutorials = getTutorials(editorUiState.layers)
 
-                // Task 4: Help overlay state + welcome card auto-show.
-                var helpActive by remember { mutableStateOf(false) }
-                var showWelcomeCard by remember { mutableStateOf(false) }
-                LaunchedEffect(editorUiState.editorMode) {
-                    val key = "tut_${editorUiState.editorMode.name.lowercase()}"
-                    showWelcomeCard = key !in completedTutorials
-                }
-
                 AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
                     azTheme(
                         activeColor = Cyan,
@@ -470,9 +463,9 @@ class MainActivity : ComponentActivity() {
                         dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
                     )
                     azAdvanced(
-                        helpEnabled = helpActive,
+                        helpEnabled = true,
                         helpList = activeHelpList,
-                        onDismissHelp = { helpActive = false },
+                        onDismissHelp = { },
                         tutorials = tutorials
                     )
 
@@ -513,6 +506,24 @@ class MainActivity : ComponentActivity() {
                     }
 
                     onscreen {
+                        // Auto-show the mode tutorial on first visit using the v8.0 controller API.
+                        // DataStore (completedTutorials) persists "seen" state across app restarts.
+                        val tutorialController = LocalAzTutorialController.current
+                        LaunchedEffect(editorUiState.editorMode, completedTutorials) {
+                            val tutorialId = when (editorUiState.editorMode) {
+                                EditorMode.AR      -> "ar_mode"
+                                EditorMode.OVERLAY -> "overlay_mode"
+                                EditorMode.MOCKUP  -> "mockup_mode"
+                                EditorMode.TRACE   -> "trace_mode"
+                                else               -> null
+                            }
+                            val key = "tut_${editorUiState.editorMode.name.lowercase()}"
+                            if (tutorialId != null && key !in completedTutorials) {
+                                tutorialController.startTutorial(tutorialId)
+                                settingsViewModel.markTutorialComplete(key)
+                            }
+                        }
+
                         if (editorUiState.stencilHintVisible || editorUiState.isStencilGenerating) {
                             val pos = editorUiState.stencilButtonPosition
                             val density = LocalDensity.current
@@ -762,26 +773,6 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            // Task 4: First-visit welcome card per mode.
-                            if (showWelcomeCard && !showLibrary && !showSettings && !mainUiState.isCapturingTarget) {
-                                val currentMode = editorUiState.editorMode
-                                ModeWelcomeCard(
-                                    mode = currentMode,
-                                    onShowHelp = {
-                                        helpActive = true
-                                        showWelcomeCard = false
-                                    },
-                                    onDismiss = {
-                                        showWelcomeCard = false
-                                        val key = "tut_${currentMode.name.lowercase()}"
-                                        settingsViewModel.markTutorialComplete(key)
-                                    },
-                                    modifier = Modifier
-                                        .align(Alignment.TopCenter)
-                                        .padding(top = 16.dp)
-                                )
-                            }
-
                             if (showSaveDialog) {
                                 SaveProjectDialog(
                                     initialName = editorUiState.projectId ?: "New Project",
@@ -929,8 +920,9 @@ class MainActivity : ComponentActivity() {
         azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.arModeInfo)
 
         if (isArMode) {
-            azRailToggle(
+            azRailSubToggle(
                 id = "scan_mode_toggle",
+                hostId = "mode_host",
                 isChecked = arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS,
                 toggleOnText = navStrings.mural,
                 toggleOffText = navStrings.canvas,
