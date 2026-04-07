@@ -1,0 +1,635 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The name of the application. -->
+    <string name="app_name">GraffitiXR</string>
+
+    <!-- Label for the navigation item that opens the mode selection menu. -->
+    <string name="nav_modes">Modes</string>
+    <!-- Description for the modes menu, explaining its purpose of switching app modes. -->
+    <string name="nav_modes_info">Basculer entre les modes Projection AR, Superposition, Maquette et Calque.</string>
+
+    <!-- Label for the Augmented Reality (AR) projection mode. -->
+    <string name="nav_ar_mode">AR</string>
+    <!-- Instructions for AR mode, explaining how to project artwork onto a wall. -->
+    <string name="nav_ar_mode_info">Projetez votre œuvre sur un vrai mur à l\'aide de la réalité augmentée. Scannez d\'abord le mur pour placer l\'ancre, puis ajoutez vos calques de conception.</string>
+
+    <!-- Label for the camera overlay mode, which doesn't use AR tracking. -->
+    <string name="nav_overlay">Superposition</string>
+    <!-- Description of Overlay mode, used for quick checks without spatial tracking. -->
+    <string name="nav_overlay_info">Superposez votre conception sur le flux de la caméra en direct sans ancrage AR. Idéal pour des vérifications rapides de cadrage et de placement.</string>
+
+    <!-- Label for the Mockup mode, used for previewing on a static background. -->
+    <string name="nav_mockup">Maquette</string>
+    <!-- Description of Mockup mode, explaining that it uses a photo background instead of a live feed. -->
+    <string name="nav_mockup_info">Prévisualisez votre conception composée sur une photo d\'un mur. Aucune caméra ni numérisation requise.</string>
+
+    <!-- Label for the Trace mode, which locks the screen for manual tracing. -->
+    <string name="nav_trace">Calque</string>
+    <!-- Description of Trace mode, explaining its use as a light-table for physical tracing. -->
+    <string name="nav_trace_info">Utilisez votre conception comme une table lumineuse pour tracer des lignes de référence sur une surface physique.</string>
+    <!-- Alternative name for Trace mode, often referred to as Lightbox. -->
+    <string name="nav_trace_mode">Table lumineuse</string>
+
+    <!-- Label for Canvas mode, which is optimized for smaller, desk-scale artwork. -->
+    <string name="nav_canvas">Toile</string>
+    <!-- Label for Mural mode, which is optimized for large-scale wall artwork. -->
+    <string name="nav_mural">Fresque</string>
+    <!-- Description for the toggle between Canvas and Mural scanning modes. -->
+    <string name="nav_scan_mode_toggle_info">Basculer entre Toile (optimisé pour les petites œuvres à l\'échelle d\'un bureau) et Fresque (optimisé pour les murs à grande échelle et le Gaussian Splatting).</string>
+
+    <!-- Label for the Stencil generation tool. -->
+    <string name="nav_stencil">Pochoir</string>
+    <!-- Description of the Stencil tool, explaining how it creates multi-layer printable templates. -->
+    <string name="nav_stencil_info">Générez des pochoirs imprimables à plusieurs couches à partir de votre œuvre. Chaque couche s\'imprime sous forme de carreaux avec contour uniquement, dimensionnés pour du papier Lettre US.</string>
+
+    <!-- Label for the Target/Grid management menu in AR mode. -->
+    <string name="nav_grid">Cible</string>
+    <!-- Description of Target management, used for anchor creation and management. -->
+    <string name="nav_grid_info">Créez et gérez des cibles d\'ancrage AR. Photographiez les marques de référence peintes sur le mur pour verrouiller la projection en place.</string>
+
+    <!-- Label for the wall survey tool, used to improve AR tracking. -->
+    <string name="nav_surveyor">Relevé</string>
+    <!-- Description of the Survey tool, explaining its role in tracking accuracy. -->
+    <string name="nav_surveyor_info">Cartographiez la surface du mur pour améliorer la précision du suivi AR.</string>
+
+    <!-- Label for the action to create a new AR anchor. -->
+    <string name="nav_create">Créer</string>
+    <!-- Instructions for creating a new AR anchor by photographing a mark on the wall. -->
+    <string name="nav_create_info">Photographiez une marque de référence sur le mur pour créer une nouvelle ancre AR. L\'application suivra cette marque pour garder votre projection alignée.</string>
+
+    <!-- Label for the action to refine an existing AR anchor. -->
+    <string name="nav_refine">Affiner</string>
+    <!-- Description of the anchor refinement process. -->
+    <string name="nav_refine_info">Ajustez finement la position d\'une cible d\'ancrage AR existante.</string>
+
+    <!-- Label for the progress tracking tool. -->
+    <string name="nav_update">Progrès</string>
+    <!-- Description of the progress tool, used for marking completed parts of a mural. -->
+    <string name="nav_update_info">Marquez les zones terminées de votre fresque pour suivre l\'avancement de la peinture.</string>
+
+    <!-- Label for the design and layer management menu. -->
+    <string name="nav_design">Conception</string>
+    <!-- Description of the design menu, where layers are added and managed. -->
+    <string name="nav_design_info">Ajoutez et gérez des calques de conception. Chaque calque peut être une image importée ou un dessin à main levée.</string>
+
+    <!-- Action label to open or import an image. -->
+    <string name="nav_open">Ouvrir</string>
+    <!-- Description of the Open action, used to add an image layer from the gallery. -->
+    <string name="nav_open_info">Ajouter une image de votre galerie comme nouveau calque.</string>
+
+    <!-- Label for the background wall image in Mockup mode. -->
+    <string name="nav_wall">Mur</string>
+    <!-- Description for the action to change the background wall image. -->
+    <string name="nav_wall_info">Remplacer la photo du mur d\'arrière-plan utilisée en mode Maquette.</string>
+
+    <!-- Label for the AI-powered background removal tool. -->
+    <string name="nav_isolate">Isoler</string>
+    <!-- Description of the Isolate tool, explaining that it removes the background from a layer. -->
+    <string name="nav_isolate_info">Supprimer automatiquement l\'arrière-plan de ce calque, ne laissant que le sujet sur un arrière-plan transparent.</string>
+
+    <!-- Label for the color inversion tool. -->
+    <string name="nav_invert">Inverser</string>
+    <!-- Description of the Invert tool, explaining its use for stencil and overlay analysis. -->
+    <string name="nav_invert_info">Créer un négatif du calque actuel. Les noirs deviennent blancs et les couleurs sont inversées — utile pour l\'analyse de pochoir et de superposition.</string>
+
+    <!-- Label for the outline filter. -->
+    <string name="nav_outline">Contour</string>
+    <!-- Description of the Outline filter, used for creating stencil templates. -->
+    <string name="nav_outline_info">Convertir ce calque en dessin au trait noir sur fond transparent — idéal pour créer des modèles de pochoir.</string>
+
+    <!-- Label for image adjustment tools (brightness, contrast, etc.). -->
+    <string name="nav_adjust">Ajuster</string>
+    <!-- Description of the image adjustment tools. -->
+    <string name="nav_adjust_info">Ajustez finement la luminosité, le contraste, la saturation et la balance des couleurs pour ce calque.</string>
+
+    <!-- Label for color balance and tinting tools. -->
+    <string name="nav_balance">Couleur</string>
+    <!-- Description of the color balance tool, mentioning RGB sliders. -->
+    <string name="nav_balance_info">Teinter les couleurs du calque à l\'aide des curseurs des canaux rouge, vert et bleu.</string>
+
+    <!-- Label for layer blending mode selection. -->
+    <string name="nav_blending">Mélange</string>
+    <!-- Description of blending modes, used to control how layers composite. -->
+    <string name="nav_blending_info">Faire défiler les modes de fusion (Normal, Produit, Superposition…) pour contrôler comment ce calque se compose avec les calques inférieurs.</string>
+
+    <!-- Label for the application settings menu. -->
+    <string name="nav_settings">Paramètres</string>
+    <!-- Description of the settings menu, listing configurable preferences. -->
+    <string name="nav_settings_info">Configurez la manualité, le mode de numérisation AR, les unités et d\'autres préférences de l\'application.</string>
+
+    <!-- Label for the project management menu. -->
+    <string name="nav_project">Projet</string>
+    <!-- Description of the project menu, covering file operations. -->
+    <string name="nav_project_info">Gérez votre projet : créer, sauvegarder, charger et exporter.</string>
+
+    <!-- Action label to start a new project. -->
+    <string name="nav_new">Nouveau</string>
+    <!-- Description of the New Project action, including a warning about unsaved changes. -->
+    <string name="nav_new_info">Démarrer un nouveau projet vide. Toutes les modifications non enregistrées seront perdues.</string>
+
+    <!-- Action label to save the current project. -->
+    <string name="nav_save">Sauvegarder</string>
+    <!-- Description of the Save action. -->
+    <string name="nav_save_info">Sauvegarder le projet actuel sur votre appareil.</string>
+
+    <!-- Action label to load a project from the library. -->
+    <string name="nav_load">Charger</string>
+    <!-- Description of the Load action, referencing the project library. -->
+    <string name="nav_load_info">Ouvrir la bibliothèque de projets pour charger un projet précédemment sauvegardé.</string>
+
+    <!-- Action label to export the final image. -->
+    <string name="nav_export">Exporter</string>
+    <!-- Description of the Export action, explaining it merges layers into one image. -->
+    <string name="nav_export_info">Exporter une image aplatie de tous les calques visibles vers votre galerie de photos.</string>
+
+    <!-- Label for the interactive help system. -->
+    <string name="nav_help">Aide</string>
+    <!-- Description of how to use the interactive help system. -->
+    <string name="nav_help_info">Appuyez sur n\'importe quel bouton pendant que l\'Aide est active pour voir ce qu\'il fait.</string>
+
+    <!-- Label for the flashlight toggle. -->
+    <string name="nav_light">Lumière</string>
+    <!-- Description of the flashlight toggle for working in low light. -->
+    <string name="nav_light_info">Activer/désactiver la lampe de poche de l\'appareil pour éclairer votre mur en travaillant par faible luminosité.</string>
+
+    <!-- Label for the touch input lock feature. -->
+    <string name="nav_lock">Verrouiller</string>
+    <!-- Description of the touch lock, explaining how to unlock it. -->
+    <string name="nav_lock_info">Verrouiller l\'écran tactile pour éviter les modifications accidentelles pendant que vous peignez. Appuyez trois fois n\'importe où pour déverrouiller.</string>
+
+    <!-- Tooltip info for the brush tool. -->
+    <string name="info_brush">Peindre à main levée sur ce calque. Faites glisser vers le haut/bas sur le bouton Taille pour modifier le diamètre du pinceau ; faites glisser vers la gauche/droite pour ajuster l\'adoucissement (douceur des bords).</string>
+    <!-- Tooltip info for the eraser tool. -->
+    <string name="info_eraser">Effacer des parties de ce calque avec un pinceau rond. Faites glisser vers le haut/bas sur le bouton Taille pour modifier le diamètre ; faites glisser vers la gauche/droite pour ajuster l\'adoucissement.</string>
+    <!-- Tooltip info for the blur tool. -->
+    <string name="info_blur">Étirer et adoucir des zones de ce calque. Faites glisser sur une région pour la flouter.</string>
+    <!-- Tooltip info for the liquify/warp tool. -->
+    <string name="info_liquify">Pousser et déformer les pixels dans n\'importe quelle direction. Faites glisser sur une zone pour la déformer — utile pour ajuster les proportions.</string>
+    <!-- Tooltip info for the dodge (lighten) tool. -->
+    <string name="info_dodge">Éclaircir des zones spécifiques en peignant dessus.</string>
+    <!-- Tooltip info for the burn (darken) tool. -->
+    <string name="info_burn">Assombrir des zones spécifiques en peignant dessus.</string>
+    <!-- Tooltip info for the brush size control, explaining vertical and horizontal drag gestures. -->
+    <string name="info_size">Faites glisser vers le haut/bas pour modifier le diamètre du pinceau. Faites glisser vers la gauche/droite pour ajuster l\'adoucissement — un adoucissement plus large donne des bords plus doux, ressemblant davantage à ceux d\'une bombe aérosol.</string>
+    <!-- Tooltip info for the brush color control, explaining gestures and the color wheel. -->
+    <string name="info_color">Affiche la couleur active du pinceau. Faites glisser vers le haut/bas pour ajuster la luminosité ; faites glisser vers la gauche/droite pour ajuster la saturation. Appuyez pour ouvrir la roue chromatique complète.</string>
+    <!-- Tooltip info for adding a new drawing layer. -->
+    <string name="info_draw">Ajouter un nouveau calque transparent vierge pour le dessin à main levée.</string>
+    <!-- Tooltip info for the AR keyframe tool, used for drift correction. -->
+    <string name="info_keyframe">Sauvegarder la pose actuelle de la caméra AR en tant qu\'image clé. Utilisé pour corriger la dérive et réaligner la projection après s\'être éloigné et être revenu.</string>
+    <!-- Tooltip info for an individual layer in the design rail. -->
+    <string name="info_layer">Ce calque. Appuyez pour l\'activer. Ouvrez le rail horizontal pour accéder aux outils. Appuyez longuement et faites glisser pour réorganiser.</string>
+
+    <!-- Label for selecting the number of stencil layers. -->
+    <string name="stencil_layers">Calques</string>
+    <!-- Description of stencil layer options (silhouette, highlight, midtone). -->
+    <string name="stencil_layers_info">Choisissez le nombre de couches de pochoir à générer : 1 (silhouette uniquement), 2 (silhouette + surbrillance), ou 3 (silhouette + demi-teinte + surbrillance).</string>
+
+    <!-- Action label to re-generate stencils. -->
+    <string name="stencil_rebuild">Reconstruire</string>
+    <!-- Description of the Rebuild action for the stencil pipeline. -->
+    <string name="stencil_rebuild_info">Relancer le processus de génération de pochoirs sur le calque source actuel.</string>
+
+    <!-- Label for the stencil printing configuration. -->
+    <string name="stencil_print">Imprimer</string>
+    <!-- Description of the print tool, mentioning tiled PDF generation. -->
+    <string name="stencil_print_info">Configurer la taille d\'impression réelle et générer un PDF en mosaïque pour papier Lettre US.</string>
+
+    <!-- Label for setting the real-world size of the stencil. -->
+    <string name="stencil_print_size">Taille</string>
+    <!-- Description of the stencil size control, mentioning centimetre units and live page count. -->
+    <string name="stencil_print_size_info">Faites glisser vers le haut/bas pour définir la largeur ou la hauteur réelle du pochoir en centimètres. Le nombre de pages se met à jour en direct.</string>
+
+    <!-- Label for toggling between width and height locking for print sizing. -->
+    <string name="stencil_print_dim_toggle">L / H</string>
+    <!-- Description of the dimension lock toggle. -->
+    <string name="stencil_print_dim_toggle_info">Appuyez pour basculer entre le verrouillage de la largeur ou de la hauteur de la sortie.</string>
+
+    <!-- Action label to generate and print the tiled PDF. -->
+    <string name="stencil_export_pdf">Imprimer PDF</string>
+    <!-- Description of the PDF export, including the mention of overlaps for assembly. -->
+    <string name="stencil_export_pdf_info">Générer un PDF en mosaïque de toutes les couches de pochoir prêt à imprimer et à couper. Chaque carreau comprend un chevauchement de 3 mm pour l\'alignement d\'assemblage.</string>
+
+    <!-- Action label to save stencil layers as PNG images. -->
+    <string name="stencil_save_layers">Enregistrer PNGs</string>
+    <!-- Description of the PNG save action for stencil layers. -->
+    <string name="stencil_save_layers_info">Enregistrer chaque couche de pochoir sous forme d\'image PNG séparée dans votre galerie.</string>
+
+    <!-- Label for the button to return to the main editor from stencil mode. -->
+    <string name="stencil_back">← Éditeur</string>
+    <!-- Description of the back action, noting that stencil layers are preserved. -->
+    <string name="stencil_back_info">Retourner à l\'éditeur principal. Vos couches de pochoir sont conservées dans la session.</string>
+
+    <!-- Action label to add a text layer. -->
+    <string name="nav_text">Texte</string>
+    <!-- Action label to add a blank drawing layer. -->
+    <string name="nav_draw">Dessiner</string>
+    <!-- Action label to edit layer content (like text). -->
+    <string name="nav_edit">Modifier</string>
+    <!-- Action label for font selection. -->
+    <string name="nav_font">Police</string>
+    <!-- Action label for size adjustment. -->
+    <string name="nav_size">Taille</string>
+    <!-- Action label for color selection. -->
+    <string name="nav_color">Couleur</string>
+    <!-- Action label for text kerning. -->
+    <string name="nav_kern">Créne</string>
+    <!-- Action label for bold text toggle. -->
+    <string name="nav_bold">Gras</string>
+    <!-- Action label for italic text toggle. -->
+    <string name="nav_italic">Italique</string>
+    <!-- Action label for drop shadow toggle. -->
+    <string name="nav_shadow">Ombre</string>
+    <!-- Action label for the eraser tool. -->
+    <string name="nav_eraser">Gomme</string>
+    <!-- Action label for the blur/smudge tool. -->
+    <string name="nav_blur">Flou</string>
+    <!-- Action label for the liquify/warp tool. -->
+    <string name="nav_liquify">Fluidité</string>
+    <!-- Action label for the dodge/lighten tool. -->
+    <string name="nav_dodge">Densité -</string>
+    <!-- Action label for the burn/darken tool. -->
+    <string name="nav_burn">Densité +</string>
+
+    <!-- MainActivity UI strings -->
+    <!-- Label shown when a stencil or process is generating. -->
+    <string name="pro_tip">Astuce de pro</string>
+    <string name="double_tap_hint">Appuyez deux fois pour changer l\'axe de rotation.</string>
+    <string name="ok_button">OK</string>
+
+    <string name="generating">GÉNÉRATION...</string>
+    <!-- Hint shown when user can add a layer by pressing again. -->
+    <string name="stencil_hint">Appuyez à nouveau pour ajouter un calque.</string>
+    <!-- Hint for renaming a layer. -->
+    <string name="rename_hint">Renommer</string>
+    <!-- Hint for editing text content. -->
+    <string name="edit_text_hint">Modifier le texte</string>
+    <!-- Action to copy layer modifications. -->
+    <string name="copy_edits">Copier les modifs</string>
+    <!-- Action to paste layer modifications. -->
+    <string name="paste_edits">Coller les modifs</string>
+    <!-- Action to generate a poster from a layer. -->
+    <string name="generate_poster">Générer Affiche</string>
+    <!-- Action to duplicate a layer. -->
+    <string name="duplicate">Dupliquer</string>
+    <!-- Action to unlink a layer from others. -->
+    <string name="unlink_layer">Délier le calque</string>
+    <!-- Action to link a layer with others. -->
+    <string name="link_layer">Lier le calque</string>
+    <!-- Action to hide a layer. -->
+    <string name="hide_layer">Masquer le calque</string>
+    <!-- Action to show a layer. -->
+    <string name="show_layer">Afficher le calque</string>
+    <!-- Action to flatten all layers. -->
+    <string name="flatten_all">Aplatir tout</string>
+    <!-- Action to delete a layer. -->
+    <string name="delete">Supprimer</string>
+    <string name="new_project_name">Nouveau projet</string>
+    <!-- Label for the lock button. -->
+    <string name="lock_button">Verrouiller</string>
+    <!-- Label for the freeze button. -->
+    <string name="freeze_button">Geler</string>
+
+    <!-- Dialog title for choosing a wall photo source. -->
+    <string name="wall_source_title">Choisir Photo Mur</string>
+    <!-- Message asking user how they want to set the wall photo. -->
+    <string name="wall_source_text">Comment souhaitez-vous définir le mur d\'arrière-plan ?</string>
+    <!-- Action to take a new photo. -->
+    <string name="take_photo">Prendre photo</string>
+    <!-- Action to choose a photo from the gallery. -->
+    <string name="choose_from_gallery">Choisir depuis la galerie</string>
+
+    <!-- Message shown when the device doesn't support the Depth API. -->
+    <string name="depth_unsupported">Cet appareil ne prend pas en charge l\'API Depth.\nPassez en mode Toile dans les paramètres.</string>
+
+    <!-- Title shown when ARCore is missing or unsupported. -->
+    <string name="arcore_required_title">ARCore requis</string>
+    <!-- Text explaining that ARCore is needed and providing instructions. -->
+    <string name="arcore_required_text">Cet appareil n\'a pas ARCore d\'installé ou n\'est pas pris en charge. Installez ARCore depuis le Play Store pour utiliser les fonctionnalités AR.</string>
+    <!-- Action to install ARCore from the store. -->
+    <string name="install_arcore">Installer ARCore</string>
+
+    <!-- Message shown when camera permission is denied. -->
+    <string name="camera_permission_required">La permission de la caméra est requise pour le mode AR.</string>
+    <!-- Action to open system settings. -->
+    <string name="open_settings">Ouvrir Paramètres</string>
+
+    <!-- Title for target creation overlay. -->
+    <string name="target_creation_title">CRÉATION DE CIBLE</string>
+    <!-- Instructions for creating a target by tapping on reference marks. -->
+    <string name="target_creation_text">Appuyez directement sur vos marques de repère peintes à l\'écran. L\'application les isolera immédiatement.</string>
+    <!-- Generic cancel action. -->
+    <string name="cancel">Annuler</string>
+
+    <!-- Label shown when diagnostic info is copied. -->
+    <string name="diag_copied">COPIÉ ✓</string>
+    <!-- Title for the depth diagnostic popup. -->
+    <string name="diag_title">DIAG PROFONDEUR (appuyer pour copier)</string>
+    <!-- Message shown when waiting for diagnostic data. -->
+    <string name="diag_waiting">En attente de la première image…</string>
+
+    <!-- Coaching step 1 for scanning. -->
+    <string name="scan_step_1">Étape 1 : Cartographier l\'environnement</string>
+    <!-- Coaching step 2 for scanning. -->
+    <string name="scan_step_2">Étape 2 : Scanner le mur cible</string>
+
+    <!-- Question asking if the AR artwork is correctly placed on the wall. -->
+    <string name="plane_confirm_question">L\'œuvre est-elle sur le bon mur ?</string>
+    <!-- Action to confirm the current plane placement. -->
+    <string name="looks_correct">Semble correct</string>
+    <!-- Action to redetect the plane. -->
+    <string name="redetect">Redétecter</string>
+
+    <!-- Title for plane realignment tool. -->
+    <string name="plane_realignment_title">Redétecter la surface du mur</string>
+    <!-- Instructions for realigning the plane with the wall. -->
+    <string name="plane_realignment_text">L\'ancre est placée à partir de là où vous étiez lors de la capture. ARCore choisit la surface verticale suivie la plus directement devant cette position d\'origine.\n\n1. Retournez approximativement là où vous étiez lors de la capture\n2. Faites un panoramique lent de la caméra sur le mur de votre fresque pour qu\'ARCore puisse l\'enregistrer comme une surface plane\n3. Restez stable face à l\'œuvre, puis appuyez ci-dessous\n\nLa bordure orange sautera vers la surface nouvellement détectée.</string>
+    <!-- Action to use the currently detected wall for realignment. -->
+    <string name="use_this_wall">Utiliser ce mur</string>
+
+    <!-- Label shown when scanning for relocation. -->
+    <string name="scanning_dots">Analyse en cours\u2026</string>
+    <!-- Progress label for relocation tracking. -->
+    <string name="matched_percent">%1$d%% correspondant</string>
+    <!-- Message shown when the AR anchor is successfully locked. -->
+    <string name="anchor_locked">Ancre verrouillée</string>
+
+    <!-- Dialog title for choosing a font. -->
+    <string name="choose_font">Choisir Police</string>
+
+    <!-- General Actions -->
+    <string name="cancel_button">Annuler</string>
+    <string name="done_button">Terminé</string>
+    <string name="apply_button">Appliquer</string>
+    <string name="close_button">Fermer</string>
+    <string name="next_button">Suivant</string>
+    <string name="save_button">Sauvegarder</string>
+    <string name="retake_button">Reprendre</string>
+    <string name="capture_button">Capturer</string>
+
+    <!-- Adjustments Panel -->
+    <string name="adj_detail">Détail</string>
+    <string name="adj_opacity">Opacité</string>
+    <string name="adj_brightness">Luminosité</string>
+    <string name="adj_contrast">Contraste</string>
+    <string name="adj_saturation">Saturation</string>
+    <string name="adj_red">Rouge</string>
+    <string name="adj_green">Vert</string>
+    <string name="adj_blue">Bleu</string>
+    <string name="adj_undo">Annuler</string>
+    <string name="adj_redo">Rétablir</string>
+    <string name="adj_magic_align">Alignement Magique</string>
+
+    <!-- Overlays & Status -->
+    <string name="status_create_grid">Créez une Grille pour commencer.</string>
+    <string name="status_scan_surfaces">Scannez les surfaces autour de vous.</string>
+    <string name="status_tap_surface">Appuyez sur une surface pour placer l\'ancre.</string>
+    <string name="status_looking_grid">Recherche de votre Grille...</string>
+    <string name="status_ready">Prêt. (%1$d pts)</string>
+    <string name="unlock_hint">Appuyez 4 fois pour déverrouiller</string>
+
+    <!-- Library Screen -->
+    <string name="lib_app_title">GraffitiXR</string>
+    <string name="lib_app_description">Projetez votre œuvre sur un vrai mur ou une toile en utilisant la RA ou une simple superposition de caméra. \n\nCréez rapidement une maquette sur une photo pour montrer à quoi ressemblera l\'œuvre terminée. \n\nOu tracez une image sur papier en utilisant votre appareil comme table lumineuse.</string>
+    <string name="lib_new_project">Nouveau</string>
+    <string name="lib_import_project">Importer</string>
+    <string name="lib_no_projects">Aucun projet pour le moment</string>
+    <string name="lib_no_projects_hint">Appuyez sur Nouveau ci-dessus pour commencer votre première fresque.\n\nVous serez dirigé vers l\'éditeur où vous pourrez :\n  \u2022  Ajouter des œuvres d\'art depuis le menu Conception\n  \u2022  Passer en mode AR pour projeter sur un vrai mur\n  \u2022  Utiliser Superposition pour faire flotter votre conception sur la caméra en direct\n  \u2022  Utiliser Maquette pour prévisualiser sur une photo de mur\n  \u2022  Utiliser Table lumineuse pour tracer votre conception sur papier</string>
+    <string name="lib_project_thumbnail">Vignette du projet</string>
+    <string name="lib_delete_project_desc">Supprimer le projet %1$s</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Paramètres</string>
+    <string name="settings_preferences_section">Préférences</string>
+    <string name="settings_hand_label">Main dominante</string>
+    <string name="settings_hand_right">Droite</string>
+    <string name="settings_hand_left">Gauche</string>
+    <string name="settings_diag_label">Superposition de diagnostic de profondeur</string>
+    <string name="settings_on">Activé</string>
+    <string name="settings_off">Désactivé</string>
+    <string name="settings_scan_mode_label">Mode de scan AR</string>
+    <string name="settings_scan_mode_point_cloud">Nuage de points</string>
+    <string name="settings_scan_mode_gaussian_splat">Splatting Gaussien</string>
+    <string name="settings_anchor_boundary_label">Afficher la limite d\'ancre</string>
+    <string name="settings_units_label">Unités de distance</string>
+    <string name="settings_units_imperial">Impérial (pi)</string>
+    <string name="settings_units_metric">Métrique (m)</string>
+    <string name="settings_canvas_bg_label">Arrière-plan de la toile</string>
+    <string name="settings_info_section">Informations sur l\'application</string>
+    <string name="settings_version_label">Version</string>
+    <string name="settings_updates_section">Mises à jour</string>
+    <string name="settings_check_updates_label">Vérifier les mises à jour expérimentales</string>
+    <string name="settings_install_update_label">Installer la mise à jour</string>
+    <string name="settings_permissions_section">Permissions</string>
+    <string name="settings_camera_access">Accès à l\'appareil photo</string>
+    <string name="settings_photo_access">Accès à la galerie photo</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_granted">Accordé</string>
+    <string name="settings_denied">Refusé</string>
+    <string name="settings_open_app_settings">Ouvrir les paramètres de l\'application</string>
+    <string name="settings_copyright">GraffitiXR © 2025</string>
+
+    <!-- Editor UI -->
+    <string name="layers_title">Calques</string>
+    <string name="brush_size_title">Taille du pinceau</string>
+    <string name="save_project_hint">Nom du projet</string>
+
+    <!-- Target Creation -->
+    <string name="target_guide_desc">Guide d\'alignement de cible</string>
+    <string name="target_captured_desc">Cible capturée</string>
+    <string name="target_review_desc">Examiner la cible extraite</string>
+    <string name="target_unwarp_hint">Faites glisser les coins pour déformer</string>
+    <string name="target_review_title">Examiner les marquages extraits</string>
+
+    <string name="target_exclude">Exclure</string>
+    <string name="target_include">Inclure</string>
+    <string name="target_erase_marks">Effacer les marques</string>
+    <string name="target_show_features">Afficher les caractéristiques</string>
+    <string name="reset_button">Réinitialiser</string>
+
+    <string name="poster_title">GÉNÉRER AFFICHE</string>
+    <string name="poster_select_layers">Sélectionner les calques à inclure :</string>
+    <string name="poster_physical_size">Taille physique (Largeur en mm) :</string>
+    <string name="poster_generate_pdf">GÉNÉRER PDF</string>
+
+    <!-- Scan Hints -->
+    <string name="scan_hint_recover">Déplacez l\'appareil lentement pour récupérer le suivi</string>
+    <string name="scan_hint_ambient">Pivotez lentement à 360° pour cartographier votre environnement (%1$d°)</string>
+    <string name="scan_hint_too_dark">Trop sombre. Allumez la lampe de poche.</string>
+    <string name="scan_hint_build_map">Marchez à gauche et à droite pour construire la carte</string>
+    <string name="scan_hint_closer">Rapprochez-vous du mur</string>
+    <string name="scan_hint_higher_lower">Scannez plus haut et plus bas</string>
+
+    <!-- Content Descriptions -->
+    <string name="desc_bg_mockup">Maquette d\'arrière-plan</string>
+    <string name="desc_segmentation_preview">Aperçu de la segmentation</string>
+
+    <!-- Help strings for main navigation rail. -->
+    <!-- Mode Switcher help text. -->
+    <string name="help_mode_host">Commutateur de mode : Basculer entre les modes de l\'application. Instructions : Appuyez pour développer, puis sélectionnez AR, Superposition, Maquette ou Table lumineuse.</string>
+    <!-- AR Mode help text. -->
+    <string name="help_ar">Mode AR : Projeter la conception sur un mur à l\'aide de la cartographie spatiale. Instructions : Scannez l\'environnement jusqu\'à ce que le mur soit détecté, puis appuyez pour placer l\'ancre.</string>
+    <!-- Overlay Mode help text. -->
+    <string name="help_overlay">Mode Superposition : Afficher la conception sur la caméra en direct sans suivi spatial. Instructions : Mettez à l\'échelle et déplacez manuellement la conception pour l\'adapter à votre cadre.</string>
+    <!-- Mockup Mode help text. -->
+    <string name="help_mockup">Mode Maquette : Prévisualiser la conception sur une photo statique. Instructions : Utilisez \'Mur\' pour définir une image d\'arrière-plan, puis organisez les calques par-dessus.</string>
+    <!-- Lightbox Mode help text. -->
+    <string name="help_trace">Mode Table lumineuse : Surface de traçage haute luminosité. Instructions : Placez du papier sur l\'écran et tracez. Appuyez trois fois n\'importe où pour quitter.</string>
+    <!-- Target Management help text. -->
+    <string name="help_target_host">Gestion de cible : Outils pour les ancres AR. Instructions : Appuyez pour accéder aux outils de création ou de réalignement de la position de la fresque.</string>
+    <!-- Scan Resolution help text. -->
+    <string name="help_scan_mode_toggle">Résolution de scan : Basculer entre Fresque (grande échelle) et Toile (petite échelle). Fresque utilise des Splats Gaussiens pour les murs ; Toile utilise des Nuages de Points pour les œuvres détaillées à l\'échelle d\'un bureau.</string>
+    <!-- Create Anchor help text. -->
+    <string name="help_create">Créer une Ancre : Photographier une marque sur le mur pour verrouiller la projection. Instructions : Pointez sur une texture distincte et appuyez. L\'application suivra cette marque.</string>
+    <!-- Layer Management help text. -->
+    <string name="help_design_host">Gestion des calques : Ajouter des images, du texte ou des croquis. Instructions : Appuyez pour développer. Appuyez longuement sur un bouton de calque pour ouvrir son menu secondaire.</string>
+    <!-- Import Image help text. -->
+    <string name="help_add_img">Importer Image : Ajouter un croquis ou une photo de référence. Instructions : Sélectionnez une image dans votre galerie. Elle apparaîtra comme un nouveau calque de conception.</string>
+    <!-- New Sketch help text. -->
+    <string name="help_add_draw">Nouveau Croquis : Ajouter un calque vierge pour le dessin à main levée. Instructions : Sélectionnez le calque pour révéler les outils pinceau, gomme et doigt.</string>
+    <!-- Add Text help text. -->
+    <string name="help_add_text">Ajouter du Texte : Créer un calque de typographie. Instructions : Appuyez sur le bouton \'Modifier\' du calque pour modifier le contenu et la mise en forme.</string>
+    <!-- Change Wall help text. -->
+    <string name="help_wall">Changer de Mur : Définir l\'arrière-plan pour le mode Maquette. Instructions : Sélectionnez une photo du mur physique sur lequel vous prévoyez de peindre.</string>
+    <!-- Project Management help text. -->
+    <string name="help_project_host">Gestion de Projet : Sauvegarder, charger et exporter le travail. Instructions : Appuyez pour accéder aux tâches administratives pour votre fresque.</string>
+    <!-- New Project help text. -->
+    <string name="help_new">Nouveau Projet : Démarrer une nouvelle fresque. Instructions : Appuyez pour réinitialiser. Avertissement : Cela efface tout le travail en cours. Sauvegardez d\'abord !</string>
+    <!-- Save Project help text. -->
+    <string name="help_save">Sauvegarder le Projet : Stocker la fresque et la carte AR. Instructions : Entrez un nom de projet et appuyez sur Sauvegarder pour préserver votre progression.</string>
+    <!-- Project Library help text. -->
+    <string name="help_load">Bibliothèque de Projets : Accéder aux fresques sauvegardées. Instructions : Parcourez la bibliothèque pour reprendre le travail ou importer des fichiers de projet partagés.</string>
+    <!-- Export Image help text. -->
+    <string name="help_export">Exporter l\'Image : Enregistrer un instantané haute résolution. Instructions : Rendu de tous les calques visibles en un seul PNG dans votre galerie photo.</string>
+    <!-- App Settings help text. -->
+    <string name="help_settings">Paramètres de l\'Appli : Configurer les préférences. Instructions : Ouvrir pour ajuster la manualité, les unités et les paramètres de numérisation.</string>
+    <!-- Flashlight help text. -->
+    <string name="help_light">Lampe de poche : Basculer la LED de l\'appareil. Instructions : Utilisez-la pour éclairer les murs sombres pour un meilleur suivi AR.</string>
+    <!-- Lock/Freeze help text. -->
+    <string name="help_lock_trace">Verrouiller/Geler : Empêcher les modifications accidentelles. Instructions : En mode Table lumineuse, désactive l\'écran. Dans les autres modes, verrouille les transformations de calque.</string>
+    <!-- Interactive 'Help' help text. -->
+    <string name="help_help_main">Aide Interactive : Explique les fonctions des boutons. Instructions : Appuyez pour l\'activer (Cyan). Pendant qu\'elle est active, appuyez sur n\'importe quel bouton pour voir son texte d\'aide.</string>
+    <!-- Individual Layer help text. -->
+    <string name="help_layer">Calque \'%1$s\' : Élément de fresque actif. Instructions : Appuyez pour sélectionner. Faites glisser le bouton vers le haut/bas pour réorganiser. Transformez à l\'écran avec des gestes.</string>
+
+    <!-- Help strings for layer-specific tools. -->
+    <!-- Edit Text tool help. -->
+    <string name="help_edit_text">Modifier le Texte : Changer les mots dans le calque de typographie. Instructions : Appuyez pour ouvrir le clavier et mettre à jour le contenu textuel.</string>
+    <!-- Brush/Text Size tool help. -->
+    <string name="help_size">Taille Pinceau/Texte : Ajuster l\'échelle et la douceur. Instructions : Faites glisser vers le haut/bas pour la taille. Faites glisser vers la gauche/droite pour l\'adoucissement du pinceau.</string>
+    <!-- Font Picker tool help. -->
+    <string name="help_font">Sélecteur de Police : Sélectionner le style de typographie. Instructions : Appuyez pour parcourir les polices disponibles et les appliquer au calque de texte.</string>
+    <!-- Color Tool help. -->
+    <string name="help_color">Outil Couleur : Définir la couleur active. Instructions : Faites glisser vers le haut/bas pour la luminosité, gauche/droite pour la saturation. Appuyez pour la roue chromatique complète.</string>
+    <!-- Text Kerning tool help. -->
+    <string name="help_kern">Créne de Texte : Ajuster l\'espacement des lettres. Instructions : Faites glisser vers la gauche/droite pour resserrer ou desserrer la mise en page du texte.</string>
+    <!-- Bold Toggle help. -->
+    <string name="help_bold">Bascule Gras : Épaisseur de police grasse. Instructions : Appuyez pour basculer le style gras sur le calque de texte actif.</string>
+    <!-- Italic Toggle help. -->
+    <string name="help_italic">Bascule Italique : Style incliné. Instructions : Appuyez pour basculer le style italique sur le calque de texte actif.</string>
+    <!-- Text Outline toggle help. -->
+    <string name="help_outline">Contour de Texte : Trait de caractère. Instructions : Appuyez pour basculer un contour visible autour des caractères de texte.</string>
+    <!-- Drop Shadow toggle help. -->
+    <string name="help_shadow">Ombre Portée : Profondeur du texte. Instructions : Appuyez pour basculer une ombre douce derrière la typographie pour une meilleure lisibilité.</string>
+    <!-- Generate Stencil help. -->
+    <string name="help_stencil_gen">Générer Pochoir : Créer des modèles imprimables. Instructions : Appuyez pour commencer la génération de pochoirs multicouches pour cette image.</string>
+    <!-- Blend Mode help. -->
+    <string name="help_blend">Mode de Fusion : Style composite. Instructions : Appuyez pour faire défiler les modes comme Produit, Superposition, etc.</string>
+    <!-- Image Adjustments help. -->
+    <string name="help_adj">Ajustements d\'Image : Affiner l\'apparence. Instructions : Appuyez pour révéler les curseurs d\'Opacité, Luminosité, Contraste et Saturation.</string>
+    <!-- Invert Colors help. -->
+    <string name="help_invert">Inverser les Couleurs : Négatif très contrasté. Instructions : Appuyez pour inverser les couleurs. Les blancs deviennent noirs et vice-versa—utile pour le traçage.</string>
+    <!-- Color Balance help. -->
+    <string name="help_balance">Balance des Couleurs : Réglage du canal RVB. Instructions : Appuyez pour révéler les curseurs pour un réglage précis du Rouge, Vert et Bleu.</string>
+    <!-- Eraser Brush help. -->
+    <string name="help_eraser">Pinceau Gomme : Supprimer le contenu du calque. Instructions : Peignez sur l\'écran pour effacer. Utilisez le bouton \'Taille\' pour ajuster le diamètre.</string>
+    <!-- Blur/Smudge tool help. -->
+    <string name="help_blur">Outil Flou/Doigt : Mélanger les couleurs. Instructions : Peignez sur les régions pour adoucir les bords ou maculer les détails ensemble.</string>
+    <!-- Warp Tool help. -->
+    <string name="help_liquify">Outil Déformation : Remodeler la conception. Instructions : Faites glisser sur l\'écran pour pousser et tirer des pixels—idéal pour ajuster les proportions.</string>
+    <!-- Dodge Tool help. -->
+    <string name="help_dodge">Outil Densité - : Éclaircir les zones. Instructions : Peignez sur des parties du calque pour augmenter leur luminance.</string>
+    <!-- Burn Tool help. -->
+    <string name="help_burn">Outil Densité + : Assombrir les zones. Instructions : Peignez sur des parties du calque pour diminuer leur luminance.</string>
+    <!-- Isolate Subject help. -->
+    <string name="help_iso">Isoler le Sujet : Suppression auto de l\'arrière-plan. Instructions : Appuyez pour extraire le sujet principal de son arrière-plan à l\'aide de l\'IA.</string>
+    <!-- Sketch Outline help. -->
+    <string name="help_line">Contour de Croquis : Filtre dessin au trait. Instructions : Appuyez pour convertir la photo en contour transparent noir et blanc.</string>
+    <!-- Layer Help toggle help. -->
+    <string name="help_help_layer">Aide Calque : Basculer les infos pour ces outils de calque spécifiques. Instructions : Appuyez pour activer. Puis appuyez sur l\'icône de n\'importe quel outil pour voir ce qu\'il fait.</string>
+
+    <!-- Unit labels -->
+    <!-- Abbreviation for feet. -->
+    <string name="unit_feet">pi</string>
+    <!-- Abbreviation for centimeters. -->
+    <string name="unit_centimeters">cm</string>
+    <!-- Abbreviation for meters. -->
+    <string name="unit_meters">m</string>
+    <!-- Tutorial: AR Mode -->
+    <string name="tut_ar_title">Projection AR</string>
+    <string name="tut_ar_text">Projette votre conception sur un vrai mur à l\'aide du capteur de profondeur du téléphone et du suivi spatial.</string>
+    <string name="tut_ar_step1_title">Étape 1 : Scannez</string>
+    <string name="tut_ar_step1_text">Pointez vers le mur et déplacez-vous lentement d\'un côté à l\'autre. Des taches colorées apparaissent lorsque le moteur cartographie la surface. Attendez que les taches couvrent la zone du mur.</string>
+    <string name="tut_ar_step2_title">Étape 2 : Appuyez pour Placer</string>
+    <string name="tut_ar_step2_text">Appuyez simplement sur l\'écran. L\'application photographie le mur, extrait les caractéristiques de suivi et verrouille l\'ancre instantanément.</string>
+    <string name="tut_ar_step3_title">Étape 3 : Ajoutez votre Œuvre</string>
+    <string name="tut_ar_step3_text">Appuyez sur \'Conception\' pour accéder à vos outils de calque. Utilisez \'Image\' pour importer des photos, \'Dessiner\' pour faire un croquis, ou \'Texte\' pour taper.</string>
+    <string name="tut_ar_tip_title">Astuce : La Texture est Importante</string>
+    <string name="tut_ar_tip_text">Les murs blancs vides, le béton lisse et les surfaces unicolores ne seront pas suivis. Visez votre point d\'ancrage sur un graffiti, du plâtre rugueux ou toute marque distincte.</string>
+
+    <!-- Tutorial: Overlay Mode -->
+    <string name="tut_overlay_title">Superposition en Direct</string>
+    <string name="tut_overlay_text">Votre conception flotte au-dessus de la vue de la caméra en direct — aucune numérisation de surface n\'est nécessaire.</string>
+    <string name="tut_overlay_step1_title">Étape 1 : Ajoutez votre Œuvre</string>
+    <string name="tut_overlay_step1_text">Appuyez sur \'Conception\' pour accéder aux outils de calque. Utilisez \'Image\' pour importer des photos, \'Dessiner\' pour esquisser, ou \'Texte\' pour taper.</string>
+    <string name="tut_overlay_step2_title">Étape 2 : Positionnez-la</string>
+    <string name="tut_overlay_step2_text">Pincez pour mettre à l\'échelle, faites glisser pour repositionner. La superposition reste fixée à votre écran — reculez pour voir comment elle s\'adapte au mur.</string>
+
+    <!-- Tutorial: Mockup Mode -->
+    <string name="tut_mockup_title">Maquette Photo</string>
+    <string name="tut_mockup_text">Prévisualisez votre conception sur une photo avant même de prendre un pinceau.</string>
+    <string name="tut_mockup_step1_title">Étape 1 : Définir le Mur</string>
+    <string name="tut_mockup_step1_text">Ouvrez \'Conception\' et appuyez sur \'Mur\' pour choisir ou prendre une photo de votre surface. Faites-le en premier !</string>
+    <string name="tut_mockup_step2_title">Étape 2 : Ajoutez votre Œuvre</string>
+    <string name="tut_mockup_step2_text">Utilisez \'Image\', \'Dessiner\', ou \'Texte\' pour ajouter des calques au-dessus du mur. Pincez et faites glisser pour les dimensionner et les positionner.</string>
+
+    <!-- Tutorial: Trace Mode -->
+    <string name="tut_trace_title">Mode Table Lumineuse</string>
+    <string name="tut_trace_text">Transforme votre écran en une table lumineuse brillante pour tracer votre conception sur du papier.</string>
+    <string name="tut_trace_step1_title">Étape 1 : Ouvrir Menu Conception</string>
+    <string name="tut_trace_step1_text">Appuyez sur \'Conception\' pour accéder aux outils de calque.</string>
+    <string name="tut_trace_step2_title">Étape 2 : Ajouter du Contenu</string>
+    <string name="tut_trace_step2_text">Utilisez \'Image\' pour importer des photos, \'Dessiner\' pour esquisser, ou \'Texte\' pour taper.</string>
+    <string name="tut_trace_step3_title">Étape 3 : Traçage</string>
+    <string name="tut_trace_step3_text">Posez du papier sur l\'écran et tracez. Appuyez trois fois n\'importe où pour quitter.</string>
+
+    <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
+    <string name="tut_create_anchor_title">Créer Ancre</string>
+    <string name="tut_create_anchor_text">Verrouille votre projection à un endroit spécifique sur le mur. Une fois définie, la conception reste en place même si vous vous promenez.</string>
+    <string name="tut_surface_req_title">Exigences de Surface</string>
+    <string name="tut_surface_req_text">Le mur a besoin d\'une texture visible — graffiti, plâtre rugueux, briques ou autocollants fonctionnent tous bien. Les murs lisses, vides ou d\'une seule couleur ne retiendront pas d\'ancre.</string>
+    <string name="tut_blobs_title">Que Signifient les Taches</string>
+    <string name="tut_blobs_text">Après avoir appuyé, vous verrez brièvement des taches vertes. Ce sont les points clés de suivi que l\'application a extraits. Plus de taches = verrouillage plus fort.</string>
+    <string name="tut_import_img_title">Importer Image</string>
+    <string name="tut_import_img_text">Ajoutez un croquis, une photo ou une référence de votre galerie. Il apparaît comme un nouveau calque empilé au-dessus des autres.</string>
+    <string name="tut_scale_pos_title">Mise à l\'Échelle et Position</string>
+    <string name="tut_scale_pos_text">Pincez avec deux doigts pour redimensionner. Faites glisser avec un doigt pour repositionner. Le calque s\'accroche à la surface du mur projetée en mode AR.</string>
+    <string name="tut_lock_freeze_title">Verrouiller / Geler</string>
+    <string name="tut_lock_freeze_text">En mode Table lumineuse (Calque) : désactive le tactile pour que vous puissiez poser du papier sur l\'écran sans rien bouger accidentellement.</string>
+    <string name="tut_in_other_modes_title">Dans d\'Autres Modes</string>
+    <string name="tut_in_other_modes_text">Dans les modes AR, Superposition et Maquette : verrouille les transformations des calques pour que les conceptions ne puissent pas être accidentellement déplacées ou mises à l\'échelle.</string>
+    <string name="tut_stencil_gen_title">Générer Pochoir</string>
+    <string name="tut_stencil_gen_text">Convertit votre image en pochoirs imprimables pour la peinture en aérosol. Chaque pochoir représente une couche de couleur de la conception.</string>
+    <string name="tut_how_many_layers_title">Combien de Couches ?</string>
+    <string name="tut_how_many_layers_text">Une conception à 3 couleurs produit 3 feuilles de pochoir. Plus de couleurs = plus de feuilles. Les images simples à contraste élevé donnent les meilleurs résultats.</string>
+    <string name="tut_exporting_title">Exportation</string>
+    <string name="tut_exporting_text">Chaque pochoir est exporté au format PDF. Imprimez à l\'échelle 100 % (sans mise à l\'échelle) pour obtenir des dimensions précises grandeur nature.</string>
+    <string name="tut_opacity_brightness_title">Opacité &amp; Luminosité</string>
+    <string name="tut_opacity_brightness_text">L\'opacité contrôle la transparence du calque. La luminosité modifie la clarté globale — utile pour faire correspondre le calque à la teinte de votre mur.</string>
+    <string name="tut_contrast_saturation_title">Contraste &amp; Saturation</string>
+    <string name="tut_contrast_saturation_text">Le contraste sépare les sombres des clairs — idéal pour faire ressortir les contours des pochoirs. La saturation contrôle l\'intensité des couleurs ; faites glisser vers zéro pour les niveaux de gris.</string>
+    <string name="tut_isolate_subject_title">Isoler Sujet</string>
+    <string name="tut_isolate_subject_text">Utilise l\'IA pour supprimer automatiquement l\'arrière-plan, ne laissant que le sujet principal de l\'image.</string>
+    <string name="tut_best_results_title">Meilleurs Résultats</string>
+    <string name="tut_best_results_text">Fonctionne mieux sur les photos avec un sujet clair contre un fond uni ou contrasté. Les scènes complexes avec des arrière-plans chargés peuvent nécessiter des retouches manuelles avec la gomme.</string>
+</resources>
