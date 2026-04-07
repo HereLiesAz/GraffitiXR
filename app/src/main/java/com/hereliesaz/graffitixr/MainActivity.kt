@@ -657,9 +657,9 @@ class MainActivity : ComponentActivity() {
                                     isRightHanded = editorUiState.isRightHanded,
                                     captureStep = mainUiState.captureStep,
                                     isLoading = isProcessing,
-                                    onConfirm = { _, mask ->
+                                    onConfirm = { bitmap, mask, depth, dw, dh, ds, intr, view ->
                                         arViewModel.setInitialAnchorFromCapture()
-                                        mainViewModel.onConfirmTargetCreation(arUiState.tempCaptureBitmap, mask)
+                                        mainViewModel.onConfirmTargetCreation(bitmap, mask, depth, dw, dh, ds, intr, view)
                                     },
                                     onRetake = {
                                         mainViewModel.onRetakeCapture()

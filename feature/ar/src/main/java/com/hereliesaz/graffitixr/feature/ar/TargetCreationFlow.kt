@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import android.graphics.Bitmap
 import android.graphics.Canvas as AndroidCanvas
+import java.nio.ByteBuffer
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -60,7 +61,7 @@ fun TargetCreationUi(
     isRightHanded: Boolean,
     captureStep: CaptureStep,
     isLoading: Boolean,
-    onConfirm: (Bitmap?, Bitmap?) -> Unit,
+    onConfirm: (bitmap: Bitmap?, mask: Bitmap?, depthBuffer: ByteBuffer?, depthW: Int, depthH: Int, depthStride: Int, intrinsics: FloatArray?, viewMatrix: FloatArray?) -> Unit,
     onRetake: () -> Unit,
     onCancel: () -> Unit,
     onUnwarpConfirm: (List<Offset>) -> Unit,
@@ -82,10 +83,18 @@ fun TargetCreationUi(
                 FeatureSelectionReview(
                     annotatedBitmap = uiState.annotatedCaptureBitmap,
                     rawBitmap = uiState.tempCaptureBitmap,
+                    depthBuffer = uiState.targetDepthBuffer,
+                    depthW = uiState.targetDepthBufferWidth,
+                    depthH = uiState.targetDepthBufferHeight,
+                    depthStride = uiState.targetDepthStride,
+                    intrinsics = uiState.targetIntrinsics,
+                    viewMatrix = uiState.targetCaptureViewMatrix,
                     isAnnotating = uiState.annotatedCaptureBitmap == null && uiState.tempCaptureBitmap != null,
                     canUndo = uiState.canUndoErase,
                     canRedo = uiState.canRedoErase,
-                    onConfirm = { mask -> onConfirm(uiState.tempCaptureBitmap, mask) },
+                    onConfirm = { mask, depth, dw, dh, ds, intr, view ->
+                        onConfirm(uiState.tempCaptureBitmap, mask, depth, dw, dh, ds, intr, view)
+                    },
                     onRetake = onRetake,
                     onBeginErase = onBeginErase,
                     onEraseAtPoint = onEraseAtPoint,
@@ -114,10 +123,16 @@ fun TargetCreationUi(
 private fun FeatureSelectionReview(
     annotatedBitmap: Bitmap?,
     rawBitmap: Bitmap?,
+    depthBuffer: ByteBuffer?,
+    depthW: Int,
+    depthH: Int,
+    depthStride: Int,
+    intrinsics: FloatArray?,
+    viewMatrix: FloatArray?,
     isAnnotating: Boolean,
     canUndo: Boolean,
     canRedo: Boolean,
-    onConfirm: (mask: Bitmap?) -> Unit,
+    onConfirm: (mask: Bitmap?, depthBuffer: ByteBuffer?, depthW: Int, depthH: Int, depthStride: Int, intrinsics: FloatArray?, viewMatrix: FloatArray?) -> Unit,
     onRetake: () -> Unit,
     onBeginErase: () -> Unit,
     onEraseAtPoint: (Float, Float) -> Unit,
@@ -333,7 +348,7 @@ private fun FeatureSelectionReview(
                 onClick = {
                     val mask = if (strokes.isEmpty()) null
                                else rasterizeStrokes(strokes, rawBitmap?.width ?: 512, rawBitmap?.height ?: 512)
-                    onConfirm(mask)
+                    onConfirm(mask, depthBuffer, depthW, depthH, depthStride, intrinsics, viewMatrix)
                 },
                 containerColor = MaterialTheme.colorScheme.primaryContainer
             ) {

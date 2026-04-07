@@ -27,8 +27,11 @@ import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -57,6 +60,9 @@ class ArViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(ArUiState())
     val uiState: StateFlow<ArUiState> = _uiState.asStateFlow()
+
+    private val _unfreezeRequested = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val unfreezeRequested: SharedFlow<Unit> = _unfreezeRequested.asSharedFlow()
 
     private var session: Session? = null
     private var renderer: ArRenderer? = null
@@ -350,10 +356,10 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    private fun loadFingerprintIfExists() {
+    internal fun loadFingerprintIfExists() {
         val fp = projectRepository.currentProject.value?.fingerprint ?: return
         viewModelScope.launch(Dispatchers.IO) {
-            slamManager.setTargetFingerprint(
+            slamManager.restoreWallFingerprint(
                 fp.descriptorsData,
                 fp.descriptorsRows,
                 fp.descriptorsCols,
@@ -495,7 +501,24 @@ class ArViewModel @Inject constructor(
     }
 
     fun updatePaintingGuide(composite: android.graphics.Bitmap) {
-        addLayerFeaturesToSLAM(composite)
+        setArtworkFingerprintFromComposite(composite)
+    }
+
+    fun onFreezeRequested(composite: Bitmap) {
+        val depthWarning = _uiState.value.targetDepthBuffer.let { it == null || it.capacity() == 0 }
+        viewModelScope.launch(Dispatchers.Default) {
+            val annotated = slamManager.annotateKeypoints(composite)
+            _uiState.update { it.copy(freezePreviewBitmap = annotated, freezeDepthWarning = depthWarning) }
+        }
+    }
+
+    fun onFreezeDismissed() {
+        _uiState.update { it.copy(freezePreviewBitmap = null) }
+    }
+
+    fun onUnfreezeRequested() {
+        _uiState.update { it.copy(freezePreviewBitmap = null) }
+        viewModelScope.launch { _unfreezeRequested.emit(Unit) }
     }
 
     fun onTargetCaptured(
@@ -847,12 +870,12 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    private fun addLayerFeaturesToSLAM(bitmap: Bitmap) {
+    private fun setArtworkFingerprintFromComposite(bitmap: Bitmap) {
         val state = _uiState.value
         val viewMat = state.targetCaptureViewMatrix ?: return
         val depthBuffer = state.targetDepthBuffer
         if (depthBuffer == null || depthBuffer.capacity() == 0) {
-            Timber.w("addLayerFeaturesToSLAM: no depth data available; skipping feature baking")
+            Timber.w("setArtworkFingerprintFromComposite: no depth data available; skipping feature baking")
             return
         }
         val depthW = state.targetDepthBufferWidth
@@ -861,7 +884,7 @@ class ArViewModel @Inject constructor(
         val intrinsics = state.targetIntrinsics ?: FloatArray(0)
 
         viewModelScope.launch(Dispatchers.IO) {
-            slamManager.addLayerFeatures(
+            slamManager.setArtworkFingerprint(
                 bitmap = bitmap,
                 depthBuffer = depthBuffer,
                 depthW = depthW,

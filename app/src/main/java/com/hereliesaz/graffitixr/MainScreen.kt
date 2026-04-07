@@ -374,7 +374,7 @@ fun MainScreen(
 
 private const val COMPOSITE_CANVAS_SIZE = 2048
 
-private fun compositeLayersForAr(layers: List<Layer>): AndroidBitmap {
+internal fun compositeLayersForAr(layers: List<Layer>): AndroidBitmap {
     val w = COMPOSITE_CANVAS_SIZE
     val h = COMPOSITE_CANVAS_SIZE
     val result = createBitmap(w, h, AndroidBitmap.Config.ARGB_8888)

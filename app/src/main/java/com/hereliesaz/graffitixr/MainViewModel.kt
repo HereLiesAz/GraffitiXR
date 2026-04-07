@@ -4,6 +4,7 @@ package com.hereliesaz.graffitixr
 import android.content.Context
 import android.graphics.Bitmap
 import android.widget.Toast
+import java.nio.ByteBuffer
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.CaptureStep
@@ -114,19 +115,28 @@ class MainViewModel @Inject constructor(
         _uiState.update { it.copy(isInPlaneRealignment = false) }
     }
 
-    fun onConfirmTargetCreation(bitmap: Bitmap? = null, selectionMask: Bitmap? = null) {
+    fun onConfirmTargetCreation(
+        bitmap: Bitmap? = null,
+        selectionMask: Bitmap? = null,
+        depthBuffer: ByteBuffer? = null,
+        depthW: Int = 0,
+        depthH: Int = 0,
+        depthStride: Int = 0,
+        intrinsics: FloatArray? = null,
+        viewMatrix: FloatArray? = null
+    ) {
         _uiState.update {
             it.copy(isCapturingTarget = false, captureStep = CaptureStep.NONE, planeConfirmationPending = true)
         }
         bitmap ?: return
+        val safeDepth = depthBuffer ?: return
+        val safeIntr = intrinsics ?: return
+        val safeView = viewMatrix ?: return
+
         viewModelScope.launch(Dispatchers.IO) {
             val currentProject = projectRepository.currentProject.value ?: return@launch
 
-            // CRITICAL FIX: The ARCore camera sensor is natively landscape.
-            // The UI passed us a portrait bitmap (rotated 90 degrees for display).
-            // If we extract features on the portrait image, the SLAM map will be rotated 90 degrees
-            // out of phase with the live camera feed, rendering all splats sideways.
-            // We MUST un-rotate the bitmap back to the sensor's native orientation.
+            // The ARCore camera sensor is natively landscape; un-rotate any portrait bitmap.
             val isRotatedForUi = bitmap.height > bitmap.width
             val sensorBmp = if (isRotatedForUi) {
                 val matrix = android.graphics.Matrix().apply { postRotate(-90f) }
@@ -142,10 +152,12 @@ class MainViewModel @Inject constructor(
                 selectionMask
             }
 
-            // Use masked detection if the user refined the selection, otherwise detect everywhere.
-            val fp = slamManager.generateFingerprintMasked(sensorBmp, sensorMask)
+            val fp = slamManager.setWallFingerprint(
+                sensorBmp, sensorMask, safeDepth,
+                depthW, depthH, depthStride,
+                safeIntr, safeView
+            )
 
-            // If the user pointed at a blank wall with no texture, ORB will fail to find points.
             if (fp == null) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "Target lacks visual detail. Please use a surface with more contrast.", Toast.LENGTH_LONG).show()
@@ -153,18 +165,9 @@ class MainViewModel @Inject constructor(
                 return@launch
             }
 
-            slamManager.setTargetFingerprint(
-                fp.descriptorsData,
-                fp.descriptorsRows,
-                fp.descriptorsCols,
-                fp.descriptorsType,
-                fp.points3d.toFloatArray()
-            )
-
             projectManager.saveProject(
                 context = context,
                 projectData = currentProject.copy(fingerprint = fp),
-                // Keep the portrait version for the UI library thumbnail
                 targetImages = listOf(bitmap)
             )
 
