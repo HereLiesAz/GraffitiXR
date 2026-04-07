@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- General Actions -->
+    <string name="cancel_button">Annuler</string>
+    <string name="done_button">Terminé</string>
+    <string name="apply_button">Appliquer</string>
+    <string name="close_button">Fermer</string>
+    <string name="next_button">Suivant</string>
+    <string name="save_button">Sauvegarder</string>
+    <string name="retake_button">Reprendre</string>
+    <string name="capture_button">Capturer</string>
+
+    <!-- Adjustments Panel -->
+    <string name="adj_detail">Détail</string>
+    <string name="adj_opacity">Opacité</string>
+    <string name="adj_brightness">Luminosité</string>
+    <string name="adj_contrast">Contraste</string>
+    <string name="adj_saturation">Saturation</string>
+    <string name="adj_red">Rouge</string>
+    <string name="adj_green">Vert</string>
+    <string name="adj_blue">Bleu</string>
+    <string name="adj_undo">Annuler</string>
+    <string name="adj_redo">Rétablir</string>
+    <string name="adj_magic_align">Alignement Magique</string>
+
+    <!-- Overlays & Status -->
+    <string name="status_create_grid">Créez une Grille pour commencer.</string>
+    <string name="status_scan_surfaces">Scannez les surfaces autour de vous.</string>
+    <string name="status_tap_surface">Appuyez sur une surface pour placer l\'ancre.</string>
+    <string name="status_looking_grid">Recherche de votre Grille...</string>
+    <string name="status_ready">Prêt. (%1$d pts)</string>
+    <string name="unlock_hint">Appuyez 3 fois pour déverrouiller</string>
+
+    <!-- Library Screen -->
+    <string name="lib_app_title">GraffitiXR</string>
+    <string name="lib_app_description">Projetez votre œuvre sur un vrai mur ou une toile en utilisant la RA ou une simple superposition de caméra. \n\nCréez rapidement une maquette sur une photo pour montrer à quoi ressemblera l\'œuvre terminée. \n\nOu tracez une image sur papier en utilisant votre appareil comme table lumineuse.</string>
+    <string name="lib_new_project">Nouveau</string>
+    <string name="lib_import_project">Importer</string>
+    <string name="lib_no_projects">Aucun projet pour le moment</string>
+    <string name="lib_no_projects_hint">Appuyez sur Nouveau ci-dessus pour commencer votre première fresque.\n\nVous serez dirigé vers l\'éditeur où vous pourrez :\n  \u2022  Ajouter des œuvres d\'art depuis le menu Conception\n  \u2022  Passer en mode AR pour projeter sur un vrai mur\n  \u2022  Utiliser Superposition pour faire flotter votre conception sur la caméra en direct\n  \u2022  Utiliser Maquette pour prévisualiser sur une photo de mur\n  \u2022  Utiliser Table lumineuse pour tracer votre conception sur papier</string>
+    <string name="lib_project_thumbnail">Vignette du projet</string>
+    <string name="lib_delete_project_desc">Supprimer le projet %1$s</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Paramètres</string>
+    <string name="settings_preferences_section">Préférences</string>
+    <string name="settings_hand_label">Main dominante</string>
+    <string name="settings_hand_right">Droite</string>
+    <string name="settings_hand_left">Gauche</string>
+    <string name="settings_diag_label">Superposition de diagnostic de profondeur</string>
+    <string name="settings_on">Activé</string>
+    <string name="settings_off">Désactivé</string>
+    <string name="settings_scan_mode_label">Mode de scan AR</string>
+    <string name="settings_scan_mode_point_cloud">Nuage de points</string>
+    <string name="settings_scan_mode_gaussian_splat">Splatting Gaussien</string>
+    <string name="settings_anchor_boundary_label">Afficher la limite d\'ancre</string>
+    <string name="settings_units_label">Unités de distance</string>
+    <string name="settings_units_imperial">Impérial (pi)</string>
+    <string name="settings_units_metric">Métrique (m)</string>
+    <string name="settings_canvas_bg_label">Arrière-plan de la toile</string>
+    <string name="settings_info_section">Informations sur l\'application</string>
+    <string name="settings_version_label">Version</string>
+    <string name="settings_updates_section">Mises à jour</string>
+    <string name="settings_check_updates_label">Vérifier les mises à jour expérimentales</string>
+    <string name="settings_install_update_label">Installer la mise à jour</string>
+    <string name="settings_permissions_section">Permissions</string>
+    <string name="settings_camera_access">Accès à l\'appareil photo</string>
+    <string name="settings_photo_access">Accès à la galerie photo</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_granted">Accordé</string>
+    <string name="settings_denied">Refusé</string>
+    <string name="settings_open_app_settings">Ouvrir les paramètres de l\'application</string>
+    <string name="settings_copyright">GraffitiXR © 2025</string>
+
+    <!-- Editor UI -->
+    <string name="layers_title">Calques</string>
+    <string name="brush_size_title">Taille du pinceau</string>
+    <string name="save_project_hint">Nom du projet</string>
+
+    <!-- Target Creation -->
+    <string name="target_guide_desc">Guide d\'alignement de cible</string>
+    <string name="target_captured_desc">Cible capturée</string>
+    <string name="target_review_desc">Examiner la cible extraite</string>
+    <string name="target_unwarp_hint">Faites glisser les coins pour déformer</string>
+    <string name="target_review_title">Examiner les marquages extraits</string>
+
+    <string name="target_exclude">Exclure</string>
+    <string name="target_include">Inclure</string>
+    <string name="target_erase_marks">Effacer les marques</string>
+    <string name="target_show_features">Afficher les caractéristiques</string>
+    <string name="reset_button">Réinitialiser</string>
+
+    <string name="poster_title">GÉNÉRER AFFICHE</string>
+    <string name="poster_select_layers">Sélectionner les calques à inclure :</string>
+    <string name="poster_physical_size">Taille physique (Largeur en mm) :</string>
+    <string name="poster_generate_pdf">GÉNÉRER PDF</string>
+
+    <!-- Scan Hints -->
+    <string name="scan_hint_recover">Déplacez l\'appareil lentement pour récupérer le suivi</string>
+    <string name="scan_hint_ambient">Pivotez lentement à 360° pour cartographier votre environnement (%1$d°)</string>
+    <string name="scan_hint_too_dark">Trop sombre. Allumez la lampe de poche.</string>
+    <string name="scan_hint_build_map">Marchez à gauche et à droite pour construire la carte</string>
+    <string name="scan_hint_closer">Rapprochez-vous du mur</string>
+    <string name="scan_hint_higher_lower">Scannez plus haut et plus bas</string>
+
+    <!-- Content Descriptions -->
+    <string name="desc_bg_mockup">Maquette d\'arrière-plan</string>
+    <string name="desc_segmentation_preview">Aperçu de la segmentation</string>
+</resources>
