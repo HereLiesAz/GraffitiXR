@@ -108,7 +108,7 @@
     <string name="nav_balance_info">Tiñe los colores de la capa usando los controles deslizantes de los canales rojo, verde y azul.</string>
 
     <!-- Label for layer blending mode selection. -->
-    <string name="nav_build">Mezcla</string>
+    <string name="nav_blending">Mezcla</string>
     <!-- Description of blending modes, used to control how layers composite. -->
     <string name="nav_blending_info">Recorre los modos de mezcla (Normal, Multiplicar, Trama, Superponer…) para controlar cómo se compone esta capa con las capas inferiores.</string>
 
