@@ -1,0 +1,637 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+
+    <string name="app_name">GraffitiXR</string>
+
+
+    <string name="nav_modes">Mga mode</string>
+
+    <string name="nav_modes_info">Lumipat sa pagitan ng AR Projection, Overlay, Mockup, at Trace mode.</string>
+
+
+    <string name="nav_ar_mode">AR</string>
+
+    <string name="nav_ar_mode_info">I-project ang iyong likhang sining sa isang tunay na pader gamit ang augmented reality. I-scan muna ang dingding upang ilagay ang anchor, pagkatapos ay idagdag ang iyong mga layer ng disenyo.</string>
+
+
+    <string name="nav_overlay">Overlay</string>
+
+    <string name="nav_overlay_info">I-layer ang iyong disenyo sa live na feed ng camera nang walang AR na naka-angkla. Mahusay para sa mabilis na pag-frame at mga pagsusuri sa pagkakalagay.</string>
+
+
+    <string name="nav_mockup">Mockup</string>
+
+    <string name="nav_mockup_info">I-preview ang iyong disenyo na pinagsama-sama sa isang larawan ng isang pader. Walang kinakailangang camera o pag-scan.</string>
+
+
+    <string name="nav_trace">Bakas</string>
+
+    <string name="nav_trace_info">Gamitin ang iyong disenyo bilang light-table overlay upang masubaybayan ang mga reference na linya sa isang pisikal na ibabaw.</string>
+
+    <string name="nav_trace_mode">Lightbox</string>
+
+
+    <string name="nav_canvas">Canvas</string>
+
+    <string name="nav_mural">Mural</string>
+
+    <string name="nav_scan_mode_toggle_info">Lumipat sa pagitan ng Canvas (na-optimize para sa mas maliit na desk-scale art) at Mural (na-optimize para sa malalaking pader at Gaussian Splatting).</string>
+
+
+    <string name="nav_stencil">Istensil</string>
+
+    <string name="nav_stencil_info">Bumuo ng mga napi-print na multi-layer stencil mula sa iyong likhang sining. Ang bawat layer ay nagpi-print bilang mga outline-only na tile na may sukat para sa US Letter paper.</string>
+
+
+    <string name="nav_grid">Target</string>
+
+    <string name="nav_grid_info">Lumikha at pamahalaan ang mga target na AR anchor. Kuhanan ng larawan ang mga reference mark sa dingding upang i-lock ang projection sa lugar.</string>
+
+
+    <string name="nav_surveyor">Survey</string>
+
+    <string name="nav_surveyor_info">I-mapa ang ibabaw ng dingding upang mapabuti ang katumpakan ng pagsubaybay sa AR.</string>
+
+
+    <string name="nav_create">Lumikha</string>
+
+    <string name="nav_create_info">Kuhanan ng larawan ang isang reference mark sa dingding upang lumikha ng bagong AR anchor. Susubaybayan ng app ang markang ito upang panatilihing nakahanay ang iyong projection.</string>
+
+
+    <string name="nav_refine">Pinuhin</string>
+
+    <string name="nav_refine_info">I-fine-tune ang posisyon ng isang kasalukuyang AR anchor target.</string>
+
+
+    <string name="nav_update">Pag-unlad</string>
+
+    <string name="nav_update_info">Markahan ang mga natapos na bahagi ng iyong mural upang subaybayan ang pag-unlad ng pagpipinta.</string>
+
+
+    <string name="nav_design">Disenyo</string>
+
+    <string name="nav_design_info">Magdagdag at pamahalaan ang mga layer ng disenyo. Ang bawat layer ay maaaring isang imported na imahe o isang freehand drawing.</string>
+
+
+    <string name="nav_open">Bukas</string>
+
+    <string name="nav_open_info">Magdagdag ng larawan mula sa iyong gallery bilang bagong layer.</string>
+
+
+    <string name="nav_wall">Pader</string>
+
+    <string name="nav_wall_info">Palitan ang background na larawan sa dingding na ginamit sa Mockup mode.</string>
+
+
+    <string name="nav_isolate">Ihiwalay</string>
+
+    <string name="nav_isolate_info">Awtomatikong alisin ang background mula sa layer na ito, iiwan lamang ang paksa sa isang transparent na background.</string>
+
+
+    <string name="nav_invert">Baliktarin</string>
+
+    <string name="nav_invert_info">Lumikha ng negatibo ng kasalukuyang layer. Ang mga itim ay nagiging puti, at ang mga kulay ay binabaligtad sa kanilang mga kabaligtaran — kapaki-pakinabang para sa pagsusuri ng stencil at overlay.</string>
+
+
+    <string name="nav_outline">Balangkas</string>
+
+    <string name="nav_outline_info">I-convert ang layer na ito sa black line art sa isang transparent na background — perpekto para sa paggawa ng mga template ng stencil.</string>
+
+
+    <string name="nav_adjust">Ayusin</string>
+
+    <string name="nav_adjust_info">I-fine-tune ang liwanag, contrast, saturation, at balanse ng kulay para sa layer na ito.</string>
+
+
+    <string name="nav_balance">Kulay</string>
+
+    <string name="nav_balance_info">Tint ang mga kulay ng layer gamit ang pula, berde, at asul na mga slider ng channel.</string>
+
+
+    <string name="nav_blending">Haluin</string>
+
+    <string name="nav_blending_info">Umikot sa mga blend mode (Normal, Multiply, Screen, Overlay...) upang kontrolin kung paano pinagsama ang layer na ito sa mga layer sa ibaba.</string>
+
+
+    <string name="nav_settings">Mga setting</string>
+
+    <string name="nav_settings_info">I-configure ang handedness, AR scan mode, mga unit, at iba pang mga kagustuhan sa app.</string>
+
+
+    <string name="nav_project">Proyekto</string>
+
+    <string name="nav_project_info">Pamahalaan ang iyong proyekto: gumawa, mag-save, mag-load, at mag-export.</string>
+
+
+    <string name="nav_new">Bago</string>
+
+    <string name="nav_new_info">Magsimula ng bagong walang laman na proyekto. Mawawala ang anumang hindi na-save na pagbabago.</string>
+
+
+    <string name="nav_save">I-save</string>
+
+    <string name="nav_save_info">I-save ang kasalukuyang proyekto sa iyong device.</string>
+
+
+    <string name="nav_load">Magkarga</string>
+
+    <string name="nav_load_info">Buksan ang library ng proyekto upang mag-load ng isang naunang na-save na proyekto.</string>
+
+
+    <string name="nav_export">I-export</string>
+
+    <string name="nav_export_info">Mag-export ng flat merged na imahe ng lahat ng nakikitang layer sa iyong photo gallery.</string>
+
+
+    <string name="nav_help">Tulong</string>
+
+    <string name="nav_help_info">I-tap ang anumang button habang aktibo ang Help para makita kung ano ang ginagawa nito.</string>
+
+
+    <string name="nav_light">Liwanag</string>
+
+    <string name="nav_light_info">I-toggle ang flashlight ng device upang maipaliwanag ang iyong dingding habang nagtatrabaho sa mahinang ilaw.</string>
+
+
+    <string name="nav_lock">Lock</string>
+
+    <string name="nav_lock_info">I-lock ang touchscreen upang maiwasan ang mga hindi sinasadyang pagbabago habang nag-iispray ka. Mag-triple-tap kahit saan para i-unlock.</string>
+
+
+
+    <string name="info_brush">Magpinta ng mga freehand stroke sa layer na ito. I-drag pataas/pababa sa button na Sukat upang baguhin ang diameter ng brush; i-drag pakaliwa/kanan para ayusin ang balahibo (lambot ng gilid).</string>
+
+    <string name="info_eraser">Burahin ang mga bahagi ng layer na ito gamit ang isang bilog na brush. I-drag pataas/pababa sa button na Sukat upang baguhin ang diameter; i-drag pakaliwa/kanan para ayusin ang balahibo.</string>
+
+    <string name="info_blur">Pahiran at palambutin ang mga bahagi ng layer na ito. Mag-drag sa isang rehiyon para i-blur ito.</string>
+
+    <string name="info_liquify">Itulak at i-warp ang mga pixel sa anumang direksyon. Mag-drag sa isang lugar upang i-distort ito — kapaki-pakinabang para sa pagsasaayos ng mga proporsyon.</string>
+
+    <string name="info_dodge">Magaan ang mga partikular na lugar sa pamamagitan ng pagpinta sa ibabaw ng mga ito.</string>
+
+    <string name="info_burn">Padilim ang mga partikular na lugar sa pamamagitan ng pagpinta sa ibabaw ng mga ito.</string>
+
+    <string name="info_size">I-drag pataas/pababa para baguhin ang diameter ng brush. I-drag pakaliwa/kanan para ayusin ang balahibo — ang mas malawak na balahibo ay nagbibigay ng mas malambot, mas mala-spray na mga gilid.</string>
+
+    <string name="info_color">Ipinapakita ang aktibong kulay ng brush. I-drag pataas/pababa upang ayusin ang liwanag; i-drag pakaliwa/kanan upang ayusin ang saturation. I-tap para buksan ang buong color wheel.</string>
+
+    <string name="info_draw">Magdagdag ng bagong blangko na transparent na layer para sa freehand drawing.</string>
+
+    <string name="info_keyframe">I-save ang kasalukuyang AR camera pose bilang isang keyframe. Ginagamit para itama ang drift at muling ihanay ang projection pagkatapos lumayo at bumalik.</string>
+
+    <string name="info_layer">Ang layer na ito. I-tap para i-activate ito. Buksan ang pahalang na riles para ma-access ang mga tool. Pindutin nang matagal at i-drag upang muling ayusin.</string>
+
+
+
+    <string name="stencil_layers">Mga layer</string>
+
+    <string name="stencil_layers_info">Piliin kung gaano karaming mga layer ng stencil ang bubuo: 1 (silhouette lang), 2 (silhouette + highlight), o 3 (silhouette + midtone + highlight).</string>
+
+
+    <string name="stencil_rebuild">Muling itayo</string>
+
+    <string name="stencil_rebuild_info">Patakbuhin muli ang pipeline ng pagbuo ng stencil sa kasalukuyang layer ng pinagmulan.</string>
+
+
+    <string name="stencil_print">Print</string>
+
+    <string name="stencil_print_info">I-configure ang totoong laki ng pag-print at bumuo ng naka-tile na PDF para sa US Letter paper.</string>
+
+
+    <string name="stencil_print_size">Sukat</string>
+
+    <string name="stencil_print_size_info">I-drag pataas/pababa upang itakda sa sentimetro ang lapad o taas ng real-world ng stencil. Live na mga update sa bilang ng pahina.</string>
+
+
+    <string name="stencil_print_dim_toggle">W / H</string>
+
+    <string name="stencil_print_dim_toggle_info">I-tap upang lumipat sa pagitan ng pag-lock ng lapad o taas ng output.</string>
+
+
+    <string name="stencil_export_pdf">Mag-print ng PDF</string>
+
+    <string name="stencil_export_pdf_info">Bumuo ng isang naka-tile na PDF ng lahat ng mga layer ng stencil na handa nang i-print at gupitin. Ang bawat tile ay may kasamang 3mm na overlap para sa pag-align ng assembly.</string>
+
+
+    <string name="stencil_save_layers">I-save ang mga PNG</string>
+
+    <string name="stencil_save_layers_info">I-save ang bawat stencil layer bilang isang hiwalay na PNG na imahe sa iyong gallery.</string>
+
+
+    <string name="stencil_back">← Editor</string>
+
+    <string name="stencil_back_info">Bumalik sa pangunahing editor. Ang iyong mga stencil layer ay napanatili sa session.</string>
+
+
+    <string name="nav_text">Text</string>
+
+    <string name="nav_draw">Gumuhit</string>
+
+    <string name="nav_edit">I-edit</string>
+
+    <string name="nav_font">Font</string>
+
+    <string name="nav_size">Sukat</string>
+
+    <string name="nav_color">Kulay</string>
+
+    <string name="nav_kern">Kern</string>
+
+    <string name="nav_bold">Matapang</string>
+
+    <string name="nav_italic">Italic</string>
+
+    <string name="nav_shadow">anino</string>
+
+    <string name="nav_eraser">Pambura</string>
+
+    <string name="nav_blur">Malabo</string>
+
+    <string name="nav_liquify">Liquify</string>
+
+    <string name="nav_dodge">Dodge</string>
+
+    <string name="nav_burn">paso</string>
+
+
+
+    <string name="pro_tip">Para sa Tip</string>
+    <string name="double_tap_hint">I-double tap para lumipat ng rotation axis.</string>
+    <string name="ok_button">OK</string>
+
+    <string name="generating">PAGBUBUO...</string>
+
+    <string name="stencil_hint">Pindutin muli upang magdagdag ng isang layer.</string>
+
+    <string name="rename_hint">Palitan ang pangalan</string>
+
+    <string name="edit_text_hint">I-edit ang text</string>
+
+    <string name="copy_edits">Kopyahin ang Mga Pag-edit</string>
+
+    <string name="paste_edits">Idikit ang Mga Pag-edit</string>
+
+    <string name="generate_poster">Bumuo ng Poster</string>
+
+    <string name="duplicate">Duplicate</string>
+
+    <string name="unlink_layer">I-unlink ang Layer</string>
+
+    <string name="link_layer">Link Layer</string>
+
+    <string name="hide_layer">Itago ang Layer</string>
+
+    <string name="show_layer">Ipakita ang Layer</string>
+
+    <string name="flatten_all">Patag Lahat</string>
+
+    <string name="delete">Tanggalin</string>
+    <string name="new_project_name">Bagong Proyekto</string>
+
+    <string name="lock_button">Lock</string>
+
+    <string name="freeze_button">I-freeze</string>
+
+
+    <string name="wall_source_title">Piliin ang Wall Photo</string>
+
+    <string name="wall_source_text">Paano mo gustong itakda ang background wall?</string>
+
+    <string name="take_photo">Kumuha ng Larawan</string>
+
+    <string name="choose_from_gallery">Pumili mula sa Gallery</string>
+
+
+    <string name="depth_unsupported">Hindi sinusuportahan ng device na ito ang Depth API.\nLumipat sa Canvas mode sa Mga Setting.</string>
+
+
+    <string name="arcore_required_title">Kinakailangan ang ARCore</string>
+
+    <string name="arcore_required_text">Walang naka-install na ARCore o hindi sinusuportahan ang device na ito. I-install ang ARCore mula sa Play Store para magamit ang mga feature ng AR.</string>
+
+    <string name="install_arcore">I-install ang ARCore</string>
+
+
+    <string name="camera_permission_required">Kinakailangan ang pahintulot sa camera para sa AR mode.</string>
+
+    <string name="open_settings">Buksan ang Mga Setting</string>
+
+
+    <string name="target_creation_title">TARGET NA PAGLIKHA</string>
+
+    <string name="target_creation_text">Direktang mag-tap sa iyong mga pininturahan na reference mark sa screen. Ihihiwalay agad sila ng app.</string>
+
+    <string name="cancel">Kanselahin</string>
+
+
+    <string name="diag_copied">KINOPYA ✓</string>
+
+    <string name="diag_title">DEPTH DIAG (i-tap para kopyahin)</string>
+
+    <string name="diag_waiting">Naghihintay para sa unang frame…</string>
+
+
+    <string name="scan_step_1">Hakbang 1: I-map ang iyong kapaligiran</string>
+
+    <string name="scan_step_2">Hakbang 2: I-scan ang target na pader</string>
+
+
+    <string name="plane_confirm_question">Nasa dingding ba ang likhang sining?</string>
+
+    <string name="looks_correct">Mukhang tama</string>
+
+    <string name="redetect">Re-detect</string>
+
+
+    <string name="plane_realignment_title">Muling i-detect ang Wall Surface</string>
+
+    <string name="plane_realignment_text">Ang anchor ay inilagay mula sa kung saan ka nakatayo noong nakunan mo. Pinipili ng ARCore ang sinusubaybayang patayong ibabaw nang direkta sa harap ng orihinal na posisyong iyon.\n\n1.Bumalik sa humigit-kumulang kung saan ka nakatayo habang kumukuha\n2.Dahan-dahang i-pan ang camera sa iyong mural wall para mairehistro ito ng ARCore bilang flat surface\n3.Manatiling nakaharap sa likhang sining, pagkatapos ay mag-tap sa ibaba\n\nTalon ang orange na hangganan sa bagong nakitang ibabaw.</string>
+
+    <string name="use_this_wall">Gamitin ang Pader na Ito</string>
+
+
+    <string name="scanning_dots">Nag-ii-scan\u2026</string>
+
+    <string name="matched_percent">%1$d%% ang tumugma</string>
+
+    <string name="anchor_locked">Naka-lock ang anchor</string>
+
+
+    <string name="choose_font">Piliin ang Font</string>
+
+
+    <string name="cancel_button">Kanselahin</string>
+    <string name="done_button">Tapos na</string>
+    <string name="apply_button">Mag-apply</string>
+    <string name="close_button">Isara</string>
+    <string name="next_button">Susunod</string>
+    <string name="save_button">I-save</string>
+    <string name="retake_button">Muling kunin</string>
+    <string name="capture_button">Kunin</string>
+
+
+    <string name="adj_detail">Detalye</string>
+    <string name="adj_opacity">Opacity</string>
+    <string name="adj_brightness">Liwanag</string>
+    <string name="adj_contrast">Contrast</string>
+    <string name="adj_saturation">Saturation</string>
+    <string name="adj_red">Pula</string>
+    <string name="adj_green">Berde</string>
+    <string name="adj_blue">Asul</string>
+    <string name="adj_undo">I-undo</string>
+    <string name="adj_redo">Gawin muli</string>
+    <string name="adj_magic_align">Magic Align</string>
+
+
+    <string name="status_create_grid">Gumawa ng Grid para magsimula.</string>
+    <string name="status_scan_surfaces">I-scan ang mga surface sa paligid mo.</string>
+    <string name="status_tap_surface">I-tap ang isang ibabaw upang ilagay ang anchor.</string>
+    <string name="status_looking_grid">Hinahanap ang iyong Grid...</string>
+    <string name="status_ready">handa na. (%1$d pts)</string>
+    <string name="unlock_hint">I-tap ng 4 na beses para i-unlock</string>
+
+
+    <string name="lib_app_title">GraffitiXR</string>
+    <string name="lib_app_description">I-project ang iyong likhang sining sa isang tunay na dingding o isang canvas gamit ang AR o isang pangunahing overlay ng camera.\n\nMabilis na gumawa ng mockup sa isang larawan upang ipakita kung ano ang magiging hitsura ng natapos na gawain.\n\nO bakas ang isang larawan sa papel sa pamamagitan ng paggamit ng iyong device bilang isang lightbox.</string>
+    <string name="lib_new_project">Bago</string>
+    <string name="lib_import_project">Mag-import</string>
+    <string name="lib_no_projects">Wala pang projects</string>
+    <string name="lib_no_projects_hint">I-tap ang Bago sa itaas para simulan ang iyong unang mural.\n\nDadalhin ka sa editor kung saan maaari kang:\n \u2022 Magdagdag ng likhang sining mula sa menu ng Disenyo\n \u2022 Lumipat sa AR mode para i-project sa totoong pader\n \u2022 Gamitin ang Overlay para palutangin ang iyong disenyo sa live na camera\n \u2022 Gamitin ang Mockup para i-preview ang iyong larawan\npapel</string>
+    <string name="lib_project_thumbnail">Thumbnail ng Proyekto</string>
+    <string name="lib_delete_project_desc">Tanggalin ang proyekto %1$s</string>
+
+
+    <string name="settings_title">Mga setting</string>
+    <string name="settings_preferences_section">Mga Kagustuhan</string>
+    <string name="settings_hand_label">Dominant na Kamay</string>
+    <string name="settings_hand_right">Tama</string>
+    <string name="settings_hand_left">Kaliwa</string>
+    <string name="settings_diag_label">Depth Diagnostic Overlay</string>
+    <string name="settings_on">Naka-on</string>
+    <string name="settings_off">Naka-off</string>
+    <string name="settings_scan_mode_label">AR Scan Mode</string>
+    <string name="settings_scan_mode_point_cloud">Point Cloud</string>
+    <string name="settings_scan_mode_gaussian_splat">Gaussian Splat</string>
+    <string name="settings_anchor_boundary_label">Ipakita ang Hangganan ng Anchor</string>
+    <string name="settings_units_label">Mga Yunit ng Distansya</string>
+    <string name="settings_units_imperial">Imperial (ft)</string>
+    <string name="settings_units_metric">Sukatan (m)</string>
+    <string name="settings_canvas_bg_label">Background ng Canvas</string>
+    <string name="settings_info_section">Impormasyon ng App</string>
+    <string name="settings_version_label">Bersyon</string>
+    <string name="settings_updates_section">Mga update</string>
+    <string name="settings_check_updates_label">Tingnan kung may mga pang-eksperimentong update</string>
+    <string name="settings_install_update_label">I-install ang Update</string>
+    <string name="settings_permissions_section">Mga Pahintulot</string>
+    <string name="settings_camera_access">Access sa Camera</string>
+    <string name="settings_photo_access">Access sa Photo Library</string>
+    <string name="settings_notifications">Mga abiso</string>
+    <string name="settings_granted">ipinagkaloob</string>
+    <string name="settings_denied">Tinanggihan</string>
+    <string name="settings_open_app_settings">Buksan ang Mga Setting ng App</string>
+    <string name="settings_copyright">GraffitiXR © 2025</string>
+
+
+    <string name="layers_title">Mga layer</string>
+    <string name="brush_size_title">Laki ng Brush</string>
+    <string name="save_project_hint">Pangalan ng Proyekto</string>
+
+
+    <string name="target_guide_desc">Gabay sa Pag-align ng Target</string>
+    <string name="target_captured_desc">Nakuha na Target</string>
+    <string name="target_review_desc">Suriin ang Extracted Target</string>
+    <string name="target_unwarp_hint">I-drag ang mga sulok upang i-unwarp</string>
+    <string name="target_review_title">Suriin ang Mga Nakuhang Marka</string>
+
+    <string name="target_exclude">Ibukod</string>
+    <string name="target_include">Isama</string>
+    <string name="target_erase_marks">Burahin ang Marks</string>
+    <string name="target_show_features">Ipakita ang Mga Tampok</string>
+    <string name="reset_button">I-reset</string>
+
+    <string name="poster_title">GUMAWA NG POSTER</string>
+    <string name="poster_select_layers">Pumili ng mga layer na isasama:</string>
+    <string name="poster_physical_size">Pisikal na Sukat (Lapad sa mm):</string>
+    <string name="poster_generate_pdf">GENERATE PDF</string>
+
+
+    <string name="scan_hint_recover">Ilipat ang device nang dahan-dahan upang mabawi ang pagsubaybay</string>
+    <string name="scan_hint_ambient">Dahan-dahang i-rotate nang 360° para imapa ang iyong paligid (%1$d°)</string>
+    <string name="scan_hint_too_dark">Masyadong madilim. Buksan ang flashlight.</string>
+    <string name="scan_hint_build_map">Maglakad pakaliwa at pakanan upang bumuo ng mapa</string>
+    <string name="scan_hint_closer">Lumapit sa pader</string>
+    <string name="scan_hint_higher_lower">I-scan ang mas mataas at mas mababa</string>
+
+
+    <string name="desc_bg_mockup">Background Mockup</string>
+    <string name="desc_segmentation_preview">Preview ng Segmentation</string>
+
+
+
+    <string name="help_mode_host">Mode Switcher: Lumipat sa pagitan ng mga mode ng app. Mga Tagubilin: I-tap para palawakin, pagkatapos ay piliin ang AR, Overlay, Mockup, o Lightbox.</string>
+
+    <string name="help_ar">AR Mode: Ang disenyo ng proyekto sa isang pader gamit ang spatial mapping. Mga Tagubilin: I-scan ang kapaligiran hanggang sa matukoy ang pader, pagkatapos ay tapikin upang ilagay ang anchor.</string>
+
+    <string name="help_overlay">Overlay Mode: Ipakita ang disenyo sa ibabaw ng live na camera nang walang spatial na pagsubaybay. Mga Tagubilin: Manu-manong sukat at ilipat ang disenyo upang magkasya sa iyong frame.</string>
+
+    <string name="help_mockup">Mockup Mode: I-preview ang disenyo sa isang static na larawan. Mga Tagubilin: Gamitin ang \'Wall\' upang magtakda ng larawan sa background, pagkatapos ay ayusin ang mga layer sa itaas.</string>
+
+    <string name="help_trace">Lightbox Mode: High-brightness tracing surface. Mga Tagubilin: Ilagay ang papel sa ibabaw ng screen at i-trace. Mag-triple-tap kahit saan para lumabas.</string>
+
+    <string name="help_target_host">Pamamahala ng Target: Mga tool para sa mga AR anchor. Mga Tagubilin: I-tap para ma-access ang mga tool para sa paggawa o muling pag-align sa posisyon ng mural.</string>
+
+    <string name="help_scan_mode_toggle">Scan Resolution: Lumipat sa pagitan ng Mural (malaking sukat) at Canvas (maliit na sukat). Gumagamit ang Mural ng Gaussian Splats para sa mga dingding; Ginagamit ng Canvas ang Point Clouds para sa detalyadong desk-scale art.</string>
+
+    <string name="help_create">Gumawa ng Anchor: Kuhanan ng larawan ang isang marka sa dingding upang i-lock ang projection. Mga Tagubilin: Ituro ang isang natatanging texture at i-tap. Susubaybayan ng app ang markang ito.</string>
+
+    <string name="help_design_host">Pamamahala ng Layer: Magdagdag ng mga larawan, text, o sketch. Mga Tagubilin: I-tap para palawakin. Pindutin nang matagal ang anumang pindutan ng layer upang buksan ang pangalawang menu nito.</string>
+
+    <string name="help_add_img">Mag-import ng Larawan: Magdagdag ng sketch o reference na larawan. Mga Tagubilin: Pumili ng larawan mula sa iyong gallery. Lilitaw ito bilang isang bagong layer ng disenyo.</string>
+
+    <string name="help_add_draw">Bagong Sketch: Magdagdag ng blangkong layer para sa freehand drawing. Mga Tagubilin: Piliin ang layer upang ipakita ang mga tool sa brush, eraser, at smudge.</string>
+
+    <string name="help_add_text">Magdagdag ng Teksto: Gumawa ng layer ng typography. Mga Tagubilin: I-tap ang button na \'Edit\' ng layer upang baguhin ang nilalaman at pag-format.</string>
+
+    <string name="help_wall">Baguhin ang Wall: Itakda ang background para sa Mockup mode. Mga Tagubilin: Pumili ng larawan ng pisikal na pader na plano mong lagyan ng pintura.</string>
+
+    <string name="help_project_host">Pamamahala ng Proyekto: I-save, i-load, at i-export ang trabaho. Mga Tagubilin: I-tap para ma-access ang mga administratibong gawain para sa iyong mural.</string>
+
+    <string name="help_new">Bagong Proyekto: Magsimula ng bagong mural. Mga Tagubilin: I-tap para i-reset. Babala: Nililinis nito ang lahat ng kasalukuyang gawain. I-save muna!</string>
+
+    <string name="help_save">I-save ang Proyekto: Mag-imbak ng mural at AR na mapa. Mga Tagubilin: Maglagay ng pangalan ng proyekto at i-tap ang I-save upang mapanatili ang iyong pag-unlad.</string>
+
+    <string name="help_load">Project Library: I-access ang mga naka-save na mural. Mga Tagubilin: Mag-browse sa library upang ipagpatuloy ang trabaho o mag-import ng mga nakabahaging file ng proyekto.</string>
+
+    <string name="help_export">I-export ang Larawan: I-save ang high-res na snapshot. Mga Tagubilin: Nire-render ang lahat ng nakikitang layer sa isang PNG sa iyong photo gallery.</string>
+
+    <string name="help_settings">Mga Setting ng App: I-configure ang mga kagustuhan. Mga Tagubilin: Buksan para isaayos ang handedness, mga unit, at mga parameter ng pag-scan.</string>
+
+    <string name="help_light">Flashlight: I-toggle ang LED ng device. Mga Tagubilin: Gamitin ito upang maipaliwanag ang madilim na pader para sa mas mahusay na pagsubaybay sa AR.</string>
+
+    <string name="help_lock_trace">I-lock/I-freeze: Pigilan ang mga hindi sinasadyang pagbabago. Mga Tagubilin: Sa Trace mode, hindi pinapagana ang screen. Sa ibang mga mode, nagbabago ang layer ng mga lock.</string>
+
+    <string name="help_help_main">Interactive Help: Nagpapaliwanag ng mga function ng button. Mga Tagubilin: I-tap para i-activate (Cyan). Habang aktibo, i-tap ang anumang button para makita ang text ng tulong nito.</string>
+
+    <string name="help_layer">Layer \'%1$s\': Aktibong elemento ng mural. Mga Tagubilin: I-tap para pumili. I-drag ang button pataas/pababa para muling ayusin. Magbago sa screen gamit ang mga galaw.</string>
+
+
+
+    <string name="help_edit_text">I-edit ang Teksto: Baguhin ang mga salita sa layer ng typography. Mga Tagubilin: I-tap para buksan ang keyboard at i-update ang nilalaman ng text.</string>
+
+    <string name="help_size">Laki ng Brush/Text: Ayusin ang sukat at lambot. Mga Tagubilin: I-drag pataas/pababa para sa laki. I-drag pakaliwa/kanan para sa brush feathering.</string>
+
+    <string name="help_font">Tagapili ng Font: Pumili ng istilo ng typography. Mga Tagubilin: I-tap upang i-browse ang mga available na font at ilapat ang mga ito sa layer ng teksto.</string>
+
+    <string name="help_color">Color Tool: Itakda ang aktibong kulay. Mga Tagubilin: I-drag pataas/pababa para sa liwanag, kaliwa/kanan para sa saturation. I-tap para sa full color wheel.</string>
+
+    <string name="help_kern">Text Kerning: Ayusin ang puwang ng titik. Mga Tagubilin: I-drag ang kaliwa/kanan upang higpitan o paluwagin ang layout ng teksto.</string>
+
+    <string name="help_bold">Bold Toggle: Makapal na bigat ng font. Mga Tagubilin: I-tap upang i-toggle ang bold na pag-istilo sa aktibong layer ng teksto.</string>
+
+    <string name="help_italic">Italic Toggle: Slanted na pag-istilo. Mga Tagubilin: I-tap upang i-toggle ang italic na istilo sa aktibong layer ng teksto.</string>
+
+    <string name="help_outline">Balangkas ng Teksto: Character stroke. Mga Tagubilin: I-tap para i-toggle ang isang nakikitang outline sa paligid ng mga text character.</string>
+
+    <string name="help_shadow">Drop Shadow: Lalim ng text. Mga Tagubilin: I-tap para i-toggle ang isang malambot na anino sa likod ng typography para sa mas mahusay na pagiging madaling mabasa.</string>
+
+    <string name="help_stencil_gen">Bumuo ng Stencil: Gumawa ng mga napi-print na template. Mga Tagubilin: I-tap upang simulan ang pagbuo ng multi-layer na stencil para sa larawang ito.</string>
+
+    <string name="help_blend">Blend Mode: Composite na istilo. Mga Tagubilin: I-tap upang umikot sa mga mode tulad ng Multiply, Screen, at Overlay.</string>
+
+    <string name="help_adj">Mga Pagsasaayos ng Larawan: I-fine-tune ang hitsura. Mga Tagubilin: I-tap upang ipakita ang mga slider para sa Opacity, Brightness, Contrast, at Saturation.</string>
+
+    <string name="help_invert">Baliktarin ang mga Kulay: Negatibong mataas ang contrast. Mga Tagubilin: I-tap para i-flip ang mga kulay. Ang mga puti ay nagiging itim at vice-versa—kapaki-pakinabang para sa pagsubaybay.</string>
+
+    <string name="help_balance">Balanse ng Kulay: RGB channel tuning. Mga Tagubilin: I-tap upang ipakita ang mga slider para sa tumpak na pagsasaayos ng Pula, Berde, at Asul.</string>
+
+    <string name="help_eraser">Eraser Brush: Alisin ang nilalaman ng layer. Mga Tagubilin: Kulayan sa screen para burahin. Gamitin ang button na \'Size\' upang ayusin ang diameter.</string>
+
+    <string name="help_blur">Blur/Smudge Tool: Paghaluin ang mga kulay. Mga Tagubilin: Kulayan ang mga rehiyon para lumambot ang mga gilid o buhiran ang mga detalye nang magkasama.</string>
+
+    <string name="help_liquify">Warp Tool: Muling hugis ng disenyo. Mga Tagubilin: I-drag sa screen upang itulak at hilahin ang mga pixel—mahusay para sa pagsasaayos ng mga proporsyon.</string>
+
+    <string name="help_dodge">Dodge Tool: Pagaan ang mga lugar. Mga Tagubilin: Kulayan ang mga bahagi ng layer upang mapataas ang kanilang ningning.</string>
+
+    <string name="help_burn">Burn Tool: Padilim ang mga lugar. Mga Tagubilin: Kulayan ang mga bahagi ng layer upang bawasan ang kanilang ningning.</string>
+
+    <string name="help_iso">Ihiwalay ang Paksa: Auto-background na pag-alis. Mga Tagubilin: I-tap para kunin ang pangunahing paksa mula sa background nito gamit ang AI.</string>
+
+    <string name="help_line">Sketch Outline: Line art filter. Mga Tagubilin: I-tap para i-convert ang larawan sa isang black-and-white na transparent na outline.</string>
+
+    <string name="help_help_layer">Tulong sa Layer: I-toggle ang impormasyon para sa mga partikular na tool sa layer na ito. Mga Tagubilin: I-tap para i-activate. Pagkatapos ay i-tap ang anumang tool icon upang makita kung ano ang ginagawa nito.</string>
+
+
+
+    <string name="unit_feet">ft</string>
+
+    <string name="unit_centimeters">cm</string>
+
+    <string name="unit_meters">m</string>
+
+    <string name="tut_ar_title">AR Projection</string>
+    <string name="tut_ar_text">Ipino-project ang iyong disenyo sa isang tunay na pader gamit ang depth sensor at spatial tracking ng telepono.</string>
+    <string name="tut_ar_step1_title">Hakbang 1: I-scan</string>
+    <string name="tut_ar_step1_text">Ituro ang dingding at dahan-dahang gumalaw sa gilid-gilid. Lumilitaw ang mga may kulay na splat habang ang makina ay nagmamapa sa ibabaw. Maghintay hanggang masakop ng mga splat ang bahagi ng dingding.</string>
+    <string name="tut_ar_step2_title">Hakbang 2: I-tap para Ilagay</string>
+    <string name="tut_ar_step2_text">I-tap lang ang screen. Kinukuha ng app ang pader, kinukuha ang mga feature sa pagsubaybay, at agad na ni-lock ang anchor.</string>
+    <string name="tut_ar_step3_title">Hakbang 3: Idagdag ang Iyong Artwork</string>
+    <string name="tut_ar_step3_text">Pindutin ang \'Design\' upang ma-access ang iyong mga tool sa layer. Gamitin ang \'Larawan\' para mag-import ng mga larawan, \'Draw\' para mag-sketch, o \'Text\' para mag-type.</string>
+    <string name="tut_ar_tip_title">Tip: Texture Matters</string>
+    <string name="tut_ar_tip_text">Hindi masusubaybayan ang mga blangkong puting pader, makinis na kongkreto, at isang kulay na ibabaw. Ituon ang iyong anchor point sa graffiti, rough plaster, o anumang natatanging marka.</string>
+
+
+    <string name="tut_overlay_title">Live na Overlay</string>
+    <string name="tut_overlay_text">Ang iyong disenyo ay lumulutang sa live na view ng camera — hindi kailangan ng pag-scan sa ibabaw.</string>
+    <string name="tut_overlay_step1_title">Hakbang 1: Idagdag ang Iyong Artwork</string>
+    <string name="tut_overlay_step1_text">Pindutin ang \'Design\' para ma-access ang mga tool sa layer. Gamitin ang \'Larawan\' para mag-import ng mga larawan, \'Draw\' para mag-sketch, o \'Text\' para mag-type.</string>
+    <string name="tut_overlay_step2_title">Hakbang 2: Iposisyon Ito</string>
+    <string name="tut_overlay_step2_text">Kurutin upang sukatin, i-drag upang muling iposisyon. Ang overlay ay nananatiling naayos sa iyong screen — umatras upang makita kung paano ito umaangkop sa dingding.</string>
+
+
+    <string name="tut_mockup_title">Photo Mockup</string>
+    <string name="tut_mockup_text">I-preview ang iyong disenyo sa isang larawan bago ka kumuha ng brush.</string>
+    <string name="tut_mockup_step1_title">Hakbang 1: Itakda ang Wall</string>
+    <string name="tut_mockup_step1_text">Buksan ang \'Design\' at i-tap ang \'Wall\' para pumili o kumuha ng larawan ng iyong surface. Gawin mo muna ito!</string>
+    <string name="tut_mockup_step2_title">Hakbang 2: Idagdag ang Iyong Artwork</string>
+    <string name="tut_mockup_step2_text">Gamitin ang \'Larawan\', \'Draw\', o \'Text\' upang magdagdag ng mga layer sa ibabaw ng dingding. I-pinch at i-drag sa laki at iposisyon ang mga ito.</string>
+
+
+    <string name="tut_trace_title">Lightbox Mode</string>
+    <string name="tut_trace_text">Ginagawang maliwanag na lightbox ang iyong screen para sa pagsubaybay sa iyong disenyo sa papel.</string>
+    <string name="tut_trace_step1_title">Hakbang 1: Buksan ang Design Menu</string>
+    <string name="tut_trace_step1_text">I-tap ang \'Design\' para ma-access ang mga tool sa layer.</string>
+    <string name="tut_trace_step2_title">Hakbang 2: Magdagdag ng Nilalaman</string>
+    <string name="tut_trace_step2_text">Gamitin ang \'Larawan\' para mag-import ng mga larawan, \'Draw\' para mag-sketch, o \'Text\' para mag-type.</string>
+    <string name="tut_trace_step3_title">Hakbang 3: Pagsubaybay</string>
+    <string name="tut_trace_step3_text">Ilagay ang papel sa ibabaw ng screen at i-trace. Mag-triple-tap kahit saan para lumabas.</string>
+
+
+    <string name="tut_create_anchor_title">Lumikha ng Anchor</string>
+    <string name="tut_create_anchor_text">Ila-lock ang iyong projection sa isang partikular na lugar sa dingding. Kapag naitakda na, mananatili ang disenyo sa lugar kahit na maglakad-lakad ka.</string>
+    <string name="tut_surface_req_title">Mga Kinakailangan sa Ibabaw</string>
+    <string name="tut_surface_req_text">Ang dingding ay nangangailangan ng nakikitang texture — graffiti, magaspang na plaster, ladrilyo, o mga sticker ay gumagana nang maayos. Ang mga makinis, blangko, o isang kulay na dingding ay hindi magkakaroon ng anchor.</string>
+    <string name="tut_blobs_title">Ano ang Ibig Sabihin ng mga Blobs</string>
+    <string name="tut_blobs_text">Pagkatapos mag-tap, makikita mo sandali ang mga berdeng blobs. Iyon ang mga keypoint sa pagsubaybay na nakuha ng app. Mas maraming blobs = mas malakas na lock.</string>
+    <string name="tut_import_img_title">Mag-import ng Larawan</string>
+    <string name="tut_import_img_text">Magdagdag ng sketch, larawan, o sanggunian mula sa iyong gallery. Lumilitaw ito bilang isang bagong layer na nakasalansan sa ibabaw ng iba pa.</string>
+    <string name="tut_scale_pos_title">Iskala at Posisyon</string>
+    <string name="tut_scale_pos_text">Kurutin gamit ang dalawang daliri upang baguhin ang laki. I-drag gamit ang isang daliri upang muling iposisyon. Kumakapit ang layer sa inaasahang ibabaw ng dingding sa AR mode.</string>
+    <string name="tut_lock_freeze_title">I-lock / I-freeze</string>
+    <string name="tut_lock_freeze_text">Sa Lightbox (Trace) mode: hindi pinapagana ang pagpindot para makapaglagay ka ng papel sa screen nang hindi sinasadyang gumagalaw ng kahit ano.</string>
+    <string name="tut_in_other_modes_title">Sa Iba pang mga Mode</string>
+    <string name="tut_in_other_modes_text">Sa mga mode na AR, Overlay, at Mockup: nag-iiba ang layer ng lock upang hindi aksidenteng malipat o ma-scale ang mga disenyo.</string>
+    <string name="tut_stencil_gen_title">Bumuo ng Stencil</string>
+    <string name="tut_stencil_gen_text">Kino-convert ang iyong larawan sa napi-print na mga stencil ng spray-paint. Ang bawat stencil ay kumakatawan sa isang layer ng kulay ng disenyo.</string>
+    <string name="tut_how_many_layers_title">Ilang Layers?</string>
+    <string name="tut_how_many_layers_text">Ang isang 3-kulay na disenyo ay gumagawa ng 3 stencil sheet. Mas maraming kulay = mas maraming sheet. Ang mga simpleng high-contrast na larawan ay nagbibigay ng pinakamahusay na mga resulta.</string>
+    <string name="tut_exporting_title">Ini-export</string>
+    <string name="tut_exporting_text">Ang bawat stencil ay nag-e-export bilang isang PDF. Mag-print sa 100% scale (walang scaling) para makakuha ng tumpak na mga sukat ng buhay.</string>
+    <string name="tut_opacity_brightness_title">Opacity at Liwanag</string>
+    <string name="tut_opacity_brightness_text">Kinokontrol ng Opacity kung gaano ka-transparent ang layer. Binabago ng liwanag ang pangkalahatang liwanag — kapaki-pakinabang upang itugma ang layer sa tono ng iyong pader.</string>
+    <string name="tut_contrast_saturation_title">Contrast at Saturation</string>
+    <string name="tut_contrast_saturation_text">Ihambing ang hiwalay na dilim sa mga ilaw — mahusay para sa pagpapalabas ng mga stencil outline. Kinokontrol ng saturation ang intensity ng kulay; i-drag sa zero para sa grayscale.</string>
+    <string name="tut_isolate_subject_title">Ihiwalay ang Paksa</string>
+    <string name="tut_isolate_subject_text">Gumagamit ng AI upang awtomatikong alisin ang background, na iiwan lamang ang pangunahing paksa ng larawan.</string>
+    <string name="tut_best_results_title">Pinakamahusay na Resulta</string>
+    <string name="tut_best_results_text">Pinakamahusay na gumagana sa mga larawang may malinaw na paksa laban sa plain o contrasting na background. Ang mga kumplikadong eksena na may mga abalang background ay maaaring mangailangan ng mga manual touch-up gamit ang pambura.</string>
+</resources>
