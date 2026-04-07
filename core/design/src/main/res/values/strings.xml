@@ -626,7 +626,7 @@
     <string name="tut_how_many_layers_title">How Many Layers?</string>
     <string name="tut_how_many_layers_text">A 3-colour design produces 3 stencil sheets. More colours = more sheets. Simple high-contrast images give the best results.</string>
     <string name="tut_exporting_title">Exporting</string>
-    <string name="tut_exporting_text">Each stencil exports as a PDF. Print at 100% scale (no scaling) to get accurate life-size dimensions.</string>
+    <string name="tut_exporting_text">Each stencil exports as a PDF. Print at 100%% scale (no scaling) to get accurate life-size dimensions.</string>
     <string name="tut_opacity_brightness_title">Opacity &amp; Brightness</string>
     <string name="tut_opacity_brightness_text">Opacity controls how transparent the layer is. Brightness shifts the overall lightness — useful to match the layer to your wall\'s tone.</string>
     <string name="tut_contrast_saturation_title">Contrast &amp; Saturation</string>
