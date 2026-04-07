@@ -1,0 +1,637 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The name of the application. -->
+    <string name="app_name">GraffitiXR</string>
+
+    <!-- Label for the navigation item that opens the mode selection menu. -->
+    <string name="nav_modes">Modi</string>
+    <!-- Description for the modes menu, explaining its purpose of switching app modes. -->
+    <string name="nav_modes_info">Wechseln Sie zwischen den Modi AR-Projektion, Overlay, Mockup und Leuchtkasten.</string>
+
+    <!-- Label for the Augmented Reality (AR) projection mode. -->
+    <string name="nav_ar_mode">AR</string>
+    <!-- Instructions for AR mode, explaining how to project artwork onto a wall. -->
+    <string name="nav_ar_mode_info">Projizieren Sie Ihr Kunstwerk mithilfe von Augmented Reality auf eine echte Wand. Scannen Sie zuerst die Wand, um den Anker zu platzieren, und fügen Sie dann Ihre Designebenen hinzu.</string>
+
+    <!-- Label for the camera overlay mode, which doesn't use AR tracking. -->
+    <string name="nav_overlay">Overlay</string>
+    <!-- Description of Overlay mode, used for quick checks without spatial tracking. -->
+    <string name="nav_overlay_info">Legen Sie Ihr Design über das Live-Kamerabild, ohne AR-Verankerung. Ideal für schnelle Rahmen- und Platzierungsprüfungen.</string>
+
+    <!-- Label for the Mockup mode, used for previewing on a static background. -->
+    <string name="nav_mockup">Mockup</string>
+    <!-- Description of Mockup mode, explaining that it uses a photo background instead of a live feed. -->
+    <string name="nav_mockup_info">Sehen Sie sich eine Vorschau Ihres Designs an, das in ein Foto einer Wand eingefügt ist. Keine Kamera oder Scannen erforderlich.</string>
+
+    <!-- Label for the Trace mode, which locks the screen for manual tracing. -->
+    <string name="nav_trace">Leuchtkasten</string>
+    <!-- Description of Trace mode, explaining its use as a light-table for physical tracing. -->
+    <string name="nav_trace_info">Verwenden Sie Ihr Design als Leuchttisch-Overlay, um Referenzlinien auf eine physische Oberfläche zu übertragen.</string>
+    <!-- Alternative name for Trace mode, often referred to as Lightbox. -->
+    <string name="nav_trace_mode">Leuchtkasten</string>
+
+    <!-- Label for Canvas mode, which is optimized for smaller, desk-scale artwork. -->
+    <string name="nav_canvas">Leinwand</string>
+    <!-- Label for Mural mode, which is optimized for large-scale wall artwork. -->
+    <string name="nav_mural">Wandbild</string>
+    <!-- Description for the toggle between Canvas and Mural scanning modes. -->
+    <string name="nav_scan_mode_toggle_info">Wechseln Sie zwischen Leinwand (optimiert für kleinere Kunstwerke im Schreibtischmaßstab) und Wandbild (optimiert für große Wände und Gaussian Splatting).</string>
+
+    <!-- Label for the Stencil generation tool. -->
+    <string name="nav_stencil">Schablone</string>
+    <!-- Description of the Stencil tool, explaining how it creates multi-layer printable templates. -->
+    <string name="nav_stencil_info">Erstellen Sie druckbare mehrschichtige Schablonen aus Ihrem Kunstwerk. Jede Ebene wird als reine Umrisskachel in der Größe für US Letter-Papier gedruckt.</string>
+
+    <!-- Label for the Target/Grid management menu in AR mode. -->
+    <string name="nav_grid">Ziel</string>
+    <!-- Description of Target management, used for anchor creation and management. -->
+    <string name="nav_grid_info">Erstellen und verwalten Sie AR-Ankerziele. Fotografieren Sie gemalte Referenzmarken an der Wand, um die Projektion an Ort und Stelle zu arretieren.</string>
+
+    <!-- Label for the wall survey tool, used to improve AR tracking. -->
+    <string name="nav_surveyor">Vermessung</string>
+    <!-- Description of the Survey tool, explaining its role in tracking accuracy. -->
+    <string name="nav_surveyor_info">Kartieren Sie die Wandoberfläche, um die AR-Tracking-Genauigkeit zu verbessern.</string>
+
+    <!-- Label for the action to create a new AR anchor. -->
+    <string name="nav_create">Erstellen</string>
+    <!-- Instructions for creating a new AR anchor by photographing a mark on the wall. -->
+    <string name="nav_create_info">Fotografieren Sie eine Referenzmarke an der Wand, um einen neuen AR-Anker zu erstellen. Die App verfolgt diese Marke, um Ihre Projektion ausgerichtet zu halten.</string>
+
+    <!-- Label for the action to refine an existing AR anchor. -->
+    <string name="nav_refine">Verfeinern</string>
+    <!-- Description of the anchor refinement process. -->
+    <string name="nav_refine_info">Nehmen Sie eine Feinabstimmung der Position eines vorhandenen AR-Ankerziels vor.</string>
+
+    <!-- Label for the progress tracking tool. -->
+    <string name="nav_update">Fortschritt</string>
+    <!-- Description of the progress tool, used for marking completed parts of a mural. -->
+    <string name="nav_update_info">Markieren Sie fertige Bereiche Ihres Wandbildes, um den Malfortschritt zu verfolgen.</string>
+
+    <!-- Label for the design and layer management menu. -->
+    <string name="nav_design">Design</string>
+    <!-- Description of the design menu, where layers are added and managed. -->
+    <string name="nav_design_info">Designebenen hinzufügen und verwalten. Jede Ebene kann ein importiertes Bild oder eine Freihandzeichnung sein.</string>
+
+    <!-- Action label to open or import an image. -->
+    <string name="nav_open">Öffnen</string>
+    <!-- Description of the Open action, used to add an image layer from the gallery. -->
+    <string name="nav_open_info">Fügen Sie ein Bild aus Ihrer Galerie als neue Ebene hinzu.</string>
+
+    <!-- Label for the background wall image in Mockup mode. -->
+    <string name="nav_wall">Wand</string>
+    <!-- Description for the action to change the background wall image. -->
+    <string name="nav_wall_info">Ersetzen Sie das Foto der Hintergrundwand, das im Mockup-Modus verwendet wird.</string>
+
+    <!-- Label for the AI-powered background removal tool. -->
+    <string name="nav_isolate">Isolieren</string>
+    <!-- Description of the Isolate tool, explaining that it removes the background from a layer. -->
+    <string name="nav_isolate_info">Entfernen Sie automatisch den Hintergrund aus dieser Ebene und lassen Sie nur das Motiv auf einem transparenten Hintergrund zurück.</string>
+
+    <!-- Label for the color inversion tool. -->
+    <string name="nav_invert">Umkehren</string>
+    <!-- Description of the Invert tool, explaining its use for stencil and overlay analysis. -->
+    <string name="nav_invert_info">Erstellen Sie ein Negativ der aktuellen Ebene. Schwarztöne werden weiß und Farben werden in ihre Gegensätze umgewandelt – nützlich für die Schablonen- und Overlay-Analyse.</string>
+
+    <!-- Label for the outline filter. -->
+    <string name="nav_outline">Umriss</string>
+    <!-- Description of the Outline filter, used for creating stencil templates. -->
+    <string name="nav_outline_info">Konvertieren Sie diese Ebene in schwarze Strichzeichnungen auf transparentem Hintergrund – ideal zum Erstellen von Schablonenvorlagen.</string>
+
+    <!-- Label for image adjustment tools (brightness, contrast, etc.). -->
+    <string name="nav_adjust">Anpassen</string>
+    <!-- Description of the image adjustment tools. -->
+    <string name="nav_adjust_info">Nehmen Sie eine Feinabstimmung von Helligkeit, Kontrast, Sättigung und Farbbalance für diese Ebene vor.</string>
+
+    <!-- Label for color balance and tinting tools. -->
+    <string name="nav_balance">Farbbalance</string>
+    <!-- Description of the color balance tool, mentioning RGB sliders. -->
+    <string name="nav_balance_info">Tönen Sie die Ebenenfarben mithilfe von Schiebereglern für die Kanäle Rot, Grün und Blau.</string>
+
+    <!-- Label for layer blending mode selection. -->
+    <string name="nav_blending">Mischung</string>
+    <!-- Description of blending modes, used to control how layers composite. -->
+    <string name="nav_blending_info">Wechseln Sie durch die Mischmodi (Normal, Multiplizieren, Negativ multiplizieren, Ineinanderkopieren…), um zu steuern, wie diese Ebene mit den darunter liegenden Ebenen zusammengesetzt wird.</string>
+
+    <!-- Label for the application settings menu. -->
+    <string name="nav_settings">Einstellungen</string>
+    <!-- Description of the settings menu, listing configurable preferences. -->
+    <string name="nav_settings_info">Konfigurieren Sie Händigkeit, AR-Scanmodus, Einheiten und andere App-Einstellungen.</string>
+
+    <!-- Label for the project management menu. -->
+    <string name="nav_project">Projekt</string>
+    <!-- Description of the project menu, covering file operations. -->
+    <string name="nav_project_info">Verwalten Sie Ihr Projekt: Erstellen, speichern, laden und exportieren.</string>
+
+    <!-- Action label to start a new project. -->
+    <string name="nav_new">Neu</string>
+    <!-- Description of the New Project action, including a warning about unsaved changes. -->
+    <string name="nav_new_info">Starten Sie ein frisches, leeres Projekt. Alle nicht gespeicherten Änderungen gehen verloren.</string>
+
+    <!-- Action label to save the current project. -->
+    <string name="nav_save">Speichern</string>
+    <!-- Description of the Save action. -->
+    <string name="nav_save_info">Speichern Sie das aktuelle Projekt auf Ihrem Gerät.</string>
+
+    <!-- Action label to load a project from the library. -->
+    <string name="nav_load">Laden</string>
+    <!-- Description of the Load action, referencing the project library. -->
+    <string name="nav_load_info">Öffnen Sie die Projektbibliothek, um ein zuvor gespeichertes Projekt zu laden.</string>
+
+    <!-- Action label to export the final image. -->
+    <string name="nav_export">Export</string>
+    <!-- Description of the Export action, explaining it merges layers into one image. -->
+    <string name="nav_export_info">Exportieren Sie ein flaches, zusammengeführtes Bild aller sichtbaren Ebenen in Ihre Fotogalerie.</string>
+
+    <!-- Label for the interactive help system. -->
+    <string name="nav_help">Hilfe</string>
+    <!-- Description of how to use the interactive help system. -->
+    <string name="nav_help_info">Tippen Sie auf eine beliebige Schaltfläche, während die Hilfe aktiv ist, um zu sehen, was sie bewirkt.</string>
+
+    <!-- Label for the flashlight toggle. -->
+    <string name="nav_light">Licht</string>
+    <!-- Description of the flashlight toggle for working in low light. -->
+    <string name="nav_light_info">Schalten Sie die Gerätetaschenlampe um, um Ihre Wand bei Arbeiten bei schwachem Licht zu beleuchten.</string>
+
+    <!-- Label for the touch input lock feature. -->
+    <string name="nav_lock">Sperren</string>
+    <!-- Description of the touch lock, explaining how to unlock it. -->
+    <string name="nav_lock_info">Sperren Sie den Touchscreen, um versehentliche Änderungen beim Sprühen zu verhindern. Tippen Sie dreimal auf eine beliebige Stelle, um die Sperre aufzuheben.</string>
+
+
+    <!-- Tooltip info for the brush tool. -->
+    <string name="info_brush">Malen Sie Freihandstriche auf diese Ebene. Ziehen Sie die Größenschaltfläche nach oben/unten, um den Pinseldurchmesser zu ändern; ziehen Sie nach links/rechts, um die Weichzeichnung (Kantenschärfe) anzupassen.</string>
+    <!-- Tooltip info for the eraser tool. -->
+    <string name="info_eraser">Radieren Sie Teile dieser Ebene mit einem runden Pinsel. Ziehen Sie die Größenschaltfläche nach oben/unten, um den Durchmesser zu ändern; ziehen Sie nach links/rechts, um die Weichzeichnung anzupassen.</string>
+    <!-- Tooltip info for the blur tool. -->
+    <string name="info_blur">Verwischen und weichzeichnen Sie Bereiche dieser Ebene. Ziehen Sie über einen Bereich, um ihn unscharf zu machen.</string>
+    <!-- Tooltip info for the liquify/warp tool. -->
+    <string name="info_liquify">Pixel in eine beliebige Richtung schieben und verzerren. Ziehen Sie über einen Bereich, um ihn zu verzerren – nützlich zum Anpassen von Proportionen.</string>
+    <!-- Tooltip info for the dodge (lighten) tool. -->
+    <string name="info_dodge">Hellen Sie bestimmte Bereiche auf, indem Sie darüber malen.</string>
+    <!-- Tooltip info for the burn (darken) tool. -->
+    <string name="info_burn">Dunkeln Sie bestimmte Bereiche ab, indem Sie darüber malen.</string>
+    <!-- Tooltip info for the brush size control, explaining vertical and horizontal drag gestures. -->
+    <string name="info_size">Ziehen Sie nach oben/unten, um den Pinseldurchmesser zu ändern. Ziehen Sie nach links/rechts, um die Weichzeichnung anzupassen – eine stärkere Weichzeichnung erzeugt weichere, sprühdosenähnlichere Kanten.</string>
+    <!-- Tooltip info for the brush color control, explaining gestures and the color wheel. -->
+    <string name="info_color">Zeigt die aktive Pinselfarbe an. Ziehen Sie nach oben/unten, um die Helligkeit anzupassen; ziehen Sie nach links/rechts, um die Sättigung anzupassen. Tippen Sie hier, um das vollständige Farbrad zu öffnen.</string>
+    <!-- Tooltip info for adding a new drawing layer. -->
+    <string name="info_draw">Fügen Sie eine neue leere transparente Ebene für Freihandzeichnungen hinzu.</string>
+    <!-- Tooltip info for the AR keyframe tool, used for drift correction. -->
+    <string name="info_keyframe">Speichern Sie die aktuelle AR-Kamerapose als Keyframe. Wird verwendet, um Abdrift zu korrigieren und die Projektion nach dem Wegbewegen und Zurückkehren neu auszurichten.</string>
+    <!-- Tooltip info for an individual layer in the design rail. -->
+    <string name="info_layer">Diese Ebene. Tippen Sie, um sie zu aktivieren. Öffnen Sie die horizontale Leiste, um auf Werkzeuge zuzugreifen. Lange drücken und ziehen, um die Reihenfolge zu ändern.</string>
+
+
+    <!-- Label for selecting the number of stencil layers. -->
+    <string name="stencil_layers">Ebenen</string>
+    <!-- Description of stencil layer options (silhouette, highlight, midtone). -->
+    <string name="stencil_layers_info">Wählen Sie, wie viele Schablonenebenen generiert werden sollen: 1 (nur Silhouette), 2 (Silhouette + Highlight) oder 3 (Silhouette + Mittelton + Highlight).</string>
+
+    <!-- Action label to re-generate stencils. -->
+    <string name="stencil_rebuild">Neu erstellen</string>
+    <!-- Description of the Rebuild action for the stencil pipeline. -->
+    <string name="stencil_rebuild_info">Führen Sie die Schablonengenerierungs-Pipeline auf der aktuellen Quellebene erneut aus.</string>
+
+    <!-- Label for the stencil printing configuration. -->
+    <string name="stencil_print">Drucken</string>
+    <!-- Description of the print tool, mentioning tiled PDF generation. -->
+    <string name="stencil_print_info">Konfigurieren Sie die reale Druckgröße und generieren Sie ein gekacheltes PDF für US Letter-Papier.</string>
+
+    <!-- Label for setting the real-world size of the stencil. -->
+    <string name="stencil_print_size">Größe</string>
+    <!-- Description of the stencil size control, mentioning centimetre units and live page count. -->
+    <string name="stencil_print_size_info">Ziehen Sie nach oben/unten, um die reale Breite oder Höhe der Schablone in Zentimetern festzulegen. Die Seitenzahl wird live aktualisiert.</string>
+
+    <!-- Label for toggling between width and height locking for print sizing. -->
+    <string name="stencil_print_dim_toggle">B / H</string>
+    <!-- Description of the dimension lock toggle. -->
+    <string name="stencil_print_dim_toggle_info">Tippen Sie hier, um zwischen dem Sperren der Breite oder der Höhe der Ausgabe zu wechseln.</string>
+
+    <!-- Action label to generate and print the tiled PDF. -->
+    <string name="stencil_export_pdf">PDF drucken</string>
+    <!-- Description of the PDF export, including the mention of overlaps for assembly. -->
+    <string name="stencil_export_pdf_info">Generieren Sie ein gekacheltes PDF aller Schablonenebenen, bereit zum Drucken und Schneiden. Jede Kachel enthält eine 3-mm-Überlappung für die Montageausrichtung.</string>
+
+    <!-- Action label to save stencil layers as PNG images. -->
+    <string name="stencil_save_layers">PNGs speichern</string>
+    <!-- Description of the PNG save action for stencil layers. -->
+    <string name="stencil_save_layers_info">Speichern Sie jede Schablonenebene als separates PNG-Bild in Ihrer Galerie.</string>
+
+    <!-- Label for the button to return to the main editor from stencil mode. -->
+    <string name="stencil_back">← Editor</string>
+    <!-- Description of the back action, noting that stencil layers are preserved. -->
+    <string name="stencil_back_info">Kehren Sie zum Haupteditor zurück. Ihre Schablonenebenen bleiben in der Sitzung erhalten.</string>
+
+    <!-- Action label to add a text layer. -->
+    <string name="nav_text">Text</string>
+    <!-- Action label to add a blank drawing layer. -->
+    <string name="nav_draw">Zeichnen</string>
+    <!-- Action label to edit layer content (like text). -->
+    <string name="nav_edit">Bearbeiten</string>
+    <!-- Action label for font selection. -->
+    <string name="nav_font">Schriftart</string>
+    <!-- Action label for size adjustment. -->
+    <string name="nav_size">Größe</string>
+    <!-- Action label for color selection. -->
+    <string name="nav_color">Farbe</string>
+    <!-- Action label for text kerning. -->
+    <string name="nav_kern">Unterschneidung</string>
+    <!-- Action label for bold text toggle. -->
+    <string name="nav_bold">Fett</string>
+    <!-- Action label for italic text toggle. -->
+    <string name="nav_italic">Kursiv</string>
+    <!-- Action label for drop shadow toggle. -->
+    <string name="nav_shadow">Schatten</string>
+    <!-- Action label for the eraser tool. -->
+    <string name="nav_eraser">Radiergummi</string>
+    <!-- Action label for the blur/smudge tool. -->
+    <string name="nav_blur">Weichzeichnen</string>
+    <!-- Action label for the liquify/warp tool. -->
+    <string name="nav_liquify">Verflüssigen</string>
+    <!-- Action label for the dodge/lighten tool. -->
+    <string name="nav_dodge">Abwedler</string>
+    <!-- Action label for the burn/darken tool. -->
+    <string name="nav_burn">Nachbelichter</string>
+
+    <!-- MainActivity UI strings -->
+    <!-- Label shown when a stencil or process is generating. -->
+    <string name="pro_tip">Profi-Tipp</string>
+    <string name="double_tap_hint">Doppeltippen, um die Rotationsachse zu wechseln.</string>
+    <string name="ok_button">OK</string>
+
+    <string name="generating">WIRD GENERIERT...</string>
+    <!-- Hint shown when user can add a layer by pressing again. -->
+    <string name="stencil_hint">Erneut drücken, um eine Ebene hinzuzufügen.</string>
+    <!-- Hint for renaming a layer. -->
+    <string name="rename_hint">Umbenennen</string>
+    <!-- Hint for editing text content. -->
+    <string name="edit_text_hint">Text bearbeiten</string>
+    <!-- Action to copy layer modifications. -->
+    <string name="copy_edits">Bearbeitungen kopieren</string>
+    <!-- Action to paste layer modifications. -->
+    <string name="paste_edits">Bearbeitungen einfügen</string>
+    <!-- Action to generate a poster from a layer. -->
+    <string name="generate_poster">Poster generieren</string>
+    <!-- Action to duplicate a layer. -->
+    <string name="duplicate">Duplizieren</string>
+    <!-- Action to unlink a layer from others. -->
+    <string name="unlink_layer">Ebene trennen</string>
+    <!-- Action to link a layer with others. -->
+    <string name="link_layer">Ebene verknüpfen</string>
+    <!-- Action to hide a layer. -->
+    <string name="hide_layer">Ebene ausblenden</string>
+    <!-- Action to show a layer. -->
+    <string name="show_layer">Ebene einblenden</string>
+    <!-- Action to flatten all layers. -->
+    <string name="flatten_all">Alle reduzieren</string>
+    <!-- Action to delete a layer. -->
+    <string name="delete">Löschen</string>
+    <string name="new_project_name">Neues Projekt</string>
+    <!-- Label for the lock button. -->
+    <string name="lock_button">Sperren</string>
+    <!-- Label for the freeze button. -->
+    <string name="freeze_button">Einfrieren</string>
+
+    <!-- Dialog title for choosing a wall photo source. -->
+    <string name="wall_source_title">Wandfoto auswählen</string>
+    <!-- Message asking user how they want to set the wall photo. -->
+    <string name="wall_source_text">Wie möchten Sie die Hintergrundwand festlegen?</string>
+    <!-- Action to take a new photo. -->
+    <string name="take_photo">Foto aufnehmen</string>
+    <!-- Action to choose a photo from the gallery. -->
+    <string name="choose_from_gallery">Aus Galerie auswählen</string>
+
+    <!-- Message shown when the device doesn't support the Depth API. -->
+    <string name="depth_unsupported">Dieses Gerät unterstützt die Depth API nicht.\nWechseln Sie in den Einstellungen zum Leinwand-Modus.</string>
+
+    <!-- Title shown when ARCore is missing or unsupported. -->
+    <string name="arcore_required_title">ARCore ist erforderlich</string>
+    <!-- Text explaining that ARCore is needed and providing instructions. -->
+    <string name="arcore_required_text">Auf diesem Gerät ist ARCore nicht installiert oder es wird nicht unterstützt. Installieren Sie ARCore aus dem Play Store, um AR-Funktionen zu nutzen.</string>
+    <!-- Action to install ARCore from the store. -->
+    <string name="install_arcore">ARCore installieren</string>
+
+    <!-- Message shown when camera permission is denied. -->
+    <string name="camera_permission_required">Für den AR-Modus ist eine Kameraberechtigung erforderlich.</string>
+    <!-- Action to open system settings. -->
+    <string name="open_settings">Einstellungen öffnen</string>
+
+    <!-- Title for target creation overlay. -->
+    <string name="target_creation_title">ZIELERSTELLUNG</string>
+    <!-- Instructions for creating a target by tapping on reference marks. -->
+    <string name="target_creation_text">Tippen Sie direkt auf dem Bildschirm auf Ihre gemalten Referenzmarken. Die App wird sie sofort isolieren.</string>
+    <!-- Generic cancel action. -->
+    <string name="cancel">Abbrechen</string>
+
+    <!-- Label shown when diagnostic info is copied. -->
+    <string name="diag_copied">KOPIERT ✓</string>
+    <!-- Title for the depth diagnostic popup. -->
+    <string name="diag_title">TIEFEN-DIAGNOSE (zum Kopieren tippen)</string>
+    <!-- Message shown when waiting for diagnostic data. -->
+    <string name="diag_waiting">Warten auf ersten Frame…</string>
+
+    <!-- Coaching step 1 for scanning. -->
+    <string name="scan_step_1">Schritt 1: Kartieren Sie Ihre Umgebung</string>
+    <!-- Coaching step 2 for scanning. -->
+    <string name="scan_step_2">Schritt 2: Scannen Sie die Zielwand</string>
+
+    <!-- Question asking if the AR artwork is correctly placed on the wall. -->
+    <string name="plane_confirm_question">Ist das Kunstwerk an der richtigen Wand platziert?</string>
+    <!-- Action to confirm the current plane placement. -->
+    <string name="looks_correct">Sieht richtig aus</string>
+    <!-- Action to redetect the plane. -->
+    <string name="redetect">Neu erkennen</string>
+
+    <!-- Title for plane realignment tool. -->
+    <string name="plane_realignment_title">Wandoberfläche neu erkennen</string>
+    <!-- Instructions for realigning the plane with the wall. -->
+    <string name="plane_realignment_text">Der Anker wird dort platziert, wo Sie bei der Aufnahme standen. ARCore wählt die verfolgte vertikale Oberfläche aus, die sich am direktesten vor dieser ursprünglichen Position befindet.\n\n1. Kehren Sie ungefähr dorthin zurück, wo Sie während der Aufnahme standen.\n2. Schwenken Sie die Kamera langsam über Ihre Wand, damit ARCore sie als flache Oberfläche registrieren kann.\n3. Halten Sie die Kamera ruhig auf das Kunstwerk gerichtet und tippen Sie dann unten.\n\nDer orangefarbene Rand springt auf die neu erkannte Oberfläche.</string>
+    <!-- Action to use the currently detected wall for realignment. -->
+    <string name="use_this_wall">Diese Wand verwenden</string>
+
+    <!-- Label shown when scanning for relocation. -->
+    <string name="scanning_dots">Scannen\u2026</string>
+    <!-- Progress label for relocation tracking. -->
+    <string name="matched_percent">%1$d%% übereinstimmend</string>
+    <!-- Message shown when the AR anchor is successfully locked. -->
+    <string name="anchor_locked">Anker gesperrt</string>
+
+    <!-- Dialog title for choosing a font. -->
+    <string name="choose_font">Schriftart auswählen</string>
+
+    <!-- General Actions -->
+    <string name="cancel_button">Abbrechen</string>
+    <string name="done_button">Fertig</string>
+    <string name="apply_button">Anwenden</string>
+    <string name="close_button">Schließen</string>
+    <string name="next_button">Weiter</string>
+    <string name="save_button">Speichern</string>
+    <string name="retake_button">Wiederholen</string>
+    <string name="capture_button">Aufnehmen</string>
+
+    <!-- Adjustments Panel -->
+    <string name="adj_detail">Detail</string>
+    <string name="adj_opacity">Deckkraft</string>
+    <string name="adj_brightness">Helligkeit</string>
+    <string name="adj_contrast">Kontrast</string>
+    <string name="adj_saturation">Sättigung</string>
+    <string name="adj_red">Rot</string>
+    <string name="adj_green">Grün</string>
+    <string name="adj_blue">Blau</string>
+    <string name="adj_undo">Rückgängig</string>
+    <string name="adj_redo">Wiederholen</string>
+    <string name="adj_magic_align">Magische Ausrichtung</string>
+
+    <!-- Overlays & Status -->
+    <string name="status_create_grid">Erstellen Sie ein Raster, um zu beginnen.</string>
+    <string name="status_scan_surfaces">Scannen Sie Oberflächen in Ihrer Nähe.</string>
+    <string name="status_tap_surface">Tippen Sie auf eine Oberfläche, um einen Anker zu platzieren.</string>
+    <string name="status_looking_grid">Suche nach Ihrem Raster...</string>
+    <string name="status_ready">Bereit. (%1$d Pkt.)</string>
+    <string name="unlock_hint">Tippen Sie 3 Mal zum Entsperren</string>
+
+    <!-- Library Screen -->
+    <string name="lib_app_title">GraffitiXR</string>
+    <string name="lib_app_description">Projizieren Sie Ihr Kunstwerk mithilfe von AR oder einem einfachen Kamera-Overlay auf eine echte Wand oder Leinwand. \n\nErstellen Sie schnell ein Mockup auf einem Foto, um zu zeigen, wie das fertige Werk aussehen wird. \n\nOder pausen Sie ein Bild auf Papier ab, indem Sie Ihr Gerät als Leuchtkasten verwenden.</string>
+    <string name="lib_new_project">Neu</string>
+    <string name="lib_import_project">Importieren</string>
+    <string name="lib_no_projects">Noch keine Projekte</string>
+    <string name="lib_no_projects_hint">Tippen Sie oben auf Neu, um Ihr erstes Wandbild zu beginnen.\n\nSie werden in den Editor weitergeleitet, wo Sie Folgendes tun können:\n  \u2022  Kunstwerk aus dem Design-Menü hinzufügen\n  \u2022  In den AR-Modus wechseln, um auf eine echte Wand zu projizieren\n  \u2022  Overlay verwenden, um Ihr Design über der Live-Kamera schweben zu lassen\n  \u2022  Mockup verwenden, um eine Vorschau auf einem Wandfoto anzuzeigen\n  \u2022  Leuchtkasten verwenden, um Ihr Design auf Papier zu pausen</string>
+    <string name="lib_project_thumbnail">Projekt-Miniaturansicht</string>
+    <string name="lib_delete_project_desc">Projekt %1$s löschen</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Einstellungen</string>
+    <string name="settings_preferences_section">Präferenzen</string>
+    <string name="settings_hand_label">Dominante Hand</string>
+    <string name="settings_hand_right">Rechts</string>
+    <string name="settings_hand_left">Links</string>
+    <string name="settings_diag_label">Tiefendiagnose-Overlay</string>
+    <string name="settings_on">Ein</string>
+    <string name="settings_off">Aus</string>
+    <string name="settings_scan_mode_label">AR-Scanmodus</string>
+    <string name="settings_scan_mode_point_cloud">Punktwolke</string>
+    <string name="settings_scan_mode_gaussian_splat">Gaussian Splat</string>
+    <string name="settings_anchor_boundary_label">Ankergrenze anzeigen</string>
+    <string name="settings_units_label">Entfernungseinheiten</string>
+    <string name="settings_units_imperial">Imperial (ft)</string>
+    <string name="settings_units_metric">Metrisch (m)</string>
+    <string name="settings_canvas_bg_label">Leinwandhintergrund</string>
+    <string name="settings_info_section">App-Informationen</string>
+    <string name="settings_version_label">Version</string>
+    <string name="settings_updates_section">Updates</string>
+    <string name="settings_check_updates_label">Nach experimentellen Updates suchen</string>
+    <string name="settings_install_update_label">Update installieren</string>
+    <string name="settings_permissions_section">Berechtigungen</string>
+    <string name="settings_camera_access">Kamerazugriff</string>
+    <string name="settings_photo_access">Zugriff auf Fotobibliothek</string>
+    <string name="settings_notifications">Benachrichtigungen</string>
+    <string name="settings_granted">Gewährt</string>
+    <string name="settings_denied">Verweigert</string>
+    <string name="settings_open_app_settings">App-Einstellungen öffnen</string>
+    <string name="settings_copyright">GraffitiXR © 2025</string>
+
+    <!-- Editor UI -->
+    <string name="layers_title">Ebenen</string>
+    <string name="brush_size_title">Pinselgröße</string>
+    <string name="save_project_hint">Projektname</string>
+
+    <!-- Target Creation -->
+    <string name="target_guide_desc">Zielausrichtungshilfe</string>
+    <string name="target_captured_desc">Erfasstes Ziel</string>
+    <string name="target_review_desc">Extrahiertes Ziel überprüfen</string>
+    <string name="target_unwarp_hint">Ecken ziehen zum Entzerren</string>
+    <string name="target_review_title">Extrahierte Markierungen überprüfen</string>
+
+    <string name="target_exclude">Ausschließen</string>
+    <string name="target_include">Einschließen</string>
+    <string name="target_erase_marks">Markierungen löschen</string>
+    <string name="target_show_features">Merkmale anzeigen</string>
+    <string name="reset_button">Zurücksetzen</string>
+
+    <string name="poster_title">POSTER GENERIEREN</string>
+    <string name="poster_select_layers">Einzuschließende Ebenen auswählen:</string>
+    <string name="poster_physical_size">Physische Größe (Breite in mm):</string>
+    <string name="poster_generate_pdf">PDF GENERIEREN</string>
+
+    <!-- Scan Hints -->
+    <string name="scan_hint_recover">Gerät langsam bewegen, um Tracking wiederherzustellen</string>
+    <string name="scan_hint_ambient">Langsam um 360° drehen, um Ihre Umgebung zu kartieren (%1$d°)</string>
+    <string name="scan_hint_too_dark">Zu dunkel. Schalten Sie die Taschenlampe ein.</string>
+    <string name="scan_hint_build_map">Gehen Sie nach links und rechts, um die Karte zu erstellen</string>
+    <string name="scan_hint_closer">Gehen Sie näher an die Wand</string>
+    <string name="scan_hint_higher_lower">Scannen Sie höher und niedriger</string>
+
+    <!-- Content Descriptions -->
+    <string name="desc_bg_mockup">Hintergrund-Mockup</string>
+    <string name="desc_segmentation_preview">Segmentierungsvorschau</string>
+
+    <!-- Help strings for main navigation rail. -->
+    <!-- Mode Switcher help text. -->
+    <string name="help_mode_host">Moduswechsler: Wechseln Sie zwischen App-Modi. Anweisungen: Tippen Sie zum Erweitern und wählen Sie dann AR, Overlay, Mockup oder Leuchtkasten.</string>
+    <!-- AR Mode help text. -->
+    <string name="help_ar">AR-Modus: Projizieren Sie das Design mithilfe räumlicher Kartierung auf eine Wand. Anweisungen: Scannen Sie die Umgebung, bis eine Wand erkannt wird, und tippen Sie dann, um den Anker zu platzieren.</string>
+    <!-- Overlay Mode help text. -->
+    <string name="help_overlay">Overlay-Modus: Zeigen Sie das Design über der Live-Kamera ohne räumliches Tracking an. Anweisungen: Skalieren und verschieben Sie das Design manuell, damit es in Ihren Rahmen passt.</string>
+    <!-- Mockup Mode help text. -->
+    <string name="help_mockup">Mockup-Modus: Sehen Sie sich eine Vorschau des Designs auf einem statischen Foto an. Anweisungen: Verwenden Sie \'Wand\', um ein Hintergrundbild festzulegen, und ordnen Sie dann die Ebenen darauf an.</string>
+    <!-- Lightbox Mode help text. -->
+    <string name="help_trace">Leuchtkasten-Modus: Pausoberfläche mit hoher Helligkeit. Anweisungen: Legen Sie Papier auf den Bildschirm und pausen Sie ab. Tippen Sie dreimal auf eine beliebige Stelle, um den Vorgang zu beenden.</string>
+    <!-- Target Management help text. -->
+    <string name="help_target_host">Zielverwaltung: Werkzeuge für AR-Anker. Anweisungen: Tippen Sie, um auf Werkzeuge zum Erstellen oder Neuausrichten der Position des Wandbildes zuzugreifen.</string>
+    <!-- Scan Resolution help text. -->
+    <string name="help_scan_mode_toggle">Scanauflösung: Wechseln Sie zwischen Wandbild (großer Maßstab) und Leinwand (kleiner Maßstab). Wandbild verwendet Gaussian Splats für Wände; Leinwand verwendet Punktwolken für detaillierte Kunst im Schreibtischmaßstab.</string>
+    <!-- Create Anchor help text. -->
+    <string name="help_create">Anker erstellen: Fotografieren Sie eine Marke an der Wand, um die Projektion zu arretieren. Anweisungen: Zielen Sie auf eine deutlich sichtbare Textur und tippen Sie. Die App verfolgt diese Marke.</string>
+    <!-- Layer Management help text. -->
+    <string name="help_design_host">Ebenenverwaltung: Bilder, Text oder Skizzen hinzufügen. Anweisungen: Tippen Sie zum Erweitern. Drücken Sie lange auf eine beliebige Ebenenschaltfläche, um ihr sekundäres Menü zu öffnen.</string>
+    <!-- Import Image help text. -->
+    <string name="help_add_img">Bild importieren: Fügen Sie eine Skizze oder ein Referenzfoto hinzu. Anweisungen: Wählen Sie ein Bild aus Ihrer Galerie. Es erscheint als neue Designebene.</string>
+    <!-- New Sketch help text. -->
+    <string name="help_add_draw">Neue Skizze: Fügen Sie eine leere Ebene für Freihandzeichnungen hinzu. Anweisungen: Wählen Sie die Ebene aus, um Pinsel-, Radiergummi- und Wischwerkzeuge anzuzeigen.</string>
+    <!-- Add Text help text. -->
+    <string name="help_add_text">Text hinzufügen: Erstellen Sie eine Typografieebene. Anweisungen: Tippen Sie auf die Schaltfläche \'Bearbeiten\' der Ebene, um Inhalt und Formatierung zu ändern.</string>
+    <!-- Change Wall help text. -->
+    <string name="help_wall">Wand ändern: Legen Sie den Hintergrund für den Mockup-Modus fest. Anweisungen: Wählen Sie ein Foto der physischen Wand aus, die Sie bemalen möchten.</string>
+    <!-- Project Management help text. -->
+    <string name="help_project_host">Projektverwaltung: Arbeiten speichern, laden und exportieren. Anweisungen: Tippen Sie, um auf administrative Aufgaben für Ihr Wandbild zuzugreifen.</string>
+    <!-- New Project help text. -->
+    <string name="help_new">Neues Projekt: Beginnen Sie ein neues Wandbild. Anweisungen: Tippen Sie zum Zurücksetzen. Warnung: Dadurch wird die gesamte aktuelle Arbeit gelöscht. Zuerst speichern!</string>
+    <!-- Save Project help text. -->
+    <string name="help_save">Projekt speichern: Wandbild und AR-Karte speichern. Anweisungen: Geben Sie einen Projektnamen ein und tippen Sie auf Speichern, um Ihren Fortschritt zu sichern.</string>
+    <!-- Project Library help text. -->
+    <string name="help_load">Projektbibliothek: Greifen Sie auf gespeicherte Wandbilder zu. Anweisungen: Durchsuchen Sie die Bibliothek, um die Arbeit fortzusetzen oder freigegebene Projektdateien zu importieren.</string>
+    <!-- Export Image help text. -->
+    <string name="help_export">Bild exportieren: Speichern Sie einen hochauflösenden Schnappschuss. Anweisungen: Rendert alle sichtbaren Ebenen in ein einzelnes PNG in Ihrer Fotogalerie.</string>
+    <!-- App Settings help text. -->
+    <string name="help_settings">App-Einstellungen: Präferenzen konfigurieren. Anweisungen: Öffnen Sie die Einstellungen, um Händigkeit, Einheiten und Scanparameter anzupassen.</string>
+    <!-- Flashlight help text. -->
+    <string name="help_light">Taschenlampe: Geräte-LED umschalten. Anweisungen: Verwenden Sie diese Funktion, um dunkle Wände für ein besseres AR-Tracking zu beleuchten.</string>
+    <!-- Lock/Freeze help text. -->
+    <string name="help_lock_trace">Sperren/Einfrieren: Verhindern Sie versehentliche Änderungen. Anweisungen: Im Pause-Modus wird der Bildschirm deaktiviert. In anderen Modi werden Ebenentransformationen gesperrt.</string>
+    <!-- Interactive 'Help' help text. -->
+    <string name="help_help_main">Interaktive Hilfe: Erklärt Schaltflächenfunktionen. Anweisungen: Tippen Sie zum Aktivieren (Cyan). Tippen Sie bei aktiver Hilfe auf eine beliebige Schaltfläche, um ihren Hilfetext anzuzeigen.</string>
+    <!-- Individual Layer help text. -->
+    <string name="help_layer">Ebene \'%1$s\': Aktives Wandbildelement. Anweisungen: Tippen Sie zum Auswählen. Ziehen Sie die Schaltfläche nach oben/unten, um die Reihenfolge zu ändern. Transformieren Sie auf dem Bildschirm mit Gesten.</string>
+
+    <!-- Help strings for layer-specific tools. -->
+    <!-- Edit Text tool help. -->
+    <string name="help_edit_text">Text bearbeiten: Ändern Sie Wörter in der Typografieebene. Anweisungen: Tippen Sie, um die Tastatur zu öffnen und den Textinhalt zu aktualisieren.</string>
+    <!-- Brush/Text Size tool help. -->
+    <string name="help_size">Pinsel-/Textgröße: Passen Sie Maßstab und Weichheit an. Anweisungen: Ziehen Sie für die Größe nach oben/unten. Ziehen Sie für die Pinselweichzeichnung nach links/rechts.</string>
+    <!-- Font Picker tool help. -->
+    <string name="help_font">Schriftauswahl: Wählen Sie den Typografiestil. Anweisungen: Tippen Sie, um verfügbare Schriftarten zu durchsuchen und sie auf die Textebene anzuwenden.</string>
+    <!-- Color Tool help. -->
+    <string name="help_color">Farbwerkzeug: Aktive Farbe festlegen. Anweisungen: Ziehen Sie nach oben/unten für die Helligkeit, nach links/rechts für die Sättigung. Tippen Sie für das vollständige Farbrad.</string>
+    <!-- Text Kerning tool help. -->
+    <string name="help_kern">Textunterschneidung: Zeichenabstand anpassen. Anweisungen: Ziehen Sie nach links/rechts, um das Textlayout zu verengen oder zu lockern.</string>
+    <!-- Bold Toggle help. -->
+    <string name="help_bold">Fett-Umschalter: Dicke Schriftstärke. Anweisungen: Tippen Sie, um die fette Formatierung auf der aktiven Textebene umzuschalten.</string>
+    <!-- Italic Toggle help. -->
+    <string name="help_italic">Kursiv-Umschalter: Schräg gestellte Formatierung. Anweisungen: Tippen Sie, um die kursive Formatierung auf der aktiven Textebene umzuschalten.</string>
+    <!-- Text Outline toggle help. -->
+    <string name="help_outline">Textumriss: Zeichenkontur. Anweisungen: Tippen Sie, um einen sichtbaren Umriss um die Textzeichen umzuschalten.</string>
+    <!-- Drop Shadow toggle help. -->
+    <string name="help_shadow">Schlagschatten: Texttiefe. Anweisungen: Tippen Sie, um für eine bessere Lesbarkeit einen weichen Schatten hinter der Typografie umzuschalten.</string>
+    <!-- Generate Stencil help. -->
+    <string name="help_stencil_gen">Schablone generieren: Erstellen Sie druckbare Vorlagen. Anweisungen: Tippen Sie, um mit der mehrschichtigen Schablonengenerierung für dieses Bild zu beginnen.</string>
+    <!-- Blend Mode help. -->
+    <string name="help_blend">Mischmodus: Zusammensetzungsstil. Anweisungen: Tippen Sie, um durch Modi wie Multiplizieren, Negativ multiplizieren und Ineinanderkopieren zu wechseln.</string>
+    <!-- Image Adjustments help. -->
+    <string name="help_adj">Bildanpassungen: Erscheinungsbild feinabstimmen. Anweisungen: Tippen Sie, um Schieberegler für Deckkraft, Helligkeit, Kontrast und Sättigung anzuzeigen.</string>
+    <!-- Invert Colors help. -->
+    <string name="help_invert">Farben umkehren: Kontrastreiches Negativ. Anweisungen: Tippen Sie, um Farben umzuwandeln. Weißtöne werden schwarz und umgekehrt – nützlich zum Abpausen.</string>
+    <!-- Color Balance help. -->
+    <string name="help_balance">Farbbalance: RGB-Kanal-Abstimmung. Anweisungen: Tippen Sie, um Schieberegler für die präzise Anpassung von Rot, Grün und Blau anzuzeigen.</string>
+    <!-- Eraser Brush help. -->
+    <string name="help_eraser">Radiergummi: Ebeneninhalt entfernen. Anweisungen: Malen Sie auf dem Bildschirm, um zu radieren. Verwenden Sie die Schaltfläche \'Größe\', um den Durchmesser anzupassen.</string>
+    <!-- Blur/Smudge tool help. -->
+    <string name="help_blur">Weichzeichnen-/Wischwerkzeug: Farben mischen. Anweisungen: Malen Sie über Bereiche, um Kanten weicher zu machen oder Details miteinander zu verwischen.</string>
+    <!-- Warp Tool help. -->
+    <string name="help_liquify">Verzerrungswerkzeug: Design umformen. Anweisungen: Ziehen Sie auf dem Bildschirm, um Pixel zu verschieben – ideal zum Anpassen von Proportionen.</string>
+    <!-- Dodge Tool help. -->
+    <string name="help_dodge">Abwedler: Bereiche aufhellen. Anweisungen: Malen Sie über Teile der Ebene, um deren Luminanz zu erhöhen.</string>
+    <!-- Burn Tool help. -->
+    <string name="help_burn">Nachbelichter: Bereiche abdunkeln. Anweisungen: Malen Sie über Teile der Ebene, um deren Luminanz zu verringern.</string>
+    <!-- Isolate Subject help. -->
+    <string name="help_iso">Motiv isolieren: Automatische Hintergrundentfernung. Anweisungen: Tippen Sie, um das Hauptmotiv mithilfe von KI aus dem Hintergrund zu extrahieren.</string>
+    <!-- Sketch Outline help. -->
+    <string name="help_line">Skizzenumriss: Strichzeichnungsfilter. Anweisungen: Tippen Sie, um das Foto in einen transparenten Schwarzweiß-Umriss zu konvertieren.</string>
+    <!-- Layer Help toggle help. -->
+    <string name="help_help_layer">Ebenenhilfe: Informationen für diese spezifischen Ebenenwerkzeuge umschalten. Anweisungen: Tippen Sie zum Aktivieren. Tippen Sie dann auf ein beliebiges Werkzeugsymbol, um zu sehen, was es bewirkt.</string>
+
+    <!-- Unit labels -->
+    <!-- Abbreviation for feet. -->
+    <string name="unit_feet">ft</string>
+    <!-- Abbreviation for centimeters. -->
+    <string name="unit_centimeters">cm</string>
+    <!-- Abbreviation for meters. -->
+    <string name="unit_meters">m</string>
+    <!-- Tutorial: AR Mode -->
+    <string name="tut_ar_title">AR-Projektion</string>
+    <string name="tut_ar_text">Projiziert Ihr Design mithilfe des Tiefensensors und des räumlichen Trackings des Telefons auf eine echte Wand.</string>
+    <string name="tut_ar_step1_title">Schritt 1: Scannen</string>
+    <string name="tut_ar_step1_text">Zielen Sie auf die Wand und bewegen Sie sich langsam von Seite zu Seite. Farbige Splats erscheinen, während die Engine die Oberfläche abbildet. Warten Sie, bis die Splats den Wandbereich abdecken.</string>
+    <string name="tut_ar_step2_title">Schritt 2: Zum Platzieren tippen</string>
+    <string name="tut_ar_step2_text">Tippen Sie einfach auf den Bildschirm. Die App fotografiert die Wand, extrahiert Tracking-Merkmale und arretiert den Anker sofort.</string>
+    <string name="tut_ar_step3_title">Schritt 3: Fügen Sie Ihr Kunstwerk hinzu</string>
+    <string name="tut_ar_step3_text">Drücken Sie auf \'Design\', um auf Ihre Ebenenwerkzeuge zuzugreifen. Verwenden Sie \'Bild\', um Fotos zu importieren, \'Zeichnen\', um zu skizzieren, oder \'Text\', um zu tippen.</string>
+    <string name="tut_ar_tip_title">Tipp: Auf die Textur kommt es an</string>
+    <string name="tut_ar_tip_text">Leere weiße Wände, glatter Beton und einfarbige Oberflächen werden nicht erfasst. Richten Sie Ihren Ankerpunkt auf Graffiti, rauen Putz oder eine beliebige andere deutliche Markierung.</string>
+
+    <!-- Tutorial: Overlay Mode -->
+    <string name="tut_overlay_title">Live-Overlay</string>
+    <string name="tut_overlay_text">Ihr Design schwebt über der Live-Kameraansicht – kein Scannen der Oberfläche erforderlich.</string>
+    <string name="tut_overlay_step1_title">Schritt 1: Fügen Sie Ihr Kunstwerk hinzu</string>
+    <string name="tut_overlay_step1_text">Drücken Sie auf \'Design\', um auf Ebenenwerkzeuge zuzugreifen. Verwenden Sie \'Bild\', um Fotos zu importieren, \'Zeichnen\', um zu skizzieren, oder \'Text\', um zu tippen.</string>
+    <string name="tut_overlay_step2_title">Schritt 2: Positionieren Sie es</string>
+    <string name="tut_overlay_step2_text">Zusammendrücken zum Skalieren, ziehen zum Neupositionieren. Das Overlay bleibt fest auf Ihrem Bildschirm – treten Sie einen Schritt zurück, um zu sehen, wie es an die Wand passt.</string>
+
+    <!-- Tutorial: Mockup Mode -->
+    <string name="tut_mockup_title">Foto-Mockup</string>
+    <string name="tut_mockup_text">Sehen Sie sich eine Vorschau Ihres Designs auf einem Foto an, bevor Sie jemals einen Pinsel in die Hand nehmen.</string>
+    <string name="tut_mockup_step1_title">Schritt 1: Legen Sie die Wand fest</string>
+    <string name="tut_mockup_step1_text">Öffnen Sie \'Design\' und tippen Sie auf \'Wand\', um ein Foto Ihrer Oberfläche auszuwählen oder aufzunehmen. Tun Sie dies zuerst!</string>
+    <string name="tut_mockup_step2_title">Schritt 2: Fügen Sie Ihr Kunstwerk hinzu</string>
+    <string name="tut_mockup_step2_text">Verwenden Sie \'Bild\', \'Zeichnen\' oder \'Text\', um Ebenen über der Wand hinzuzufügen. Drücken und ziehen Sie, um sie in der Größe anzupassen und zu positionieren.</string>
+
+    <!-- Tutorial: Trace Mode -->
+    <string name="tut_trace_title">Leuchtkasten-Modus</string>
+    <string name="tut_trace_text">Verwandelt Ihren Bildschirm in einen hellen Leuchtkasten zum Übertragen Ihres Designs auf Papier.</string>
+    <string name="tut_trace_step1_title">Schritt 1: Öffnen Sie das Design-Menü</string>
+    <string name="tut_trace_step1_text">Tippen Sie auf \'Design\', um auf Ebenenwerkzeuge zuzugreifen.</string>
+    <string name="tut_trace_step2_title">Schritt 2: Inhalt hinzufügen</string>
+    <string name="tut_trace_step2_text">Verwenden Sie \'Bild\', um Fotos zu importieren, \'Zeichnen\', um zu skizzieren, oder \'Text\', um zu tippen.</string>
+    <string name="tut_trace_step3_title">Schritt 3: Abpausen</string>
+    <string name="tut_trace_step3_text">Legen Sie Papier auf den Bildschirm und pausen Sie ab. Tippen Sie dreimal auf eine beliebige Stelle, um den Vorgang zu beenden.</string>
+
+    <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
+    <string name="tut_create_anchor_title">Anker erstellen</string>
+    <string name="tut_create_anchor_text">Fixiert Ihre Projektion auf einen bestimmten Punkt an der Wand. Einmal festgelegt, bleibt das Design an Ort und Stelle, auch wenn Sie herumlaufen.</string>
+    <string name="tut_surface_req_title">Oberflächenanforderungen</string>
+    <string name="tut_surface_req_text">Die Wand benötigt eine sichtbare Textur – Graffiti, rauer Putz, Ziegel oder Aufkleber funktionieren gut. Glatte, leere oder einfarbige Wände bieten keinen Halt für einen Anker.</string>
+    <string name="tut_blobs_title">Was die Blobs bedeuten</string>
+    <string name="tut_blobs_text">Nach dem Tippen sehen Sie kurz grüne Blobs. Das sind die Tracking-Schlüsselpunkte, die die App extrahiert hat. Mehr Blobs = stärkere Fixierung.</string>
+    <string name="tut_import_img_title">Bild importieren</string>
+    <string name="tut_import_img_text">Fügen Sie eine Skizze, ein Foto oder eine Referenz aus Ihrer Galerie hinzu. Es erscheint als neue Ebene, die über den anderen gestapelt ist.</string>
+    <string name="tut_scale_pos_title">Skalieren und Positionieren</string>
+    <string name="tut_scale_pos_text">Zum Ändern der Größe mit zwei Fingern zusammendrücken. Zum Neupositionieren mit einem Finger ziehen. Die Ebene rastet im AR-Modus auf der projizierten Wandoberfläche ein.</string>
+    <string name="tut_lock_freeze_title">Sperren / Einfrieren</string>
+    <string name="tut_lock_freeze_text">Im Leuchtkasten-Modus (Pause): deaktiviert die Berührung, sodass Sie Papier auf den Bildschirm legen können, ohne versehentlich etwas zu verschieben.</string>
+    <string name="tut_in_other_modes_title">In anderen Modi</string>
+    <string name="tut_in_other_modes_text">In den Modi AR, Overlay und Mockup: Sperrt Ebenentransformationen, sodass Designs nicht versehentlich verschoben oder skaliert werden können.</string>
+    <string name="tut_stencil_gen_title">Schablone generieren</string>
+    <string name="tut_stencil_gen_text">Konvertiert Ihr Bild in druckbare Sprühschablonen. Jede Schablone stellt eine Farbebene des Designs dar.</string>
+    <string name="tut_how_many_layers_title">Wie viele Ebenen?</string>
+    <string name="tut_how_many_layers_text">Ein 3-farbiges Design ergibt 3 Schablonenblätter. Mehr Farben = mehr Blätter. Einfache, kontrastreiche Bilder liefern die besten Ergebnisse.</string>
+    <string name="tut_exporting_title">Exportieren</string>
+    <string name="tut_exporting_text">Jede Schablone wird als PDF exportiert. Drucken Sie im 100%-Maßstab (keine Skalierung), um genaue, lebensgroße Abmessungen zu erhalten.</string>
+    <string name="tut_opacity_brightness_title">Deckkraft &amp; Helligkeit</string>
+    <string name="tut_opacity_brightness_text">Die Deckkraft steuert, wie transparent die Ebene ist. Die Helligkeit verschiebt die allgemeine Helligkeit – nützlich, um die Ebene an den Farbton Ihrer Wand anzupassen.</string>
+    <string name="tut_contrast_saturation_title">Kontrast &amp; Sättigung</string>
+    <string name="tut_contrast_saturation_text">Der Kontrast trennt dunkle von hellen Tönen – ideal, um Schablonenumrisse hervorzuheben. Die Sättigung steuert die Farbintensität; ziehen Sie sie auf null, um Graustufen zu erhalten.</string>
+    <string name="tut_isolate_subject_title">Motiv isolieren</string>
+    <string name="tut_isolate_subject_text">Verwendet KI, um den Hintergrund automatisch zu entfernen und nur das Hauptmotiv des Bildes zu hinterlassen.</string>
+    <string name="tut_best_results_title">Beste Ergebnisse</string>
+    <string name="tut_best_results_text">Funktioniert am besten bei Fotos mit einem klaren Motiv vor einem einfachen oder kontrastierenden Hintergrund. Komplexe Szenen mit unruhigen Hintergründen erfordern möglicherweise manuelle Nachbesserungen mit dem Radiergummi.</string>
+</resources>
