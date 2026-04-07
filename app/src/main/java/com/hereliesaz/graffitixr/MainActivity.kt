@@ -839,7 +839,7 @@ class MainActivity : ComponentActivity() {
                                             val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tmpFile)
                                             cameraUri = uri.toString()
                                             takePictureLauncher.launch(uri)
-                                        } else {
+                                            permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
                                             permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
                                         }
                                     }
