@@ -602,7 +602,7 @@
     <string name="tut_trace_step1_text">Tippen Sie auf \'Design\', um auf Ebenenwerkzeuge zuzugreifen.</string>
     <string name="tut_trace_step2_title">Schritt 2: Inhalt hinzufügen</string>
     <string name="tut_trace_step2_text">Verwenden Sie \'Bild\', um Fotos zu importieren, \'Zeichnen\', um zu skizzieren, oder \'Text\', um zu tippen.</string>
-    <string name="tut_trace_step3_title">Schritt 3: Pausen</string>
+    <string name="tut_trace_step3_title">Schritt 3: Abpausen</string>
     <string name="tut_trace_step3_text">Legen Sie Papier auf den Bildschirm und pausen Sie ab. Tippen Sie dreimal auf eine beliebige Stelle, um den Vorgang zu beenden.</string>
 
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
