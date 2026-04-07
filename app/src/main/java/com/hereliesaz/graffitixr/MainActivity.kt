@@ -399,7 +399,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                val tutorials = getTutorials()
+                val tutorials = getTutorials(editorUiState.layers)
                 AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
                     azTheme(
                         activeColor = Cyan,

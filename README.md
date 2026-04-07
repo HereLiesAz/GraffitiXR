@@ -1,12 +1,20 @@
 # GraffitiXR
 
-GraffitiXR is an android app for street artists. There are plenty of apps that overlay an image on your camera view so you can trace it, but when I'm painting a mural based on a sketch I have saved on my phone, using a tripod can really ebb my flow. We're all over the damn place. Me, I put my phone in my pocket. Even the apps that use AR to keep the image steady and in one place can't deal with the abysmal darkness of my pocket.
+GraffitiXR is an android app for street artists. There are plenty of apps that overlay an image on your camera view so you can virtually trace it, but when I'm painting a mural based on a sketch that I have saved on my phone, using a tripod can really ebb the flow. We're all over the damn place. Me, I put my phone in my pocket. Even the apps that use AR to keep the image steady and in one place can't deal with the abysmal darkness of the pocket.
 
-So I'm making something better by repurposing the lazy grid method. I was always thinking, "Why can't these specific doodles be saved, like a persistent anchor, so the overlay is always just plain in the right spot?" So, now, that's what those doodles do. Progress tracking replaces those marks with the piece itself as you go, like an ever-evolving fingerprinted target.
+So I'm making something better by repurposing (what those in-the-know call) the grid method. I was always thinking, "Why can't these specific doodles be saved, like a persistent anchor, so the overlay is always just plain in the right spot?"
 
-Just for shits and giggles, I included the non-AR version for image tracing just like you get with those other apps, too. Just in case you cray like that. Or if you cray-cray, there's Mockup mode. Nab a picture of the wall, cuz I got some quick tools for a quick mockup. And if you've got nothing to prove, you just want something copied onto paper perfectly, Trace mode allows you to use your phone as a lightbox, keeping your screen on with the brightness turned up, locking your image into place and blocking all touches until you're finished. 
+So, now, that's what those doodles do.
 
-**GraffitiXR** is a local-first, offline-capable Android application for street artists. It leverages Augmented Reality (AR) and a custom C++ engine to project sketches onto walls using a confidence-based voxel mapping system.
+I had to invent a custom Gaussian Splatting engine that works on Android without the help of the cloud--because graffiti is, you know, illegal.
+
+And I followed it up with what I call a Teleological Slam--since we know what the result is supposed to look like, I use OpenCV to look for your progress, meaning that the further along you are, the more tightly the overlay sticks to the wall. Without this, you'd cover those marks up with the painting itself, making the app less accurate as you go. That's exactly where other apps like this truly fail.
+
+Just for shirts and goggles, I included the non-AR, image overlay functionality for image tracing, just like you get with those other apps, in case you cray like that. Or if you cray-cray, there's Mockup mode. Nab a picture of the wall, then I got some quick tools for a quick mockup. And if you've got nothing to prove, you just want something copied onto paper perfectly, Trace mode allows you to use your phone as a lightbox, keeping your screen on with the brightness turned up, locking your image into place and blocking all touches until you're finished.
+
+And then, there's a decent suite of pertinent design tools, with support for multi-layer graphical creation. I could go on, but I feel like I already have.
+
+**GraffitiXR** is an offline Android app for street artists. It uses AR to project images onto walls using a confidence-based voxel mapping system.
 
 ## Key Features
 *   **Offline-First:** No cloud dependencies; zero data collected.
