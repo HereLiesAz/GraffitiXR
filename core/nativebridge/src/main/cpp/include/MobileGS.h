@@ -49,15 +49,15 @@ public:
 
     void setArCoreTrackingState(bool isTracking);
 
-    void setTargetFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
+    void restoreWallFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
     void scheduleRelocCheck(const cv::Mat& colorFrame);
 
     void getAnchorTransform(float* outMat16) const;
 
-    void addLayerFeatures(const cv::Mat& composite,
-                          const uint8_t* depthData, int depthW, int depthH, int depthStride,
-                          const float* intrinsics4,
-                          const float* viewMat16);
+    void setArtworkFingerprint(const cv::Mat& composite,
+                               const uint8_t* depthData, int depthW, int depthH, int depthStride,
+                               const float* intrinsics4,
+                               const float* viewMat16);
 
     bool loadSuperPoint(const std::vector<uchar>& onnxBytes);
 
@@ -123,8 +123,8 @@ private:
 
     SuperPointDetector mSuperPoint;
 
-    cv::Mat mTargetDescriptors;
-    std::vector<cv::Point3f> mTargetKeypoints3D;
+    cv::Mat mWallDescriptors;
+    std::vector<cv::Point3f> mWallKeypoints3D;
 
     cv::Mat mArtworkDescriptors;
     std::vector<cv::Point3f> mArtworkKeypoints3D;
