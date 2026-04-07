@@ -103,7 +103,7 @@
     <string name="nav_adjust_info">Nehmen Sie eine Feinabstimmung von Helligkeit, Kontrast, Sättigung und Farbbalance für diese Ebene vor.</string>
 
     <!-- Label for color balance and tinting tools. -->
-    <string name="nav_balance">Farbe</string>
+    <string name="nav_balance">Farbbalance</string>
     <!-- Description of the color balance tool, mentioning RGB sliders. -->
     <string name="nav_balance_info">Tönen Sie die Ebenenfarben mithilfe von Schiebereglern für die Kanäle Rot, Grün und Blau.</string>
 
