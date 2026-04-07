@@ -258,7 +258,7 @@
     <string name="double_tap_hint">Dubbeltryck för att byta rotationsaxel.</string>
     <string name="ok_button">OK</string>
 
-    <string name="generating">ALSTRANDE...</string>
+    <string name="generating">ALSTRANDE…</string>
 
     <string name="stencil_hint">Tryck igen för att lägga till ett lager.</string>
 
