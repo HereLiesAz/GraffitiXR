@@ -1,0 +1,637 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+
+    <string name="app_name">塗鴉XR</string>
+
+
+    <string name="nav_modes">模式</string>
+
+    <string name="nav_modes_info">在 AR 投影、疊加、模型和追蹤模式之間切換。</string>
+
+
+    <string name="nav_ar_mode">擴增實境</string>
+
+    <string name="nav_ar_mode_info">使用擴增實境將您的藝術作品投影到真實的牆上。首先掃描牆壁以放置錨點，然後添加您的設計圖層。</string>
+
+
+    <string name="nav_overlay">覆蓋</string>
+
+    <string name="nav_overlay_info">將您的設計疊加在即時攝影機畫面上，無需 AR 錨定。非常適合快速取景和位置檢查。</string>
+
+
+    <string name="nav_mockup">小樣</string>
+
+    <string name="nav_mockup_info">預覽合成到牆壁照片上的設計。無需相機或掃描。</string>
+
+
+    <string name="nav_trace">痕跡</string>
+
+    <string name="nav_trace_info">將您的設計用作光台覆蓋層，以在物理表面上追蹤參考線。</string>
+
+    <string name="nav_trace_mode">燈箱</string>
+
+
+    <string name="nav_canvas">畫布</string>
+
+    <string name="nav_mural">壁畫</string>
+
+    <string name="nav_scan_mode_toggle_info">在畫布（針對較小的桌面尺寸藝術進行了最佳化）和壁畫（針對大型牆壁和高斯潑濺進行了最佳化）之間切換。</string>
+
+
+    <string name="nav_stencil">模版</string>
+
+    <string name="nav_stencil_info">從您的藝術品生成可列印的多層模板。每層列印為僅輪廓圖塊，尺寸適合美國信紙。</string>
+
+
+    <string name="nav_grid">目標</string>
+
+    <string name="nav_grid_info">建立和管理 AR 錨點目標。照片在牆上畫了參考標記，以將投影鎖定到位。</string>
+
+
+    <string name="nav_surveyor">民調</string>
+
+    <string name="nav_surveyor_info">繪製牆面地圖以提高 AR 追蹤精度。</string>
+
+
+    <string name="nav_create">創造</string>
+
+    <string name="nav_create_info">拍攝牆上的參考標記以建立新的 AR 錨點。該應用程式將追蹤此標記以保持您的投影對齊。</string>
+
+
+    <string name="nav_refine">精煉</string>
+
+    <string name="nav_refine_info">微調現有 AR 錨點目標的位置。</string>
+
+
+    <string name="nav_update">進步</string>
+
+    <string name="nav_update_info">標記壁畫的已完成區域以追蹤繪畫進度。</string>
+
+
+    <string name="nav_design">設計</string>
+
+    <string name="nav_design_info">新增和管理設計圖層。每個圖層可以是匯入的影像或手繪圖。</string>
+
+
+    <string name="nav_open">打開</string>
+
+    <string name="nav_open_info">新增圖庫中的圖像作為新圖層。</string>
+
+
+    <string name="nav_wall">牆</string>
+
+    <string name="nav_wall_info">取代Mockup模式下所使用的背景牆照片。</string>
+
+
+    <string name="nav_isolate">隔離</string>
+
+    <string name="nav_isolate_info">自動從此圖層中刪除背景，僅將主體保留在透明背景上。</string>
+
+
+    <string name="nav_invert">倒置</string>
+
+    <string name="nav_invert_info">建立目前圖層的負片。黑色變成白色，顏色翻轉為相反的顏色 - 對於模板和疊加分析非常有用。</string>
+
+
+    <string name="nav_outline">大綱</string>
+
+    <string name="nav_outline_info">將此圖層轉換為透明背景上的黑色線條藝術 - 非常適合創建模板模板。</string>
+
+
+    <string name="nav_adjust">調整</string>
+
+    <string name="nav_adjust_info">微調此圖層的亮度、對比、飽和度和色彩平衡。</string>
+
+
+    <string name="nav_balance">顏色</string>
+
+    <string name="nav_balance_info">使用紅色、綠色和藍色通道滑桿對圖層顏色進行著色。</string>
+
+
+    <string name="nav_blending">混合</string>
+
+    <string name="nav_blending_info">循環切換混合模式（普通、正片疊底、濾色、疊加…）以控制此圖層與下方圖層的合成方式。</string>
+
+
+    <string name="nav_settings">設定</string>
+
+    <string name="nav_settings_info">配置慣用手、AR 掃描模式、單位和其他應用程式首選項。</string>
+
+
+    <string name="nav_project">專案</string>
+
+    <string name="nav_project_info">管理您的專案：建立、儲存、載入和匯出。</string>
+
+
+    <string name="nav_new">新的</string>
+
+    <string name="nav_new_info">啟動新的空項目。任何未儲存的變更都將遺失。</string>
+
+
+    <string name="nav_save">儲存</string>
+
+    <string name="nav_save_info">將目前項目儲存到您的裝置。</string>
+
+
+    <string name="nav_load">載入</string>
+
+    <string name="nav_load_info">打開項目庫以載入先前儲存的項目。</string>
+
+
+    <string name="nav_export">匯出</string>
+
+    <string name="nav_export_info">將所有可見圖層的平面合併影像匯出到您的照片庫。</string>
+
+
+    <string name="nav_help">幫助</string>
+
+    <string name="nav_help_info">當「幫助」處於活動狀態時，點擊任一按鈕即可查看其功能。</string>
+
+
+    <string name="nav_light">光</string>
+
+    <string name="nav_light_info">在低光源條件下工作時，切換設備手電筒以照亮牆壁。</string>
+
+
+    <string name="nav_lock">鎖</string>
+
+    <string name="nav_lock_info">鎖定觸控螢幕以防止噴塗時發生意外變更。在任何位置點擊三次即可解鎖。</string>
+
+
+
+    <string name="info_brush">在該圖層上徒手繪製筆觸。向上/向下拖曳「大小」按鈕可變更畫筆直徑；向左/向右拖曳以調整羽化（邊緣柔和度）。</string>
+
+    <string name="info_eraser">用圓形畫筆擦除該圖層的部分內容。向上/向下拖曳“尺寸”按鈕可更改直徑；向左/向右拖曳以調整羽化。</string>
+
+    <string name="info_blur">塗抹並軟化該層的區域。拖曳過某個區域以使其模糊。</string>
+
+    <string name="info_liquify">向任意方向推動和扭曲像素。在某個區域上拖曳可使其變形－對於調整比例很有用。</string>
+
+    <string name="info_dodge">透過在特定區域上繪畫來照亮它們。</string>
+
+    <string name="info_burn">透過在特定區域上繪畫來使它們變暗。</string>
+
+    <string name="info_size">向上/向下拖曳以更改畫筆直徑。向左/向右拖曳以調整羽化 - 較寬的羽化可提供更柔和、更像噴霧罐的邊緣。</string>
+
+    <string name="info_color">顯示活動畫筆顏色。上下拖曳可調整亮度；向左/向右拖曳以調整飽和度。點擊可打開全色輪。</string>
+
+    <string name="info_draw">增加一個新的空白透明圖層用於手繪。</string>
+
+    <string name="info_keyframe">將目前 AR 相機姿勢儲存為關鍵影格。用於在離開和返回後校正漂移並重新對齊投影。</string>
+
+    <string name="info_layer">這一層。點擊以激活它。打開水平導軌即可使用工具。長按並拖曳可重新排序。</string>
+
+
+
+    <string name="stencil_layers">層數</string>
+
+    <string name="stencil_layers_info">選擇要產生的模板層數：1（僅輪廓）、2（輪廓 + 高光）或 3（輪廓 + 中間調 + 高光）。</string>
+
+
+    <string name="stencil_rebuild">重建</string>
+
+    <string name="stencil_rebuild_info">在目前來源層上重新執行模板產生管道。</string>
+
+
+    <string name="stencil_print">列印</string>
+
+    <string name="stencil_print_info">配置實際列印尺寸並為 US Letter 紙產生平鋪 PDF。</string>
+
+
+    <string name="stencil_print_size">尺寸</string>
+
+    <string name="stencil_print_size_info">向上/向下拖曳以設定模板的實際寬度或高度（以公分為單位）。頁數即時更新。</string>
+
+
+    <string name="stencil_print_dim_toggle">寬/高</string>
+
+    <string name="stencil_print_dim_toggle_info">點擊可在鎖定輸出的寬度或高度之間切換。</string>
+
+
+    <string name="stencil_export_pdf">列印 PDF</string>
+
+    <string name="stencil_export_pdf_info">產生所有模板層的平鋪 PDF，準備列印和切割。每個磁磚都有 3 毫米的重疊部分，用於組裝對齊。</string>
+
+
+    <string name="stencil_save_layers">保存 PNG</string>
+
+    <string name="stencil_save_layers_info">將每個模板層作為單獨的 PNG 圖像儲存到您的圖庫中。</string>
+
+
+    <string name="stencil_back">← 編輯</string>
+
+    <string name="stencil_back_info">返回主編輯器。您的模板層將保留在會話中。</string>
+
+
+    <string name="nav_text">文字</string>
+
+    <string name="nav_draw">畫</string>
+
+    <string name="nav_edit">編輯</string>
+
+    <string name="nav_font">字體</string>
+
+    <string name="nav_size">尺寸</string>
+
+    <string name="nav_color">顏色</string>
+
+    <string name="nav_kern">字距</string>
+
+    <string name="nav_bold">粗體</string>
+
+    <string name="nav_italic">斜體</string>
+
+    <string name="nav_shadow">陰影</string>
+
+    <string name="nav_eraser">橡皮</string>
+
+    <string name="nav_blur">模糊</string>
+
+    <string name="nav_liquify">液化</string>
+
+    <string name="nav_dodge">減淡</string>
+
+    <string name="nav_burn">加深</string>
+
+
+
+    <string name="pro_tip">專業提示</string>
+    <string name="double_tap_hint">雙擊可切換旋轉軸。</string>
+    <string name="ok_button">好的</string>
+
+    <string name="generating">正在生成...</string>
+
+    <string name="stencil_hint">再次按下可新增圖層。</string>
+
+    <string name="rename_hint">重新命名</string>
+
+    <string name="edit_text_hint">編輯文字</string>
+
+    <string name="copy_edits">複製編輯</string>
+
+    <string name="paste_edits">貼上編輯</string>
+
+    <string name="generate_poster">生成海報</string>
+
+    <string name="duplicate">複製</string>
+
+    <string name="unlink_layer">取消連結層</string>
+
+    <string name="link_layer">連結層</string>
+
+    <string name="hide_layer">隱藏層</string>
+
+    <string name="show_layer">顯示圖層</string>
+
+    <string name="flatten_all">全部展平</string>
+
+    <string name="delete">刪除</string>
+    <string name="new_project_name">新專案</string>
+
+    <string name="lock_button">鎖</string>
+
+    <string name="freeze_button">凍結</string>
+
+
+    <string name="wall_source_title">選擇牆面照片</string>
+
+    <string name="wall_source_text">您想如何設置背景牆？</string>
+
+    <string name="take_photo">拍照</string>
+
+    <string name="choose_from_gallery">從圖庫中選擇</string>
+
+
+    <string name="depth_unsupported">此設備不支援 Depth API。 \n在「設定」中切換到「畫布」模式。</string>
+
+
+    <string name="arcore_required_title">需要 ARCore</string>
+
+    <string name="arcore_required_text">該設備未安裝 ARCore 或不受支援。從 Play 商店安裝 ARCore 以使用 AR 功能。</string>
+
+    <string name="install_arcore">安裝ARCore</string>
+
+
+    <string name="camera_permission_required">AR 模式需要相機權限。</string>
+
+    <string name="open_settings">開啟設定</string>
+
+
+    <string name="target_creation_title">目標制定</string>
+
+    <string name="target_creation_text">直接點選螢幕上繪製的參考標記。該應用程式將立即隔離他們。</string>
+
+    <string name="cancel">取消</string>
+
+
+    <string name="diag_copied">已複製 ✓</string>
+
+    <string name="diag_title">深度診斷（點擊複製）</string>
+
+    <string name="diag_waiting">等待第一幀...</string>
+
+
+    <string name="scan_step_1">第 1 步：繪製周圍環境地圖</string>
+
+    <string name="scan_step_2">第 2 步：掃描目標牆</string>
+
+
+    <string name="plane_confirm_question">藝術品掛在正確的牆上嗎？</string>
+
+    <string name="looks_correct">看起來正確</string>
+
+    <string name="redetect">重新偵測</string>
+
+
+    <string name="plane_realignment_title">重新偵測牆面</string>
+
+    <string name="plane_realignment_text">錨點是從您捕獲時站立的位置放置的。ARCore 選擇最直接位於原始位置前方的追蹤垂直表面。\n\n1.返回捕獲期間您站立的位置\n2.緩慢地將相機平移到壁畫上，以便 ARCore 可以將其記錄為平坦的表面\n3.面向圖稿保持穩定，然後點擊下方\n\n橙色邊框將跳到新檢測到的表面。</string>
+
+    <string name="use_this_wall">使用這堵牆</string>
+
+
+    <string name="scanning_dots">掃描\u2026</string>
+
+    <string name="matched_percent">%1$d%% 匹配</string>
+
+    <string name="anchor_locked">錨已鎖定</string>
+
+
+    <string name="choose_font">選擇字體</string>
+
+
+    <string name="cancel_button">取消</string>
+    <string name="done_button">完畢</string>
+    <string name="apply_button">套用</string>
+    <string name="close_button">關閉</string>
+    <string name="next_button">下一個</string>
+    <string name="save_button">儲存</string>
+    <string name="retake_button">重拍</string>
+    <string name="capture_button">捕獲</string>
+
+
+    <string name="adj_detail">細節</string>
+    <string name="adj_opacity">不透明度</string>
+    <string name="adj_brightness">亮度</string>
+    <string name="adj_contrast">對比</string>
+    <string name="adj_saturation">飽和</string>
+    <string name="adj_red">紅色的</string>
+    <string name="adj_green">綠色的</string>
+    <string name="adj_blue">藍色的</string>
+    <string name="adj_undo">撤銷</string>
+    <string name="adj_redo">重做</string>
+    <string name="adj_magic_align">魔法對齊</string>
+
+
+    <string name="status_create_grid">建立一個網格以開始。</string>
+    <string name="status_scan_surfaces">掃描您周圍的表面。</string>
+    <string name="status_tap_surface">點擊表面以放置錨點。</string>
+    <string name="status_looking_grid">正在尋找您的網格...</string>
+    <string name="status_ready">準備好。（%1$d 分）</string>
+    <string name="unlock_hint">點擊4次即可解鎖</string>
+
+
+    <string name="lib_app_title">塗鴉XR</string>
+    <string name="lib_app_description">使用 AR 或基本相機覆蓋將您的藝術作品投影到真實的牆壁或畫布上。\n\n在照片上快速建立模型，以顯示完成的作品的外觀。\n\n或將您的裝置用作燈箱，將影像描畫到紙上。</string>
+    <string name="lib_new_project">新的</string>
+    <string name="lib_import_project">進口</string>
+    <string name="lib_no_projects">還沒有項目</string>
+    <string name="lib_no_projects_hint">點擊上面的「新建」即可開始創作您的第一幅壁畫。 \n\n您將進入編輯器，您可以在其中執行以下操作：\n \u2022 從「設計」選單中新增圖稿\n \u2022 切換到 AR 模式以投影到真實的牆壁上\n \u2022 使用疊加將您的設計浮動在牆壁上描繪成對圖2022</string>
+    <string name="lib_project_thumbnail">項目縮圖</string>
+    <string name="lib_delete_project_desc">刪除項目%1$s</string>
+
+
+    <string name="settings_title">設定</string>
+    <string name="settings_preferences_section">偏好設定</string>
+    <string name="settings_hand_label">慣用手</string>
+    <string name="settings_hand_right">正確的</string>
+    <string name="settings_hand_left">左邊</string>
+    <string name="settings_diag_label">深度診斷疊加</string>
+    <string name="settings_on">開啟</string>
+    <string name="settings_off">關閉</string>
+    <string name="settings_scan_mode_label">AR掃描模式</string>
+    <string name="settings_scan_mode_point_cloud">點雲</string>
+    <string name="settings_scan_mode_gaussian_splat">高斯分佈</string>
+    <string name="settings_anchor_boundary_label">顯示錨定邊界</string>
+    <string name="settings_units_label">距離單位</string>
+    <string name="settings_units_imperial">英制（英尺）</string>
+    <string name="settings_units_metric">公制（米）</string>
+    <string name="settings_canvas_bg_label">畫布背景</string>
+    <string name="settings_info_section">應用程式資訊</string>
+    <string name="settings_version_label">版本</string>
+    <string name="settings_updates_section">更新</string>
+    <string name="settings_check_updates_label">檢查實驗性更新</string>
+    <string name="settings_install_update_label">安裝更新</string>
+    <string name="settings_permissions_section">權限</string>
+    <string name="settings_camera_access">相機訪問</string>
+    <string name="settings_photo_access">照片庫訪問</string>
+    <string name="settings_notifications">通知</string>
+    <string name="settings_granted">已允許</string>
+    <string name="settings_denied">被拒絕</string>
+    <string name="settings_open_app_settings">打開應用程式設定</string>
+    <string name="settings_copyright">塗鴉XR © 2025</string>
+
+
+    <string name="layers_title">層數</string>
+    <string name="brush_size_title">刷子尺寸</string>
+    <string name="save_project_hint">項目名稱</string>
+
+
+    <string name="target_guide_desc">目標對準指南</string>
+    <string name="target_captured_desc">捕獲的目標</string>
+    <string name="target_review_desc">查看提取的目標</string>
+    <string name="target_unwarp_hint">拖曳角點以恢復扭曲</string>
+    <string name="target_review_title">查看擷取的標記</string>
+
+    <string name="target_exclude">排除</string>
+    <string name="target_include">包括</string>
+    <string name="target_erase_marks">擦除標記</string>
+    <string name="target_show_features">展會特色</string>
+    <string name="reset_button">重置</string>
+
+    <string name="poster_title">生成海報</string>
+    <string name="poster_select_layers">選擇要包含的圖層：</string>
+    <string name="poster_physical_size">物理尺寸（寬度，單位：毫米）：</string>
+    <string name="poster_generate_pdf">產生 PDF</string>
+
+
+    <string name="scan_hint_recover">緩慢移動設備以恢復跟踪</string>
+    <string name="scan_hint_ambient">緩慢旋轉 360° 以繪製周圍環境的地圖 (%1$d°)</string>
+    <string name="scan_hint_too_dark">太黑了。打開手電筒。</string>
+    <string name="scan_hint_build_map">左右行走構建地圖</string>
+    <string name="scan_hint_closer">靠近牆壁</string>
+    <string name="scan_hint_higher_lower">掃描更高和更低</string>
+
+
+    <string name="desc_bg_mockup">背景原型機</string>
+    <string name="desc_segmentation_preview">分割預覽</string>
+
+
+
+    <string name="help_mode_host">模式切換器：在應用程式模式之間切換。說明：點選展開，然後選擇 AR、疊加、模型或燈箱。</string>
+
+    <string name="help_ar">AR 模式：使用空間映射將設計投影到牆上。說明：掃描環境直到偵測到牆壁，然後點擊以放置錨點。</string>
+
+    <string name="help_overlay">疊加模式：在即時攝影機上顯示設計，無需空間追蹤。說明：手動縮放和移動設計以適合您的框架。</string>
+
+    <string name="help_mockup">樣機模式：在靜態照片上預覽設計。說明：使用「牆」設定背景影像，然後在上面排列圖層。</string>
+
+    <string name="help_trace">燈箱模式：高亮度追蹤表面。說明：將紙放在螢幕上並描畫。在任何位置點擊三次即可退出。</string>
+
+    <string name="help_target_host">目標管理：AR 錨點工具。說明： 點擊可存取用於創建或重新對齊壁畫位置的工具。</string>
+
+    <string name="help_scan_mode_toggle">掃描解析度：在壁畫（大比例）和畫布（小比例）之間切換。壁畫使用 Gaussian Splats 進行牆壁； Canvas 使用點雲來繪製詳細的桌面尺寸藝術。</string>
+
+    <string name="help_create">建立錨點：在牆上拍攝一個標記以鎖定投影。說明：指向明顯的紋理並點擊。該應用程式將追蹤該標記。</string>
+
+    <string name="help_design_host">圖層管理：新增圖像、文字或草圖。說明： 點選展開。長按任一圖層按鈕可開啟其二級選單。</string>
+
+    <string name="help_add_img">匯入影像：新增草圖或參考照片。說明：從您的圖庫中選擇一張圖像。它將作為一個新的設計層出現。</string>
+
+    <string name="help_add_draw">新建草圖：新增空白圖層以進行手繪。說明： 選擇圖層以顯示畫筆、橡皮擦和塗抹工具。</string>
+
+    <string name="help_add_text">新增文字：建立排版圖層。說明： 點選圖層的「編輯」按鈕來變更內容和格式。</string>
+
+    <string name="help_wall">更改牆：設定樣機模式的背景。說明：選擇您打算在其上繪畫的實體牆的照片。</string>
+
+    <string name="help_project_host">專案管理：儲存、載入和匯出工作。說明： 點選即可存取壁畫的管理任務。</string>
+
+    <string name="help_new">新項目：開始一幅新的壁畫。說明：點擊即可重置。警告：這將清除所有當前工作。先保存！</string>
+
+    <string name="help_save">保存項目：儲存壁畫和AR地圖。說明：輸入專案名稱並點選儲存以儲存進度。</string>
+
+    <string name="help_load">項目庫：訪問保存的壁畫。說明：瀏覽庫以恢復工作或匯入共享項目文件。</string>
+
+    <string name="help_export">匯出影像：儲存高解析度快照。說明： 將所有可見圖層渲染為照片庫中的單一 PNG。</string>
+
+    <string name="help_settings">應用程式設定：配置首選項。說明：開啟可調整慣用手、單位和掃描參數。</string>
+
+    <string name="help_light">手電筒：切換設備 LED。說明：使用它來照亮黑暗的牆壁，以實現更好的 AR 追蹤。</string>
+
+    <string name="help_lock_trace">鎖定/凍結：防止意外變更。說明： 在追蹤模式下，停用螢幕。在其他模式下，鎖定圖層變換。</string>
+
+    <string name="help_help_main">互動式幫助：解釋按鈕功能。說明：點選即可啟動（青色）。處於活動狀態時，點擊任一按鈕即可查看其說明文字。</string>
+
+    <string name="help_layer">圖層「%1$s」：活動壁畫元素。說明：點選選擇。向上/向下拖曳按鈕以重新排序。透過手勢在螢幕上變換。</string>
+
+
+
+    <string name="help_edit_text">編輯文字：更改版式圖層中的文字。使用說明：點選開啟鍵盤，更新文字內容。</string>
+
+    <string name="help_size">畫筆/文字大小：調整比例和柔軟度。說明：向上/向下拖曳以調整大小。向左/向右拖曳以進行筆刷羽化。</string>
+
+    <string name="help_font">字體選擇器：選擇排版樣式。說明： 點選可瀏覽可用字體並將其套用至文字圖層。</string>
+
+    <string name="help_color">顏色工具：設定活動顏色。說明：向上/向下拖曳可調整亮度，向左/向右拖曳可調整飽和度。點擊全色輪。</string>
+
+    <string name="help_kern">文字字距調整：調整字母間距。說明：向左/向右拖曳以收緊或放鬆文字佈局。</string>
+
+    <string name="help_bold">粗體切換：粗字體粗細。說明： 點選可在活動文字圖層切換粗體樣式。</string>
+
+    <string name="help_italic">斜體切換：傾斜樣式。說明： 點選可在活動文字圖層上切換斜體樣式。</string>
+
+    <string name="help_outline">文字輪廓：字符筆畫。說明：點選可切換文字字元周圍的可見輪廓。</string>
+
+    <string name="help_shadow">投影：文字深度。說明：點選可在版式後方切換軟陰影，以獲得更好的易讀性。</string>
+
+    <string name="help_stencil_gen">產生模板：建立可列印模板。說明： 點選開始為此圖片產生多層模板。</string>
+
+    <string name="help_blend">混合模式：複合風格。說明：點選可循環選擇「正片疊底」、「螢幕」和「疊加」等模式。</string>
+
+    <string name="help_adj">影像調整：微調外觀。說明：點選可顯示不透明度、亮度、對比和飽和度的滑桿。</string>
+
+    <string name="help_invert">反轉顏色：高對比負片。說明： 點選可翻轉顏色。白色變成黑色，反之亦然——對於追蹤很有用。</string>
+
+    <string name="help_balance">色彩平衡：RGB 頻道調整。說明：點擊以顯示滑桿以進行精確的紅色、綠色和藍色調整。</string>
+
+    <string name="help_eraser">橡皮擦刷：刪除圖層內容。說明： 在螢幕上繪畫並擦除。使用“尺寸”按鈕調整直徑。</string>
+
+    <string name="help_blur">模糊/塗抹工具：混合顏色。說明：在區域上繪畫以柔化邊緣或將細節塗抹在一起。</string>
+
+    <string name="help_liquify">變形工具：重塑設計。說明： 在螢幕上拖曳以推動和拉動像素 - 非常適合調整比例。</string>
+
+    <string name="help_dodge">減淡工具：減亮區域。說明：在圖層的某些部分上繪畫以增加其亮度。</string>
+
+    <string name="help_burn">加深工具：使區域變暗。說明：在圖層的某些部分上繪畫以降低其亮度。</string>
+
+    <string name="help_iso">隔離主題：自動背景刪除。說明： 點擊以使用人工智慧從背景中提取主要主題。</string>
+
+    <string name="help_line">草圖輪廓：線條藝術濾鏡。使用說明：點選可將照片轉換為黑白透明輪廓。</string>
+
+    <string name="help_help_layer">圖層幫助：切換這些特定圖層工具的資訊。說明：點選即可啟動。然後點擊任意工具圖示以查看其功能。</string>
+
+
+
+    <string name="unit_feet">英尺</string>
+
+    <string name="unit_centimeters">公分</string>
+
+    <string name="unit_meters">米</string>
+
+    <string name="tut_ar_title">擴增實境投影</string>
+    <string name="tut_ar_text">使用手機的深度感應器和空間追蹤將您的設計投影到真實的牆上。</string>
+    <string name="tut_ar_step1_title">第 1 步：掃描</string>
+    <string name="tut_ar_step1_text">指向牆壁並緩慢地左右移動。當引擎繪製表面時，會出現彩色斑點。等到碎片覆蓋牆壁區域。</string>
+    <string name="tut_ar_step2_title">第 2 步：點擊放置</string>
+    <string name="tut_ar_step2_text">只需點擊螢幕即可。該應用程式拍攝牆壁，提取追蹤特徵，並立即鎖定錨點。</string>
+    <string name="tut_ar_step3_title">第 3 步：新增您的作品</string>
+    <string name="tut_ar_step3_text">按“設計”存取圖層工具。使用“圖像”匯入照片，使用“繪圖”繪製草圖，或使用“文字”鍵入。</string>
+    <string name="tut_ar_tip_title">提示：紋理很重要</string>
+    <string name="tut_ar_tip_text">空白的白色牆壁、光滑的混凝土和單色表面不會跟踪。將錨點瞄準塗鴉、粗糙的灰泥或任何明顯的標記。</string>
+
+
+    <string name="tut_overlay_title">即時疊加</string>
+    <string name="tut_overlay_text">您的設計漂浮在即時攝影機視圖上 - 無需表面掃描。</string>
+    <string name="tut_overlay_step1_title">第 1 步：新增您的作品</string>
+    <string name="tut_overlay_step1_text">按“設計”存取圖層工具。使用“圖像”匯入照片，使用“繪圖”繪製草圖，或使用“文字”鍵入。</string>
+    <string name="tut_overlay_step2_title">第 2 步：定位</string>
+    <string name="tut_overlay_step2_text">捏合可縮放，拖曳可重新定位。覆蓋層固定在您的螢幕上 - 退一步看看它是否適合牆壁。</string>
+
+
+    <string name="tut_mockup_title">照片樣機</string>
+    <string name="tut_mockup_text">在拿起畫筆之前，在照片上預覽您的設計。</string>
+    <string name="tut_mockup_step1_title">第 1 步：設定牆壁</string>
+    <string name="tut_mockup_step1_text">打開“設計”並點擊“牆壁”以選擇表面或拍攝表面照片。先做這個吧！</string>
+    <string name="tut_mockup_step2_title">第 2 步：新增您的作品</string>
+    <string name="tut_mockup_step2_text">使用「圖像」、「繪圖」或「文字」在牆壁頂部新增圖層。捏合併拖曳以調整它們的大小和位置。</string>
+
+
+    <string name="tut_trace_title">燈箱模式</string>
+    <string name="tut_trace_text">將您的螢幕變成明亮的燈箱，以便將您的設計描繪到紙上。</string>
+    <string name="tut_trace_step1_title">第 1 步：開啟設計選單</string>
+    <string name="tut_trace_step1_text">點擊“設計”以存取圖層工具。</string>
+    <string name="tut_trace_step2_title">第 2 步：新增內容</string>
+    <string name="tut_trace_step2_text">使用“圖像”匯入照片，使用“繪圖”繪製草圖，或使用“文字”鍵入。</string>
+    <string name="tut_trace_step3_title">第三步：追蹤</string>
+    <string name="tut_trace_step3_text">將紙放在螢幕上並描畫。在任何位置點擊三次即可退出。</string>
+
+
+    <string name="tut_create_anchor_title">建立錨點</string>
+    <string name="tut_create_anchor_text">將投影鎖定到牆上的特定位置。一旦設定完畢，即使您四處走動，設計也會保持在原位。</string>
+    <string name="tut_surface_req_title">表面要求</string>
+    <string name="tut_surface_req_text">牆壁需要可見的紋理——塗鴉​​、粗糙的灰泥、磚塊或貼紙都可以。光滑、空白或單色的牆壁無法固定。</string>
+    <string name="tut_blobs_title">斑點的意思是什麼</string>
+    <string name="tut_blobs_text">點擊後，您會短暫看到綠色斑點。這些是應用程式提取的追蹤關鍵點。更多的斑點=更強的鎖定。</string>
+    <string name="tut_import_img_title">導入影像</string>
+    <string name="tut_import_img_text">新增草圖、照片或圖庫中的參考。它看起來像一個新層堆疊在其他層之上。</string>
+    <string name="tut_scale_pos_title">規模和位置</string>
+    <string name="tut_scale_pos_text">用兩根手指捏合以調整大小。用一根手指拖曳以重新定位。此圖層在 AR 模式下捕捉到投影牆面。</string>
+    <string name="tut_lock_freeze_title">鎖定/凍結</string>
+    <string name="tut_lock_freeze_text">在燈箱（追蹤）模式下：停用觸摸，以便您可以將紙張放在螢幕上而不會意外移動任何東西。</string>
+    <string name="tut_in_other_modes_title">其他模式下</string>
+    <string name="tut_in_other_modes_text">在 AR、疊加和模型模式中：鎖定圖層變換，以便設計不會意外移動或縮放。</string>
+    <string name="tut_stencil_gen_title">產生模板</string>
+    <string name="tut_stencil_gen_text">將您的影像轉換為可列印的噴漆模板。每個模板代表設計的一個顏色層。</string>
+    <string name="tut_how_many_layers_title">有多少層？</string>
+    <string name="tut_how_many_layers_text">3 色設計可產生 3 個模板紙。更多顏色=更多床單。簡單的高對比度影像可提供最佳效果。</string>
+    <string name="tut_exporting_title">匯出</string>
+    <string name="tut_exporting_text">每個模板都會匯出為 PDF。以 100% 比例列印（無縮放）以獲得準確的真人大小尺寸。</string>
+    <string name="tut_opacity_brightness_title">不透明度和亮度</string>
+    <string name="tut_opacity_brightness_text">不透明度控制圖層的透明度。亮度會改變整體亮度 - 有助於將圖層與牆壁的色調相匹配。</string>
+    <string name="tut_contrast_saturation_title">對比度和飽和度</string>
+    <string name="tut_contrast_saturation_text">將深色與淺色進行對比——非常適合使模板輪廓突出。飽和度控制顏色強度；拖曳到零以獲得灰階。</string>
+    <string name="tut_isolate_subject_title">隔離對象</string>
+    <string name="tut_isolate_subject_text">利用AI自動去除背景，只留下影像的主要主體。</string>
+    <string name="tut_best_results_title">最佳結果</string>
+    <string name="tut_best_results_text">最適合拍攝主題清晰、背景簡單或對比鮮明的照片。背景複雜的複雜場景可能需要使用橡皮擦進行手動修飾。</string>
+</resources>

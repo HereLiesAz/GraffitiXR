@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+
+    <string name="title_mediatek_runtime">聯發科技 NPU 運作時</string>
+
+    <string name="title_qualcomm_runtime_v69">高通 NPU 運行時 v69</string>
+
+    <string name="title_qualcomm_runtime_v73">高通 NPU 運行時 v73</string>
+
+    <string name="title_qualcomm_runtime_v75">高通 NPU 運行時 v75</string>
+
+    <string name="title_qualcomm_runtime_v79">高通 NPU 運行時 v79</string>
+
+    <string name="title_qualcomm_runtime_v81">高通 NPU 運行時 v81</string>
+
+    <string name="title_google_tensor_runtime">Google Tensor NPU 運行時</string>
+</resources>
