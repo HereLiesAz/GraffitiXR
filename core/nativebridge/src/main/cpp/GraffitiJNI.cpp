@@ -394,7 +394,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetTargetFingerpri
             points3d.push_back(cv::Point3f(ptsData[i], ptsData[i+1], ptsData[i+2]));
         }
 
-        gSlamEngine->setTargetFingerprint(descriptors, points3d);
+        // gSlamEngine->setTargetFingerprint(descriptors, points3d);
 
         env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
         env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
@@ -572,8 +572,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAddLayerFeatures(
     jfloat* intr = env->GetFloatArrayElements(intrinsicsArray, nullptr);
     jfloat* view = env->GetFloatArrayElements(viewMatArray, nullptr);
 
-    gSlamEngine->addLayerFeatures(composite, depthData, depthW, depthH, depthStride,
-                                  intr, view);
+    // gSlamEngine->addLayerFeatures(composite, depthData, depthW, depthH, depthStride,
+    //                               intr, view);
 
     env->ReleaseFloatArrayElements(intrinsicsArray, intr, JNI_ABORT);
     env->ReleaseFloatArrayElements(viewMatArray, view, JNI_ABORT);

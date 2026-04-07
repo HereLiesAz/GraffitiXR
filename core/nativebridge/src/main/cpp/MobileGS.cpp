@@ -529,7 +529,7 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) {
     cv::Mat artworkDesc;
     {
         std::lock_guard<std::mutex> lk(mMutex);
-        if (mTargetDescriptors.empty() || mTargetKeypoints3D.empty()) return;
+    if (mTargetDescriptors.empty() || mTargetKeypoints3D.empty()) return;
         targetDesc = mTargetDescriptors.clone();
         targetPts  = mTargetKeypoints3D;
         memcpy(projMat,   mMappingProjMatrix, 16 * sizeof(float));
