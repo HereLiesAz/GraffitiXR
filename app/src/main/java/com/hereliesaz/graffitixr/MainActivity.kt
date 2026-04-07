@@ -124,7 +124,6 @@ import android.provider.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.core.net.toUri
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.hereliesaz.graffitixr.design.theme.AppStrings
@@ -175,22 +174,10 @@ class MainActivity : ComponentActivity() {
             GraffitiXRTheme {
                 val navController = rememberNavController()
 
-                @Suppress("DEPRECATION")
-                val mainViewModel: MainViewModel
-                hiltViewModel().also { mainViewModel = it }
-                @Suppress("DEPRECATION")
-                val editorViewModel: EditorViewModel
-                val also1 = hiltViewModel().also { editorViewModel = it }
-
-                @Suppress("DEPRECATION")
-                val dashboardViewModel: DashboardViewModel
-                val also = hiltViewModel().also {
-                    dashboardViewModel = it
-                }
-
-                @Suppress("DEPRECATION")
-                val settingsViewModel: SettingsViewModel
-                settingsViewModel = hiltViewModel()
+                val mainViewModel: MainViewModel = hiltViewModel()
+                val editorViewModel: EditorViewModel = hiltViewModel()
+                val dashboardViewModel: DashboardViewModel = hiltViewModel()
+                val settingsViewModel: SettingsViewModel = hiltViewModel()
                 val cameraController = rememberCameraController()
 
                 var cameraUri by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
@@ -419,7 +406,7 @@ class MainActivity : ComponentActivity() {
                     )
 
                     editorUiState.layers.forEach { layer ->
-                        base["layer_${layer.id}"] = stringResource(strings.help.layerResource, layer.name)
+                        base["layer_${layer.id}"] = strings.help.layer(layer.name)
                     }
                     base
                 }
@@ -654,7 +641,8 @@ class MainActivity : ComponentActivity() {
                                         mainViewModel.cancelTapMode()
                                         arViewModel.clearTapHighlights()
                                     },
-                                    modifier = Modifier.align(Alignment.BottomCenter)
+                                    modifier = Modifier.align(Alignment.BottomCenter),
+                                    strings = strings
                                 )
                             }
 
@@ -677,7 +665,8 @@ class MainActivity : ComponentActivity() {
                                 PlaneConfirmOverlay(
                                     onConfirm = { mainViewModel.confirmPlane() },
                                     onRedetect = { mainViewModel.beginPlaneRealignment() },
-                                    modifier = Modifier.align(Alignment.BottomCenter)
+                                    modifier = Modifier.align(Alignment.BottomCenter),
+                                    strings = strings
                                 )
                             }
 
@@ -691,7 +680,8 @@ class MainActivity : ComponentActivity() {
                                         mainViewModel.endPlaneRealignment()
                                     },
                                     onCancel = { mainViewModel.endPlaneRealignment() },
-                                    modifier = Modifier.align(Alignment.BottomCenter)
+                                    modifier = Modifier.align(Alignment.BottomCenter),
+                                    strings = strings
                                 )
                             }
 
@@ -730,19 +720,21 @@ class MainActivity : ComponentActivity() {
                                     paintingProgress = arUiState.paintingProgress,
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
-                                        .padding(top = 16.dp, end = 16.dp)
+                                        .padding(top = 16.dp, end = 16.dp),
+                                    strings = strings
                                 )
                             }
 
                             if (editorUiState.editorMode == EditorMode.AR && editorUiState.showDiagOverlay) {
                                 DiagPopup(
                                     diagLog = arUiState.diagLog,
-                                    modifier = Modifier.align(Alignment.TopStart)
+                                    modifier = Modifier.align(Alignment.TopStart),
+                                    strings = strings
                                 )
                             }
 
                             if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings) {
-                                AnchorLockFlash(isAnchorEstablished = arUiState.isAnchorEstablished)
+                                AnchorLockFlash(isAnchorEstablished = arUiState.isAnchorEstablished, strings = strings)
                             }
 
                             OffscreenIndicators(
@@ -961,10 +953,12 @@ class MainActivity : ComponentActivity() {
         backgroundPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>,
         editorUiState: EditorUiState,
         arUiState: ArUiState,
+        strings: AppStrings,
         navItemColor: Color = Color.White,
         onShowFontPicker: (String) -> Unit = {},
         layerMenusOpen: MutableMap<String, Boolean>
     ) {
+        val navStrings = strings.nav
         val requestPermissions = {
             permissionLauncher.launch(
                 arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
@@ -1414,23 +1408,23 @@ class MainActivity : ComponentActivity() {
                         azHelpRailItem(id = "help_layer_${layer.id}", text = navStrings.help, color = navItemColor, shape = AzButtonShape.RECTANGLE)
                     }
                 ) {
-                    inputItem(hint = DesignR.string.rename_hint) { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
+                    inputItem(hint = strings.editor.renameHint) { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
                     if (layer.textParams != null) {
                         inputItem(
-                            hint = DesignR.string.edit_text_hint,
+                            hint = strings.editor.editTextHint,
                             initialValue = layer.textParams!!.text,
                             onValueChange = { text -> editorViewModel.onTextContentChanged(layer.id, text) }
                         )
                     }
-                    listItem(text = DesignR.string.copy_edits) { editorViewModel.copyLayerModifications(layer.id) }
-                    listItem(text = DesignR.string.paste_edits) { editorViewModel.pasteLayerModifications(layer.id) }
+                    listItem(text = strings.editor.copyEdits) { editorViewModel.copyLayerModifications(layer.id) }
+                    listItem(text = strings.editor.pasteEdits) { editorViewModel.pasteLayerModifications(layer.id) }
                     if (layer.stencilType != null) {
-                        listItem(text = DesignR.string.generate_poster) { 
+                        listItem(text = strings.editor.generatePoster) { 
                             posterSourceLayerId = layer.stencilSourceId ?: layer.id
                             showPosterDialog = true 
                         }
                     }
-                    listItem(text = DesignR.string.duplicate) { editorViewModel.onLayerDuplicated(layer.id) }
+                    listItem(text = strings.editor.duplicate) { editorViewModel.onLayerDuplicated(layer.id) }
                     
                     // Check if part of a linked group (contiguous links)
                     val layers = editorUiState.layers
@@ -1440,10 +1434,10 @@ class MainActivity : ComponentActivity() {
                         (idx + 1 < layers.size && layers[idx + 1].isLinked)
                     } else false
 
-                    listItem(text = if (isPartToUnlink) DesignR.string.unlink_layer else DesignR.string.link_layer) { editorViewModel.onToggleLinkLayer(layer.id) }
-                    listItem(text = if (layer.isVisible) DesignR.string.hide_layer else DesignR.string.show_layer) { editorViewModel.onToggleVisibility(layer.id) }
-                    listItem(text = DesignR.string.flatten_all) { editorViewModel.onFlattenAllLayers() }
-                    listItem(text = DesignR.string.delete) { editorViewModel.onLayerRemoved(layer.id) }
+                    listItem(text = if (isPartToUnlink) strings.editor.unlinkLayer else strings.editor.linkLayer) { editorViewModel.onToggleLinkLayer(layer.id) }
+                    listItem(text = if (layer.isVisible) strings.editor.hideLayer else strings.editor.showLayer) { editorViewModel.onToggleVisibility(layer.id) }
+                    listItem(text = strings.editor.flattenAll) { editorViewModel.onFlattenAllLayers() }
+                    listItem(text = strings.editor.delete) { editorViewModel.onLayerRemoved(layer.id) }
                 }
             }
         }
@@ -1454,7 +1448,7 @@ class MainActivity : ComponentActivity() {
             azRailItem(id = "light", text = navStrings.light, color = navItemColor, info = navStrings.lightInfo, onClick = { arViewModel.toggleFlashlight() })
         }
 
-        val lockTextId = if (editorUiState.editorMode == EditorMode.TRACE) DesignR.string.lock_button else DesignR.string.freeze_button
+        val lockText = if (editorUiState.editorMode == EditorMode.TRACE) strings.editor.lock else strings.editor.freeze
         val lockAction: () -> Unit = if (editorUiState.editorMode == EditorMode.TRACE) {
             { mainViewModel.setTouchLocked(true) }
         } else {
@@ -1467,7 +1461,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        azRailItem(id = "lock_trace", text = lockTextId, color = navItemColor, info = navStrings.lockInfo, onClick = lockAction)
+        azRailItem(id = "lock_trace", text = lockText, color = navItemColor, info = navStrings.lockInfo, onClick = lockAction)
 
         azHelpRailItem(id = "help_main", text = navStrings.help, color = navItemColor, shape = AzButtonShape.RECTANGLE)
     }

@@ -509,7 +509,7 @@
     <string name="help_light">Flashlight: Toggle device LED. Instructions: Use this to illuminate dark walls for better AR tracking.</string>
     <!-- Lock/Freeze help text. -->
     <string name="help_lock_trace">Lock/Freeze: Prevent accidental changes. Instructions: In Trace mode, disables screen. In other modes, locks layer transforms.</string>
-    <!-- Interactive Help help text. -->
+    <!-- Interactive 'Help' help text. -->
     <string name="help_help_main">Interactive Help: Explains button functions. Instructions: Tap to activate (Cyan). While active, tap any button to see its help text.</string>
     <!-- Individual Layer help text. -->
     <string name="help_layer">Layer \'%1$s\': Active mural element. Instructions: Tap to select. Drag button up/down to reorder. Transform on screen with gestures.</string>

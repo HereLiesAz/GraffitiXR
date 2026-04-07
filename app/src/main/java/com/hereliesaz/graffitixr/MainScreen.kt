@@ -30,6 +30,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.hereliesaz.graffitixr.design.R as DesignR
 import com.hereliesaz.graffitixr.feature.editor.createColorMatrix
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
