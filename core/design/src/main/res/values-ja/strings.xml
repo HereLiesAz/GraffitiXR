@@ -6,7 +6,7 @@
 
     <string name="nav_modes">モード</string>
 
-    <string name="nav_modes_info">ARプロジェクション、オーバーレイ、モックアップ、トレースモードを切り替えます。</string>
+    <string name="nav_modes_info">ARプロジェクション、オーバーレイ、モックアップ、ライトボックスモードを切り替えます。</string>
 
 
     <string name="nav_ar_mode">AR</string>
