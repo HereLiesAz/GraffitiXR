@@ -13,13 +13,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.hereliesaz.aznavrail.AzTextBox
-import com.hereliesaz.aznavrail.AzTextBoxDefaults
+import com.hereliesaz.graffitixr.design.theme.AppStrings
 
 @Composable
 fun SaveProjectDialog(
     initialName: String,
     onDismissRequest: () -> Unit,
-    onSaveRequest: (String) -> Unit
+    onSaveRequest: (String) -> Unit,
+    strings: AppStrings
 ) {
     Dialog(onDismissRequest = onDismissRequest) {
         Box(
@@ -29,19 +30,16 @@ fun SaveProjectDialog(
                 .padding(24.dp),
             contentAlignment = Alignment.Center
         ) {
-            // Configure AzTextBox defaults if needed, though usually done globally.
-            // Here we just use it directly.
-
             AzTextBox(
                 value = initialName,
-                hint = "Project Name",
+                hint = strings.editor.saveProjectHint,
                 onSubmit = { text ->
                     if (text.isNotBlank()) {
                         onSaveRequest(text)
                     }
                 },
                 submitButtonContent = {
-                    Text("Save")
+                    Text(strings.common.save)
                 }
             )
         }

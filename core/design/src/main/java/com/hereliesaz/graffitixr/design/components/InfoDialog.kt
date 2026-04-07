@@ -6,6 +6,9 @@ import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.model.AzButtonShape
 import androidx.compose.runtime.Composable
 
+import androidx.compose.ui.res.stringResource
+import com.hereliesaz.graffitixr.design.R
+
 /**
  * A simple informational dialog using Material3 design.
  *
@@ -24,7 +27,7 @@ fun InfoDialog(
         title = { Text(text = title) },
         text = { Text(text = content) },
         confirmButton = {
-            AzButton(text = "Close", onClick = onDismiss, shape = AzButtonShape.RECTANGLE)
+            AzButton(text = stringResource(R.string.close_button), onClick = onDismiss, shape = AzButtonShape.RECTANGLE)
         }
     )
 }

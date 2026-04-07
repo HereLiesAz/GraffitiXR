@@ -5,10 +5,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 class HelpViewModel : ViewModel() {
-    private val _activeHelpList = MutableStateFlow<Map<String, String>>(emptyMap())
-    val activeHelpList: StateFlow<Map<String, String>> = _activeHelpList
+    private val _activeHelpList = MutableStateFlow<Map<String, Any>>(emptyMap())
+    val activeHelpList: StateFlow<Map<String, Any>> = _activeHelpList
 
-    fun setActiveHelpList(helpList: Map<String, String>) {
+    fun setActiveHelpList(helpList: Map<String, Any>) {
         _activeHelpList.value = helpList
     }
 }

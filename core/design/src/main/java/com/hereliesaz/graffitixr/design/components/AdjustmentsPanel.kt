@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.graffitixr.common.model.OverlayLayer
 import com.hereliesaz.graffitixr.design.theme.HotPink
+import com.hereliesaz.graffitixr.design.theme.AppStrings
 
 data class AdjustmentsState(
     val hideUiForCapture: Boolean = false,
@@ -68,6 +69,7 @@ fun AdjustmentsPanel(
     onMagicAlign: () -> Unit,
     onAdjustmentStart: () -> Unit,
     onAdjustmentEnd: () -> Unit,
+    strings: AppStrings,
     showSegmentationSlider: Boolean = false,
     segmentationInfluence: Float = 0.5f,
     onSegmentationInfluenceChange: (Float) -> Unit = {},
@@ -123,6 +125,7 @@ fun AdjustmentsPanel(
                     onInfluenceChange = onSegmentationInfluenceChange,
                     onDismiss = onSegmentationDismiss,
                     onCancel = onSegmentationCancel,
+                    strings = strings,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -141,6 +144,7 @@ fun AdjustmentsPanel(
                     onColorBalanceBChange = onColorBalanceBChange,
                     onAdjustmentStart = onAdjustmentStart,
                     onAdjustmentEnd = onAdjustmentEnd,
+                    strings = strings,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -161,6 +165,7 @@ fun AdjustmentsPanel(
                     onSaturationChange = onSaturationChange,
                     onAdjustmentStart = onAdjustmentStart,
                     onAdjustmentEnd = onAdjustmentEnd,
+                    strings = strings,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -175,6 +180,7 @@ fun AdjustmentsPanel(
                 onUndo = onUndo,
                 onRedo = onRedo,
                 onMagicClicked = onMagicAlign,
+                strings = strings,
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -187,6 +193,7 @@ fun SegmentationInfluenceRow(
     onInfluenceChange: (Float) -> Unit,
     onDismiss: () -> Unit,
     onCancel: () -> Unit,
+    strings: AppStrings,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -208,7 +215,7 @@ fun SegmentationInfluenceRow(
                 shadowElevation = 4.dp
             ) {
                 IconButton(onClick = onCancel) {
-                    Icon(Icons.Default.Close, contentDescription = "Cancel", tint = Color.White)
+                    Icon(Icons.Default.Close, contentDescription = strings.common.cancel, tint = Color.White)
                 }
             }
 
@@ -219,7 +226,7 @@ fun SegmentationInfluenceRow(
                 shadowElevation = 4.dp
             ) {
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Check, contentDescription = "Done", tint = Color.White)
+                    Icon(Icons.Default.Check, contentDescription = strings.common.done, tint = Color.White)
                 }
             }
         }
@@ -230,7 +237,7 @@ fun SegmentationInfluenceRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                "Detail",
+                strings.adj.detail,
                 color = Color.White,
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.width(36.dp)

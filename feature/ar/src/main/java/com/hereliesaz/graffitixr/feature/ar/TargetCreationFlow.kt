@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.CaptureStep
+import com.hereliesaz.graffitixr.design.theme.AppStrings
 
 /** A single brush stroke recorded during user interaction with the selection tool. */
 private data class SelectionStroke(
@@ -63,6 +64,7 @@ fun TargetCreationUi(
     isRightHanded: Boolean,
     captureStep: CaptureStep,
     isLoading: Boolean,
+    strings: AppStrings,
     onConfirm: (bitmap: Bitmap?, mask: Bitmap?, depthBuffer: ByteBuffer?, depthW: Int, depthH: Int, depthStride: Int, intrinsics: FloatArray?, viewMatrix: FloatArray?) -> Unit,
     onRetake: () -> Unit,
     onCancel: () -> Unit,
@@ -94,6 +96,7 @@ fun TargetCreationUi(
                     isAnnotating = uiState.annotatedCaptureBitmap == null && uiState.tempCaptureBitmap != null,
                     canUndo = uiState.canUndoErase,
                     canRedo = uiState.canRedoErase,
+                    strings = strings,
                     onConfirm = { mask, depth, dw, dh, ds, intr, view ->
                         onConfirm(uiState.tempCaptureBitmap, mask, depth, dw, dh, ds, intr, view)
                     },
@@ -134,6 +137,7 @@ private fun FeatureSelectionReview(
     isAnnotating: Boolean,
     canUndo: Boolean,
     canRedo: Boolean,
+    strings: AppStrings,
     onConfirm: (mask: Bitmap?, depthBuffer: ByteBuffer?, depthW: Int, depthH: Int, depthStride: Int, intrinsics: FloatArray?, viewMatrix: FloatArray?) -> Unit,
     onRetake: () -> Unit,
     onBeginErase: () -> Unit,
@@ -272,7 +276,7 @@ private fun FeatureSelectionReview(
                     FilterChip(
                         selected = mode == 0,
                         onClick = { mode = 0 },
-                        label = { Text("Exclude") },
+                        label = { Text(strings.ar.targetExclude) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = Color(0xAACC2200),
                             selectedLabelColor = Color.White
@@ -281,7 +285,7 @@ private fun FeatureSelectionReview(
                     FilterChip(
                         selected = mode == 1,
                         onClick = { mode = 1 },
-                        label = { Text("Include") },
+                        label = { Text(strings.ar.targetInclude) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = Color(0xAA008833),
                             selectedLabelColor = Color.White
@@ -290,7 +294,7 @@ private fun FeatureSelectionReview(
                     FilterChip(
                         selected = mode == 2,
                         onClick = { mode = 2 },
-                        label = { Text("Erase Marks") },
+                        label = { Text(strings.ar.targetEraseMarks) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = Color(0xAA007788),
                             selectedLabelColor = Color.White
@@ -305,7 +309,7 @@ private fun FeatureSelectionReview(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Show Features", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                    Text(strings.ar.targetShowFeatures, color = Color.White, style = MaterialTheme.typography.labelSmall)
                     Switch(
                         checked = showFeatures,
                         onCheckedChange = { showFeatures = it },
@@ -323,7 +327,7 @@ private fun FeatureSelectionReview(
                                 Icon(Icons.Default.Refresh, contentDescription = "Redo", tint = if (canRedo) Color.White else Color.Gray)
                             }
                         } else {
-                            AzButton(text = "Reset", onClick = { strokes.clear() }, modifier = Modifier.height(24.dp), shape = AzButtonShape.RECTANGLE)
+                            AzButton(text = strings.common.reset, onClick = { strokes.clear() }, modifier = Modifier.height(24.dp), shape = AzButtonShape.RECTANGLE)
                         }
                     }
                 }

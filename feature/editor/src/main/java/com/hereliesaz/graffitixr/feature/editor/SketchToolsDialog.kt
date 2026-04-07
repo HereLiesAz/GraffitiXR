@@ -26,6 +26,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.hereliesaz.graffitixr.design.theme.AppStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.*
@@ -35,7 +36,8 @@ fun ColorPickerDialog(
     currentColor: Color,
     history: List<Color>,
     onSelectColor: (Color) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    strings: AppStrings
 ) {
     // Decompose current color into HSV
     val initHsv = FloatArray(3)
@@ -90,7 +92,7 @@ fun ColorPickerDialog(
 
                 // Brightness slider
                 Text(
-                    "Brightness",
+                    strings.adj.brightness,
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.Gray,
                     modifier = Modifier.align(Alignment.Start)
@@ -108,9 +110,9 @@ fun ColorPickerDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
-                    AzButton(text = "Cancel", onClick = onDismiss, shape = AzButtonShape.RECTANGLE)
+                    AzButton(text = strings.common.cancel, onClick = onDismiss, shape = AzButtonShape.RECTANGLE)
                     Spacer(Modifier.width(8.dp))
-                    AzButton(text = "Apply", onClick = { onSelectColor(selectedColor) }, shape = AzButtonShape.RECTANGLE)
+                    AzButton(text = strings.common.apply, onClick = { onSelectColor(selectedColor) }, shape = AzButtonShape.RECTANGLE)
                 }
             }
         }
@@ -225,12 +227,13 @@ private suspend fun generateColorWheelBitmap(size: Int, brightness: Float): Imag
 fun SizePickerDialog(
     currentSize: Float,
     onSizeChange: (Float) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    strings: AppStrings
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface) {
             Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Brush Size", style = MaterialTheme.typography.titleMedium)
+                Text(strings.editor.brushSize, style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(32.dp))
 
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.height(100.dp)) {
@@ -239,7 +242,7 @@ fun SizePickerDialog(
 
                 Slider(value = currentSize, onValueChange = onSizeChange, valueRange = 5f..150f)
 
-                AzButton(text = "Done", onClick = onDismiss, modifier = Modifier.padding(top = 16.dp), shape = AzButtonShape.RECTANGLE)
+                AzButton(text = strings.common.done, onClick = onDismiss, modifier = Modifier.padding(top = 16.dp), shape = AzButtonShape.RECTANGLE)
             }
         }
     }

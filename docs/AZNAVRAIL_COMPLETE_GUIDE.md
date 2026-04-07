@@ -61,7 +61,7 @@ azAdvanced(
     isLoading = isLoading,               // Boolean: Show global loading overlay
     enableRailDragging = true,           // Boolean: Enable FAB Mode (detach rail)
     helpEnabled = showHelp,              // Boolean: Show Help Overlay
-    helpList = mapOf("home" to "Home screen"), // Map<String, String>: Extra help texts
+    helpList = mapOf("home" to "Home screen"), // Map<String, Any>: Extra help texts
     onDismissHelp = { showHelp = false }
 )
 ```

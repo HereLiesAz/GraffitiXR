@@ -19,6 +19,7 @@ import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.design.components.AdjustmentsPanel
 import com.hereliesaz.graffitixr.design.components.AdjustmentsState
 import com.hereliesaz.graffitixr.feature.editor.ui.GestureFeedback
+import com.hereliesaz.graffitixr.design.theme.AppStrings
 
 @Composable
 fun EditorUi(
@@ -26,6 +27,7 @@ fun EditorUi(
     uiState: EditorUiState,
     isTouchLocked: Boolean,
     showUnlockInstructions: Boolean,
+    strings: AppStrings,
     isCapturingTarget: Boolean = false
 ) {
     val configuration = LocalConfiguration.current
@@ -39,7 +41,8 @@ fun EditorUi(
                 currentColor = uiState.activeColor,
                 history = listOf(Color.Red, Color.Green, Color.Blue, Color.Yellow, Color.Black, Color.White),
                 onSelectColor = { actions.setActiveColor(it) },
-                onDismiss = { actions.onColorPickerDismissed() }
+                onDismiss = { actions.onColorPickerDismissed() },
+                strings = strings
             )
         }
 
@@ -65,7 +68,8 @@ fun EditorUi(
                         activeLayerId = uiState.activeLayerId,
                         onSelectLayer = actions::onLayerActivated,
                         onToggleVisibility = { /* Toggle logic */ },
-                        onClose = { actions.onDismissPanel() }
+                        onClose = { actions.onDismissPanel() },
+                        strings = strings
                     )
                 }
             }
@@ -118,6 +122,7 @@ fun EditorUi(
                 onMagicAlign = actions::onMagicClicked,
                 onAdjustmentStart = actions::onAdjustmentStart,
                 onAdjustmentEnd = actions::onAdjustmentEnd,
+                strings = strings,
                 showSegmentationSlider = uiState.isSegmenting,
                 segmentationInfluence = uiState.segmentationInfluence,
                 onSegmentationInfluenceChange = { actions.setSegmentationInfluence(it) },
@@ -134,7 +139,8 @@ fun LayersPanel(
     activeLayerId: String?,
     onSelectLayer: (String) -> Unit,
     onToggleVisibility: (String) -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    strings: AppStrings
 ) {
     Column(Modifier.fillMaxWidth()) {
         Row(
@@ -142,9 +148,9 @@ fun LayersPanel(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Layers", style = MaterialTheme.typography.titleMedium, color = Color.White)
+            Text(strings.editor.layers, style = MaterialTheme.typography.titleMedium, color = Color.White)
             Text(
-                "Close",
+                strings.common.close,
                 color = Color.Gray,
                 modifier = Modifier.clickable { onClose() }.padding(8.dp)
             )

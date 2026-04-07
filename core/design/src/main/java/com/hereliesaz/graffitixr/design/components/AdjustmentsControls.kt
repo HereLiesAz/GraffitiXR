@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.graffitixr.design.theme.HotPink
+import com.hereliesaz.graffitixr.design.theme.AppStrings
 import kotlin.math.roundToInt
 
 @Composable
@@ -31,6 +32,7 @@ fun UndoRedoRow(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onMagicClicked: () -> Unit,
+    strings: AppStrings,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -51,7 +53,7 @@ fun UndoRedoRow(
                 IconButton(onClick = onUndo, enabled = canUndo) {
                     Icon(
                         Icons.AutoMirrored.Filled.Undo,
-                        contentDescription = "Undo",
+                        contentDescription = strings.adj.undo,
                         tint = if (canUndo) Color.White else Color.White.copy(alpha = 0.38f)
                     )
                 }
@@ -73,7 +75,7 @@ fun UndoRedoRow(
             shadowElevation = 4.dp
         ) {
             IconButton(onClick = onMagicClicked) {
-                Icon(Icons.Filled.AutoFixHigh, contentDescription = "Magic Align", tint = Color.White)
+                Icon(Icons.Filled.AutoFixHigh, contentDescription = strings.adj.magicAlign, tint = Color.White)
             }
         }
 
@@ -96,7 +98,7 @@ fun UndoRedoRow(
                 IconButton(onClick = onRedo, enabled = canRedo) {
                     Icon(
                         Icons.AutoMirrored.Filled.Redo,
-                        contentDescription = "Redo",
+                        contentDescription = strings.adj.redo,
                         tint = if (canRedo) Color.White else Color.White.copy(alpha = 0.38f)
                     )
                 }
@@ -118,6 +120,7 @@ fun AdjustmentsKnobsRow(
     onSaturationChange: (Float) -> Unit,
     onAdjustmentStart: () -> Unit,
     onAdjustmentEnd: () -> Unit,
+    strings: AppStrings,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -131,7 +134,7 @@ fun AdjustmentsKnobsRow(
             onValueChange = onOpacityChange,
             onValueChangeStart = onAdjustmentStart,
             onValueChangeFinished = onAdjustmentEnd,
-            text = "Opacity",
+            text = strings.adj.opacity,
             color = MaterialTheme.colorScheme.secondary,
             valueRange = 0f..1f,
             defaultValue = 1f,
@@ -142,7 +145,7 @@ fun AdjustmentsKnobsRow(
             onValueChange = onBrightnessChange,
             onValueChangeStart = onAdjustmentStart,
             onValueChangeFinished = onAdjustmentEnd,
-            text = "Brightness",
+            text = strings.adj.brightness,
             color = MaterialTheme.colorScheme.onSurface,
             valueRange = -1f..1f,
             defaultValue = 0f,
@@ -153,7 +156,7 @@ fun AdjustmentsKnobsRow(
             onValueChange = onContrastChange,
             onValueChangeStart = onAdjustmentStart,
             onValueChangeFinished = onAdjustmentEnd,
-            text = "Contrast",
+            text = strings.adj.contrast,
             color = MaterialTheme.colorScheme.tertiary,
             valueRange = 0f..2f,
             defaultValue = 1f,
@@ -164,7 +167,7 @@ fun AdjustmentsKnobsRow(
             onValueChange = onSaturationChange,
             onValueChangeStart = onAdjustmentStart,
             onValueChangeFinished = onAdjustmentEnd,
-            text = "Saturation",
+            text = strings.adj.saturation,
             color = MaterialTheme.colorScheme.primary,
             valueRange = 0f..2f,
             defaultValue = 1f,
@@ -183,6 +186,7 @@ fun ColorBalanceKnobsRow(
     onColorBalanceBChange: (Float) -> Unit,
     onAdjustmentStart: () -> Unit,
     onAdjustmentEnd: () -> Unit,
+    strings: AppStrings,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -197,7 +201,7 @@ fun ColorBalanceKnobsRow(
             onValueChange = onColorBalanceRChange,
             onValueChangeStart = onAdjustmentStart,
             onValueChangeFinished = onAdjustmentEnd,
-            text = "Red",
+            text = strings.adj.red,
             color = Color.Red,
             valueRange = 0f..2f,
             defaultValue = 1f,
@@ -209,7 +213,7 @@ fun ColorBalanceKnobsRow(
             onValueChange = onColorBalanceGChange,
             onValueChangeStart = onAdjustmentStart,
             onValueChangeFinished = onAdjustmentEnd,
-            text = "Green",
+            text = strings.adj.green,
             color = Color.Green,
             valueRange = 0f..2f,
             defaultValue = 1f,
@@ -221,7 +225,7 @@ fun ColorBalanceKnobsRow(
             onValueChange = onColorBalanceBChange,
             onValueChangeStart = onAdjustmentStart,
             onValueChangeFinished = onAdjustmentEnd,
-            text = "Blue",
+            text = strings.adj.blue,
             color = Color.Blue,
             valueRange = 0f..2f,
             defaultValue = 1f,

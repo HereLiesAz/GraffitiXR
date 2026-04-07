@@ -40,6 +40,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.design.R as DesignR
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import java.nio.ByteBuffer
@@ -903,14 +904,14 @@ class ArViewModel @Inject constructor(
         scanPhase: ScanPhase = ScanPhase.AMBIENT,
         sectorsCovered: Int = 0
     ): String? {
-        if (!isTracking) return "Move device slowly to recover tracking"
+        if (!isTracking) return appContext.getString(DesignR.string.scan_hint_recover)
         return when (scanPhase) {
-            ScanPhase.AMBIENT -> "Slowly rotate 360° to map your surroundings (${sectorsCovered * 30}°)"
+            ScanPhase.AMBIENT -> appContext.getString(DesignR.string.scan_hint_ambient, sectorsCovered * 30)
             ScanPhase.WALL -> {
-                if (lightLevel < 0.3f) "Too dark. Turn on the flashlight."
-                else if (splatCount < 5000) "Walk left and right to build map"
-                else if (splatCount < 20000) "Move closer to the wall"
-                else if (splatCount < 40000) "Scan higher and lower"
+                if (lightLevel < 0.3f) appContext.getString(DesignR.string.scan_hint_too_dark)
+                else if (splatCount < 5000) appContext.getString(DesignR.string.scan_hint_build_map)
+                else if (splatCount < 20000) appContext.getString(DesignR.string.scan_hint_closer)
+                else if (splatCount < 40000) appContext.getString(DesignR.string.scan_hint_higher_lower)
                 else null
             }
             ScanPhase.COMPLETE -> null

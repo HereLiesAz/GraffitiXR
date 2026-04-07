@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.hereliesaz.aznavrail.AzLoad
 import com.hereliesaz.graffitixr.common.model.ArScanMode
+import com.hereliesaz.graffitixr.design.theme.AppStrings
 
 @Composable
 fun SettingsScreen(
@@ -73,7 +74,8 @@ fun SettingsScreen(
     onBackgroundColorChanged: (Int) -> Unit,
     onCheckForUpdates: () -> Unit,
     onInstallUpdate: () -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    strings: AppStrings
 ) {
     val context = LocalContext.current
 
@@ -134,12 +136,12 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Settings",
+                            text = strings.settings.title,
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold
                         )
                         IconButton(onClick = onClose) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Close")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.common.close)
                         }
                     }
 
@@ -151,15 +153,15 @@ fun SettingsScreen(
                     ) {
                         // Preferences Section
                         item {
-                            SettingsSectionTitle("Preferences")
+                            SettingsSectionTitle(strings.settings.preferences)
                             SettingsItem(
-                                label = "Dominant Hand",
-                                value = if (isRightHanded) "Right" else "Left",
+                                label = strings.settings.dominantHand,
+                                value = if (isRightHanded) strings.settings.handRight else strings.settings.handLeft,
                                 modifier = Modifier.clickable { onHandednessChanged(!isRightHanded) }
                             )
                             SettingsItem(
-                                label = "Depth Diagnostic Overlay",
-                                value = if (showDiagOverlay) "On" else "Off",
+                                label = strings.settings.diagOverlay,
+                                value = if (showDiagOverlay) strings.settings.on else strings.settings.off,
                                 modifier = Modifier.clickable { onDiagOverlayChanged() }
                             )
                             val nextMode = if (arScanMode == ArScanMode.CLOUD_POINTS) {
@@ -168,21 +170,21 @@ fun SettingsScreen(
                                 ArScanMode.CLOUD_POINTS
                             }
                             SettingsItem(
-                                label = "AR Scan Mode",
-                                value = if (arScanMode == ArScanMode.CLOUD_POINTS) "Point Cloud" else "Gaussian Splat",
+                                label = strings.settings.scanMode,
+                                value = if (arScanMode == ArScanMode.CLOUD_POINTS) strings.settings.pointCloud else strings.settings.gaussianSplat,
                                 modifier = Modifier.clickable { onArScanModeChanged(nextMode) }
                             )
                             SettingsItem(
-                                label = "Show Anchor Boundary",
-                                value = if (showAnchorBoundary) "On" else "Off",
+                                label = strings.settings.anchorBoundary,
+                                value = if (showAnchorBoundary) strings.settings.on else strings.settings.off,
                                 modifier = Modifier.clickable { onAnchorBoundaryChanged(!showAnchorBoundary) }
                             )
                             SettingsItem(
-                                label = "Distance Units",
-                                value = if (isImperialUnits) "Imperial (ft)" else "Metric (m)",
+                                label = strings.settings.units,
+                                value = if (isImperialUnits) strings.settings.imperial else strings.settings.metric,
                                 modifier = Modifier.clickable { onImperialUnitsChanged(!isImperialUnits) }
                             )
-                            SettingRow(label = "Canvas Background") {
+                            SettingRow(label = strings.settings.canvasBg) {
                                 listOf(
                                     "Black" to 0xFF000000.toInt(),
                                     "Dark"  to 0xFF1A1A2E.toInt(),
@@ -208,16 +210,16 @@ fun SettingsScreen(
 
                         // Version Section
                         item {
-                            SettingsSectionTitle("App Information")
+                            SettingsSectionTitle(strings.settings.appInfo)
                             SettingsItem(
-                                label = "Version",
+                                label = strings.settings.version,
                                 value = currentVersion
                             )
                         }
 
                         // Updates Section
                         item {
-                            SettingsSectionTitle("Updates")
+                            SettingsSectionTitle(strings.settings.updates)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -231,10 +233,10 @@ fun SettingsScreen(
                                             enabled = isUpdateAvailable,
                                             onClick = onInstallUpdate,
                                             role = Role.Button,
-                                            onClickLabel = "Install Update"
+                                            onClickLabel = strings.settings.installUpdate
                                         )
                                 ) {
-                                    Text(text = "Check for experimental updates", fontWeight = FontWeight.Medium)
+                                    Text(text = strings.settings.checkUpdates, fontWeight = FontWeight.Medium)
                                     if (updateStatus != null) {
                                         Text(
                                             text = updateStatus,
@@ -247,7 +249,7 @@ fun SettingsScreen(
                                     if (isCheckingForUpdate) {
                                         AzLoad()
                                     } else {
-                                        Icon(Icons.Default.Refresh, contentDescription = "Check for updates")
+                                        Icon(Icons.Default.Refresh, contentDescription = strings.settings.checkUpdates)
                                     }
                                 }
                             }
@@ -255,18 +257,18 @@ fun SettingsScreen(
 
                         // Permissions Section (User can accept/revoke via App Settings)
                         item {
-                            SettingsSectionTitle("Permissions")
-                            PermissionItem(name = "Camera Access", isGranted = cameraPermission, onClick = openAppSettings)
-                            PermissionItem(name = "Photo Library Access", isGranted = storagePermission, onClick = openAppSettings)
+                            SettingsSectionTitle(strings.settings.permissions)
+                            PermissionItem(name = strings.settings.cameraAccess, isGranted = cameraPermission, onClick = openAppSettings, strings = strings)
+                            PermissionItem(name = strings.settings.photoAccess, isGranted = storagePermission, onClick = openAppSettings, strings = strings)
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                 val notificationPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-                                PermissionItem(name = "Notifications", isGranted = notificationPermission, onClick = openAppSettings)
+                                PermissionItem(name = strings.settings.notifications, isGranted = notificationPermission, onClick = openAppSettings, strings = strings)
                             }
                         }
                     }
 
                     Text(
-                        text = "GraffitiXR © 2025",
+                        text = strings.settings.copyright,
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Gray,
                         modifier = Modifier
@@ -317,15 +319,15 @@ private fun SettingRow(label: String, content: @Composable RowScope.() -> Unit) 
 }
 
 @Composable
-fun PermissionItem(name: String, isGranted: Boolean, onClick: () -> Unit) {
-    val statusText = if (isGranted) "Granted" else "Denied"
+fun PermissionItem(name: String, isGranted: Boolean, onClick: () -> Unit, strings: AppStrings) {
+    val statusText = if (isGranted) strings.settings.granted else strings.settings.denied
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(
                 onClick = onClick,
                 role = Role.Button,
-                onClickLabel = "Open App Settings"
+                onClickLabel = strings.settings.openAppSettings
             )
             .padding(vertical = 8.dp)
             .semantics(mergeDescendants = true) {

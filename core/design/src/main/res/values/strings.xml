@@ -222,8 +222,43 @@
     <!-- Description of the back action, noting that stencil layers are preserved. -->
     <string name="stencil_back_info">Return to the main editor. Your stencil layers are preserved in the session.</string>
 
+    <!-- Action label to add a text layer. -->
+    <string name="nav_text">Text</string>
+    <!-- Action label to add a blank drawing layer. -->
+    <string name="nav_draw">Draw</string>
+    <!-- Action label to edit layer content (like text). -->
+    <string name="nav_edit">Edit</string>
+    <!-- Action label for font selection. -->
+    <string name="nav_font">Font</string>
+    <!-- Action label for size adjustment. -->
+    <string name="nav_size">Size</string>
+    <!-- Action label for color selection. -->
+    <string name="nav_color">Color</string>
+    <!-- Action label for text kerning. -->
+    <string name="nav_kern">Kern</string>
+    <!-- Action label for bold text toggle. -->
+    <string name="nav_bold">Bold</string>
+    <!-- Action label for italic text toggle. -->
+    <string name="nav_italic">Italic</string>
+    <!-- Action label for drop shadow toggle. -->
+    <string name="nav_shadow">Shadow</string>
+    <!-- Action label for the eraser tool. -->
+    <string name="nav_eraser">Eraser</string>
+    <!-- Action label for the blur/smudge tool. -->
+    <string name="nav_blur">Blur</string>
+    <!-- Action label for the liquify/warp tool. -->
+    <string name="nav_liquify">Liquify</string>
+    <!-- Action label for the dodge/lighten tool. -->
+    <string name="nav_dodge">Dodge</string>
+    <!-- Action label for the burn/darken tool. -->
+    <string name="nav_burn">Burn</string>
+
     <!-- MainActivity UI strings -->
     <!-- Label shown when a stencil or process is generating. -->
+    <string name="pro_tip">Pro Tip</string>
+    <string name="double_tap_hint">Double tap to switch rotation axis.</string>
+    <string name="ok_button">OK</string>
+
     <string name="generating">GENERATING...</string>
     <!-- Hint shown when user can add a layer by pressing again. -->
     <string name="stencil_hint">Press again to add a layer.</string>
@@ -251,6 +286,7 @@
     <string name="flatten_all">Flatten All</string>
     <!-- Action to delete a layer. -->
     <string name="delete">Delete</string>
+    <string name="new_project_name">New Project</string>
     <!-- Label for the lock button. -->
     <string name="lock_button">Lock</string>
     <!-- Label for the freeze button. -->
@@ -406,6 +442,12 @@
     <string name="target_review_desc">Review Extracted Target</string>
     <string name="target_unwarp_hint">Drag corners to unwarp</string>
     <string name="target_review_title">Review Extracted Markings</string>
+
+    <string name="target_exclude">Exclude</string>
+    <string name="target_include">Include</string>
+    <string name="target_erase_marks">Erase Marks</string>
+    <string name="target_show_features">Show Features</string>
+    <string name="reset_button">Reset</string>
 
     <!-- Scan Hints -->
     <string name="scan_hint_recover">Move device slowly to recover tracking</string>

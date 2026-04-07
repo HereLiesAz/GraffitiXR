@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
+import com.hereliesaz.graffitixr.design.theme.AppStrings
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -49,7 +50,8 @@ fun ProjectLibraryScreen(
     onDeleteProject: (String) -> Unit,
     onNewProject: () -> Unit,
     onImportProject: (Uri) -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    strings: AppStrings
 ) {
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -76,7 +78,7 @@ fun ProjectLibraryScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "GraffitiXR \n \n",
+                    text = strings.lib.title,
                     style = MaterialTheme.typography.headlineLarge,
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
@@ -84,7 +86,7 @@ fun ProjectLibraryScreen(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Project your artwork onto a real wall or a canvas using AR or a basic camera overlay. \n\nQuickly create a mockup on a photo to show how the completed work will look. \n\nOr trace an image onto paper by using your device as a lightbox.",
+                    text = strings.lib.description,
                     style = MaterialTheme.typography.bodyLarge,
                     color = Color.White.copy(alpha = 0.7f),
                     textAlign = TextAlign.Justify
@@ -98,14 +100,14 @@ fun ProjectLibraryScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AzButton(
-                    text = "New",
+                    text = strings.lib.newProject,
                     onClick = onNewProject,
                     modifier = Modifier.width(120.dp),
                     shape = com.hereliesaz.aznavrail.model.AzButtonShape.RECTANGLE
                 )
                 Spacer(modifier = Modifier.width(16.dp))
                 AzButton(
-                    text = "Import",
+                    text = strings.lib.importProject,
                     onClick = { importLauncher.launch("*/*") },
                     modifier = Modifier.width(120.dp),
                     shape = com.hereliesaz.aznavrail.model.AzButtonShape.RECTANGLE
@@ -121,20 +123,14 @@ fun ProjectLibraryScreen(
                     verticalArrangement = Arrangement.Top
                 ) {
                     Text(
-                        text = "No projects yet",
+                        text = strings.lib.noProjects,
                         style = MaterialTheme.typography.titleMedium,
                         color = Color.White,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "Tap New above to start your first mural.\n\n" +
-                            "You'll be taken into the editor where you can:\n" +
-                            "  \u2022  Add artwork from the Design menu\n" +
-                            "  \u2022  Switch to AR mode to project onto a real wall\n" +
-                            "  \u2022  Use Overlay to float your design on the live camera\n" +
-                            "  \u2022  Use Mockup to preview on a wall photo\n" +
-                            "  \u2022  Use Lightbox to trace your design onto paper",
+                        text = strings.lib.noProjectsHint,
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White.copy(alpha = 0.65f),
                         textAlign = TextAlign.Center
@@ -160,7 +156,7 @@ fun ProjectLibraryScreen(
                                 if (project.thumbnailUri != null) {
                                     coil.compose.AsyncImage(
                                         model = project.thumbnailUri,
-                                        contentDescription = "Project Thumbnail",
+                                        contentDescription = strings.lib.projectThumbnail,
                                         modifier = Modifier
                                             .size(60.dp)
                                             .background(Color.Black)
@@ -196,7 +192,7 @@ fun ProjectLibraryScreen(
                                 IconButton(onClick = { onDeleteProject(project.id) }) {
                                     Icon(
                                         Icons.Default.Delete,
-                                        contentDescription = "Delete project ${project.name}",
+                                        contentDescription = strings.lib.deleteProjectDesc(project.name),
                                         tint = MaterialTheme.colorScheme.error
                                     )
                                 }
