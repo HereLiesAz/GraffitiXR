@@ -110,8 +110,8 @@ class ArViewModel @Inject constructor(
                 _uiState.update { it.copy(arScanMode = mode) }
                 renderer?.scanMode = mode
                 
-                // Attune voxel size: Mural (Splats) = 10mm, Canvas (Points) = 2mm
-                val voxelSize = if (mode == ArScanMode.GAUSSIAN_SPLATS) 0.01f else 0.002f
+                // Attune voxel size: Mural (Splats) = 8mm, Canvas (Points) = 2mm
+                val voxelSize = if (mode == ArScanMode.GAUSSIAN_SPLATS) 0.008f else 0.002f
                 slamManager.setVoxelSize(voxelSize)
 
                 visitedSectors.fill(false)
@@ -317,7 +317,7 @@ class ArViewModel @Inject constructor(
             try {
                 val root = File(appContext.filesDir, "projects/${project.id}")
                 if (!root.exists()) root.mkdirs()
-                // Removed aggressive 0.6f pruning which was wiping out recent scans
+                slamManager.pruneByConfidence(0.6f)
                 slamManager.saveModel(File(root, "map.bin").absolutePath)
                 lastSavedSplatCount.set(slamManager.getSplatCount())
                 loadedProjectId = project.id
@@ -345,7 +345,7 @@ class ArViewModel @Inject constructor(
             try {
                 val root = File(appContext.filesDir, "projects/${project.id}")
                 if (!root.exists()) root.mkdirs()
-                // Removed aggressive 0.6f pruning which was wiping out recent scans
+                slamManager.pruneByConfidence(0.6f)
                 slamManager.saveModel(File(root, "map.bin").absolutePath)
                 lastSavedSplatCount.set(slamManager.getSplatCount())
                 loadedProjectId = project.id
