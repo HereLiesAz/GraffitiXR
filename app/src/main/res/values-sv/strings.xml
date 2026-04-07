@@ -1,0 +1,637 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+
+    <string name="app_name">GraffitiXR</string>
+
+
+    <string name="nav_modes">Lägen</string>
+
+    <string name="nav_modes_info">Växla mellan lägena AR-projektion, Overlay, Mockup och Trace.</string>
+
+
+    <string name="nav_ar_mode">AR</string>
+
+    <string name="nav_ar_mode_info">Projicera ditt konstverk på en riktig vägg med hjälp av förstärkt verklighet. Skanna väggen först för att placera ankaret och lägg sedan till dina designlager.</string>
+
+
+    <string name="nav_overlay">Täcka över</string>
+
+    <string name="nav_overlay_info">Lägg din design i lager över livekameraflödet utan AR-förankring. Perfekt för snabb inramning och placeringskontroller.</string>
+
+
+    <string name="nav_mockup">Mockup</string>
+
+    <string name="nav_mockup_info">Förhandsgranska din design sammansatt på ett foto av en vägg. Ingen kamera eller skanning krävs.</string>
+
+
+    <string name="nav_trace">Spåra</string>
+
+    <string name="nav_trace_info">Använd din design som ett ljusbordsöverlägg för att spåra referenslinjer på en fysisk yta.</string>
+
+    <string name="nav_trace_mode">Ljuslåda</string>
+
+
+    <string name="nav_canvas">Duk</string>
+
+    <string name="nav_mural">Väggmålning</string>
+
+    <string name="nav_scan_mode_toggle_info">Växla mellan Canvas (optimerad för konst i mindre skrivbordsskala) och Mural (optimerad för storskaliga väggar och Gaussisk stänk).</string>
+
+
+    <string name="nav_stencil">Stencil</string>
+
+    <string name="nav_stencil_info">Skapa utskrivbara schabloner i flera lager från ditt konstverk. Varje lager skrivs ut som enbart konturer i storleken för US Letter-papper.</string>
+
+
+    <string name="nav_grid">Mål</string>
+
+    <string name="nav_grid_info">Skapa och hantera AR-ankarmål. Fotografera målade referensmärken på väggen för att låsa projektionen på plats.</string>
+
+
+    <string name="nav_surveyor">Undersökning</string>
+
+    <string name="nav_surveyor_info">Kartlägg väggytan för att förbättra AR-spårningsnoggrannheten.</string>
+
+
+    <string name="nav_create">Skapa</string>
+
+    <string name="nav_create_info">Fotografera ett referensmärke på väggen för att skapa ett nytt AR-ankare. Appen kommer att spåra detta märke för att hålla din projektion justerad.</string>
+
+
+    <string name="nav_refine">Förfina</string>
+
+    <string name="nav_refine_info">Finjustera positionen för ett befintligt AR-ankarmål.</string>
+
+
+    <string name="nav_update">Framsteg</string>
+
+    <string name="nav_update_info">Markera färdiga delar av din väggmålning för att spåra målningens framsteg.</string>
+
+
+    <string name="nav_design">Design</string>
+
+    <string name="nav_design_info">Lägg till och hantera designlager. Varje lager kan vara en importerad bild eller en frihandsteckning.</string>
+
+
+    <string name="nav_open">Öppna</string>
+
+    <string name="nav_open_info">Lägg till en bild från ditt galleri som ett nytt lager.</string>
+
+
+    <string name="nav_wall">Vägg</string>
+
+    <string name="nav_wall_info">Byt ut bakgrundsväggfotot som används i Mockup-läge.</string>
+
+
+    <string name="nav_isolate">Isolera</string>
+
+    <string name="nav_isolate_info">Ta automatiskt bort bakgrunden från det här lagret och lämna bara motivet på en genomskinlig bakgrund.</string>
+
+
+    <string name="nav_invert">Invertera</string>
+
+    <string name="nav_invert_info">Skapa ett negativ av det aktuella lagret. Svarta blir vita och färger vänds till sina motsatser - användbart för stencil- och överlagringsanalys.</string>
+
+
+    <string name="nav_outline">Skissera</string>
+
+    <string name="nav_outline_info">Konvertera det här lagret till svart streckteckning på en transparent bakgrund - perfekt för att skapa stencilmallar.</string>
+
+
+    <string name="nav_adjust">Justera</string>
+
+    <string name="nav_adjust_info">Finjustera ljusstyrka, kontrast, mättnad och färgbalans för detta lager.</string>
+
+
+    <string name="nav_balance">Färg</string>
+
+    <string name="nav_balance_info">Färga lagrets färger med rött, grönt och blått kanalreglage.</string>
+
+
+    <string name="nav_blending">Blandning</string>
+
+    <string name="nav_blending_info">Bläddra genom blandningslägen (Normal, Multiplicera, Skärm, Överlagring...) för att kontrollera hur detta lager sammansätts med lager nedan.</string>
+
+
+    <string name="nav_settings">Inställningar</string>
+
+    <string name="nav_settings_info">Konfigurera handenhet, AR-skanningsläge, enheter och andra apppreferenser.</string>
+
+
+    <string name="nav_project">Projekt</string>
+
+    <string name="nav_project_info">Hantera ditt projekt: skapa, spara, ladda och exportera.</string>
+
+
+    <string name="nav_new">Ny</string>
+
+    <string name="nav_new_info">Starta nytt tomt projekt. Alla osparade ändringar kommer att gå förlorade.</string>
+
+
+    <string name="nav_save">Spara</string>
+
+    <string name="nav_save_info">Spara det aktuella projektet på din enhet.</string>
+
+
+    <string name="nav_load">Ladda</string>
+
+    <string name="nav_load_info">Öppna projektbiblioteket för att ladda ett tidigare sparat projekt.</string>
+
+
+    <string name="nav_export">Exportera</string>
+
+    <string name="nav_export_info">Exportera en platt sammanslagen bild av alla synliga lager till ditt fotogalleri.</string>
+
+
+    <string name="nav_help">Hjälp</string>
+
+    <string name="nav_help_info">Tryck på valfri knapp när Hjälp är aktivt för att se vad den gör.</string>
+
+
+    <string name="nav_light">Ljus</string>
+
+    <string name="nav_light_info">Växla enhetens ficklampa för att lysa upp din vägg när du arbetar i svagt ljus.</string>
+
+
+    <string name="nav_lock">Låsa</string>
+
+    <string name="nav_lock_info">Lås pekskärmen för att förhindra oavsiktliga ändringar medan du sprayar. Tryck tre gånger var som helst för att låsa upp.</string>
+
+
+
+    <string name="info_brush">Måla frihandsdrag på detta lager. Dra upp/ned på knappen Storlek för att ändra borstens diameter; dra åt vänster/höger för att justera fjädring (kantmjukhet).</string>
+
+    <string name="info_eraser">Radera delar av detta lager med en rund borste. Dra upp/ned på knappen Storlek för att ändra diameter; dra åt vänster/höger för att justera fjädring.</string>
+
+    <string name="info_blur">Smörj ut och mjuka upp områden i detta lager. Dra över en region för att sudda ut den.</string>
+
+    <string name="info_liquify">Tryck och förvräng pixlar i valfri riktning. Dra över ett område för att förvränga det - användbart för att justera proportioner.</string>
+
+    <string name="info_dodge">Ljusna upp specifika områden genom att måla över dem.</string>
+
+    <string name="info_burn">Gör specifika områden mörkare genom att måla över dem.</string>
+
+    <string name="info_size">Dra upp/ned för att ändra borstens diameter. Dra åt vänster/höger för att justera fjädern — en bredare fjäder ger mjukare, mer sprayburkliknande kanter.</string>
+
+    <string name="info_color">Visar den aktiva borstfärgen. Dra upp/ned för att justera ljusstyrkan; dra åt vänster/höger för att justera mättnaden. Tryck för att öppna fullfärgshjulet.</string>
+
+    <string name="info_draw">Lägg till ett nytt tomt transparent lager för frihandsteckning.</string>
+
+    <string name="info_keyframe">Spara den aktuella AR-kameraposen som en nyckelbild. Används för att korrigera drift och justera om projektionen efter att ha flyttat iväg och återvänt.</string>
+
+    <string name="info_layer">Detta lager. Tryck för att aktivera den. Öppna den horisontella skenan för att komma åt verktyg. Tryck länge och dra för att ändra ordning.</string>
+
+
+
+    <string name="stencil_layers">Lager</string>
+
+    <string name="stencil_layers_info">Välj hur många stencillager som ska genereras: 1 (endast siluett), 2 (silhuett + högdager) eller 3 (siluett + mellanton + högdager).</string>
+
+
+    <string name="stencil_rebuild">Återuppbygga</string>
+
+    <string name="stencil_rebuild_info">Kör om stencilgenereringspipelinen på det aktuella källskiktet.</string>
+
+
+    <string name="stencil_print">Skriva ut</string>
+
+    <string name="stencil_print_info">Konfigurera den verkliga utskriftsstorleken och generera en sida vid sida PDF för US Letter-papper.</string>
+
+
+    <string name="stencil_print_size">Storlek</string>
+
+    <string name="stencil_print_size_info">Dra upp/ned för att ställa in stencilens verkliga bredd eller höjd i centimeter. Uppdateringar av sidantal live.</string>
+
+
+    <string name="stencil_print_dim_toggle">W/H</string>
+
+    <string name="stencil_print_dim_toggle_info">Tryck för att växla mellan att låsa bredden eller höjden på utmatningen.</string>
+
+
+    <string name="stencil_export_pdf">Skriv ut PDF</string>
+
+    <string name="stencil_export_pdf_info">Skapa en sida vid sida med alla stencillager redo att skriva ut och klippa. Varje platta inkluderar en 3 mm överlappning för monteringsjustering.</string>
+
+
+    <string name="stencil_save_layers">Spara PNG-filer</string>
+
+    <string name="stencil_save_layers_info">Spara varje stencillager som en separat PNG-bild i ditt galleri.</string>
+
+
+    <string name="stencil_back">← Redaktör</string>
+
+    <string name="stencil_back_info">Återgå till huvudredigeraren. Dina stencillager bevaras i sessionen.</string>
+
+
+    <string name="nav_text">Text</string>
+
+    <string name="nav_draw">Dra</string>
+
+    <string name="nav_edit">Redigera</string>
+
+    <string name="nav_font">Font</string>
+
+    <string name="nav_size">Storlek</string>
+
+    <string name="nav_color">Färg</string>
+
+    <string name="nav_kern">Kern</string>
+
+    <string name="nav_bold">Djärv</string>
+
+    <string name="nav_italic">Kursiv</string>
+
+    <string name="nav_shadow">Skugga</string>
+
+    <string name="nav_eraser">Suddgummi</string>
+
+    <string name="nav_blur">Fläck</string>
+
+    <string name="nav_liquify">Flytande</string>
+
+    <string name="nav_dodge">Undvika</string>
+
+    <string name="nav_burn">Bränna</string>
+
+
+
+    <string name="pro_tip">Proffs tips</string>
+    <string name="double_tap_hint">Dubbeltryck för att byta rotationsaxel.</string>
+    <string name="ok_button">OK</string>
+
+    <string name="generating">ALSTRANDE...</string>
+
+    <string name="stencil_hint">Tryck igen för att lägga till ett lager.</string>
+
+    <string name="rename_hint">Döpa om</string>
+
+    <string name="edit_text_hint">Redigera text</string>
+
+    <string name="copy_edits">Kopiera redigeringar</string>
+
+    <string name="paste_edits">Klistra in redigeringar</string>
+
+    <string name="generate_poster">Skapa affisch</string>
+
+    <string name="duplicate">Duplicera</string>
+
+    <string name="unlink_layer">Ta bort länken lager</string>
+
+    <string name="link_layer">Länklager</string>
+
+    <string name="hide_layer">Dölj lager</string>
+
+    <string name="show_layer">Visa lager</string>
+
+    <string name="flatten_all">Platta till alla</string>
+
+    <string name="delete">Radera</string>
+    <string name="new_project_name">Nytt projekt</string>
+
+    <string name="lock_button">Låsa</string>
+
+    <string name="freeze_button">Frysa</string>
+
+
+    <string name="wall_source_title">Välj Väggfoto</string>
+
+    <string name="wall_source_text">Hur skulle du vilja ställa in bakgrundsväggen?</string>
+
+    <string name="take_photo">Ta foto</string>
+
+    <string name="choose_from_gallery">Välj från Galleri</string>
+
+
+    <string name="depth_unsupported">Den här enheten stöder inte Depth API.\nVäxla till Canvas-läge i Inställningar.</string>
+
+
+    <string name="arcore_required_title">ARCore krävs</string>
+
+    <string name="arcore_required_text">Den här enheten har inte ARCore installerat eller stöds inte. Installera ARCore från Play Butik för att använda AR-funktioner.</string>
+
+    <string name="install_arcore">Installera ARCore</string>
+
+
+    <string name="camera_permission_required">Kameratillstånd krävs för AR-läge.</string>
+
+    <string name="open_settings">Öppna Inställningar</string>
+
+
+    <string name="target_creation_title">MÅLSKAPANDE</string>
+
+    <string name="target_creation_text">Tryck direkt på dina målade referensmärken på skärmen. Appen kommer omedelbart att isolera dem.</string>
+
+    <string name="cancel">Avboka</string>
+
+
+    <string name="diag_copied">KOPIERAD ✓</string>
+
+    <string name="diag_title">DEPTH DIAG (tryck för att kopiera)</string>
+
+    <string name="diag_waiting">Väntar på första bildrutan...</string>
+
+
+    <string name="scan_step_1">Steg 1: Kartlägg din omgivning</string>
+
+    <string name="scan_step_2">Steg 2: Skanna målväggen</string>
+
+
+    <string name="plane_confirm_question">Är konstverket på rätt vägg?</string>
+
+    <string name="looks_correct">Ser korrekt ut</string>
+
+    <string name="redetect">Upptäck igen</string>
+
+
+    <string name="plane_realignment_title">Upptäck väggytan igen</string>
+
+    <string name="plane_realignment_text">Ankaret placeras från där du stod när du fångade. ARCore väljer den spårade vertikala ytan mest direkt framför den ursprungliga positionen.\n\n1. Gå tillbaka till ungefär där du stod under fångsten\n2. Panorera långsamt kameran över väggen så att ARCore kan registrera den som en plan yta\n3. Håll stadigt vänd mot konstverket och tryck sedan på nedan\n\nDen orangea kanten kommer att hoppa till den nyligen upptäckta ytan.</string>
+
+    <string name="use_this_wall">Använd denna vägg</string>
+
+
+    <string name="scanning_dots">Skannas\u2026</string>
+
+    <string name="matched_percent">%1$d%% matchade</string>
+
+    <string name="anchor_locked">Ankare låst</string>
+
+
+    <string name="choose_font">Välj Teckensnitt</string>
+
+
+    <string name="cancel_button">Avboka</string>
+    <string name="done_button">Gjort</string>
+    <string name="apply_button">Tillämpas</string>
+    <string name="close_button">Nära</string>
+    <string name="next_button">Nästa</string>
+    <string name="save_button">Spara</string>
+    <string name="retake_button">Ta om</string>
+    <string name="capture_button">Fånga</string>
+
+
+    <string name="adj_detail">Detalj</string>
+    <string name="adj_opacity">Opacitet</string>
+    <string name="adj_brightness">Ljusstyrka</string>
+    <string name="adj_contrast">Kontrast</string>
+    <string name="adj_saturation">Mättnad</string>
+    <string name="adj_red">Röd</string>
+    <string name="adj_green">Grön</string>
+    <string name="adj_blue">Blå</string>
+    <string name="adj_undo">Ångra</string>
+    <string name="adj_redo">Göra om</string>
+    <string name="adj_magic_align">Magic Align</string>
+
+
+    <string name="status_create_grid">Skapa ett rutnät för att börja.</string>
+    <string name="status_scan_surfaces">Skanna ytor runt dig.</string>
+    <string name="status_tap_surface">Tryck på en yta för att placera ankare.</string>
+    <string name="status_looking_grid">Letar du efter ditt Grid...</string>
+    <string name="status_ready">Redo. (%1$d poäng)</string>
+    <string name="unlock_hint">Tryck 4 gånger för att låsa upp</string>
+
+
+    <string name="lib_app_title">GraffitiXR</string>
+    <string name="lib_app_description">Projicera ditt konstverk på en riktig vägg eller en duk med AR eller en grundläggande kameraöverlägg. \n\nSkapa snabbt en mockup på ett foto för att visa hur det färdiga arbetet kommer att se ut. \n\nEller spåra en bild på papper genom att använda din enhet som en ljuslåda.</string>
+    <string name="lib_new_project">Ny</string>
+    <string name="lib_import_project">Importera</string>
+    <string name="lib_no_projects">Inga projekt ännu</string>
+    <string name="lib_no_projects_hint">Tryck på Ny ovan för att starta din första väggmålning.\n\nDu tas in i redigeraren där du kan:\n  \u2022 Lägg till konstverk från Design-menyn\n  \u2022 Byt till AR-läge för att projicera på en riktig vägg\n  \u2022 Använd Overlay för att flytta din design på livekameran\n  \u2022 Använd Mockup för att förhandsgranska ett väggfoto\n  \u2022 Använd Lightbox för att spåra din design på papper</string>
+    <string name="lib_project_thumbnail">Projektets miniatyrbild</string>
+    <string name="lib_delete_project_desc">Ta bort projekt %1$s</string>
+
+
+    <string name="settings_title">Inställningar</string>
+    <string name="settings_preferences_section">Inställningar</string>
+    <string name="settings_hand_label">Dominant Hand</string>
+    <string name="settings_hand_right">Rätt</string>
+    <string name="settings_hand_left">Vänster</string>
+    <string name="settings_diag_label">Djupdiagnostiköverlägg</string>
+    <string name="settings_on">På</string>
+    <string name="settings_off">Av</string>
+    <string name="settings_scan_mode_label">AR-skanningsläge</string>
+    <string name="settings_scan_mode_point_cloud">Punktmoln</string>
+    <string name="settings_scan_mode_gaussian_splat">Gaussisk Splat</string>
+    <string name="settings_anchor_boundary_label">Visa ankargräns</string>
+    <string name="settings_units_label">Avståndsenheter</string>
+    <string name="settings_units_imperial">Imperial (ft)</string>
+    <string name="settings_units_metric">Metrisk (m)</string>
+    <string name="settings_canvas_bg_label">Canvas bakgrund</string>
+    <string name="settings_info_section">Appinformation</string>
+    <string name="settings_version_label">Version</string>
+    <string name="settings_updates_section">Uppdateringar</string>
+    <string name="settings_check_updates_label">Sök efter experimentella uppdateringar</string>
+    <string name="settings_install_update_label">Installera uppdatering</string>
+    <string name="settings_permissions_section">Behörigheter</string>
+    <string name="settings_camera_access">Kameraåtkomst</string>
+    <string name="settings_photo_access">Tillgång till fotobibliotek</string>
+    <string name="settings_notifications">Aviseringar</string>
+    <string name="settings_granted">Beviljas</string>
+    <string name="settings_denied">Nekad</string>
+    <string name="settings_open_app_settings">Öppna Appinställningar</string>
+    <string name="settings_copyright">GraffitiXR © 2025</string>
+
+
+    <string name="layers_title">Lager</string>
+    <string name="brush_size_title">Borststorlek</string>
+    <string name="save_project_hint">Projektnamn</string>
+
+
+    <string name="target_guide_desc">Målinriktningsguide</string>
+    <string name="target_captured_desc">Fångat mål</string>
+    <string name="target_review_desc">Granska extraherade mål</string>
+    <string name="target_unwarp_hint">Dra i hörnen för att avvika</string>
+    <string name="target_review_title">Granska extraherade markeringar</string>
+
+    <string name="target_exclude">Utesluta</string>
+    <string name="target_include">Omfatta</string>
+    <string name="target_erase_marks">Radera märken</string>
+    <string name="target_show_features">Visa funktioner</string>
+    <string name="reset_button">Återställa</string>
+
+    <string name="poster_title">GENERERA AFFISCH</string>
+    <string name="poster_select_layers">Välj lager att inkludera:</string>
+    <string name="poster_physical_size">Fysisk storlek (bredd i mm):</string>
+    <string name="poster_generate_pdf">GENERERA PDF</string>
+
+
+    <string name="scan_hint_recover">Flytta enheten långsamt för att återställa spårningen</string>
+    <string name="scan_hint_ambient">Vrid långsamt 360° för att kartlägga din omgivning (%1$d°)</string>
+    <string name="scan_hint_too_dark">För mörkt. Slå på ficklampan.</string>
+    <string name="scan_hint_build_map">Gå åt vänster och höger för att bygga en karta</string>
+    <string name="scan_hint_closer">Flytta dig närmare väggen</string>
+    <string name="scan_hint_higher_lower">Skanna högre och lägre</string>
+
+
+    <string name="desc_bg_mockup">Bakgrundsmockup</string>
+    <string name="desc_segmentation_preview">Förhandsgranskning av segmentering</string>
+
+
+
+    <string name="help_mode_host">Mode Switcher: Växla mellan applägen. Instruktioner: Tryck för att expandera och välj sedan AR, Overlay, Mockup eller Lightbox.</string>
+
+    <string name="help_ar">AR-läge: Projicera design på en vägg med hjälp av rumslig kartläggning. Instruktioner: Skanna miljön tills väggen upptäcks, tryck sedan för att placera ankaret.</string>
+
+    <string name="help_overlay">Överlagringsläge: Displaydesign över livekamera utan rumslig spårning. Instruktioner: Skala och flytta motivet manuellt så att det passar din ram.</string>
+
+    <string name="help_mockup">Mockup-läge: Förhandsgranska design på ett statiskt foto. Instruktioner: Använd \'Vägg\' för att ställa in en bakgrundsbild och arrangera sedan lager ovanpå.</string>
+
+    <string name="help_trace">Lightbox-läge: Spårningsyta med hög ljusstyrka. Instruktioner: Lägg papper över skärmen och rita. Tryck tre gånger var som helst för att avsluta.</string>
+
+    <string name="help_target_host">Målhantering: Verktyg för AR-ankare. Instruktioner: Tryck för att komma åt verktyg för att skapa eller justera väggmålningens position.</string>
+
+    <string name="help_scan_mode_toggle">Skanningsupplösning: Växla mellan Mural (stor skala) och Canvas (liten skala). Mural använder Gaussian Splats för väggar; Canvas använder Point Clouds för detaljerad konst i skrivbordsskala.</string>
+
+    <string name="help_create">Skapa ankare: Fotografera ett märke på väggen för att låsa projektionen. Instruktioner: Peka på en distinkt textur och tryck. Appen kommer att spåra detta märke.</string>
+
+    <string name="help_design_host">Lagerhantering: Lägg till bilder, text eller skisser. Instruktioner: Tryck för att expandera. Tryck länge på valfri lagerknapp för att öppna dess sekundära meny.</string>
+
+    <string name="help_add_img">Importera bild: Lägg till en skiss eller referensfoto. Instruktioner: Välj en bild från ditt galleri. Det kommer att visas som ett nytt designlager.</string>
+
+    <string name="help_add_draw">Ny skiss: Lägg till ett tomt lager för frihandsritning. Instruktioner: Välj lagret för att avslöja pensel-, suddgummi- och smutsverktyg.</string>
+
+    <string name="help_add_text">Lägg till text: Skapa ett typografilager. Instruktioner: Tryck på lagrets "Redigera"-knapp för att ändra innehåll och formatering.</string>
+
+    <string name="help_wall">Change Wall: Set background for Mockup mode. Instruktioner: Välj ett foto av den fysiska väggen du planerar att måla på.</string>
+
+    <string name="help_project_host">Projektledning: Spara, ladda och exportera arbete. Instruktioner: Tryck för att komma åt administrativa uppgifter för din väggmålning.</string>
+
+    <string name="help_new">Nytt projekt: Starta en ny väggmålning. Instruktioner: Tryck för att återställa. Varning: Detta rensar allt pågående arbete. Spara först!</string>
+
+    <string name="help_save">Spara projekt: Lagra väggmålning och AR-karta. Instruktioner: Ange ett projektnamn och tryck på Spara för att bevara dina framsteg.</string>
+
+    <string name="help_load">Projektbibliotek: Få tillgång till sparade väggmålningar. Instruktioner: Bläddra i biblioteket för att återuppta arbetet eller importera delade projektfiler.</string>
+
+    <string name="help_export">Exportera bild: Spara högupplöst ögonblicksbild. Instruktioner: Gör alla synliga lager till en enda PNG i ditt fotogalleri.</string>
+
+    <string name="help_settings">Appinställningar: Konfigurera inställningar. Instruktioner: Öppna för att justera handenhet, enheter och skanningsparametrar.</string>
+
+    <string name="help_light">Ficklampa: Växla enhetens LED. Instruktioner: Använd detta för att belysa mörka väggar för bättre AR-spårning.</string>
+
+    <string name="help_lock_trace">Lås/frys: Förhindra oavsiktliga ändringar. Instruktioner: Inaktiverar skärmen i spårningsläge. I andra lägen transformeras låslager.</string>
+
+    <string name="help_help_main">Interaktiv hjälp: Förklarar knappfunktioner. Instruktioner: Tryck för att aktivera (cyan). När du är aktiv trycker du på valfri knapp för att se hjälptexten.</string>
+
+    <string name="help_layer">Lager \'%1$s\': Aktivt väggmålningselement. Instruktioner: Tryck för att välja. Dra knappen upp/ned för att ändra ordning. Förvandla på skärmen med gester.</string>
+
+
+
+    <string name="help_edit_text">Redigera text: Ändra ord i typografiskiktet. Instruktioner: Tryck för att öppna tangentbordet och uppdatera textinnehållet.</string>
+
+    <string name="help_size">Pensel/textstorlek: Justera skala och mjukhet. Instruktioner: Dra upp/ner för storlek. Dra åt vänster/höger för borstfjädring.</string>
+
+    <string name="help_font">Teckensnittsväljare: Välj typografistil. Instruktioner: Tryck för att bläddra bland tillgängliga teckensnitt och tillämpa dem på textlagret.</string>
+
+    <string name="help_color">Färgverktyg: Ställ in aktiv färg. Instruktioner: Dra upp/ner för ljusstyrka, vänster/höger för mättnad. Tryck för fullfärgshjul.</string>
+
+    <string name="help_kern">Text Kerning: Justera bokstavsavstånd. Instruktioner: Dra åt vänster/höger för att skärpa eller lossa textlayouten.</string>
+
+    <string name="help_bold">Fet växling: Tjock teckensnittsvikt. Instruktioner: Tryck för att växla fet stil på det aktiva textlagret.</string>
+
+    <string name="help_italic">Kursiv Växla: Lutande styling. Instruktioner: Tryck för att växla kursiv stil på det aktiva textlagret.</string>
+
+    <string name="help_outline">Textkontur: Teckendrag. Instruktioner: Tryck för att växla en synlig kontur runt texttecknen.</string>
+
+    <string name="help_shadow">Drop Shadow: Textdjup. Instruktioner: Tryck för att växla mellan en mjuk skugga bakom typografin för bättre läsbarhet.</string>
+
+    <string name="help_stencil_gen">Generera stencil: Skapa utskrivbara mallar. Instruktioner: Tryck för att börja generera schabloner i flera lager för den här bilden.</string>
+
+    <string name="help_blend">Blandningsläge: Kompositstil. Instruktioner: Tryck för att växla mellan lägen som Multiplicera, Skärm och Överlägg.</string>
+
+    <string name="help_adj">Bildjusteringar: Finjustera utseendet. Instruktioner: Tryck för att visa skjutreglage för Opacitet, Ljusstyrka, Kontrast och Mättnad.</string>
+
+    <string name="help_invert">Invertera färger: Negativ med hög kontrast. Instruktioner: Tryck för att vända färger. Vita blir svarta och vice versa - användbara för att spåra.</string>
+
+    <string name="help_balance">Färgbalans: RGB-kanalinställning. Instruktioner: Tryck för att visa reglagen för exakt röd, grön och blå justering.</string>
+
+    <string name="help_eraser">Eraser Brush: Ta bort lagerinnehåll. Instruktioner: Måla på skärmen för att radera. Använd knappen "Storlek" för att justera diametern.</string>
+
+    <string name="help_blur">Oskärpa/smutsverktyg: Blanda färger. Instruktioner: Måla över områden för att mjuka upp kanterna eller smeta ihop detaljer.</string>
+
+    <string name="help_liquify">Warp Tool: Omforma design. Instruktioner: Dra på skärmen för att trycka och dra pixlar – perfekt för att justera proportioner.</string>
+
+    <string name="help_dodge">Dodge Tool: Gör områden ljusare. Instruktioner: Måla över delar av lagret för att öka deras luminans.</string>
+
+    <string name="help_burn">Brännverktyg: Gör områden mörkare. Instruktioner: Måla över delar av lagret för att minska deras luminans.</string>
+
+    <string name="help_iso">Isolera ämne: Auto-bakgrundsborttagning. Instruktioner: Tryck för att extrahera huvudmotivet från dess bakgrund med hjälp av AI.</string>
+
+    <string name="help_line">Sketch Outline: Line art-filter. Instruktioner: Tryck för att konvertera fotot till en svart-vit transparent kontur.</string>
+
+    <string name="help_help_layer">Lagerhjälp: Växla information för dessa specifika lagerverktyg. Instruktioner: Tryck för att aktivera. Tryck sedan på valfri verktygsikon för att se vad den gör.</string>
+
+
+
+    <string name="unit_feet">ft</string>
+
+    <string name="unit_centimeters">cm</string>
+
+    <string name="unit_meters">m</string>
+
+    <string name="tut_ar_title">AR-projektion</string>
+    <string name="tut_ar_text">Projicerar din design på en riktig vägg med telefonens djupsensor och rumslig spårning.</string>
+    <string name="tut_ar_step1_title">Steg 1: Skanna</string>
+    <string name="tut_ar_step1_text">Peka på väggen och rör dig långsamt sida till sida. Färgade fläckar visas när motorn kartlägger ytan. Vänta tills fläckarna täcker väggområdet.</string>
+    <string name="tut_ar_step2_title">Steg 2: Tryck för att placera</string>
+    <string name="tut_ar_step2_text">Tryck bara på skärmen. Appen fotograferar väggen, extraherar spårningsfunktioner och låser ankaret direkt.</string>
+    <string name="tut_ar_step3_title">Steg 3: Lägg till ditt konstverk</string>
+    <string name="tut_ar_step3_text">Tryck på "Design" för att komma åt dina lagerverktyg. Använd "Bild" för att importera foton, "Rita" för att skissa eller "Text" för att skriva.</string>
+    <string name="tut_ar_tip_title">Tips: Texture Matters</string>
+    <string name="tut_ar_tip_text">Tomma vita väggar, slät betong och enfärgade ytor kommer inte att spåra. Rikta din ankarpunkt mot graffiti, grov gips eller något tydligt märke.</string>
+
+
+    <string name="tut_overlay_title">Live Overlay</string>
+    <string name="tut_overlay_text">Din design svävar över livekameravyn – ingen ytskanning behövs.</string>
+    <string name="tut_overlay_step1_title">Steg 1: Lägg till ditt konstverk</string>
+    <string name="tut_overlay_step1_text">Tryck på "Design" för att komma åt lagerverktyg. Använd "Bild" för att importera foton, "Rita" för att skissa eller "Text" för att skriva.</string>
+    <string name="tut_overlay_step2_title">Steg 2: Placera den</string>
+    <string name="tut_overlay_step2_text">Nyp för att skala, dra för att flytta om. Överlägget förblir fixerat på din skärm – gå tillbaka för att se hur det passar väggen.</string>
+
+
+    <string name="tut_mockup_title">Fotomodell</string>
+    <string name="tut_mockup_text">Förhandsgranska din design på ett foto innan du någonsin tar upp en pensel.</string>
+    <string name="tut_mockup_step1_title">Steg 1: Ställ in väggen</string>
+    <string name="tut_mockup_step1_text">Öppna "Design" och tryck på "Vägg" för att välja eller ta ett foto av din yta. Gör detta först!</string>
+    <string name="tut_mockup_step2_title">Steg 2: Lägg till ditt konstverk</string>
+    <string name="tut_mockup_step2_text">Använd \'Bild\', \'Rita\' eller \'Text\' för att lägga till lager ovanpå väggen. Nyp och dra till storlek och placera dem.</string>
+
+
+    <string name="tut_trace_title">Lightbox-läge</string>
+    <string name="tut_trace_text">Förvandlar din skärm till en ljus ljuslåda för att spåra din design på papper.</string>
+    <string name="tut_trace_step1_title">Steg 1: Öppna Design Menu</string>
+    <string name="tut_trace_step1_text">Tryck på "Design" för att komma åt lagerverktyg.</string>
+    <string name="tut_trace_step2_title">Steg 2: Lägg till innehåll</string>
+    <string name="tut_trace_step2_text">Använd "Bild" för att importera foton, "Rita" för att skissa eller "Text" för att skriva.</string>
+    <string name="tut_trace_step3_title">Steg 3: Spårning</string>
+    <string name="tut_trace_step3_text">Lägg papper över skärmen och rita. Tryck tre gånger var som helst för att avsluta.</string>
+
+
+    <string name="tut_create_anchor_title">Skapa ankare</string>
+    <string name="tut_create_anchor_text">Låser din projektion till en specifik plats på väggen. När den väl är inställd sitter designen på plats även om du går runt.</string>
+    <string name="tut_surface_req_title">Ytkrav</string>
+    <string name="tut_surface_req_text">Väggen behöver synlig struktur - graffiti, grov gips, tegel eller klistermärken fungerar bra. Släta, tomma eller enfärgade väggar håller inte ett ankare.</string>
+    <string name="tut_blobs_title">Vad klumparna betyder</string>
+    <string name="tut_blobs_text">Efter att du har tryckt, kommer du kort att se gröna blubbar. Det är de spårningsnyckelpunkter som appen extraherade. Fler blobbar = starkare lås.</string>
+    <string name="tut_import_img_title">Importera bild</string>
+    <string name="tut_import_img_text">Lägg till en skiss, foto eller referens från ditt galleri. Det visas som ett nytt lager staplat ovanpå de andra.</string>
+    <string name="tut_scale_pos_title">Skala och position</string>
+    <string name="tut_scale_pos_text">Nyp med två fingrar för att ändra storlek. Dra med ett finger för att flytta. Skiktet fästs mot den projicerade väggytan i AR-läge.</string>
+    <string name="tut_lock_freeze_title">Lås/frys</string>
+    <string name="tut_lock_freeze_text">I Lightbox-läge (spårning): inaktiverar beröring så att du kan lägga papper på skärmen utan att flytta något av misstag.</string>
+    <string name="tut_in_other_modes_title">I andra lägen</string>
+    <string name="tut_in_other_modes_text">I AR-, Overlay- och Mockup-lägen: låser lagertransformeringar så att mönster inte kan flyttas eller skalas av misstag.</string>
+    <string name="tut_stencil_gen_title">Skapa stencil</string>
+    <string name="tut_stencil_gen_text">Konverterar din bild till utskrivbara sprayfärgsschabloner. Varje stencil representerar ett färglager av designen.</string>
+    <string name="tut_how_many_layers_title">Hur många lager?</string>
+    <string name="tut_how_many_layers_text">En 3-färgad design ger 3 stencilark. Fler färger = fler ark. Enkla bilder med hög kontrast ger bästa resultat.</string>
+    <string name="tut_exporting_title">Exporterar</string>
+    <string name="tut_exporting_text">Varje stencil exporteras som en PDF. Skriv ut i 100 % skala (ingen skalning) för att få exakta dimensioner i naturlig storlek.</string>
+    <string name="tut_opacity_brightness_title">Opacitet och ljusstyrka</string>
+    <string name="tut_opacity_brightness_text">Opacitet styr hur transparent lagret är. Ljusstyrkan ändrar den övergripande ljusheten - användbart för att matcha lagret till din väggs ton.</string>
+    <string name="tut_contrast_saturation_title">Kontrast &amp; Mättnad</string>
+    <string name="tut_contrast_saturation_text">Kontrast skiljer mörker från ljus — perfekt för att få stencilkonturer att slå ut. Mättnad styr färgintensiteten; dra till noll för gråskala.</string>
+    <string name="tut_isolate_subject_title">Isolera ämne</string>
+    <string name="tut_isolate_subject_text">Använder AI för att automatiskt ta bort bakgrunden, vilket bara lämnar bildens huvudmotiv.</string>
+    <string name="tut_best_results_title">Bästa resultat</string>
+    <string name="tut_best_results_text">Fungerar bäst på foton med ett tydligt motiv mot en vanlig eller kontrasterande bakgrund. Komplexa scener med upptagen bakgrund kan behöva korrigeras manuellt med suddgummi.</string>
+</resources>
