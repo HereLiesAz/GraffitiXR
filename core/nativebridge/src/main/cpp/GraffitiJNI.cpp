@@ -97,6 +97,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearMap(JNIEnv* e
 }
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativePruneByConfidence(JNIEnv* env, jobject thiz, jfloat threshold) {
+    if (gSlamEngine) gSlamEngine->pruneByConfidence(threshold);
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetViewportSize(JNIEnv* env, jobject thiz, jint width, jint height) {
     if (gSlamEngine) gSlamEngine->setViewportSize(width, height);
 }
@@ -323,6 +328,17 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadModel(JNIEnv* 
 }
 
 JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeImportModel3D(JNIEnv* env, jobject thiz, jstring pathStr) {
+    if (gSlamEngine) {
+        const char* path = env->GetStringUTFChars(pathStr, nullptr);
+        bool ok = gSlamEngine->importModel3D(path);
+        env->ReleaseStringUTFChars(pathStr, path);
+        return ok ? JNI_TRUE : JNI_FALSE;
+    }
+    return JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadSuperPoint(
         JNIEnv* env, jobject thiz, jobject assetManager) {
     if (!gSlamEngine) return JNI_FALSE;
@@ -355,6 +371,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
     }
 }
 
+JNIEXPORT jobject JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallFingerprint(
+        JNIEnv* env, jobject thiz, jobject bitmap, jobject mask, jobject depthBuffer, jint depthW, jint depthH, jint depthStride, jfloatArray intrArray, jfloatArray viewMatArray) {
+    // Legacy method for wall alignment - currently returns null as we use target fingerprints
+    return nullptr;
+}
+
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArtworkFingerprint(
         JNIEnv* env, jobject thiz, jobject bitmap, jobject depthBuffer, jint depthW, jint depthH, jint depthStride, jfloatArray intrArray, jfloatArray viewMatArray) {
@@ -368,6 +391,16 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArtworkFingerpr
         env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
         env->ReleaseFloatArrayElements(viewMatArray, view, JNI_ABORT);
     }
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
+        JNIEnv* env, jobject thiz, jobject bitmap) {
+    cv::Mat frame;
+    bitmapToMat(env, bitmap, frame);
+    if (frame.empty()) return;
+    // Implementation removed for performance, providing empty stub to prevent crash
+    matToBitmap(env, frame, bitmap);
 }
 
 extern "C" JNIEXPORT jstring JNICALL
