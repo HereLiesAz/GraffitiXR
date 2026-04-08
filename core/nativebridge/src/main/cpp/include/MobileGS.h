@@ -11,17 +11,17 @@
 #include <condition_variable>
 #include <GLES3/gl3.h>
 
-// Upgraded Splat Struct (48 bytes)
-struct Splat {
-    float x, y, z;          // Position (12 bytes)
-    float r, g, b, a;       // Color (16 bytes)
-    float confidence;       // SLAM Confidence (4 bytes)
-    float nx, ny, nz;       // Surface Normal (12 bytes)
-    float radius;           // Splat Scale (4 bytes)
-};
-static_assert(sizeof(Splat) == 48, "Splat struct layout changed — update .bin serialization.");
+// ~~~ RESTORED TO MARCH 9TH STABLE ARCHITECTURE ~~~
 
-// Voxel spatial hashing keys
+struct Splat {
+    float x, y, z;          // Position (World Space)
+    float r, g, b, a;       // Color
+    float confidence;       // Persistence
+    float nx, ny, nz;       // Surface Normal
+    float radius;           // Splat Scale
+};
+static_assert(sizeof(Splat) == 48, "Splat struct layout mismatch.");
+
 struct VoxelKey {
     int x, y, z;
     bool operator==(const VoxelKey& other) const {
@@ -44,23 +44,17 @@ public:
     void updateMappingCamera(float* viewMat, float* projMat);
     void updateLightLevel(float level);
     void updateAnchorTransform(float* transformMat);
-    void processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* anchorMat, const float* intrinsics, bool isYuv);
+
+    // Restoration: World-space processing pipeline
+    void processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv);
     void pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv);
 
     void setArCoreTrackingState(bool isTracking);
-
     void restoreWallFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
     void scheduleRelocCheck(const cv::Mat& colorFrame);
-
     void getAnchorTransform(float* outMat16) const;
-
-    void setArtworkFingerprint(const cv::Mat& composite,
-                               const uint8_t* depthData, int depthW, int depthH, int depthStride,
-                               const float* intrinsics4,
-                               const float* viewMat16);
-
+    void setArtworkFingerprint(const cv::Mat& composite, const uint8_t* depthData, int depthW, int depthH, int depthStride, const float* intrinsics4, const float* viewMat16);
     bool loadSuperPoint(const std::vector<uchar>& onnxBytes);
-
     void clearMap();
     void pruneByConfidence(float threshold);
     void setViewportSize(int width, int height);
@@ -69,13 +63,10 @@ public:
 
     int getSplatCount() const { return mPointCount; }
     void setSplatsVisible(bool visible) { mSplatsVisible = visible; }
-
     float getPaintingProgress() const { return mPaintingProgress.load(std::memory_order_relaxed); }
 
     void saveModel(const std::string& path);
     void loadModel(const std::string& path);
-
-    // NEW: Imports an external .obj point cloud into the Voxel Hash Map
     bool importModel3D(const std::string& path);
 
     void draw();
@@ -88,7 +79,6 @@ private:
     void initShaders();
 
     std::mutex mMapMutex;
-
     void mapThreadFunc();
     struct FrameData {
         cv::Mat depth;
@@ -96,7 +86,6 @@ private:
         bool isYuv = false;
         float viewMatrix[16];
         float projMatrix[16];
-        float anchorMatrix[16];
         float intrinsics[4];
         bool hasIntrinsics = false;
     };
@@ -108,12 +97,10 @@ private:
 
     void sortThreadFunc();
     cv::Point3f getCameraWorldPosition() const;
-
     void interpolateAnchorStep();
 
     void relocThreadFunc();
     void runPnPMatch(const cv::Mat& frame);
-
     void tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, const float* viewMat, const float* projMat);
 
     mutable std::mutex mMutex;
@@ -121,12 +108,10 @@ private:
 
     cv::Ptr<cv::ORB> mFeatureDetector;
     cv::Ptr<cv::DescriptorMatcher> mMatcher;
-
     SuperPointDetector mSuperPoint;
 
     cv::Mat mWallDescriptors;
     std::vector<cv::Point3f> mWallKeypoints3D;
-
     cv::Mat mArtworkDescriptors;
     std::vector<cv::Point3f> mArtworkKeypoints3D;
     std::atomic<float> mPaintingProgress{0.0f};
@@ -199,7 +184,7 @@ private:
 
     int mScreenWidth = 1920;
     int mScreenHeight = 1080;
-    float mVoxelSize = 0.005f;
+    float mVoxelSize = 0.02f; // Restored to 20mm for stability
 
-    static constexpr float MIN_RENDER_CONFIDENCE = 0.6f;
+    static constexpr float MIN_RENDER_CONFIDENCE = 0.1f; // Restored for immediate feedback
 };

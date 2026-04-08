@@ -16,9 +16,6 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "GraffitiJNI", __VA_ARGS__)
-
-std::string gLastSplatTrace;
-#define SPLAT_TRACE(fmt, ...) do {     char _buf[256];     snprintf(_buf, sizeof(_buf), fmt, ##__VA_ARGS__);     LOGI("SPLAT_PIPE: %s", _buf);     gLastSplatTrace += std::string(_buf) + "\n"; } while(0)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI", __VA_ARGS__)
 
 extern JavaVM* gJvm;
@@ -47,7 +44,7 @@ struct JniThreadAttacher {
     }
 };
 
-// --- SPLAT SHADERS (UPGRADED TO DENSE SURFELS) ---
+// --- RESTORED MARCH 9TH GAUSSIAN SHADERS ---
 static const char* kVertexShader =
         "#version 300 es\n"
         "layout(location = 0) in vec3 aPosition;\n"
@@ -60,41 +57,33 @@ static const char* kVertexShader =
         "uniform float uFocalY;\n"
         "out vec4 vColor;\n"
         "out float vNdotV;\n"
-        "out float vConfidence;\n"
         "void main() {\n"
         "  vec4 clip = uMvp * vec4(aPosition, 1.0);\n"
         "  gl_Position = clip;\n"
         "  vec3 viewDir = normalize(uCameraPos - aPosition);\n"
         "  vNdotV = abs(dot(aNormal, viewDir));\n"
+        "  // RESTORATION: Using physical scale model from stable version\n"
         "  float diameter = (aRadius * 2.0 * 1.414) * uFocalY / clip.w;\n"
         "  float confScale = 0.5 + (0.5 * aConfidence);\n"
-        "  gl_PointSize = clamp(diameter * confScale, 2.0, 256.0);\n"
+        "  gl_PointSize = clamp(diameter * confScale, 4.0, 256.0);\n"
         "  vColor = aColor;\n"
-        "  vConfidence = aConfidence;\n"
         "}\n";
 
-static std::string getFragmentShaderSource(float minConfidence) {
-    char buffer[1024];
-    snprintf(buffer, sizeof(buffer),
+static const char* kFragmentShader =
         "#version 300 es\n"
         "precision mediump float;\n"
         "in vec4 vColor;\n"
         "in float vNdotV;\n"
-        "in float vConfidence;\n"
         "out vec4 oColor;\n"
         "void main() {\n"
-        "  // MANDATE: Render only confident surfaces\n"
-        "  if (vConfidence < %f) discard;\n"
         "  vec2 d = gl_PointCoord - 0.5;\n"
         "  float r2 = dot(d, d) * 4.0;\n"
-        "  // MANDATE: Hard-edged opaque circles\n"
         "  if (r2 > 1.0) discard;\n"
-        "  float shading = 0.8 + 0.2 * vNdotV;\n"
-        "  oColor = vec4(vColor.rgb * shading, 1.0);\n"
-        "  gl_FragDepth = gl_FragCoord.z + (r2 * 0.001);\n"
-        "}\n", minConfidence);
-    return std::string(buffer);
-}
+        "  // RESTORATION: Soft Gaussian falloff\n"
+        "  float alpha = exp(-4.0 * r2);\n"
+        "  float finalAlpha = alpha * vColor.a * vNdotV * 0.9;\n"
+        "  oColor = vec4(vColor.rgb, finalAlpha);\n"
+        "}\n";
 
 // --- MESH (WIREFRAME) SHADERS ---
 static const char* kMeshVertexShader =
@@ -175,11 +164,7 @@ void MobileGS::initialize(int width, int height) {
 
 void MobileGS::initGl() {
     std::lock_guard<std::mutex> lock(mMutex);
-    if (mProgram != 0) {
-        LOGI("MobileGS GL re-initialized. Purging old handles.");
-        mProgram = 0; mPointVbo = 0; mIndexVbo = 0;
-        mMeshProgram = 0; mMeshVbo = 0; mMeshIbo = 0;
-    }
+    if (mProgram != 0) return;
     initShaders();
     LOGI("MobileGS GL initialized");
 }
@@ -238,8 +223,7 @@ void MobileGS::destroy() {
 
 void MobileGS::initShaders() {
     GLuint vertexShader = compileShader(GL_VERTEX_SHADER, kVertexShader);
-    std::string fragSource = getFragmentShaderSource(MIN_RENDER_CONFIDENCE);
-    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, fragSource.c_str());
+    GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, kFragmentShader);
     if (vertexShader && fragmentShader) {
         mProgram = glCreateProgram();
         glAttachShader(mProgram, vertexShader);
@@ -332,7 +316,6 @@ void MobileGS::setVoxelSize(float size) {
     if (std::abs(mVoxelSize - size) < 1e-6f) return;
     mVoxelSize = size;
 
-    // Re-hash existing points into the new voxel grid resolution
     std::lock_guard<std::mutex> mapLock(mMapMutex);
     mVoxelGrid.clear();
     for (size_t i = 0; i < splatData.size(); ++i) {
@@ -344,7 +327,6 @@ void MobileGS::setVoxelSize(float size) {
         };
         mVoxelGrid[key] = i;
     }
-    LOGI("Voxel size adjusted to %.4f. Grid re-hashed.", size);
 }
 
 cv::Point3f MobileGS::getCameraWorldPosition() const {
@@ -365,7 +347,7 @@ void MobileGS::sortThreadFunc() {
 
     while (mSortRunning) {
         std::vector<cv::Point3f> positions;
-        cv::Point3f camPosLocal;
+        cv::Point3f camPos;
         int currentCount = 0;
 
         {
@@ -375,10 +357,7 @@ void MobileGS::sortThreadFunc() {
 
             {
                 std::lock_guard<std::mutex> mainLock(mMutex);
-                cv::Point3f camPosWorld = getCameraWorldPosition();
-                glm::mat4 invA = glm::inverse(glm::make_mat4(mAnchorMatrix));
-                glm::vec4 local = invA * glm::vec4(camPosWorld.x, camPosWorld.y, camPosWorld.z, 1.0f);
-                camPosLocal = cv::Point3f(local.x, local.y, local.z);
+                camPos = getCameraWorldPosition();
             }
 
             {
@@ -394,40 +373,12 @@ void MobileGS::sortThreadFunc() {
 
         if (currentCount == 0) continue;
 
-        // Perform basic culling: ignore points behind the camera or too far (> 15m) to reduce GPU draw calls and sorting overhead.
-        std::vector<uint32_t> indices;
-        indices.reserve(currentCount);
-
-        glm::vec3 camFwdLocal;
-        {
-            std::lock_guard<std::mutex> lock(mMutex);
-            glm::mat4 V = glm::make_mat4(mViewMatrix);
-            glm::mat4 A = glm::make_mat4(mAnchorMatrix);
-            glm::mat4 VA = V * A;
-            // Camera forward in local space is -Z of View*Anchor
-            // VA is Local-to-Camera. Camera-to-Local is (VA)_inv.
-            // Camera -Z in local space:
-            glm::mat4 camToLocal = glm::inverse(VA);
-            glm::vec4 fwd = camToLocal * glm::vec4(0, 0, -1, 0);
-            camFwdLocal = glm::vec3(fwd);
-        }
-
-        {
-            std::lock_guard<std::mutex> mapLock(mMapMutex);
-            for (int i = 0; i < currentCount; ++i) {
-                if (splatData[i].confidence < MIN_RENDER_CONFIDENCE) continue;
-                glm::vec3 p(positions[i].x, positions[i].y, positions[i].z);
-                glm::vec3 delta = p - glm::vec3(camPosLocal.x, camPosLocal.y, camPosLocal.z);
-                float distSq = glm::dot(delta, delta);
-                if (distSq > 225.0f) continue; // Further than 15m
-                if (glm::dot(delta, camFwdLocal) < -0.5f) continue; // Far behind the camera (0.5m buffer)
-                indices.push_back(i);
-            }
-        }
+        std::vector<uint32_t> indices(currentCount);
+        std::iota(indices.begin(), indices.end(), 0);
 
         std::sort(indices.begin(), indices.end(), [&](uint32_t a, uint32_t b) {
-            cv::Point3f da = positions[a] - camPosLocal;
-            cv::Point3f db = positions[b] - camPosLocal;
+            cv::Point3f da = positions[a] - camPos;
+            cv::Point3f db = positions[b] - camPos;
             return (da.x*da.x + da.y*da.y + da.z*da.z) > (db.x*db.x + db.y*db.y + db.z*db.z);
         });
 
@@ -439,6 +390,29 @@ void MobileGS::sortThreadFunc() {
     }
 }
 
+// RESTORATION: March 9th World-Space Transform
+static void camToWorld(const float* V, float xc, float yc, float zc,
+                       float& xw, float& yw, float& zw) {
+    float tx = V[12], ty = V[13], tz = V[14];
+    float r00 = V[0], r10 = V[1], r20 = V[2];
+    float r01 = V[4], r11 = V[5], r21 = V[6];
+    float r02 = V[8], r12 = V[9], r22 = V[10];
+
+    float camX = -(r00*tx + r10*ty + r20*tz);
+    float camY = -(r01*tx + r11*ty + r21*tz);
+    float camZ = -(r02*tx + r12*ty + r22*tz);
+
+    xw = r00*xc + r01*yc + r02*zc + camX;
+    yw = r10*xc + r11*yc + r12*zc + camY;
+    zw = r20*xc + r21*yc + r22*zc + camZ;
+}
+
+static void camToWorldNormal(const float* V, float nxc, float nyc, float nzc,
+                             float& nxw, float& nyw, float& nzw) {
+    nxw = V[0]*nxc + V[4]*nyc + V[8]*nzc;
+    nyw = V[1]*nxc + V[5]*nyc + V[9]*nzc;
+    nzw = V[2]*nxc + V[6]*nyc + V[10]*nzc;
+}
 
 void MobileGS::interpolateAnchorStep() {
     if (!mAnchorInterpolating) return;
@@ -476,7 +450,7 @@ void MobileGS::scheduleRelocCheck(const cv::Mat& colorFrame) {
 }
 
 void MobileGS::relocThreadFunc() {
-    setpriority(PRIO_PROCESS, 0, 15); // Reduced priority to minimize interference with high-speed rendering threads
+    setpriority(PRIO_PROCESS, 0, 15);
     JniThreadAttacher attacher;
 
     while (mRelocRunning) {
@@ -636,14 +610,6 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
     }
     if (allDescs.empty()) return;
 
-    int cellW = gray.cols / 3;
-    int cellH = gray.rows / 3;
-    auto isPeripheral = [&](const cv::KeyPoint& kp) {
-        int col = std::min((int)(kp.pt.x / cellW), 2);
-        int row = std::min((int)(kp.pt.y / cellH), 2);
-        return !(row == 1 && col == 1);
-    };
-
     const float* V = viewMat;
     const float halfW_fp = depth.cols / 2.0f;
     const float halfH_fp = depth.rows / 2.0f;
@@ -652,17 +618,12 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
     const float cx_fp = ( projMat[8]  + 1.0f) * halfW_fp;
     const float cy_fp = (-projMat[9]  + 1.0f) * halfH_fp;
 
-    glm::mat4 invV = glm::inverse(glm::make_mat4(V));
-
     std::vector<cv::Point3f> newPts;
     cv::Mat newDescs;
 
     for (int i = 0; i < (int)allKps.size(); ++i) {
-        const cv::KeyPoint& kp = allKps[i];
-        if (!isPeripheral(kp)) continue;
-
-        int u = (int)kp.pt.x;
-        int v = (int)kp.pt.y;
+        int u = (int)allKps[i].pt.x;
+        int v = (int)allKps[i].pt.y;
         if (u < 0 || u >= depth.cols || v < 0 || v >= depth.rows) continue;
 
         float d = depth.at<float>(v, u);
@@ -672,43 +633,27 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
         float yc = -(v - cy_fp) * d / fy_fp;
         float zc = -d;
 
-        glm::vec4 p_world = invV * glm::vec4(xc, yc, zc, 1.0f);
+        float xw, yw, zw;
+        camToWorld(V, xc, yc, zc, xw, yw, zw);
 
-        newPts.push_back(cv::Point3f(p_world.x, p_world.y, p_world.z));
+        newPts.push_back(cv::Point3f(xw, yw, zw));
         newDescs.push_back(allDescs.row(i));
     }
 
     if (newPts.empty()) return;
 
     std::lock_guard<std::mutex> lock(mMutex);
-
-    bool misaligned = !mWallDescriptors.empty() &&
-                      (mWallKeypoints3D.size() != (size_t)mWallDescriptors.rows);
-    if (misaligned || (usedSP && !mWallDescriptors.empty() && mWallDescriptors.type() == CV_8U)) {
-        mWallDescriptors = cv::Mat();
-        mWallKeypoints3D.clear();
-    }
-
     mWallKeypoints3D.insert(mWallKeypoints3D.end(), newPts.begin(), newPts.end());
-
     if (mWallDescriptors.empty()) {
         mWallDescriptors = newDescs.clone();
-    } else {
-        if (mWallDescriptors.type() == newDescs.type()) {
-            cv::vconcat(mWallDescriptors, newDescs, mWallDescriptors);
-        } else {
-            mWallDescriptors = newDescs.clone();
-            mWallKeypoints3D = newPts;
-        }
+    } else if (mWallDescriptors.type() == newDescs.type()) {
+        cv::vconcat(mWallDescriptors, newDescs, mWallDescriptors);
     }
 
     if (mWallKeypoints3D.size() > MAX_FINGERPRINT_KEYPOINTS) {
         size_t excess = mWallKeypoints3D.size() - MAX_FINGERPRINT_KEYPOINTS;
-        mWallKeypoints3D.erase(mWallKeypoints3D.begin(),
-                                 mWallKeypoints3D.begin() + excess);
-        mWallDescriptors = mWallDescriptors
-                .rowRange((int)excess, mWallDescriptors.rows)
-                .clone();
+        mWallKeypoints3D.erase(mWallKeypoints3D.begin(), mWallKeypoints3D.begin() + excess);
+        mWallDescriptors = mWallDescriptors.rowRange((int)excess, mWallDescriptors.rows).clone();
     }
 }
 
@@ -725,10 +670,6 @@ void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float
         data.isYuv = isYuv;
         memcpy(data.viewMatrix, viewMat, 16 * sizeof(float));
         memcpy(data.projMatrix, projMat, 16 * sizeof(float));
-        {
-            std::lock_guard<std::mutex> mainLock(mMutex);
-            memcpy(data.anchorMatrix, mAnchorMatrix, 16 * sizeof(float));
-        }
         if (intrinsics) {
             memcpy(data.intrinsics, intrinsics, 4 * sizeof(float));
             data.hasIntrinsics = true;
@@ -741,7 +682,7 @@ void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float
 }
 
 void MobileGS::mapThreadFunc() {
-    setpriority(PRIO_PROCESS, 0, 15); // Reduced priority to minimize interference with high-speed rendering threads
+    setpriority(PRIO_PROCESS, 0, 15);
     JniThreadAttacher attacher;
     while (mMapRunning) {
         FrameData frame;
@@ -752,23 +693,21 @@ void MobileGS::mapThreadFunc() {
             frame = std::move(mFrameQueue.front());
             mFrameQueue.erase(mFrameQueue.begin());
         }
-        processDepthFrame(frame.depth, frame.color, frame.viewMatrix, frame.projMatrix, frame.anchorMatrix,
+        processDepthFrame(frame.depth, frame.color, frame.viewMatrix, frame.projMatrix,
                           frame.hasIntrinsics ? frame.intrinsics : nullptr, frame.isYuv);
     }
 }
 
-void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* anchorMat, const float* intrinsics, bool isYuv) {
+// RESTORATION: Stable World-Space Pipeline
+void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv) {
     auto startTime = std::chrono::high_resolution_clock::now();
     bool isTrackingState = false;
     {
         std::lock_guard<std::mutex> lock(mMutex);
-        gLastSplatTrace.clear();
-        if (depth.empty()) { return; }
-        if (color.empty()) { return; }
-        if (!mCameraReady) { return; }
+        if (depth.empty() || color.empty() || !mCameraReady) return;
         isTrackingState = mIsArCoreTracking;
     }
-    if (!isTrackingState) { return; }
+    if (!isTrackingState) return;
 
     cv::Mat colorRGB;
     if (isYuv) {
@@ -777,78 +716,48 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         colorRGB = color;
     }
 
-    // MANDATE: Coordinate Transformation Pipeline
-    // 1. Unproject from raw sensor depth (Landscape) using physical intrinsics
-    // 2. Transform to World Space using physical camera pose (MappingViewMatrix)
-    // 3. Transform to Anchor-Local Space for drift-locked storage
-    glm::mat4 V_inv = glm::inverse(glm::make_mat4(viewMat));
-    glm::mat4 A_inv = glm::inverse(glm::make_mat4(anchorMat));
-    glm::mat4 camToLocal = A_inv * V_inv;
-    glm::mat3 normalCamToLocal = glm::mat3(camToLocal);
+    const float* V = viewMat;
 
-    float fx_px, fy_px, cx_px, cy_px;
+    // RESTORATION: Recover intrinsics from projection matrix (Stability fallback)
+    const float halfW = depth.cols / 2.0f;
+    const float halfH = depth.rows / 2.0f;
+    float fx_px = projMat[0] * halfW;
+    float fy_px = projMat[5] * halfH;
+    float cx_px = (projMat[8]  + 1.0f) * halfW;
+    float cy_px = (-projMat[9] + 1.0f) * halfH;
+
     if (intrinsics) {
-        fx_px = intrinsics[0];
-        fy_px = intrinsics[1];
-        cx_px = intrinsics[2];
-        cy_px = intrinsics[3];
-    } else {
-        const float halfW = depth.cols / 2.0f;
-        const float halfH = depth.rows / 2.0f;
-        fx_px = projMat[0] * halfW;
-        fy_px = projMat[5] * halfH;
-        cx_px = (projMat[8]  + 1.0f) * halfW;
-        cy_px = (-projMat[9] + 1.0f) * halfH;
+        fx_px = intrinsics[0]; fy_px = intrinsics[1];
+        cx_px = intrinsics[2]; cy_px = intrinsics[3];
     }
 
     const float scaleX = (float)colorRGB.cols / depth.cols;
     const float scaleY = (float)colorRGB.rows / depth.rows;
 
     bool mapModified = false;
-    int step = (depth.cols > 320) ? 2 : 1;
-    if (mVoxelSize < 0.004f) step = 1;
+    int step = 8; // Stable density
 
     auto unproject = [&](int r, int c, float d) {
-        return glm::vec3(
-                (static_cast<float>(c) - cx_px) * d / fx_px,
-                -(static_cast<float>(r) - cy_px) * d / fy_px, // MANDATE: Y-flip for OpenGL Camera Space
+        return cv::Point3f(
+                (c - cx_px) * d / fx_px,
+                -(r - cy_px) * d / fy_px, // Y-UP flip
                 -d
         );
     };
 
     std::vector<std::pair<VoxelKey, Splat>> newVoxelUpdates;
-    newVoxelUpdates.reserve((depth.rows / step) * (depth.cols / step));
-
     for (int r = 0; r < depth.rows - step; r += step) {
-        const float* depthRow = depth.ptr<float>(r);
-        const float* depthRowD = depth.ptr<float>(r + step);
-
         for (int c = 0; c < depth.cols - step; c += step) {
-            float d = depthRow[c];
-            float d_r = depthRow[c + step];
-            float d_d = depthRowD[c];
-
-            if (d > 0.1f && d < 5.0f && d_r > 0.1f && d_d > 0.1f) {
-                glm::vec3 p_cam = unproject(r, c, d);
-                glm::vec3 p_r_cam = unproject(r, c + step, d_r);
-                glm::vec3 p_d_cam = unproject(r + step, c, d_d);
-
-                glm::vec3 v1 = p_r_cam - p_cam;
-                glm::vec3 v2 = p_d_cam - p_cam;
-                glm::vec3 n_cam = glm::normalize(glm::cross(v1, v2));
-
-                if (glm::dot(n_cam, p_cam) > 0) n_cam = -n_cam;
-
-                glm::vec4 p_local = camToLocal * glm::vec4(p_cam, 1.0f);
-                glm::vec3 n_local = normalCamToLocal * n_cam;
-
-                float localRadius = std::max(glm::length(v1), glm::length(v2)) * 0.707f;
-                localRadius = std::clamp(localRadius, mVoxelSize * 0.5f, mVoxelSize * 5.0f);
+            float d = depth.at<float>(r, c);
+            if (d > 0.1f && d < 5.0f) {
+                cv::Point3f p_cam = unproject(r, c, d);
+                float xw, yw, zw;
+                camToWorld(V, p_cam.x, p_cam.y, p_cam.z, xw, yw, zw);
 
                 VoxelKey key{
-                        static_cast<int>(std::floor(p_local.x / mVoxelSize)),
-                        static_cast<int>(std::floor(p_local.y / mVoxelSize)),
-                        static_cast<int>(std::floor(p_local.z / mVoxelSize))
+                        static_cast<int>(std::floor(xw / mVoxelSize)),
+                        static_cast<int>(std::floor(yw / mVoxelSize)),
+                        static_cast<int>(std::floor(zw / mVoxelSize))
                 };
 
                 int colorR = static_cast<int>(r * scaleY);
@@ -858,7 +767,8 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 cv::Vec3b col = colorRGB.at<cv::Vec3b>(colorR, colorC);
                 float r_f = col[0]/255.0f, g_f = col[1]/255.0f, b_f = col[2]/255.0f;
 
-                newVoxelUpdates.push_back({key, {p_local.x, p_local.y, p_local.z, r_f, g_f, b_f, 1.0f, 0.2f, n_local.x, n_local.y, n_local.z, localRadius}});
+                // Radius 1.5f + NORMAL + confidence 0.2f
+                newVoxelUpdates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.2f, 0.0f, 0.0f, 1.0f, 1.5f}});
                 mapModified = true;
             }
         }
@@ -871,49 +781,26 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
             if (it != mVoxelGrid.end()) {
                 Splat& s = splatData[it->second];
                 const Splat& nu = update.second;
-
-                float colorDist = std::abs(s.r - nu.r) + std::abs(s.g - nu.g) + std::abs(s.b - nu.b);
-                float alpha = s.confidence / (s.confidence + 1.0f);
-
-                if (colorDist > 0.8f) {
-                    s.confidence *= 0.5f;
-                    alpha = 0.2f;
-                }
-
-                s.x = s.x * alpha + nu.x * (1.0f - alpha);
-                s.y = s.y * alpha + nu.y * (1.0f - alpha);
-                s.z = s.z * alpha + nu.z * (1.0f - alpha);
-                s.r = s.r * alpha + nu.r * (1.0f - alpha);
-                s.g = s.g * alpha + nu.g * (1.0f - alpha);
-                s.b = s.b * alpha + nu.b * (1.0f - alpha);
-
-                s.nx = s.nx * alpha + nu.nx * (1.0f - alpha);
-                s.ny = s.ny * alpha + nu.ny * (1.0f - alpha);
-                s.nz = s.nz * alpha + nu.nz * (1.0f - alpha);
-                float len = std::sqrt(s.nx*s.nx + s.ny*s.ny + s.nz*s.nz);
-                if(len > 0) { s.nx/=len; s.ny/=len; s.nz/=len; }
-
-                s.radius = s.radius * alpha + nu.radius * (1.0f - alpha);
-
-                float confGain = (mVoxelSize < 0.004f) ? 0.12f : 0.05f;
-                s.confidence = std::min(1.0f, s.confidence + confGain);
+                float alpha = 0.1f; // Slow averaging for high stability
+                s.x = s.x * (1.0f-alpha) + nu.x * alpha;
+                s.y = s.y * (1.0f-alpha) + nu.y * alpha;
+                s.z = s.z * (1.0f-alpha) + nu.z * alpha;
+                s.r = s.r * (1.0f-alpha) + nu.r * alpha;
+                s.g = s.g * (1.0f-alpha) + nu.g * alpha;
+                s.b = s.b * (1.0f-alpha) + nu.b * alpha;
+                s.confidence = std::min(1.0f, s.confidence + 0.05f); // RESTORED: Conf build-up
             } else {
-                Splat s = update.second;
-                s.confidence = 0.2f; // Increased initial confidence
-                splatData.push_back(s);
+                splatData.push_back(update.second);
                 mVoxelGrid[update.first] = splatData.size() - 1;
             }
         }
-
-        if (splatData.size() >= MAX_SPLATS) {
-            pruneMap();
-        }
+        if (splatData.size() >= MAX_SPLATS) pruneMap();
         mPointCount = static_cast<int>(splatData.size());
     }
 
+    // Mesh vertices in World Space
     std::vector<float> meshVertices;
     std::vector<uint32_t> meshIndices;
-
     int gridW = depth.cols / step;
     int gridH = depth.rows / step;
     std::vector<int> vIndex(gridW * gridH, -1);
@@ -922,13 +809,13 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         for (int c = 0; c < depth.cols - step; c += step) {
             float d = depth.at<float>(r, c);
             if (d > 0.1f && d < 5.0f) {
-                glm::vec3 p_cam = unproject(r, c, d);
-                glm::vec4 p_local = camToLocal * glm::vec4(p_cam, 1.0f);
-
+                cv::Point3f p_cam = unproject(r, c, d);
+                float xw, yw, zw;
+                camToWorld(V, p_cam.x, p_cam.y, p_cam.z, xw, yw, zw);
                 int idx = meshVertices.size() / 3;
-                meshVertices.push_back(p_local.x);
-                meshVertices.push_back(p_local.y);
-                meshVertices.push_back(p_local.z);
+                meshVertices.push_back(xw);
+                meshVertices.push_back(yw);
+                meshVertices.push_back(zw);
                 vIndex[(r / step) * gridW + (c / step)] = idx;
             }
         }
@@ -939,100 +826,48 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
             int idx = vIndex[r * gridW + c];
             int right = vIndex[r * gridW + c + 1];
             int down = vIndex[(r + 1) * gridW + c];
-
             if (idx != -1) {
-                if (right != -1) {
-                    meshIndices.push_back(idx);
-                    meshIndices.push_back(right);
-                }
-                if (down != -1) {
-                    meshIndices.push_back(idx);
-                    meshIndices.push_back(down);
-                }
+                if (right != -1) { meshIndices.push_back(idx); meshIndices.push_back(right); }
+                if (down != -1) { meshIndices.push_back(idx); meshIndices.push_back(down); }
             }
         }
     }
 
     std::vector<Splat> localSplatCopy;
-    if (mapModified) {
-        std::lock_guard<std::mutex> mapLock(mMapMutex);
-        localSplatCopy = splatData;
-    }
+    if (mapModified) { localSplatCopy = splatData; }
 
     {
         std::lock_guard<std::mutex> glLock(mGlDataMutex);
-        if (mapModified) {
-            mPendingSplatData = std::move(localSplatCopy);
-        }
+        if (mapModified) mPendingSplatData = std::move(localSplatCopy);
         mPendingMeshVertices = std::move(meshVertices);
         mPendingMeshIndices = std::move(meshIndices);
         mGlDataDirty = true;
     }
 
-    ++mFrameCounter;
-    // First sort fires after 10 frames so indices are ready quickly;
-    // subsequent sorts fire every 30 frames (~2s at 15Hz depth feed).
-    const bool doSort = (mFrameCounter == 10) || (mFrameCounter > 10 && (mFrameCounter % 30 == 0));
-    if (doSort) {
+    if (++mFrameCounter % 30 == 0) {
         continuousOptimize();
-        {
-            std::lock_guard<std::mutex> sortLock(mSortMutex);
-            mSortRequested = true;
-        }
+        { std::lock_guard<std::mutex> sortLock(mSortMutex); mSortRequested = true; }
         mSortCv.notify_one();
-    }
-
-    if (isTrackingState && (mFrameCounter - mLastFingerprintUpdateFrame) >= FINGERPRINT_UPDATE_INTERVAL) {
-        {
-            std::lock_guard<std::mutex> lk(mRelocMutex);
-            mFingerprintColorFrame = colorRGB.clone();
-            mFingerprintDepthFrame = depth.clone();
-            memcpy(mFingerprintViewMatrix, viewMat, 16 * sizeof(float));
-            memcpy(mFingerprintProjMatrix, projMat, 16 * sizeof(float));
-            mFingerprintRequested = true;
-        }
-        mRelocCv.notify_one();
-        mLastFingerprintUpdateFrame = mFrameCounter;
-    }
-
-    auto endTime = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
-    if (mFrameCounter % 100 == 0) {
-        LOGI("MobileGS: processDepthFrame took %lld ms (avg over last 100 frames)", duration);
     }
 }
 
 void MobileGS::continuousOptimize() {
     std::lock_guard<std::mutex> mapLock(mMapMutex);
     if (splatData.empty()) return;
-
     bool needsRebuild = false;
     size_t validCount = 0;
-
     for (size_t i = 0; i < splatData.size(); i++) {
-        // TUNE: Slower decay for dense surfaces
-        float decay = (mVoxelSize < 0.004f) ? 0.0005f : 0.002f;
-        splatData[i].confidence -= decay;
-
+        splatData[i].confidence -= 0.005f; // RESTORED: Slow decay
         if (splatData[i].confidence > 0.0f) {
-            if (validCount != i) {
-                splatData[validCount] = splatData[i];
-            }
+            if (validCount != i) splatData[validCount] = splatData[i];
             validCount++;
-        } else {
-            needsRebuild = true;
-        }
+        } else { needsRebuild = true; }
     }
-
     if (needsRebuild) {
         splatData.resize(validCount);
         mVoxelGrid.clear();
         for (size_t i = 0; i < splatData.size(); ++i) {
-            VoxelKey key{
-                    static_cast<int>(std::floor(splatData[i].x / mVoxelSize)),
-                    static_cast<int>(std::floor(splatData[i].y / mVoxelSize)),
-                    static_cast<int>(std::floor(splatData[i].z / mVoxelSize))
-            };
+            VoxelKey key{ (int)(splatData[i].x / mVoxelSize), (int)(splatData[i].y / mVoxelSize), (int)(splatData[i].z / mVoxelSize) };
             mVoxelGrid[key] = i;
         }
         mPointCount = static_cast<int>(validCount);
@@ -1041,34 +876,19 @@ void MobileGS::continuousOptimize() {
 
 void MobileGS::pruneMap() {
     if (splatData.size() < MAX_SPLATS) return;
-
     const size_t evictCount = MAX_SPLATS / 10;
-    const size_t keepCount = splatData.size() - evictCount;
-
-    std::nth_element(splatData.begin(),
-                     splatData.begin() + keepCount,
-                     splatData.end(),[](const Splat& a, const Splat& b) {
-                return a.confidence > b.confidence;
-            });
-
-    splatData.resize(keepCount);
-
+    std::partial_sort(splatData.begin(), splatData.begin() + evictCount, splatData.end(),
+                      [](const Splat& a, const Splat& b) { return a.confidence < b.confidence; });
+    splatData.erase(splatData.begin(), splatData.begin() + evictCount);
     mVoxelGrid.clear();
     for (size_t i = 0; i < splatData.size(); ++i) {
-        const auto& s = splatData[i];
-        VoxelKey key{
-                static_cast<int>(std::floor(s.x / mVoxelSize)),
-                static_cast<int>(std::floor(s.y / mVoxelSize)),
-                static_cast<int>(std::floor(s.z / mVoxelSize))
-        };
+        VoxelKey key{ (int)(splatData[i].x / mVoxelSize), (int)(splatData[i].y / mVoxelSize), (int)(splatData[i].z / mVoxelSize) };
         mVoxelGrid[key] = i;
     }
 }
 
 void MobileGS::pruneByConfidence(float threshold) {
     std::lock_guard<std::mutex> mapLock(mMapMutex);
-    if (splatData.empty()) return;
-
     size_t validCount = 0;
     for (size_t i = 0; i < splatData.size(); i++) {
         if (splatData[i].confidence >= threshold) {
@@ -1076,17 +896,10 @@ void MobileGS::pruneByConfidence(float threshold) {
             validCount++;
         }
     }
-
-    if (validCount == splatData.size()) return;
-
     splatData.resize(validCount);
     mVoxelGrid.clear();
     for (size_t i = 0; i < splatData.size(); ++i) {
-        VoxelKey key{
-                static_cast<int>(std::floor(splatData[i].x / mVoxelSize)),
-                static_cast<int>(std::floor(splatData[i].y / mVoxelSize)),
-                static_cast<int>(std::floor(splatData[i].z / mVoxelSize))
-        };
+        VoxelKey key{ (int)(splatData[i].x / mVoxelSize), (int)(splatData[i].y / mVoxelSize), (int)(splatData[i].z / mVoxelSize) };
         mVoxelGrid[key] = i;
     }
     mPointCount = static_cast<int>(validCount);
@@ -1107,15 +920,12 @@ void MobileGS::updateMappingCamera(float* viewMat, float* projMat) {
 
 void MobileGS::updateLightLevel(float level) {
     std::lock_guard<std::mutex> lock(mMutex);
-
     float normalizedLight = std::clamp(level, 0.0f, 1.0f);
     int orbThreshold = (normalizedLight < 0.2f) ? 10 : (normalizedLight > 0.8f ? 45 : 31);
-
     static int lastThreshold = -1;
     if (orbThreshold != lastThreshold) {
         mFeatureDetector = cv::ORB::create(500, 1.2f, 8, orbThreshold);
         lastThreshold = orbThreshold;
-        LOGI("Sensitivity adjusted: light=%.2f, new ORB threshold=%d", level, orbThreshold);
     }
 }
 
@@ -1125,9 +935,7 @@ void MobileGS::restoreWallFingerprint(const cv::Mat& descriptors, const std::vec
     mWallKeypoints3D = points3d;
 }
 
-bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) {
-    return mSuperPoint.load(onnxBytes);
-}
+bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) { return mSuperPoint.load(onnxBytes); }
 
 void MobileGS::updateAnchorTransform(float* transformMat) {
     std::lock_guard<std::mutex> lock(mMutex);
@@ -1139,354 +947,126 @@ void MobileGS::getAnchorTransform(float* outMat16) const {
     memcpy(outMat16, mAnchorMatrix, 16 * sizeof(float));
 }
 
-void MobileGS::setArtworkFingerprint(const cv::Mat& composite,
-                                     const uint8_t* depthData, int depthW, int depthH, int depthStride,
-                                     const float* intrinsics4,
-                                     const float* viewMat16) {
+void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* depthData, int depthW, int depthH, int depthStride, const float* intrinsics4, const float* viewMat16) {
     if (composite.empty() || !depthData) return;
-
-    cv::Mat gray;
-    if (composite.channels() == 4) {
-        cv::cvtColor(composite, gray, cv::COLOR_RGBA2GRAY);
-    } else if (composite.channels() == 3) {
-        cv::cvtColor(composite, gray, cv::COLOR_RGB2GRAY);
-    } else {
-        gray = composite;
-    }
-
-    std::vector<cv::KeyPoint> kps;
-    cv::Mat descs;
+    cv::Mat gray; cv::cvtColor(composite, gray, cv::COLOR_RGBA2GRAY);
+    std::vector<cv::KeyPoint> kps; cv::Mat descs;
     cv::ORB::create(500)->detectAndCompute(gray, cv::noArray(), kps, descs);
     if (descs.empty()) return;
-
-    const float fx = intrinsics4[0], fy = intrinsics4[1];
-    const float cx = intrinsics4[2], cy = intrinsics4[3];
-    const float scaleX = (float)depthW / composite.cols;
-    const float scaleY = (float)depthH / composite.rows;
-
-    glm::mat4 invV = glm::inverse(glm::make_mat4(viewMat16));
-
-    std::vector<cv::Point3f> newPts;
-    cv::Mat newDescs;
-
+    const float fx = intrinsics4[0], fy = intrinsics4[1], cx = intrinsics4[2], cy = intrinsics4[3];
+    const float scaleX = (float)depthW / composite.cols, scaleY = (float)depthH / composite.rows;
+    std::vector<cv::Point3f> newPts; cv::Mat newDescs;
     for (int i = 0; i < (int)kps.size(); ++i) {
-        int du = (int)(kps[i].pt.x * scaleX);
-        int dv = (int)(kps[i].pt.y * scaleY);
+        int du = (int)(kps[i].pt.x * scaleX), dv = (int)(kps[i].pt.y * scaleY);
         if (du < 0 || du >= depthW || dv < 0 || dv >= depthH) continue;
-
-        const uint16_t raw = *reinterpret_cast<const uint16_t*>(
-                depthData + dv * depthStride + du * 2);
-        const uint16_t depthMm = raw & 0x1FFFu;
-        if (depthMm == 0) continue;
-
-        float d = depthMm / 1000.0f;
-        if (d > 5.0f) continue;
-
-        float u = kps[i].pt.x;
-        float v = kps[i].pt.y;
-        float xc = (u - cx) * d / fx;
-        float yc = -(v - cy) * d / fy;
-        float zc = -d;
-
-        glm::vec4 p_world = invV * glm::vec4(xc, yc, zc, 1.0f);
-        newPts.push_back(cv::Point3f(p_world.x, p_world.y, p_world.z));
-        newDescs.push_back(descs.row(i));
+        const uint16_t raw = *reinterpret_cast<const uint16_t*>(depthData + dv * depthStride + du * 2);
+        const uint16_t depthMm = raw & 0x1FFFu; if (depthMm == 0) continue;
+        float d = depthMm / 1000.0f; if (d > 5.0f) continue;
+        float xc = (kps[i].pt.x - cx) * d / fx, yc = -(kps[i].pt.y - cy) * d / fy, zc = -d;
+        float xw, yw, zw; camToWorld(viewMat16, xc, yc, zc, xw, yw, zw);
+        newPts.push_back(cv::Point3f(xw, yw, zw)); newDescs.push_back(descs.row(i));
     }
-
     if (newPts.empty()) return;
-
     std::lock_guard<std::mutex> lock(mMutex);
-    mArtworkDescriptors = newDescs.clone();
-    mArtworkKeypoints3D = newPts;
+    mArtworkDescriptors = newDescs.clone(); mArtworkKeypoints3D = newPts;
     mPaintingProgress.store(0.0f, std::memory_order_relaxed);
 }
 
 void MobileGS::saveModel(const std::string& path) {
     std::lock_guard<std::mutex> lock(mMutex);
-    std::ofstream out(path, std::ios::binary);
-    if (!out) return;
-
-    char magic[4] = {'G','X','R','M'};
-    out.write(magic, 4);
-    int version = 3;
-    out.write((char*)&version, 4);
-    int numSplats = splatData.size();
-    out.write((char*)&numSplats, 4);
-    int keyframes = 0;
-    out.write((char*)&keyframes, 4);
-
+    std::ofstream out(path, std::ios::binary); if (!out) return;
+    out.write("GXRM", 4); int version = 3; out.write((char*)&version, 4);
+    int numSplats = splatData.size(); out.write((char*)&numSplats, 4);
+    int keyframes = 0; out.write((char*)&keyframes, 4);
     out.write((char*)splatData.data(), numSplats * sizeof(Splat));
     out.write((char*)mAnchorMatrix, 16 * sizeof(float));
-    out.close();
 }
 
 void MobileGS::loadModel(const std::string& path) {
     std::lock_guard<std::mutex> lock(mMutex);
-    std::ifstream in(path, std::ios::binary);
-    if (!in) return;
-
-    char magic[4];
-    in.read(magic, 4);
-    if (strncmp(magic, "GXRM", 4) != 0) return;
-
-    int version, numSplats, keyframes;
-    in.read((char*)&version, 4);
-    in.read((char*)&numSplats, 4);
-    in.read((char*)&keyframes, 4);
-
-    if (version == 3) {
-        splatData.resize(numSplats);
-        in.read((char*)splatData.data(), numSplats * sizeof(Splat));
-    } else if (version == 2) {
-        struct LegacySplat { float x,y,z, r,g,b,a, conf; };
-        std::vector<LegacySplat> legacy(numSplats);
-        in.read((char*)legacy.data(), numSplats * sizeof(LegacySplat));
-        splatData.resize(numSplats);
-        for(int i=0; i<numSplats; i++) {
-            splatData[i] = {legacy[i].x, legacy[i].y, legacy[i].z,
-                            legacy[i].r, legacy[i].g, legacy[i].b, legacy[i].a,
-                            legacy[i].conf,
-                            0.0f, 0.0f, 1.0f, 1.0f};
-        }
-    } else {
-        return;
+    std::ifstream in(path, std::ios::binary); if (!in) return;
+    char magic[4]; in.read(magic, 4); if (strncmp(magic, "GXRM", 4) != 0) return;
+    int v, ns, kf; in.read((char*)&v, 4); in.read((char*)&ns, 4); in.read((char*)&kf, 4);
+    splatData.resize(ns); in.read((char*)splatData.data(), ns * sizeof(Splat));
+    in.read((char*)mAnchorMatrix, 16 * sizeof(float)); mPointCount = ns;
+    std::lock_guard<std::mutex> mapLock(mMapMutex); mVoxelGrid.clear();
+    for (size_t i = 0; i < splatData.size(); ++i) {
+        VoxelKey key{ (int)(splatData[i].x / mVoxelSize), (int)(splatData[i].y / mVoxelSize), (int)(splatData[i].z / mVoxelSize) };
+        mVoxelGrid[key] = i;
     }
-
-    in.read((char*)mAnchorMatrix, 16 * sizeof(float));
-    in.close();
-
-    mPointCount = numSplats;
-    {
-        std::lock_guard<std::mutex> mapLock(mMapMutex);
-        mVoxelGrid.clear();
-        for (size_t i = 0; i < splatData.size(); ++i) {
-            const auto& s = splatData[i];
-            VoxelKey key{
-                    static_cast<int>(std::floor(s.x / mVoxelSize)),
-                    static_cast<int>(std::floor(s.y / mVoxelSize)),
-                    static_cast<int>(std::floor(s.z / mVoxelSize))
-            };
-            mVoxelGrid[key] = i;
-        }
-    }
-
-    std::lock_guard<std::mutex> glLock(mGlDataMutex);
-    mPendingSplatData = splatData;
-    mGlDataDirty = true;
+    std::lock_guard<std::mutex> glLock(mGlDataMutex); mPendingSplatData = splatData; mGlDataDirty = true;
 }
 
-bool MobileGS::importModel3D(const std::string& path) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    std::ifstream file(path);
-    if (!file.is_open()) {
-        LOGE("Failed to open .obj file for import: %s", path.c_str());
-        return false;
-    }
-
-    std::string line;
-    bool mapModified = false;
-    std::vector<Splat> newSplats;
-
-    // Simple .obj parser for vertex ingestion (point clouds)
-    while (std::getline(file, line)) {
-        if (line.length() > 2 && line.substr(0, 2) == "v ") {
-            float x, y, z;
-            if (sscanf(line.c_str(), "v %f %f %f", &x, &y, &z) == 3) {
-                Splat s;
-                s.x = x; s.y = y; s.z = z;
-                s.r = 1.0f; s.g = 1.0f; s.b = 1.0f; s.a = 1.0f; // Default solid white point cloud
-                s.confidence = 1.0f;
-                s.nx = 0.0f; s.ny = 0.0f; s.nz = 1.0f;
-                s.radius = mVoxelSize;
-                newSplats.push_back(s);
-            }
-        }
-    }
-
-    if (!newSplats.empty()) {
-        std::lock_guard<std::mutex> mapLock(mMapMutex);
-        for (const auto& s : newSplats) {
-            if (splatData.size() >= MAX_SPLATS) {
-                pruneMap(); // ensure we have space for the incoming points
-            }
-            if (splatData.size() < MAX_SPLATS) {
-                splatData.push_back(s);
-                VoxelKey key{
-                        static_cast<int>(std::floor(s.x / mVoxelSize)),
-                        static_cast<int>(std::floor(s.y / mVoxelSize)),
-                        static_cast<int>(std::floor(s.z / mVoxelSize))
-                };
-                mVoxelGrid[key] = splatData.size() - 1;
-                mapModified = true;
-            }
-        }
-        mPointCount = static_cast<int>(splatData.size());
-        LOGI("Imported %zu points from %s", newSplats.size(), path.c_str());
-    }
-
-    if (mapModified) {
-        std::lock_guard<std::mutex> glLock(mGlDataMutex);
-        mPendingSplatData = splatData;
-        mGlDataDirty = true;
-    }
-
-    return mapModified;
-}
+bool MobileGS::importModel3D(const std::string& path) { return false; }
 
 void MobileGS::draw() {
     std::vector<Splat> uploadSplats;
     std::vector<float> uploadMeshVerts;
     std::vector<uint32_t> uploadMeshInds;
     bool doUploadGl = false;
-
     {
         std::lock_guard<std::mutex> glLock(mGlDataMutex);
         if (mGlDataDirty) {
             uploadSplats = std::move(mPendingSplatData);
             uploadMeshVerts = std::move(mPendingMeshVertices);
             uploadMeshInds = std::move(mPendingMeshIndices);
-            doUploadGl = true;
-            mGlDataDirty = false;
+            doUploadGl = true; mGlDataDirty = false;
         }
     }
-
     if (doUploadGl) {
-        if (mPointVbo != 0 && !uploadSplats.empty()) {
-            glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
-            glBufferData(GL_ARRAY_BUFFER, uploadSplats.size() * sizeof(Splat), uploadSplats.data(), GL_DYNAMIC_DRAW);
-            glBindBuffer(GL_ARRAY_BUFFER, 0);
-        }
-
-        if (mMeshVbo != 0) {
-            if (!uploadMeshVerts.empty()) {
-                glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo);
-                glBufferData(GL_ARRAY_BUFFER, uploadMeshVerts.size() * sizeof(float), uploadMeshVerts.data(), GL_DYNAMIC_DRAW);
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mMeshIbo);
-                glBufferData(GL_ELEMENT_ARRAY_BUFFER, uploadMeshInds.size() * sizeof(uint32_t), uploadMeshInds.data(), GL_DYNAMIC_DRAW);
-                glBindBuffer(GL_ARRAY_BUFFER, 0);
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-                mMeshIndexCount = uploadMeshInds.size();
-            } else {
-                mMeshIndexCount = 0;
-            }
-        }
+        if (mPointVbo && !uploadSplats.empty()) { glBindBuffer(GL_ARRAY_BUFFER, mPointVbo); glBufferData(GL_ARRAY_BUFFER, uploadSplats.size() * sizeof(Splat), uploadSplats.data(), GL_DYNAMIC_DRAW); }
+        if (mMeshVbo && !uploadMeshVerts.empty()) { glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo); glBufferData(GL_ARRAY_BUFFER, uploadMeshVerts.size() * sizeof(float), uploadMeshVerts.data(), GL_DYNAMIC_DRAW); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mMeshIbo); glBufferData(GL_ELEMENT_ARRAY_BUFFER, uploadMeshInds.size() * sizeof(uint32_t), uploadMeshInds.data(), GL_DYNAMIC_DRAW); mMeshIndexCount = uploadMeshInds.size(); }
     }
-
     std::lock_guard<std::mutex> lock(mMutex);
     interpolateAnchorStep();
-
     if (!mProgram || !mCameraReady) return;
-
-    std::vector<uint32_t> uploadIndices;
-    bool doUploadIndices = false;
-    int elementsToDraw = 0;
-
     {
         std::lock_guard<std::mutex> sortLock(mSortMutex);
-        if (mIndicesDirty) {
-            uploadIndices = mDrawIndices;
-            doUploadIndices = true;
-            mIndicesDirty = false;
-        }
-        elementsToDraw = std::min(mPointCount.load(), static_cast<int>(mDrawIndices.size()));
+        if (mIndicesDirty) { glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexVbo); glBufferData(GL_ELEMENT_ARRAY_BUFFER, mDrawIndices.size() * sizeof(uint32_t), mDrawIndices.data(), GL_DYNAMIC_DRAW); mIndicesDirty = false; }
     }
-
-    if (doUploadIndices && mIndexVbo != 0) {
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexVbo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, uploadIndices.size() * sizeof(uint32_t), uploadIndices.data(), GL_DYNAMIC_DRAW);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    }
-
     glm::mat4 V = glm::make_mat4(mViewMatrix);
     glm::mat4 A = glm::make_mat4(mAnchorMatrix);
     glm::mat4 P = glm::make_mat4(mProjMatrix);
-
     glm::mat4 mvp = P * V * A;
-    glm::mat4 meshMvp = mvp; // MANDATE: Mesh must align with local surfels
+    glm::mat4 meshMvp = P * V;
 
     if (mSplatsVisible && mPointCount > 0) {
         glUseProgram(mProgram);
-
-        GLint mvpLoc = glGetUniformLocation(mProgram, "uMvp");
-        glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, glm::value_ptr(mvp));
-
+        glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMvp"), 1, GL_FALSE, glm::value_ptr(mvp));
         cv::Point3f camPos = getCameraWorldPosition();
-        glm::vec4 camPosLocal = glm::inverse(A) * glm::vec4(camPos.x, camPos.y, camPos.z, 1.0f);
-        GLint camLoc = glGetUniformLocation(mProgram, "uCameraPos");
-        glUniform3f(camLoc, camPosLocal.x, camPosLocal.y, camPosLocal.z);
-
-        GLint focalLoc = glGetUniformLocation(mProgram, "uFocalY");
-        float focalY = std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f);
-        glUniform1f(focalLoc, focalY);
-
-        glDisable(GL_BLEND); // MANDATE: Dense Opaque Surfels
-        glDepthMask(GL_TRUE);
-        glEnable(GL_DEPTH_TEST);
-
-        glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
-
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)0);
-
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(12));
-
-        glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(28));
-
-        glEnableVertexAttribArray(3);
-        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(32));
-
-        glEnableVertexAttribArray(4);
-        glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(44));
-
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexVbo);
-
-        if (elementsToDraw > 0) {
-            glDrawElements(GL_POINTS, elementsToDraw, GL_UNSIGNED_INT, (void*)0);
-        } else {
-            // Sorted indices not ready yet — draw all splats unsorted as fallback
-            // so the scene isn't blank while the first sort is in progress.
-            glDrawArrays(GL_POINTS, 0, mPointCount);
-        }
-
-        glDisableVertexAttribArray(0);
-        glDisableVertexAttribArray(1);
-        glDisableVertexAttribArray(2);
-        glDisableVertexAttribArray(3);
-        glDisableVertexAttribArray(4);
-
-        glDepthMask(GL_TRUE);
-        glDisable(GL_BLEND);
-    }
-
-    if (mMeshProgram != 0 && mMeshIndexCount > 0) {
-        glUseProgram(mMeshProgram);
-
-        GLint meshMvpLoc = glGetUniformLocation(mMeshProgram, "uMvp");
-        glUniformMatrix4fv(meshMvpLoc, 1, GL_FALSE, glm::value_ptr(meshMvp));
-
-        GLint colorLoc = glGetUniformLocation(mMeshProgram, "uColor");
-        glUniform4f(colorLoc, 0.0f, 1.0f, 1.0f, 0.2f);
+        glUniform3f(glGetUniformLocation(mProgram, "uCameraPos"), camPos.x, camPos.y, camPos.z);
+        glUniform1f(glGetUniformLocation(mProgram, "uFocalY"), std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f));
 
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glDepthMask(GL_FALSE);
+        glEnable(GL_DEPTH_TEST);
 
-        glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+        glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
+        glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)0);
+        glEnableVertexAttribArray(1); glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(12));
+        glEnableVertexAttribArray(2); glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(28));
+        glEnableVertexAttribArray(3); glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(32));
+        glEnableVertexAttribArray(4); glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(44));
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mMeshIbo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexVbo);
+        int elementsToDraw = std::min(mPointCount.load(), (int)mDrawIndices.size());
+        if (elementsToDraw > 0) glDrawElements(GL_POINTS, elementsToDraw, GL_UNSIGNED_INT, (void*)0);
+        else glDrawArrays(GL_POINTS, 0, mPointCount);
 
-        glLineWidth(2.0f);
-        glDrawElements(GL_LINES, mMeshIndexCount, GL_UNSIGNED_INT, (void*)0);
-
-        glDisableVertexAttribArray(0);
-        glDisable(GL_BLEND);
-        glDepthMask(GL_TRUE);
+        glDisableVertexAttribArray(0); glDisableVertexAttribArray(1); glDisableVertexAttribArray(2); glDisableVertexAttribArray(3); glDisableVertexAttribArray(4);
+        glDepthMask(GL_TRUE); glDisable(GL_BLEND);
     }
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    if (mMeshProgram != 0 && mMeshIndexCount > 0) {
+        glUseProgram(mMeshProgram);
+        glUniformMatrix4fv(glGetUniformLocation(mMeshProgram, "uMvp"), 1, GL_FALSE, glm::value_ptr(meshMvp));
+        glUniform4f(glGetUniformLocation(mMeshProgram, "uColor"), 0.0f, 1.0f, 1.0f, 0.2f);
+        glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(GL_FALSE);
+        glBindBuffer(GL_ARRAY_BUFFER, mMeshVbo); glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mMeshIbo); glDrawElements(GL_LINES, mMeshIndexCount, GL_UNSIGNED_INT, (void*)0);
+        glDisableVertexAttribArray(0); glDisable(GL_BLEND); glDepthMask(GL_TRUE);
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, 0); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }

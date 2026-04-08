@@ -18,13 +18,17 @@ The engine operates on a **Sparse Voxel Hashing** system.
 
 ### Coordinate System & Storage
 
-**CRITICAL MANDATE: Sensor-Native Pipeline**
-1.  **Ingestion**: Depth maps are fed in **Sensor-Native (Landscape)** orientation. Do NOT rotate depth maps in JNI.
-2.  **Unprojection**: Use physical sensor intrinsics (fx, fy, cx, cy) scaled to the depth resolution.
-3.  **Transformation**: Use the **Physical Camera Pose** (`MappingViewMatrix` in Kotlin, which is `camera.pose.inverse()`) to transform from Camera Space to World Space.
-4.  **Storage**: Points MUST be stored in **Anchor-Local Space** to ensure they are immune to ARCore world-origin drift.
-    *   `Local_Point = inverse(Anchor_from_World) * camera_pose_landscape * Camera_Space_Point`
-5.  **Rendering**: Use `MVP = Display_Projection * Display_View * Anchor_from_World`. This correctly handles display rotation during the final rasterization stage.
+**CRITICAL MANDATE: World-Space Pipeline (Restored Stable Version)**
+1.  **Ingestion**: Depth maps are processed in their raw orientation.
+2.  **Unprojection**: Uses pixel-space intrinsics recovered from the OpenGL projection matrix or physical sensor parameters.
+    *   `xc = (c_px - cx_px) * depth / fx_px`
+    *   `yc = -(r_px - cy_px) * depth / fy_px` (MANDATORY Y-FLIP)
+3.  **Transformation**: Stored points use **World Space** positions. 
+    *   `World_Point = inverse(View_Matrix) * Camera_Space_Point`
+4.  **Storage**: Voxel hashing operates on world coordinates with a 20mm resolution (`VOXEL_SIZE = 0.02f`).
+5.  **Rendering**: Uses Gaussian Splatting with soft feathered edges and additive/alpha blending for a "Perfect" visual look. 
+    *   `MVP = Projection * View * Anchor_Matrix`
+    *   Alpha falloff: `exp(-4.0 * r2)`
 
 ## Sensor Input Pipeline
 
