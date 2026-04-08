@@ -11,5 +11,6 @@ data class DashboardUiState(
     val isLoading: Boolean = false,
     val updateStatusMessage: String? = null,
     val isCheckingForUpdate: Boolean = false,
-    val pendingUpdateApkUrl: String? = null
+    val pendingUpdateApkUrl: String? = null,
+    val showNewProjectDialog: Boolean = false
 )

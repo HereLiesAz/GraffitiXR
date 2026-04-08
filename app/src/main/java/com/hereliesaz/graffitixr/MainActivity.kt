@@ -149,6 +149,7 @@ class MainActivity : ComponentActivity() {
     var posterSourceLayerId by mutableStateOf<String?>(null)
     var hasCameraPermission by mutableStateOf(false)
     var showWallSourceDialog by mutableStateOf(false)
+    var isExporting by mutableStateOf(false)
 
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p ->
         hasCameraPermission = p[Manifest.permission.CAMERA] ?: false
@@ -183,10 +184,12 @@ class MainActivity : ComponentActivity() {
                 val cameraController = rememberCameraController()
 
                 var cameraUri by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
+                var showHelp by remember { mutableStateOf(false) }
 
                 val editorUiState by editorViewModel.uiState.collectAsState()
                 val mainUiState by mainViewModel.uiState.collectAsState()
                 val arUiState by arViewModel.uiState.collectAsState()
+                val dashboardUiState by dashboardViewModel.uiState.collectAsState()
                 val dashboardNavigation by dashboardViewModel.navigationTrigger.collectAsState()
                 val completedTutorials by settingsViewModel.completedTutorials.collectAsState()
                 val language by settingsViewModel.language.collectAsState()
@@ -313,7 +316,8 @@ class MainActivity : ComponentActivity() {
                         !mainUiState.isTouchLocked &&
                         !mainUiState.isCapturingTarget &&
                         !mainUiState.planeConfirmationPending &&
-                        !showSettings
+                        !showSettings &&
+                        !isExporting
 
                 var permissionRequestedAtLeastOnce by remember { mutableStateOf(hasCameraPermission) }
 
@@ -483,12 +487,13 @@ class MainActivity : ComponentActivity() {
                     )
                     azConfig(
                         packButtons = true,
-                        dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT
+                        dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT,
+                        noMenu = !isRailVisible
                     )
                     azAdvanced(
-                        helpEnabled = true,
+                        helpEnabled = showHelp,
                         helpList = activeHelpList,
-                        onDismissHelp = { },
+                        onDismissHelp = { showHelp = false },
                         tutorials = tutorials
                     )
 
@@ -499,7 +504,9 @@ class MainActivity : ComponentActivity() {
                             navItemColor = navItemColor,
                             onShowFontPicker = { layerId -> fontPickerLayerId = layerId; showFontPicker = true },
                             layerMenusOpen = layerMenusOpen,
-                            showLibrary = showLibrary
+                            showLibrary = showLibrary,
+                            showHelp = showHelp,
+                            onHelpToggle = { showHelp = !showHelp }
                         )
                     }
 
@@ -530,25 +537,33 @@ class MainActivity : ComponentActivity() {
                     }
 
                     onscreen {
+                        if (isExporting) return@onscreen
+
                         // Auto-show the mode tutorial on first visit using the v8.0 controller API.
                         // DataStore (completedTutorials) persists "seen" state across app restarts.
                         // showLibrary is included as a key so the effect re-fires when the library
                         // closes — without this guard the tutorial fires while the library is still
                         // covering the editor, marking it "complete" before the user ever sees it.
                         val tutorialController = LocalAzTutorialController.current
-                        LaunchedEffect(editorUiState.editorMode, completedTutorials, showLibrary) {
+                        LaunchedEffect(editorUiState.editorMode, showLibrary, completedTutorials) {
                             if (showLibrary) return@LaunchedEffect
-                            val tutorialId = when (editorUiState.editorMode) {
-                                EditorMode.AR      -> "ar_mode"
-                                EditorMode.OVERLAY -> "overlay_mode"
-                                EditorMode.MOCKUP  -> "mockup_mode"
-                                EditorMode.TRACE   -> "trace_mode"
-                                else               -> null
-                            }
-                            val key = "tut_${editorUiState.editorMode.name.lowercase()}"
-                            if (tutorialId != null && key !in completedTutorials) {
-                                tutorialController.startTutorial(tutorialId)
-                                settingsViewModel.markTutorialComplete(key)
+
+                            val noLayers = editorUiState.layers.isEmpty()
+                            val noAnchor = !arUiState.isAnchorEstablished
+
+                            if (noLayers && (editorUiState.editorMode != EditorMode.AR || noAnchor)) {
+                                val tutorialId = when (editorUiState.editorMode) {
+                                    EditorMode.AR      -> "ar_mode"
+                                    EditorMode.OVERLAY -> "overlay_mode"
+                                    EditorMode.MOCKUP  -> "mockup_mode"
+                                    EditorMode.TRACE   -> "trace_mode"
+                                    else               -> null
+                                }
+                                val key = "tut_${editorUiState.editorMode.name.lowercase()}"
+                                if (tutorialId != null && key !in completedTutorials) {
+                                    tutorialController.startTutorial(tutorialId)
+                                    settingsViewModel.markTutorialComplete(key)
+                                }
                             }
                         }
 
@@ -823,6 +838,18 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
+                            if (dashboardUiState.showNewProjectDialog) {
+                                SaveProjectDialog(
+                                    initialName = stringResource(DesignR.string.new_project_name),
+                                    onDismissRequest = { dashboardViewModel.dismissNewProjectDialog() },
+                                    onSaveRequest = { name ->
+                                        dashboardViewModel.onCreateProject(name, editorUiState.isRightHanded)
+                                        showLibrary = false
+                                    },
+                                    strings = strings
+                                )
+                            }
+
                             if (showFontPicker) {
                                 FontPickerDialog(
                                     onFontSelected = { fontName ->
@@ -881,8 +908,7 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onDeleteProject = { dashboardViewModel.deleteProject(it) },
                                     onNewProject = {
-                                        dashboardViewModel.onNewProject(editorUiState.isRightHanded)
-                                        showLibrary = false
+                                        dashboardViewModel.onNewProjectTriggered()
                                     },
                                     onImportProject = { uri ->
                                         dashboardViewModel.importProject(uri)
@@ -969,7 +995,9 @@ class MainActivity : ComponentActivity() {
         navItemColor: Color = Color.White,
         onShowFontPicker: (String) -> Unit = {},
         layerMenusOpen: MutableMap<String, Boolean>,
-        showLibrary: Boolean
+        showLibrary: Boolean,
+        showHelp: Boolean,
+        onHelpToggle: () -> Unit
     ) {
         val navStrings = strings.nav
         val requestPermissions = {
@@ -1044,8 +1072,7 @@ class MainActivity : ComponentActivity() {
 
         azRailHostItem(id = "project_host", text = navStrings.project, color = navItemColor, info = navStrings.projectInfo)
         azRailSubItem(id = "new", hostId = "project_host", text = navStrings.new, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.newInfo) {
-            dashboardViewModel.onNewProject(editorUiState.isRightHanded)
-            this@MainActivity.showLibrary = false
+            dashboardViewModel.onNewProjectTriggered()
         }
         azRailSubItem(id = "save", hostId = "project_host", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.saveInfo) {
             showSaveDialog = true
@@ -1485,7 +1512,17 @@ class MainActivity : ComponentActivity() {
             azRailItem(id = "lock_trace", text = lockText, color = navItemColor, info = navStrings.lockInfo, onClick = lockAction)
         }
 
-        azHelpRailItem(id = "help_main", text = navStrings.help, color = navItemColor, shape = AzButtonShape.RECTANGLE)
+        azDivider()
+
+        azRailItem(
+            id = "help_main",
+            text = navStrings.help,
+            color = if (showHelp) Cyan else navItemColor,
+            shape = AzButtonShape.RECTANGLE,
+            info = navStrings.helpInfo
+        ) {
+            onHelpToggle()
+        }
     }
 }
 

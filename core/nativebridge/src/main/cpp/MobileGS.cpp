@@ -364,7 +364,7 @@ void MobileGS::sortThreadFunc() {
 
     while (mSortRunning) {
         std::vector<cv::Point3f> positions;
-        cv::Point3f camPos;
+        cv::Point3f camPosLocal;
         int currentCount = 0;
 
         {
@@ -374,7 +374,10 @@ void MobileGS::sortThreadFunc() {
 
             {
                 std::lock_guard<std::mutex> mainLock(mMutex);
-                camPos = getCameraWorldPosition();
+                cv::Point3f camPosWorld = getCameraWorldPosition();
+                glm::mat4 invA = glm::inverse(glm::make_mat4(mAnchorMatrix));
+                glm::vec4 local = invA * glm::vec4(camPosWorld.x, camPosWorld.y, camPosWorld.z, 1.0f);
+                camPosLocal = cv::Point3f(local.x, local.y, local.z);
             }
 
             {
@@ -394,25 +397,36 @@ void MobileGS::sortThreadFunc() {
         std::vector<uint32_t> indices;
         indices.reserve(currentCount);
 
-        glm::vec3 camFwd = -glm::vec3(mViewMatrix[8], mViewMatrix[9], mViewMatrix[10]);
-        glm::vec3 camPosVec = glm::vec3(camPos.x, camPos.y, camPos.z);
+        glm::vec3 camFwdLocal;
+        {
+            std::lock_guard<std::mutex> lock(mMutex);
+            glm::mat4 V = glm::make_mat4(mViewMatrix);
+            glm::mat4 A = glm::make_mat4(mAnchorMatrix);
+            glm::mat4 VA = V * A;
+            // Camera forward in local space is -Z of View*Anchor
+            // VA is Local-to-Camera. Camera-to-Local is (VA)_inv.
+            // Camera -Z in local space:
+            glm::mat4 camToLocal = glm::inverse(VA);
+            glm::vec4 fwd = camToLocal * glm::vec4(0, 0, -1, 0);
+            camFwdLocal = glm::vec3(fwd);
+        }
 
         {
             std::lock_guard<std::mutex> mapLock(mMapMutex);
             for (int i = 0; i < currentCount; ++i) {
                 if (splatData[i].confidence < MIN_RENDER_CONFIDENCE) continue;
                 glm::vec3 p(positions[i].x, positions[i].y, positions[i].z);
-                glm::vec3 delta = p - camPosVec;
+                glm::vec3 delta = p - glm::vec3(camPosLocal.x, camPosLocal.y, camPosLocal.z);
                 float distSq = glm::dot(delta, delta);
                 if (distSq > 225.0f) continue; // Further than 15m
-                if (glm::dot(delta, camFwd) < -0.5f) continue; // Far behind the camera (0.5m buffer)
+                if (glm::dot(delta, camFwdLocal) < -0.5f) continue; // Far behind the camera (0.5m buffer)
                 indices.push_back(i);
             }
         }
 
         std::sort(indices.begin(), indices.end(), [&](uint32_t a, uint32_t b) {
-            cv::Point3f da = positions[a] - camPos;
-            cv::Point3f db = positions[b] - camPos;
+            cv::Point3f da = positions[a] - camPosLocal;
+            cv::Point3f db = positions[b] - camPosLocal;
             return (da.x*da.x + da.y*da.y + da.z*da.z) > (db.x*db.x + db.y*db.y + db.z*db.z);
         });
 
@@ -726,6 +740,10 @@ void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float
         data.isYuv = isYuv;
         memcpy(data.viewMatrix, viewMat, 16 * sizeof(float));
         memcpy(data.projMatrix, projMat, 16 * sizeof(float));
+        {
+            std::lock_guard<std::mutex> mainLock(mMutex);
+            memcpy(data.anchorMatrix, mAnchorMatrix, 16 * sizeof(float));
+        }
         if (intrinsics) {
             memcpy(data.intrinsics, intrinsics, 4 * sizeof(float));
             data.hasIntrinsics = true;
@@ -749,12 +767,12 @@ void MobileGS::mapThreadFunc() {
             frame = std::move(mFrameQueue.front());
             mFrameQueue.erase(mFrameQueue.begin());
         }
-        processDepthFrame(frame.depth, frame.color, frame.viewMatrix, frame.projMatrix,
+        processDepthFrame(frame.depth, frame.color, frame.viewMatrix, frame.projMatrix, frame.anchorMatrix,
                           frame.hasIntrinsics ? frame.intrinsics : nullptr, frame.isYuv);
     }
 }
 
-void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv) {
+void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* anchorMat, const float* intrinsics, bool isYuv) {
     auto startTime = std::chrono::high_resolution_clock::now();
     bool isTrackingState = false;
     {
@@ -775,6 +793,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     }
 
     const float* V = viewMat;
+    const float* A = anchorMat;
 
     float fx_px, fy_px, cx_px, cy_px;
     if (intrinsics) {
@@ -796,7 +815,6 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
 
     bool mapModified = false;
     int step = (depth.cols > 320) ? 2 : 1;
-    // TUNE: Always use high-detail step=1 for Canvas mode (small voxels) to capture fine geometry
     if (mVoxelSize < 0.004f) step = 1;
 
     auto unproject = [&](int r, int c, float d) {
@@ -833,19 +851,33 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 float n_len = cv::norm(n_cam);
                 if (n_len > 0.0001f) n_cam /= n_len;
 
+                // 1. Camera to World
                 float xw, yw, zw;
                 camToWorld(V, p_cam.x, p_cam.y, p_cam.z, xw, yw, zw);
 
                 float nx_w, ny_w, nz_w;
                 camToWorldNormal(V, n_cam.x, n_cam.y, n_cam.z, nx_w, ny_w, nz_w);
 
+                // 2. World to Anchor-Local
+                // Local = R_A^T * (World - T_A)
+                float tx = A[12], ty = A[13], tz = A[14];
+                float dx = xw - tx, dy = yw - ty, dz = zw - tz;
+                float xl = A[0]*dx + A[1]*dy + A[2]*dz;
+                float yl = A[4]*dx + A[5]*dy + A[6]*dz;
+                float zl = A[8]*dx + A[9]*dy + A[10]*dz;
+
+                float nxl = A[0]*nx_w + A[1]*ny_w + A[2]*nz_w;
+                float nyl = A[4]*nx_w + A[5]*ny_w + A[6]*nz_w;
+                float nzl = A[8]*nx_w + A[9]*ny_w + A[10]*nz_w;
+
+                // Splat radius based on camera-space geometry to ensure coverage
                 float localRadius = std::max(cv::norm(v1), cv::norm(v2)) * 0.707f;
                 localRadius = std::clamp(localRadius, mVoxelSize * 0.5f, mVoxelSize * 5.0f);
 
                 VoxelKey key{
-                        static_cast<int>(std::floor(xw / mVoxelSize)),
-                        static_cast<int>(std::floor(yw / mVoxelSize)),
-                        static_cast<int>(std::floor(zw / mVoxelSize))
+                        static_cast<int>(std::floor(xl / mVoxelSize)),
+                        static_cast<int>(std::floor(yl / mVoxelSize)),
+                        static_cast<int>(std::floor(zl / mVoxelSize))
                 };
 
                 int colorR = static_cast<int>(r * scaleY);
@@ -855,7 +887,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 cv::Vec3b col = colorRGB.at<cv::Vec3b>(colorR, colorC);
                 float r_f = col[0]/255.0f, g_f = col[1]/255.0f, b_f = col[2]/255.0f;
 
-                newVoxelUpdates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.1f, nx_w, ny_w, nz_w, localRadius}});
+                newVoxelUpdates.push_back({key, {xl, yl, zl, r_f, g_f, b_f, 1.0f, 0.1f, nxl, nyl, nzl, localRadius}});
                 mapModified = true;
             }
         }
@@ -892,12 +924,11 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
 
                 s.radius = s.radius * alpha + nu.radius * (1.0f - alpha);
 
-                // TUNE: Faster confidence build-up for small-scale art to lock geometry in place
                 float confGain = (mVoxelSize < 0.004f) ? 0.12f : 0.05f;
                 s.confidence = std::min(1.0f, s.confidence + confGain);
             } else {
                 Splat s = update.second;
-                s.confidence = 0.1f; // Initial confidence boost
+                s.confidence = 0.1f;
                 splatData.push_back(s);
                 mVoxelGrid[update.first] = splatData.size() - 1;
             }
@@ -924,10 +955,17 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 float xw, yw, zw;
                 camToWorld(V, p_cam.x, p_cam.y, p_cam.z, xw, yw, zw);
 
+                // Local = R_A^T * (World - T_A)
+                float tx = A[12], ty = A[13], tz = A[14];
+                float dx = xw - tx, dy = yw - ty, dz = zw - tz;
+                float xl = A[0]*dx + A[1]*dy + A[2]*dz;
+                float yl = A[4]*dx + A[5]*dy + A[6]*dz;
+                float zl = A[8]*dx + A[9]*dy + A[10]*dz;
+
                 int idx = meshVertices.size() / 3;
-                meshVertices.push_back(xw);
-                meshVertices.push_back(yw);
-                meshVertices.push_back(zw);
+                meshVertices.push_back(xl);
+                meshVertices.push_back(yl);
+                meshVertices.push_back(zl);
                 vIndex[(r / step) * gridW + (c / step)] = idx;
             }
         }
@@ -1400,7 +1438,7 @@ void MobileGS::draw() {
     glm::mat4 P = glm::make_mat4(mProjMatrix);
 
     glm::mat4 mvp = P * V * A;
-    glm::mat4 meshMvp = P * V;
+    glm::mat4 meshMvp = mvp;
 
     if (mSplatsVisible && mPointCount > 0) {
         glUseProgram(mProgram);
@@ -1409,8 +1447,9 @@ void MobileGS::draw() {
         glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, glm::value_ptr(mvp));
 
         cv::Point3f camPos = getCameraWorldPosition();
+        glm::vec4 camPosLocal = glm::inverse(A) * glm::vec4(camPos.x, camPos.y, camPos.z, 1.0f);
         GLint camLoc = glGetUniformLocation(mProgram, "uCameraPos");
-        glUniform3f(camLoc, camPos.x, camPos.y, camPos.z);
+        glUniform3f(camLoc, camPosLocal.x, camPosLocal.y, camPosLocal.z);
 
         GLint focalLoc = glGetUniformLocation(mProgram, "uFocalY");
         float focalY = std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f);

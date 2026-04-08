@@ -68,7 +68,8 @@ fun MainScreen(
     slamManager: SlamManager,
     hasCameraPermission: Boolean,
     cameraController: androidx.camera.view.LifecycleCameraController,
-    onRendererCreated: (ArRenderer) -> Unit
+    onRendererCreated: (ArRenderer) -> Unit,
+    isExporting: Boolean = false
 ) {
     val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
     val isImageLocked = activeLayer?.isImageLocked ?: false
@@ -169,6 +170,7 @@ fun MainScreen(
                                     arViewModel.appendDiag(text)
                                 }
                             )
+                            renderer.hideVisualization = isExporting
                             rendererRef.value = renderer
                             arViewModel.attachSessionToRenderer(renderer)
                             onRendererCreated(renderer)
@@ -188,6 +190,7 @@ fun MainScreen(
                                 r.captureRequested = arUiState.isCaptureRequested
                                 r.isCapturingTarget = mainUiState.isCapturingTarget
                                 r.isInPlaneRealignment = mainUiState.isInPlaneRealignment
+                                r.hideVisualization = isExporting
                             }
                         },
                         modifier = Modifier.fillMaxSize()
@@ -352,7 +355,7 @@ fun MainScreen(
             }
         }
 
-        if (uiState.isLoading) {
+        if (uiState.isLoading && !isExporting) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -368,7 +371,7 @@ fun MainScreen(
         }
 
         val segmentationPreview = uiState.segmentationPreview
-        if (uiState.isSegmenting && segmentationPreview != null) {
+        if (uiState.isSegmenting && segmentationPreview != null && !isExporting) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()

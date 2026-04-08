@@ -62,15 +62,22 @@ class DashboardViewModelTest {
     }
 
     @Test
-    fun `onNewProject creates and updates project`() = runTest {
-        val newProject = GraffitiProject(id = "new", name = "New Project")
+    fun `onNewProjectTriggered shows the dialog`() = runTest {
+        viewModel.onNewProjectTriggered()
+        assertEquals(true, viewModel.uiState.value.showNewProjectDialog)
+    }
+
+    @Test
+    fun `onCreateProject creates and updates project`() = runTest {
+        val newProject = GraffitiProject(id = "new", name = "Test Project")
         coEvery { repository.createProject(any<String>()) } returns newProject
 
-        viewModel.onNewProject(isRightHanded = false)
+        viewModel.onCreateProject(name = "Test Project", isRightHanded = false)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        coVerify { repository.createProject("New Project") }
+        coVerify { repository.createProject("Test Project") }
         coVerify { repository.updateProject(match<GraffitiProject> { it.id == "new" && !it.isRightHanded }) }
+        assertEquals(false, viewModel.uiState.value.showNewProjectDialog)
     }
 
     @Test

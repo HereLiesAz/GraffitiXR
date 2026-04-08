@@ -138,7 +138,8 @@ fun getTutorials(layers: List<Layer>, strings: AppStrings): Map<String, AzTutori
             card(
                 title = strings.ar.diagTitle,
                 text = strings.ar.diagWaiting,
-                highlight = AzHighlight.FullScreen
+                highlight = AzHighlight.FullScreen,
+                actionText = strings.common.done
             )
         }
     }

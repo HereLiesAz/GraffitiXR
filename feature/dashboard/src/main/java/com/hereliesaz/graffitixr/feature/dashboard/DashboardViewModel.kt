@@ -41,11 +41,21 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch { repository.loadProject(project.id) }
     }
 
-    fun onNewProject(isRightHanded: Boolean) {
+    fun onNewProjectTriggered() {
+        _uiState.update { it.copy(showNewProjectDialog = true) }
+    }
+
+    fun onCreateProject(name: String, isRightHanded: Boolean) {
         viewModelScope.launch {
-            val p = repository.createProject("New Project")
+            val p = repository.createProject(name)
             repository.updateProject(p.copy(isRightHanded = isRightHanded))
+            _uiState.update { it.copy(showNewProjectDialog = false) }
+            loadAvailableProjects()
         }
+    }
+
+    fun dismissNewProjectDialog() {
+        _uiState.update { it.copy(showNewProjectDialog = false) }
     }
 
     fun importProject(uri: Uri) {
