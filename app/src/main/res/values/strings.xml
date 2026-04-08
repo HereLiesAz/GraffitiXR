@@ -391,7 +391,7 @@
     <string name="unlock_hint">Tap 4 times to unlock</string>
 
     <!-- Library Screen -->
-    <string name="lib_app_title">GraffitiXR</string>
+    <string name="lib_app_title">GraffitiXR \n \n</string>
     <string name="lib_app_description">Project your artwork onto a real wall or a canvas using AR or a basic camera overlay. \n\nQuickly create a mockup on a photo to show how the completed work will look. \n\nOr trace an image onto paper by using your device as a lightbox.</string>
     <string name="lib_new_project">New</string>
     <string name="lib_import_project">Import</string>
