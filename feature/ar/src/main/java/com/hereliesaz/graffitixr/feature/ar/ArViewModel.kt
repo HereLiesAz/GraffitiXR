@@ -551,16 +551,17 @@ class ArViewModel @Inject constructor(
         val tapPos = pendingTapPosition
         val extent = computePhysicalExtent(depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics, depthBufStride)
 
-        if (tapPos != null) {
-            val rotatedBmp = if (displayRotation != 0) {
-                val matrix = android.graphics.Matrix().apply { postRotate(displayRotation.toFloat()) }
-                Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-            } else bitmap
+        val rotatedBmp = if (displayRotation != 0) {
+            val matrix = android.graphics.Matrix().apply { postRotate(displayRotation.toFloat()) }
+            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        } else bitmap
 
+        if (tapPos != null) {
             pendingTapPosition = null
             _uiState.update {
                 it.copy(
                     tapHighlightKeypoints = it.tapHighlightKeypoints + tapPos,
+                    tempCaptureBitmap = rotatedBmp, // Keep full image for context
                     targetRawBitmap = bitmap,
                     targetDisplayRotation = displayRotation,
                     targetDepthBuffer = depthBuffer,
@@ -572,22 +573,17 @@ class ArViewModel @Inject constructor(
                     targetIntrinsics = intrinsics,
                     targetCaptureViewMatrix = viewMatrix,
                     targetPhysicalExtent = extent,
-                    isCaptureRequested = false
+                    isCaptureRequested = false,
+                    annotatedCaptureBitmap = null
                 )
             }
             viewModelScope.launch {
-                val maskedBmp = withContext(Dispatchers.Default) { rotatedBmp.isolateMarkings(tapPos) }
-                _uiState.update { it.copy(tempCaptureBitmap = maskedBmp, annotatedCaptureBitmap = null) }
-                val annotated = withContext(Dispatchers.Default) { slamManager.annotateKeypoints(maskedBmp) }
+                // Annotate on the full frame so user sees features in context
+                val annotated = withContext(Dispatchers.Default) { slamManager.annotateKeypoints(rotatedBmp) }
                 _uiState.update { it.copy(annotatedCaptureBitmap = annotated) }
             }
             return
         }
-
-        val rotatedBmp = if (displayRotation != 0) {
-            val matrix = android.graphics.Matrix().apply { postRotate(displayRotation.toFloat()) }
-            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-        } else bitmap
 
         extent?.let { (halfW, halfH) ->
             renderer?.updateOverlayExtent(halfW, halfH)
@@ -836,7 +832,8 @@ class ArViewModel @Inject constructor(
     }
 
     fun requestCapture() {
-        _uiState.update { it.copy(isCaptureRequested = true) }
+        slamManager.setSplatsVisible(false)
+        _uiState.update { it.copy(isCaptureRequested = true, tempCaptureBitmap = null) }
     }
 
     fun requestExport(onCaptured: (android.graphics.Bitmap) -> Unit) {
