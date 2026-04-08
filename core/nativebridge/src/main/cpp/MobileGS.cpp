@@ -18,6 +18,9 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "GraffitiJNI", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI", __VA_ARGS__)
 
+std::string gLastSplatTrace;
+#define SPLAT_TRACE(fmt, ...) do {     char _buf[256];     snprintf(_buf, sizeof(_buf), fmt, ##__VA_ARGS__);     LOGI("SPLAT_PIPE: %s", _buf);     gLastSplatTrace += std::string(_buf) + "\n"; } while(0)
+
 extern JavaVM* gJvm;
 
 static constexpr size_t MAX_SPLATS = 500000;
@@ -44,20 +47,28 @@ struct JniThreadAttacher {
     }
 };
 
-// --- STABLE GAUSSIAN SHADERS (RESTORED FROM MARCH 9TH) ---
+// --- RESTORED MARCH 9TH GAUSSIAN SHADERS ---
 static const char* kVertexShader =
         "#version 300 es\n"
         "layout(location = 0) in vec3 aPosition;\n"
         "layout(location = 1) in vec4 aColor;\n"
         "layout(location = 2) in float aConfidence;\n"
+        "layout(location = 3) in vec3 aNormal;\n"
+        "layout(location = 4) in float aRadius;\n"
         "uniform mat4 uMvp;\n"
+        "uniform vec3 uCameraPos;\n"
+        "uniform float uFocalY;\n"
         "out vec4 vColor;\n"
+        "out float vNdotV;\n"
         "void main() {\n"
         "  vec4 clip = uMvp * vec4(aPosition, 1.0);\n"
         "  gl_Position = clip;\n"
-        "  // Perspective-correct size: (base + confidence bonus) / depth\n"
-        "  float sz = (16.0 + 12.0 * aConfidence) / clip.w;\n"
-        "  gl_PointSize = clamp(sz, 2.0, 128.0);\n"
+        "  vec3 viewDir = normalize(uCameraPos - aPosition);\n"
+        "  vNdotV = abs(dot(aNormal, viewDir));\n"
+        "  // RESTORATION: Using physical scale model from stable version\n"
+        "  float diameter = (aRadius * 2.0 * 1.414) * uFocalY / clip.w;\n"
+        "  float confScale = 0.5 + (0.5 * aConfidence);\n"
+        "  gl_PointSize = clamp(diameter * confScale, 2.0, 256.0);\n"
         "  vColor = aColor;\n"
         "}\n";
 
@@ -65,13 +76,16 @@ static const char* kFragmentShader =
         "#version 300 es\n"
         "precision mediump float;\n"
         "in vec4 vColor;\n"
+        "in float vNdotV;\n"
         "out vec4 oColor;\n"
         "void main() {\n"
         "  vec2 d = gl_PointCoord - 0.5;\n"
         "  float r2 = dot(d, d) * 4.0;\n"
         "  if (r2 > 1.0) discard;\n"
+        "  // RESTORATION: Soft Gaussian falloff\n"
         "  float alpha = exp(-4.0 * r2);\n"
-        "  oColor = vec4(vColor.rgb, alpha * vColor.a);\n"
+        "  float finalAlpha = alpha * vColor.a * vNdotV * 0.9;\n"
+        "  oColor = vec4(vColor.rgb, finalAlpha);\n"
         "}\n";
 
 // --- MESH (WIREFRAME) SHADERS ---
@@ -319,7 +333,6 @@ void MobileGS::setVoxelSize(float size) {
 }
 
 cv::Point3f MobileGS::getCameraWorldPosition() const {
-    // Column-major view matrix inverse: CamPos = -R^T * t
     float r00 = mViewMatrix[0], r10 = mViewMatrix[1], r20 = mViewMatrix[2];
     float r01 = mViewMatrix[4], r11 = mViewMatrix[5], r21 = mViewMatrix[6];
     float r02 = mViewMatrix[8], r12 = mViewMatrix[9], r22 = mViewMatrix[10];
@@ -694,11 +707,11 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
 
     const float* V = viewMat;
 
-    // Recover intrinsics for unprojection.
-    // Stable Version: halfW used as focal length for NDC reconstruction.
+    // ~~~ RESTORED PERFECT UNPROJECTION (960f72a9) ~~~
     const float halfW = depth.cols / 2.0f;
     const float halfH = depth.rows / 2.0f;
 
+    // Recovery from NDC: focal = w / (2 * tan(fov/2)) = halfW * projMat[0]
     float fx_px = projMat[0] * halfW;
     float fy_px = projMat[5] * halfH;
     float cx_px = (projMat[8]  + 1.0f) * halfW;
@@ -713,12 +726,12 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     const float scaleY = (float)colorRGB.rows / depth.rows;
 
     bool mapModified = false;
-    int step = 8; // Constant stable density
+    int step = 8;
 
     auto unproject = [&](int r, int c, float d) {
         return cv::Point3f(
                 (static_cast<float>(c) - cx_px) * d / fx_px,
-                -(static_cast<float>(r) - cy_px) * d / fy_px, // MANDATORY Y-UP FLIP
+                -(static_cast<float>(r) - cy_px) * d / fy_px, // Y-UP flip
                 -d
         );
     };
@@ -745,7 +758,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 cv::Vec3b col = colorRGB.at<cv::Vec3b>(colorR, colorC);
                 float r_f = col[0]/255.0f, g_f = col[1]/255.0f, b_f = col[2]/255.0f;
 
-                // STABLE RADIUS: physical coverage
+                // Surfel physical radius: physical resolution coverage
                 newVoxelUpdates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.2f, 0.0f, 0.0f, 1.0f, 0.02f}});
                 mapModified = true;
             }
@@ -816,7 +829,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
 
     {
         std::lock_guard<std::mutex> glLock(mGlDataMutex);
-        if (mapModified) mPendingSplatData = std::move(localSplatCopy);
+        if (mapModified) mPendingSplatData = localSplatCopy;
         mPendingMeshVertices = std::move(meshVertices);
         mPendingMeshIndices = std::move(meshIndices);
         mGlDataDirty = true;
@@ -1003,10 +1016,9 @@ void MobileGS::draw() {
         if (mIndicesDirty) { glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexVbo); glBufferData(GL_ELEMENT_ARRAY_BUFFER, mDrawIndices.size() * sizeof(uint32_t), mDrawIndices.data(), GL_DYNAMIC_DRAW); mIndicesDirty = false; }
     }
     glm::mat4 V = glm::make_mat4(mViewMatrix);
-    glm::mat4 A = glm::make_mat4(mAnchorMatrix);
     glm::mat4 P = glm::make_mat4(mProjMatrix);
-    glm::mat4 mvp = P * V * A;
-    glm::mat4 meshMvp = P * V;
+    glm::mat4 mvp = P * V; // MANDATE: Points are in World Space
+    glm::mat4 meshMvp = mvp;
 
     if (mSplatsVisible && mPointCount > 0) {
         glUseProgram(mProgram);

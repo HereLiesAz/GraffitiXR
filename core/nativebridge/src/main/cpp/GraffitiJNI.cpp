@@ -245,15 +245,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
         JNIEnv* env, jobject thiz, jobject depthBuffer, jint width, jint height, jint rowStride, jfloatArray intrArray, jint cpuW, jint cpuH, jint cvRotateCode) {
 
     gLastDepthTrace.clear();
-    DEPTH_TRACE("feedArCoreDepth called w=%d h=%d stride=%d", width, height, rowStride);
-
-    if (!gSlamEngine) { DEPTH_TRACE("DROPPED - no engine"); return; }
-    if (gLastColorFrame.empty()) { DEPTH_TRACE("DROPPED - no color frame yet"); return; }
+    if (!gSlamEngine) return;
+    if (gLastColorFrame.empty()) return;
 
     auto* rawDepthBytes = static_cast<const uint8_t*>(env->GetDirectBufferAddress(depthBuffer));
-    if (!rawDepthBytes) { DEPTH_TRACE("DROPPED - null buffer"); return; }
+    if (!rawDepthBytes) return;
 
-    // MANDATE: Keep depth map in sensor-native (Landscape) orientation to align with Physical pose.
+    // MANDATE: Sensor-native (Landscape) orientation
     cv::Mat depthMap(height, width, CV_32F, cv::Scalar(0.0f));
 
     int validPixels = 0;
@@ -264,7 +262,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
             uint16_t depthMm = raw & 0x1FFFu;
             uint8_t conf = (raw >> 13u) & 0x7u;
             if (depthMm > 0 && conf > 0) {
-                depthMap.at<float>(r, c) = depthMm / 1000.0f;
+                depthMap.at<float>(r, c) = (float)depthMm / 1000.0f;
                 validPixels++;
             }
         }
@@ -272,28 +270,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
 
     if (validPixels == 0) return;
 
-    jfloat* intr = env->GetFloatArrayElements(intrArray, nullptr);
-    float fx = intr[0], fy = intr[1], cx = intr[2], cy = intr[3];
-    env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
+    // We pass NO intrinsics to force the stable NDC fallback in MobileGS.cpp
+    if (!gHasCameraMatrices) return;
 
-    // 1. SCALE: Physical intrinsics are for the full CPU resolution (cpuW/cpuH).
-    // They must be scaled to match the sensor-native depth resolution (width/height).
-    if (cpuW > 0 && cpuH > 0) {
-        float scaleX = (float)width / (float)cpuW;
-        float scaleY = (float)height / (float)cpuH;
-        fx *= scaleX; fy *= scaleY;
-        cx *= scaleX; cy *= scaleY;
-    }
-
-    float finalIntrinsics[4] = {fx, fy, cx, cy};
-
-    if (!gHasCameraMatrices) {
-        DEPTH_TRACE("DROPPED - no camera matrices yet");
-        return;
-    }
-
-    // MANDATE: Pass sensor-native depth map with Physical Pose (gLastMappingViewMatrix)
-    gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastMappingViewMatrix, gLastMappingProjMatrix, finalIntrinsics, false);
+    // MANDATE: Use MappingViewMatrix (Physical Pose)
+    gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastMappingViewMatrix, gLastMappingProjMatrix, nullptr, false);
 }
 
 JNIEXPORT void JNICALL
