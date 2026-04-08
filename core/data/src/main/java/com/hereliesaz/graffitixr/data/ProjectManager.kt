@@ -215,7 +215,8 @@ class ProjectManager @Inject constructor(
         try {
             context.contentResolver.openOutputStream(uri)?.use { os ->
                 ZipOutputStream(os).use { zos ->
-                    zipFolder(sourceFolder, sourceFolder.name, zos)
+                    // Use empty string for parent to zip contents directly into the root.
+                    zipFolder(sourceFolder, "", zos)
                 }
             }
         } catch (e: Exception) {
@@ -304,10 +305,12 @@ class ProjectManager @Inject constructor(
 
     private fun zipFolder(folder: File, parentFolder: String, zos: ZipOutputStream) {
         for (file in folder.listFiles() ?: emptyArray()) {
+            // Use relative path from the source folder to avoid nested parent directories in the ZIP.
+            val zipPath = if (parentFolder.isEmpty()) file.name else "$parentFolder/${file.name}"
             if (file.isDirectory) {
-                zipFolder(file, "$parentFolder/${file.name}", zos)
+                zipFolder(file, zipPath, zos)
             } else {
-                val entry = ZipEntry("$parentFolder/${file.name}")
+                val entry = ZipEntry(zipPath)
                 zos.putNextEntry(entry)
                 FileInputStream(file).use { fis ->
                     fis.copyTo(zos)

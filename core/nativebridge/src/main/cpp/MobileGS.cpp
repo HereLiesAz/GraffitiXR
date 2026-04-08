@@ -63,9 +63,8 @@ static const char* kVertexShader =
         "  gl_Position = clip;\n"
         "  // Correct physical point size: diameter in pixels\n"
         "  // sz = (diameter_m * focal_y_px) / depth_m\n"
-        "  // We use a tightened 0.8x multiplier to ensure points stay sharp and separated\n"
-        "  float sz = (aRadius * 2.0 * 0.8) * uFocalY / clip.w;\n"
-        "  gl_PointSize = clamp(sz, 1.0, 48.0);\n"
+        "  float sz = (aRadius * 2.0 * 1.414) * uFocalY / clip.w;\n"
+        "  gl_PointSize = clamp(sz, 2.0, 256.0);\n"
         "  vColor = aColor;\n"
         "}\n";
 
@@ -75,9 +74,8 @@ static const char* kFragmentShader =
         "in vec4 vColor;\n"
         "out vec4 oColor;\n"
         "void main() {\n"
-        "  // Mandate: High-performance hard-edged points\n"
         "  vec2 d = gl_PointCoord - 0.5;\n"
-        "  if (dot(d, d) > 0.25) discard;\n"
+        "  if (dot(d, d) > 0.25) discard; // Hard-edged circle\n"
         "  oColor = vec4(vColor.rgb, 1.0);\n"
         "}\n";
 
@@ -139,13 +137,6 @@ void MobileGS::initialize(int width, int height) {
     mFrameCounter = 0;
     splatData.reserve(MAX_SPLATS);
 
-    // OPAQUE SURFELS DO NOT REQUIRE SORTING (Depth Buffer handles it)
-    if (mSortRunning) {
-        mSortRunning = false;
-        mSortCv.notify_all();
-        if (mSortThread.joinable()) mSortThread.join();
-    }
-
     if (!mRelocRunning) {
         mRelocRunning = true;
         mRelocThread = std::thread(&MobileGS::relocThreadFunc, this);
@@ -186,16 +177,12 @@ void MobileGS::destroy() {
         if (mMapThread.joinable()) mMapThread.join();
     }
 
-    if (mSortRunning) {
-        mSortRunning = false;
-        mSortCv.notify_all();
-        if (mSortThread.joinable()) mSortThread.join();
-    }
-
     if (mRelocRunning) {
         mRelocRunning = false;
         mRelocCv.notify_all();
-        if (mRelocThread.joinable()) mRelocThread.join();
+        if (mRelocThread.joinable()) {
+            mRelocThread.join();
+        }
     }
 
     std::lock_guard<std::mutex> lock(mMutex);
@@ -336,8 +323,8 @@ void MobileGS::sortThreadFunc() {
 static void camToWorld(const float* V_mat, float xc, float yc, float zc,
                        float& xw, float& yw, float& zw) {
     glm::mat4 V = glm::make_mat4(V_mat);
-    glm::mat4 M = glm::inverse(V);
-    glm::vec4 p_world = M * glm::vec4(xc, yc, zc, 1.0f);
+    glm::mat4 invV = glm::inverse(V);
+    glm::vec4 p_world = invV * glm::vec4(xc, yc, zc, 1.0f);
     xw = p_world.x; yw = p_world.y; zw = p_world.z;
 }
 
@@ -714,7 +701,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 s.g = s.g * (1.0f-alpha) + nu.g * alpha;
                 s.b = s.b * (1.0f-alpha) + nu.b * alpha;
                 s.radius = s.radius * (1.0f-alpha) + nu.radius * alpha;
-                s.confidence = std::min(1.0f, s.confidence + 0.05f);
+                s.confidence = std::min(1.0f, s.confidence + 0.1f); // Faster build-up
             } else {
                 splatData.push_back(update.second);
                 mVoxelGrid[update.first] = splatData.size() - 1;
@@ -777,7 +764,7 @@ void MobileGS::continuousOptimize() {
     bool needsRebuild = false;
     size_t validCount = 0;
     for (size_t i = 0; i < splatData.size(); i++) {
-        splatData[i].confidence -= 0.005f;
+        splatData[i].confidence -= 0.0005f; // 10x slower decay for persistence
         if (splatData[i].confidence > 0.0f) {
             if (validCount != i) splatData[validCount] = splatData[i];
             validCount++;
@@ -787,7 +774,11 @@ void MobileGS::continuousOptimize() {
         splatData.resize(validCount);
         mVoxelGrid.clear();
         for (size_t i = 0; i < splatData.size(); ++i) {
-            VoxelKey key{ (int)(splatData[i].x / mVoxelSize), (int)(splatData[i].y / mVoxelSize), (int)(splatData[i].z / mVoxelSize) };
+            VoxelKey key{
+                static_cast<int>(std::floor(splatData[i].x / mVoxelSize)),
+                static_cast<int>(std::floor(splatData[i].y / mVoxelSize)),
+                static_cast<int>(std::floor(splatData[i].z / mVoxelSize))
+            };
             mVoxelGrid[key] = i;
         }
         mPointCount = static_cast<int>(validCount);
@@ -802,7 +793,11 @@ void MobileGS::pruneMap() {
     splatData.erase(splatData.begin(), splatData.begin() + evictCount);
     mVoxelGrid.clear();
     for (size_t i = 0; i < splatData.size(); ++i) {
-        VoxelKey key{ (int)(splatData[i].x / mVoxelSize), (int)(splatData[i].y / mVoxelSize), (int)(splatData[i].z / mVoxelSize) };
+        VoxelKey key{
+            static_cast<int>(std::floor(splatData[i].x / mVoxelSize)),
+            static_cast<int>(std::floor(splatData[i].y / mVoxelSize)),
+            static_cast<int>(std::floor(splatData[i].z / mVoxelSize))
+        };
         mVoxelGrid[key] = i;
     }
 }
@@ -819,7 +814,11 @@ void MobileGS::pruneByConfidence(float threshold) {
     splatData.resize(validCount);
     mVoxelGrid.clear();
     for (size_t i = 0; i < splatData.size(); ++i) {
-        VoxelKey key{ (int)(splatData[i].x / mVoxelSize), (int)(splatData[i].y / mVoxelSize), (int)(splatData[i].z / mVoxelSize) };
+        VoxelKey key{
+            static_cast<int>(std::floor(splatData[i].x / mVoxelSize)),
+            static_cast<int>(std::floor(splatData[i].y / mVoxelSize)),
+            static_cast<int>(std::floor(splatData[i].z / mVoxelSize))
+        };
         mVoxelGrid[key] = i;
     }
     mPointCount = static_cast<int>(validCount);
@@ -911,7 +910,11 @@ void MobileGS::loadModel(const std::string& path) {
     in.read((char*)mAnchorMatrix, 16 * sizeof(float)); mPointCount = ns;
     std::lock_guard<std::mutex> mapLock(mMapMutex); mVoxelGrid.clear();
     for (size_t i = 0; i < splatData.size(); ++i) {
-        VoxelKey key{ (int)(splatData[i].x / mVoxelSize), (int)(splatData[i].y / mVoxelSize), (int)(splatData[i].z / mVoxelSize) };
+        VoxelKey key{
+            static_cast<int>(std::floor(splatData[i].x / mVoxelSize)),
+            static_cast<int>(std::floor(splatData[i].y / mVoxelSize)),
+            static_cast<int>(std::floor(splatData[i].z / mVoxelSize))
+        };
         mVoxelGrid[key] = i;
     }
     std::lock_guard<std::mutex> glLock(mGlDataMutex); mPendingSplatData = splatData; mGlDataDirty = true;

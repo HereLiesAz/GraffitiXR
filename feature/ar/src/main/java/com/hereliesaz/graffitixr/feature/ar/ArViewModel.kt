@@ -329,7 +329,8 @@ class ArViewModel @Inject constructor(
             try {
                 val root = File(appContext.filesDir, "projects/${project.id}")
                 if (!root.exists()) root.mkdirs()
-                slamManager.pruneByConfidence(0.6f)
+                // MANDATE: Keep all visible splats during save (threshold 0.1)
+                slamManager.pruneByConfidence(0.1f)
                 slamManager.saveModel(File(root, "map.bin").absolutePath)
                 lastSavedSplatCount.set(slamManager.getSplatCount())
                 loadedProjectId = project.id
@@ -357,7 +358,8 @@ class ArViewModel @Inject constructor(
             try {
                 val root = File(appContext.filesDir, "projects/${project.id}")
                 if (!root.exists()) root.mkdirs()
-                slamManager.pruneByConfidence(0.6f)
+                // MANDATE: Keep all visible splats during auto-save (threshold 0.1)
+                slamManager.pruneByConfidence(0.1f)
                 slamManager.saveModel(File(root, "map.bin").absolutePath)
                 lastSavedSplatCount.set(slamManager.getSplatCount())
                 loadedProjectId = project.id
