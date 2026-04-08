@@ -2,7 +2,7 @@
 import org.gradle.api.plugins.quality.CheckstyleExtension
 buildscript {
     val commonForcedDependencies = listOf(
-        "commons-beanutils:commons-beanutils:1.11.0",
+        "commons-beanutils:commons-beanutils:1.9.4",
         "org.jdom:jdom2:2.0.6.1",
         "io.netty:netty-codec:4.1.132.Final",
         "io.netty:netty-codec-http2:4.1.132.Final",
