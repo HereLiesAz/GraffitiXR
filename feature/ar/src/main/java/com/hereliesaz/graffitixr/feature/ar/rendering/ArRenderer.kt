@@ -373,6 +373,8 @@ class ArRenderer(
                         // Always feed temporal stereo frames for continuous depth refinement
                         stereoProvider?.submitFrame(planes[0].buffer, image.width, image.height, frame.timestamp)
                     }
+                } catch (e: com.google.ar.core.exceptions.NotYetAvailableException) {
+                    // Normal on first frames
                 } catch (e: Exception) {
                     Timber.w(e, "Failed to feed YUV frame")
                 }

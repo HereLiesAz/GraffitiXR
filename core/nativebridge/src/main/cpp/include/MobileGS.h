@@ -54,6 +54,14 @@ public:
     void scheduleRelocCheck(const cv::Mat& colorFrame);
     void getAnchorTransform(float* outMat16) const;
     void setArtworkFingerprint(const cv::Mat& composite, const uint8_t* depthData, int depthW, int depthH, int depthStride, const float* intrinsics4, const float* viewMat16);
+
+    struct FingerprintData {
+        std::vector<cv::KeyPoint> keypoints;
+        std::vector<float> points3d;
+        cv::Mat descriptors;
+    };
+    FingerprintData generateFingerprint(const cv::Mat& image, const cv::Mat& mask, const uint8_t* depthData, int depthW, int depthH, int depthStride, const float* intrinsics, const float* viewMat);
+
     bool loadSuperPoint(const std::vector<uchar>& onnxBytes);
     void clearMap();
     void pruneByConfidence(float threshold);

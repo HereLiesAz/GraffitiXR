@@ -194,21 +194,32 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     if (uvPixelStride == 1) {
         uMat.copyTo(yuv(cv::Rect(0, height, width / 2, height / 4)));
         vMat.copyTo(yuv(cv::Rect(width / 2, height, width / 2, height / 4)));
-        cv::cvtColor(yuv, gLastColorFrame, cv::COLOR_YUV2RGB_I420);
+        // No conversion on GL thread; pass raw YUV to map thread
+        gLastColorFrame = yuv.clone();
     } else if (uvPixelStride == 2) {
         cv::Mat uvInterleaved(height / 2, width, CV_8UC1, vData, uvStride);
         uvInterleaved.copyTo(yuv(cv::Rect(0, height, width, height / 2)));
-        cv::cvtColor(yuv, gLastColorFrame, cv::COLOR_YUV2RGB_NV21);
+        // No conversion on GL thread; pass raw YUV to map thread
+        gLastColorFrame = yuv.clone();
     } else {
         cv::cvtColor(yMat, gLastColorFrame, cv::COLOR_GRAY2RGB);
     }
 
     // Relocalization MATCHING still uses the Display-Aligned frame for best user feedback
-    cv::Mat relocFrame = gLastColorFrame.clone();
-    if (cvRotateCode >= 0) {
-        cv::rotate(relocFrame, relocFrame, cvRotateCode);
+    if (!gLastColorFrame.empty() && gLastColorFrame.rows == height + height/2) {
+        cv::Mat relocFrame;
+        cv::cvtColor(gLastColorFrame, relocFrame, cv::COLOR_YUV2RGB_NV21);
+        if (cvRotateCode >= 0) {
+            cv::rotate(relocFrame, relocFrame, cvRotateCode);
+        }
+        gSlamEngine->scheduleRelocCheck(relocFrame);
+    } else if (!gLastColorFrame.empty()) {
+        cv::Mat relocFrame = gLastColorFrame.clone();
+        if (cvRotateCode >= 0) {
+            cv::rotate(relocFrame, relocFrame, cvRotateCode);
+        }
+        gSlamEngine->scheduleRelocCheck(relocFrame);
     }
-    gSlamEngine->scheduleRelocCheck(relocFrame);
 }
 
 JNIEXPORT void JNICALL
@@ -278,8 +289,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
 
     if (!gHasCameraMatrices) return;
 
+    bool isYuv = (gLastColorFrame.rows == gColorImageHeight + gColorImageHeight / 2);
+
     // MANDATE: Pass sensor-native depth map with Physical Pose (gLastMappingViewMatrix)
-    gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastMappingViewMatrix, gLastMappingProjMatrix, finalIntrinsics, false);
+    gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastMappingViewMatrix, gLastMappingProjMatrix, finalIntrinsics, isYuv);
 }
 
 JNIEXPORT void JNICALL
@@ -305,7 +318,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
     if (!disparity.empty() && !gLastColorFrame.empty() && gHasCameraMatrices) {
         cv::Mat depthFromStereo;
         disparity.convertTo(depthFromStereo, CV_32F, 1.0/16.0);
-        gSlamEngine->pushFrame(depthFromStereo, gLastColorFrame, gLastMappingViewMatrix, gLastMappingProjMatrix, nullptr, false);
+        bool isYuv = (gLastColorFrame.rows == gColorImageHeight + gColorImageHeight / 2);
+        gSlamEngine->pushFrame(depthFromStereo, gLastColorFrame, gLastMappingViewMatrix, gLastMappingProjMatrix, nullptr, isYuv);
     }
 }
 
@@ -371,11 +385,68 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
     }
 }
 
+jobject buildFingerprintObject(JNIEnv* env, const MobileGS::FingerprintData& fd) {
+    if (fd.descriptors.empty()) return nullptr;
+
+    jclass listClass = env->FindClass("java/util/ArrayList");
+    jmethodID listCtor = env->GetMethodID(listClass, "<init>", "(I)V");
+    jmethodID addMethod = env->GetMethodID(listClass, "add", "(Ljava/lang/Object;)Z");
+
+    // Keypoints: List<org.opencv.core.KeyPoint>
+    jclass kpClass = env->FindClass("org/opencv/core/KeyPoint");
+    jmethodID kpCtor = env->GetMethodID(kpClass, "<init>", "(FFFFFII)V");
+    jobject kpList = env->NewObject(listClass, listCtor, (jint)fd.keypoints.size());
+    for (const auto& kp : fd.keypoints) {
+        jobject jkp = env->NewObject(kpClass, kpCtor, kp.pt.x, kp.pt.y, kp.size, kp.angle, kp.response, (jint)kp.octave, (jint)kp.class_id);
+        env->CallBooleanMethod(kpList, addMethod, jkp);
+        env->DeleteLocalRef(jkp);
+    }
+
+    // Points3D: List<Float>
+    jclass floatClass = env->FindClass("java/lang/Float");
+    jmethodID floatCtor = env->GetMethodID(floatClass, "<init>", "(F)V");
+    jobject ptsList = env->NewObject(listClass, listCtor, (jint)fd.points3d.size());
+    for (float f : fd.points3d) {
+        jobject jf = env->NewObject(floatClass, floatCtor, f);
+        env->CallBooleanMethod(ptsList, addMethod, jf);
+        env->DeleteLocalRef(jf);
+    }
+
+    // DescriptorsData: byte[]
+    jsize descSize = fd.descriptors.total() * fd.descriptors.elemSize();
+    jbyteArray descArray = env->NewByteArray(descSize);
+    env->SetByteArrayRegion(descArray, 0, descSize, (const jbyte*)fd.descriptors.data);
+
+    jclass fpClass = env->FindClass("com/hereliesaz/graffitixr/common/model/Fingerprint");
+    jmethodID fpCtor = env->GetMethodID(fpClass, "<init>", "(Ljava/util/List;Ljava/util/List;[BIII)V");
+
+    jobject fpObj = env->NewObject(fpClass, fpCtor, kpList, ptsList, descArray, fd.descriptors.rows, fd.descriptors.cols, fd.descriptors.type());
+
+    return fpObj;
+}
+
 JNIEXPORT jobject JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallFingerprint(
         JNIEnv* env, jobject thiz, jobject bitmap, jobject mask, jobject depthBuffer, jint depthW, jint depthH, jint depthStride, jfloatArray intrArray, jfloatArray viewMatArray) {
-    // Legacy method for wall alignment - currently returns null as we use target fingerprints
-    return nullptr;
+
+    if (!gSlamEngine) return nullptr;
+
+    cv::Mat image;
+    bitmapToMat(env, bitmap, image);
+
+    cv::Mat maskMat;
+    if (mask) bitmapToMat(env, mask, maskMat);
+
+    auto* depthData = static_cast<const uint8_t*>(env->GetDirectBufferAddress(depthBuffer));
+    jfloat* intr = env->GetFloatArrayElements(intrArray, nullptr);
+    jfloat* view = env->GetFloatArrayElements(viewMatArray, nullptr);
+
+    MobileGS::FingerprintData fd = gSlamEngine->generateFingerprint(image, maskMat, depthData, depthW, depthH, depthStride, intr, view);
+
+    env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
+    env->ReleaseFloatArrayElements(viewMatArray, view, JNI_ABORT);
+
+    return buildFingerprintObject(env, fd);
 }
 
 JNIEXPORT void JNICALL
@@ -399,8 +470,25 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
     cv::Mat frame;
     bitmapToMat(env, bitmap, frame);
     if (frame.empty()) return;
-    // Implementation removed for performance, providing empty stub to prevent crash
-    matToBitmap(env, frame, bitmap);
+
+    cv::Mat gray;
+    cv::cvtColor(frame, gray, cv::COLOR_RGBA2GRAY);
+
+    std::vector<cv::KeyPoint> kps;
+    cv::Mat descs;
+    if (gSlamEngine) {
+        // Implementation logic borrowed from generateFingerprint for visualization
+        gSlamEngine->getMutex().lock();
+        // SuperPoint or ORB
+        cv::ORB::create(500)->detectAndCompute(gray, cv::noArray(), kps, descs);
+        gSlamEngine->getMutex().unlock();
+    }
+
+    cv::Mat annotated;
+    cv::cvtColor(gray, annotated, cv::COLOR_GRAY2RGBA);
+    cv::drawKeypoints(annotated, kps, annotated, cv::Scalar(0, 255, 0, 255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+
+    matToBitmap(env, annotated, bitmap);
 }
 
 extern "C" JNIEXPORT jstring JNICALL

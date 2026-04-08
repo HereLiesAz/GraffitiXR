@@ -623,6 +623,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
 
     cv::Mat colorRGB;
     if (isYuv) {
+        // High-performance YUV to RGB conversion on the map thread
         cv::cvtColor(color, colorRGB, cv::COLOR_YUV2RGB_NV21);
     } else {
         colorRGB = color;
@@ -679,7 +680,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 cv::Vec3b col = colorRGB.at<cv::Vec3b>(colorR, colorC);
                 float r_f = col[0]/255.0f, g_f = col[1]/255.0f, b_f = col[2]/255.0f;
 
-                // Tighter radius 0.006f (6mm) for crisp physical alignment and lower overdraw
+                // Radius 0.006f (6mm) for crisp physical alignment and lower overdraw
                 newVoxelUpdates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.2f, 0.0f, 0.0f, 1.0f, 0.006f}});
                 mapModified = true;
             }
@@ -701,7 +702,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 s.g = s.g * (1.0f-alpha) + nu.g * alpha;
                 s.b = s.b * (1.0f-alpha) + nu.b * alpha;
                 s.radius = s.radius * (1.0f-alpha) + nu.radius * alpha;
-                s.confidence = std::min(1.0f, s.confidence + 0.1f); // Faster build-up
+                s.confidence = std::min(1.0f, s.confidence + 0.2f); // Faster build-up for better persistence
             } else {
                 splatData.push_back(update.second);
                 mVoxelGrid[update.first] = splatData.size() - 1;
@@ -764,7 +765,7 @@ void MobileGS::continuousOptimize() {
     bool needsRebuild = false;
     size_t validCount = 0;
     for (size_t i = 0; i < splatData.size(); i++) {
-        splatData[i].confidence -= 0.0005f; // 10x slower decay for persistence
+        splatData[i].confidence -= 0.0001f; // 50x slower decay for extreme persistence
         if (splatData[i].confidence > 0.0f) {
             if (validCount != i) splatData[validCount] = splatData[i];
             validCount++;
@@ -868,27 +869,80 @@ void MobileGS::getAnchorTransform(float* outMat16) const {
 
 void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* depthData, int depthW, int depthH, int depthStride, const float* intrinsics4, const float* viewMat16) {
     if (composite.empty() || !depthData) return;
-    cv::Mat gray; cv::cvtColor(composite, gray, cv::COLOR_RGBA2GRAY);
-    std::vector<cv::KeyPoint> kps; cv::Mat descs;
-    cv::ORB::create(500)->detectAndCompute(gray, cv::noArray(), kps, descs);
-    if (descs.empty()) return;
-    const float fx = intrinsics4[0], fy = intrinsics4[1], cx = intrinsics4[2], cy = intrinsics4[3];
-    const float scaleX = (float)depthW / composite.cols, scaleY = (float)depthH / composite.rows;
-    std::vector<cv::Point3f> newPts; cv::Mat newDescs;
-    for (int i = 0; i < (int)kps.size(); ++i) {
-        int du = (int)(kps[i].pt.x * scaleX), dv = (int)(kps[i].pt.y * scaleY);
-        if (du < 0 || du >= depthW || dv < 0 || dv >= depthH) continue;
-        const uint16_t raw = *reinterpret_cast<const uint16_t*>(depthData + dv * depthStride + du * 2);
-        const uint16_t depthMm = raw & 0x1FFFu; if (depthMm == 0) continue;
-        float d = depthMm / 1000.0f; if (d > 5.0f) continue;
-        float xc = (kps[i].pt.x - cx) * d / fx, yc = -(kps[i].pt.y - cy) * d / fy, zc = -d;
-        float xw, yw, zw; camToWorld(viewMat16, xc, yc, zc, xw, yw, zw);
-        newPts.push_back(cv::Point3f(xw, yw, zw)); newDescs.push_back(descs.row(i));
-    }
-    if (newPts.empty()) return;
+
+    cv::Mat mask; // empty mask
+    FingerprintData fd = generateFingerprint(composite, mask, depthData, depthW, depthH, depthStride, intrinsics4, viewMat16);
+
+    if (fd.descriptors.empty()) return;
+
     std::lock_guard<std::mutex> lock(mMutex);
-    mArtworkDescriptors = newDescs.clone(); mArtworkKeypoints3D = newPts;
+    mArtworkDescriptors = fd.descriptors.clone();
+    mArtworkKeypoints3D.clear();
+    for (size_t i = 0; i < fd.points3d.size(); i += 3) {
+        mArtworkKeypoints3D.push_back(cv::Point3f(fd.points3d[i], fd.points3d[i+1], fd.points3d[i+2]));
+    }
     mPaintingProgress.store(0.0f, std::memory_order_relaxed);
+}
+
+MobileGS::FingerprintData MobileGS::generateFingerprint(const cv::Mat& image, const cv::Mat& mask, const uint8_t* depthData, int depthW, int depthH, int depthStride, const float* intrinsics, const float* viewMat) {
+    FingerprintData result;
+    if (image.empty() || !depthData) return result;
+
+    cv::Mat gray;
+    if (image.channels() == 4) cv::cvtColor(image, gray, cv::COLOR_RGBA2GRAY);
+    else if (image.channels() == 3) cv::cvtColor(image, gray, cv::COLOR_RGB2GRAY);
+    else gray = image;
+
+    std::vector<cv::KeyPoint> kps;
+    cv::Mat descs;
+
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        bool usedSP = mSuperPoint.isLoaded() && mSuperPoint.detect(gray, kps, descs, mask);
+        if (!usedSP) {
+            // INCREASED: Request 1500 features for target alignment to avoid "lacks detail" errors
+            cv::Ptr<cv::ORB> detector = cv::ORB::create(1500);
+            detector->detectAndCompute(gray, mask, kps, descs);
+        }
+    }
+
+    if (descs.empty()) return result;
+
+    const float fx = intrinsics[0], fy = intrinsics[1], cx = intrinsics[2], cy = intrinsics[3];
+
+    // SCALE: Map image-space keypoints to depth-buffer space for depth sampling
+    const float imageToDepthScaleX = (float)depthW / image.cols;
+    const float imageToDepthScaleY = (float)depthH / image.rows;
+
+    for (int i = 0; i < (int)kps.size(); ++i) {
+        int du = (int)(kps[i].pt.x * imageToDepthScaleX);
+        int dv = (int)(kps[i].pt.y * imageToDepthScaleY);
+
+        if (du < 0 || du >= depthW || dv < 0 || dv >= depthH) continue;
+
+        const uint16_t raw = *reinterpret_cast<const uint16_t*>(depthData + dv * depthStride + du * 2);
+        const uint16_t depthMm = raw & 0x1FFFu;
+        if (depthMm == 0) continue;
+
+        float d = depthMm / 1000.0f;
+        if (d > 5.0f) continue;
+
+        // Unproject using image-space coordinates and scaled intrinsics
+        float xc = (kps[i].pt.x - cx) * d / fx;
+        float yc = -(kps[i].pt.y - cy) * d / fy;
+        float zc = -d;
+
+        float xw, yw, zw;
+        camToWorld(viewMat, xc, yc, zc, xw, yw, zw);
+
+        result.keypoints.push_back(kps[i]);
+        result.points3d.push_back(xw);
+        result.points3d.push_back(yw);
+        result.points3d.push_back(zw);
+        result.descriptors.push_back(descs.row(i));
+    }
+
+    return result;
 }
 
 void MobileGS::saveModel(const std::string& path) {
