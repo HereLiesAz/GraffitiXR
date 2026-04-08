@@ -219,6 +219,10 @@ class ArViewModel @Inject constructor(
                     updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                     depthMode = Config.DepthMode.AUTOMATIC
                     focusMode = Config.FocusMode.AUTO
+                    // Enable dual-camera (stereo) depth if available for superior SLAM stability
+                    if (newSession.isDualCameraModeSupported(Config.DualCameraMode.ENABLED)) {
+                        dualCameraMode = Config.DualCameraMode.ENABLED
+                    }
                 }
 
                 newSession.configure(config)

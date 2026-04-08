@@ -47,7 +47,7 @@ struct JniThreadAttacher {
     }
 };
 
-// --- RESTORED MARCH 9TH GAUSSIAN SHADERS ---
+// --- HIGH-PERFORMANCE OPAQUE SURFEL SHADERS ---
 static const char* kVertexShader =
         "#version 300 es\n"
         "layout(location = 0) in vec3 aPosition;\n"
@@ -56,19 +56,15 @@ static const char* kVertexShader =
         "layout(location = 3) in vec3 aNormal;\n"
         "layout(location = 4) in float aRadius;\n"
         "uniform mat4 uMvp;\n"
-        "uniform vec3 uCameraPos;\n"
         "uniform float uFocalY;\n"
         "out vec4 vColor;\n"
-        "out float vNdotV;\n"
         "void main() {\n"
         "  vec4 clip = uMvp * vec4(aPosition, 1.0);\n"
         "  gl_Position = clip;\n"
-        "  vec3 viewDir = normalize(uCameraPos - aPosition);\n"
-        "  vNdotV = abs(dot(aNormal, viewDir));\n"
-        "  // RESTORATION: Using physical scale model from stable version\n"
-        "  float diameter = (aRadius * 2.0 * 1.414) * uFocalY / clip.w;\n"
-        "  float confScale = 0.5 + (0.5 * aConfidence);\n"
-        "  gl_PointSize = clamp(diameter * confScale, 2.0, 256.0);\n"
+        "  // Correct physical point size: diameter in pixels\n"
+        "  // sz = (diameter_m * focal_y_px) / depth_m\n"
+        "  float sz = (aRadius * 2.0) * uFocalY / clip.w;\n"
+        "  gl_PointSize = clamp(sz, 2.0, 128.0);\n"
         "  vColor = aColor;\n"
         "}\n";
 
@@ -76,16 +72,11 @@ static const char* kFragmentShader =
         "#version 300 es\n"
         "precision mediump float;\n"
         "in vec4 vColor;\n"
-        "in float vNdotV;\n"
         "out vec4 oColor;\n"
         "void main() {\n"
         "  vec2 d = gl_PointCoord - 0.5;\n"
-        "  float r2 = dot(d, d) * 4.0;\n"
-        "  if (r2 > 1.0) discard;\n"
-        "  // RESTORATION: Soft Gaussian falloff\n"
-        "  float alpha = exp(-4.0 * r2);\n"
-        "  float finalAlpha = alpha * vColor.a * vNdotV * 0.9;\n"
-        "  oColor = vec4(vColor.rgb, finalAlpha);\n"
+        "  if (dot(d, d) > 0.25) discard; // Hard-edged circle\n"
+        "  oColor = vec4(vColor.rgb, 1.0);\n"
         "}\n";
 
 // --- MESH (WIREFRAME) SHADERS ---
@@ -145,11 +136,12 @@ void MobileGS::initialize(int width, int height) {
 
     mFrameCounter = 0;
     splatData.reserve(MAX_SPLATS);
-    mDrawIndices.reserve(MAX_SPLATS);
 
-    if (!mSortRunning) {
-        mSortRunning = true;
-        mSortThread = std::thread(&MobileGS::sortThreadFunc, this);
+    // OPAQUE SURFELS DO NOT REQUIRE SORTING (Depth Buffer handles it)
+    if (mSortRunning) {
+        mSortRunning = false;
+        mSortCv.notify_all();
+        if (mSortThread.joinable()) mSortThread.join();
     }
 
     if (!mRelocRunning) {
@@ -195,17 +187,13 @@ void MobileGS::destroy() {
     if (mSortRunning) {
         mSortRunning = false;
         mSortCv.notify_all();
-        if (mSortThread.joinable()) {
-            mSortThread.join();
-        }
+        if (mSortThread.joinable()) mSortThread.join();
     }
 
     if (mRelocRunning) {
         mRelocRunning = false;
         mRelocCv.notify_all();
-        if (mRelocThread.joinable()) {
-            mRelocThread.join();
-        }
+        if (mRelocThread.joinable()) mRelocThread.join();
     }
 
     std::lock_guard<std::mutex> lock(mMutex);
@@ -333,75 +321,22 @@ void MobileGS::setVoxelSize(float size) {
 }
 
 cv::Point3f MobileGS::getCameraWorldPosition() const {
-    float r00 = mViewMatrix[0], r10 = mViewMatrix[1], r20 = mViewMatrix[2];
-    float r01 = mViewMatrix[4], r11 = mViewMatrix[5], r21 = mViewMatrix[6];
-    float r02 = mViewMatrix[8], r12 = mViewMatrix[9], r22 = mViewMatrix[10];
-    float tx = mViewMatrix[12], ty = mViewMatrix[13], tz = mViewMatrix[14];
-
-    float cx = -(r00*tx + r10*ty + r20*tz);
-    float cy = -(r01*tx + r11*ty + r21*tz);
-    float cz = -(r02*tx + r12*ty + r22*tz);
-    return cv::Point3f(cx, cy, cz);
+    glm::mat4 V = glm::make_mat4(mViewMatrix);
+    glm::mat4 invV = glm::inverse(V);
+    glm::vec3 pos = glm::vec3(invV[3]);
+    return cv::Point3f(pos.x, pos.y, pos.z);
 }
 
 void MobileGS::sortThreadFunc() {
-    setpriority(PRIO_PROCESS, 0, 15);
-    JniThreadAttacher attacher;
-
-    while (mSortRunning) {
-        std::vector<cv::Point3f> positions;
-        cv::Point3f camPos;
-        int currentCount = 0;
-
-        {
-            std::unique_lock<std::mutex> lock(mSortMutex);
-            mSortCv.wait(lock, [this] { return mSortRequested || !mSortRunning; });
-            if (!mSortRunning) break;
-
-            {
-                std::lock_guard<std::mutex> mainLock(mMutex);
-                camPos = getCameraWorldPosition();
-            }
-
-            {
-                std::lock_guard<std::mutex> mapLock(mMapMutex);
-                currentCount = mPointCount;
-                positions.resize(currentCount);
-                for (int i = 0; i < currentCount; ++i) {
-                    positions[i] = cv::Point3f(splatData[i].x, splatData[i].y, splatData[i].z);
-                }
-            }
-            mSortRequested = false;
-        }
-
-        if (currentCount == 0) continue;
-
-        std::vector<uint32_t> indices(currentCount);
-        std::iota(indices.begin(), indices.end(), 0);
-
-        std::sort(indices.begin(), indices.end(), [&](uint32_t a, uint32_t b) {
-            cv::Point3f da = positions[a] - camPos;
-            cv::Point3f db = positions[b] - camPos;
-            return (da.x*da.x + da.y*da.y + da.z*da.z) > (db.x*db.x + db.y*db.y + db.z*db.z);
-        });
-
-        {
-            std::lock_guard<std::mutex> lock(mSortMutex);
-            mDrawIndices = std::move(indices);
-            mIndicesDirty = true;
-        }
-    }
+    // Deprecated for Opaque Surfels
 }
 
-// RESTORATION: STABLE MARCH 9TH WORLD-SPACE TRANSFORM
-static void camToWorld(const float* V, float xc, float yc, float zc,
+static void camToWorld(const float* V_mat, float xc, float yc, float zc,
                        float& xw, float& yw, float& zw) {
-    // Inverse View Transform: P_world = R^T * (P_cam - t)
-    float tx = V[12], ty = V[13], tz = V[14];
-    float dx = xc - tx, dy = yc - ty, dz = zc - tz;
-    xw = V[0]*dx + V[1]*dy + V[2]*dz;
-    yw = V[4]*dx + V[5]*dy + V[6]*dz;
-    zw = V[8]*dx + V[9]*dy + V[10]*dz;
+    glm::mat4 V = glm::make_mat4(V_mat);
+    glm::mat4 M = glm::inverse(V);
+    glm::vec4 p_world = M * glm::vec4(xc, yc, zc, 1.0f);
+    xw = p_world.x; yw = p_world.y; zw = p_world.z;
 }
 
 void MobileGS::interpolateAnchorStep() {
@@ -688,7 +623,6 @@ void MobileGS::mapThreadFunc() {
     }
 }
 
-// RESTORATION: STABLE MARCH 9TH WORLD-SPACE RECONSTRUCTION
 void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv) {
     bool isTrackingState = false;
     {
@@ -707,11 +641,9 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
 
     const float* V = viewMat;
 
-    // ~~~ RESTORED PERFECT UNPROJECTION (960f72a9) ~~~
     const float halfW = depth.cols / 2.0f;
     const float halfH = depth.rows / 2.0f;
 
-    // Recovery from NDC: focal = w / (2 * tan(fov/2)) = halfW * projMat[0]
     float fx_px = projMat[0] * halfW;
     float fy_px = projMat[5] * halfH;
     float cx_px = (projMat[8]  + 1.0f) * halfW;
@@ -731,7 +663,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     auto unproject = [&](int r, int c, float d) {
         return cv::Point3f(
                 (static_cast<float>(c) - cx_px) * d / fx_px,
-                -(static_cast<float>(r) - cy_px) * d / fy_px, // Y-UP flip
+                -(static_cast<float>(r) - cy_px) * d / fy_px, // MANDATORY Y-UP FLIP
                 -d
         );
     };
@@ -758,8 +690,8 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 cv::Vec3b col = colorRGB.at<cv::Vec3b>(colorR, colorC);
                 float r_f = col[0]/255.0f, g_f = col[1]/255.0f, b_f = col[2]/255.0f;
 
-                // Surfel physical radius: physical resolution coverage
-                newVoxelUpdates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.2f, 0.0f, 0.0f, 1.0f, 0.02f}});
+                // Tighter radius 0.012f (12mm) for better physical alignment
+                newVoxelUpdates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.2f, 0.0f, 0.0f, 1.0f, 0.012f}});
                 mapModified = true;
             }
         }
@@ -779,7 +711,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 s.r = s.r * (1.0f-alpha) + nu.r * alpha;
                 s.g = s.g * (1.0f-alpha) + nu.g * alpha;
                 s.b = s.b * (1.0f-alpha) + nu.b * alpha;
-                s.confidence = std::min(1.0f, s.confidence + 0.05f); // Stable build-up
+                s.confidence = std::min(1.0f, s.confidence + 0.05f);
             } else {
                 splatData.push_back(update.second);
                 mVoxelGrid[update.first] = splatData.size() - 1;
@@ -789,7 +721,6 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         mPointCount = static_cast<int>(splatData.size());
     }
 
-    // Mesh vertices in World Space
     std::vector<float> meshVertices;
     std::vector<uint32_t> meshIndices;
     int gridW = depth.cols / step;
@@ -824,12 +755,9 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         }
     }
 
-    std::vector<Splat> localSplatCopy;
-    if (mapModified) { localSplatCopy = splatData; }
-
-    {
+    if (mapModified) {
         std::lock_guard<std::mutex> glLock(mGlDataMutex);
-        if (mapModified) mPendingSplatData = localSplatCopy;
+        mPendingSplatData = splatData;
         mPendingMeshVertices = std::move(meshVertices);
         mPendingMeshIndices = std::move(meshIndices);
         mGlDataDirty = true;
@@ -837,8 +765,6 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
 
     if (++mFrameCounter % 30 == 0) {
         continuousOptimize();
-        { std::lock_guard<std::mutex> sortLock(mSortMutex); mSortRequested = true; }
-        mSortCv.notify_one();
     }
 }
 
@@ -1011,10 +937,7 @@ void MobileGS::draw() {
     std::lock_guard<std::mutex> lock(mMutex);
     interpolateAnchorStep();
     if (!mProgram || !mCameraReady) return;
-    {
-        std::lock_guard<std::mutex> sortLock(mSortMutex);
-        if (mIndicesDirty) { glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexVbo); glBufferData(GL_ELEMENT_ARRAY_BUFFER, mDrawIndices.size() * sizeof(uint32_t), mDrawIndices.data(), GL_DYNAMIC_DRAW); mIndicesDirty = false; }
-    }
+
     glm::mat4 V = glm::make_mat4(mViewMatrix);
     glm::mat4 P = glm::make_mat4(mProjMatrix);
     glm::mat4 mvp = P * V; // MANDATE: Points are in World Space
@@ -1023,13 +946,11 @@ void MobileGS::draw() {
     if (mSplatsVisible && mPointCount > 0) {
         glUseProgram(mProgram);
         glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMvp"), 1, GL_FALSE, glm::value_ptr(mvp));
-        cv::Point3f camPos = getCameraWorldPosition();
-        glUniform3f(glGetUniformLocation(mProgram, "uCameraPos"), camPos.x, camPos.y, camPos.z);
         glUniform1f(glGetUniformLocation(mProgram, "uFocalY"), std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f));
 
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glDepthMask(GL_FALSE);
+        // MANDATE: High-Performance Opaque rendering
+        glDisable(GL_BLEND);
+        glDepthMask(GL_TRUE);
         glEnable(GL_DEPTH_TEST);
 
         glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
@@ -1039,13 +960,10 @@ void MobileGS::draw() {
         glEnableVertexAttribArray(3); glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(32));
         glEnableVertexAttribArray(4); glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(44));
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexVbo);
-        int elementsToDraw = std::min(mPointCount.load(), (int)mDrawIndices.size());
-        if (elementsToDraw > 0) glDrawElements(GL_POINTS, elementsToDraw, GL_UNSIGNED_INT, (void*)0);
-        else glDrawArrays(GL_POINTS, 0, mPointCount);
+        // Use DrawArrays since we don't need sorting
+        glDrawArrays(GL_POINTS, 0, mPointCount);
 
         glDisableVertexAttribArray(0); glDisableVertexAttribArray(1); glDisableVertexAttribArray(2); glDisableVertexAttribArray(3); glDisableVertexAttribArray(4);
-        glDepthMask(GL_TRUE); glDisable(GL_BLEND);
     }
 
     if (mMeshProgram != 0 && mMeshIndexCount > 0) {

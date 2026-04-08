@@ -24,11 +24,11 @@ The engine operates on a **Sparse Voxel Hashing** system.
     *   `xc = (c_px - cx_px) * depth / fx_px`
     *   `yc = -(r_px - cy_px) * depth / fy_px` (MANDATORY Y-FLIP)
 3.  **Transformation**: Stored points use **World Space** positions. 
-    *   `World_Point = inverse(View_Matrix) * Camera_Space_Point`
 4.  **Storage**: Voxel hashing operates on world coordinates with a 20mm resolution (`VOXEL_SIZE = 0.02f`).
-5.  **Rendering**: Uses Gaussian Splatting with soft feathered edges and additive/alpha blending for a "Perfect" visual look. 
-    *   `MVP = Projection * View * Anchor_Matrix`
-    *   Alpha falloff: `exp(-4.0 * r2)`
+5.  **Rendering**: Uses **High-Performance Opaque Surfels**. We do NOT use fuzzy, transparent Gaussian splats or sorting. 
+    *   `MVP = Projection * View`
+    *   `glDisable(GL_BLEND)` and `glDepthMask(GL_TRUE)` are mandatory.
+    *   Physical Point Size: `sz = (diameter_m * focal_y_px) / depth_m`.
 
 ## Sensor Input Pipeline
 
