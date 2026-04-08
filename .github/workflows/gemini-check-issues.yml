@@ -1,40 +1,105 @@
-name: Check Code and Close Completed Issues
+name: '📋 Gemini Check and Close Issues'
 
 on:
   push:
     branches:
-      - main
-      - master
+      - 'main'
+      - 'master'
+  workflow_dispatch:
 
-permissions:
-  contents: read
-  issues: write
+concurrency:
+  group: '${{ github.workflow }}-${{ github.ref }}'
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: 'bash'
 
 jobs:
   check-issues:
-    runs-on: ubuntu-latest
+    runs-on: 'ubuntu-latest'
+    timeout-minutes: 15
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+      issues: 'write'
+      pull-requests: 'write'
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: 'Mint identity token'
+        id: 'mint_identity_token'
+        if: |-
+          ${{ vars.APP_ID }}
+        uses: 'actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf' # ratchet:actions/create-github-app-token@v2
         with:
-          fetch-depth: 0
+          app-id: '${{ vars.APP_ID }}'
+          private-key: '${{ secrets.APP_PRIVATE_KEY }}'
+          permission-contents: 'read'
+          permission-issues: 'write'
+          permission-pull-requests: 'write'
 
-      - name: Run Gemini CLI to Check Issues
-        uses: google-github-actions/run-gemini-cli@v0
-        with:
-          prompt: |
-            You are a code review assistant for the ${{ github.repository }} repository.
+      - name: 'Checkout repository'
+        uses: 'actions/checkout@v4'
 
-            Your task is to review open GitHub issues and close any that have been resolved by the current codebase.
-
-            Steps:
-            1. Run `gh issue list --state open --json number,title,body --limit 100` to retrieve all open issues.
-            2. Examine the relevant source files to determine whether each issue has been addressed.
-            3. For any issue that is clearly and fully resolved by the current code, close it:
-               `gh issue close <number> --comment "Automatically closed: resolved in the current codebase as of commit ${{ github.sha }}."`
-            4. Leave unresolved or ambiguous issues open.
-
-            Be conservative — only close an issue when the code unambiguously addresses the reported problem.
-          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+      - name: 'Run Gemini CLI to check issues'
+        uses: 'google-github-actions/run-gemini-cli@v0' # ratchet:exclude
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: '${{ steps.mint_identity_token.outputs.token || secrets.GH_TOKEN || github.token }}'
+          REPOSITORY: '${{ github.repository }}'
+          GITHUB_SHA: '${{ github.sha }}'
+        with:
+          gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
+          gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
+          gcp_service_account: '${{ vars.SERVICE_ACCOUNT_EMAIL }}'
+          gcp_workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}'
+          gemini_api_key: '${{ secrets.GEMINI_API_KEY }}'
+          gemini_cli_version: '${{ vars.GEMINI_CLI_VERSION }}'
+          gemini_debug: '${{ fromJSON(vars.GEMINI_DEBUG || vars.ACTIONS_STEP_DEBUG || false) }}'
+          gemini_model: '${{ vars.GEMINI_MODEL }}'
+          use_gemini_code_assist: '${{ vars.GOOGLE_GENAI_USE_GCA }}'
+          use_vertex_ai: '${{ vars.GOOGLE_GENAI_USE_VERTEXAI }}'
+          upload_artifacts: '${{ vars.UPLOAD_ARTIFACTS }}'
+          workflow_name: 'gemini-check-issues'
+          settings: |-
+            {
+              "model": {
+                "maxSessionTurns": 50
+              },
+              "telemetry": {
+                "enabled": true,
+                "target": "local",
+                "outfile": ".gemini/telemetry.log"
+              },
+              "mcpServers": {
+                "github": {
+                  "command": "docker",
+                  "args": [
+                    "run",
+                    "-i",
+                    "--rm",
+                    "-e",
+                    "GITHUB_PERSONAL_ACCESS_TOKEN",
+                    "ghcr.io/github/github-mcp-server:v0.27.0"
+                  ],
+                  "includeTools": [
+                    "list_issues",
+                    "issue_read",
+                    "add_issue_comment",
+                    "get_file_contents",
+                    "search_code"
+                  ],
+                  "env": {
+                    "GITHUB_PERSONAL_ACCESS_TOKEN": "${GH_TOKEN}"
+                  }
+                }
+              },
+              "tools": {
+                "core": [
+                  "run_shell_command(cat)",
+                  "run_shell_command(ls)",
+                  "run_shell_command(grep)",
+                  "run_shell_command(find)",
+                  "run_shell_command(gh)"
+                ]
+              }
+            }
+          prompt: '/gemini-check-issues'
