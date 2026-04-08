@@ -44,28 +44,20 @@ struct JniThreadAttacher {
     }
 };
 
-// --- RESTORED MARCH 9TH GAUSSIAN SHADERS ---
+// --- STABLE GAUSSIAN SHADERS (RESTORED FROM MARCH 9TH) ---
 static const char* kVertexShader =
         "#version 300 es\n"
         "layout(location = 0) in vec3 aPosition;\n"
         "layout(location = 1) in vec4 aColor;\n"
         "layout(location = 2) in float aConfidence;\n"
-        "layout(location = 3) in vec3 aNormal;\n"
-        "layout(location = 4) in float aRadius;\n"
         "uniform mat4 uMvp;\n"
-        "uniform vec3 uCameraPos;\n"
-        "uniform float uFocalY;\n"
         "out vec4 vColor;\n"
-        "out float vNdotV;\n"
         "void main() {\n"
         "  vec4 clip = uMvp * vec4(aPosition, 1.0);\n"
         "  gl_Position = clip;\n"
-        "  vec3 viewDir = normalize(uCameraPos - aPosition);\n"
-        "  vNdotV = abs(dot(aNormal, viewDir));\n"
-        "  // RESTORATION: Using physical scale model from stable version\n"
-        "  float diameter = (aRadius * 2.0 * 1.414) * uFocalY / clip.w;\n"
-        "  float confScale = 0.5 + (0.5 * aConfidence);\n"
-        "  gl_PointSize = clamp(diameter * confScale, 4.0, 256.0);\n"
+        "  // Perspective-correct size: (base + confidence bonus) / depth\n"
+        "  float sz = (16.0 + 12.0 * aConfidence) / clip.w;\n"
+        "  gl_PointSize = clamp(sz, 2.0, 128.0);\n"
         "  vColor = aColor;\n"
         "}\n";
 
@@ -73,16 +65,13 @@ static const char* kFragmentShader =
         "#version 300 es\n"
         "precision mediump float;\n"
         "in vec4 vColor;\n"
-        "in float vNdotV;\n"
         "out vec4 oColor;\n"
         "void main() {\n"
         "  vec2 d = gl_PointCoord - 0.5;\n"
         "  float r2 = dot(d, d) * 4.0;\n"
         "  if (r2 > 1.0) discard;\n"
-        "  // RESTORATION: Soft Gaussian falloff\n"
         "  float alpha = exp(-4.0 * r2);\n"
-        "  float finalAlpha = alpha * vColor.a * vNdotV * 0.9;\n"
-        "  oColor = vec4(vColor.rgb, finalAlpha);\n"
+        "  oColor = vec4(vColor.rgb, alpha * vColor.a);\n"
         "}\n";
 
 // --- MESH (WIREFRAME) SHADERS ---
@@ -330,6 +319,7 @@ void MobileGS::setVoxelSize(float size) {
 }
 
 cv::Point3f MobileGS::getCameraWorldPosition() const {
+    // Column-major view matrix inverse: CamPos = -R^T * t
     float r00 = mViewMatrix[0], r10 = mViewMatrix[1], r20 = mViewMatrix[2];
     float r01 = mViewMatrix[4], r11 = mViewMatrix[5], r21 = mViewMatrix[6];
     float r02 = mViewMatrix[8], r12 = mViewMatrix[9], r22 = mViewMatrix[10];
@@ -390,28 +380,15 @@ void MobileGS::sortThreadFunc() {
     }
 }
 
-// RESTORATION: March 9th World-Space Transform
+// RESTORATION: STABLE MARCH 9TH WORLD-SPACE TRANSFORM
 static void camToWorld(const float* V, float xc, float yc, float zc,
                        float& xw, float& yw, float& zw) {
+    // Inverse View Transform: P_world = R^T * (P_cam - t)
     float tx = V[12], ty = V[13], tz = V[14];
-    float r00 = V[0], r10 = V[1], r20 = V[2];
-    float r01 = V[4], r11 = V[5], r21 = V[6];
-    float r02 = V[8], r12 = V[9], r22 = V[10];
-
-    float camX = -(r00*tx + r10*ty + r20*tz);
-    float camY = -(r01*tx + r11*ty + r21*tz);
-    float camZ = -(r02*tx + r12*ty + r22*tz);
-
-    xw = r00*xc + r01*yc + r02*zc + camX;
-    yw = r10*xc + r11*yc + r12*zc + camY;
-    zw = r20*xc + r21*yc + r22*zc + camZ;
-}
-
-static void camToWorldNormal(const float* V, float nxc, float nyc, float nzc,
-                             float& nxw, float& nyw, float& nzw) {
-    nxw = V[0]*nxc + V[4]*nyc + V[8]*nzc;
-    nyw = V[1]*nxc + V[5]*nyc + V[9]*nzc;
-    nzw = V[2]*nxc + V[6]*nyc + V[10]*nzc;
+    float dx = xc - tx, dy = yc - ty, dz = zc - tz;
+    xw = V[0]*dx + V[1]*dy + V[2]*dz;
+    yw = V[4]*dx + V[5]*dy + V[6]*dz;
+    zw = V[8]*dx + V[9]*dy + V[10]*dz;
 }
 
 void MobileGS::interpolateAnchorStep() {
@@ -698,9 +675,8 @@ void MobileGS::mapThreadFunc() {
     }
 }
 
-// RESTORATION: Stable World-Space Pipeline
+// RESTORATION: STABLE MARCH 9TH WORLD-SPACE RECONSTRUCTION
 void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv) {
-    auto startTime = std::chrono::high_resolution_clock::now();
     bool isTrackingState = false;
     {
         std::lock_guard<std::mutex> lock(mMutex);
@@ -718,9 +694,11 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
 
     const float* V = viewMat;
 
-    // RESTORATION: Recover intrinsics from projection matrix (Stability fallback)
+    // Recover intrinsics for unprojection.
+    // Stable Version: halfW used as focal length for NDC reconstruction.
     const float halfW = depth.cols / 2.0f;
     const float halfH = depth.rows / 2.0f;
+
     float fx_px = projMat[0] * halfW;
     float fy_px = projMat[5] * halfH;
     float cx_px = (projMat[8]  + 1.0f) * halfW;
@@ -735,12 +713,12 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     const float scaleY = (float)colorRGB.rows / depth.rows;
 
     bool mapModified = false;
-    int step = 8; // Stable density
+    int step = 8; // Constant stable density
 
     auto unproject = [&](int r, int c, float d) {
         return cv::Point3f(
-                (c - cx_px) * d / fx_px,
-                -(r - cy_px) * d / fy_px, // Y-UP flip
+                (static_cast<float>(c) - cx_px) * d / fx_px,
+                -(static_cast<float>(r) - cy_px) * d / fy_px, // MANDATORY Y-UP FLIP
                 -d
         );
     };
@@ -767,8 +745,8 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 cv::Vec3b col = colorRGB.at<cv::Vec3b>(colorR, colorC);
                 float r_f = col[0]/255.0f, g_f = col[1]/255.0f, b_f = col[2]/255.0f;
 
-                // Radius 1.5f + NORMAL + confidence 0.2f
-                newVoxelUpdates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.2f, 0.0f, 0.0f, 1.0f, 1.5f}});
+                // STABLE RADIUS: physical coverage
+                newVoxelUpdates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.2f, 0.0f, 0.0f, 1.0f, 0.02f}});
                 mapModified = true;
             }
         }
@@ -781,14 +759,14 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
             if (it != mVoxelGrid.end()) {
                 Splat& s = splatData[it->second];
                 const Splat& nu = update.second;
-                float alpha = 0.1f; // Slow averaging for high stability
+                float alpha = 0.15f;
                 s.x = s.x * (1.0f-alpha) + nu.x * alpha;
                 s.y = s.y * (1.0f-alpha) + nu.y * alpha;
                 s.z = s.z * (1.0f-alpha) + nu.z * alpha;
                 s.r = s.r * (1.0f-alpha) + nu.r * alpha;
                 s.g = s.g * (1.0f-alpha) + nu.g * alpha;
                 s.b = s.b * (1.0f-alpha) + nu.b * alpha;
-                s.confidence = std::min(1.0f, s.confidence + 0.05f); // RESTORED: Conf build-up
+                s.confidence = std::min(1.0f, s.confidence + 0.05f); // Stable build-up
             } else {
                 splatData.push_back(update.second);
                 mVoxelGrid[update.first] = splatData.size() - 1;
@@ -857,7 +835,7 @@ void MobileGS::continuousOptimize() {
     bool needsRebuild = false;
     size_t validCount = 0;
     for (size_t i = 0; i < splatData.size(); i++) {
-        splatData[i].confidence -= 0.005f; // RESTORED: Slow decay
+        splatData[i].confidence -= 0.005f;
         if (splatData[i].confidence > 0.0f) {
             if (validCount != i) splatData[validCount] = splatData[i];
             validCount++;
@@ -1007,9 +985,9 @@ void MobileGS::draw() {
     {
         std::lock_guard<std::mutex> glLock(mGlDataMutex);
         if (mGlDataDirty) {
-            uploadSplats = std::move(mPendingSplatData);
-            uploadMeshVerts = std::move(mPendingMeshVertices);
-            uploadMeshInds = std::move(mPendingMeshIndices);
+            uploadSplats = mPendingSplatData;
+            uploadMeshVerts = mPendingMeshVertices;
+            uploadMeshInds = mPendingMeshIndices;
             doUploadGl = true; mGlDataDirty = false;
         }
     }
