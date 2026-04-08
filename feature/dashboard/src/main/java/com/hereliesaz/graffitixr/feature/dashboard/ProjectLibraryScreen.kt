@@ -75,7 +75,7 @@ fun ProjectLibraryScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.Start
             ) {
                 Text(
                     text = strings.lib.title,
