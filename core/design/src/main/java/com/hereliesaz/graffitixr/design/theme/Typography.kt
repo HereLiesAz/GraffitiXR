@@ -9,7 +9,7 @@ import androidx.compose.ui.unit.sp
 import com.hereliesaz.graffitixr.design.R
 
 val BlackoutFontFamily = FontFamily(
-    Font(R.font.blackout_midnight)
+    Font(R.font.blackout_midnight),
 )
 
 // Set of Material typography styles to start with.
@@ -18,15 +18,15 @@ val BlackoutFontFamily = FontFamily(
 val Typography = Typography(
     bodyLarge = TextStyle(
         fontFamily = BlackoutFontFamily,
-        fontWeight = FontWeight.Large,
-        fontSize = 18.sp,
+        fontWeight = FontWeight.Medium,
+        fontSize = 20.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.5.sp
     ),
     titleLarge = TextStyle(
         fontFamily = BlackoutFontFamily,
-        fontWeight = FontWeight.Large,
-        fontSize = 18.sp,
+        fontWeight = FontWeight.Medium,
+        fontSize = 22.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.sp
     ),
@@ -45,11 +45,11 @@ val Typography = Typography(
         letterSpacing = 0.25.sp
     ),
     labelLarge = TextStyle(
-        fontFamily = BlackoutFontFamily
-        fontWeight = FontWeight.Large,
-        fontSize = 20.sp,
+        fontFamily = BlackoutFontFamily,
+        fontWeight = FontWeight.Medium,
+        fontSize = 22.sp,
         lineHeight = 18.sp,
-        letterSpacing = 0.1
+        letterSpacing = 0.1.sp
     ),
     displayLarge = TextStyle(
         fontFamily = BlackoutFontFamily,
@@ -74,8 +74,8 @@ val Typography = Typography(
     ),
     headlineLarge = TextStyle(
         fontFamily = BlackoutFontFamily,
-        fontWeight = FontWeight.Large,
-        fontSize = 28.sp,
+        fontWeight = FontWeight.Medium,
+        fontSize = 32.sp,
         lineHeight = 28.sp,
         letterSpacing = 0.sp
     ),
