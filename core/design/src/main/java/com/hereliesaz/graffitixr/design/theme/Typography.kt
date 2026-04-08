@@ -18,14 +18,14 @@ val BlackoutFontFamily = FontFamily(
 val Typography = Typography(
     bodyLarge = TextStyle(
         fontFamily = BlackoutFontFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
+        fontWeight = FontWeight.Large,
+        fontSize = 18.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.5.sp
     ),
     titleLarge = TextStyle(
         fontFamily = BlackoutFontFamily,
-        fontWeight = FontWeight.Normal,
+        fontWeight = FontWeight.Large,
         fontSize = 18.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.sp
@@ -45,11 +45,11 @@ val Typography = Typography(
         letterSpacing = 0.25.sp
     ),
     labelLarge = TextStyle(
-        fontFamily = BlackoutFontFamily,
-        fontWeight = FontWeight.Medium,
-        fontSize = 13.sp,
+        fontFamily = BlackoutFontFamily
+        fontWeight = FontWeight.Large,
+        fontSize = 20.sp,
         lineHeight = 18.sp,
-        letterSpacing = 0.1.sp
+        letterSpacing = 0.1
     ),
     displayLarge = TextStyle(
         fontFamily = BlackoutFontFamily,
@@ -74,8 +74,8 @@ val Typography = Typography(
     ),
     headlineLarge = TextStyle(
         fontFamily = BlackoutFontFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 22.sp,
+        fontWeight = FontWeight.Large,
+        fontSize = 28.sp,
         lineHeight = 28.sp,
         letterSpacing = 0.sp
     ),
