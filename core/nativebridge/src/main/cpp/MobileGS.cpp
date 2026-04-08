@@ -652,6 +652,8 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
     const float cx_fp = ( projMat[8]  + 1.0f) * halfW_fp;
     const float cy_fp = (-projMat[9]  + 1.0f) * halfH_fp;
 
+    glm::mat4 invV = glm::inverse(glm::make_mat4(V));
+
     std::vector<cv::Point3f> newPts;
     cv::Mat newDescs;
 
@@ -670,10 +672,9 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, 
         float yc = -(v - cy_fp) * d / fy_fp;
         float zc = -d;
 
-        float xw, yw, zw;
-        camToWorld(V, xc, yc, zc, xw, yw, zw);
+        glm::vec4 p_world = invV * glm::vec4(xc, yc, zc, 1.0f);
 
-        newPts.push_back(cv::Point3f(xw, yw, zw));
+        newPts.push_back(cv::Point3f(p_world.x, p_world.y, p_world.z));
         newDescs.push_back(allDescs.row(i));
     }
 
@@ -1160,6 +1161,8 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite,
     const float scaleX = (float)depthW / composite.cols;
     const float scaleY = (float)depthH / composite.rows;
 
+    glm::mat4 invV = glm::inverse(glm::make_mat4(viewMat16));
+
     std::vector<cv::Point3f> newPts;
     cv::Mat newDescs;
 
@@ -1182,9 +1185,8 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite,
         float yc = -(v - cy) * d / fy;
         float zc = -d;
 
-        float xw, yw, zw;
-        camToWorld(viewMat16, xc, yc, zc, xw, yw, zw);
-        newPts.push_back(cv::Point3f(xw, yw, zw));
+        glm::vec4 p_world = invV * glm::vec4(xc, yc, zc, 1.0f);
+        newPts.push_back(cv::Point3f(p_world.x, p_world.y, p_world.z));
         newDescs.push_back(descs.row(i));
     }
 
