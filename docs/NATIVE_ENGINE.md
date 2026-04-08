@@ -37,9 +37,10 @@ A single OpenGL ES 3.0 render path runs inside `ArRenderer`'s `GLSurfaceView`:
 **Crucial Shader Logic:** The vertex shader calculates the exact pixel diameter needed to cover the surfel based on the physical focal length (`uFocalY`) and depth (`clip.w`). The fragment shader aggressively discards fragments outside the radius and writes to the depth buffer completely opaquely. Alpha blending is `DISABLED`.
 
 ### 4. Depth Processing (`processDepthFrame`)
-*   **Input**: `cv::Mat` depth (metres, CV_32F) + colour frame + CPU Intrinsics + Rotation Delta.
-*   **Orientation Fix**: Depth maps are strictly rotated (`cv::rotate`) via the `cvRotateCode` parameter to match the active display orientation, preventing diagonal perspective skew.
-*   **Unprojection**: Uses the exact physical CPU intrinsics (`fx, fy, cx, cy`) to unproject pixels into Camera Space, then transforms to World Space using the `mViewMatrix`.
+*   **Input**: `cv::Mat` depth (metres, CV_32F) + colour frame + CPU Intrinsics + Anchor Transform.
+*   **Orientation Fix**: Depth maps and color frames are rotated via the `cvRotateCode` parameter to match the active display orientation.
+*   **Unprojection**: Uses the exact physical CPU intrinsics (`fx, fy, cx, cy`) to unproject pixels into Camera Space (with Y-up flip).
+*   **Coordinate Space**: Transforms points from Camera Space to **Anchor-Local Space** using `inverse(View * Anchor)`. All stored data is relative to the anchor to ensure stability and drift correction.
 
 ### 5. Optical Flow Depth Estimation (`computeOpticalFlowDepth`)
 Used as a fallback when ARCore Depth API frames are unavailable.

@@ -10,14 +10,18 @@ The engine operates on a **Sparse Voxel Hashing** system.
 
 ### Key Parameters
 
-Defined in `MobileGS.cpp`; tuned for dense watertight surfaces.
-
 | Parameter | Value | Description |
 | :--- | :--- | :--- |
-| `VOXEL_SIZE` | `0.005f` (5mm) | Physical size of a single surfel. Reduced to 5mm to provide ultra-high mapping resolution and eliminate grid-like artifacts. |
-| `CONFIDENCE_THRESHOLD` | `0.6f` | Voxel must reach this opacity before being considered "solid". |
-| `MAX_SPLATS` | `500,000` | Hard limit on the instance buffer to maintain 60 FPS on mid-range devices. |
-| `CULL_DISTANCE` | `5.0f` (metres) | Points further than 5m are ignored to keep the map local to the wall. |
+| `VOXEL_SIZE` | `0.005f` (5mm) | Physical size of a single surfel. |
+| `MIN_RENDER_CONFIDENCE` | `0.6f` | Surfel must reach this confidence before being rendered as "solid". |
+| `MAX_SPLATS` | `500,000` | Hard limit on the instance buffer. |
+
+### Coordinate System & Storage
+
+**CRITICAL MANDATE:** All surfels and mesh vertices MUST be stored in **Anchor-Local Space**. 
+*   **Conversion**: `Local = inverse(World_from_Anchor) * inverse(Camera_from_World) * Camera_Space_Point`
+*   **Reasoning**: Storing in local space ensures that the map remains locked to the physical wall even if ARCore's world origin drifts. It also ensures that Teleological Corrections (anchor updates) apply instantly without needing to re-process the entire map.
+*   **Rendering**: Use `MVP = Projection * View * Anchor` to project local points back to screen space.
 
 ## Sensor Input Pipeline
 
@@ -47,9 +51,11 @@ Cause: Reverted to legacy alpha-blended rendering.
 Fix: Ensure glDisable(GL_BLEND) and glDepthMask(GL_TRUE) remain in MobileGS::draw(). The fragment shader must use if (r2 > 1.0) discard; to draw hard-edged opaque circles.
 "The geometry looks stretched diagonally (Skewed)"
 Cause: Mismatch between sensor orientation and display orientation during unprojection.
-Fix: Ensure cvRotateCode is calculated correctly in ArRenderer.kt using DisplayRotationHelper, and that feedArCoreDepth uses the true physical CPU intrinsics (fx, fy, cx, cy) to unproject rays before converting them to world space.
-"App crashes after scanning for 2 minutes"
-LRU pruning is implemented via pruneMap() — automatically evicts the 10% least-confident splats using std::partial_sort when MAX_SPLATS is reached. This prevents OOM crashes on long scans.
+Fix: Ensure `cvRotateCode` is passed to BOTH color and depth feeding in `ArRenderer.kt`. The JNI layer must rotate the depth map AND intrinsics to match the screen-aligned color buffer.
+
+"The map is upside down or jumping"
+Cause: Incorrect Y-flip in unprojection or storing in World Space without applying Anchor transform correctly.
+Fix: Ensure `unproject` lambda in `MobileGS.cpp` uses `-(r - cy_px)` for the Y coordinate. Ensure points are stored in **Anchor-Local Space**.
 
 
 

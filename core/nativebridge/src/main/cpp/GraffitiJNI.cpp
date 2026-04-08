@@ -183,7 +183,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateAnchorTransf
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
         JNIEnv* env, jobject thiz, jobject yBuffer, jobject uBuffer, jobject vBuffer,
-        jint width, jint height, jint yStride, jint uvStride, jint uvPixelStride, jlong timestampNs) {
+        jint width, jint height, jint yStride, jint uvStride, jint uvPixelStride, jlong timestampNs, jint cvRotateCode) {
 
     if (!gSlamEngine) return;
 
@@ -197,47 +197,55 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     cv::Mat uMat(height / 2, width / 2, CV_8UC1, uData, uvStride);
     cv::Mat vMat(height / 2, width / 2, CV_8UC1, vData, uvStride);
 
-    if (gLastColorFrame.empty() || gLastColorFrame.cols != width || gLastColorFrame.rows != height) {
-        gLastColorFrame = cv::Mat(height, width, CV_8UC3);
-    }
-
+    cv::Mat colorRGB;
     cv::Mat yuv(height + height / 2, width, CV_8UC1);
     yMat.copyTo(yuv(cv::Rect(0, 0, width, height)));
 
     if (uvPixelStride == 1) {
         uMat.copyTo(yuv(cv::Rect(0, height, width / 2, height / 4)));
         vMat.copyTo(yuv(cv::Rect(width / 2, height, width / 2, height / 4)));
-        cv::cvtColor(yuv, gLastColorFrame, cv::COLOR_YUV2RGB_I420);
+        cv::cvtColor(yuv, colorRGB, cv::COLOR_YUV2RGB_I420);
     } else if (uvPixelStride == 2) {
         cv::Mat uvInterleaved(height / 2, width, CV_8UC1, vData, uvStride);
         uvInterleaved.copyTo(yuv(cv::Rect(0, height, width, height / 2)));
-        cv::cvtColor(yuv, gLastColorFrame, cv::COLOR_YUV2RGB_NV21);
+        cv::cvtColor(yuv, colorRGB, cv::COLOR_YUV2RGB_NV21);
     } else {
-        cv::cvtColor(yMat, gLastColorFrame, cv::COLOR_GRAY2RGB);
+        cv::cvtColor(yMat, colorRGB, cv::COLOR_GRAY2RGB);
     }
 
+    if (cvRotateCode >= 0) {
+        cv::rotate(colorRGB, colorRGB, cvRotateCode);
+    }
+
+    gLastColorFrame = colorRGB;
     gSlamEngine->scheduleRelocCheck(gLastColorFrame);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
-        JNIEnv* env, jobject thiz, jobject colorBuffer, jint width, jint height, jlong timestampNs) {
+        JNIEnv* env, jobject thiz, jobject colorBuffer, jint width, jint height, jlong timestampNs, jint cvRotateCode) {
 
     uint8_t* buffer = static_cast<uint8_t*>(env->GetDirectBufferAddress(colorBuffer));
     if (!buffer || !gSlamEngine) return;
 
     cv::Mat frame(height, width, CV_8UC4, buffer);
-    cv::cvtColor(frame, gLastColorFrame, cv::COLOR_RGBA2RGB);
+    cv::Mat colorRGB;
+    cv::cvtColor(frame, colorRGB, cv::COLOR_RGBA2RGB);
 
+    if (cvRotateCode >= 0) {
+        cv::rotate(colorRGB, colorRGB, cvRotateCode);
+    }
+
+    gLastColorFrame = colorRGB;
     gSlamEngine->scheduleRelocCheck(gLastColorFrame);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
-        JNIEnv* env, jobject thiz, jobject depthBuffer, jint width, jint height, jint rowStride, jfloatArray intrArray, jint cpuW, jint cpuH) {
+        JNIEnv* env, jobject thiz, jobject depthBuffer, jint width, jint height, jint rowStride, jfloatArray intrArray, jint cpuW, jint cpuH, jint cvRotateCode) {
 
     gLastDepthTrace.clear();
-    DEPTH_TRACE("feedArCoreDepth called w=%d h=%d stride=%d", width, height, rowStride);
+    DEPTH_TRACE("feedArCoreDepth called w=%d h=%d stride=%d rot=%d", width, height, rowStride, cvRotateCode);
 
     if (!gSlamEngine) { DEPTH_TRACE("DROPPED - no engine"); return; }
     if (gLastColorFrame.empty()) { DEPTH_TRACE("DROPPED - no color frame yet"); return; }
@@ -257,7 +265,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
             uint16_t raw = rowPtr[c];
             uint16_t depthMm = raw & 0x1FFFu;
             uint8_t conf = (raw >> 13u) & 0x7u;
-            if (depthMm > 0) {
+            if (depthMm > 0 && conf > 0) { // Requirement: confidence > 0
                 float d = depthMm / 1000.0f;
                 depthMap.at<float>(r, c) = d;
                 validPixels++;
@@ -280,7 +288,26 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
     float fx = intr[0], fy = intr[1], cx = intr[2], cy = intr[3];
     env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
 
-    if (cpuW > 0 && cpuH > 0) {
+    if (cvRotateCode >= 0) {
+        cv::rotate(depthMap, depthMap, cvRotateCode);
+        // If rotated 90 or 270, swap and adjust intrinsics
+        if (cvRotateCode == cv::ROTATE_90_CLOCKWISE || cvRotateCode == cv::ROTATE_90_COUNTERCLOCKWISE) {
+            float oldFx = fx, oldFy = fy, oldCx = cx, oldCy = cy;
+            fx = oldFy; fy = oldFx;
+            if (cvRotateCode == cv::ROTATE_90_CLOCKWISE) {
+                cx = oldCy;
+                cy = depthMap.rows - oldCx;
+            } else {
+                cx = depthMap.cols - oldCy;
+                cy = oldCx;
+            }
+        } else if (cvRotateCode == cv::ROTATE_180) {
+            cx = depthMap.cols - cx;
+            cy = depthMap.rows - cy;
+        }
+    }
+
+    if (cpuW > 0 && cpuH > 0 && cvRotateCode < 0) { // Only scale if not rotated (rotation handled above)
         float scaleX = (float)depthMap.cols / cpuW;
         float scaleY = (float)depthMap.rows / cpuH;
         fx *= scaleX;

@@ -351,6 +351,15 @@ class ArRenderer(
             // Throttle frame feeding to 15Hz (every 4 frames at 60Hz) to halve processing-related power draw.
             // When tracking is stable and the device is stationary, we could throttle even further.
             if (frameCount++ % 4 == 0) {
+                // Calculate rotation code to align sensor-native data with display orientation
+                val displayRotation = displayRotationHelper.getRotation()
+                val cvRotateCode = when ((sensorOrientation - displayRotation * 90 + 360) % 360) {
+                    90 -> 0 // cv::ROTATE_90_CLOCKWISE
+                    180 -> 1 // cv::ROTATE_180
+                    270 -> 2 // cv::ROTATE_90_COUNTERCLOCKWISE
+                    else -> -1
+                }
+
                 try {
                     frame.acquireCameraImage().use { image ->
                         val planes = image.planes
@@ -358,7 +367,8 @@ class ArRenderer(
                             planes[0].buffer, planes[1].buffer, planes[2].buffer,
                             image.width, image.height,
                             planes[0].rowStride, planes[1].rowStride, planes[1].pixelStride,
-                            frame.timestamp
+                            frame.timestamp,
+                            cvRotateCode
                         )
                         // Always feed temporal stereo frames for continuous depth refinement
                         stereoProvider?.submitFrame(planes[0].buffer, image.width, image.height, frame.timestamp)
@@ -389,11 +399,21 @@ class ArRenderer(
                             )
                             val cpuDim = intrinsics.imageDimensions
 
+                            // Calculate rotation code to align sensor-native depth with display orientation
+                            val displayRotation = displayRotationHelper.getRotation()
+                            val cvRotateCode = when ((sensorOrientation - displayRotation * 90 + 360) % 360) {
+                                90 -> 0 // cv::ROTATE_90_CLOCKWISE
+                                180 -> 1 // cv::ROTATE_180
+                                270 -> 2 // cv::ROTATE_90_COUNTERCLOCKWISE
+                                else -> null
+                            }
+
                             slamManager.feedArCoreDepth(
                                 depthPlane.buffer,
                                 depthImage.width, depthImage.height,
                                 depthPlane.rowStride,
-                                intrArr, cpuDim[0], cpuDim[1]
+                                intrArr, cpuDim[0], cpuDim[1],
+                                cvRotateCode
                             )
                         }
                     } catch (e: com.google.ar.core.exceptions.NotYetAvailableException) {

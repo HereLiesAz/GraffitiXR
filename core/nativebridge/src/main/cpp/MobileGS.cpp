@@ -83,10 +83,11 @@ static std::string getFragmentShaderSource(float minConfidence) {
         "in float vConfidence;\n"
         "out vec4 oColor;\n"
         "void main() {\n"
-        "  // Threshold synced with MobileGS::MIN_RENDER_CONFIDENCE to immediately render new points\n"
+        "  // MANDATE: Solid surface threshold\n"
         "  if (vConfidence < %f) discard;\n"
         "  vec2 d = gl_PointCoord - 0.5;\n"
         "  float r2 = dot(d, d) * 4.0;\n"
+        "  // MANDATE: Hard-edged opaque circles (No fuzzy Gaussians)\n"
         "  if (r2 > 1.0) discard;\n"
         "  float shading = 0.8 + 0.2 * vNdotV;\n"
         "  oColor = vec4(vColor.rgb * shading, 1.0);\n"
@@ -438,23 +439,6 @@ void MobileGS::sortThreadFunc() {
     }
 }
 
-static void camToWorld(const float* V, float xc, float yc, float zc,
-                       float& xw, float& yw, float& zw) {
-    float tx = V[12], ty = V[13], tz = V[14];
-    float camX = -(V[0]*tx + V[1]*ty + V[2]*tz);
-    float camY = -(V[4]*tx + V[5]*ty + V[6]*tz);
-    float camZ = -(V[8]*tx + V[9]*ty + V[10]*tz);
-    xw = V[0]*xc + V[1]*yc + V[2]*zc + camX;
-    yw = V[4]*xc + V[5]*yc + V[6]*zc + camY;
-    zw = V[8]*xc + V[9]*yc + V[10]*zc + camZ;
-}
-
-static void camToWorldNormal(const float* V, float nxc, float nyc, float nzc,
-                             float& nxw, float& nyw, float& nzw) {
-    nxw = V[0]*nxc + V[1]*nyc + V[2]*nzc;
-    nyw = V[4]*nxc + V[5]*nyc + V[6]*nzc;
-    nzw = V[8]*nxc + V[9]*nyc + V[10]*nzc;
-}
 
 void MobileGS::interpolateAnchorStep() {
     if (!mAnchorInterpolating) return;
@@ -792,8 +776,11 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         colorRGB = color;
     }
 
-    const float* V = viewMat;
-    const float* A = anchorMat;
+    // MANDATE: Store in Anchor-Local Space to fix jumping/drift
+    glm::mat4 V = glm::make_mat4(viewMat);
+    glm::mat4 A = glm::make_mat4(anchorMat);
+    glm::mat4 camToLocal = glm::inverse(V * A);
+    glm::mat3 normalCamToLocal = glm::mat3(camToLocal);
 
     float fx_px, fy_px, cx_px, cy_px;
     if (intrinsics) {
@@ -818,9 +805,9 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     if (mVoxelSize < 0.004f) step = 1;
 
     auto unproject = [&](int r, int c, float d) {
-        return cv::Point3f(
+        return glm::vec3(
                 (c - cx_px) * d / fx_px,
-                -(r - cy_px) * d / fy_px,
+                -(r - cy_px) * d / fy_px, // MANDATE: Y-flip for OpenGL camera space
                 -d
         );
     };
@@ -838,46 +825,26 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
             float d_d = depthRowD[c];
 
             if (d > 0.1f && d < 5.0f && d_r > 0.1f && d_d > 0.1f) {
-                cv::Point3f p_cam = unproject(r, c, d);
-                cv::Point3f p_r_cam = unproject(r, c + step, d_r);
-                cv::Point3f p_d_cam = unproject(r + step, c, d_d);
+                glm::vec3 p_cam = unproject(r, c, d);
+                glm::vec3 p_r_cam = unproject(r, c + step, d_r);
+                glm::vec3 p_d_cam = unproject(r + step, c, d_d);
 
-                cv::Point3f v1 = p_r_cam - p_cam;
-                cv::Point3f v2 = p_d_cam - p_cam;
-                cv::Point3f n_cam = v1.cross(v2);
+                glm::vec3 v1 = p_r_cam - p_cam;
+                glm::vec3 v2 = p_d_cam - p_cam;
+                glm::vec3 n_cam = glm::normalize(glm::cross(v1, v2));
 
-                if (n_cam.dot(p_cam) > 0) n_cam = -n_cam;
+                if (glm::dot(n_cam, p_cam) > 0) n_cam = -n_cam;
 
-                float n_len = cv::norm(n_cam);
-                if (n_len > 0.0001f) n_cam /= n_len;
+                glm::vec4 p_local = camToLocal * glm::vec4(p_cam, 1.0f);
+                glm::vec3 n_local = normalCamToLocal * n_cam;
 
-                // 1. Camera to World
-                float xw, yw, zw;
-                camToWorld(V, p_cam.x, p_cam.y, p_cam.z, xw, yw, zw);
-
-                float nx_w, ny_w, nz_w;
-                camToWorldNormal(V, n_cam.x, n_cam.y, n_cam.z, nx_w, ny_w, nz_w);
-
-                // 2. World to Anchor-Local
-                // Local = R_A^T * (World - T_A)
-                float tx = A[12], ty = A[13], tz = A[14];
-                float dx = xw - tx, dy = yw - ty, dz = zw - tz;
-                float xl = A[0]*dx + A[1]*dy + A[2]*dz;
-                float yl = A[4]*dx + A[5]*dy + A[6]*dz;
-                float zl = A[8]*dx + A[9]*dy + A[10]*dz;
-
-                float nxl = A[0]*nx_w + A[1]*ny_w + A[2]*nz_w;
-                float nyl = A[4]*nx_w + A[5]*ny_w + A[6]*nz_w;
-                float nzl = A[8]*nx_w + A[9]*ny_w + A[10]*nz_w;
-
-                // Splat radius based on camera-space geometry to ensure coverage
-                float localRadius = std::max(cv::norm(v1), cv::norm(v2)) * 0.707f;
+                float localRadius = std::max(glm::length(v1), glm::length(v2)) * 0.707f;
                 localRadius = std::clamp(localRadius, mVoxelSize * 0.5f, mVoxelSize * 5.0f);
 
                 VoxelKey key{
-                        static_cast<int>(std::floor(xl / mVoxelSize)),
-                        static_cast<int>(std::floor(yl / mVoxelSize)),
-                        static_cast<int>(std::floor(zl / mVoxelSize))
+                        static_cast<int>(std::floor(p_local.x / mVoxelSize)),
+                        static_cast<int>(std::floor(p_local.y / mVoxelSize)),
+                        static_cast<int>(std::floor(p_local.z / mVoxelSize))
                 };
 
                 int colorR = static_cast<int>(r * scaleY);
@@ -887,7 +854,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 cv::Vec3b col = colorRGB.at<cv::Vec3b>(colorR, colorC);
                 float r_f = col[0]/255.0f, g_f = col[1]/255.0f, b_f = col[2]/255.0f;
 
-                newVoxelUpdates.push_back({key, {xl, yl, zl, r_f, g_f, b_f, 1.0f, 0.1f, nxl, nyl, nzl, localRadius}});
+                newVoxelUpdates.push_back({key, {p_local.x, p_local.y, p_local.z, r_f, g_f, b_f, 1.0f, 0.2f, n_local.x, n_local.y, n_local.z, localRadius}});
                 mapModified = true;
             }
         }
@@ -928,7 +895,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 s.confidence = std::min(1.0f, s.confidence + confGain);
             } else {
                 Splat s = update.second;
-                s.confidence = 0.1f;
+                s.confidence = 0.2f; // Increased initial confidence
                 splatData.push_back(s);
                 mVoxelGrid[update.first] = splatData.size() - 1;
             }
@@ -951,21 +918,13 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         for (int c = 0; c < depth.cols - step; c += step) {
             float d = depth.at<float>(r, c);
             if (d > 0.1f && d < 5.0f) {
-                cv::Point3f p_cam = unproject(r, c, d);
-                float xw, yw, zw;
-                camToWorld(V, p_cam.x, p_cam.y, p_cam.z, xw, yw, zw);
-
-                // Local = R_A^T * (World - T_A)
-                float tx = A[12], ty = A[13], tz = A[14];
-                float dx = xw - tx, dy = yw - ty, dz = zw - tz;
-                float xl = A[0]*dx + A[1]*dy + A[2]*dz;
-                float yl = A[4]*dx + A[5]*dy + A[6]*dz;
-                float zl = A[8]*dx + A[9]*dy + A[10]*dz;
+                glm::vec3 p_cam = unproject(r, c, d);
+                glm::vec4 p_local = camToLocal * glm::vec4(p_cam, 1.0f);
 
                 int idx = meshVertices.size() / 3;
-                meshVertices.push_back(xl);
-                meshVertices.push_back(yl);
-                meshVertices.push_back(zl);
+                meshVertices.push_back(p_local.x);
+                meshVertices.push_back(p_local.y);
+                meshVertices.push_back(p_local.z);
                 vIndex[(r / step) * gridW + (c / step)] = idx;
             }
         }
@@ -1047,8 +1006,8 @@ void MobileGS::continuousOptimize() {
     size_t validCount = 0;
 
     for (size_t i = 0; i < splatData.size(); i++) {
-        // TUNE: Slower decay for small-scale art to prevent "shimmering" or loss of detail
-        float decay = (mVoxelSize < 0.004f) ? 0.001f : 0.005f;
+        // TUNE: Slower decay for dense surfaces
+        float decay = (mVoxelSize < 0.004f) ? 0.0005f : 0.002f;
         splatData[i].confidence -= decay;
 
         if (splatData[i].confidence > 0.0f) {

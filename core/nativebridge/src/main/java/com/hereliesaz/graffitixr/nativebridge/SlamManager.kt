@@ -96,10 +96,11 @@ class SlamManager @Inject constructor() {
         rowStride: Int,
         intrinsics: FloatArray,
         intrW: Int,
-        intrH: Int
+        intrH: Int,
+        cvRotateCode: Int? = null
     ) {
         if (depthBuffer.isDirect) {
-            nativeFeedArCoreDepth(depthBuffer, width, height, rowStride, intrinsics, intrW, intrH)
+            nativeFeedArCoreDepth(depthBuffer, width, height, rowStride, intrinsics, intrW, intrH, cvRotateCode ?: -1)
         }
     }
 
@@ -112,16 +113,17 @@ class SlamManager @Inject constructor() {
         yStride: Int,
         uvStride: Int,
         uvPixelStride: Int,
-        timestampNs: Long
+        timestampNs: Long,
+        cvRotateCode: Int? = null
     ) {
         if (yBuffer.isDirect && uBuffer.isDirect && vBuffer.isDirect) {
-            nativeFeedYuvFrame(yBuffer, uBuffer, vBuffer, width, height, yStride, uvStride, uvPixelStride, timestampNs)
+            nativeFeedYuvFrame(yBuffer, uBuffer, vBuffer, width, height, yStride, uvStride, uvPixelStride, timestampNs, cvRotateCode ?: -1)
         }
     }
 
-    fun feedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int, timestampNs: Long) {
+    fun feedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int, timestampNs: Long, cvRotateCode: Int? = null) {
         if (colorBuffer.isDirect) {
-            nativeFeedColorFrame(colorBuffer, width, height, timestampNs)
+            nativeFeedColorFrame(colorBuffer, width, height, timestampNs, cvRotateCode ?: -1)
         }
     }
 
@@ -214,7 +216,7 @@ class SlamManager @Inject constructor() {
     )
     private external fun nativeSetRelocEnabled(enabled: Boolean)
     private external fun nativeSetVoxelSize(size: Float)
-    private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int, intrinsics: FloatArray, intrW: Int, intrH: Int)
+    private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int, intrinsics: FloatArray, intrW: Int, intrH: Int, cvRotateCode: Int)
     private external fun nativeFeedYuvFrame(
         yBuffer: ByteBuffer,
         uBuffer: ByteBuffer,
@@ -224,9 +226,10 @@ class SlamManager @Inject constructor() {
         yStride: Int,
         uvStride: Int,
         uvPixelStride: Int,
-        timestampNs: Long
+        timestampNs: Long,
+        cvRotateCode: Int
     )
-    private external fun nativeFeedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int, timestampNs: Long)
+    private external fun nativeFeedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int, timestampNs: Long, cvRotateCode: Int)
     private external fun nativeDestroy()
     private external fun nativeAnnotateKeypoints(bitmap: Bitmap)
     private external fun nativeFeedStereoData(leftBuffer: ByteBuffer, rightBuffer: ByteBuffer, width: Int, height: Int, timestamp: Long)
