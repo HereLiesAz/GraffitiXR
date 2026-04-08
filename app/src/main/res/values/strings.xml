@@ -396,7 +396,7 @@
     <string name="lib_new_project">New</string>
     <string name="lib_import_project">Import</string>
     <string name="lib_no_projects">No projects yet</string>
-    <string name="lib_no_projects_hint">Tap New above to start your first mural.\n\nYou\'ll be taken into the editor where you can:\n  \u2022  Add artwork from the Design menu\n  \u2022  Switch to AR mode to project onto a real wall\n  \u2022  Use Overlay to float your design on the live camera\n  \u2022  Use Mockup to preview on a wall photo\n  \u2022  Use Lightbox to trace your design onto paper</string>
+    <string name="lib_no_projects_hint">Tap New above to start your first mural.\n\nYou\'ll be taken into the editor where you can:\n  \u2022  Add artwork from the Design menu\n \n \u2022  Switch to AR mode to project onto a real wall\n  \n\u2022  Use Overlay to float your design on the live camera\n \n \u2022  Use Mockup to preview on a wall photo\n \n \u2022  Use Lightbox to trace your design onto paper</string>
     <string name="lib_project_thumbnail">Project Thumbnail</string>
     <string name="lib_delete_project_desc">Delete project %1$s</string>
 
