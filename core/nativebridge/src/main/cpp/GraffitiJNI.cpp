@@ -472,21 +472,34 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
     if (frame.empty()) return;
 
     cv::Mat gray;
-    cv::cvtColor(frame, gray, cv::COLOR_RGBA2GRAY);
+    if (frame.channels() == 4) cv::cvtColor(frame, gray, cv::COLOR_RGBA2GRAY);
+    else if (frame.channels() == 3) cv::cvtColor(frame, gray, cv::COLOR_RGB2GRAY);
+    else gray = frame.clone();
 
     std::vector<cv::KeyPoint> kps;
     cv::Mat descs;
     if (gSlamEngine) {
-        // Implementation logic borrowed from generateFingerprint for visualization
         gSlamEngine->getMutex().lock();
-        // SuperPoint or ORB
+        // Use consistent feature detection for visualization
         cv::ORB::create(500)->detectAndCompute(gray, cv::noArray(), kps, descs);
         gSlamEngine->getMutex().unlock();
     }
 
+    // Convert frame to RGBA if it isn't already for drawing
     cv::Mat annotated;
-    cv::cvtColor(gray, annotated, cv::COLOR_GRAY2RGBA);
+    if (frame.channels() == 4) annotated = frame.clone();
+    else if (frame.channels() == 3) cv::cvtColor(frame, annotated, cv::COLOR_RGB2RGBA);
+    else cv::cvtColor(frame, annotated, cv::COLOR_GRAY2RGBA);
+
     cv::drawKeypoints(annotated, kps, annotated, cv::Scalar(0, 255, 0, 255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+
+    // Add feature count label
+    std::string label = std::to_string(kps.size()) + " features";
+    int baseline = 0;
+    double scale = std::max(1.0, frame.cols / 640.0);
+    cv::Size textSize = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, scale, 2, &baseline);
+    cv::rectangle(annotated, cv::Point(8, 8), cv::Point(textSize.width + 16, textSize.height + baseline + 16), cv::Scalar(0, 0, 0, 180), cv::FILLED);
+    cv::putText(annotated, label, cv::Point(12, textSize.height + 12), cv::FONT_HERSHEY_SIMPLEX, scale, cv::Scalar(255, 220, 0, 255), 2);
 
     matToBitmap(env, annotated, bitmap);
 }
