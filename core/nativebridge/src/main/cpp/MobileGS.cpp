@@ -347,6 +347,12 @@ void MobileGS::setVoxelSize(float size) {
     LOGI("Voxel size adjusted to %.4f. Grid re-hashed.", size);
 }
 
+static inline void camToWorld(const float* V, float xc, float yc, float zc, float& xw, float& yw, float& zw) {
+    xw = V[0] * xc + V[4] * yc + V[8] * zc + V[12];
+    yw = V[1] * xc + V[5] * yc + V[9] * zc + V[13];
+    zw = V[2] * xc + V[6] * yc + V[10] * zc + V[14];
+}
+
 cv::Point3f MobileGS::getCameraWorldPosition() const {
     float r00 = mViewMatrix[0], r10 = mViewMatrix[1], r20 = mViewMatrix[2];
     float r01 = mViewMatrix[4], r11 = mViewMatrix[5], r21 = mViewMatrix[6];
