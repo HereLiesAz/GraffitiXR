@@ -245,7 +245,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
         JNIEnv* env, jobject thiz, jobject depthBuffer, jint width, jint height, jint rowStride, jfloatArray intrArray, jint cpuW, jint cpuH, jint cvRotateCode) {
 
     gLastDepthTrace.clear();
-    DEPTH_TRACE("feedArCoreDepth called w=%d h=%d stride=%d rot=%d", width, height, rowStride, cvRotateCode);
+    DEPTH_TRACE("feedArCoreDepth called w=%d h=%d stride=%d", width, height, rowStride);
 
     if (!gSlamEngine) { DEPTH_TRACE("DROPPED - no engine"); return; }
     if (gLastColorFrame.empty()) { DEPTH_TRACE("DROPPED - no color frame yet"); return; }
@@ -253,67 +253,36 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
     auto* rawDepthBytes = static_cast<const uint8_t*>(env->GetDirectBufferAddress(depthBuffer));
     if (!rawDepthBytes) { DEPTH_TRACE("DROPPED - null buffer"); return; }
 
+    // MANDATE: Keep depth map in sensor-native (Landscape) orientation to align with Physical pose.
     cv::Mat depthMap(height, width, CV_32F, cv::Scalar(0.0f));
 
     int validPixels = 0;
-    int zeroConfPixels = 0;
-    float minD = 999.f, maxD = 0.f;
-
     for (int r = 0; r < height; r++) {
         auto* rowPtr = reinterpret_cast<const uint16_t*>(rawDepthBytes + (r * rowStride));
         for (int c = 0; c < width; c++) {
             uint16_t raw = rowPtr[c];
             uint16_t depthMm = raw & 0x1FFFu;
             uint8_t conf = (raw >> 13u) & 0x7u;
-            if (depthMm > 0 && conf > 0) { // Requirement: confidence > 0
-                float d = depthMm / 1000.0f;
-                depthMap.at<float>(r, c) = d;
+            if (depthMm > 0 && conf > 0) {
+                depthMap.at<float>(r, c) = depthMm / 1000.0f;
                 validPixels++;
-                if (d < minD) minD = d;
-                if (d > maxD) maxD = d;
-            } else if (conf == 0) {
-                zeroConfPixels++;
             }
         }
     }
 
-    DEPTH_TRACE("decoded valid=%d zeroConf=%d range=%.2f-%.2fm", validPixels, zeroConfPixels, minD, maxD);
-
-    if (validPixels == 0) {
-        DEPTH_TRACE("DROPPED - all pixels invalid (no depth data)");
-        return;
-    }
+    if (validPixels == 0) return;
 
     jfloat* intr = env->GetFloatArrayElements(intrArray, nullptr);
     float fx = intr[0], fy = intr[1], cx = intr[2], cy = intr[3];
     env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
 
-    if (cvRotateCode >= 0) {
-        cv::rotate(depthMap, depthMap, cvRotateCode);
-        // If rotated 90 or 270, swap and adjust intrinsics
-        if (cvRotateCode == cv::ROTATE_90_CLOCKWISE || cvRotateCode == cv::ROTATE_90_COUNTERCLOCKWISE) {
-            float oldFx = fx, oldFy = fy, oldCx = cx, oldCy = cy;
-            fx = oldFy; fy = oldFx;
-            if (cvRotateCode == cv::ROTATE_90_CLOCKWISE) {
-                cx = oldCy;
-                cy = depthMap.rows - oldCx;
-            } else {
-                cx = depthMap.cols - oldCy;
-                cy = oldCx;
-            }
-        } else if (cvRotateCode == cv::ROTATE_180) {
-            cx = depthMap.cols - cx;
-            cy = depthMap.rows - cy;
-        }
-    }
-
-    if (cpuW > 0 && cpuH > 0 && cvRotateCode < 0) { // Only scale if not rotated (rotation handled above)
-        float scaleX = (float)depthMap.cols / cpuW;
-        float scaleY = (float)depthMap.rows / cpuH;
-        fx *= scaleX;
-        fy *= scaleY;
-        cx *= scaleX;
-        cy *= scaleY;
+    // 1. SCALE: Physical intrinsics are for the full CPU resolution (cpuW/cpuH).
+    // They must be scaled to match the sensor-native depth resolution (width/height).
+    if (cpuW > 0 && cpuH > 0) {
+        float scaleX = (float)width / (float)cpuW;
+        float scaleY = (float)height / (float)cpuH;
+        fx *= scaleX; fy *= scaleY;
+        cx *= scaleX; cy *= scaleY;
     }
 
     float finalIntrinsics[4] = {fx, fy, cx, cy};
@@ -323,7 +292,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
         return;
     }
 
-    DEPTH_TRACE("pushing frame to map thread depthSize=%dx%d", depthMap.cols, depthMap.rows);
+    // MANDATE: Pass sensor-native depth map with Physical Pose (gLastMappingViewMatrix)
     gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastMappingViewMatrix, gLastMappingProjMatrix, finalIntrinsics, false);
 }
 

@@ -83,11 +83,11 @@ static std::string getFragmentShaderSource(float minConfidence) {
         "in float vConfidence;\n"
         "out vec4 oColor;\n"
         "void main() {\n"
-        "  // MANDATE: Solid surface threshold\n"
+        "  // MANDATE: Render only confident surfaces\n"
         "  if (vConfidence < %f) discard;\n"
         "  vec2 d = gl_PointCoord - 0.5;\n"
         "  float r2 = dot(d, d) * 4.0;\n"
-        "  // MANDATE: Hard-edged opaque circles (No fuzzy Gaussians)\n"
+        "  // MANDATE: Hard-edged opaque circles\n"
         "  if (r2 > 1.0) discard;\n"
         "  float shading = 0.8 + 0.2 * vNdotV;\n"
         "  oColor = vec4(vColor.rgb * shading, 1.0);\n"
@@ -777,10 +777,13 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         colorRGB = color;
     }
 
-    // MANDATE: Store in Anchor-Local Space to fix jumping/drift
-    glm::mat4 V = glm::make_mat4(viewMat);
-    glm::mat4 A = glm::make_mat4(anchorMat);
-    glm::mat4 camToLocal = glm::inverse(V * A);
+    // MANDATE: Coordinate Transformation Pipeline
+    // 1. Unproject from raw sensor depth (Landscape) using physical intrinsics
+    // 2. Transform to World Space using physical camera pose (MappingViewMatrix)
+    // 3. Transform to Anchor-Local Space for drift-locked storage
+    glm::mat4 V_inv = glm::inverse(glm::make_mat4(viewMat));
+    glm::mat4 A_inv = glm::inverse(glm::make_mat4(anchorMat));
+    glm::mat4 camToLocal = A_inv * V_inv;
     glm::mat3 normalCamToLocal = glm::mat3(camToLocal);
 
     float fx_px, fy_px, cx_px, cy_px;
@@ -807,8 +810,8 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
 
     auto unproject = [&](int r, int c, float d) {
         return glm::vec3(
-                (c - cx_px) * d / fx_px,
-                -(r - cy_px) * d / fy_px, // MANDATE: Y-flip for OpenGL camera space
+                (static_cast<float>(c) - cx_px) * d / fx_px,
+                -(static_cast<float>(r) - cy_px) * d / fy_px, // MANDATE: Y-flip for OpenGL Camera Space
                 -d
         );
     };
@@ -1399,7 +1402,7 @@ void MobileGS::draw() {
     glm::mat4 P = glm::make_mat4(mProjMatrix);
 
     glm::mat4 mvp = P * V * A;
-    glm::mat4 meshMvp = mvp;
+    glm::mat4 meshMvp = mvp; // MANDATE: Mesh must align with local surfels
 
     if (mSplatsVisible && mPointCount > 0) {
         glUseProgram(mProgram);
@@ -1416,7 +1419,7 @@ void MobileGS::draw() {
         float focalY = std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f);
         glUniform1f(focalLoc, focalY);
 
-        glDisable(GL_BLEND);
+        glDisable(GL_BLEND); // MANDATE: Dense Opaque Surfels
         glDepthMask(GL_TRUE);
         glEnable(GL_DEPTH_TEST);
 

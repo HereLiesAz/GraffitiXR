@@ -156,7 +156,7 @@ private:
     std::atomic<bool>       mRelocEnabled{true};
     cv::Mat                 mRelocColorFrame;
     uint64_t                mLastRelocTriggerFrame = 0;
-    static constexpr uint64_t LOOP_CLOSURE_INTERVAL = 120; // 4 seconds at 30Hz or 8 seconds at 15Hz throttling
+    static constexpr uint64_t LOOP_CLOSURE_INTERVAL = 120;
     static constexpr float    DRIFT_THRESHOLD_M     = 0.003f;
 
     std::atomic<bool>       mFingerprintRequested{false};
@@ -166,7 +166,7 @@ private:
     float                   mFingerprintProjMatrix[16];
 
     uint64_t mLastFingerprintUpdateFrame = 0;
-    static constexpr uint64_t FINGERPRINT_UPDATE_INTERVAL = 600; // Increased from 300 to 600 (20 seconds at 30Hz)
+    static constexpr uint64_t FINGERPRINT_UPDATE_INTERVAL = 600;
     static constexpr size_t   MAX_FINGERPRINT_KEYPOINTS   = 2000;
 
     GLuint mProgram = 0;

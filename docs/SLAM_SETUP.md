@@ -18,10 +18,13 @@ The engine operates on a **Sparse Voxel Hashing** system.
 
 ### Coordinate System & Storage
 
-**CRITICAL MANDATE:** All surfels and mesh vertices MUST be stored in **Anchor-Local Space**. 
-*   **Conversion**: `Local = inverse(World_from_Anchor) * inverse(Camera_from_World) * Camera_Space_Point`
-*   **Reasoning**: Storing in local space ensures that the map remains locked to the physical wall even if ARCore's world origin drifts. It also ensures that Teleological Corrections (anchor updates) apply instantly without needing to re-process the entire map.
-*   **Rendering**: Use `MVP = Projection * View * Anchor` to project local points back to screen space.
+**CRITICAL MANDATE: Sensor-Native Pipeline**
+1.  **Ingestion**: Depth maps are fed in **Sensor-Native (Landscape)** orientation. Do NOT rotate depth maps in JNI.
+2.  **Unprojection**: Use physical sensor intrinsics (fx, fy, cx, cy) scaled to the depth resolution.
+3.  **Transformation**: Use the **Physical Camera Pose** (`MappingViewMatrix` in Kotlin, which is `camera.pose.inverse()`) to transform from Camera Space to World Space.
+4.  **Storage**: Points MUST be stored in **Anchor-Local Space** to ensure they are immune to ARCore world-origin drift.
+    *   `Local_Point = inverse(Anchor_from_World) * camera_pose_landscape * Camera_Space_Point`
+5.  **Rendering**: Use `MVP = Display_Projection * Display_View * Anchor_from_World`. This correctly handles display rotation during the final rasterization stage.
 
 ## Sensor Input Pipeline
 
