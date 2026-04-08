@@ -210,10 +210,12 @@ class MainActivity : ComponentActivity() {
 
                 LaunchedEffect(currentTempCapture, currentCaptureStep, isWaitingForTap) {
                     if (currentTempCapture != null) {
-                        if (currentCaptureStep == CaptureStep.CAPTURE) {
+                        if (currentCaptureStep == CaptureStep.NONE && isWaitingForTap) {
+                            // Phase 4: Captured frame from tap. Transition to RECTIFY.
                             mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
-                        } else if (isWaitingForTap) {
-                            mainViewModel.confirmTapCapture()
+                        } else if (currentCaptureStep == CaptureStep.CAPTURE) {
+                            // Manual capture from rail. Transition to RECTIFY.
+                            mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
                         }
                     }
                 }

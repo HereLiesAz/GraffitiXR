@@ -560,7 +560,7 @@ class ArViewModel @Inject constructor(
             pendingTapPosition = null
             
             // INITIALIZE: Default unwarp quad to the corners of the screen/view
-            val w = 1080f // Reasonable default if boxSize not yet known
+            val w = 1080f 
             val h = 1920f
             val padding = 200f
             val initialPoints = listOf(
@@ -589,15 +589,6 @@ class ArViewModel @Inject constructor(
                     annotatedCaptureBitmap = null,
                     unwarpPoints = initialPoints
                 )
-            }
-            viewModelScope.launch {
-                // RESTORATION: Use isolateMarkings to extract high-contrast target marks
-                val maskedBmp = withContext(Dispatchers.Default) { rotatedBmp.isolateMarkings(tapPos) }
-                _uiState.update { it.copy(tempCaptureBitmap = maskedBmp) }
-                
-                // Keep annotation as an optional diagnostic overlay
-                val annotated = withContext(Dispatchers.Default) { slamManager.annotateKeypoints(maskedBmp) }
-                _uiState.update { it.copy(annotatedCaptureBitmap = annotated) }
             }
             return
         }

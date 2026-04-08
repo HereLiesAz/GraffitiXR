@@ -157,7 +157,6 @@ fun MainScreen(
                                         dw, dh, stride,
                                         intr, viewMat, rot
                                     )
-                                    mainViewModel.confirmTapCapture()
                                 },
                                 onTrackingUpdated = { isTracking, splatCount, isDepthSupported, yaw, distanceMeters, relDir ->
                                     arViewModel.setTrackingState(isTracking, splatCount, isDepthSupported, yaw, distanceMeters, relDir)
