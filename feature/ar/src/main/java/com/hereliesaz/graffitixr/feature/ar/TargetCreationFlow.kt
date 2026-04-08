@@ -82,7 +82,34 @@ fun TargetCreationUi(
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         when (captureStep) {
-            // ... CAPTURE, RECTIFY, MASK ...
+            CaptureStep.RECTIFY -> {
+                uiState.targetRawBitmap?.let { bitmap ->
+                    UnwarpScreen(
+                        bitmap = bitmap,
+                        points = uiState.unwarpPoints,
+                        onUpdatePoints = onUpdateUnwarpPoints,
+                        onConfirm = onUnwarpConfirm,
+                        onCancel = onCancel,
+                        strings = strings
+                    )
+                }
+            }
+            CaptureStep.MASK -> {
+                uiState.tempCaptureBitmap?.let { bitmap ->
+                    MaskScreen(
+                        bitmap = bitmap,
+                        onConfirm = { onMaskConfirmed(it); onMaskConfirmed(it) }, // Trigger review
+                        onRetake = onRetake,
+                        strings = strings,
+                        onBeginErase = onBeginErase,
+                        onEraseAtPoint = onEraseAtPoint,
+                        onUndoErase = onUndoErase,
+                        onRedoErase = onRedoErase,
+                        canUndo = uiState.canUndoErase,
+                        canRedo = uiState.canRedoErase
+                    )
+                }
+            }
             CaptureStep.REVIEW -> {
                 FeatureSelectionReview(
                     annotatedBitmap = uiState.annotatedCaptureBitmap,
@@ -109,7 +136,150 @@ fun TargetCreationUi(
             }
             else -> {}
         }
-        // ... isLoading ...
+        
+        if (isLoading) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f))) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+            }
+        }
+    }
+}
+
+@Composable
+private fun UnwarpScreen(
+    bitmap: Bitmap,
+    points: List<Offset>,
+    onUpdatePoints: (List<Offset>) -> Unit,
+    onConfirm: (List<Offset>) -> Unit,
+    onCancel: () -> Unit,
+    strings: AppStrings
+) {
+    var boxSize by remember { mutableStateOf(IntSize.Zero) }
+    
+    Box(modifier = Modifier.fillMaxSize().onSizeChanged { boxSize = it }) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = "Unwarp Base",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit
+        )
+
+        if (boxSize != IntSize.Zero) {
+            // Unwarp overlay with draggable corners
+            UnwarpOverlay(
+                points = points,
+                onUpdatePoints = onUpdatePoints,
+                boxSize = boxSize,
+                bitmapSize = IntSize(bitmap.width, bitmap.height)
+            )
+        }
+
+        Box(modifier = Modifier.align(Alignment.BottomCenter).padding(32.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                AzButton(text = strings.common.cancel, onClick = onCancel, shape = AzButtonShape.RECTANGLE)
+                AzButton(text = strings.common.next, onClick = { onConfirm(points) }, shape = AzButtonShape.RECTANGLE)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MaskScreen(
+    bitmap: Bitmap,
+    onConfirm: (Bitmap) -> Unit,
+    onRetake: () -> Unit,
+    strings: AppStrings,
+    onBeginErase: () -> Unit,
+    onEraseAtPoint: (Float, Float) -> Unit,
+    onUndoErase: () -> Unit,
+    onRedoErase: () -> Unit,
+    canUndo: Boolean,
+    canRedo: Boolean
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = "Masking View",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit
+        )
+        
+        var boxSize by remember { mutableStateOf(IntSize.Zero) }
+        Box(modifier = Modifier.fillMaxSize().onSizeChanged { boxSize = it }.pointerInput(Unit) {
+            detectTapGestures { pos ->
+                if (boxSize.width > 0 && boxSize.height > 0) {
+                    val nx = pos.x / boxSize.width
+                    val ny = pos.y / boxSize.height
+                    onBeginErase()
+                    onEraseAtPoint(nx, ny)
+                }
+            }
+        })
+
+        Column(modifier = Modifier.align(Alignment.BottomCenter).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onUndoErase, enabled = canUndo) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Undo", tint = if (canUndo) Color.White else Color.Gray, modifier = Modifier.graphicsLayer { rotationY = 180f })
+                }
+                IconButton(onClick = onRedoErase, enabled = canRedo) {
+                    Icon(Icons.Default.Refresh, contentDescription = "Redo", tint = if (canRedo) Color.White else Color.Gray)
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                AzButton(text = "Retake", onClick = onRetake, shape = AzButtonShape.RECTANGLE)
+                AzButton(text = strings.common.next, onClick = { onConfirm(bitmap) }, shape = AzButtonShape.RECTANGLE)
+            }
+        }
+    }
+}
+
+@Composable
+private fun UnwarpOverlay(
+    points: List<Offset>,
+    onUpdatePoints: (List<Offset>) -> Unit,
+    boxSize: IntSize,
+    bitmapSize: IntSize
+) {
+    val boxW = boxSize.width.toFloat()
+    val boxH = boxSize.height.toFloat()
+    val bmpW = bitmapSize.width.toFloat()
+    val bmpH = bitmapSize.height.toFloat()
+    
+    // Scaling factor from image space to screen space
+    val scale = if (bmpW / bmpH > boxW / boxH) boxW / bmpW else boxH / bmpH
+    val offsetX = (boxW - bmpW * scale) / 2
+    val offsetY = (boxH - bmpH * scale) / 2
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        if (points.size == 4) {
+            val path = Path().apply {
+                moveTo(points[0].x, points[0].y)
+                lineTo(points[1].x, points[1].y)
+                lineTo(points[2].x, points[2].y)
+                lineTo(points[3].x, points[3].y)
+                close()
+            }
+            drawPath(path, Color.Cyan, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4f))
+        }
+    }
+    
+    points.forEachIndexed { index, point ->
+        Box(
+            modifier = Modifier
+                .offset(point.x.dp - 20.dp, point.y.dp - 20.dp)
+                .size(40.dp)
+                .background(Color.White.copy(alpha = 0.5f), CircleShape)
+                .border(2.dp, Color.Cyan, CircleShape)
+                .pointerInput(index) {
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        val newList = points.toMutableList()
+                        newList[index] = points[index] + dragAmount
+                        onUpdatePoints(newList)
+                    }
+                }
+        )
     }
 }
 
@@ -149,7 +319,7 @@ private fun FeatureSelectionReview(
 
     // Mode: 0 = Exclude (Brush), 1 = Include (Brush), 2 = Erase Marks (Flood Fill)
     var mode by remember { mutableIntStateOf(0) }
-    var showFeatures by remember { mutableStateOf(true) }
+    var showFeatures by remember { mutableStateOf(false) } // Default to false to avoid "green circles" regression
 
     // Strokes recorded while user paints
     val strokes = remember { mutableStateListOf<SelectionStroke>() }

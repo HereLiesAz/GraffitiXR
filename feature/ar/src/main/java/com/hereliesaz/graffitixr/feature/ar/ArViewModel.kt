@@ -558,10 +558,21 @@ class ArViewModel @Inject constructor(
 
         if (tapPos != null) {
             pendingTapPosition = null
+            
+            // INITIALIZE: Default unwarp quad to the corners of the screen/view
+            val w = 1080f // Reasonable default if boxSize not yet known
+            val h = 1920f
+            val padding = 200f
+            val initialPoints = listOf(
+                Offset(padding, padding),
+                Offset(w - padding, padding),
+                Offset(w - padding, h - padding),
+                Offset(padding, h - padding)
+            )
+
             _uiState.update {
                 it.copy(
                     tapHighlightKeypoints = it.tapHighlightKeypoints + tapPos,
-                    tempCaptureBitmap = rotatedBmp, // Keep full image for context
                     targetRawBitmap = bitmap,
                     targetDisplayRotation = displayRotation,
                     targetDepthBuffer = depthBuffer,
@@ -574,12 +585,18 @@ class ArViewModel @Inject constructor(
                     targetCaptureViewMatrix = viewMatrix,
                     targetPhysicalExtent = extent,
                     isCaptureRequested = false,
-                    annotatedCaptureBitmap = null
+                    tempCaptureBitmap = rotatedBmp,
+                    annotatedCaptureBitmap = null,
+                    unwarpPoints = initialPoints
                 )
             }
             viewModelScope.launch {
-                // Annotate on the full frame so user sees features in context
-                val annotated = withContext(Dispatchers.Default) { slamManager.annotateKeypoints(rotatedBmp) }
+                // RESTORATION: Use isolateMarkings to extract high-contrast target marks
+                val maskedBmp = withContext(Dispatchers.Default) { rotatedBmp.isolateMarkings(tapPos) }
+                _uiState.update { it.copy(tempCaptureBitmap = maskedBmp) }
+                
+                // Keep annotation as an optional diagnostic overlay
+                val annotated = withContext(Dispatchers.Default) { slamManager.annotateKeypoints(maskedBmp) }
                 _uiState.update { it.copy(annotatedCaptureBitmap = annotated) }
             }
             return

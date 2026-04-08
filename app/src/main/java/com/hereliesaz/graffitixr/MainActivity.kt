@@ -79,6 +79,7 @@ import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.hereliesaz.graffitixr.common.security.SecurityProviderState
 import com.hereliesaz.graffitixr.common.util.ImageProcessor
+import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.design.components.InfoDialog
 import com.hereliesaz.graffitixr.design.components.PosterOptionsDialog
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
@@ -210,30 +211,14 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(currentTempCapture, currentCaptureStep, isWaitingForTap) {
                     if (currentTempCapture != null) {
                         if (currentCaptureStep == CaptureStep.CAPTURE) {
-                            mainViewModel.setCaptureStep(CaptureStep.REVIEW)
+                            mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
                         } else if (isWaitingForTap) {
                             mainViewModel.confirmTapCapture()
                         }
                     }
                 }
 
-                // Task 5: AR tap → auto-confirm. Skip the REVIEW step when the capture
-                // originated from a screen tap (not the manual "Create Anchor" rail button).
-                LaunchedEffect(currentCaptureStep, mainUiState.captureOriginatedFromTap) {
-                    if (currentCaptureStep == CaptureStep.REVIEW && mainUiState.captureOriginatedFromTap) {
-                        arViewModel.setInitialAnchorFromCapture()
-                        mainViewModel.onConfirmTargetCreation(
-                            bitmap        = arUiState.tempCaptureBitmap,
-                            selectionMask = null,
-                            depthBuffer   = arUiState.targetDepthBuffer,
-                            depthW        = arUiState.targetDepthBufferWidth,
-                            depthH        = arUiState.targetDepthBufferHeight,
-                            depthStride   = arUiState.targetDepthStride,
-                            intrinsics    = arUiState.targetIntrinsics,
-                            viewMatrix    = arUiState.targetCaptureViewMatrix
-                        )
-                    }
-                }
+                // Removed auto-confirm LaunchedEffect to allow target review
 
                 LaunchedEffect(dashboardNavigation) {
                     dashboardNavigation?.let { destination ->
@@ -791,13 +776,15 @@ class MainActivity : ComponentActivity() {
                                         mainViewModel.onCancelCaptureClicked()
                                     },
                                     onUnwarpConfirm = { points ->
-                                        val currentBitmap = arUiState.tempCaptureBitmap
+                                        val currentBitmap = arUiState.targetRawBitmap // Use raw sensor frame
                                         if (currentBitmap != null && points.size == 4) {
                                             isProcessing = true
                                             lifecycleScope.launch(Dispatchers.Default) {
                                                 val unwarped = ImageProcessor.unwarpImage(currentBitmap, points)
                                                 if (unwarped != null) {
-                                                    arViewModel.setTempCapture(unwarped)
+                                                    // Phase 4: Isolate markings on the rectified surface for the mask step
+                                                    val isolated = unwarped.isolateMarkings(null)
+                                                    arViewModel.setTempCapture(isolated)
                                                 }
                                                 mainViewModel.setCaptureStep(CaptureStep.MASK)
                                                 isProcessing = false
