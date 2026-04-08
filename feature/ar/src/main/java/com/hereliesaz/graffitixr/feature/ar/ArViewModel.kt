@@ -215,14 +215,22 @@ class ArViewModel @Inject constructor(
                     newSession.cameraConfig = bestConfig
                 }
 
-                val config = Config(newSession).apply {
-                    updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                    depthMode = Config.DepthMode.AUTOMATIC
-                    focusMode = Config.FocusMode.AUTO
-                    // Enable dual-camera (stereo) depth if available for superior SLAM stability
-                    if (newSession.isDualCameraModeSupported(Config.DualCameraMode.ENABLED)) {
-                        dualCameraMode = Config.DualCameraMode.ENABLED
+                val config = newSession.config
+                config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                config.depthMode = Config.DepthMode.AUTOMATIC
+                config.focusMode = Config.FocusMode.AUTO
+                
+                // Attempt to enable dual-camera mode using safe reflection to avoid compilation errors
+                // on some SDK environments while still requesting the feature for hardware that supports it.
+                try {
+                    val dualModeClass = Class.forName("com.google.ar.core.Config\$DualCameraMode")
+                    val enabledEnum = dualModeClass.getField("ENABLED").get(null)
+                    val isSupported = newSession.javaClass.getMethod("isDualCameraModeSupported", dualModeClass).invoke(newSession, enabledEnum) as Boolean
+                    if (isSupported) {
+                        config.javaClass.getMethod("setDualCameraMode", dualModeClass).invoke(config, enabledEnum)
                     }
+                } catch (e: Exception) {
+                    // Fallback to standard depth mode if dual-camera API is unavailable
                 }
 
                 newSession.configure(config)

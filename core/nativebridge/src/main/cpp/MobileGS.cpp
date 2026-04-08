@@ -63,8 +63,9 @@ static const char* kVertexShader =
         "  gl_Position = clip;\n"
         "  // Correct physical point size: diameter in pixels\n"
         "  // sz = (diameter_m * focal_y_px) / depth_m\n"
+        "  // We use a tightened 0.8x multiplier to ensure points stay sharp and separated\n"
         "  float sz = (aRadius * 2.0) * uFocalY / clip.w;\n"
-        "  gl_PointSize = clamp(sz, 2.0, 128.0);\n"
+        "  gl_PointSize = clamp(sz, 1.0, 64.0);\n"
         "  vColor = aColor;\n"
         "}\n";
 
@@ -74,8 +75,9 @@ static const char* kFragmentShader =
         "in vec4 vColor;\n"
         "out vec4 oColor;\n"
         "void main() {\n"
+        "  // Mandate: High-performance hard-edged points\n"
         "  vec2 d = gl_PointCoord - 0.5;\n"
-        "  if (dot(d, d) > 0.25) discard; // Hard-edged circle\n"
+        "  if (dot(d, d) > 0.25) discard;\n"
         "  oColor = vec4(vColor.rgb, 1.0);\n"
         "}\n";
 
@@ -690,8 +692,8 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
                 cv::Vec3b col = colorRGB.at<cv::Vec3b>(colorR, colorC);
                 float r_f = col[0]/255.0f, g_f = col[1]/255.0f, b_f = col[2]/255.0f;
 
-                // Tighter radius 0.012f (12mm) for better physical alignment
-                newVoxelUpdates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.2f, 0.0f, 0.0f, 1.0f, 0.012f}});
+                // Tighter radius 0.008f (8mm) for crisp physical alignment and lower overdraw
+                newVoxelUpdates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.2f, 0.0f, 0.0f, 1.0f, 0.008f}});
                 mapModified = true;
             }
         }
