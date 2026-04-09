@@ -774,6 +774,61 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(sketchThickness = thickness.coerceIn(1, 20)) }
     }
 
+    override fun onApplyCannyEdgeClicked() {
+        val state = _uiState.value
+        val layerId = state.activeLayerId ?: return
+        val layer = state.layers.find { it.id == layerId } ?: return
+        val projectId = state.projectId ?: return
+        val uri = layer.uri ?: return
+
+        pushHistory()
+        _uiState.update { it.copy(isLoading = true) }
+
+        viewModelScope.launch(dispatchers.default) {
+            val bitmap = ImageUtils.loadBitmapAsync(context, uri)
+            if (bitmap != null) {
+                val cannyBitmap = ImageProcessor.applyCannyEdgeDetection(bitmap, 50.0, 150.0)
+                val path = projectRepository.saveArtifact(
+                    projectId,
+                    "canny_${System.currentTimeMillis()}.png",
+                    ImageUtils.bitmapToByteArray(cannyBitmap)
+                )
+                val cannyUri = android.net.Uri.parse("file://$path")
+                val cannyLayer = Layer(
+                    id = java.util.UUID.randomUUID().toString(),
+                    name = "Canny – ${layer.name}",
+                    uri = cannyUri,
+                    isSketch = true,
+                    isLinked = false,
+                    blendMode = androidx.compose.ui.graphics.BlendMode.SrcOver,
+                    scale = layer.scale,
+                    offset = layer.offset,
+                    rotationX = layer.rotationX,
+                    rotationY = layer.rotationY,
+                    rotationZ = layer.rotationZ,
+                    warpMesh = layer.warpMesh
+                )
+                withContext(dispatchers.main) {
+                    _uiState.update { s ->
+                        val idx = s.layers.indexOfFirst { it.id == layerId }
+                        if (idx < 0) return@update s
+                        val newLayers = s.layers.toMutableList().apply {
+                            var topIdx = idx
+                            while (topIdx + 1 < size && get(topIdx + 1).isLinked) topIdx++
+                            add(topIdx + 1, cannyLayer)
+                        }
+                        s.copy(layers = newLayers, isLoading = false)
+                    }
+                }
+                updateLayerUri(cannyLayer.id, cannyUri)
+                return@launch
+            }
+            withContext(dispatchers.main) {
+                _uiState.update { it.copy(isLoading = false) }
+            }
+        }
+    }
+
     private fun updateLayerUri(id: String, uri: Uri) {
         viewModelScope.launch(dispatchers.io) {
             val bitmap = ImageUtils.loadBitmapAsync(context, uri)

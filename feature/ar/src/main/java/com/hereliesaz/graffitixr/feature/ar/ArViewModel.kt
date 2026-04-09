@@ -110,8 +110,8 @@ class ArViewModel @Inject constructor(
                 _uiState.update { it.copy(arScanMode = mode) }
                 renderer?.scanMode = mode
                 
-                // Attune voxel size: Mural (Splats) = 8mm, Canvas (Points) = 2mm
-                val voxelSize = if (mode == ArScanMode.GAUSSIAN_SPLATS) 0.008f else 0.002f
+                // Use a universal dense 5mm voxel scale for all modes to maximize detail up to 15ft.
+                val voxelSize = 0.005f
                 slamManager.setVoxelSize(voxelSize)
 
                 visitedSectors.fill(false)
@@ -219,6 +219,7 @@ class ArViewModel @Inject constructor(
                 config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                 config.depthMode = Config.DepthMode.AUTOMATIC
                 config.focusMode = Config.FocusMode.AUTO
+                config.imageStabilizationMode = Config.ImageStabilizationMode.EIS
                 
                 // Attempt to enable dual-camera mode using safe reflection to avoid compilation errors
                 // on some SDK environments while still requesting the feature for hardware that supports it.

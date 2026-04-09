@@ -6,7 +6,7 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
-    alias(libs.plugins.kotlin.parcelize) // Required for @Parcelize
+    alias(libs.plugins.kotlin.parcelize)
     alias(libs.plugins.kotlinx.serialization) // Required for @Serializable
 }
 

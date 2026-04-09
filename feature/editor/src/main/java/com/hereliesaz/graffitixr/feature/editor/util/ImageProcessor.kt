@@ -11,6 +11,9 @@ import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.graffitixr.common.model.Tool
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.opencv.android.Utils
+import org.opencv.core.Mat
+import org.opencv.imgproc.Imgproc
 
 /**
  * Kotlin UI layer implementation of image manipulation tools.
@@ -231,4 +234,44 @@ object ImageProcessor {
                                                 canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
                                                         canvas.drawBitmapMesh(tempBmp, meshWidth, meshHeight, verts, 0, null, 0, null)
                     }
+
+            /**
+             * Applies Canny Edge Detection to the entire bitmap and returns a new transparent bitmap
+             * containing the extracted stroke outlines.
+             */
+            suspend fun applyCannyEdgeDetection(
+                originalBitmap: Bitmap,
+                threshold1: Double = 100.0,
+                threshold2: Double = 200.0,
+                apertureSize: Int = 3
+            ): Bitmap = withContext(Dispatchers.Default) {
+                val mat = Mat()
+                Utils.bitmapToMat(originalBitmap, mat)
+
+                val gray = Mat()
+                Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGBA2GRAY)
+
+                val edges = Mat()
+                Imgproc.Canny(gray, edges, threshold1, threshold2, apertureSize, false)
+
+                // Convert grayscale edges to an ARGB mask (white edges, transparent background)
+                val argbEdges = Mat(edges.rows(), edges.cols(), org.opencv.core.CvType.CV_8UC4)
+                
+                // Create a completely transparent base
+                argbEdges.setTo(org.opencv.core.Scalar(0.0, 0.0, 0.0, 0.0))
+                
+                // Copy the white edges to the transparent base using the edges as a mask
+                val whiteColor = org.opencv.core.Scalar(255.0, 255.0, 255.0, 255.0)
+                argbEdges.setTo(whiteColor, edges)
+
+                val resultBitmap = Bitmap.createBitmap(originalBitmap.width, originalBitmap.height, Bitmap.Config.ARGB_8888)
+                Utils.matToBitmap(argbEdges, resultBitmap)
+                
+                mat.release()
+                gray.release()
+                edges.release()
+                argbEdges.release()
+                
+                resultBitmap
+            }
 }

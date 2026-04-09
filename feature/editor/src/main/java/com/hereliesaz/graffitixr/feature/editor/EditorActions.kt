@@ -19,6 +19,7 @@ interface EditorActions {
     fun onMagicClicked()
     fun onRemoveBackgroundClicked()
     fun onSketchClicked()
+    fun onApplyCannyEdgeClicked()
     fun onSketchThicknessChanged(thickness: Int)
     fun onCycleBlendMode()
 
