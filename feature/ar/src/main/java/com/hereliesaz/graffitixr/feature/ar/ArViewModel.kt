@@ -201,15 +201,17 @@ class ArViewModel @Inject constructor(
                 val filter = CameraConfigFilter(newSession)
                 val supportedConfigs = newSession.getSupportedCameraConfigs(filter)
 
+                val sortedConfigs = supportedConfigs.sortedByDescending { it.fpsRange.upper }
+
                 // Prioritize "dual lens" (stereo camera) and hardware depth sensor usage for superior world refinement.
-                val bestConfig = supportedConfigs.find {
+                val bestConfig = sortedConfigs.find {
                     it.stereoCameraUsage == CameraConfig.StereoCameraUsage.REQUIRE_AND_USE &&
                             it.depthSensorUsage == CameraConfig.DepthSensorUsage.REQUIRE_AND_USE
-                } ?: supportedConfigs.find {
+                } ?: sortedConfigs.find {
                     it.stereoCameraUsage == CameraConfig.StereoCameraUsage.REQUIRE_AND_USE
-                } ?: supportedConfigs.find {
+                } ?: sortedConfigs.find {
                     it.depthSensorUsage == CameraConfig.DepthSensorUsage.REQUIRE_AND_USE
-                } ?: supportedConfigs.firstOrNull()
+                } ?: sortedConfigs.firstOrNull()
 
                 if (bestConfig != null) {
                     newSession.cameraConfig = bestConfig
