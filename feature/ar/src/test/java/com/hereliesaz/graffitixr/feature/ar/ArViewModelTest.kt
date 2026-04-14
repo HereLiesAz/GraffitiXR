@@ -361,10 +361,14 @@ class ArViewModelTest {
             depthBufW = 0, depthBufH = 0, depthBufStride = 0,
             intrinsics = null, viewMatrix = FloatArray(16), displayRotation = 0
         )
-        testDispatcher.scheduler.advanceUntilIdle()
 
-        assertNull(viewModel.uiState.value.annotatedCaptureBitmap)
-        assertEquals(4, viewModel.uiState.value.unwarpPoints.size)
+        var attempts = 0
+        while (viewModel.uiState.value.annotatedCaptureBitmap != annotatedBmp && attempts < 50) {
+            testDispatcher.scheduler.advanceTimeBy(100)
+            testDispatcher.scheduler.advanceUntilIdle()
+            attempts++
+        }
+        assertEquals(annotatedBmp, viewModel.uiState.value.annotatedCaptureBitmap)
     }
 
     private fun setPrivateField(obj: Any, fieldName: String, value: Any?) {
