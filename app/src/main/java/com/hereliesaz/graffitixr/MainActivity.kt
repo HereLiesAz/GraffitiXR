@@ -185,7 +185,7 @@ class MainActivity : ComponentActivity() {
                 val cameraController = rememberCameraController()
 
                 var cameraUri by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
-                var showHelp by remember { mutableStateOf(false) }
+
 
                 val editorUiState by editorViewModel.uiState.collectAsState()
                 val mainUiState by mainViewModel.uiState.collectAsState()
@@ -457,9 +457,13 @@ class MainActivity : ComponentActivity() {
 
                 // Onboarding Manager
                 val onboardingManager = remember(context) { OnboardingManager(context) }
-                LaunchedEffect(Unit) {
-                    if (onboardingManager.isFirstTime("main_screen")) {
-                        onboardingManager.markAsSeen("main_screen")
+                var showOnboarding by remember { mutableStateOf(false) }
+
+                LaunchedEffect(editorUiState.editorMode) {
+                    val modeStr = editorUiState.editorMode.name
+                    if (onboardingManager.isFirstTime(modeStr)) {
+                        showOnboarding = true
+                        onboardingManager.markAsSeen(modeStr)
                     }
                 }
 
@@ -478,11 +482,20 @@ class MainActivity : ComponentActivity() {
                         noMenu = !isRailVisible
                     )
                     azAdvanced(
-                        helpEnabled = showHelp,
+                        helpEnabled = true,
                         helpList = activeHelpList,
-                        onDismissHelp = { showHelp = false },
+                        onDismissHelp = { },
                         tutorials = tutorials
                     )
+
+                    onscreen {
+                        if (showOnboarding) {
+                            com.hereliesaz.graffitixr.design.components.OnboardingDialog(
+                                mode = editorUiState.editorMode,
+                                onDismiss = { showOnboarding = false }
+                            )
+                        }
+                    }
 
                     if (isRailVisible) {
                         ConfigureRailItems(
@@ -491,9 +504,7 @@ class MainActivity : ComponentActivity() {
                             navItemColor = navItemColor,
                             onShowFontPicker = { layerId -> fontPickerLayerId = layerId; showFontPicker = true },
                             layerMenusOpen = layerMenusOpen,
-                            showLibrary = showLibrary,
-                            showHelp = showHelp,
-                            onHelpToggle = { showHelp = !showHelp }
+                            showLibrary = showLibrary
                         )
                     }
 
@@ -985,9 +996,7 @@ class MainActivity : ComponentActivity() {
         navItemColor: Color = Color.White,
         onShowFontPicker: (String) -> Unit = {},
         layerMenusOpen: MutableMap<String, Boolean>,
-        showLibrary: Boolean,
-        showHelp: Boolean,
-        onHelpToggle: () -> Unit
+        showLibrary: Boolean
     ) {
         val navStrings = strings.nav
         val requestPermissions = {
@@ -1443,7 +1452,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            azHelpRailItem(id = "help_layer_${layer.id}", text = navStrings.help, color = navItemColor, shape = AzButtonShape.RECTANGLE)
+                            azHelpSubItem(id = "help_layer_${layer.id}", hostId = "layer_${layer.id}", text = navStrings.help, color = navItemColor, shape = AzButtonShape.RECTANGLE)
                         }
                     ) {
                         inputItem(hint = strings.editor.renameHint) { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
@@ -1504,15 +1513,12 @@ class MainActivity : ComponentActivity() {
 
         azDivider()
 
-        azRailItem(
+        azHelpRailItem(
             id = "help_main",
             text = navStrings.help,
-            color = if (showHelp) Cyan else navItemColor,
-            shape = AzButtonShape.RECTANGLE,
-            info = navStrings.helpInfo
-        ) {
-            onHelpToggle()
-        }
+            color = navItemColor,
+            shape = AzButtonShape.RECTANGLE
+        )
     }
 }
 
