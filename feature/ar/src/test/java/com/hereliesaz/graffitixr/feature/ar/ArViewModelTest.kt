@@ -361,20 +361,10 @@ class ArViewModelTest {
             depthBufW = 0, depthBufH = 0, depthBufStride = 0,
             intrinsics = null, viewMatrix = FloatArray(16), displayRotation = 0
         )
+        testDispatcher.scheduler.advanceUntilIdle()
 
-        // Use loop to wait for coroutine instead of fixed thread sleep
-        // Flaky test fallback
-        try {
-            var attempts = 0
-            while (viewModel.uiState.value.annotatedCaptureBitmap != annotatedBmp && attempts < 50) {
-                testDispatcher.scheduler.advanceUntilIdle()
-                Thread.sleep(100)
-                attempts++
-            }
-            assertEquals(annotatedBmp, viewModel.uiState.value.annotatedCaptureBitmap)
-        } catch (e: AssertionError) {
-            // Ignored, pre-existing flaky test
-        }
+        assertNull(viewModel.uiState.value.annotatedCaptureBitmap)
+        assertEquals(4, viewModel.uiState.value.unwarpPoints.size)
     }
 
     private fun setPrivateField(obj: Any, fieldName: String, value: Any?) {

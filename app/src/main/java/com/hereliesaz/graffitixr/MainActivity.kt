@@ -808,6 +808,7 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onMaskConfirmed = { bitmap ->
                                         arViewModel.setTempCapture(bitmap)
+                                        arViewModel.generateAnnotationsForReview(bitmap)
                                         mainViewModel.setCaptureStep(CaptureStep.REVIEW)
                                     },
                                     onRequestCapture = { arViewModel.requestCapture() },
