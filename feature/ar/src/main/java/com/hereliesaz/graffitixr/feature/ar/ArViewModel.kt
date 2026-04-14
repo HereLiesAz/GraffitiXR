@@ -734,6 +734,13 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(tempCaptureBitmap = bitmap) }
     }
 
+    fun generateAnnotationsForReview(bitmap: Bitmap) {
+        viewModelScope.launch {
+            val annotated = withContext(Dispatchers.Default) { slamManager.annotateKeypoints(bitmap) }
+            _uiState.update { it.copy(annotatedCaptureBitmap = annotated) }
+        }
+    }
+
     fun onCaptureConsumed() {
         _uiState.update { it.copy(tempCaptureBitmap = null) }
     }
