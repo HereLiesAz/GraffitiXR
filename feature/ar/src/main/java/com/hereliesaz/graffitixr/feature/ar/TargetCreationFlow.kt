@@ -83,7 +83,7 @@ fun TargetCreationUi(
     Box(modifier = Modifier.fillMaxSize()) {
         when (captureStep) {
             CaptureStep.RECTIFY -> {
-                uiState.targetRawBitmap?.let { bitmap ->
+                uiState.tempCaptureBitmap?.let { bitmap ->
                     UnwarpScreen(
                         bitmap = bitmap,
                         points = uiState.unwarpPoints,
