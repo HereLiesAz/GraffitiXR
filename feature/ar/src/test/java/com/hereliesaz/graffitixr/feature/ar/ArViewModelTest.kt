@@ -348,7 +348,7 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `onTargetCaptured tap path annotates keypoints asynchronously`() = runTest {
+    fun `onTargetCaptured tap path sets annotatedCaptureBitmap to null and populates unwarpPoints`() = runTest {
         val rawBmp = mockk<Bitmap>(relaxed = true)
         val annotatedBmp = mockk<Bitmap>(relaxed = true)
         every { slamManager.annotateKeypoints(any()) } returns annotatedBmp
@@ -361,15 +361,10 @@ class ArViewModelTest {
             depthBufW = 0, depthBufH = 0, depthBufStride = 0,
             intrinsics = null, viewMatrix = FloatArray(16), displayRotation = 0
         )
-        // Tap path has TWO withContext(Default) calls (isolateMarkings + annotateKeypoints);
-        // each requires a sleep to let the real Default dispatcher thread complete.
-        repeat(2) {
-            testDispatcher.scheduler.advanceUntilIdle()
-            Thread.sleep(200)
-        }
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals(annotatedBmp, viewModel.uiState.value.annotatedCaptureBitmap)
+        assertNull(viewModel.uiState.value.annotatedCaptureBitmap)
+        assertEquals(4, viewModel.uiState.value.unwarpPoints.size)
     }
 
     private fun setPrivateField(obj: Any, fieldName: String, value: Any?) {

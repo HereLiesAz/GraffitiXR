@@ -778,7 +778,7 @@ class MainActivity : ComponentActivity() {
                                         mainViewModel.onCancelCaptureClicked()
                                     },
                                     onUnwarpConfirm = { points ->
-                                        val currentBitmap = arUiState.targetRawBitmap // Use raw sensor frame
+                                        val currentBitmap = arUiState.tempCaptureBitmap // Use upright display frame
                                         if (currentBitmap != null && points.size == 4) {
                                             isProcessing = true
                                             lifecycleScope.launch(Dispatchers.Default) {
@@ -797,6 +797,7 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onMaskConfirmed = { bitmap ->
                                         arViewModel.setTempCapture(bitmap)
+                                        arViewModel.generateAnnotationsForReview(bitmap)
                                         mainViewModel.setCaptureStep(CaptureStep.REVIEW)
                                     },
                                     onRequestCapture = { arViewModel.requestCapture() },
