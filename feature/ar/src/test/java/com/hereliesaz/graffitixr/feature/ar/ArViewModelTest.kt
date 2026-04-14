@@ -348,7 +348,7 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `onTargetCaptured tap path annotates keypoints asynchronously`() = runTest {
+    fun `onTargetCaptured tap path sets annotatedCaptureBitmap to null and populates unwarpPoints`() = runTest {
         val rawBmp = mockk<Bitmap>(relaxed = true)
         val annotatedBmp = mockk<Bitmap>(relaxed = true)
         every { slamManager.annotateKeypoints(any()) } returns annotatedBmp
