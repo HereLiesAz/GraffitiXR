@@ -1,15 +1,25 @@
 package com.hereliesaz.graffitixr.design.components
 
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
-import com.hereliesaz.aznavrail.AzButton
-import com.hereliesaz.aznavrail.model.AzButtonShape
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.hereliesaz.graffitixr.common.model.EditorMode
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 
 /**
  * Displays contextual help based on the current active EditorMode.
+ * Requires user to tap anywhere to advance through multiple steps or close at the end.
  */
 @Composable
 fun OnboardingDialog(
@@ -24,20 +34,107 @@ fun OnboardingDialog(
         EditorMode.STENCIL -> "Stencil Mode"
     }
 
-    val description = when (mode) {
-        EditorMode.AR -> "Virtually project images onto real-world surfaces."
-        EditorMode.TRACE -> "Project images onto surfaces to trace them in real space."
-        EditorMode.MOCKUP -> "Visualize your artwork on 3D surfaces with perspective."
-        EditorMode.OVERLAY -> "Compare your progress with a semi-transparent reference."
-        EditorMode.STENCIL -> "Generate printable multi-layer stencils from your artwork."
+    val steps = when (mode) {
+        EditorMode.AR -> listOf(
+            "Virtually project images onto real-world surfaces.",
+            "Ensure the area is well lit and scan the floor and walls slowly.",
+            "Once a solid mesh appears, tap 'Create' to begin capturing your surface."
+        )
+        EditorMode.TRACE -> listOf(
+            "Project images onto surfaces to trace them in real space.",
+            "Import an image using the Design menu.",
+            "Use the lock button to freeze the image in place while you trace."
+        )
+        EditorMode.MOCKUP -> listOf(
+            "Visualize your artwork on 3D surfaces with perspective.",
+            "Select a background image or take a photo of a wall.",
+            "Place and adjust your layers to see how they will look in reality."
+        )
+        EditorMode.OVERLAY -> listOf(
+            "Compare your progress with a semi-transparent reference.",
+            "Add your reference image.",
+            "Adjust its opacity to match your real-world painting."
+        )
+        EditorMode.STENCIL -> listOf(
+            "Generate printable multi-layer stencils from your artwork.",
+            "Isolate the colors you need.",
+            "Export the separated layers to print."
+        )
     }
 
-    AlertDialog(
+    var currentStep by remember { mutableStateOf(0) }
+
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text(text = title, style = MaterialTheme.typography.headlineMedium) },
-        text = { Text(text = description, style = MaterialTheme.typography.bodyLarge) },
-        confirmButton = {
-            AzButton(text = "Got it", onClick = onDismiss, shape = AzButtonShape.RECTANGLE)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.8f))
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null
+                ) {
+                    if (currentStep < steps.size - 1) {
+                        currentStep++
+                    } else {
+                        onDismiss()
+                    }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(32.dp)
+                    .background(Color(0xFF222222), RoundedCornerShape(16.dp))
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = title,
+                    color = Color.Cyan,
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = steps[currentStep],
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    steps.forEachIndexed { index, _ ->
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(
+                                    if (index == currentStep) Color.Cyan else Color.Gray,
+                                    RoundedCornerShape(4.dp)
+                                )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = if (currentStep < steps.size - 1) "Tap anywhere to continue" else "Tap anywhere to finish",
+                    color = Color.Gray,
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
-    )
+    }
 }
