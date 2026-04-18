@@ -127,7 +127,7 @@ class SurfaceUnroller(
      * KLmax Loss: L = sum( P_ij * log( max(P_ij, Q_ij) ) )
      * This loss function is specifically designed to improve global structure preservation.
      */
-    private fun computeKLmaxGradients(P: Array<FloatArray>, Y: Array<floatArray>): Array<floatArray> {
+    private fun computeKLmaxGradients(P: Array<FloatArray>, Y: Array<FloatArray>): Array<FloatArray> {
         val Q = FloatArray(count * count)
         var sumQ = 0f
         
@@ -179,20 +179,20 @@ class SurfaceUnroller(
         return dx * dx + dy * dy + dz * dz
     }
 
-    private fun dist2dSquared(y1: floatArray, y2: floatArray): Float {
+    private fun dist2dSquared(y1: FloatArray, y2: FloatArray): Float {
         val dx = y1[0] - y2[0]
         val dy = y1[1] - y2[1]
         return dx * dx + dy * dy
     }
 
-    private fun center(Y: Array<floatArray>) {
+    private fun center(Y: Array<FloatArray>) {
         var meanX = 0f; var meanY = 0f
         for (y in Y) { meanX += y[0]; meanY += y[1] }
         meanX /= count; meanY /= count
         for (y in Y) { y[0] -= meanX; y[1] -= meanY }
     }
 
-    private fun normalize(Y: Array<floatArray>): List<Offset> {
+    private fun normalize(Y: Array<FloatArray>): List<Offset> {
         var minX = Float.MAX_VALUE; var minY = Float.MAX_VALUE
         var maxX = Float.MIN_VALUE; var maxY = Float.MIN_VALUE
         for (y in Y) {

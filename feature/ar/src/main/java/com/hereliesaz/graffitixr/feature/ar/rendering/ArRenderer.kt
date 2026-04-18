@@ -12,6 +12,7 @@ import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.NotYetAvailableException
 import com.google.ar.core.exceptions.SessionPausedException
 import com.hereliesaz.graffitixr.common.model.ArScanMode
+import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
 import com.hereliesaz.graffitixr.feature.ar.DisplayRotationHelper
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
