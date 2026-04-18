@@ -1,4 +1,4 @@
-package com.hereliesaz.graffitixr
+package com.hereliesaz.graffitixr.data
 
 import android.content.Context
 import android.content.SharedPreferences

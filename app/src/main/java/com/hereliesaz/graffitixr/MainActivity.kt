@@ -102,6 +102,7 @@ import com.hereliesaz.graffitixr.feature.dashboard.SettingsViewModel
 import com.hereliesaz.graffitixr.feature.editor.EditorUi
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.feature.editor.TraceScreen
+import com.hereliesaz.graffitixr.data.OnboardingManager
 import com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor as EditorImageProcessor
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.common.model.RelocState
@@ -456,12 +457,12 @@ class MainActivity : ComponentActivity() {
                     helpViewModel.setActiveHelpList(helpList)
                 }
 
-                // Onboarding Manager
+                // Onboarding Manager (excludes Trace mode, which is handled in TraceScreen)
                 val onboardingManager = remember(context) { OnboardingManager(context) }
                 var showOnboarding by remember { mutableStateOf(false) }
 
                 LaunchedEffect(editorUiState.editorMode, showLibrary) {
-                    if (showLibrary) return@LaunchedEffect
+                    if (showLibrary || editorUiState.editorMode == EditorMode.TRACE) return@LaunchedEffect
                     val modeStr = editorUiState.editorMode.name
                     if (onboardingManager.isFirstTime(modeStr)) {
                         showOnboarding = true
