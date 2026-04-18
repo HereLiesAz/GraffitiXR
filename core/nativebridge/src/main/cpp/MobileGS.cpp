@@ -16,6 +16,8 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "MobileGS", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "MobileGS", __VA_ARGS__)
 
+std::string gLastSplatTrace = "";
+
 extern JavaVM* gJvm;
 
 struct JniThreadAttacher {
@@ -43,9 +45,13 @@ void MobileGS::initialize(int width, int height) {
 
     memset(mViewMatrix, 0, sizeof(mViewMatrix));
     memset(mProjMatrix, 0, sizeof(mProjMatrix));
+    memset(mMappingViewMatrix, 0, sizeof(mMappingViewMatrix));
+    memset(mMappingProjMatrix, 0, sizeof(mMappingProjMatrix));
     memset(mAnchorMatrix, 0, sizeof(mAnchorMatrix));
     mViewMatrix[0] = mViewMatrix[5] = mViewMatrix[10] = mViewMatrix[15] = 1.0f;
     mProjMatrix[0] = mProjMatrix[5] = mProjMatrix[10] = mProjMatrix[15] = 1.0f;
+    mMappingViewMatrix[0] = mMappingViewMatrix[5] = mMappingViewMatrix[10] = mMappingViewMatrix[15] = 1.0f;
+    mMappingProjMatrix[0] = mMappingProjMatrix[5] = mMappingProjMatrix[10] = mMappingProjMatrix[15] = 1.0f;
     mAnchorMatrix[0] = mAnchorMatrix[5] = mAnchorMatrix[10] = mAnchorMatrix[15] = 1.0f;
 
     if (!mRelocRunning) {
@@ -203,6 +209,9 @@ void MobileGS::setViewportSize(int w, int h) { mScreenWidth = w; mScreenHeight =
 void MobileGS::setRelocEnabled(bool e) { mRelocEnabled = e; }
 void MobileGS::restoreWallFingerprint(const cv::Mat& d, const std::vector<cv::Point3f>& p) { mWallDescriptors = d.clone(); mWallKeypoints3D = p; }
 void MobileGS::scheduleRelocCheck(const cv::Mat& f) { mRelocColorFrame = f.clone(); mRelocRequested = true; mRelocCv.notify_one(); }
+bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) {
+    return mSuperPoint.load(onnxBytes);
+}
 void MobileGS::setArtworkFingerprint(const cv::Mat& c, const uint8_t* d, int w, int h, int s, const float* i, const float* v) {}
 MobileGS::FingerprintData MobileGS::generateFingerprint(const cv::Mat& i, const cv::Mat& m, const uint8_t* d, int w, int h, int s, const float* intr, const float* v) { return {}; }
 bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) { return mSuperPoint.load(onnxBytes); }

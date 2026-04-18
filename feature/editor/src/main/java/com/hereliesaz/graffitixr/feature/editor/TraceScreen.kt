@@ -6,38 +6,48 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import com.hereliesaz.aznavrail.AzButton
-import com.hereliesaz.aznavrail.model.AzButtonShape
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
+import com.hereliesaz.graffitixr.data.OnboardingManager
+import com.hereliesaz.graffitixr.common.model.EditorMode
+import com.hereliesaz.graffitixr.design.components.OnboardingDialog
 
 @Composable
-fun TraceScreen(viewModel: EditorViewModel) {
+fun TraceScreen(viewModel: EditorViewModel, isLibraryVisible: Boolean = false) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    val onboardingManager = remember(context) { OnboardingManager(context) }
+    var showOnboarding by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isLibraryVisible, uiState.projectId) {
+        if (!isLibraryVisible && uiState.projectId != null && onboardingManager.isFirstTime(EditorMode.TRACE.name)) {
+            showOnboarding = true
+            onboardingManager.markAsSeen(EditorMode.TRACE.name)
+        }
+    }
+
+    if (showOnboarding) {
+        OnboardingDialog(
+            mode = EditorMode.TRACE,
+            onDismiss = { showOnboarding = false }
+        )
+    }
 
     TraceControls(
-        onRotateAxis = viewModel::onCycleRotationAxis,
         onTransformStart = viewModel::onGestureStart,
         onTransform = viewModel::onTransformGesture,
-        onTransformEnd = viewModel::onGestureEnd,
-        axisName = uiState.activeRotationAxis.name
+        onTransformEnd = viewModel::onGestureEnd
     )
 }
 
 @Composable
 fun TraceControls(
-    onRotateAxis: () -> Unit,
     onTransformStart: () -> Unit,
     onTransform: (Offset, Float, Float) -> Unit,
-    onTransformEnd: () -> Unit,
-    axisName: String
+    onTransformEnd: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -57,12 +67,5 @@ fun TraceControls(
                     onTransform(pan, zoom, rotation)
                 }
             }
-    ) {
-        AzButton(
-            text = "Rotate Axis: $axisName",
-            onClick = onRotateAxis,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-            shape = AzButtonShape.RECTANGLE
-        )
-    }
+    )
 }
