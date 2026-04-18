@@ -443,6 +443,7 @@ class MainActivity : ComponentActivity() {
                     base
                 }
 
+                // Help View Model and items... (removed global onboarding manager)
                 val helpViewModel: HelpViewModel =
                     hiltViewModel(checkNotNull<ViewModelStoreOwner>(LocalViewModelStoreOwner.current) {
                         "No ViewModelStoreOwner was provided via LocalViewModelStoreOwner"
@@ -455,19 +456,6 @@ class MainActivity : ComponentActivity() {
                         .d("Active layer ID changed to: ${editorUiState.activeLayerId}")
                     val helpList = if (editorUiState.activeLayerId != null) nestedHelpItems else mainHelpItems
                     helpViewModel.setActiveHelpList(helpList)
-                }
-
-                // Onboarding Manager (excludes Trace mode, which is handled in TraceScreen)
-                val onboardingManager = remember(context) { OnboardingManager(context) }
-                var showOnboarding by remember { mutableStateOf(false) }
-
-                LaunchedEffect(editorUiState.editorMode, showLibrary) {
-                    if (showLibrary || editorUiState.editorMode == EditorMode.TRACE) return@LaunchedEffect
-                    val modeStr = editorUiState.editorMode.name
-                    if (onboardingManager.isFirstTime(modeStr)) {
-                        showOnboarding = true
-                        onboardingManager.markAsSeen(modeStr)
-                    }
                 }
 
                 val tutorials = getTutorials(editorUiState.layers, strings)
@@ -490,15 +478,6 @@ class MainActivity : ComponentActivity() {
                         onDismissHelp = { },
                         tutorials = tutorials
                     )
-
-                    onscreen {
-                        if (showOnboarding) {
-                            com.hereliesaz.graffitixr.design.components.OnboardingDialog(
-                                mode = editorUiState.editorMode,
-                                onDismiss = { showOnboarding = false }
-                            )
-                        }
-                    }
 
                     if (isRailVisible) {
                         ConfigureRailItems(
@@ -592,12 +571,12 @@ class MainActivity : ComponentActivity() {
 
                         Box(Modifier.fillMaxSize().onSizeChanged { fullSize = it }) {
                             AzNavHost(startDestination = EditorMode.TRACE.name) {
-                                composable(EditorMode.AR.name) { EditorOverlay(editorViewModel, mainUiState, strings) }
-                                composable(EditorMode.OVERLAY.name) { EditorOverlay(editorViewModel, mainUiState, strings) }
-                                composable(EditorMode.MOCKUP.name) { EditorOverlay(editorViewModel, mainUiState, strings) }
+                                composable(EditorMode.AR.name) { EditorOverlay(editorViewModel, mainUiState, strings, showLibrary) }
+                                composable(EditorMode.OVERLAY.name) { EditorOverlay(editorViewModel, mainUiState, strings, showLibrary) }
+                                composable(EditorMode.MOCKUP.name) { EditorOverlay(editorViewModel, mainUiState, strings, showLibrary) }
                                 composable(EditorMode.TRACE.name) {
-                                    TraceScreen(editorViewModel)
-                                    EditorOverlay(editorViewModel, mainUiState, strings)
+                                    TraceScreen(editorViewModel, showLibrary)
+                                    EditorOverlay(editorViewModel, mainUiState, strings, showLibrary)
                                 }
                             }
 
@@ -961,8 +940,30 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun EditorOverlay(viewModel: EditorViewModel, mainUiState: MainUiState, strings: AppStrings) {
+    private fun EditorOverlay(viewModel: EditorViewModel, mainUiState: MainUiState, strings: AppStrings, isLibraryVisible: Boolean) {
         val uiState by viewModel.uiState.collectAsState()
+
+        // Handle onboarding for modes other than TRACE (which handles its own)
+        if (uiState.editorMode != EditorMode.TRACE) {
+            val context = LocalContext.current
+            val onboardingManager = remember(context) { OnboardingManager(context) }
+            var showOnboarding by remember(uiState.editorMode) { mutableStateOf(false) }
+
+            LaunchedEffect(isLibraryVisible, uiState.projectId, uiState.editorMode) {
+                if (!isLibraryVisible && uiState.projectId != null && onboardingManager.isFirstTime(uiState.editorMode.name)) {
+                    showOnboarding = true
+                    onboardingManager.markAsSeen(uiState.editorMode.name)
+                }
+            }
+
+            if (showOnboarding) {
+                com.hereliesaz.graffitixr.design.components.OnboardingDialog(
+                    mode = uiState.editorMode,
+                    onDismiss = { showOnboarding = false }
+                )
+            }
+        }
+
         EditorUi(
             actions = viewModel,
             uiState = uiState,

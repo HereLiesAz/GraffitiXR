@@ -16,13 +16,14 @@ import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.design.components.OnboardingDialog
 
 @Composable
-fun TraceScreen(viewModel: EditorViewModel) {
+fun TraceScreen(viewModel: EditorViewModel, isLibraryVisible: Boolean = false) {
     val context = LocalContext.current
+    val uiState by viewModel.uiState.collectAsState()
     val onboardingManager = remember(context) { OnboardingManager(context) }
     var showOnboarding by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        if (onboardingManager.isFirstTime(EditorMode.TRACE.name)) {
+    LaunchedEffect(isLibraryVisible, uiState.projectId) {
+        if (!isLibraryVisible && uiState.projectId != null && onboardingManager.isFirstTime(EditorMode.TRACE.name)) {
             showOnboarding = true
             onboardingManager.markAsSeen(EditorMode.TRACE.name)
         }
