@@ -101,6 +101,7 @@ import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
 import com.hereliesaz.graffitixr.feature.dashboard.SettingsViewModel
 import com.hereliesaz.graffitixr.feature.editor.EditorUi
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
+import com.hereliesaz.graffitixr.feature.editor.TraceScreen
 import com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor as EditorImageProcessor
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.common.model.RelocState
@@ -459,7 +460,8 @@ class MainActivity : ComponentActivity() {
                 val onboardingManager = remember(context) { OnboardingManager(context) }
                 var showOnboarding by remember { mutableStateOf(false) }
 
-                LaunchedEffect(editorUiState.editorMode) {
+                LaunchedEffect(editorUiState.editorMode, showLibrary) {
+                    if (showLibrary) return@LaunchedEffect
                     val modeStr = editorUiState.editorMode.name
                     if (onboardingManager.isFirstTime(modeStr)) {
                         showOnboarding = true
@@ -592,7 +594,10 @@ class MainActivity : ComponentActivity() {
                                 composable(EditorMode.AR.name) { EditorOverlay(editorViewModel, mainUiState, strings) }
                                 composable(EditorMode.OVERLAY.name) { EditorOverlay(editorViewModel, mainUiState, strings) }
                                 composable(EditorMode.MOCKUP.name) { EditorOverlay(editorViewModel, mainUiState, strings) }
-                                composable(EditorMode.TRACE.name) { EditorOverlay(editorViewModel, mainUiState, strings) }
+                                composable(EditorMode.TRACE.name) {
+                                    TraceScreen(editorViewModel)
+                                    EditorOverlay(editorViewModel, mainUiState, strings)
+                                }
                             }
 
                             if (mainUiState.isTouchLocked) {
