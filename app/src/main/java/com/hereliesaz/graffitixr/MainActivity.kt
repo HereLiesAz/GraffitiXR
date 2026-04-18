@@ -571,12 +571,21 @@ class MainActivity : ComponentActivity() {
 
                         Box(Modifier.fillMaxSize().onSizeChanged { fullSize = it }) {
                             AzNavHost(startDestination = EditorMode.TRACE.name) {
-                                composable(EditorMode.AR.name) { EditorOverlay(editorViewModel, mainUiState, strings, showLibrary) }
-                                composable(EditorMode.OVERLAY.name) { EditorOverlay(editorViewModel, mainUiState, strings, showLibrary) }
-                                composable(EditorMode.MOCKUP.name) { EditorOverlay(editorViewModel, mainUiState, strings, showLibrary) }
+                                composable(EditorMode.AR.name) {
+                                    ModeOnboarding(EditorMode.AR, showLibrary, editorViewModel)
+                                    EditorOverlay(editorViewModel, mainUiState, strings)
+                                }
+                                composable(EditorMode.OVERLAY.name) {
+                                    OverlayScreen(editorViewModel, showLibrary)
+                                    EditorOverlay(editorViewModel, mainUiState, strings)
+                                }
+                                composable(EditorMode.MOCKUP.name) {
+                                    MockupScreen(editorViewModel, showLibrary)
+                                    EditorOverlay(editorViewModel, mainUiState, strings)
+                                }
                                 composable(EditorMode.TRACE.name) {
                                     TraceScreen(editorViewModel, showLibrary)
-                                    EditorOverlay(editorViewModel, mainUiState, strings, showLibrary)
+                                    EditorOverlay(editorViewModel, mainUiState, strings)
                                 }
                             }
 
@@ -940,30 +949,8 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun EditorOverlay(viewModel: EditorViewModel, mainUiState: MainUiState, strings: AppStrings, isLibraryVisible: Boolean) {
+    private fun EditorOverlay(viewModel: EditorViewModel, mainUiState: MainUiState, strings: AppStrings) {
         val uiState by viewModel.uiState.collectAsState()
-
-        // Handle onboarding for modes other than TRACE (which handles its own)
-        if (uiState.editorMode != EditorMode.TRACE) {
-            val context = LocalContext.current
-            val onboardingManager = remember(context) { OnboardingManager(context) }
-            var showOnboarding by remember(uiState.editorMode) { mutableStateOf(false) }
-
-            LaunchedEffect(isLibraryVisible, uiState.projectId, uiState.editorMode) {
-                if (!isLibraryVisible && uiState.projectId != null && onboardingManager.isFirstTime(uiState.editorMode.name)) {
-                    showOnboarding = true
-                    onboardingManager.markAsSeen(uiState.editorMode.name)
-                }
-            }
-
-            if (showOnboarding) {
-                com.hereliesaz.graffitixr.design.components.OnboardingDialog(
-                    mode = uiState.editorMode,
-                    onDismiss = { showOnboarding = false }
-                )
-            }
-        }
-
         EditorUi(
             actions = viewModel,
             uiState = uiState,
@@ -972,6 +959,28 @@ class MainActivity : ComponentActivity() {
             strings = strings,
             isCapturingTarget = mainUiState.isCapturingTarget
         )
+    }
+
+    @Composable
+    private fun ModeOnboarding(mode: EditorMode, isLibraryVisible: Boolean, viewModel: EditorViewModel) {
+        val context = LocalContext.current
+        val uiState by viewModel.uiState.collectAsState()
+        val onboardingManager = remember(context) { OnboardingManager(context) }
+        var showOnboarding by remember(mode) { mutableStateOf(false) }
+
+        LaunchedEffect(isLibraryVisible, uiState.editorMode, mode) {
+            if (!isLibraryVisible && uiState.editorMode == mode && onboardingManager.isFirstTime(mode.name)) {
+                showOnboarding = true
+                onboardingManager.markAsSeen(mode.name)
+            }
+        }
+
+        if (showOnboarding) {
+            com.hereliesaz.graffitixr.design.components.OnboardingDialog(
+                mode = mode,
+                onDismiss = { showOnboarding = false }
+            )
+        }
     }
 
     override fun onResume() {
