@@ -81,6 +81,8 @@ fun SettingsScreen(
     onImperialUnitsChanged: (Boolean) -> Unit,
     backgroundColor: Int,
     onBackgroundColorChanged: (Int) -> Unit,
+    muralMethod: MuralMethod,
+    onMuralMethodChanged: (MuralMethod) -> Unit,
     onCheckForUpdates: () -> Unit,
     onInstallUpdate: () -> Unit,
     onClose: () -> Unit,
@@ -211,16 +213,31 @@ fun SettingsScreen(
                                 value = if (showDiagOverlay) strings.settings.on else strings.settings.off,
                                 modifier = Modifier.clickable { onDiagOverlayChanged() }
                             )
-                            val nextMode = if (arScanMode == ArScanMode.CLOUD_POINTS) {
-                                ArScanMode.GAUSSIAN_SPLATS
-                            } else {
-                                ArScanMode.CLOUD_POINTS
+                            val modes = ArScanMode.entries
+                            val nextMode = modes[(arScanMode.ordinal + 1) % modes.size]
+                            val scanModeValue = when (arScanMode) {
+                                ArScanMode.CLOUD_POINTS -> strings.settings.pointCloud
+                                ArScanMode.MURAL -> strings.settings.mural
                             }
                             SettingsItem(
                                 label = strings.settings.scanMode,
-                                value = if (arScanMode == ArScanMode.CLOUD_POINTS) strings.settings.pointCloud else strings.settings.gaussianSplat,
+                                value = scanModeValue,
                                 modifier = Modifier.clickable { onArScanModeChanged(nextMode) }
                             )
+
+                            if (arScanMode == ArScanMode.MURAL) {
+                                val methods = MuralMethod.entries
+                                val nextMethod = methods[(muralMethod.ordinal + 1) % methods.size]
+                                val muralMethodValue = when (muralMethod) {
+                                    MuralMethod.VOXEL_HASH -> strings.settings.voxelHash
+                                    MuralMethod.SURFACE_MESH -> strings.settings.surfaceMesh
+                                }
+                                SettingsItem(
+                                    label = strings.settings.muralMethod,
+                                    value = muralMethodValue,
+                                    modifier = Modifier.clickable { onMuralMethodChanged(nextMethod) }
+                                )
+                            }
                             SettingsItem(
                                 label = strings.settings.anchorBoundary,
                                 value = if (showAnchorBoundary) strings.settings.on else strings.settings.off,

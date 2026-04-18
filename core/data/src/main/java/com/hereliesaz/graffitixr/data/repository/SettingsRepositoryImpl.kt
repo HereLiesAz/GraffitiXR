@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.hereliesaz.graffitixr.common.model.AppLanguage
 import com.hereliesaz.graffitixr.common.model.ArScanMode
+import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -24,6 +25,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val LANGUAGE = stringPreferencesKey("language")
     private val IS_RIGHT_HANDED = booleanPreferencesKey("is_right_handed")
     private val AR_SCAN_MODE = stringPreferencesKey("ar_scan_mode")
+    private val MURAL_METHOD = stringPreferencesKey("mural_method")
     private val SHOW_ANCHOR_BOUNDARY = booleanPreferencesKey("show_anchor_boundary")
     private val IS_IMPERIAL_UNITS = booleanPreferencesKey("is_imperial_units")
     private val BACKGROUND_COLOR = intPreferencesKey("background_color")
@@ -56,9 +58,23 @@ class SettingsRepositoryImpl @Inject constructor(
         .map { preferences ->
             when (preferences[AR_SCAN_MODE]) {
                 ArScanMode.CLOUD_POINTS.name -> ArScanMode.CLOUD_POINTS
-                else -> ArScanMode.GAUSSIAN_SPLATS  // default
+                else -> ArScanMode.MURAL  // default
             }
         }
+
+    override val muralMethod: Flow<MuralMethod> = context.dataStore.data
+        .map { preferences ->
+            when (preferences[MURAL_METHOD]) {
+                MuralMethod.SURFACE_MESH.name -> MuralMethod.SURFACE_MESH
+                else -> MuralMethod.VOXEL_HASH // default
+            }
+        }
+
+    override suspend fun setMuralMethod(method: MuralMethod) {
+        context.dataStore.edit { preferences ->
+            preferences[MURAL_METHOD] = method.name
+        }
+    }
 
     override suspend fun setArScanMode(mode: ArScanMode) {
         context.dataStore.edit { preferences ->

@@ -65,8 +65,10 @@ data class ArUiState(
     // OverlayRenderer sizes its textured quad to (halfW*2) × (halfH*2) meters.
     val targetPhysicalExtent: Pair<Float, Float>? = null,
 
-    // Which 3-D mapping mode is active. Defaults to GAUSSIAN_SPLATS (richer depth data).
-    val arScanMode: ArScanMode = ArScanMode.GAUSSIAN_SPLATS,
+    // Which 3-D mapping mode is active. Defaults to MURAL.
+    val arScanMode: ArScanMode = ArScanMode.MURAL,
+    // The specific engine used when MURAL is active.
+    val muralMethod: MuralMethod = MuralMethod.VOXEL_HASH,
 
     // Phase 3 — True once the renderer has confirmed ARCore Depth API is available on this device.
     val isDepthApiSupported: Boolean = false,
@@ -129,11 +131,18 @@ enum class ArScanMode {
      * Use ARCore's built-in feature-point cloud (reliable, no depth API required). 
      */
     CLOUD_POINTS,
-    /** 
-     * User-facing: "Mural". Optimized for large-scale walls.
-     * Use the MobileGS depth-to-voxel-splat pipeline (richer spatial map, but slower to build). 
+    /**
+     * User-facing: "Mural". The specific engine (Splatting or Surface Mesh) 
+     * is determined by the MuralMethod setting.
      */
-    GAUSSIAN_SPLATS
+    MURAL
+}
+
+enum class MuralMethod {
+    /** Gaussian Splatting (Mural v1) */
+    VOXEL_HASH,
+    /** Surface-Aware Mesh / t-SNE Unroller (Mural v2) */
+    SURFACE_MESH
 }
 
 enum class ScanPhase { AMBIENT, WALL, COMPLETE }

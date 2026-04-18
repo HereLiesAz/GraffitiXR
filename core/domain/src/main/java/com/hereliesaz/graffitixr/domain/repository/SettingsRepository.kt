@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.domain.repository
 
 import com.hereliesaz.graffitixr.common.model.ArScanMode
+import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.AppLanguage
 import kotlinx.coroutines.flow.Flow
 
@@ -31,10 +32,15 @@ interface SettingsRepository {
      */
     suspend fun setRightHanded(isRight: Boolean)
 
-    /** Which AR depth/mapping mode the user has selected. Defaults to [ArScanMode.GAUSSIAN_SPLATS]. */
+    /** Which AR depth/mapping mode the user has selected. Defaults to [ArScanMode.MURAL]. */
     val arScanMode: Flow<ArScanMode>
 
     suspend fun setArScanMode(mode: ArScanMode)
+    
+    /** The specific engine used when [ArScanMode.MURAL] is active. */
+    val muralMethod: Flow<MuralMethod>
+    
+    suspend fun setMuralMethod(method: MuralMethod)
 
     /** Whether to draw an orange boundary rectangle around the AR overlay quad when anchor is active. */
     val showAnchorBoundary: Flow<Boolean>

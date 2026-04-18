@@ -235,6 +235,9 @@ void MobileGS::initShaders() {
         glGenBuffers(1, &mMeshIbo);
     }
 
+    glGenBuffers(1, &mPersistentMeshVbo);
+    glGenBuffers(1, &mPersistentMeshIbo);
+
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
@@ -757,6 +760,9 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     if (++mFrameCounter % 30 == 0) {
         continuousOptimize();
     }
+
+    // NEW: Persistent Surface Mesh update (Twindo-style)
+    updatePersistentMesh(depth, viewMat, projMat);
 }
 
 void MobileGS::continuousOptimize() {
@@ -1003,7 +1009,7 @@ void MobileGS::draw() {
     glm::mat4 mvp = P * V; // MANDATE: Points are in World Space
     glm::mat4 meshMvp = mvp;
 
-    if (mSplatsVisible && mPointCount > 0) {
+    if (mSplatsVisible && mPointCount > 0 && mMuralMethod == 0) {
         glUseProgram(mProgram);
         glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMvp"), 1, GL_FALSE, glm::value_ptr(mvp));
         glUniform1f(glGetUniformLocation(mProgram, "uFocalY"), std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f));
@@ -1036,5 +1042,133 @@ void MobileGS::draw() {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mMeshIbo); glDrawElements(GL_LINES, mMeshIndexCount, GL_UNSIGNED_INT, (void*)0);
         glDisableVertexAttribArray(0); glDisable(GL_BLEND); glDepthMask(GL_TRUE);
     }
+
+    // NEW: Persistent Surface Mesh (Twindo-style)
+    if (mPersistentMeshInitialized && mMuralMethod == 1) {
+        if (mFrameCounter % 2 == 0) {
+            std::vector<float> verts;
+            verts.reserve(mPersistentMesh.size() * 3);
+            for(auto& v : mPersistentMesh) { verts.push_back(v.x); verts.push_back(v.y); verts.push_back(v.z); }
+            glBindBuffer(GL_ARRAY_BUFFER, mPersistentMeshVbo);
+            glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_DYNAMIC_DRAW);
+            
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mPersistentMeshIbo);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, mPersistentMeshIndices.size() * sizeof(uint32_t), mPersistentMeshIndices.data(), GL_STATIC_DRAW);
+        }
+
+        glUseProgram(mMeshProgram);
+        glUniformMatrix4fv(glGetUniformLocation(mMeshProgram, "uMvp"), 1, GL_FALSE, glm::value_ptr(meshMvp));
+        glUniform4f(glGetUniformLocation(mMeshProgram, "uColor"), 1.0f, 0.6f, 0.0f, 0.4f); // Orange
+        glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(GL_FALSE);
+        glBindBuffer(GL_ARRAY_BUFFER, mPersistentMeshVbo); glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mPersistentMeshIbo); glDrawElements(GL_LINES, mPersistentMeshIndices.size(), GL_UNSIGNED_INT, (void*)0);
+        glDisableVertexAttribArray(0); glDisable(GL_BLEND); glDepthMask(GL_TRUE);
+    }
+
     glBindBuffer(GL_ARRAY_BUFFER, 0); glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+}
+
+void MobileGS::setArScanMode(int mode) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mScanMode = mode;
+}
+
+void MobileGS::setMuralMethod(int method) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mMuralMethod = method;
+}
+
+void MobileGS::updatePersistentMesh(const cv::Mat& depth, const float* viewMat, const float* projMat) {
+    if (depth.empty()) return;
+
+    if (!mPersistentMeshInitialized) {
+        float extent = 5.0f;
+        float step = (extent * 2.0f) / (MESH_GRID_DIM - 1);
+        mPersistentMesh.reserve(MESH_GRID_DIM * MESH_GRID_DIM);
+        for (int i = 0; i < MESH_GRID_DIM; ++i) {
+            for (int j = 0; j < MESH_GRID_DIM; ++j) {
+                mPersistentMesh.push_back({-extent + j * step, -extent + i * step, 0.0f, 0.0f});
+            }
+        }
+        mPersistentMeshIndices.reserve((MESH_GRID_DIM - 1) * (MESH_GRID_DIM - 1) * 4);
+        for (int i = 0; i < MESH_GRID_DIM - 1; ++i) {
+            for (int j = 0; j < MESH_GRID_DIM - 1; ++j) {
+                int bl = i * MESH_GRID_DIM + j;
+                int br = bl + 1;
+                int tl = (i + 1) * MESH_GRID_DIM + j;
+                int tr = tl + 1;
+                mPersistentMeshIndices.push_back(bl); mPersistentMeshIndices.push_back(br);
+                mPersistentMeshIndices.push_back(bl); mPersistentMeshIndices.push_back(tl);
+            }
+        }
+        mPersistentMeshInitialized = true;
+    }
+
+    glm::mat4 V = glm::make_mat4(viewMat);
+    glm::mat4 A = glm::make_mat4(mAnchorMatrix);
+    glm::mat4 invVA = glm::inverse(V * A);
+
+    float fx = projMat[0] * (depth.cols / 2.0f);
+    float fy = projMat[5] * (depth.rows / 2.0f);
+    float cx = (projMat[8] + 1.0f) * (depth.cols / 2.0f);
+    float cy = (-projMat[9] + 1.0f) * (depth.rows / 2.0f);
+
+    // Update vertices based on depth image
+    for (auto& v : mPersistentMesh) {
+        glm::vec4 p_cam = V * A * glm::vec4(v.x, v.y, v.z, 1.0f);
+        if (p_cam.z >= -0.1f) continue;
+        
+        float u = (p_cam.x * fx / -p_cam.z) + cx;
+        float vi = (p_cam.y * -fy / -p_cam.z) + cy;
+        
+        if (u >= 0 && u < depth.cols && vi >= 0 && vi < depth.rows) {
+            float d = depth.at<float>((int)vi, (int)u);
+            if (d > 0.1f && d < 10.0f) {
+                float current_d = -p_cam.z;
+                if (std::abs(current_d - d) < 0.3f) {
+                    // Back-project target depth to anchor space
+                    glm::vec4 p_target_cam = p_cam * (d / current_d);
+                    p_target_cam.w = 1.0f;
+                    glm::vec4 p_target_anchor = invVA * p_target_cam;
+
+                    // Pull vertex towards target in anchor space
+                    float alpha = 0.15f;
+                    v.x += (p_target_anchor.x - v.x) * alpha;
+                    v.y += (p_target_anchor.y - v.y) * alpha;
+                    v.z += (p_target_anchor.z - v.z) * alpha;
+                    
+                    v.confidence = std::min(1.0f, v.confidence + 0.1f);
+                }
+            }
+        }
+    }
+
+    // Laplacian Smoothing
+    std::vector<float> nextZ(mPersistentMesh.size());
+    for (int i = 1; i < MESH_GRID_DIM - 1; ++i) {
+        for (int j = 1; j < MESH_GRID_DIM - 1; ++j) {
+            int idx = i * MESH_GRID_DIM + j;
+            float sum = mPersistentMesh[idx - 1].z + mPersistentMesh[idx + 1].z +
+                        mPersistentMesh[idx - MESH_GRID_DIM].z + mPersistentMesh[idx + MESH_GRID_DIM].z;
+            nextZ[idx] = mPersistentMesh[idx].z * 0.6f + (sum / 4.0f) * 0.4f;
+        }
+    }
+    for (int i = 1; i < MESH_GRID_DIM - 1; ++i) {
+        for (int j = 1; j < MESH_GRID_DIM - 1; ++j) {
+            int idx = i * MESH_GRID_DIM + j;
+            mPersistentMesh[idx].z = nextZ[idx];
+        }
+    }
+}
+
+void MobileGS::getPersistentMesh(std::vector<float>& outVertices, std::vector<float>& outWeights) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    outVertices.clear(); outWeights.clear();
+    outVertices.reserve(mPersistentMesh.size() * 3);
+    outWeights.reserve(mPersistentMesh.size());
+    for (const auto& v : mPersistentMesh) {
+        outVertices.push_back(v.x); outVertices.push_back(v.y); outVertices.push_back(v.z);
+        outWeights.push_back(v.confidence);
+    }
 }

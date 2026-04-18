@@ -35,7 +35,7 @@
     <!-- Label for Mural mode, which is optimized for large-scale wall artwork. -->
     <string name="nav_mural">Mural</string>
     <!-- Description for the toggle between Canvas and Mural scanning modes. -->
-    <string name="nav_scan_mode_toggle_info">Switch between Canvas (optimized for smaller desk-scale art) and Mural (optimized for large-scale walls and Gaussian Splatting).</string>
+    <string name="nav_scan_mode_toggle_info">Switch between Canvas (optimized for smaller desk-scale art) and Mural (optimized for large-scale walls and Voxel Hashing).</string>
 
     <!-- Label for the Stencil generation tool. -->
     <string name="nav_stencil">Stencil</string>
@@ -412,7 +412,9 @@
     <string name="settings_off">Off</string>
     <string name="settings_scan_mode_label">AR Scan Mode</string>
     <string name="settings_scan_mode_point_cloud">Point Cloud</string>
-    <string name="settings_scan_mode_gaussian_splat">Gaussian Splat</string>
+    <string name="settings_scan_mode_voxel_hash">Voxel Hash</string>
+    <string name="settings_mural_method_label">Mural Engine</string>
+    <string name="settings_scan_mode_surface_mesh">Surface Mesh</string>
     <string name="settings_anchor_boundary_label">Show Anchor Boundary</string>
     <string name="settings_units_label">Distance Units</string>
     <string name="settings_units_imperial">Imperial (ft)</string>
@@ -481,7 +483,7 @@
     <!-- Target Management help text. -->
     <string name="help_target_host">Target Management: Tools for AR anchors. Instructions: Tap to access tools for creating or re-aligning the mural\'s position.</string>
     <!-- Scan Resolution help text. -->
-    <string name="help_scan_mode_toggle">Scan Resolution: Switch between Mural (large scale) and Canvas (small scale). Mural uses Gaussian Splats for walls; Canvas uses Point Clouds for detailed desk-scale art.</string>
+    <string name="help_scan_mode_toggle">Scan Resolution: Switch between Mural (large scale) and Canvas (small scale). Mural uses Voxel Hashing for walls; Canvas uses Point Clouds for detailed desk-scale art.</string>
     <!-- Create Anchor help text. -->
     <string name="help_create">Create Anchor: Photograph a mark on the wall to lock projection. Instructions: Point at a distinct texture and tap. The app will track this mark.</string>
     <!-- Layer Management help text. -->
@@ -572,7 +574,7 @@
     <string name="tut_ar_title">AR Projection</string>
     <string name="tut_ar_text">Projects your design onto a real wall using the phone\'s depth sensor and spatial tracking.</string>
     <string name="tut_ar_step1_title">Step 1: Scan</string>
-    <string name="tut_ar_step1_text">Point at the wall and move slowly side-to-side. Coloured splats appear as the engine maps the surface. Wait until splats cover the wall area.</string>
+    <string name="tut_ar_step1_text">Point at the wall and move slowly side-to-side. Coloured shapes appear as the engine maps the surface. Wait until the wall area is covered.</string>
     <string name="tut_ar_step2_title">Step 2: Tap to Place</string>
     <string name="tut_ar_step2_text">Just tap the screen. The app photographs the wall, extracts tracking features, and locks the anchor instantly.</string>
     <string name="tut_ar_step3_title">Step 3: Add Your Artwork</string>

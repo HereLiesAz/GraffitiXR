@@ -8,26 +8,22 @@ import android.opengl.Matrix
 import com.hereliesaz.graffitixr.design.rendering.ShaderUtil
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.FloatBuffer
+import java.nio.IntBuffer
 
 /**
- * Renders the editor layer composite as a textured quad locked to the AR anchor.
- *
- * Coordinate space: anchor-local XY plane, Z = 0 facing the camera.
- * MVP = P × V × A  where A is the PnP-driven anchor matrix from MobileGS.
- *
- * Quad corners (counter-clockwise from bottom-left):
- *   (-halfW, -halfH, 0), (halfW, -halfH, 0), (-halfW, halfH, 0), (halfW, halfH, 0)
- * Rendered as GL_TRIANGLE_STRIP with alpha blending.
+ * Renders the editor layer composite as a warped grid mesh locked to the AR anchor.
+ * Supports both flat-quad and dense-mesh (Twindo-style) rendering.
  */
 class OverlayRenderer(private val context: Context) {
 
     private var program = 0
     private var positionHandle = 0
     private var texCoordHandle = 0
+    private var weightHandle = 0
     private var mvpMatrixHandle = 0
     private var textureHandle = 0
 
-    // Border (line-loop) program — separate from the textured-quad program
     private var borderProgram = 0
     private var borderPositionHandle = 0
     private var borderMvpMatrixHandle = 0
@@ -38,17 +34,21 @@ class OverlayRenderer(private val context: Context) {
         private set
 
     private var vboId = 0
+    private var iboId = 0
+    private var indexCount = 0
 
     @Volatile private var halfW = QUAD_HALF_EXTENT
     @Volatile private var halfH = QUAD_HALF_EXTENT
-    @Volatile private var quadDirty = false
+    @Volatile private var meshDirty = true
 
-    // Border is a separate visual indicator — decoupled from the textured quad size.
     @Volatile private var borderHalfW = 0.5f
     @Volatile private var borderHalfH = 0.5f
-    @Volatile private var borderDirty = false
+    @Volatile private var borderDirty = true
 
     private val mvpMatrix = FloatArray(16)
+
+    // Reusable buffers for dynamic mesh updates
+    private var vertexBuffer: FloatBuffer? = null
 
     fun createOnGlThread() {
         val vs = ShaderUtil.loadGLShader(TAG, context, GLES30.GL_VERTEX_SHADER, VERTEX_SHADER)
@@ -62,10 +62,10 @@ class OverlayRenderer(private val context: Context) {
 
         positionHandle = GLES30.glGetAttribLocation(program, "a_Position")
         texCoordHandle = GLES30.glGetAttribLocation(program, "a_TexCoord")
+        weightHandle = GLES30.glGetAttribLocation(program, "a_Weight")
         mvpMatrixHandle = GLES30.glGetUniformLocation(program, "u_MvpMatrix")
         textureHandle = GLES30.glGetUniformLocation(program, "u_Texture")
 
-        // Allocate texture
         GLES30.glGenTextures(1, textureIds, 0)
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, textureIds[0])
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
@@ -74,13 +74,13 @@ class OverlayRenderer(private val context: Context) {
         GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_T, GLES30.GL_CLAMP_TO_EDGE)
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, 0)
 
-        // Allocate textured-quad VBO
-        val buf = IntArray(1)
-        GLES30.glGenBuffers(1, buf, 0)
-        vboId = buf[0]
-        buildQuad()
+        val bufs = IntArray(2)
+        GLES30.glGenBuffers(2, bufs, 0)
+        vboId = bufs[0]
+        iboId = bufs[1]
+        
+        buildInitialMesh()
 
-        // Set up border line-loop program
         val borderVs = ShaderUtil.loadGLShader(TAG, context, GLES30.GL_VERTEX_SHADER, BORDER_VERTEX_SHADER)
         val borderFs = ShaderUtil.loadGLShader(TAG, context, GLES30.GL_FRAGMENT_SHADER, BORDER_FRAGMENT_SHADER)
         borderProgram = GLES30.glCreateProgram().also {
@@ -96,12 +96,10 @@ class OverlayRenderer(private val context: Context) {
         buildBorderQuad()
     }
 
-    /** Clear the overlay texture so nothing is rendered until a new bitmap is uploaded. Must be called from the GL thread. */
     fun clearTexture() {
         hasTexture = false
     }
 
-    /** Upload a new overlay composite bitmap. Must be called from the GL thread. */
     fun updateTexture(bitmap: Bitmap) {
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, textureIds[0])
         GLUtils.texImage2D(GLES30.GL_TEXTURE_2D, 0, bitmap, 0)
@@ -109,34 +107,20 @@ class OverlayRenderer(private val context: Context) {
         hasTexture = true
     }
 
-    /**
-     * Set the physical half-extents of the overlay quad (meters).
-     * Thread-safe; actual VBO rebuild happens at the start of the next [draw] call.
-     */
     fun setExtent(halfW: Float, halfH: Float) {
-        this.halfW = halfW
-        this.halfH = halfH
-        quadDirty = true
+        if (this.halfW != halfW || this.halfH != halfH) {
+            this.halfW = halfW
+            this.halfH = halfH
+            meshDirty = true
+        }
     }
 
-    /**
-     * Set the physical half-extents of the anchor border indicator (meters).
-     * The border is purely decorative — it shows where the anchor plane is, but does NOT
-     * constrain the textured quad or images in any way.
-     * Thread-safe; actual VBO rebuild happens at the start of the next [drawAnchorBorder] call.
-     */
     fun setBorderExtent(halfW: Float, halfH: Float) {
         this.borderHalfW = halfW
         this.borderHalfH = halfH
         borderDirty = true
     }
 
-    /**
-     * Draw an orange line-loop border around the anchor quad boundary.
-     * Renders even when no texture is loaded, so the artist can see the anchor
-     * placement before the artwork overlay is ready.
-     * Must be called from the GL thread.
-     */
     fun drawAnchorBorder(viewMatrix: FloatArray, projMatrix: FloatArray, anchorMatrix: FloatArray) {
         if (borderProgram == 0 || borderVboId == 0) return
         if (borderDirty) {
@@ -164,19 +148,19 @@ class OverlayRenderer(private val context: Context) {
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, 0)
     }
 
-    /**
-     * Draw the overlay quad.  Must be called from the GL thread.
-     * No-op until [updateTexture] has been called at least once.
+     * @param meshVertices Optional warped vertices (x,y,z) from SlamManager.
+     * @param meshWeights Optional vertex confidence weights (0..1).
+     * If null, renders a flat quad.
      */
-    fun draw(viewMatrix: FloatArray, projMatrix: FloatArray, anchorMatrix: FloatArray) {
+    fun draw(viewMatrix: FloatArray, projMatrix: FloatArray, anchorMatrix: FloatArray, 
+             meshVertices: FloatArray? = null, meshWeights: FloatArray? = null) {
         if (!hasTexture || program == 0 || vboId == 0) return
 
-        if (quadDirty) {
-            buildQuad()
-            quadDirty = false
+        if (meshDirty || meshVertices != null) {
+            updateMeshBuffers(meshVertices, meshWeights)
+            meshDirty = false
         }
 
-        // MVP = P × V × A
         Matrix.multiplyMM(mvpMatrix, 0, viewMatrix, 0, anchorMatrix, 0)
         Matrix.multiplyMM(mvpMatrix, 0, projMatrix, 0, mvpMatrix, 0)
 
@@ -188,48 +172,114 @@ class OverlayRenderer(private val context: Context) {
         GLES30.glUniform1i(textureHandle, 0)
 
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, vboId)
-
-        val stride = 5 * 4  // 5 floats × 4 bytes
+        val stride = 6 * 4 // x,y,z, u,v, weight
         GLES30.glEnableVertexAttribArray(positionHandle)
         GLES30.glVertexAttribPointer(positionHandle, 3, GLES30.GL_FLOAT, false, stride, 0)
         GLES30.glEnableVertexAttribArray(texCoordHandle)
         GLES30.glVertexAttribPointer(texCoordHandle, 2, GLES30.GL_FLOAT, false, stride, 3 * 4)
+        GLES30.glEnableVertexAttribArray(weightHandle)
+        GLES30.glVertexAttribPointer(weightHandle, 1, GLES30.GL_FLOAT, false, stride, 5 * 4)
 
+        GLES30.glBindBuffer(GLES30.GL_ELEMENT_ARRAY_BUFFER, iboId)
         GLES30.glEnable(GLES30.GL_BLEND)
         GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
-        GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
+        
+        GLES30.glDrawElements(GLES30.GL_TRIANGLES, indexCount, GLES30.GL_UNSIGNED_INT, 0)
+        
         GLES30.glDisable(GLES30.GL_BLEND)
-
         GLES30.glDisableVertexAttribArray(positionHandle)
         GLES30.glDisableVertexAttribArray(texCoordHandle)
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, 0)
+        GLES30.glBindBuffer(GLES30.GL_ELEMENT_ARRAY_BUFFER, 0)
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, 0)
     }
 
-    // Must be called from the GL thread.
-    private fun buildQuad() {
-        val w = halfW
-        val h = halfH
-        // Triangle-strip quad: BL, BR, TL, TR  (each vertex: x, y, z, u, v)
-        val data = floatArrayOf(
-            -w, -h, 0f,  0f, 1f,
-             w, -h, 0f,  1f, 1f,
-            -w,  h, 0f,  0f, 0f,
-             w,  h, 0f,  1f, 0f,
-        )
-        val buf = ByteBuffer.allocateDirect(data.size * 4)
-            .order(ByteOrder.nativeOrder())
-            .asFloatBuffer()
-            .also { it.put(data); it.position(0) }
+    private fun buildInitialMesh() {
+        val vertices = FloatArray(MESH_DIM * MESH_DIM * 6)
+        val indices = IntArray((MESH_DIM - 1) * (MESH_DIM - 1) * 6)
+        
+        var vIdx = 0
+        for (i in 0 until MESH_DIM) {
+            val v = i.toFloat() / (MESH_DIM - 1)
+            val y = -halfH + v * (halfH * 2)
+            for (j in 0 until MESH_DIM) {
+                val u = j.toFloat() / (MESH_DIM - 1)
+                val x = -halfW + u * (halfW * 2)
+                
+                vertices[vIdx++] = x
+                vertices[vIdx++] = y
+                vertices[vIdx++] = 0f
+                vertices[vIdx++] = u
+                vertices[vIdx++] = 1.0f - v // Flip V
+                vertices[vIdx++] = 1.0f // Initial weight
+            }
+        }
 
+        var iIdx = 0
+        for (i in 0 until MESH_DIM - 1) {
+            for (j in 0 until MESH_DIM - 1) {
+                val bl = i * MESH_DIM + j
+                val br = bl + 1
+                val tl = (i + 1) * MESH_DIM + j
+                val tr = tl + 1
+                
+                indices[iIdx++] = bl
+                indices[iIdx++] = br
+                indices[iIdx++] = tl
+                indices[iIdx++] = br
+                indices[iIdx++] = tr
+                indices[iIdx++] = tl
+            }
+        }
+
+        indexCount = indices.size
+        
+        val vBuf = ByteBuffer.allocateDirect(vertices.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().put(vertices)
+        vBuf.position(0)
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, vboId)
-        GLES30.glBufferData(GLES30.GL_ARRAY_BUFFER, data.size * 4, buf, GLES30.GL_DYNAMIC_DRAW)
-        GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, 0)
+        GLES30.glBufferData(GLES30.GL_ARRAY_BUFFER, vertices.size * 4, vBuf, GLES30.GL_DYNAMIC_DRAW)
+
+        val iBuf = ByteBuffer.allocateDirect(indices.size * 4).order(ByteOrder.nativeOrder()).asIntBuffer().put(indices)
+        iBuf.position(0)
+        GLES30.glBindBuffer(GLES30.GL_ELEMENT_ARRAY_BUFFER, iboId)
+        GLES30.glBufferData(GLES30.GL_ELEMENT_ARRAY_BUFFER, indices.size * 4, iBuf, GLES30.GL_STATIC_DRAW)
     }
 
-    // Must be called from the GL thread.
-    // Border VBO: 4 vertices in CCW order for GL_LINE_LOOP (BL, BR, TR, TL).
-    // Each vertex: x, y, z (3 floats, stride = 12).
+    private fun updateMeshBuffers(warpedVertices: FloatArray?, warpedWeights: FloatArray?) {
+        val totalVertices = MESH_DIM * MESH_DIM
+        if (vertexBuffer == null) {
+            vertexBuffer = ByteBuffer.allocateDirect(totalVertices * 6 * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+        }
+        val buf = vertexBuffer!!
+        buf.position(0)
+
+        for (i in 0 until MESH_DIM) {
+            val v = i.toFloat() / (MESH_DIM - 1)
+            val y = -halfH + v * (halfH * 2)
+            for (j in 0 until MESH_DIM) {
+                val u = j.toFloat() / (MESH_DIM - 1)
+                val x = -halfW + u * (halfW * 2)
+                
+                val idx = i * MESH_DIM + j
+                if (warpedVertices != null && idx * 3 + 2 < warpedVertices.size) {
+                    buf.put(warpedVertices[idx * 3])
+                    buf.put(warpedVertices[idx * 3 + 1])
+                    buf.put(warpedVertices[idx * 3 + 2])
+                } else {
+                    buf.put(x)
+                    buf.put(y)
+                    buf.put(0f)
+                }
+                buf.put(u)
+                buf.put(1.0f - v)
+                buf.put(warpedWeights?.getOrNull(idx) ?: 1.0f)
+            }
+        }
+        buf.position(0)
+        GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, vboId)
+        GLES30.glBufferSubData(GLES30.GL_ARRAY_BUFFER, 0, totalVertices * 6 * 4, buf)
+    }
+
     private fun buildBorderQuad() {
         val w = borderHalfW
         val h = borderHalfH
@@ -239,27 +289,17 @@ class OverlayRenderer(private val context: Context) {
              w,  h, 0f,   // TR
             -w,  h, 0f,   // TL
         )
-        val buf = ByteBuffer.allocateDirect(data.size * 4)
-            .order(ByteOrder.nativeOrder())
-            .asFloatBuffer()
-            .also { it.put(data); it.position(0) }
-
+        val buf = ByteBuffer.allocateDirect(data.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().put(data)
+        buf.position(0)
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, borderVboId)
         GLES30.glBufferData(GLES30.GL_ARRAY_BUFFER, data.size * 4, buf, GLES30.GL_DYNAMIC_DRAW)
-        GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, 0)
     }
 
     companion object {
         private const val TAG = "OverlayRenderer"
-
-        /**
-         * Fixed half-extent (meters) for the textured overlay quad — 10 m × 10 m total.
-         * Large enough that mural-scale artwork is never spatially clipped by the quad boundary.
-         * The anchor border indicator uses a separate, smaller extent set via [setBorderExtent].
-         */
+        private const val MESH_DIM = 32 // Sufficient for smooth warping
         const val QUAD_HALF_EXTENT = 5.0f
 
-        // Colored-line shader for the anchor boundary rectangle.
         private const val BORDER_VERTEX_SHADER = """#version 300 es
             uniform mat4 u_MvpMatrix;
             in vec3 a_Position;
@@ -272,7 +312,6 @@ class OverlayRenderer(private val context: Context) {
             precision mediump float;
             out vec4 FragColor;
             void main() {
-                // Orange with 85% alpha — "chalk line" feel
                 FragColor = vec4(1.0, 0.55, 0.0, 0.85);
             }
         """
@@ -281,10 +320,13 @@ class OverlayRenderer(private val context: Context) {
             uniform mat4 u_MvpMatrix;
             in vec3 a_Position;
             in vec2 a_TexCoord;
+            in float a_Weight;
             out vec2 v_TexCoord;
+            out float v_Weight;
             void main() {
                 gl_Position = u_MvpMatrix * vec4(a_Position, 1.0);
                 v_TexCoord = a_TexCoord;
+                v_Weight = a_Weight;
             }
         """
 
@@ -292,9 +334,12 @@ class OverlayRenderer(private val context: Context) {
             precision mediump float;
             uniform sampler2D u_Texture;
             in vec2 v_TexCoord;
+            in float v_Weight;
             out vec4 FragColor;
             void main() {
-                FragColor = texture(u_Texture, v_TexCoord);
+                vec4 tex = texture(u_Texture, v_TexCoord);
+                // Modulate alpha by weight to show "uncertain" areas as faded
+                FragColor = vec4(tex.rgb, tex.a * v_Weight);
             }
         """
     }

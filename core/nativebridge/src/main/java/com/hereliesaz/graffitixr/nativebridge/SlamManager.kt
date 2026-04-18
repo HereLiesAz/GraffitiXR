@@ -155,6 +155,11 @@ class SlamManager @Inject constructor() {
 
     fun loadSuperPoint(assetManager: AssetManager): Boolean = nativeLoadSuperPoint(assetManager)
 
+    fun setArScanMode(mode: Int) = nativeSetArScanMode(mode)
+    fun setMuralMethod(method: Int) = nativeSetMuralMethod(method)
+
+    fun getPersistentMesh(vertices: FloatArray, weights: FloatArray) = nativeGetPersistentMesh(vertices, weights)
+
     fun destroy() {
         if (isInitialized) {
             nativeDestroy()
@@ -200,6 +205,9 @@ class SlamManager @Inject constructor() {
     private external fun nativeUpdateAnchorTransform(transform: FloatArray)
     private external fun nativeGetAnchorTransform(): FloatArray
     private external fun nativeGetPaintingProgress(): Float
+    private external fun nativeSetArScanMode(mode: Int)
+    private external fun nativeSetMuralMethod(method: Int)
+    private external fun nativeGetPersistentMesh(vertices: FloatArray, weights: FloatArray)
     private external fun nativeSetWallFingerprint(
         bitmap: Bitmap, mask: Bitmap?,
         depthBuffer: ByteBuffer,

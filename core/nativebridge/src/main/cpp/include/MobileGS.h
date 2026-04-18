@@ -20,6 +20,11 @@ struct Splat {
     float nx, ny, nz;       // Surface Normal
     float radius;           // Splat Scale
 };
+
+struct MeshVertex {
+    float x, y, z;          // Position (Anchor-Local Space)
+    float confidence;       // Persistence/Weight
+};
 static_assert(sizeof(Splat) == 48, "Splat struct layout mismatch.");
 
 struct VoxelKey {
@@ -65,6 +70,8 @@ public:
     bool loadSuperPoint(const std::vector<uchar>& onnxBytes);
     void clearMap();
     void pruneByConfidence(float threshold);
+    void setArScanMode(int mode);
+    void setMuralMethod(int method);
     void setViewportSize(int width, int height);
     void setRelocEnabled(bool enabled);
     void setVoxelSize(float size);
@@ -76,6 +83,9 @@ public:
     void saveModel(const std::string& path);
     void loadModel(const std::string& path);
     bool importModel3D(const std::string& path);
+
+    void updatePersistentMesh(const cv::Mat& depth, const float* viewMat, const float* projMat);
+    void getPersistentMesh(std::vector<float>& outVertices, std::vector<float>& outWeights);
 
     void draw();
     void destroy();
@@ -167,6 +177,8 @@ private:
     GLuint mIndexVbo = 0;
     std::atomic<int> mPointCount{0};
     bool mSplatsVisible{true};
+    int mScanMode = 0; // 0=CLOUD, 1=MURAL
+    int mMuralMethod = 0; // 0=VOXEL_HASH, 1=SURFACE_MESH
 
     GLuint mMeshProgram = 0;
     GLuint mMeshVbo = 0;
@@ -180,6 +192,14 @@ private:
     std::vector<float> mPendingMeshVertices;
     std::vector<uint32_t> mPendingMeshIndices;
     bool mGlDataDirty = false;
+
+    // Persistent Surface Mesh (Twindo-style)
+    static constexpr int MESH_GRID_DIM = 32;
+    std::vector<MeshVertex> mPersistentMesh;
+    std::vector<uint32_t> mPersistentMeshIndices;
+    GLuint mPersistentMeshVbo = 0;
+    GLuint mPersistentMeshIbo = 0;
+    bool mPersistentMeshInitialized = false;
 
     uint64_t mFrameCounter = 0;
 

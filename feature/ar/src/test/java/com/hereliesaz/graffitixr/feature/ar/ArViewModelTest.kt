@@ -287,27 +287,27 @@ class ArViewModelTest {
     // ==================== Scan Mode Tests ====================
 
     @Test
-    fun `setArScanMode to GAUSSIAN_SPLATS updates arScanMode in uiState`() = runTest {
+    fun `setArScanMode to MURAL updates arScanMode in uiState`() = runTest {
         every { settingsRepository.arScanMode } returns MutableStateFlow(ArScanMode.CLOUD_POINTS)
         viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, context)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        every { settingsRepository.arScanMode } returns MutableStateFlow(ArScanMode.GAUSSIAN_SPLATS)
+        every { settingsRepository.arScanMode } returns MutableStateFlow(ArScanMode.MURAL)
         // Simulate what setArScanMode does: push the new mode through the settings flow
         val modeFlow = MutableStateFlow(ArScanMode.CLOUD_POINTS)
         every { settingsRepository.arScanMode } returns modeFlow
         viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, context)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        modeFlow.value = ArScanMode.GAUSSIAN_SPLATS
+        modeFlow.value = ArScanMode.MURAL
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals(ArScanMode.GAUSSIAN_SPLATS, viewModel.uiState.value.arScanMode)
+        assertEquals(ArScanMode.MURAL, viewModel.uiState.value.arScanMode)
     }
 
     @Test
     fun `setArScanMode to CLOUD_POINTS updates arScanMode in uiState`() = runTest {
-        val modeFlow = MutableStateFlow(ArScanMode.GAUSSIAN_SPLATS)
+        val modeFlow = MutableStateFlow(ArScanMode.MURAL)
         every { settingsRepository.arScanMode } returns modeFlow
         viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, context)
         testDispatcher.scheduler.advanceUntilIdle()

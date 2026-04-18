@@ -609,7 +609,7 @@ class MainActivity : ComponentActivity() {
                             }
 
                             val isScanningPhase = editorUiState.editorMode == EditorMode.AR
-                                    && arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS
+                                    && arUiState.arScanMode == ArScanMode.MURAL
                                     && arUiState.scanPhase != ScanPhase.COMPLETE
                             if (isScanningPhase && !mainUiState.isCapturingTarget && !showLibrary && !showSettings) {
                                 ScanCoachingOverlay(
@@ -624,7 +624,7 @@ class MainActivity : ComponentActivity() {
                             }
 
                             val showDepthWarning = editorUiState.editorMode == EditorMode.AR
-                                    && arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS
+                                    && arUiState.arScanMode == ArScanMode.MURAL
                                     && !arUiState.isDepthApiSupported
                                     && arUiState.splatCount == 0
                             if (showDepthWarning && !showLibrary && !showSettings) {
@@ -939,6 +939,8 @@ class MainActivity : ComponentActivity() {
                                     onImperialUnitsChanged = { arViewModel.setImperialUnits(it) },
                                     backgroundColor = editorUiState.canvasBackground.toArgb(),
                                     onBackgroundColorChanged = { argb -> settingsViewModel.setBackgroundColor(argb) },
+                                    muralMethod = arUiState.muralMethod,
+                                    onMuralMethodChanged = { arViewModel.setMuralMethod(it) },
                                     onCheckForUpdates = { dashboardViewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
                                     onInstallUpdate = { dashboardViewModel.installUpdate(this@MainActivity) },
                                     onClose = { showSettings = false },
@@ -1014,16 +1016,21 @@ class MainActivity : ComponentActivity() {
             azRailSubItem(id = "ar", hostId = "mode_host", text = navStrings.arMode, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.arModeInfo)
 
             if (isArMode) {
-                azRailSubToggle(
-                    id = "scan_mode_toggle",
+                val scanModeText = when (arUiState.arScanMode) {
+                    ArScanMode.CLOUD_POINTS -> navStrings.canvas
+                    ArScanMode.MURAL -> navStrings.mural
+                }
+                azRailSubItem(
+                    id = "scan_mode_cycle",
                     hostId = "mode_host",
-                    isChecked = arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS,
-                    toggleOnText = navStrings.mural,
-                    toggleOffText = navStrings.canvas,
+                    text = scanModeText,
                     info = navStrings.scanModeToggleInfo,
-                    color = Cyan
+                    color = Cyan,
+                    shape = AzButtonShape.RECTANGLE
                 ) {
-                    arViewModel.setArScanMode(if (arUiState.arScanMode == ArScanMode.GAUSSIAN_SPLATS) ArScanMode.CLOUD_POINTS else ArScanMode.GAUSSIAN_SPLATS)
+                    val modes = ArScanMode.entries
+                    val next = modes[(arUiState.arScanMode.ordinal + 1) % modes.size]
+                    arViewModel.setArScanMode(next)
                 }
             }
 

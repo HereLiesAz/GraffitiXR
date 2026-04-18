@@ -536,4 +536,27 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPaintingProgres
     return 0.0f;
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArScanMode(JNIEnv* env, jobject, jint mode) {
+    if (gSlamEngine) gSlamEngine->setArScanMode(mode);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMuralMethod(JNIEnv* env, jobject, jint method) {
+    if (gSlamEngine) gSlamEngine->setMuralMethod(method);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPersistentMesh(JNIEnv* env, jobject, jfloatArray vertices, jfloatArray weights) {
+    if (!gSlamEngine) return;
+    std::vector<float> v, w;
+    gSlamEngine->getPersistentMesh(v, w);
+    if (!v.empty()) {
+        jsize vlen = env->GetArrayLength(vertices);
+        jsize wlen = env->GetArrayLength(weights);
+        env->SetFloatArrayRegion(vertices, 0, std::min((jsize)v.size(), vlen), v.data());
+        env->SetFloatArrayRegion(weights, 0, std::min((jsize)w.size(), wlen), w.data());
+    }
+}
+
 } // extern "C"

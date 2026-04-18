@@ -16,6 +16,7 @@ import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.UnavailableException
 import com.hereliesaz.graffitixr.common.model.ArScanMode
+import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
@@ -120,6 +121,13 @@ class ArViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            settingsRepository.muralMethod.collect { method ->
+                _uiState.update { it.copy(muralMethod = method) }
+                renderer?.muralMethod = method
+            }
+        }
+
+        viewModelScope.launch {
             settingsRepository.showAnchorBoundary.collect { show ->
                 _uiState.update { it.copy(showAnchorBoundary = show) }
                 renderer?.showAnchorBoundary = show
@@ -135,6 +143,12 @@ class ArViewModel @Inject constructor(
 
     fun setArScanMode(mode: ArScanMode) {
         viewModelScope.launch { settingsRepository.setArScanMode(mode) }
+    }
+
+    fun setMuralMethod(method: MuralMethod) {
+        viewModelScope.launch {
+            settingsRepository.setMuralMethod(method)
+        }
     }
 
     fun setShowAnchorBoundary(show: Boolean) {

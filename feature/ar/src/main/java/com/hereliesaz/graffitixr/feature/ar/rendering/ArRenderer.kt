@@ -48,7 +48,8 @@ class ArRenderer(
     private val pointCloudRenderer = PointCloudRenderer()
     private val planeRenderer = PlaneRenderer()
 
-    @Volatile var scanMode: ArScanMode = ArScanMode.CLOUD_POINTS
+    @Volatile var scanMode: ArScanMode = ArScanMode.MURAL
+    @Volatile var muralMethod: MuralMethod = MuralMethod.VOXEL_HASH
     @Volatile var showAnchorBoundary: Boolean = false
     @Volatile var showBorderForConfirmation: Boolean = false
     @Volatile var anchorEstablished: Boolean = false
@@ -80,6 +81,10 @@ class ArRenderer(
 
     @Volatile var exportRequested: Boolean = false
     var onExportCaptured: ((Bitmap) -> Unit)? = null
+
+    // Pre-allocated buffers for Surface Mesh updates (32x32 grid)
+    private val meshVerticesBuffer = FloatArray(32 * 32 * 3)
+    private val meshWeightsBuffer = FloatArray(32 * 32)
 
     fun attachSession(session: Session?) {
         sessionLock.withLock {
@@ -229,6 +234,7 @@ class ArRenderer(
             slamManager.setArCoreTrackingState(isTracking)
 
             val currentScanMode = scanMode
+            slamManager.setArScanMode(currentScanMode.ordinal)
             val anchorMatrix = slamManager.getAnchorTransform()
             
             var relDir: Triple<Float, Float, Float>? = null
@@ -495,7 +501,15 @@ class ArRenderer(
                 if (bmp != null) overlayRenderer.updateTexture(bmp) else overlayRenderer.clearTexture()
             }
 
-            overlayRenderer.draw(viewMatrix, projMatrix, anchorMatrix)
+            val hasMeshData = if (scanMode == ArScanMode.MURAL && muralMethod == MuralMethod.SURFACE_MESH) {
+                slamManager.getPersistentMesh(meshVerticesBuffer, meshWeightsBuffer)
+                true
+            } else false
+
+            overlayRenderer.draw(viewMatrix, projMatrix, anchorMatrix, 
+                if (hasMeshData) meshVerticesBuffer else null,
+                if (hasMeshData) meshWeightsBuffer else null
+            )
 
             val showBorder = anchorEstablished && !isCapturingTarget &&
                 (showAnchorBoundary || (showBorderForConfirmation && !overlayRenderer.hasTexture))
