@@ -63,6 +63,10 @@ void MobileGS::initGl() {
     mSurfaceMesh.initGl();
 }
 
+void MobileGS::resetGlContext() {
+    initGl();
+}
+
 void MobileGS::draw() {
     std::lock_guard<std::mutex> lock(mMutex);
     interpolateAnchorStep();
@@ -155,6 +159,16 @@ void MobileGS::updateCamera(float* viewMat, float* projMat) {
     mCameraReady = true;
 }
 
+void MobileGS::updateMappingCamera(float* viewMat, float* projMat) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    memcpy(mMappingViewMatrix, viewMat, 16 * sizeof(float));
+    memcpy(mMappingProjMatrix, projMat, 16 * sizeof(float));
+}
+
+void MobileGS::updateLightLevel(float level) {
+    mLightLevel = level;
+}
+
 void MobileGS::updateAnchorTransform(float* transformMat) {
     std::lock_guard<std::mutex> lock(mMutex);
     memcpy(mAnchorMatrix, transformMat, 16 * sizeof(float));
@@ -190,3 +204,4 @@ void MobileGS::restoreWallFingerprint(const cv::Mat& d, const std::vector<cv::Po
 void MobileGS::scheduleRelocCheck(const cv::Mat& f) { mRelocColorFrame = f.clone(); mRelocRequested = true; mRelocCv.notify_one(); }
 void MobileGS::setArtworkFingerprint(const cv::Mat& c, const uint8_t* d, int w, int h, int s, const float* i, const float* v) {}
 MobileGS::FingerprintData MobileGS::generateFingerprint(const cv::Mat& i, const cv::Mat& m, const uint8_t* d, int w, int h, int s, const float* intr, const float* v) { return {}; }
+bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) { return mSuperPoint.load(onnxBytes); }

@@ -174,6 +174,7 @@ private:
     bool mPersistentMeshInitialized = false;
 
     uint64_t mFrameCounter = 0;
+    float mLightLevel = 1.0f;
 
     float mViewMatrix[16];
     float mProjMatrix[16];
