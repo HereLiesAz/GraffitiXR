@@ -70,11 +70,7 @@ void MobileGS::initGl() {
 }
 
 void MobileGS::resetGlContext() {
-    std::lock_guard<std::mutex> lock(mGlDataMutex);
-    mGlDataDirty = true;
-    mPersistentMeshInitialized = false;
-    mPersistentMeshVbo = 0;
-    mPersistentMeshIbo = 0;
+    initGl();
 }
 
 void MobileGS::draw() {
@@ -176,7 +172,8 @@ void MobileGS::updateMappingCamera(float* viewMat, float* projMat) {
 }
 
 void MobileGS::updateLightLevel(float level) {
-    // Optional: Could be used to adjust rendering brightness/exposure
+    std::lock_guard<std::mutex> lock(mMutex);
+    mLightLevel = level;
 }
 
 void MobileGS::updateAnchorTransform(float* transformMat) {
@@ -217,3 +214,4 @@ bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) {
 }
 void MobileGS::setArtworkFingerprint(const cv::Mat& c, const uint8_t* d, int w, int h, int s, const float* i, const float* v) {}
 MobileGS::FingerprintData MobileGS::generateFingerprint(const cv::Mat& i, const cv::Mat& m, const uint8_t* d, int w, int h, int s, const float* intr, const float* v) { return {}; }
+bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) { return mSuperPoint.load(onnxBytes); }
