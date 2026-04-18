@@ -491,6 +491,7 @@ class ArViewModel @Inject constructor(
         if (arRenderer != null) {
             arRenderer.stereoProvider = stereoProvider
             arRenderer.scanMode = _uiState.value.arScanMode
+            arRenderer.muralMethod = _uiState.value.muralMethod
             arRenderer.showAnchorBoundary = _uiState.value.showAnchorBoundary
             arRenderer.anchorEstablished = _uiState.value.isAnchorEstablished
             if (session != null && isSessionResumed) {

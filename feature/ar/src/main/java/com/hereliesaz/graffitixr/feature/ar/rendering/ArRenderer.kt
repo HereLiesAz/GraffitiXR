@@ -236,6 +236,7 @@ class ArRenderer(
 
             val currentScanMode = scanMode
             slamManager.setArScanMode(currentScanMode.ordinal)
+            slamManager.setMuralMethod(muralMethod.ordinal)
             val anchorMatrix = slamManager.getAnchorTransform()
             
             var relDir: Triple<Float, Float, Float>? = null
