@@ -101,6 +101,8 @@ import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
 import com.hereliesaz.graffitixr.feature.dashboard.SettingsViewModel
 import com.hereliesaz.graffitixr.feature.editor.EditorUi
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
+import com.hereliesaz.graffitixr.feature.editor.MockupScreen
+import com.hereliesaz.graffitixr.feature.editor.OverlayScreen
 import com.hereliesaz.graffitixr.feature.editor.TraceScreen
 import com.hereliesaz.graffitixr.data.OnboardingManager
 import com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor as EditorImageProcessor
