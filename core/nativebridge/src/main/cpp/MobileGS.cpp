@@ -166,6 +166,7 @@ void MobileGS::updateMappingCamera(float* viewMat, float* projMat) {
 }
 
 void MobileGS::updateLightLevel(float level) {
+    std::lock_guard<std::mutex> lock(mMutex);
     mLightLevel = level;
 }
 
