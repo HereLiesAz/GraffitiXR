@@ -159,6 +159,7 @@ class SlamManager @Inject constructor() {
     fun setMuralMethod(method: Int) = nativeSetMuralMethod(method)
 
     fun getPersistentMesh(vertices: FloatArray, weights: FloatArray) = nativeGetPersistentMesh(vertices, weights)
+    fun unrollMesh(vertices: FloatArray): FloatArray = nativeUnrollMesh(vertices)
 
     fun destroy() {
         if (isInitialized) {
@@ -208,6 +209,7 @@ class SlamManager @Inject constructor() {
     private external fun nativeSetArScanMode(mode: Int)
     private external fun nativeSetMuralMethod(method: Int)
     private external fun nativeGetPersistentMesh(vertices: FloatArray, weights: FloatArray)
+    private external fun nativeUnrollMesh(vertices: FloatArray): FloatArray
     private external fun nativeSetWallFingerprint(
         bitmap: Bitmap, mask: Bitmap?,
         depthBuffer: ByteBuffer,

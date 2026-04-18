@@ -13,32 +13,9 @@
 
 // ~~~ RESTORED TO MARCH 9TH STABLE ARCHITECTURE ~~~
 
-struct Splat {
-    float x, y, z;          // Position (World Space)
-    float r, g, b, a;       // Color
-    float confidence;       // Persistence
-    float nx, ny, nz;       // Surface Normal
-    float radius;           // Splat Scale
-};
-
-struct MeshVertex {
-    float x, y, z;          // Position (Anchor-Local Space)
-    float confidence;       // Persistence/Weight
-};
-static_assert(sizeof(Splat) == 48, "Splat struct layout mismatch.");
-
-struct VoxelKey {
-    int x, y, z;
-    bool operator==(const VoxelKey& other) const {
-        return x == other.x && y == other.y && z == other.z;
-    }
-};
-
-struct VoxelKeyHash {
-    std::size_t operator()(const VoxelKey& k) const {
-        return ((std::hash<int>()(k.x) ^ (std::hash<int>()(k.y) << 1)) >> 1) ^ (std::hash<int>()(k.z) << 1);
-    }
-};
+#include "VoxelHash.h"
+#include "SurfaceMesh.h"
+#include "NativeUtil.h"
 
 class MobileGS {
 public:
@@ -76,7 +53,7 @@ public:
     void setRelocEnabled(bool enabled);
     void setVoxelSize(float size);
 
-    int getSplatCount() const { return mPointCount; }
+    int getSplatCount() const { return mVoxelHash.getSplatCount(); }
     void setSplatsVisible(bool visible) { mSplatsVisible = visible; }
     float getPaintingProgress() const { return mPaintingProgress.load(std::memory_order_relaxed); }
 
@@ -134,16 +111,14 @@ private:
     std::vector<cv::Point3f> mArtworkKeypoints3D;
     std::atomic<float> mPaintingProgress{0.0f};
 
-    std::vector<Splat> splatData;
-    std::unordered_map<VoxelKey, int, VoxelKeyHash> mVoxelGrid;
+    VoxelHash   mVoxelHash;
+    SurfaceMesh mSurfaceMesh;
 
     std::thread mSortThread;
     std::mutex mSortMutex;
     std::condition_variable mSortCv;
     std::atomic<bool> mSortRunning{false};
     std::atomic<bool> mSortRequested{false};
-    std::vector<uint32_t> mDrawIndices;
-    bool mIndicesDirty = false;
 
     float mTargetAnchorMatrix[16];
     bool  mAnchorInterpolating   = false;
@@ -172,9 +147,6 @@ private:
     static constexpr uint64_t FINGERPRINT_UPDATE_INTERVAL = 600;
     static constexpr size_t   MAX_FINGERPRINT_KEYPOINTS   = 2000;
 
-    GLuint mProgram = 0;
-    GLuint mPointVbo = 0;
-    GLuint mIndexVbo = 0;
     std::atomic<int> mPointCount{0};
     bool mSplatsVisible{true};
     int mScanMode = 0; // 0=CLOUD, 1=MURAL

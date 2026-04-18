@@ -5,6 +5,7 @@
 #include <opencv2/opencv.hpp>
 #include <GLES3/gl3.h>
 #include "include/MobileGS.h"
+#include "include/SurfaceUnroller.h"
 #include "include/StereoProcessor.h"
 
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "GraffitiJNI", __VA_ARGS__)
@@ -557,6 +558,22 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPersistentMesh(
         env->SetFloatArrayRegion(vertices, 0, std::min((jsize)v.size(), vlen), v.data());
         env->SetFloatArrayRegion(weights, 0, std::min((jsize)w.size(), wlen), w.data());
     }
+}
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUnrollMesh(JNIEnv* env, jobject, jfloatArray vertices) {
+    jsize len = env->GetArrayLength(vertices);
+    std::vector<float> v(len);
+    env->GetFloatArrayRegion(vertices, 0, len, v.data());
+
+    SurfaceUnroller unroller(32); // Default dim
+    auto uv = unroller.unroll(v);
+
+    jfloatArray result = env->NewFloatArray(uv.size() * 2);
+    std::vector<float> flatUv;
+    for (const auto& p : uv) { flatUv.push_back(p.x); flatUv.push_back(p.y); }
+    env->SetFloatArrayRegion(result, 0, flatUv.size(), flatUv.data());
+    return result;
 }
 
 } // extern "C"

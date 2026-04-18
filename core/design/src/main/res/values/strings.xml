@@ -412,9 +412,9 @@
     <string name="settings_off">Off</string>
     <string name="settings_scan_mode_label">AR Scan Mode</string>
     <string name="settings_scan_mode_point_cloud">Point Cloud</string>
-    <string name="settings_scan_mode_voxel_hash">Voxel</string>
+    <string name="settings_scan_mode_voxel_hash">Voxel Hash</string>
     <string name="settings_mural_method_label">Mural Engine</string>
-    <string name="settings_scan_mode_surface_mesh">Mesh</string>
+    <string name="settings_scan_mode_surface_mesh">Surface Mesh</string>
     <string name="settings_anchor_boundary_label">Show Anchor Boundary</string>
     <string name="settings_units_label">Distance Units</string>
     <string name="settings_units_imperial">Imperial (ft)</string>
