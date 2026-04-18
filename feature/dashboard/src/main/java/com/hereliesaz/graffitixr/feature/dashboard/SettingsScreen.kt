@@ -57,6 +57,7 @@ import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.AzLoad
 import com.hereliesaz.graffitixr.common.model.AppLanguage
 import com.hereliesaz.graffitixr.common.model.ArScanMode
+import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.design.theme.AppStrings
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -217,7 +218,7 @@ fun SettingsScreen(
                             val nextMode = modes[(arScanMode.ordinal + 1) % modes.size]
                             val scanModeValue = when (arScanMode) {
                                 ArScanMode.CLOUD_POINTS -> strings.settings.pointCloud
-                                ArScanMode.MURAL -> strings.settings.mural
+                                ArScanMode.MURAL -> strings.nav.mural
                             }
                             SettingsItem(
                                 label = strings.settings.scanMode,

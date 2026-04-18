@@ -350,8 +350,6 @@ class ArViewModelTest {
     @Test
     fun `onTargetCaptured tap path sets annotatedCaptureBitmap to null and populates unwarpPoints`() = runTest {
         val rawBmp = mockk<Bitmap>(relaxed = true)
-        val annotatedBmp = mockk<Bitmap>(relaxed = true)
-        every { slamManager.annotateKeypoints(any()) } returns annotatedBmp
         viewModel.onScreenTap(0.5f, 0.5f)
         testDispatcher.scheduler.advanceUntilIdle()
 
@@ -362,12 +360,10 @@ class ArViewModelTest {
             intrinsics = null, viewMatrix = FloatArray(16), displayRotation = 0
         )
 
-        var attempts = 0
-        while (viewModel.uiState.value.annotatedCaptureBitmap != annotatedBmp && attempts < 50) {
-            testDispatcher.scheduler.advanceTimeBy(100)
-            testDispatcher.scheduler.advanceUntilIdle()
-            attempts++
-        }
+        val state = viewModel.uiState.value
+        assertNull(state.annotatedCaptureBitmap)
+        assertEquals(4, state.unwarpPoints.size)
+    }
         assertEquals(annotatedBmp, viewModel.uiState.value.annotatedCaptureBitmap)
     }
 

@@ -148,6 +148,7 @@ class OverlayRenderer(private val context: Context) {
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, 0)
     }
 
+    /**
      * @param meshVertices Optional warped vertices (x,y,z) from SlamManager.
      * @param meshWeights Optional vertex confidence weights (0..1).
      * If null, renders a flat quad.
