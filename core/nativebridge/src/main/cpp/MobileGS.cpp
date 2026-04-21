@@ -187,7 +187,7 @@ void MobileGS::getAnchorTransform(float* outMat16) const {
 }
 
 void MobileGS::updatePersistentMesh(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat) {
-    mSurfaceMesh.update(depth, color, viewMat, projMat, mAnchorMatrix);
+    mSurfaceMesh.update(depth, color, viewMat, projMat, mAnchorMatrix, mLightLevel);
 }
 
 void MobileGS::getPersistentMesh(std::vector<float>& outVertices, std::vector<float>& outWeights) {
