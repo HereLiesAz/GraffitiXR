@@ -153,6 +153,8 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
         glm::mat4 V = glm::make_mat4(viewMat);
 
         for (int i = 0; i < (int)mSplatData.size(); ++i) {
+            if (mSplatData[i].confidence >= 0.999f) continue; // Real Immutability
+
             if (i < (int)hitThisFrame.size() && hitThisFrame[i]) {
                 // Reinforced established splat: gain ground fast
                 mSplatData[i].confidence = std::min(1.0f, mSplatData[i].confidence + 0.15f);
@@ -237,4 +239,13 @@ void VoxelHash::prune(float threshold) {
 int VoxelHash::getSplatCount() const {
     std::lock_guard<std::mutex> lock(mMutex);
     return (int)mSplatData.size();
+}
+
+int VoxelHash::getImmutableSplatCount() const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    int count = 0;
+    for (const auto& s : mSplatData) {
+        if (s.confidence >= 0.999f) count++;
+    }
+    return count;
 }

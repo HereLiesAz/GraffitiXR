@@ -87,6 +87,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetSplatCount(JNIE
     return 0;
 }
 
+JNIEXPORT jint JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetImmutableSplatCount(JNIEnv* env, jobject thiz) {
+    if (gSlamEngine) return gSlamEngine->getImmutableSplatCount();
+    return 0;
+}
+
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArCoreTrackingState(JNIEnv* env, jobject thiz, jboolean isTracking) {
     if (gSlamEngine) gSlamEngine->setArCoreTrackingState(isTracking);

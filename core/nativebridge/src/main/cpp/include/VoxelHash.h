@@ -39,6 +39,7 @@ public:
     void clear();
     void prune(float threshold);
     int getSplatCount() const;
+    int getImmutableSplatCount() const;
 
 private:
     void pruneInternal(float threshold, float voxelSize);

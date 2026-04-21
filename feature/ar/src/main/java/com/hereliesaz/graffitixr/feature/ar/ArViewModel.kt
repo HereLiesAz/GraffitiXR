@@ -532,7 +532,7 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    fun setTrackingState(isTracking: Boolean, splatCount: Int, isDepthApiSupported: Boolean, cameraYaw: Float = 0f, distanceToAnchorMeters: Float = -1f, anchorRelativeDirection: Triple<Float, Float, Float>? = null) {
+    fun setTrackingState(isTracking: Boolean, splatCount: Int, immutableSplatCount: Int, isDepthApiSupported: Boolean, cameraYaw: Float = 0f, distanceToAnchorMeters: Float = -1f, anchorRelativeDirection: Triple<Float, Float, Float>? = null) {
         val progress = if (isTracking) slamManager.getPaintingProgress() else _uiState.value.paintingProgress
 
         val sector = (((cameraYaw % 360f) + 360f) % 360f / 30f).toInt().coerceIn(0, 11)
@@ -548,6 +548,7 @@ class ArViewModel @Inject constructor(
             state.copy(
                 isScanning = isTracking,
                 splatCount = splatCount,
+                immutableSplatCount = immutableSplatCount,
                 isDepthApiSupported = isDepthApiSupported,
                 paintingProgress = progress,
                 scanPhase = newPhase,

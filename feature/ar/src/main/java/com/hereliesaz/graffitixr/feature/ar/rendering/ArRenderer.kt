@@ -32,7 +32,7 @@ class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
     private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int) -> Unit,
-    private val onTrackingUpdated: (Boolean, Int, Boolean, Float, Float, Triple<Float, Float, Float>?) -> Unit,
+    private val onTrackingUpdated: (Boolean, Int, Int, Boolean, Float, Float, Triple<Float, Float, Float>?) -> Unit,
     private val onLightUpdated: (Float) -> Unit,
     private val onDiag: (String) -> Unit = {}
 ) : GLSurfaceView.Renderer {
@@ -267,12 +267,12 @@ class ArRenderer(
             // Throttle UI updates to 15Hz to match SLAM processing frequency and reduce state churn.
             if (frameCount % 4 == 0) {
                 backgroundScope.launch {
-                    val count = if (currentScanMode == ArScanMode.CLOUD_POINTS) {
-                        pointCloudRenderer.accumulatedPointCount
+                    val (count, immutableCount) = if (currentScanMode == ArScanMode.CLOUD_POINTS) {
+                        pointCloudRenderer.accumulatedPointCount to 0
                     } else {
-                        slamManager.getSplatCount()
+                        slamManager.getSplatCount() to slamManager.getImmutableSplatCount()
                     }
-                    onTrackingUpdated(isTracking, count, depthSupported, yawDeg, distanceMeters, relDir)
+                    onTrackingUpdated(isTracking, count, immutableCount, depthSupported, yawDeg, distanceMeters, relDir)
                 }
             }
 

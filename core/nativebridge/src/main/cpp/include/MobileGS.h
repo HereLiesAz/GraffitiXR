@@ -54,6 +54,7 @@ public:
     void setVoxelSize(float size);
 
     int getSplatCount() const { return mVoxelHash.getSplatCount(); }
+    int getImmutableSplatCount() const { return mVoxelHash.getImmutableSplatCount(); }
     void setSplatsVisible(bool visible) { mSplatsVisible = visible; }
     float getPaintingProgress() const { return mPaintingProgress.load(std::memory_order_relaxed); }
 

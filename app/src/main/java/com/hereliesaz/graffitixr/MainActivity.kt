@@ -617,6 +617,7 @@ class MainActivity : ComponentActivity() {
                             if (isScanningPhase && !mainUiState.isCapturingTarget && !showLibrary && !showSettings) {
                                 ScanCoachingOverlay(
                                     splatCount = arUiState.splatCount,
+                                    immutableCount = arUiState.immutableSplatCount,
                                     hint = arUiState.scanHint,
                                     scanPhase = arUiState.scanPhase,
                                     ambientSectorsCovered = arUiState.ambientSectorsCovered,
@@ -1800,6 +1801,7 @@ private fun DiagPopup(
 @Composable
 private fun ScanCoachingOverlay(
     splatCount: Int,
+    immutableCount: Int,
     hint: String?,
     modifier: Modifier = Modifier,
     scanPhase: ScanPhase = ScanPhase.AMBIENT,
@@ -1886,10 +1888,11 @@ private fun ScanCoachingOverlay(
                             color = Color.Cyan,
                             trackColor = Color.White.copy(alpha = 0.2f)
                         )
+                        val displayTotal = splatCount / 1000
+                        val displayImmutable = immutableCount / 1000
                         Text(
-                            text = "${splatCount / 1000}k / 50k",
+                            text = "${displayTotal}k (${displayImmutable}k locked) / 50k",
                             color = Color.LightGray,
-
                         )
                     }
                 }

@@ -184,6 +184,8 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
     }
 
     for (int i = 0; i < (int)mPersistentMesh.size(); ++i) {
+        if (mPersistentMesh[i].confidence >= 0.999f) continue; // Real Immutability
+
         if (vertexHits[i]) {
             // Reinforced established vertex: gain ground faster
             mPersistentMesh[i].confidence = std::min(1.0f, mPersistentMesh[i].confidence + 0.15f);
