@@ -34,7 +34,7 @@ public:
     ~VoxelHash();
 
     void initGl();
-    void update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, float voxelSize);
+    void update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, float voxelSize, float lightLevel);
     void draw(const glm::mat4& mvp, float focalY, int screenHeight);
     void clear();
     void prune(float threshold);

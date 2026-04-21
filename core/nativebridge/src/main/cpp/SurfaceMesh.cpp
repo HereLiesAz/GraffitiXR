@@ -99,7 +99,7 @@ void SurfaceMesh::initGl() {
     }
 }
 
-void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* anchorMatrix) {
+void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* anchorMatrix, float lightLevel) {
     if (depth.empty() || color.empty()) return;
 
     std::lock_guard<std::mutex> lock(mMutex);
@@ -162,14 +162,14 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
             float d = depth.at<float>((int)v_cam, (int)u_cam);
             if (d > 0.1f && d < 10.0f) {
                 float current_d = -p_cam.z;
-                if (std::abs(current_d - d) < 0.2f) {
+                if (std::abs(current_d - d) < 0.4f) { // Wider hit window
                     glm::vec4 p_target_cam = p_cam * (d / current_d);
                     p_target_cam.w = 1.0f;
                     glm::vec4 p_target_anchor = invVA * p_target_cam;
 
                     // Relaxed Immutability: Position is locked for high-confidence vertices to prevent jitter,
                     // but we no longer skip the hit test entirely. This allows for decay if the plane is lost.
-                    if (v.confidence < 0.98f) {
+                    if (v.confidence < 0.8f) {
                         float alpha = 0.10f;
                         v.x += (p_target_anchor.x - v.x) * alpha;
                         v.y += (p_target_anchor.y - v.y) * alpha;
@@ -184,11 +184,13 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
     }
 
     for (int i = 0; i < (int)mPersistentMesh.size(); ++i) {
-        if (mPersistentMesh[i].confidence >= 0.999f) continue; // Real Immutability
+        if (mPersistentMesh[i].confidence >= 0.98f) continue; // Real Immutability
 
         if (vertexHits[i]) {
             // Reinforced established vertex: gain ground faster
-            mPersistentMesh[i].confidence = std::min(1.0f, mPersistentMesh[i].confidence + 0.15f);
+            // Light is barely a factor (90% base, 10% light contribution)
+            float gain = 0.25f * (0.9f + 0.1f * lightLevel);
+            mPersistentMesh[i].confidence = std::min(1.0f, mPersistentMesh[i].confidence + gain);
         } else if (inView[i]) {
             // In-view Miss: Rapid decay
             mPersistentMesh[i].confidence = std::max(0.0f, mPersistentMesh[i].confidence - 0.045f);

@@ -18,7 +18,7 @@ public:
     ~SurfaceMesh();
 
     void initGl();
-    void update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* anchorMatrix);
+    void update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* anchorMatrix, float lightLevel);
     void draw(const glm::mat4& mvp);
     void clear();
     void getMesh(std::vector<float>& outVertices, std::vector<float>& outWeights);

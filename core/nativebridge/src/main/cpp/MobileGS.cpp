@@ -106,9 +106,9 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
 
     if (mScanMode == 1) { // MURAL
         if (mMuralMethod == 0) { // VOXEL_HASH
-            mVoxelHash.update(depth, colorRGB, viewMat, projMat, mVoxelSize);
+            mVoxelHash.update(depth, colorRGB, viewMat, projMat, mVoxelSize, mLightLevel);
         } else { // SURFACE_MESH
-            mSurfaceMesh.update(depth, colorRGB, viewMat, projMat, mAnchorMatrix);
+            mSurfaceMesh.update(depth, colorRGB, viewMat, projMat, mAnchorMatrix, mLightLevel);
         }
     }
 }

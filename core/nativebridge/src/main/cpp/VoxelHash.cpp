@@ -66,7 +66,7 @@ void VoxelHash::initGl() {
     }
 }
 
-void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, float voxelSize) {
+void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, float voxelSize, float lightLevel) {
     if (depth.empty() || color.empty()) return;
 
     mLastVoxelSize = voxelSize;
@@ -104,8 +104,8 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                 cv::Vec3b col = color.at<cv::Vec3b>(colorR, colorC);
                 float r_f = col[2]/255.0f, g_f = col[1]/255.0f, b_f = col[0]/255.0f; // BGR to RGB
 
-                // Fast Birth: start with visible confidence, but give it a bit more room to breathe
-                updates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.3f, 0.0f, 0.0f, 1.0f, 0.004f}});
+                // Fast Birth: start with higher confidence to reach immutability faster
+                updates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.5f, 0.0f, 0.0f, 1.0f, 0.004f}});
             }
         }
     }
@@ -124,7 +124,7 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
 
                 // Relaxed Immutability: Once established, skip all refinement (depth, color, lighting)
                 // but we still mark it as hit to prevent decay while it's confirmed.
-                if (s.confidence >= 0.98f) {
+                if (s.confidence >= 0.8f) {
                     if (index < (int)hitThisFrame.size()) hitThisFrame[index] = true;
                     continue;
                 }
@@ -153,11 +153,13 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
         glm::mat4 V = glm::make_mat4(viewMat);
 
         for (int i = 0; i < (int)mSplatData.size(); ++i) {
-            if (mSplatData[i].confidence >= 0.999f) continue; // Real Immutability
+            if (mSplatData[i].confidence >= 0.98f) continue; // Real Immutability
 
             if (i < (int)hitThisFrame.size() && hitThisFrame[i]) {
                 // Reinforced established splat: gain ground fast
-                mSplatData[i].confidence = std::min(1.0f, mSplatData[i].confidence + 0.15f);
+                // Light is barely a factor (90% base, 10% light contribution)
+                float gain = 0.25f * (0.9f + 0.1f * lightLevel);
+                mSplatData[i].confidence = std::min(1.0f, mSplatData[i].confidence + gain);
             } else {
                 // Check if the splat is actually in the camera's view before applying decay
                 glm::vec4 p_cam = V * glm::vec4(mSplatData[i].x, mSplatData[i].y, mSplatData[i].z, 1.0f);
@@ -245,7 +247,7 @@ int VoxelHash::getImmutableSplatCount() const {
     std::lock_guard<std::mutex> lock(mMutex);
     int count = 0;
     for (const auto& s : mSplatData) {
-        if (s.confidence >= 0.999f) count++;
+        if (s.confidence >= 0.98f) count++;
     }
     return count;
 }
