@@ -96,7 +96,6 @@ fun MainScreen(
 
         if (hasCameraPermission && isCameraActive && uiState.editorMode != EditorMode.TRACE && uiState.editorMode != EditorMode.STENCIL) {
             when (uiState.editorMode) {
-                EditorMode.STENCIL -> {}
                 EditorMode.AR -> {
                     var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
 
@@ -127,11 +126,10 @@ fun MainScreen(
                     }
 
                     val visibleLayers = uiState.layers.filter { it.isVisible && it.bitmap != null }
-                    val showPlaneConfirm = mainUiState.planeConfirmationPending
 
-                    LaunchedEffect(visibleLayers, arUiState.isAnchorEstablished, showPlaneConfirm) {
-                        if (!arUiState.isAnchorEstablished || showPlaneConfirm || visibleLayers.isEmpty()) {
-                            // No anchor, plane awaiting confirmation, or no layers to show.
+                    LaunchedEffect(visibleLayers, arUiState.isAnchorEstablished) {
+                        if (!arUiState.isAnchorEstablished || visibleLayers.isEmpty()) {
+                            // No anchor or no layers to show.
                             // Clear the image quad — the orange border line-loop is the only
                             // anchor indicator needed. The quad renders nothing when cleared.
                             rendererRef.value?.updateOverlayBitmap(null)
@@ -209,6 +207,7 @@ fun MainScreen(
                 }
 
                 EditorMode.MOCKUP, EditorMode.TRACE -> {}
+                else -> {}
             }
         }
 
