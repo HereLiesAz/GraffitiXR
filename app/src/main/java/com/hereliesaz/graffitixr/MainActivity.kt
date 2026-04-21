@@ -1489,7 +1489,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            azHelpSubItem(id = "help_layer_${layer.id}", hostId = "layer_${layer.id}", text = navStrings.help, color = navItemColor, shape = AzButtonShape.RECTANGLE)
+                            azHelpSubItem(id = "help_layer_${layer.id}", hostId = "design_host", text = navStrings.help, color = navItemColor, shape = AzButtonShape.RECTANGLE)
                         }
                     ) {
                         inputItem(hint = strings.editor.renameHint) { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
