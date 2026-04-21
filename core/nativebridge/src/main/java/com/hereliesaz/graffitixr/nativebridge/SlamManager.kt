@@ -161,6 +161,9 @@ class SlamManager @Inject constructor() {
     fun getPersistentMesh(vertices: FloatArray, weights: FloatArray) = nativeGetPersistentMesh(vertices, weights)
     fun unrollMesh(vertices: FloatArray): FloatArray = nativeUnrollMesh(vertices)
 
+    fun exportFingerprint(): ByteArray? = nativeExportFingerprint()
+    fun alignToFingerprint(data: ByteArray) = nativeAlignToFingerprint(data)
+
     fun destroy() {
         if (isInitialized) {
             nativeDestroy()
@@ -210,6 +213,8 @@ class SlamManager @Inject constructor() {
     private external fun nativeSetMuralMethod(method: Int)
     private external fun nativeGetPersistentMesh(vertices: FloatArray, weights: FloatArray)
     private external fun nativeUnrollMesh(vertices: FloatArray): FloatArray
+    private external fun nativeExportFingerprint(): ByteArray?
+    private external fun nativeAlignToFingerprint(data: ByteArray)
     private external fun nativeSetWallFingerprint(
         bitmap: Bitmap, mask: Bitmap?,
         depthBuffer: ByteBuffer,
