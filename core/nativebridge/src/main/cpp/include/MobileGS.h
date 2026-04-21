@@ -193,3 +193,9 @@ private:
 
     static constexpr float MIN_RENDER_CONFIDENCE = 0.1f; // Restored for immediate feedback
 };
+
+namespace mobilegs {
+    std::vector<uint8_t> exportFingerprint();
+    void alignToFingerprint(const uint8_t* data, size_t size);
+}
+

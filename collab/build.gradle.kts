@@ -9,23 +9,11 @@ android {
     defaultConfig {
         minSdk = 29
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        
-        externalNativeBuild {
-            cmake {
-                cppFlags("-std=c++17")
-            }
-        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-        }
-    }
-    
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
         }
     }
 }

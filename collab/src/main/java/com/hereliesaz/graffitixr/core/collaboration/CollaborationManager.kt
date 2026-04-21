@@ -15,7 +15,7 @@ class CollaborationManager(context: Context) {
     private var serverSocket: ServerSocket? = null
 
     init {
-        System.loadLibrary("collaboration_bridge")
+        System.loadLibrary("graffitixr")
     }
 
     /**
