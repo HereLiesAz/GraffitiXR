@@ -476,9 +476,7 @@ class MainActivity : ComponentActivity() {
                         helpEnabled = true,
                         helpList = activeHelpList,
                         onDismissHelp = { },
-                        tutorials = tutorials,
-                        tutorialModal = false,
-                        tutorialDim = 0.0f
+                        tutorials = tutorials
                     )
 
                     if (isRailVisible) {

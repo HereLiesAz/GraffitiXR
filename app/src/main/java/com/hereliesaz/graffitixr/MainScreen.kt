@@ -127,7 +127,7 @@ fun MainScreen(
                     }
 
                     val visibleLayers = uiState.layers.filter { it.isVisible && it.bitmap != null }
-                    val showPlaneConfirm = mainUiState.planeConfirmationPending
+                    val showPlaneConfirm = mainUiState.isInPlaneRealignment
 
                     LaunchedEffect(visibleLayers, arUiState.isAnchorEstablished, showPlaneConfirm) {
                         if (!arUiState.isAnchorEstablished || showPlaneConfirm || visibleLayers.isEmpty()) {
