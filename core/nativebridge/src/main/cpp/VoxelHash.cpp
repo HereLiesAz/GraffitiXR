@@ -122,7 +122,8 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                 int index = it->second;
                 Splat& s = mSplatData[index];
 
-                // Absolute Immutability: Once established, skip all refinement (depth, color, lighting)
+                // Relaxed Immutability: Once established, skip all refinement (depth, color, lighting)
+                // but we still mark it as hit to prevent decay while it's confirmed.
                 if (s.confidence >= 0.98f) {
                     if (index < (int)hitThisFrame.size()) hitThisFrame[index] = true;
                     continue;
@@ -152,8 +153,6 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
         glm::mat4 V = glm::make_mat4(viewMat);
 
         for (int i = 0; i < (int)mSplatData.size(); ++i) {
-            if (mSplatData[i].confidence >= 0.98f) continue;
-
             if (i < (int)hitThisFrame.size() && hitThisFrame[i]) {
                 // Reinforced established splat: gain ground fast
                 mSplatData[i].confidence = std::min(1.0f, mSplatData[i].confidence + 0.15f);

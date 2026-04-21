@@ -159,13 +159,6 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
         if (u_cam >= 0 && u_cam < depth.cols && v_cam >= 0 && v_cam < depth.rows) {
             inView[i] = true;
 
-            // Absolute Immutability: Once a vertex is established, lock its position and skip all work
-            if (v.confidence >= 0.98f) {
-                vertexHits[i] = true;
-                camPoints[i] = glm::vec2(u_cam * ((float)color.cols / depth.cols), v_cam * ((float)color.rows / depth.rows));
-                continue;
-            }
-
             float d = depth.at<float>((int)v_cam, (int)u_cam);
             if (d > 0.1f && d < 10.0f) {
                 float current_d = -p_cam.z;
@@ -174,10 +167,15 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
                     p_target_cam.w = 1.0f;
                     glm::vec4 p_target_anchor = invVA * p_target_cam;
 
-                    float alpha = 0.10f;
-                    v.x += (p_target_anchor.x - v.x) * alpha;
-                    v.y += (p_target_anchor.y - v.y) * alpha;
-                    v.z += (p_target_anchor.z - v.z) * alpha;
+                    // Relaxed Immutability: Position is locked for high-confidence vertices to prevent jitter,
+                    // but we no longer skip the hit test entirely. This allows for decay if the plane is lost.
+                    if (v.confidence < 0.98f) {
+                        float alpha = 0.10f;
+                        v.x += (p_target_anchor.x - v.x) * alpha;
+                        v.y += (p_target_anchor.y - v.y) * alpha;
+                        v.z += (p_target_anchor.z - v.z) * alpha;
+                    }
+
                     vertexHits[i] = true;
                     camPoints[i] = glm::vec2(u_cam * ((float)color.cols / depth.cols), v_cam * ((float)color.rows / depth.rows));
                 }
@@ -186,8 +184,6 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
     }
 
     for (int i = 0; i < (int)mPersistentMesh.size(); ++i) {
-        if (mPersistentMesh[i].confidence >= 0.98f) continue;
-
         if (vertexHits[i]) {
             // Reinforced established vertex: gain ground faster
             mPersistentMesh[i].confidence = std::min(1.0f, mPersistentMesh[i].confidence + 0.15f);
@@ -323,11 +319,9 @@ void SurfaceMesh::updateTexture(const cv::Mat& color, const std::vector<glm::vec
             // Only update if the quad is not yet fully established
             if (mPersistentMesh[i00].confidence < 0.2f) continue;
 
-            // Absolute Immutability: If all 4 corners are fully baked, stop wasting effort on warping
-            if (mPersistentMesh[i00].confidence >= 0.98f &&
-                mPersistentMesh[i10].confidence >= 0.98f &&
-                mPersistentMesh[i01].confidence >= 0.98f &&
-                mPersistentMesh[i11].confidence >= 0.98f) continue;
+            // Relaxed Immutability: We still allow texture updates even if established,
+            // but we could slow it down if we wanted to.
+            // if (mPersistentMesh[i00].confidence >= 0.98f && ... ) continue;
 
             cv::Mat H = cv::getPerspectiveTransform(src, dst);
 

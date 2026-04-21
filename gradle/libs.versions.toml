@@ -1,7 +1,7 @@
 
 [versions]
 activityCompose = "1.13.0"
-agp = "9.1.1"
+agp = "9.2.0"
 appcompat = "1.7.1"
 arcore = "1.53.0"
 azNavRail = "8.6"
