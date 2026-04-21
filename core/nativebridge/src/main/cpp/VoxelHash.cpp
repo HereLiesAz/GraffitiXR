@@ -31,8 +31,6 @@ static const char* kFragmentShader =
     "in vec4 vColor;\n"
     "out vec4 oColor;\n"
     "void main() {\n"
-    "  vec2 d = gl_PointCoord - 0.5;\n"
-    "  if (dot(d, d) > 0.25) discard;\n"
     "  oColor = vec4(vColor.rgb, 1.0);\n"
     "}\n";
 
@@ -102,7 +100,8 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                 cv::Vec3b col = color.at<cv::Vec3b>(colorR, colorC);
                 float r_f = col[0]/255.0f, g_f = col[1]/255.0f, b_f = col[2]/255.0f;
 
-                updates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.2f, 0.0f, 0.0f, 1.0f, 0.006f}});
+                // Radius reduced to 0.004f and initial confidence to 0.1f
+                updates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.1f, 0.0f, 0.0f, 1.0f, 0.004f}});
             }
         }
     }
@@ -121,7 +120,8 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                 s.r = s.r * (1.0f-alpha) + nu.r * alpha;
                 s.g = s.g * (1.0f-alpha) + nu.g * alpha;
                 s.b = s.b * (1.0f-alpha) + nu.b * alpha;
-                s.confidence = std::min(1.0f, s.confidence + 0.2f);
+                // Confidence increment reduced to 0.1f (requires 10 hits for max confidence)
+                s.confidence = std::min(1.0f, s.confidence + 0.1f);
             } else {
                 mSplatData.push_back(up.second);
                 mVoxelGrid[up.first] = mSplatData.size() - 1;
@@ -185,8 +185,8 @@ int VoxelHash::getSplatCount() const {
 }
 
 void VoxelHash::pruneMap() {
-    // Basic pruning to stay under limit
+    // Basic pruning to stay under limit - threshold increased to 0.5f for higher stability requirement
     if (mSplatData.size() > MAX_SPLATS * 0.9) {
-        prune(0.3f);
+        prune(0.5f);
     }
 }

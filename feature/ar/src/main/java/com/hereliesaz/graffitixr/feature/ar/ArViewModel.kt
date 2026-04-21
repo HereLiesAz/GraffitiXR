@@ -45,6 +45,7 @@ import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.design.R as DesignR
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
+import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.util.EnumSet
 import java.util.concurrent.atomic.AtomicBoolean
@@ -258,27 +259,31 @@ class ArViewModel @Inject constructor(
                 renderer?.attachSession(newSession)
 
                 // Initialize Offline-First AR Collaboration
-                val collab = CollaborationManager(context)
-                collaborationManager = collab
-                collab.startDiscovery { host, port ->
-                    viewModelScope.launch {
-                        _uiState.update { it.copy(isSyncing = true) }
-                        try {
-                            collab.connectToPeer(host, port)
-                            appendDiag("Collaboration: Connected to peer $host")
-                        } catch (e: Exception) {
-                            Timber.e(e, "Collaboration: Connection failed")
-                        } finally {
-                            _uiState.update { it.copy(isSyncing = false) }
+                try {
+                    val collab = CollaborationManager(context)
+                    collaborationManager = collab
+                    collab.startDiscovery { host: InetAddress, port: Int ->
+                        viewModelScope.launch {
+                            _uiState.update { it.copy(isSyncing = true) }
+                            try {
+                                collab.connectToPeer(host, port)
+                                appendDiag("Collaboration: Connected to peer $host")
+                            } catch (e: Exception) {
+                                Timber.e(e, "Collaboration: Connection failed")
+                            } finally {
+                                _uiState.update { it.copy(isSyncing = false) }
+                            }
                         }
                     }
-                }
-                viewModelScope.launch(Dispatchers.IO) {
-                    try {
-                        collab.startServer()
-                    } catch (e: Exception) {
-                        Timber.e(e, "Collaboration: Server failed")
+                    viewModelScope.launch(Dispatchers.IO) {
+                        try {
+                            collab.startServer()
+                        } catch (e: Exception) {
+                            Timber.e(e, "Collaboration: Server failed")
+                        }
                     }
+                } catch (e: Exception) {
+                    Timber.e(e, "Collaboration initialization failed; continuing without peer sync")
                 }
 
                 viewModelScope.launch(Dispatchers.IO) {
@@ -373,8 +378,8 @@ class ArViewModel @Inject constructor(
             try {
                 val root = File(appContext.filesDir, "projects/${project.id}")
                 if (!root.exists()) root.mkdirs()
-                // MANDATE: Keep all visible splats during save (threshold 0.1)
-                slamManager.pruneByConfidence(0.1f)
+                // MANDATE: Keep only established splats during save (threshold increased to 0.3)
+                slamManager.pruneByConfidence(0.3f)
                 slamManager.saveModel(File(root, "map.bin").absolutePath)
                 lastSavedSplatCount.set(slamManager.getSplatCount())
                 loadedProjectId = project.id
@@ -402,8 +407,8 @@ class ArViewModel @Inject constructor(
             try {
                 val root = File(appContext.filesDir, "projects/${project.id}")
                 if (!root.exists()) root.mkdirs()
-                // MANDATE: Keep all visible splats during auto-save (threshold 0.1)
-                slamManager.pruneByConfidence(0.1f)
+                // MANDATE: Keep only established splats during auto-save (threshold increased to 0.3)
+                slamManager.pruneByConfidence(0.3f)
                 slamManager.saveModel(File(root, "map.bin").absolutePath)
                 lastSavedSplatCount.set(slamManager.getSplatCount())
                 loadedProjectId = project.id

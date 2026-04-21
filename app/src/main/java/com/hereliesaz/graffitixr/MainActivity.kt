@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -316,9 +317,13 @@ class MainActivity : ComponentActivity() {
 
                 LaunchedEffect(Unit) {
                     if (!hasCameraPermission) {
-                        permissionLauncher.launch(
-                            arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
-                        )
+                        val permissions = mutableListOf(Manifest.permission.CAMERA)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
+                        } else {
+                            permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
+                        }
+                        permissionLauncher.launch(permissions.toTypedArray())
                     }
                     permissionRequestedAtLeastOnce = true
                 }
@@ -1489,7 +1494,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            azHelpSubItem(id = "help_layer_${layer.id}", hostId = "design_host", text = navStrings.help, color = navItemColor, shape = AzButtonShape.RECTANGLE)
+                            azHelpRailItem(id = "help_layer_${layer.id}", text = navStrings.help, color = navItemColor, shape = AzButtonShape.RECTANGLE)
                         }
                     ) {
                         inputItem(hint = strings.editor.renameHint) { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
