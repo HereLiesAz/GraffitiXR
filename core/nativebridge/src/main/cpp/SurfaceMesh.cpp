@@ -145,6 +145,7 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
     float cy = (-projMat[9] + 1.0f) * (depth.rows / 2.0f);
 
     std::vector<bool> vertexHits(mPersistentMesh.size(), false);
+    std::vector<bool> inView(mPersistentMesh.size(), false);
     std::vector<glm::vec2> camPoints(mPersistentMesh.size(), glm::vec2(-1.0f));
 
     for (int i = 0; i < (int)mPersistentMesh.size(); ++i) {
@@ -156,6 +157,8 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
         float v_cam = (p_cam.y * -fy / -p_cam.z) + cy;
         
         if (u_cam >= 0 && u_cam < depth.cols && v_cam >= 0 && v_cam < depth.rows) {
+            inView[i] = true;
+
             // Absolute Immutability: Once a vertex is established, lock its position and skip all work
             if (v.confidence >= 0.98f) {
                 vertexHits[i] = true;
@@ -183,24 +186,18 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
     }
 
     for (int i = 0; i < (int)mPersistentMesh.size(); ++i) {
-        // Hard Life: global persistent decay (skipped for immutable established vertices)
-        if (mPersistentMesh[i].confidence < 0.98f) {
-            mPersistentMesh[i].confidence = std::max(0.0f, mPersistentMesh[i].confidence - 0.02f);
-        }
+        if (mPersistentMesh[i].confidence >= 0.98f) continue;
 
         if (vertexHits[i]) {
-            // Fast Birth: reach stability quickly
-            if (mPersistentMesh[i].confidence < 0.98f) {
-                mPersistentMesh[i].confidence = std::min(1.0f, mPersistentMesh[i].confidence + 0.22f);
-            } else {
-                mPersistentMesh[i].confidence = 1.0f; // Lock at max
-            }
-        } else if (mPersistentMesh[i].confidence < 0.98f) {
-            // Fast Death: Only applies to non-immutable points
-            mPersistentMesh[i].confidence = std::max(0.0f, mPersistentMesh[i].confidence - 0.48f);
-            float resetAlpha = 0.3f;
+            // Reinforced established vertex: gain ground faster
+            mPersistentMesh[i].confidence = std::min(1.0f, mPersistentMesh[i].confidence + 0.15f);
+        } else if (inView[i]) {
+            // In-view Miss: Rapid decay
+            mPersistentMesh[i].confidence = std::max(0.0f, mPersistentMesh[i].confidence - 0.045f);
+            float resetAlpha = 0.15f;
             mPersistentMesh[i].z *= (1.0f - resetAlpha);
         }
+        // If not in view, confidence and position are preserved (No global decay)
     }
 
     updateTexture(color, camPoints);

@@ -104,8 +104,8 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                 cv::Vec3b col = color.at<cv::Vec3b>(colorR, colorC);
                 float r_f = col[2]/255.0f, g_f = col[1]/255.0f, b_f = col[0]/255.0f; // BGR to RGB
 
-                // Fast Birth: higher initial confidence so points are visible immediately
-                updates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.4f, 0.0f, 0.0f, 1.0f, 0.004f}});
+                // Fast Birth: start with visible confidence, but give it a bit more room to breathe
+                updates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.3f, 0.0f, 0.0f, 1.0f, 0.004f}});
             }
         }
     }
@@ -113,15 +113,7 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
     if (!updates.empty()) {
         std::lock_guard<std::mutex> lock(mMutex);
 
-        // Hard Life: global persistent decay every frame
-        for (auto& s : mSplatData) {
-            // Immutable once high confidence is reached
-            if (s.confidence < 0.98f) {
-                s.confidence = std::max(0.0f, s.confidence - 0.02f);
-            }
-        }
-
-        // Tracking hits in this frame to apply decay to misses
+        // Tracking hits in this frame to apply decay ONLY to in-view misses
         std::vector<bool> hitThisFrame(mSplatData.size(), false);
 
         for (const auto& up : updates) {
@@ -157,20 +149,28 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
         }
 
         bool needsPruning = false;
+        glm::mat4 V = glm::make_mat4(viewMat);
+
         for (int i = 0; i < (int)mSplatData.size(); ++i) {
-            if (i < (int)hitThisFrame.size()) {
-                if (hitThisFrame[i]) {
-                    // Reinforced established splat: gain ground faster
-                    if (mSplatData[i].confidence < 0.98f) {
-                        mSplatData[i].confidence = std::min(1.0f, mSplatData[i].confidence + 0.2f);
-                    } else {
-                        mSplatData[i].confidence = 1.0f; // Lock at max
-                    }
-                } else if (mSplatData[i].confidence < 0.98f) {
-                    // Fast Death: Only applies to non-immutable points
-                    mSplatData[i].confidence -= 0.48f;
+            if (mSplatData[i].confidence >= 0.98f) continue;
+
+            if (i < (int)hitThisFrame.size() && hitThisFrame[i]) {
+                // Reinforced established splat: gain ground fast
+                mSplatData[i].confidence = std::min(1.0f, mSplatData[i].confidence + 0.15f);
+            } else {
+                // Check if the splat is actually in the camera's view before applying decay
+                glm::vec4 p_cam = V * glm::vec4(mSplatData[i].x, mSplatData[i].y, mSplatData[i].z, 1.0f);
+                if (p_cam.z >= -0.1f) continue; // Behind or too close
+
+                float u_cam = (p_cam.x * fx / -p_cam.z) + cx;
+                float v_cam = (p_cam.y * -fy / -p_cam.z) + cy;
+
+                if (u_cam >= 0 && u_cam < depth.cols && v_cam >= 0 && v_cam < depth.rows) {
+                    // In-view Miss: Rapid decay
+                    mSplatData[i].confidence -= 0.05f;
                     if (mSplatData[i].confidence <= 0.0f) needsPruning = true;
                 }
+                // If not in view, confidence is preserved (No global decay)
             }
         }
 
@@ -179,6 +179,11 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
         }
     }
 }
+
+        if (needsPruning || mSplatData.size() >= MAX_SPLATS * 0.95) {
+            pruneInternal(0.01f, voxelSize);
+        }
+
 
 void VoxelHash::draw(const glm::mat4& mvp, float focalY, int screenHeight) {
     std::lock_guard<std::mutex> lock(mMutex);
