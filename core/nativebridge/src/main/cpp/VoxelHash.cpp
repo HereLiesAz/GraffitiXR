@@ -69,6 +69,7 @@ void VoxelHash::initGl() {
 void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, float voxelSize) {
     if (depth.empty() || color.empty()) return;
 
+    mLastVoxelSize = voxelSize;
     const float halfW = depth.cols / 2.0f;
     const float halfH = depth.rows / 2.0f;
     float fx = projMat[0] * halfW;
@@ -101,10 +102,10 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                 int colorR = static_cast<int>(r * scaleY);
                 int colorC = static_cast<int>(c * scaleX);
                 cv::Vec3b col = color.at<cv::Vec3b>(colorR, colorC);
-                float r_f = col[0]/255.0f, g_f = col[1]/255.0f, b_f = col[2]/255.0f;
+                float r_f = col[2]/255.0f, g_f = col[1]/255.0f, b_f = col[0]/255.0f; // BGR to RGB
 
-                // Radius reduced to 0.004f and initial confidence to 0.1f
-                updates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.1f, 0.0f, 0.0f, 1.0f, 0.004f}});
+                // Fast Birth: higher initial confidence so points are visible immediately
+                updates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.4f, 0.0f, 0.0f, 1.0f, 0.004f}});
             }
         }
     }
@@ -112,16 +113,32 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
     if (!updates.empty()) {
         std::lock_guard<std::mutex> lock(mMutex);
 
-        // Apply a small decay to all existing splats to allow unobserved areas to fade
+        // Hard Life: global persistent decay every frame
         for (auto& s : mSplatData) {
-            s.confidence = std::max(0.0f, s.confidence - 0.005f);
+            // Immutable once high confidence is reached
+            if (s.confidence < 0.98f) {
+                s.confidence = std::max(0.0f, s.confidence - 0.02f);
+            }
         }
+
+        // Tracking hits in this frame to apply decay to misses
+        std::vector<bool> hitThisFrame(mSplatData.size(), false);
 
         for (const auto& up : updates) {
             auto it = mVoxelGrid.find(up.first);
             if (it != mVoxelGrid.end()) {
-                Splat& s = mSplatData[it->second];
+                int index = it->second;
+                Splat& s = mSplatData[index];
+
+                // Absolute Immutability: Once established, skip all refinement (depth, color, lighting)
+                if (s.confidence >= 0.98f) {
+                    if (index < (int)hitThisFrame.size()) hitThisFrame[index] = true;
+                    continue;
+                }
+
                 const Splat& nu = up.second;
+
+                // Active refinement for developing points
                 float alpha = 0.15f;
                 s.x = s.x * (1.0f-alpha) + nu.x * alpha;
                 s.y = s.y * (1.0f-alpha) + nu.y * alpha;
@@ -129,14 +146,37 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                 s.r = s.r * (1.0f-alpha) + nu.r * alpha;
                 s.g = s.g * (1.0f-alpha) + nu.g * alpha;
                 s.b = s.b * (1.0f-alpha) + nu.b * alpha;
-                // Confidence increment reduced to 0.1f (requires 10 hits for max confidence)
-                s.confidence = std::min(1.0f, s.confidence + 0.1f);
+
+                if (index < (int)hitThisFrame.size()) hitThisFrame[index] = true;
             } else {
-                mSplatData.push_back(up.second);
-                mVoxelGrid[up.first] = mSplatData.size() - 1;
+                if (mSplatData.size() < MAX_SPLATS) {
+                    mSplatData.push_back(up.second);
+                    mVoxelGrid[up.first] = (int)mSplatData.size() - 1;
+                }
             }
         }
-        if (mSplatData.size() >= MAX_SPLATS) pruneMap();
+
+        bool needsPruning = false;
+        for (int i = 0; i < (int)mSplatData.size(); ++i) {
+            if (i < (int)hitThisFrame.size()) {
+                if (hitThisFrame[i]) {
+                    // Reinforced established splat: gain ground faster
+                    if (mSplatData[i].confidence < 0.98f) {
+                        mSplatData[i].confidence = std::min(1.0f, mSplatData[i].confidence + 0.2f);
+                    } else {
+                        mSplatData[i].confidence = 1.0f; // Lock at max
+                    }
+                } else if (mSplatData[i].confidence < 0.98f) {
+                    // Fast Death: Only applies to non-immutable points
+                    mSplatData[i].confidence -= 0.48f;
+                    if (mSplatData[i].confidence <= 0.0f) needsPruning = true;
+                }
+            }
+        }
+
+        if (needsPruning || mSplatData.size() >= MAX_SPLATS * 0.95) {
+            pruneInternal(0.01f, voxelSize);
+        }
     }
 }
 
@@ -166,6 +206,8 @@ void VoxelHash::draw(const glm::mat4& mvp, float focalY, int screenHeight) {
     glDrawArrays(GL_POINTS, 0, count);
 
     glDisableVertexAttribArray(0); glDisableVertexAttribArray(1); glDisableVertexAttribArray(2); glDisableVertexAttribArray(3); glDisableVertexAttribArray(4);
+    glDisable(GL_BLEND);
+    glDepthMask(GL_TRUE);
 }
 
 void VoxelHash::clear() {
@@ -174,29 +216,26 @@ void VoxelHash::clear() {
     mVoxelGrid.clear();
 }
 
-void VoxelHash::prune(float threshold) {
-    std::lock_guard<std::mutex> lock(mMutex);
+void VoxelHash::pruneInternal(float threshold, float voxelSize) {
     mSplatData.erase(std::remove_if(mSplatData.begin(), mSplatData.end(),
         [threshold](const Splat& s) { return s.confidence < threshold; }), mSplatData.end());
     mVoxelGrid.clear();
     for (int i = 0; i < (int)mSplatData.size(); ++i) {
         VoxelKey key{
-            static_cast<int>(std::floor(mSplatData[i].x / 0.005f)), // assuming default size
-            static_cast<int>(std::floor(mSplatData[i].y / 0.005f)),
-            static_cast<int>(std::floor(mSplatData[i].z / 0.005f))
+            static_cast<int>(std::floor(mSplatData[i].x / voxelSize)),
+            static_cast<int>(std::floor(mSplatData[i].y / voxelSize)),
+            static_cast<int>(std::floor(mSplatData[i].z / voxelSize))
         };
         mVoxelGrid[key] = i;
     }
 }
 
+void VoxelHash::prune(float threshold) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    pruneInternal(threshold, mLastVoxelSize);
+}
+
 int VoxelHash::getSplatCount() const {
     std::lock_guard<std::mutex> lock(mMutex);
     return (int)mSplatData.size();
-}
-
-void VoxelHash::pruneMap() {
-    // Basic pruning to stay under limit - threshold increased to 0.5f for higher stability requirement
-    if (mSplatData.size() > MAX_SPLATS * 0.9) {
-        prune(0.5f);
-    }
 }

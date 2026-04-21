@@ -156,6 +156,13 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
         float v_cam = (p_cam.y * -fy / -p_cam.z) + cy;
         
         if (u_cam >= 0 && u_cam < depth.cols && v_cam >= 0 && v_cam < depth.rows) {
+            // Absolute Immutability: Once a vertex is established, lock its position and skip all work
+            if (v.confidence >= 0.98f) {
+                vertexHits[i] = true;
+                camPoints[i] = glm::vec2(u_cam * ((float)color.cols / depth.cols), v_cam * ((float)color.rows / depth.rows));
+                continue;
+            }
+
             float d = depth.at<float>((int)v_cam, (int)u_cam);
             if (d > 0.1f && d < 10.0f) {
                 float current_d = -p_cam.z;
@@ -176,11 +183,22 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
     }
 
     for (int i = 0; i < (int)mPersistentMesh.size(); ++i) {
+        // Hard Life: global persistent decay (skipped for immutable established vertices)
+        if (mPersistentMesh[i].confidence < 0.98f) {
+            mPersistentMesh[i].confidence = std::max(0.0f, mPersistentMesh[i].confidence - 0.02f);
+        }
+
         if (vertexHits[i]) {
-            mPersistentMesh[i].confidence = std::min(1.0f, mPersistentMesh[i].confidence + 0.05f);
-        } else {
-            mPersistentMesh[i].confidence = std::max(0.0f, mPersistentMesh[i].confidence - 0.3f);
-            float resetAlpha = 0.2f;
+            // Fast Birth: reach stability quickly
+            if (mPersistentMesh[i].confidence < 0.98f) {
+                mPersistentMesh[i].confidence = std::min(1.0f, mPersistentMesh[i].confidence + 0.22f);
+            } else {
+                mPersistentMesh[i].confidence = 1.0f; // Lock at max
+            }
+        } else if (mPersistentMesh[i].confidence < 0.98f) {
+            // Fast Death: Only applies to non-immutable points
+            mPersistentMesh[i].confidence = std::max(0.0f, mPersistentMesh[i].confidence - 0.48f);
+            float resetAlpha = 0.3f;
             mPersistentMesh[i].z *= (1.0f - resetAlpha);
         }
     }
@@ -305,8 +323,14 @@ void SurfaceMesh::updateTexture(const cv::Mat& color, const std::vector<glm::vec
                 {mPersistentMesh[i01].u * TEXTURE_SIZE, mPersistentMesh[i01].v * TEXTURE_SIZE}
             };
 
-            // Only update if the quad is established
+            // Only update if the quad is not yet fully established
             if (mPersistentMesh[i00].confidence < 0.2f) continue;
+
+            // Absolute Immutability: If all 4 corners are fully baked, stop wasting effort on warping
+            if (mPersistentMesh[i00].confidence >= 0.98f &&
+                mPersistentMesh[i10].confidence >= 0.98f &&
+                mPersistentMesh[i01].confidence >= 0.98f &&
+                mPersistentMesh[i11].confidence >= 0.98f) continue;
 
             cv::Mat H = cv::getPerspectiveTransform(src, dst);
 
@@ -328,7 +352,7 @@ void SurfaceMesh::updateTexture(const cv::Mat& color, const std::vector<glm::vec
             cv::Mat patch;
             cv::warpPerspective(color, patch, H, roi.size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT);
 
-            float alpha = 0.15f;
+            float alpha = 0.30f; // Fast Birth for textures
             cv::addWeighted(mMuralTexture(roi), 1.0 - alpha, patch, alpha, 0, mMuralTexture(roi));
             mTextureDirty = true;
         }

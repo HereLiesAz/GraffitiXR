@@ -41,8 +41,7 @@ public:
     int getSplatCount() const;
 
 private:
-    void pruneInternal(float threshold);
-    void pruneMap();
+    void pruneInternal(float threshold, float voxelSize);
 
     mutable std::mutex mMutex;
     std::vector<Splat> mSplatData;
