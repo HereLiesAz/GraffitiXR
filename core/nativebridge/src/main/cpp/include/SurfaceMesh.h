@@ -35,6 +35,7 @@ private:
     cv::Mat mMuralTexture;
     GLuint mTextureId = 0;
     bool mTextureDirty = false;
+    bool mMeshDirty = false;
 
     GLuint mProgram = 0;
     GLuint mVbo = 0;

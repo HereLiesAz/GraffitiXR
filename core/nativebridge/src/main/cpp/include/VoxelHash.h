@@ -52,6 +52,7 @@ private:
     GLuint mProgram = 0;
     GLuint mPointVbo = 0;
     GLuint mIndexVbo = 0;
+    bool mDataDirty = false;
 
     static constexpr int MAX_SPLATS = 500000;
 };

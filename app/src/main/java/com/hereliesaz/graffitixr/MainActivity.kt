@@ -268,11 +268,10 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // If the anchor is lost while confirmation is pending (e.g. project reload),
-                // auto-clear so the hidden rail is never left with no escape path.
+                // If the anchor is lost, auto-clear.
                 LaunchedEffect(arUiState.isAnchorEstablished) {
-                    if (!arUiState.isAnchorEstablished && mainViewModel.uiState.value.planeConfirmationPending) {
-                        mainViewModel.confirmPlane()
+                    if (!arUiState.isAnchorEstablished && mainViewModel.uiState.value.isInPlaneRealignment) {
+                        mainViewModel.endPlaneRealignment()
                     }
                 }
 
@@ -292,9 +291,6 @@ class MainActivity : ComponentActivity() {
                 // Back-press escape hatches — defined lowest-priority first (Compose uses LIFO).
                 BackHandler(enabled = showLibrary) { showLibrary = false }
                 BackHandler(enabled = showSettings) { showSettings = false }
-                BackHandler(enabled = mainUiState.planeConfirmationPending && !mainUiState.isInPlaneRealignment) {
-                    mainViewModel.confirmPlane()
-                }
                 BackHandler(enabled = mainUiState.isInPlaneRealignment) {
                     mainViewModel.endPlaneRealignment()
                 }
@@ -309,7 +305,6 @@ class MainActivity : ComponentActivity() {
                 val isRailVisible = !editorUiState.hideUiForCapture &&
                         !mainUiState.isTouchLocked &&
                         !mainUiState.isCapturingTarget &&
-                        !mainUiState.planeConfirmationPending &&
                         !showSettings &&
                         !isExporting
 
@@ -359,12 +354,8 @@ class MainActivity : ComponentActivity() {
                 }
 
                 // Task 6: Auto-open image picker once anchor is established and no layers exist yet.
-                // Guard on !planeConfirmationPending so it fires after plane confirm, not during.
-                LaunchedEffect(arUiState.isAnchorEstablished, mainUiState.planeConfirmationPending) {
-                    if (arUiState.isAnchorEstablished
-                        && !mainUiState.planeConfirmationPending
-                        && editorUiState.layers.isEmpty()
-                    ) {
+                LaunchedEffect(arUiState.isAnchorEstablished) {
+                    if (arUiState.isAnchorEstablished && editorUiState.layers.isEmpty()) {
                         overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }
                 }
@@ -474,7 +465,7 @@ class MainActivity : ComponentActivity() {
                         activeColor = Cyan,
                         defaultShape = AzButtonShape.RECTANGLE,
                         headerIconShape = AzHeaderIconShape.ROUNDED,
-                        translucentBackground = Color.Black.copy(alpha = 0.5f)
+                        translucentBackground = Color.Transparent
                     )
                     azConfig(
                         packButtons = true,
@@ -485,7 +476,9 @@ class MainActivity : ComponentActivity() {
                         helpEnabled = true,
                         helpList = activeHelpList,
                         onDismissHelp = { },
-                        tutorials = tutorials
+                        tutorials = tutorials,
+                        tutorialModal = false,
+                        tutorialDim = 0.0f
                     )
 
                     if (isRailVisible) {
@@ -662,38 +655,20 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            if (mainUiState.isWaitingForTap && !showLibrary && !showSettings) {
-                                TapTargetOverlay(
-                                    onCancel = {
-                                        mainViewModel.cancelTapMode()
-                                        arViewModel.clearTapHighlights()
-                                    },
-                                    modifier = Modifier.align(Alignment.BottomCenter),
-                                    strings = strings
-                                )
-                            }
-
-                            LaunchedEffect(mainUiState.planeConfirmationPending) {
-                                arViewModel.setPlaneConfirmationBorder(mainUiState.planeConfirmationPending)
-                            }
-
                             LaunchedEffect(arUiState.targetPhysicalExtent) {
                                 arUiState.targetPhysicalExtent?.let { (w, h) ->
                                     editorViewModel.setAnchorExtent(w, h)
                                 }
                             }
 
-                            val showPlaneConfirm = mainUiState.planeConfirmationPending
-                                    && !mainUiState.isInPlaneRealignment
-                                    && arUiState.isAnchorEstablished
+                            val showPostTargetHint = arUiState.isAnchorEstablished 
+                                    && editorUiState.layers.isEmpty() 
+                                    && !mainUiState.isCapturingTarget
                                     && editorUiState.editorMode == EditorMode.AR
                                     && !showLibrary && !showSettings
-                            if (showPlaneConfirm) {
-                                PlaneConfirmOverlay(
-                                    onConfirm = { mainViewModel.confirmPlane() },
-                                    onRedetect = { mainViewModel.beginPlaneRealignment() },
-                                    modifier = Modifier.align(Alignment.BottomCenter),
-                                    strings = strings
+                            if (showPostTargetHint) {
+                                PostTargetInstructionOverlay(
+                                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp)
                                 )
                             }
 
@@ -785,6 +760,7 @@ class MainActivity : ComponentActivity() {
                                     uiState = arUiState,
                                     isRightHanded = editorUiState.isRightHanded,
                                     captureStep = mainUiState.captureStep,
+                                    isWaitingForTap = mainUiState.isWaitingForTap,
                                     isLoading = isProcessing,
                                     strings = strings,
                                     onConfirm = { bitmap, mask, depth, dw, dh, ds, intr, view ->
@@ -803,27 +779,24 @@ class MainActivity : ComponentActivity() {
                                         mainViewModel.onCancelCaptureClicked()
                                     },
                                     onUnwarpConfirm = { points ->
-                                        val currentBitmap = arUiState.tempCaptureBitmap // Use upright display frame
+                                        val currentBitmap = arUiState.tempCaptureBitmap
                                         if (currentBitmap != null && points.size == 4) {
                                             isProcessing = true
                                             lifecycleScope.launch(Dispatchers.Default) {
-                                                val unwarped = ImageProcessor.unwarpImage(currentBitmap, points)
+                                                val pixelPoints = points.map {
+                                                    Offset(it.x * currentBitmap.width, it.y * currentBitmap.height)
+                                                }
+                                                val unwarped = ImageProcessor.unwarpImage(currentBitmap, pixelPoints)
                                                 if (unwarped != null) {
-                                                    // Phase 4: Isolate markings on the rectified surface for the mask step
                                                     val isolated = unwarped.isolateMarkings(null)
                                                     arViewModel.setTempCapture(isolated)
                                                 }
-                                                mainViewModel.setCaptureStep(CaptureStep.MASK)
+                                                mainViewModel.setCaptureStep(CaptureStep.REVIEW)
                                                 isProcessing = false
                                             }
                                         } else {
-                                            mainViewModel.setCaptureStep(CaptureStep.MASK)
+                                            mainViewModel.setCaptureStep(CaptureStep.REVIEW)
                                         }
-                                    },
-                                    onMaskConfirmed = { bitmap ->
-                                        arViewModel.setTempCapture(bitmap)
-                                        arViewModel.generateAnnotationsForReview(bitmap)
-                                        mainViewModel.setCaptureStep(CaptureStep.REVIEW)
                                     },
                                     onRequestCapture = { arViewModel.requestCapture() },
                                     onUpdateUnwarpPoints = { arViewModel.setUnwarpPoints(it) },
@@ -1902,46 +1875,27 @@ private fun ScanCoachingOverlay(
 }
 
 @Composable
-private fun PlaneConfirmOverlay(
-    onConfirm: () -> Unit,
-    onRedetect: () -> Unit,
-    modifier: Modifier = Modifier,
-    strings: AppStrings
-) {
-    Column(
-        modifier = modifier.padding(bottom = 96.dp).padding(horizontal = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+private fun PostTargetInstructionOverlay(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .background(Color(0xCC000000), RoundedCornerShape(20.dp))
+            .border(2.dp, Color.Cyan, RoundedCornerShape(20.dp))
+            .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .background(Color(0xEE000000), RoundedCornerShape(16.dp))
-                .border(2.dp, Color(0xFFFF8C00), RoundedCornerShape(16.dp))
-                .padding(20.dp)
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = strings.ar.planeConfirmQuestion,
-                    color = Color.White,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(Modifier.height(16.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    AzButton(
-                        text = strings.ar.looksCorrect,
-                        onClick = onConfirm,
-                        color = Color(0xFF2E7D32),
-                        shape = AzButtonShape.RECTANGLE
-                    )
-                    AzButton(
-                        text = strings.ar.redetect,
-                        onClick = onRedetect,
-                        color = Color(0xFFFF8C00),
-                        shape = AzButtonShape.RECTANGLE
-                    )
-                }
-            }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "TARGET LOCKED",
+                color = Color.Cyan,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Click 'Design' in the rail and select Image, Sketch, or Text to create your first layer.",
+                color = Color.White,
+                textAlign = TextAlign.Center,
+                fontSize = 14.sp
+            )
         }
     }
 }

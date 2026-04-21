@@ -542,7 +542,7 @@ class ArViewModel @Inject constructor(
         _uiState.update { state ->
             val newPhase = when (state.scanPhase) {
                 ScanPhase.AMBIENT -> if (sectorsCovered >= 6) ScanPhase.WALL else ScanPhase.AMBIENT
-                ScanPhase.WALL -> if (splatCount >= 30_000) ScanPhase.COMPLETE else ScanPhase.WALL
+                ScanPhase.WALL -> if (splatCount >= 30_000 || state.isAnchorEstablished) ScanPhase.COMPLETE else ScanPhase.WALL
                 ScanPhase.COMPLETE -> ScanPhase.COMPLETE
             }
             state.copy(
@@ -610,15 +610,13 @@ class ArViewModel @Inject constructor(
         if (tapPos != null) {
             pendingTapPosition = null
             
-            // INITIALIZE: Default unwarp quad to the corners of the screen/view
-            val w = 1080f 
-            val h = 1920f
-            val padding = 200f
+            // INITIALIZE: Default unwarp quad to the corners of the view (NORMALIZED)
+            val padding = 0.15f
             val initialPoints = listOf(
                 Offset(padding, padding),
-                Offset(w - padding, padding),
-                Offset(w - padding, h - padding),
-                Offset(padding, h - padding)
+                Offset(1f - padding, padding),
+                Offset(1f - padding, 1f - padding),
+                Offset(padding, 1f - padding)
             )
 
             _uiState.update {

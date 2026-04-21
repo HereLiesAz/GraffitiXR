@@ -81,6 +81,7 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
     const float scaleY = (float)color.rows / depth.rows;
 
     std::lock_guard<std::mutex> lock(mMutex);
+    mDataDirty = true;
     glm::mat4 V = glm::make_mat4(viewMat);
     glm::mat4 invV = glm::inverse(V);
     bool needsPruning = false;
@@ -125,7 +126,7 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
     }
 
     // 2. Discovery Loop: Sample depth map to add NEW voxels
-    int step = 4; // Higher resolution discovery
+    int step = 8; // Optimized sampling for battery efficiency
     for (int r = 0; r < depth.rows - step; r += step) {
         for (int c = 0; c < depth.cols - step; c += step) {
             float d = depth.at<float>(r, c);
@@ -160,6 +161,7 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
 
     if (needsPruning || mSplatData.size() >= MAX_SPLATS * 0.95) {
         pruneInternal(0.01f, voxelSize);
+        mDataDirty = true;
     }
 }
 
@@ -169,7 +171,10 @@ void VoxelHash::draw(const glm::mat4& mvp, float focalY, int screenHeight) {
     if (!mProgram || count == 0) return;
 
     glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
-    glBufferData(GL_ARRAY_BUFFER, count * sizeof(Splat), mSplatData.data(), GL_DYNAMIC_DRAW);
+    if (mDataDirty) {
+        glBufferData(GL_ARRAY_BUFFER, count * sizeof(Splat), mSplatData.data(), GL_DYNAMIC_DRAW);
+        mDataDirty = false;
+    }
 
     glUseProgram(mProgram);
     glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMvp"), 1, GL_FALSE, glm::value_ptr(mvp));

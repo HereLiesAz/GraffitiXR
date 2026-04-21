@@ -358,7 +358,9 @@ class ArRenderer(
 
             // Throttle frame feeding to 15Hz (every 4 frames at 60Hz) to halve processing-related power draw.
             // When tracking is stable and the device is stationary, we could throttle even further.
-            if (frameCount++ % 4 == 0) {
+            // ── Frame Data Pipeline (Throttle to 10Hz or 2Hz for Battery Efficiency) ──
+            val throttleRate = if (anchorEstablished) 30 else 6 // 2Hz vs 10Hz
+            if (isTracking && frameCount++ % throttleRate == 0) {
                 // Calculate rotation code to align sensor-native data with display orientation
                 val displayRotation = displayRotationHelper.getRotation()
                 val cvRotateCode = when ((sensorOrientation - displayRotation * 90 + 360) % 360) {
@@ -378,8 +380,10 @@ class ArRenderer(
                             frame.timestamp,
                             cvRotateCode
                         )
-                        // Always feed temporal stereo frames for continuous depth refinement
-                        stereoProvider?.submitFrame(planes[0].buffer, image.width, image.height, frame.timestamp)
+                        // Feed temporal stereo ONLY when mapping
+                        if (!anchorEstablished) {
+                            stereoProvider?.submitFrame(planes[0].buffer, image.width, image.height, frame.timestamp)
+                        }
                     }
                 } catch (e: com.google.ar.core.exceptions.NotYetAvailableException) {
                     // Normal on first frames
@@ -387,8 +391,8 @@ class ArRenderer(
                     Timber.w(e, "Failed to feed YUV frame")
                 }
 
-                // 1. Point Cloud acquisition (for visualization in CLOUD_POINTS mode)
-                if (currentScanMode == ArScanMode.CLOUD_POINTS) {
+                // 1. Point Cloud acquisition (only when scanning in CLOUD_POINTS mode)
+                if (currentScanMode == ArScanMode.CLOUD_POINTS && !anchorEstablished) {
                     try {
                         frame.acquirePointCloud().use { pointCloud ->
                             pointCloudRenderer.update(pointCloud)
@@ -398,8 +402,8 @@ class ArRenderer(
                     }
                 }
 
-                // 2. Depth acquisition (for continuous world refinement in BOTH modes)
-                if (depthSupported) {
+                // 2. Depth acquisition (STOP processing depth once target is baked)
+                if (depthSupported && !anchorEstablished) {
                     try {
                         frame.acquireDepthImage16Bits().use { depthImage ->
                             val depthPlane = depthImage.planes[0]
@@ -408,15 +412,6 @@ class ArRenderer(
                                 intrinsics.principalPoint[0], intrinsics.principalPoint[1]
                             )
                             val cpuDim = intrinsics.imageDimensions
-
-                            // Calculate rotation code to align sensor-native depth with display orientation
-                            val displayRotation = displayRotationHelper.getRotation()
-                            val cvRotateCode = when ((sensorOrientation - displayRotation * 90 + 360) % 360) {
-                                90 -> 0 // cv::ROTATE_90_CLOCKWISE
-                                180 -> 1 // cv::ROTATE_180
-                                270 -> 2 // cv::ROTATE_90_COUNTERCLOCKWISE
-                                else -> null
-                            }
 
                             slamManager.feedArCoreDepth(
                                 depthPlane.buffer,
@@ -489,11 +484,14 @@ class ArRenderer(
             }
 
             if (!hideVisualization) {
-                if (currentScanMode == ArScanMode.CLOUD_POINTS) {
-                    planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose)
-                    pointCloudRenderer.draw(viewMatrix, projMatrix)
-                } else {
-                    slamManager.draw()
+                val showDiagnostics = !anchorEstablished
+                if (showDiagnostics) {
+                    if (currentScanMode == ArScanMode.CLOUD_POINTS) {
+                        planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose)
+                        pointCloudRenderer.draw(viewMatrix, projMatrix)
+                    } else {
+                        slamManager.draw()
+                    }
                 }
             }
 

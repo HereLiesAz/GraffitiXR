@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.design.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,8 +15,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hereliesaz.graffitixr.common.model.EditorMode
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 
 /**
  * Displays contextual help based on the current active EditorMode.
@@ -64,18 +63,15 @@ fun OnboardingDialog(
 
     var currentStep by remember { mutableStateOf(0) }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true
-        )
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
     ) {
-        Box(
+        Column(
             modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.8f))
+                .padding(32.dp)
+                .background(Color(0xEE222222), RoundedCornerShape(16.dp))
+                .border(1.dp, Color.Cyan.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
                 .clickable(
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                     indication = null
@@ -85,56 +81,49 @@ fun OnboardingDialog(
                     } else {
                         onDismiss()
                     }
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(32.dp)
-                    .background(Color(0xFF222222), RoundedCornerShape(16.dp))
-                    .padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = title,
-                    color = Color.Cyan,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = steps[currentStep],
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    steps.forEachIndexed { index, _ ->
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .background(
-                                    if (index == currentStep) Color.Cyan else Color.Gray,
-                                    RoundedCornerShape(4.dp)
-                                )
-                        )
-                    }
                 }
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                text = title,
+                color = Color.Cyan,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = steps[currentStep],
+                color = Color.White,
+                fontSize = 18.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(24.dp))
 
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = if (currentStep < steps.size - 1) "Tap anywhere to continue" else "Tap anywhere to finish",
-                    color = Color.Gray,
-                    fontSize = 14.sp,
-                    textAlign = TextAlign.Center
-                )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                steps.forEachIndexed { index, _ ->
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(
+                                if (index == currentStep) Color.Cyan else Color.Gray,
+                                RoundedCornerShape(4.dp)
+                            )
+                    )
+                }
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = if (currentStep < steps.size - 1) "Tap card to continue" else "Tap card to finish",
+                color = Color.Gray,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }

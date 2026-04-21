@@ -103,6 +103,7 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
     if (depth.empty() || color.empty()) return;
 
     std::lock_guard<std::mutex> lock(mMutex);
+    mMeshDirty = true;
     if (!mInitialized) {
         float extent = 5.0f;
         float step = (extent * 2.0f) / (MESH_GRID_DIM - 1);
@@ -232,15 +233,18 @@ void SurfaceMesh::draw(const glm::mat4& mvp) {
         mTextureDirty = false;
     }
 
-    std::vector<float> data;
-    data.reserve(mPersistentMesh.size() * 5);
-    for(auto& v : mPersistentMesh) {
-        data.push_back(v.x); data.push_back(v.y); data.push_back(v.z);
-        data.push_back(v.u); data.push_back(v.v);
-    }
+    if (mMeshDirty) {
+        std::vector<float> data;
+        data.reserve(mPersistentMesh.size() * 5);
+        for(auto& v : mPersistentMesh) {
+            data.push_back(v.x); data.push_back(v.y); data.push_back(v.z);
+            data.push_back(v.u); data.push_back(v.v);
+        }
 
-    glBindBuffer(GL_ARRAY_BUFFER, mVbo);
-    glBufferData(GL_ARRAY_BUFFER, data.size() * sizeof(float), data.data(), GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, mVbo);
+        glBufferData(GL_ARRAY_BUFFER, data.size() * sizeof(float), data.data(), GL_DYNAMIC_DRAW);
+        mMeshDirty = false;
+    }
 
     glUseProgram(mProgram);
     glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMvp"), 1, GL_FALSE, glm::value_ptr(mvp));

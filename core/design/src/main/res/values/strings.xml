@@ -447,7 +447,7 @@
     <string name="target_captured_desc">Captured Target</string>
     <string name="target_review_desc">Review Extracted Target</string>
     <string name="target_unwarp_hint">Drag corners to unwarp</string>
-    <string name="target_review_title">Review Extracted Markings</string>
+    <string name="target_review_title">TARGET LOCKED</string>
 
     <string name="target_exclude">Exclude</string>
     <string name="target_include">Include</string>

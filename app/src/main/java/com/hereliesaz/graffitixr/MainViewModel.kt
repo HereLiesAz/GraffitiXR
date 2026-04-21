@@ -29,8 +29,6 @@ data class MainUiState(
     val captureStep: CaptureStep = CaptureStep.NONE,
     // Phase 4: True while the user is in "tap your painted marks" mode.
     val isWaitingForTap: Boolean = false,
-    // True after target creation until user confirms the overlay is on the right wall.
-    val planeConfirmationPending: Boolean = false,
     // True when the user tapped "Re-detect" and is being walked through realignment.
     val isInPlaneRealignment: Boolean = false,
     // True when the current capture was initiated via the tap-to-target path (Phase 4).
@@ -103,10 +101,6 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun confirmPlane() {
-        _uiState.update { it.copy(planeConfirmationPending = false, isInPlaneRealignment = false) }
-    }
-
     fun beginPlaneRealignment() {
         _uiState.update { it.copy(isInPlaneRealignment = true) }
     }
@@ -126,7 +120,12 @@ class MainViewModel @Inject constructor(
         viewMatrix: FloatArray? = null
     ) {
         _uiState.update {
-            it.copy(isCapturingTarget = false, captureStep = CaptureStep.NONE, planeConfirmationPending = true)
+            it.copy(
+                isCapturingTarget = false,
+                captureStep = CaptureStep.NONE,
+                isWaitingForTap = false,
+                captureOriginatedFromTap = false
+            )
         }
         bitmap ?: return
         val safeDepth = depthBuffer ?: return
@@ -184,6 +183,7 @@ class MainViewModel @Inject constructor(
             it.copy(
                 isCapturingTarget = false,
                 captureStep = CaptureStep.NONE,
+                isWaitingForTap = false,
                 captureOriginatedFromTap = false
             )
         }
