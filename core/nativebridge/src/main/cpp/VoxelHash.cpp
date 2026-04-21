@@ -180,11 +180,6 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
     }
 }
 
-        if (needsPruning || mSplatData.size() >= MAX_SPLATS * 0.95) {
-            pruneInternal(0.01f, voxelSize);
-        }
-
-
 void VoxelHash::draw(const glm::mat4& mvp, float focalY, int screenHeight) {
     std::lock_guard<std::mutex> lock(mMutex);
     int count = (int)mSplatData.size();
