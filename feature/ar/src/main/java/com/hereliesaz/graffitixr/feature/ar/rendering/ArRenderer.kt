@@ -537,30 +537,42 @@ class ArRenderer(
         val camX = cameraMat[12]; val camY = cameraMat[13]; val camZ = cameraMat[14]
         val fwdX = -cameraMat[8]; val fwdY = -cameraMat[9]; val fwdZ = -cameraMat[10]
 
-        // Find the vertical plane most directly ahead of the camera (dot product with forward ray)
+        // Find the plane most directly ahead of the camera (unbiased search)
         val planes = session.getAllTrackables(com.google.ar.core.Plane::class.java)
         var bestPlane: com.google.ar.core.Plane? = null
-        var maxDot = 0.65f  // Must be within ~49° of straight ahead (matches green threshold)
+        var maxDot = 0.4f
 
         for (plane in planes) {
             if (plane.trackingState != TrackingState.TRACKING) continue
-            if (plane.type != com.google.ar.core.Plane.Type.VERTICAL) continue
+            
             val pose = plane.centerPose
             val dx = pose.tx() - camX
             val dy = pose.ty() - camY
             val dz = pose.tz() - camZ
             val len = kotlin.math.sqrt((dx * dx + dy * dy + dz * dz).toDouble()).toFloat()
-            if (len < 0.3f || len > 15f) continue   // Valid range: 30 cm – 15 m
+            if (len < 0.3f || len > 15f) continue
+            
             val dot = (dx * fwdX + dy * fwdY + dz * fwdZ) / len
-            if (dot > maxDot) { maxDot = dot; bestPlane = plane }
+            if (dot > maxDot) { 
+                maxDot = dot
+                bestPlane = plane 
+            }
         }
 
         val plane = bestPlane ?: return
 
-        // Compute plane orientation axes
+        // Validate: Disallow selection if the surface is too perpendicular to the gaze
         val planeMatrix = FloatArray(16)
         plane.centerPose.toMatrix(planeMatrix, 0)
         val nx = planeMatrix[4]; val ny = planeMatrix[5]; val nz = planeMatrix[6]  // plane normal (Y col)
+        val alignment = kotlin.math.abs(nx * fwdX + ny * fwdY + nz * fwdZ)
+
+        if (alignment < 0.3f) {
+            if (frameCount % 60 == 0) {
+                onDiag("Surface Disallowed: Facing angle too steep ($alignment)")
+            }
+            return
+        }
 
         // Ray–plane intersection: where does the camera's forward ray hit this plane?
         val nDotD = nx * fwdX + ny * fwdY + nz * fwdZ
