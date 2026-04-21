@@ -208,7 +208,75 @@ bool MobileGS::importModel3D(const std::string& p) { return false; }
 void MobileGS::setViewportSize(int w, int h) { mScreenWidth = w; mScreenHeight = h; }
 void MobileGS::setRelocEnabled(bool e) { mRelocEnabled = e; }
 void MobileGS::restoreWallFingerprint(const cv::Mat& d, const std::vector<cv::Point3f>& p) { mWallDescriptors = d.clone(); mWallKeypoints3D = p; }
+
+std::vector<uint8_t> MobileGS::exportFingerprint() {
+    std::lock_guard<std::mutex> lock(mMutex);
+    std::vector<uint8_t> buffer;
+    if (mWallDescriptors.empty()) return buffer;
+
+    int numPts = (int)mWallKeypoints3D.size();
+    int descRows = mWallDescriptors.rows;
+    int descCols = mWallDescriptors.cols;
+    int descType = mWallDescriptors.type();
+
+    size_t headerSize = sizeof(int) * 4;
+    size_t descSize = mWallDescriptors.total() * mWallDescriptors.elemSize();
+    size_t ptsSize = numPts * sizeof(cv::Point3f);
+
+    buffer.resize(headerSize + descSize + ptsSize);
+    uint8_t* ptr = buffer.data();
+
+    memcpy(ptr, &numPts, sizeof(int)); ptr += sizeof(int);
+    memcpy(ptr, &descRows, sizeof(int)); ptr += sizeof(int);
+    memcpy(ptr, &descCols, sizeof(int)); ptr += sizeof(int);
+    memcpy(ptr, &descType, sizeof(int)); ptr += sizeof(int);
+
+    memcpy(ptr, mWallDescriptors.data, descSize); ptr += descSize;
+    memcpy(ptr, mWallKeypoints3D.data(), ptsSize);
+
+    return buffer;
+}
+
+void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
+    if (size < sizeof(int) * 4) return;
+
+    const uint8_t* ptr = data;
+    int numPts, descRows, descCols, descType;
+    memcpy(&numPts, ptr, sizeof(int)); ptr += sizeof(int);
+    memcpy(&descRows, ptr, sizeof(int)); ptr += sizeof(int);
+    memcpy(&descCols, ptr, sizeof(int)); ptr += sizeof(int);
+    memcpy(&descType, ptr, sizeof(int)); ptr += sizeof(int);
+
+    cv::Mat remoteDescriptors(descRows, descCols, descType);
+    size_t descByteSize = remoteDescriptors.total() * remoteDescriptors.elemSize();
+    memcpy(remoteDescriptors.data, ptr, descByteSize);
+    ptr += descByteSize;
+
+    std::vector<cv::Point3f> remotePoints3D(numPts);
+    memcpy(remotePoints3D.data(), ptr, numPts * sizeof(cv::Point3f));
+
+    std::lock_guard<std::mutex> lock(mMutex);
+    mWallDescriptors = remoteDescriptors.clone();
+    mWallKeypoints3D = remotePoints3D;
+    mRelocRequested = true;
+    mRelocCv.notify_one();
+    LOGI("Collaboration: Aligned to peer fingerprint with %d points", numPts);
+}
+
 void MobileGS::scheduleRelocCheck(const cv::Mat& f) { mRelocColorFrame = f.clone(); mRelocRequested = true; mRelocCv.notify_one(); }
+
+// Global bridge for collaboration module
+extern MobileGS* gSlamEngine;
+namespace mobilegs {
+    std::vector<uint8_t> exportFingerprint() {
+        if (gSlamEngine) return gSlamEngine->exportFingerprint();
+        return {};
+    }
+    void alignToFingerprint(const uint8_t* data, size_t size) {
+        if (gSlamEngine) gSlamEngine->alignToFingerprint(data, size);
+    }
+}
+
 bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) { return mSuperPoint.load(onnxBytes); }
 void MobileGS::setArtworkFingerprint(const cv::Mat& c, const uint8_t* d, int w, int h, int s, const float* i, const float* v) {}
 MobileGS::FingerprintData MobileGS::generateFingerprint(const cv::Mat& i, const cv::Mat& m, const uint8_t* d, int w, int h, int s, const float* intr, const float* v) { return {}; }

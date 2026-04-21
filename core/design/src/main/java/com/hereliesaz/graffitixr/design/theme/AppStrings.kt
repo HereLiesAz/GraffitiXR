@@ -120,7 +120,8 @@ fun rememberAppStrings(): AppStrings {
             targetExclude = stringResource(R.string.target_exclude),
             targetInclude = stringResource(R.string.target_include),
             targetEraseMarks = stringResource(R.string.target_erase_marks),
-            targetShowFeatures = stringResource(R.string.target_show_features)
+            targetShowFeatures = stringResource(R.string.target_show_features),
+            syncing = stringResource(R.string.syncing)
         ),
         help = AppStrings.Help(
             modeHost = R.string.help_mode_host,
@@ -305,7 +306,8 @@ data class AppStrings(
         val targetExclude: String,
         val targetInclude: String,
         val targetEraseMarks: String,
-        val targetShowFeatures: String
+        val targetShowFeatures: String,
+        val syncing: String
     )
     data class Help(
         val modeHost: Int,

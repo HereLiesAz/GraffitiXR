@@ -41,6 +41,7 @@ dependencies {
 
     // Native Engine (MobileGS)
     implementation(project(":core:nativebridge"))
+    implementation(project(":android_collaboration_module"))
 
     // Compose
     implementation(libs.androidx.compose.ui)

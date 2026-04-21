@@ -64,6 +64,10 @@ public:
     void updatePersistentMesh(const cv::Mat& depth, const float* viewMat, const float* projMat);
     void getPersistentMesh(std::vector<float>& outVertices, std::vector<float>& outWeights);
 
+    // Collaboration methods
+    std::vector<uint8_t> exportFingerprint();
+    void alignToFingerprint(const uint8_t* data, size_t size);
+
     void draw();
     void destroy();
     std::mutex& getMutex() { return mMutex; }

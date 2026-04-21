@@ -760,6 +760,14 @@ class MainActivity : ComponentActivity() {
                                 AnchorLockFlash(isAnchorEstablished = arUiState.isAnchorEstablished, strings = strings)
                             }
 
+                            SyncingBadge(
+                                isSyncing = arUiState.isSyncing,
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .padding(bottom = 120.dp),
+                                strings = strings
+                            )
+
                             OffscreenIndicators(
                                 uiState = editorUiState,
                                 arUiState = arUiState,
@@ -2095,6 +2103,49 @@ private fun AnchorLockFlash(isAnchorEstablished: Boolean, strings: AppStrings) {
                 )
             }
         }
+    }
+}
+
+    }
+}
+
+@Composable
+private fun SyncingBadge(
+    isSyncing: Boolean,
+    modifier: Modifier = Modifier,
+    strings: AppStrings
+) {
+    if (!isSyncing) return
+
+    val infiniteTransition = rememberInfiniteTransition(label = "sync_pulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f, targetValue = 1f, label = "pulse",
+        animationSpec = infiniteRepeatable(
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+
+    Row(
+        modifier = modifier
+            .background(Color(0xCC000000), RoundedCornerShape(20.dp))
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .alpha(pulseAlpha)
+                .background(Color.Cyan, CircleShape)
+        )
+        Text(
+            text = strings.ar.syncing,
+            color = Color.White,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp
+        )
     }
 }
 

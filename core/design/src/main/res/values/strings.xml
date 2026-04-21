@@ -356,6 +356,9 @@
     <!-- Message shown when the AR anchor is successfully locked. -->
     <string name="anchor_locked">Anchor locked</string>
 
+    <!-- Label shown when a peer is being synced. -->
+    <string name="syncing">SYNCING...</string>
+
     <!-- Dialog title for choosing a font. -->
     <string name="choose_font">Choose Font</string>
 

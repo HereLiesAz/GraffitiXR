@@ -114,7 +114,10 @@ data class ArUiState(
     // Freeze preview — non-null while FreezePreviewScreen is shown
     val freezePreviewBitmap: Bitmap? = null,
     // True when target was captured without depth data; shown as banner in FreezePreviewScreen
-    val freezeDepthWarning: Boolean = false
+    val freezeDepthWarning: Boolean = false,
+
+    // Peer-to-Peer Sync — True when a local peer is found and coordinates are being aligned.
+    val isSyncing: Boolean = false
 )
 
 enum class Tool {

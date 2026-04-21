@@ -21,6 +21,7 @@ import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.common.util.eraseColorBlob
+import com.hereliesaz.graffitixr.core.collaboration.CollaborationManager
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
@@ -68,6 +69,8 @@ class ArViewModel @Inject constructor(
 
     private var session: Session? = null
     private var renderer: ArRenderer? = null
+
+    private var collaborationManager: CollaborationManager? = null
 
     private val _isCameraInUseByAr = MutableStateFlow(false)
     val isCameraInUseByAr = _isCameraInUseByAr.asStateFlow()
@@ -253,6 +256,30 @@ class ArViewModel @Inject constructor(
                 newSession.configure(config)
                 session = newSession
                 renderer?.attachSession(newSession)
+
+                // Initialize Offline-First AR Collaboration
+                val collab = CollaborationManager(context)
+                collaborationManager = collab
+                collab.startDiscovery { host, port ->
+                    viewModelScope.launch {
+                        _uiState.update { it.copy(isSyncing = true) }
+                        try {
+                            collab.connectToPeer(host, port)
+                            appendDiag("Collaboration: Connected to peer $host")
+                        } catch (e: Exception) {
+                            Timber.e(e, "Collaboration: Connection failed")
+                        } finally {
+                            _uiState.update { it.copy(isSyncing = false) }
+                        }
+                    }
+                }
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        collab.startServer()
+                    } catch (e: Exception) {
+                        Timber.e(e, "Collaboration: Server failed")
+                    }
+                }
 
                 viewModelScope.launch(Dispatchers.IO) {
                     slamManager.loadSuperPoint(context.assets)
