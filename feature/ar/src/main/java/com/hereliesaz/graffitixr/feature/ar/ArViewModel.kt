@@ -806,47 +806,42 @@ class ArViewModel @Inject constructor(
                 }
 
                 bestPlane?.let { plane ->
-                    // Validate: Disallow perpendicular surfaces (grazing angles < 0.3 alignment)
                     val planeMatrix = FloatArray(16)
                     plane.centerPose.toMatrix(planeMatrix, 0)
                     val nx = planeMatrix[4]; val ny = planeMatrix[5]; val nz = planeMatrix[6]
-                    val alignment = Math.abs(nx * fwdX + ny * fwdY + nz * fwdZ)
 
-                    if (alignment >= 0.3f) {
-                        val zx = nx; val zy = ny; val zz = nz
-                        var xx = 1f * zz - 0f * zy
-                        var xy = 0f * zx - 0f * zz
-                        var xz = 0f * zy - 1f * zx
-                        val xLen = Math.sqrt((xx * xx + xy * xy + xz * xz).toDouble()).toFloat()
-                        if (xLen > 0.0001f) {
-                            xx /= xLen; xy /= xLen; xz /= xLen
-                            val yx = zy * xz - zz * xy
-                            val yy = zz * xx - zx * xz
-                            val yz = zx * xy - zy * xx
+                    // Robust orthonormal basis construction for ANY plane orientation
+                    val zx = nx; val zy = ny; val zz = nz
+                    var refX = 0f; var refY = 1f; var refZ = 0f
+                    if (Math.abs(zy) > 0.9f) { refX = 1f; refY = 0f; refZ = 0f }
+                    
+                    var xx = refY * zz - refZ * zy
+                    var xy = refZ * zx - refX * zz
+                    var xz = refX * zy - refY * zx
+                    val xLen = Math.sqrt((xx * xx + xy * xy + xz * xz).toDouble()).toFloat()
+                    
+                    if (xLen > 0.0001f) {
+                        xx /= xLen; xy /= xLen; xz /= xLen
+                        val yx = zy * xz - zz * xy
+                        val yy = zz * xx - zx * xz
+                        val yz = zx * xy - zy * xx
 
-                            val newCamPose = FloatArray(16)
-                            android.opengl.Matrix.setIdentityM(newCamPose, 0)
-                            newCamPose[0] = xx; newCamPose[1] = xy; newCamPose[2] = xz
-                            newCamPose[4] = yx; newCamPose[5] = yy; newCamPose[6] = yz
-                            newCamPose[8] = zx; newCamPose[9] = zy; newCamPose[10] = zz
-                            newCamPose[12] = camX; newCamPose[13] = camY; newCamPose[14] = camZ
-                            val newViewMat = FloatArray(16)
-                            android.opengl.Matrix.invertM(newViewMat, 0, newCamPose, 0)
-                            flatViewMat = newViewMat
+                        val newCamPose = FloatArray(16)
+                        android.opengl.Matrix.setIdentityM(newCamPose, 0)
+                        newCamPose[0] = xx; newCamPose[1] = xy; newCamPose[2] = xz
+                        newCamPose[4] = yx; newCamPose[5] = yy; newCamPose[6] = yz
+                        newCamPose[8] = zx; newCamPose[9] = zy; newCamPose[10] = zz
+                        newCamPose[12] = camX; newCamPose[13] = camY; newCamPose[14] = camZ
+                        val newViewMat = FloatArray(16)
+                        android.opengl.Matrix.invertM(newViewMat, 0, newCamPose, 0)
+                        flatViewMat = newViewMat
 
-                            val wallX = planeMatrix[12]
-                            val wallY = planeMatrix[13]
-                            val wallZ = planeMatrix[14]
-                            anchorModelMatrix = FloatArray(16)
-                            android.opengl.Matrix.setIdentityM(anchorModelMatrix, 0)
-                            anchorModelMatrix[0] = xx; anchorModelMatrix[1] = xy; anchorModelMatrix[2] = xz
-                            anchorModelMatrix[4] = yx; anchorModelMatrix[5] = yy; anchorModelMatrix[6] = yz
-                            anchorModelMatrix[8] = zx; anchorModelMatrix[9] = zy; anchorModelMatrix[10] = zz
-                            anchorModelMatrix[12] = wallX; anchorModelMatrix[13] = wallY; anchorModelMatrix[14] = wallZ
-                        }
-                    } else {
-                        appendDiag("Selection Disallowed: Plane is too perpendicular (alignment: $alignment)")
-                        // Fall back to original view matrix pose
+                        anchorModelMatrix = FloatArray(16)
+                        android.opengl.Matrix.setIdentityM(anchorModelMatrix, 0)
+                        anchorModelMatrix[0] = xx; anchorModelMatrix[1] = xy; anchorModelMatrix[2] = xz
+                        anchorModelMatrix[4] = yx; anchorModelMatrix[5] = yy; anchorModelMatrix[6] = yz
+                        anchorModelMatrix[8] = zx; anchorModelMatrix[9] = zy; anchorModelMatrix[10] = zz
+                        anchorModelMatrix[12] = planeMatrix[12]; anchorModelMatrix[13] = planeMatrix[13]; anchorModelMatrix[14] = planeMatrix[14]
                     }
                 }
             } catch (e: Exception) {
@@ -864,7 +859,8 @@ class ArViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 isAnchorEstablished = true,
-                targetCaptureViewMatrix = flatViewMat
+                targetCaptureViewMatrix = flatViewMat,
+                scanPhase = ScanPhase.COMPLETE
             )
         }
         renderer?.anchorEstablished = true

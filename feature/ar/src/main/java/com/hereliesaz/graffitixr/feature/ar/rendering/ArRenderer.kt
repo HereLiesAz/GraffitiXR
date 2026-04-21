@@ -513,7 +513,7 @@ class ArRenderer(
                 if (hasMeshData) meshWeightsBuffer else null
             )
 
-            val showBorder = anchorEstablished && !isCapturingTarget &&
+            val showBorder = !anchorEstablished && !isCapturingTarget &&
                 (showAnchorBoundary || (showBorderForConfirmation && !overlayRenderer.hasTexture))
             if (showBorder) {
                 overlayRenderer.drawAnchorBorder(viewMatrix, projMatrix, anchorMatrix)
@@ -561,18 +561,9 @@ class ArRenderer(
 
         val plane = bestPlane ?: return
 
-        // Validate: Disallow selection if the surface is too perpendicular to the gaze
         val planeMatrix = FloatArray(16)
         plane.centerPose.toMatrix(planeMatrix, 0)
         val nx = planeMatrix[4]; val ny = planeMatrix[5]; val nz = planeMatrix[6]  // plane normal (Y col)
-        val alignment = kotlin.math.abs(nx * fwdX + ny * fwdY + nz * fwdZ)
-
-        if (alignment < 0.3f) {
-            if (frameCount % 60 == 0) {
-                onDiag("Surface Disallowed: Facing angle too steep ($alignment)")
-            }
-            return
-        }
 
         // Ray–plane intersection: where does the camera's forward ray hit this plane?
         val nDotD = nx * fwdX + ny * fwdY + nz * fwdZ
@@ -588,11 +579,14 @@ class ArRenderer(
 
         // Build an orthonormal anchor frame: Z = plane normal, X = horizontal, Y = up
         val zx = nx; val zy = ny; val zz = nz
-        var xx = 0f * zz - 1f * zy   // cross(world_up=[0,1,0], z)
-        var xy = 1f * zx - 0f * zz
-        var xz = 0f * zy - 0f * zx
+        var refX = 0f; var refY = 1f; var refZ = 0f
+        if (kotlin.math.abs(zy) > 0.9f) { refX = 1f; refY = 0f; refZ = 0f }
+        
+        var xx = refY * zz - refZ * zy
+        var xy = refZ * zx - refX * zz
+        var xz = refX * zy - refY * zx
         val xLen = kotlin.math.sqrt((xx * xx + xy * xy + xz * xz).toDouble()).toFloat()
-        if (xLen < 0.0001f) return   // Degenerate (plane is horizontal)
+        if (xLen < 0.0001f) return   // Degenerate
         xx /= xLen; xy /= xLen; xz /= xLen
         val yx = zy * xz - zz * xy   // Y = Z × X
         val yy = zz * xx - zx * xz

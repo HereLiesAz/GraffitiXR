@@ -711,6 +711,7 @@ class MainActivity : ComponentActivity() {
                                     && arUiState.paintingProgress > 0.01f
                                     && !mainUiState.isCapturingTarget
                                     && !showLibrary && !showSettings
+                                    && false // HIDE ALWAYS ONCE TARGET CREATED (USER REQUEST)
                             if (showProgress) {
                                 PaintingProgressIndicator(
                                     progress = arUiState.paintingProgress,
@@ -725,6 +726,7 @@ class MainActivity : ComponentActivity() {
                                 && arUiState.isAnchorEstablished
                                 && distanceM > 0f
                                 && !showLibrary && !showSettings
+                                && false // HIDE ALWAYS ONCE TARGET CREATED (USER REQUEST)
                             ) {
                                 DistanceBadge(
                                     distanceMeters = distanceM,
@@ -735,7 +737,7 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings) {
+                            if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && !arUiState.isAnchorEstablished) {
                                 RelocStatusBadge(
                                     isAnchorEstablished = arUiState.isAnchorEstablished,
                                     paintingProgress = arUiState.paintingProgress,
@@ -746,7 +748,7 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            if (editorUiState.editorMode == EditorMode.AR && editorUiState.showDiagOverlay) {
+                            if (editorUiState.editorMode == EditorMode.AR && editorUiState.showDiagOverlay && !arUiState.isAnchorEstablished) {
                                 DiagPopup(
                                     diagLog = arUiState.diagLog,
                                     modifier = Modifier.align(Alignment.TopStart),
