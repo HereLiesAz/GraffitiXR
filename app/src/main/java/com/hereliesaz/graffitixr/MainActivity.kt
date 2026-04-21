@@ -2106,8 +2106,6 @@ private fun AnchorLockFlash(isAnchorEstablished: Boolean, strings: AppStrings) {
     }
 }
 
-    }
-}
 
 @Composable
 private fun SyncingBadge(

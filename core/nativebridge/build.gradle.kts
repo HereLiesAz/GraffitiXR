@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.hereliesaz.graffitixr.nativebridge"
-    compileSdk = 36
+    compileSdk = 37
     defaultConfig {
         minSdk = 29
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

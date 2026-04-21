@@ -2,7 +2,7 @@ plugins { id("com.android.dynamic-feature") }
 
 android {
   namespace = "com.google.ai.edge.litert.qualcomm_runtime.v79"
-  compileSdk = 35
+  compileSdk = 37
 
   defaultConfig { minSdk = 31 }
 

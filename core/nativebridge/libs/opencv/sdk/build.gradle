@@ -2,11 +2,11 @@ apply plugin: 'com.android.library'
 
 android {
     namespace 'org.opencv'
-    compileSdk 36
+    compileSdk 37
 
     defaultConfig {
         minSdk 29
-        targetSdk 36
+        targetSdk 37
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "proguard-rules.pro"
