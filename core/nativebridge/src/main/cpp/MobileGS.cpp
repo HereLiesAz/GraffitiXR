@@ -108,7 +108,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         if (mMuralMethod == 0) { // VOXEL_HASH
             mVoxelHash.update(depth, colorRGB, viewMat, projMat, mVoxelSize);
         } else { // SURFACE_MESH
-            mSurfaceMesh.update(depth, viewMat, projMat, mAnchorMatrix);
+            mSurfaceMesh.update(depth, colorRGB, viewMat, projMat, mAnchorMatrix);
         }
     }
 }
@@ -186,8 +186,8 @@ void MobileGS::getAnchorTransform(float* outMat16) const {
     memcpy(outMat16, mAnchorMatrix, 16 * sizeof(float));
 }
 
-void MobileGS::updatePersistentMesh(const cv::Mat& depth, const float* viewMat, const float* projMat) {
-    mSurfaceMesh.update(depth, viewMat, projMat, mAnchorMatrix);
+void MobileGS::updatePersistentMesh(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat) {
+    mSurfaceMesh.update(depth, color, viewMat, projMat, mAnchorMatrix);
 }
 
 void MobileGS::getPersistentMesh(std::vector<float>& outVertices, std::vector<float>& outWeights) {

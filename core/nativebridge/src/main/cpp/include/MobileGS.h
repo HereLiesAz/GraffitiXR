@@ -61,7 +61,7 @@ public:
     void loadModel(const std::string& path);
     bool importModel3D(const std::string& path);
 
-    void updatePersistentMesh(const cv::Mat& depth, const float* viewMat, const float* projMat);
+    void updatePersistentMesh(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat);
     void getPersistentMesh(std::vector<float>& outVertices, std::vector<float>& outWeights);
 
     // Collaboration methods

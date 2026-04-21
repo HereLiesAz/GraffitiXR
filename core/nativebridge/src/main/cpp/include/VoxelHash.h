@@ -41,12 +41,14 @@ public:
     int getSplatCount() const;
 
 private:
+    void pruneInternal(float threshold);
     void pruneMap();
 
     mutable std::mutex mMutex;
     std::vector<Splat> mSplatData;
     std::unordered_map<VoxelKey, int, VoxelKeyHash> mVoxelGrid;
 
+    float mLastVoxelSize = 0.005f;
     GLuint mProgram = 0;
     GLuint mPointVbo = 0;
     GLuint mIndexVbo = 0;

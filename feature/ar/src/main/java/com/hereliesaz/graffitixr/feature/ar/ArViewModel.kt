@@ -770,8 +770,9 @@ class ArViewModel @Inject constructor(
         val fx = intrinsics[0]
         val fy = intrinsics[1]
 
-        val halfW = (colorW * 0.2f / fx * depthM).coerceIn(0.2f, 5f)
-        val halfH = (colorH * 0.2f / fy * depthM).coerceIn(0.2f, 5f)
+        // Erring on side of caution: reduced multiplier to 0.18f for conservative initial dimensions
+        val halfW = (colorW * 0.18f / fx * depthM).coerceIn(0.2f, 5f)
+        val halfH = (colorH * 0.18f / fy * depthM).coerceIn(0.2f, 5f)
 
         return Pair(halfW, halfH)
     }

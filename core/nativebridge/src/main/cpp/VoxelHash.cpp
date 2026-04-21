@@ -17,21 +17,24 @@ static const char* kVertexShader =
     "uniform mat4 uMvp;\n"
     "uniform float uFocalY;\n"
     "out vec4 vColor;\n"
+    "out float vConfidence;\n"
     "void main() {\n"
     "  vec4 clip = uMvp * vec4(aPosition, 1.0);\n"
     "  gl_Position = clip;\n"
     "  float sz = (aRadius * 2.0 * 1.414) * uFocalY / clip.w;\n"
     "  gl_PointSize = clamp(sz, 2.0, 256.0);\n"
     "  vColor = aColor;\n"
+    "  vConfidence = aConfidence;\n"
     "}\n";
 
 static const char* kFragmentShader =
     "#version 300 es\n"
     "precision mediump float;\n"
     "in vec4 vColor;\n"
+    "in float vConfidence;\n"
     "out vec4 oColor;\n"
     "void main() {\n"
-    "  oColor = vec4(vColor.rgb, 1.0);\n"
+    "  oColor = vec4(vColor.rgb, vConfidence);\n"
     "}\n";
 
 VoxelHash::VoxelHash() {
@@ -108,6 +111,12 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
 
     if (!updates.empty()) {
         std::lock_guard<std::mutex> lock(mMutex);
+
+        // Apply a small decay to all existing splats to allow unobserved areas to fade
+        for (auto& s : mSplatData) {
+            s.confidence = std::max(0.0f, s.confidence - 0.005f);
+        }
+
         for (const auto& up : updates) {
             auto it = mVoxelGrid.find(up.first);
             if (it != mVoxelGrid.end()) {
@@ -143,8 +152,9 @@ void VoxelHash::draw(const glm::mat4& mvp, float focalY, int screenHeight) {
     glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMvp"), 1, GL_FALSE, glm::value_ptr(mvp));
     glUniform1f(glGetUniformLocation(mProgram, "uFocalY"), focalY);
 
-    glDisable(GL_BLEND);
-    glDepthMask(GL_TRUE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE);
     glEnable(GL_DEPTH_TEST);
 
     glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)0);
