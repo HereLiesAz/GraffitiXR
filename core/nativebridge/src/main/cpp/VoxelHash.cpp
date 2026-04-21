@@ -66,7 +66,7 @@ void VoxelHash::initGl() {
     }
 }
 
-void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, float voxelSize, float lightLevel) {
+void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, float voxelSize, float /*lightLevel*/) {
     if (depth.empty() || color.empty()) return;
 
     mLastVoxelSize = voxelSize;
@@ -80,13 +80,56 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
     const float scaleX = (float)color.cols / depth.cols;
     const float scaleY = (float)color.rows / depth.rows;
 
-    std::vector<std::pair<VoxelKey, Splat>> updates;
-    int step = 8;
+    std::lock_guard<std::mutex> lock(mMutex);
+    glm::mat4 V = glm::make_mat4(viewMat);
+    glm::mat4 invV = glm::inverse(V);
+    bool needsPruning = false;
 
+    // 1. Refinement & Decay Loop: Reproject EVERY existing splat
+    // This ensures every splat gets a fair chance to be reinforced or decayed, regardless of sampling step.
+    for (int i = 0; i < (int)mSplatData.size(); ++i) {
+        if (mSplatData[i].confidence >= 0.98f) continue;
+
+        glm::vec4 p_cam = V * glm::vec4(mSplatData[i].x, mSplatData[i].y, mSplatData[i].z, 1.0f);
+        if (p_cam.z >= -0.1f) continue;
+
+        float u_cam = (p_cam.x * fx / -p_cam.z) + cx;
+        float v_cam = (p_cam.y * -fy / -p_cam.z) + cy;
+
+        if (u_cam >= 0 && u_cam < depth.cols && v_cam >= 0 && v_cam < depth.rows) {
+            float d = depth.at<float>((int)v_cam, (int)u_cam);
+            if (d > 0.1f) {
+                float current_d = -p_cam.z;
+                if (std::abs(current_d - d) < 0.5f) { // High tolerance: 50cm
+                    // HIT! Rapid gain for immediate immutability
+                    mSplatData[i].confidence = std::min(1.0f, mSplatData[i].confidence + 0.4f);
+
+                    // Spatial refinement only for developing points
+                    if (mSplatData[i].confidence < 0.9f) {
+                        glm::vec4 p_target_cam = p_cam * (d / current_d);
+                        p_target_cam.w = 1.0f;
+                        glm::vec4 p_target_world = invV * p_target_cam;
+
+                        float alpha = 0.15f;
+                        mSplatData[i].x += (p_target_world.x - mSplatData[i].x) * alpha;
+                        mSplatData[i].y += (p_target_world.y - mSplatData[i].y) * alpha;
+                        mSplatData[i].z += (p_target_world.z - mSplatData[i].z) * alpha;
+                    }
+                    continue;
+                }
+            }
+            // MISS: Very slow decay to survive noise
+            mSplatData[i].confidence -= 0.01f;
+            if (mSplatData[i].confidence <= 0.0f) needsPruning = true;
+        }
+    }
+
+    // 2. Discovery Loop: Sample depth map to add NEW voxels
+    int step = 4; // Higher resolution discovery
     for (int r = 0; r < depth.rows - step; r += step) {
         for (int c = 0; c < depth.cols - step; c += step) {
             float d = depth.at<float>(r, c);
-            if (d > 0.1f && d < 5.0f) {
+            if (d > 0.1f && d < 7.0f) {
                 float xc = (static_cast<float>(c) - cx) * d / fx;
                 float yc = -(static_cast<float>(r) - cy) * d / fy;
                 float zc = -d;
@@ -99,87 +142,24 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                     static_cast<int>(std::floor(zw / voxelSize))
                 };
 
-                int colorR = static_cast<int>(r * scaleY);
-                int colorC = static_cast<int>(c * scaleX);
-                cv::Vec3b col = color.at<cv::Vec3b>(colorR, colorC);
-                float r_f = col[2]/255.0f, g_f = col[1]/255.0f, b_f = col[0]/255.0f; // BGR to RGB
+                if (mVoxelGrid.find(key) == mVoxelGrid.end()) {
+                    if (mSplatData.size() < MAX_SPLATS) {
+                        int colorR = static_cast<int>(r * scaleY);
+                        int colorC = static_cast<int>(c * scaleX);
+                        cv::Vec3b col = color.at<cv::Vec3b>(colorR, colorC);
+                        float r_f = col[2]/255.0f, g_f = col[1]/255.0f, b_f = col[0]/255.0f;
 
-                // Fast Birth: start with higher confidence to reach immutability faster
-                updates.push_back({key, {xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.5f, 0.0f, 0.0f, 1.0f, 0.004f}});
+                        // Start with high confidence: Ready to lock on next hit
+                        mSplatData.push_back({xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.8f, 0.0f, 0.0f, 1.0f, 0.004f});
+                        mVoxelGrid[key] = (int)mSplatData.size() - 1;
+                    }
+                }
             }
         }
     }
 
-    if (!updates.empty()) {
-        std::lock_guard<std::mutex> lock(mMutex);
-
-        // Tracking hits in this frame to apply decay ONLY to in-view misses
-        std::vector<bool> hitThisFrame(mSplatData.size(), false);
-
-        for (const auto& up : updates) {
-            auto it = mVoxelGrid.find(up.first);
-            if (it != mVoxelGrid.end()) {
-                int index = it->second;
-                Splat& s = mSplatData[index];
-
-                // Relaxed Immutability: Once established, skip all refinement (depth, color, lighting)
-                // but we still mark it as hit to prevent decay while it's confirmed.
-                if (s.confidence >= 0.8f) {
-                    if (index < (int)hitThisFrame.size()) hitThisFrame[index] = true;
-                    continue;
-                }
-
-                const Splat& nu = up.second;
-
-                // Active refinement for developing points
-                float alpha = 0.15f;
-                s.x = s.x * (1.0f-alpha) + nu.x * alpha;
-                s.y = s.y * (1.0f-alpha) + nu.y * alpha;
-                s.z = s.z * (1.0f-alpha) + nu.z * alpha;
-                s.r = s.r * (1.0f-alpha) + nu.r * alpha;
-                s.g = s.g * (1.0f-alpha) + nu.g * alpha;
-                s.b = s.b * (1.0f-alpha) + nu.b * alpha;
-
-                if (index < (int)hitThisFrame.size()) hitThisFrame[index] = true;
-            } else {
-                if (mSplatData.size() < MAX_SPLATS) {
-                    mSplatData.push_back(up.second);
-                    mVoxelGrid[up.first] = (int)mSplatData.size() - 1;
-                }
-            }
-        }
-
-        bool needsPruning = false;
-        glm::mat4 V = glm::make_mat4(viewMat);
-
-        for (int i = 0; i < (int)mSplatData.size(); ++i) {
-            if (mSplatData[i].confidence >= 0.98f) continue; // Real Immutability
-
-            if (i < (int)hitThisFrame.size() && hitThisFrame[i]) {
-                // Reinforced established splat: gain ground fast
-                // Light is barely a factor (90% base, 10% light contribution)
-                float gain = 0.25f * (0.9f + 0.1f * lightLevel);
-                mSplatData[i].confidence = std::min(1.0f, mSplatData[i].confidence + gain);
-            } else {
-                // Check if the splat is actually in the camera's view before applying decay
-                glm::vec4 p_cam = V * glm::vec4(mSplatData[i].x, mSplatData[i].y, mSplatData[i].z, 1.0f);
-                if (p_cam.z >= -0.1f) continue; // Behind or too close
-
-                float u_cam = (p_cam.x * fx / -p_cam.z) + cx;
-                float v_cam = (p_cam.y * -fy / -p_cam.z) + cy;
-
-                if (u_cam >= 0 && u_cam < depth.cols && v_cam >= 0 && v_cam < depth.rows) {
-                    // In-view Miss: Rapid decay
-                    mSplatData[i].confidence -= 0.05f;
-                    if (mSplatData[i].confidence <= 0.0f) needsPruning = true;
-                }
-                // If not in view, confidence is preserved (No global decay)
-            }
-        }
-
-        if (needsPruning || mSplatData.size() >= MAX_SPLATS * 0.95) {
-            pruneInternal(0.01f, voxelSize);
-        }
+    if (needsPruning || mSplatData.size() >= MAX_SPLATS * 0.95) {
+        pruneInternal(0.01f, voxelSize);
     }
 }
 

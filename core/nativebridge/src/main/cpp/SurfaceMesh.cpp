@@ -187,14 +187,13 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
         if (mPersistentMesh[i].confidence >= 0.98f) continue; // Real Immutability
 
         if (vertexHits[i]) {
-            // Reinforced established vertex: gain ground faster
-            // Light is barely a factor (90% base, 10% light contribution)
-            float gain = 0.25f * (0.9f + 0.1f * lightLevel);
+            // Reinforced established vertex: Rapid lock
+            float gain = 0.5f;
             mPersistentMesh[i].confidence = std::min(1.0f, mPersistentMesh[i].confidence + gain);
         } else if (inView[i]) {
-            // In-view Miss: Rapid decay
-            mPersistentMesh[i].confidence = std::max(0.0f, mPersistentMesh[i].confidence - 0.045f);
-            float resetAlpha = 0.15f;
+            // In-view Miss: Extremely slow decay to prioritize persistence
+            mPersistentMesh[i].confidence = std::max(0.0f, mPersistentMesh[i].confidence - 0.005f);
+            float resetAlpha = 0.02f; // Barely budge if flickering
             mPersistentMesh[i].z *= (1.0f - resetAlpha);
         }
         // If not in view, confidence and position are preserved (No global decay)
