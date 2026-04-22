@@ -17,8 +17,8 @@ static const char* kVertexShader =
     "layout(location = 4) in float aRadius;\n"
     "uniform mat4 uMvp;\n"
     "uniform float uFocalY;\n"
-    "out vec4 vColor;\n"
-    "out float vAlpha;\n"
+    "out lowp vec4 vColor;\n"
+    "out mediump float vAlpha;\n"
     "void main() {\n"
     "  vec4 clip = uMvp * vec4(aPosition, 1.0);\n"
     "  gl_Position = clip;\n"
@@ -32,8 +32,8 @@ static const char* kVertexShader =
 static const char* kFragmentShader =
     "#version 300 es\n"
     "precision mediump float;\n"
-    "in vec4 vColor;\n"
-    "in float vAlpha;\n"
+    "in lowp vec4 vColor;\n"
+    "in mediump float vAlpha;\n"
     "out vec4 oColor;\n"
     "void main() {\n"
     "  oColor = vec4(vColor.rgb, vAlpha);\n"
@@ -99,40 +99,47 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
     {
         std::lock_guard<std::mutex> lock(mMutex);
 
-        // 1. Refinement & Decay Loop: Reproject EVERY existing splat
-        for (int i = 0; i < (int)mSplatData.size(); ++i) {
-            if (mSplatData[i].confidence >= 0.98f) continue;
+        // 1. Refinement & Decay Loop: Reproject a SUBSET of existing splats to save battery
+        int totalSplats = (int)mSplatData.size();
+        if (totalSplats > 0) {
+            int itemsToProcess = std::max(100, totalSplats / 4); // 25% per update
+            for (int i = 0; i < itemsToProcess; ++i) {
+                int idx = mNextRefineIndex % totalSplats;
+                mNextRefineIndex++;
 
-            glm::vec4 p_cam = V * glm::vec4(mSplatData[i].x, mSplatData[i].y, mSplatData[i].z, 1.0f);
-            if (p_cam.z >= -0.1f) continue;
+                if (mSplatData[idx].confidence >= 0.98f) continue;
 
-            float u_cam = (p_cam.x * fx / -p_cam.z) + cx;
-            float v_cam = (p_cam.y * -fy / -p_cam.z) + cy;
+                glm::vec4 p_cam = V * glm::vec4(mSplatData[idx].x, mSplatData[idx].y, mSplatData[idx].z, 1.0f);
+                if (p_cam.z >= -0.1f) continue;
 
-            if (u_cam >= 0 && u_cam < depth.cols && v_cam >= 0 && v_cam < depth.rows) {
-                float d = depth.at<float>((int)v_cam, (int)u_cam);
-                if (d > 0.1f) {
-                    float current_d = -p_cam.z;
-                    if (std::abs(current_d - d) < 0.05f) { // High Precision: 5cm
-                        mSplatData[i].confidence = std::min(1.0f, mSplatData[i].confidence + 0.15f);
+                float u_cam = (p_cam.x * fx / -p_cam.z) + cx;
+                float v_cam = (p_cam.y * -fy / -p_cam.z) + cy;
 
-                        if (mSplatData[i].confidence < 0.9f) {
-                            glm::vec4 p_target_cam = p_cam * (d / current_d);
-                            p_target_cam.w = 1.0f;
-                            glm::vec4 p_target_world = invV * p_target_cam;
+                if (u_cam >= 0 && u_cam < depth.cols && v_cam >= 0 && v_cam < depth.rows) {
+                    float d = depth.at<float>((int)v_cam, (int)u_cam);
+                    if (d > 0.1f) {
+                        float current_d = -p_cam.z;
+                        if (std::abs(current_d - d) < 0.05f) { // High Precision: 5cm
+                            mSplatData[idx].confidence = std::min(1.0f, mSplatData[idx].confidence + 0.15f);
 
-                            float alpha = 0.15f;
-                            mSplatData[i].x += (p_target_world.x - mSplatData[i].x) * alpha;
-                            mSplatData[i].y += (p_target_world.y - mSplatData[i].y) * alpha;
-                            mSplatData[i].z += (p_target_world.z - mSplatData[i].z) * alpha;
+                            if (mSplatData[idx].confidence < 0.9f) {
+                                glm::vec4 p_target_cam = p_cam * (d / current_d);
+                                p_target_cam.w = 1.0f;
+                                glm::vec4 p_target_world = invV * p_target_cam;
+
+                                float alpha = 0.15f;
+                                mSplatData[idx].x += (p_target_world.x - mSplatData[idx].x) * alpha;
+                                mSplatData[idx].y += (p_target_world.y - mSplatData[idx].y) * alpha;
+                                mSplatData[idx].z += (p_target_world.z - mSplatData[idx].z) * alpha;
+                            }
+                            dataChanged = true;
+                            continue;
                         }
-                        dataChanged = true;
-                        continue;
                     }
+                    mSplatData[idx].confidence -= 0.05f; // Faster pruning for accuracy
+                    dataChanged = true;
+                    if (mSplatData[idx].confidence <= 0.0f) needsPruning = true;
                 }
-                mSplatData[i].confidence -= 0.05f; // Faster pruning for accuracy
-                dataChanged = true;
-                if (mSplatData[i].confidence <= 0.0f) needsPruning = true;
             }
         }
 

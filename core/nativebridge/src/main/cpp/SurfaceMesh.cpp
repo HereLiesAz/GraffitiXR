@@ -96,6 +96,7 @@ void SurfaceMesh::initGl() {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         mTextureDirty = true;
+        mIndicesUploaded = false;
     }
 }
 
@@ -133,6 +134,7 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
         }
         mMuralTexture = cv::Mat::zeros(TEXTURE_SIZE, TEXTURE_SIZE, CV_8UC3);
         mInitialized = true;
+        mIndicesUploaded = false; // Reset to ensure upload on next draw
     }
 
     glm::mat4 V = glm::make_mat4(viewMat);
@@ -246,6 +248,16 @@ void SurfaceMesh::draw(const glm::mat4& mvp) {
         mMeshDirty = false;
     }
 
+    if (!mIndicesUploaded) {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIbo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, mPersistentMeshIndices.size() * sizeof(uint32_t), mPersistentMeshIndices.data(), GL_STATIC_DRAW);
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mWireIbo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, mWireframeIndices.size() * sizeof(uint32_t), mWireframeIndices.data(), GL_STATIC_DRAW);
+
+        mIndicesUploaded = true;
+    }
+
     glUseProgram(mProgram);
     glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMvp"), 1, GL_FALSE, glm::value_ptr(mvp));
     glUniform1i(glGetUniformLocation(mProgram, "uTexture"), 0);
@@ -265,7 +277,6 @@ void SurfaceMesh::draw(const glm::mat4& mvp) {
     glBindTexture(GL_TEXTURE_2D, mTextureId);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIbo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mPersistentMeshIndices.size() * sizeof(uint32_t), mPersistentMeshIndices.data(), GL_DYNAMIC_DRAW);
     glDrawElements(GL_TRIANGLES, mPersistentMeshIndices.size(), GL_UNSIGNED_INT, (void*)0);
 
     // Pass 2: Wireframe Grid
@@ -273,7 +284,6 @@ void SurfaceMesh::draw(const glm::mat4& mvp) {
     glUniform1f(glGetUniformLocation(mProgram, "uAlpha"), 0.3f); // Fainter wireframe
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mWireIbo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mWireframeIndices.size() * sizeof(uint32_t), mWireframeIndices.data(), GL_DYNAMIC_DRAW);
     glDrawElements(GL_LINES, mWireframeIndices.size(), GL_UNSIGNED_INT, (void*)0);
 
     glDisableVertexAttribArray(0);
@@ -299,60 +309,63 @@ void SurfaceMesh::getMesh(std::vector<float>& outVertices, std::vector<float>& o
 }
 
 void SurfaceMesh::updateTexture(const cv::Mat& color, const std::vector<glm::vec2>& camPoints) {
-    // Piecewise warp: Optimized to warp small patches directly into mMuralTexture
-    for (int i = 0; i < MESH_GRID_DIM - 1; ++i) {
-        for (int j = 0; j < MESH_GRID_DIM - 1; ++j) {
-            int i00 = i * MESH_GRID_DIM + j;
-            int i10 = i00 + 1;
-            int i01 = (i + 1) * MESH_GRID_DIM + j;
-            int i11 = i01 + 1;
+    // Piecewise warp: Optimized to warp a SUBSET of patches directly into mMuralTexture to save battery.
+    int totalPatches = (MESH_GRID_DIM - 1) * (MESH_GRID_DIM - 1);
+    int patchesToProcess = 32;
 
-            if (camPoints[i00].x < 0 || camPoints[i10].x < 0 || camPoints[i01].x < 0 || camPoints[i11].x < 0) continue;
+    for (int p = 0; p < patchesToProcess; ++p) {
+        int patchIdx = mNextTexturePatchIndex % totalPatches;
+        mNextTexturePatchIndex++;
 
-            cv::Point2f src[4] = {
-                {camPoints[i00].x, camPoints[i00].y},
-                {camPoints[i10].x, camPoints[i10].y},
-                {camPoints[i11].x, camPoints[i11].y},
-                {camPoints[i01].x, camPoints[i01].y}
-            };
+        int i = patchIdx / (MESH_GRID_DIM - 1);
+        int j = patchIdx % (MESH_GRID_DIM - 1);
 
-            cv::Point2f dst[4] = {
-                {mPersistentMesh[i00].u * TEXTURE_SIZE, mPersistentMesh[i00].v * TEXTURE_SIZE},
-                {mPersistentMesh[i10].u * TEXTURE_SIZE, mPersistentMesh[i10].v * TEXTURE_SIZE},
-                {mPersistentMesh[i11].u * TEXTURE_SIZE, mPersistentMesh[i11].v * TEXTURE_SIZE},
-                {mPersistentMesh[i01].u * TEXTURE_SIZE, mPersistentMesh[i01].v * TEXTURE_SIZE}
-            };
+        int i00 = i * MESH_GRID_DIM + j;
+        int i10 = i00 + 1;
+        int i01 = (i + 1) * MESH_GRID_DIM + j;
+        int i11 = i01 + 1;
 
-            // Only update if the quad is not yet fully established
-            if (mPersistentMesh[i00].confidence < 0.2f) continue;
+        if (camPoints[i00].x < 0 || camPoints[i10].x < 0 || camPoints[i01].x < 0 || camPoints[i11].x < 0) continue;
 
-            // Relaxed Immutability: We still allow texture updates even if established,
-            // but we could slow it down if we wanted to.
-            // if (mPersistentMesh[i00].confidence >= 0.98f && ... ) continue;
+        cv::Point2f src[4] = {
+            {camPoints[i00].x, camPoints[i00].y},
+            {camPoints[i10].x, camPoints[i10].y},
+            {camPoints[i11].x, camPoints[i11].y},
+            {camPoints[i01].x, camPoints[i01].y}
+        };
 
-            cv::Mat H = cv::getPerspectiveTransform(src, dst);
+        cv::Point2f dst[4] = {
+            {mPersistentMesh[i00].u * TEXTURE_SIZE, mPersistentMesh[i00].v * TEXTURE_SIZE},
+            {mPersistentMesh[i10].u * TEXTURE_SIZE, mPersistentMesh[i10].v * TEXTURE_SIZE},
+            {mPersistentMesh[i11].u * TEXTURE_SIZE, mPersistentMesh[i11].v * TEXTURE_SIZE},
+            {mPersistentMesh[i01].u * TEXTURE_SIZE, mPersistentMesh[i01].v * TEXTURE_SIZE}
+        };
 
-            float minX = std::min({dst[0].x, dst[1].x, dst[2].x, dst[3].x});
-            float minY = std::min({dst[0].y, dst[1].y, dst[2].y, dst[3].y});
-            float maxX = std::max({dst[0].x, dst[1].x, dst[2].x, dst[3].x});
-            float maxY = std::max({dst[0].y, dst[1].y, dst[2].y, dst[3].y});
+        // Only update if the quad is not yet fully established
+        if (mPersistentMesh[i00].confidence < 0.2f) continue;
 
-            cv::Rect roi((int)minX, (int)minY, (int)(maxX - minX + 1), (int)(maxY - minY + 1));
-            roi &= cv::Rect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
-            if (roi.width <= 0 || roi.height <= 0) continue;
+        cv::Mat H = cv::getPerspectiveTransform(src, dst);
 
-            // Offset H to warp directly into the ROI of the mural
-            cv::Mat H_roi = cv::Mat::eye(3, 3, CV_64F);
-            H_roi.at<double>(0, 2) = -roi.x;
-            H_roi.at<double>(1, 2) = -roi.y;
-            H = H_roi * H;
+        float minX = std::min({dst[0].x, dst[1].x, dst[2].x, dst[3].x});
+        float minY = std::min({dst[0].y, dst[1].y, dst[2].y, dst[3].y});
+        float maxX = std::max({dst[0].x, dst[1].x, dst[2].x, dst[3].x});
+        float maxY = std::max({dst[0].y, dst[1].y, dst[2].y, dst[3].y});
 
-            cv::Mat patch;
-            cv::warpPerspective(color, patch, H, roi.size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT);
+        cv::Rect roi((int)minX, (int)minY, (int)(maxX - minX + 1), (int)(maxY - minY + 1));
+        roi &= cv::Rect(0, 0, TEXTURE_SIZE, TEXTURE_SIZE);
+        if (roi.width <= 0 || roi.height <= 0) continue;
 
-            float alpha = 0.30f; // Fast Birth for textures
-            cv::addWeighted(mMuralTexture(roi), 1.0 - alpha, patch, alpha, 0, mMuralTexture(roi));
-            mTextureDirty = true;
-        }
+        // Offset H to warp directly into the ROI of the mural
+        cv::Mat H_roi = cv::Mat::eye(3, 3, CV_64F);
+        H_roi.at<double>(0, 2) = -roi.x;
+        H_roi.at<double>(1, 2) = -roi.y;
+        H = H_roi * H;
+
+        cv::Mat patch;
+        cv::warpPerspective(color, patch, H, roi.size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT);
+
+        float alpha = 0.30f; // Fast Birth for textures
+        cv::addWeighted(mMuralTexture(roi), 1.0 - alpha, patch, alpha, 0, mMuralTexture(roi));
+        mTextureDirty = true;
     }
 }

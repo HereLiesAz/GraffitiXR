@@ -36,6 +36,8 @@ private:
     GLuint mTextureId = 0;
     bool mTextureDirty = false;
     bool mMeshDirty = false;
+    bool mIndicesUploaded = false;
+    int mNextTexturePatchIndex = 0;
 
     GLuint mProgram = 0;
     GLuint mVbo = 0;

@@ -239,33 +239,8 @@ class ArRenderer(
             slamManager.setArScanMode(currentScanMode.ordinal)
             slamManager.setMuralMethod(muralMethod.ordinal)
             val anchorMatrix = slamManager.getAnchorTransform()
-            
-            var relDir: Triple<Float, Float, Float>? = null
-            
-            val distanceMeters = run {
-                if (!anchorEstablished) return@run -1f
-                val camPose = FloatArray(16)
-                android.opengl.Matrix.invertM(camPose, 0, viewMatrix, 0)
-                val dx = anchorMatrix[12] - camPose[12]
-                val dy = anchorMatrix[13] - camPose[13]
-                val dz = anchorMatrix[14] - camPose[14]
-                val len = kotlin.math.sqrt((dx * dx + dy * dy + dz * dz).toDouble()).toFloat()
-                
-                if (len > 0.01f) {
-                    // Compute direction in camera local space
-                    // Camera direction is -Z in local space
-                    val localX = dx * viewMatrix[0] + dy * viewMatrix[1] + dz * viewMatrix[2]
-                    val localY = dx * viewMatrix[4] + dy * viewMatrix[5] + dz * viewMatrix[6]
-                    val localZ = dx * viewMatrix[8] + dy * viewMatrix[9] + dz * viewMatrix[10]
-                    relDir = Triple(localX / len, localY / len, localZ / len)
-                }
 
-                // Only report distance when anchor is in front of the camera
-                val fwdDot = dx * (-viewMatrix[8]) + dy * (-viewMatrix[9]) + dz * (-viewMatrix[10])
-                if (len > 0.01f && fwdDot > 0f) len else -1f
-            }
-
-            // Throttle UI updates to 15Hz to match SLAM processing frequency and reduce state churn.
+            // Throttle UI and distance updates to 15Hz to match SLAM processing frequency and reduce state churn.
             if (frameCount % 4 == 0) {
                 backgroundScope.launch {
                     val (count, immutableCount) = if (currentScanMode == ArScanMode.CLOUD_POINTS) {
@@ -273,6 +248,28 @@ class ArRenderer(
                     } else {
                         slamManager.getSplatCount() to slamManager.getImmutableSplatCount()
                     }
+
+                    var relDir: Triple<Float, Float, Float>? = null
+                    val distanceMeters = run {
+                        if (!anchorEstablished) return@run -1f
+                        val camPose = FloatArray(16)
+                        android.opengl.Matrix.invertM(camPose, 0, viewMatrix, 0)
+                        val dx = anchorMatrix[12] - camPose[12]
+                        val dy = anchorMatrix[13] - camPose[13]
+                        val dz = anchorMatrix[14] - camPose[14]
+                        val len = kotlin.math.sqrt((dx * dx + dy * dy + dz * dz).toDouble()).toFloat()
+
+                        if (len > 0.01f) {
+                            val localX = dx * viewMatrix[0] + dy * viewMatrix[1] + dz * viewMatrix[2]
+                            val localY = dx * viewMatrix[4] + dy * viewMatrix[5] + dz * viewMatrix[6]
+                            val localZ = dx * viewMatrix[8] + dy * viewMatrix[9] + dz * viewMatrix[10]
+                            relDir = Triple(localX / len, localY / len, localZ / len)
+                        }
+
+                        val fwdDot = dx * (-viewMatrix[8]) + dy * (-viewMatrix[9]) + dz * (-viewMatrix[10])
+                        if (len > 0.01f && fwdDot > 0f) len else -1f
+                    }
+
                     onTrackingUpdated(isTracking, count, immutableCount, depthSupported, yawDeg, distanceMeters, relDir)
                 }
             }
