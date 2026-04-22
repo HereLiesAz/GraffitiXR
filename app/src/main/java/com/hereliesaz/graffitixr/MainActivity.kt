@@ -1043,7 +1043,7 @@ class MainActivity : ComponentActivity() {
                 azRailSubItem(
                     id = "coop_main",
                     hostId = "mode_host",
-                    text = if (arUiState.coopStatus != null) arUiState.coopStatus!! else "Co-op",
+                    text = arUiState.coopStatus ?: "Co-op",
                     color = if (arUiState.isCoopSearching || arUiState.isSyncing) Cyan else navItemColor,
                     shape = AzButtonShape.RECTANGLE
                 ) {
@@ -1083,13 +1083,6 @@ class MainActivity : ComponentActivity() {
 
                 azRailSubItem(id = "create", hostId = "target_host", text = navStrings.create, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.createInfo) {
                     if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
-                }
-
-                azRailSubItem(id = "host_coop", hostId = "target_host", text = navStrings.hostCoop, color = navItemColor, info = navStrings.hostCoopInfo) {
-                    arViewModel.startCollaborationHost()
-                }
-                azRailSubItem(id = "join_coop", hostId = "target_host", text = navStrings.joinCoop, color = navItemColor, info = navStrings.joinCoopInfo) {
-                    arViewModel.startCollaborationDiscovery()
                 }
 
                 azDivider()
