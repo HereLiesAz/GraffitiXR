@@ -52,27 +52,21 @@ import com.hereliesaz.graffitixr.design.theme.HotPink
 private data class SelectionStroke(
     val nx: Float,
     val ny: Float,
-    val nr: Float
+    val nr: Float,
 )
 
 @Composable
 fun TargetCreationUi(
     uiState: ArUiState,
-    isRightHanded: Boolean,
     captureStep: CaptureStep,
     isWaitingForTap: Boolean,
     isLoading: Boolean,
     strings: AppStrings,
-    onConfirm: (bitmap: Bitmap?, mask: Bitmap?, depthBuffer: ByteBuffer?, depthW: Int, depthH: Int, depthStride: Int, intrinsics: FloatArray?, viewMatrix: FloatArray?) -> Unit,
     onRetake: () -> Unit,
     onCancel: () -> Unit,
     onUnwarpConfirm: (List<Offset>) -> Unit,
     onMaskConfirmed: (Bitmap) -> Unit,
-    onRequestCapture: () -> Unit,
     onUpdateUnwarpPoints: (List<Offset>) -> Unit,
-    onSetActiveUnwarpPoint: (Int) -> Unit,
-    onSetMagnifierPosition: (Offset) -> Unit,
-    onUpdateMaskPath: (Path?) -> Unit,
     onBeginErase: () -> Unit,
     onEraseAtPoint: (Float, Float) -> Unit,
     onUndoErase: () -> Unit,
@@ -88,14 +82,23 @@ fun TargetCreationUi(
                     canRedo = uiState.canRedoErase,
                     strings = strings,
                     onNext = { strokes ->
-                         val mask = if (strokes.isEmpty()) null 
-                                    else rasterizeStrokes(strokes, uiState.tempCaptureBitmap?.width ?: 512, uiState.tempCaptureBitmap?.height ?: 512)
-                         
-                         val refined = if (mask != null && uiState.tempCaptureBitmap != null) {
-                             applyMaskToBitmap(uiState.tempCaptureBitmap, mask)
-                         } else uiState.tempCaptureBitmap
-                         
-                         if (refined != null) onMaskConfirmed(refined)
+                        val tempBmp = uiState.tempCaptureBitmap
+                        val mask = if (strokes.isEmpty()) null
+                        else rasterizeStrokes(
+                            strokes,
+                            tempBmp?.width ?: 512,
+                            tempBmp?.height ?: 512
+                        )
+
+                        val refined = if (mask != null && tempBmp != null) {
+                            applyMaskToBitmap(tempBmp, mask)
+                        } else {
+                            tempBmp
+                        }
+
+                        if (refined != null) {
+                            onMaskConfirmed(refined)
+                        }
                     },
                     onRetake = onRetake,
                     onCancel = onCancel,

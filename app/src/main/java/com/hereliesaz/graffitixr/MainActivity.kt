@@ -767,15 +767,10 @@ class MainActivity : ComponentActivity() {
                             if (mainUiState.isCapturingTarget) {
                                 TargetCreationUi(
                                     uiState = arUiState,
-                                    isRightHanded = editorUiState.isRightHanded,
                                     captureStep = mainUiState.captureStep,
                                     isWaitingForTap = mainUiState.isWaitingForTap,
                                     isLoading = isProcessing,
                                     strings = strings,
-                                    onConfirm = { bitmap, mask, depth, dw, dh, ds, intr, view ->
-                                        arViewModel.setInitialAnchorFromCapture()
-                                        mainViewModel.onConfirmTargetCreation(bitmap, mask, depth, dw, dh, ds, intr, view)
-                                    },
                                     onRetake = {
                                         mainViewModel.onRetakeCapture()
                                         if (mainUiState.captureOriginatedFromTap) {
@@ -818,11 +813,7 @@ class MainActivity : ComponentActivity() {
                                         arViewModel.setTempCapture(mask)
                                         mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
                                     },
-                                    onRequestCapture = { arViewModel.requestCapture() },
                                     onUpdateUnwarpPoints = { arViewModel.setUnwarpPoints(it) },
-                                    onSetActiveUnwarpPoint = { arViewModel.setActiveUnwarpPoint(it) },
-                                    onSetMagnifierPosition = { arViewModel.setMagnifierPosition(it) },
-                                    onUpdateMaskPath = { path -> path?.let { arViewModel.updateMaskPath(it) } },
                                     onBeginErase = { arViewModel.beginErase() },
                                     onEraseAtPoint = { nx, ny -> arViewModel.eraseAtPoint(nx, ny) },
                                     onUndoErase = { arViewModel.undoErase() },
