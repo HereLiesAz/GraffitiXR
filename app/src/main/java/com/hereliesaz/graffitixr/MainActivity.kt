@@ -1054,6 +1054,13 @@ class MainActivity : ComponentActivity() {
                     if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
                 }
 
+                azRailSubItem(id = "host_coop", hostId = "target_host", text = navStrings.hostCoop, color = navItemColor, info = navStrings.hostCoopInfo) {
+                    arViewModel.startCollaborationHost()
+                }
+                azRailSubItem(id = "join_coop", hostId = "target_host", text = navStrings.joinCoop, color = navItemColor, info = navStrings.joinCoopInfo) {
+                    arViewModel.startCollaborationDiscovery()
+                }
+
                 azDivider()
             }
 

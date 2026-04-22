@@ -39,36 +39,5 @@ fun TraceScreen(viewModel: EditorViewModel, isLibraryVisible: Boolean) {
         )
     }
 
-    TraceControls(
-        onTransformStart = viewModel::onGestureStart,
-        onTransform = viewModel::onTransformGesture,
-        onTransformEnd = viewModel::onGestureEnd
-    )
-}
-
-@Composable
-fun TraceControls(
-    onTransformStart: () -> Unit,
-    onTransform: (Offset, Float, Float) -> Unit,
-    onTransformEnd: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false)
-                    onTransformStart()
-                    do {
-                        val event = awaitPointerEvent()
-                    } while (event.changes.any { it.pressed })
-                    onTransformEnd()
-                }
-            }
-            .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, rotation ->
-                    onTransform(pan, zoom, rotation)
-                }
-            }
-    )
+    // GESTURE HANDLING REMOVED: Managed centrally by MainScreen's background block.
 }

@@ -35,19 +35,6 @@ fun MockupScreen(viewModel: EditorViewModel, isLibraryVisible: Boolean) {
         )
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, rotation ->
-                    viewModel.onTransformGesture(pan, zoom, rotation)
-                }
-            }
-    ) {
-        // Logic for warp mesh updates
-        uiState.activeLayerId?.let { layerId ->
-            // When user manipulates mesh pins, trigger:
-            // viewModel.onLayerWarpChanged(layerId, updatedPoints)
-        }
-    }
+    // GESTURE HANDLING REMOVED: Managed centrally by MainScreen's background block
+    // to support consistent rotation axis switching and 'smart' snapping.
 }

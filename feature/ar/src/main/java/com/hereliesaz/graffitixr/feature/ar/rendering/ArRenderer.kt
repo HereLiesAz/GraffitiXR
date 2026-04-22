@@ -172,12 +172,15 @@ class ArRenderer(
 
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
+        frameCount++ // Increment every frame for consistent timing
 
         sessionLock.withLock {
             val activeSession = session ?: return
 
             activeSession.setCameraTextureName(backgroundRenderer.textureId)
             displayRotationHelper.updateSessionIfNeeded(activeSession)
+            
+            // ... (rest of session update)
 
             val frame: Frame = try {
                 activeSession.update()
@@ -360,7 +363,7 @@ class ArRenderer(
             // When tracking is stable and the device is stationary, we could throttle even further.
             // ── Frame Data Pipeline (Throttle to 10Hz or 2Hz for Battery Efficiency) ──
             val throttleRate = if (anchorEstablished) 30 else 6 // 2Hz vs 10Hz
-            if (isTracking && frameCount++ % throttleRate == 0) {
+            if (isTracking && frameCount % throttleRate == 0) {
                 // Calculate rotation code to align sensor-native data with display orientation
                 val displayRotation = displayRotationHelper.getRotation()
                 val cvRotateCode = when ((sensorOrientation - displayRotation * 90 + 360) % 360) {

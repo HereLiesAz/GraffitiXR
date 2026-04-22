@@ -73,6 +73,29 @@ class ArViewModel @Inject constructor(
 
     private var collaborationManager: CollaborationManager? = null
 
+    fun startCollaborationHost() {
+        if (collaborationManager == null) {
+            collaborationManager = CollaborationManager(appContext)
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSyncing = true) }
+            collaborationManager?.startServer()
+        }
+    }
+
+    fun startCollaborationDiscovery() {
+        if (collaborationManager == null) {
+            collaborationManager = CollaborationManager(appContext)
+        }
+        _uiState.update { it.copy(isSyncing = true) }
+        collaborationManager?.startDiscovery { address, port ->
+            viewModelScope.launch {
+                collaborationManager?.connectToPeer(address, port)
+                _uiState.update { it.copy(isSyncing = false) }
+            }
+        }
+    }
+
     private val _isCameraInUseByAr = MutableStateFlow(false)
     val isCameraInUseByAr = _isCameraInUseByAr.asStateFlow()
 

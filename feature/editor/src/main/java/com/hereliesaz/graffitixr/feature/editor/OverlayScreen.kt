@@ -1,9 +1,6 @@
 package com.hereliesaz.graffitixr.feature.editor
 
-import androidx.compose.foundation.Image
 import androidx.compose.runtime.*
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import com.hereliesaz.graffitixr.data.OnboardingManager
 import com.hereliesaz.graffitixr.common.model.EditorMode
@@ -32,35 +29,7 @@ fun OverlayScreen(viewModel: EditorViewModel, isLibraryVisible: Boolean) {
         )
     }
 
-    val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
-    if (activeLayer != null && activeLayer.isVisible) {
-        activeLayer.bitmap?.let { b ->
-            // Create ColorMatrix for image adjustments
-            val colorMatrix = remember(
-                activeLayer.saturation,
-                activeLayer.contrast,
-                activeLayer.brightness,
-                activeLayer.colorBalanceR,
-                activeLayer.colorBalanceG,
-                activeLayer.colorBalanceB
-            ) {
-                createColorMatrix(
-                    saturation = activeLayer.saturation,
-                    contrast = activeLayer.contrast,
-                    brightness = activeLayer.brightness,
-                    colorBalanceR = activeLayer.colorBalanceR,
-                    colorBalanceG = activeLayer.colorBalanceG,
-                    colorBalanceB = activeLayer.colorBalanceB
-                )
-            }
-
-            Image(
-                bitmap = b.asImageBitmap(),
-                contentDescription = null,
-                alpha = activeLayer.opacity,
-                colorFilter = ColorFilter.colorMatrix(colorMatrix)
-                // BlendMode handled via GraphicsLayer or Canvas
-            )
-        }
-    }
+    // REDUNDANCY REMOVED: Layers are now managed centrally by MainScreen's background block.
+    // This prevents the 'fixed background' bug where the active layer was double-rendered 
+    // without transforms on the onscreen layer.
 }

@@ -9,6 +9,7 @@
 
 static const char* kVertexShader =
     "#version 300 es\n"
+    "precision highp float;\n"
     "layout(location = 0) in vec3 aPosition;\n"
     "layout(location = 1) in vec4 aColor;\n"
     "layout(location = 2) in float aConfidence;\n"
@@ -17,38 +18,50 @@ static const char* kVertexShader =
     "uniform mat4 uMvp;\n"
     "uniform float uFocalY;\n"
     "out vec4 vColor;\n"
-    "out float vConfidence;\n"
+    "out float vAlpha;\n"
     "void main() {\n"
     "  vec4 clip = uMvp * vec4(aPosition, 1.0);\n"
     "  gl_Position = clip;\n"
-    "  float sz = (aRadius * 2.0 * 1.414) * uFocalY / clip.w;\n"
-    "  gl_PointSize = clamp(sz, 2.0, 256.0);\n"
+    "  // Robust point sizing for Mali GPUs and high-DPI screens\n"
+    "  float sz = (aRadius * 2.0 * 1.732) * uFocalY / max(clip.w, 0.001);\n"
+    "  gl_PointSize = clamp(sz, 4.0, 256.0);\n"
     "  vColor = aColor;\n"
-    "  vConfidence = aConfidence;\n"
+    "  vAlpha = clamp(aConfidence, 0.1, 1.0);\n"
     "}\n";
 
 static const char* kFragmentShader =
     "#version 300 es\n"
     "precision mediump float;\n"
     "in vec4 vColor;\n"
-    "in float vConfidence;\n"
+    "in float vAlpha;\n"
     "out vec4 oColor;\n"
     "void main() {\n"
-    "  oColor = vec4(vColor.rgb, vConfidence);\n"
+    "  // Circular points are more pleasing and robust\n"
+    "  vec2 circ = gl_PointCoord - vec2(0.5);\n"
+    "  if (dot(circ, circ) > 0.25) discard;\n"
+    "  oColor = vec4(vColor.rgb, vAlpha);\n"
     "}\n";
 
 VoxelHash::VoxelHash() {
-    mSplatData.reserve(500000);
+    mSplatData.reserve(200000);
 }
 
 VoxelHash::~VoxelHash() {
-    if (mProgram) glDeleteProgram(mProgram);
-    if (mPointVbo) glDeleteBuffers(1, &mPointVbo);
+    // Explicitly don't delete here as context might be gone; cleanup handled by GL lifecycle
 }
 
 void VoxelHash::initGl() {
     std::lock_guard<std::mutex> lock(mMutex);
-    if (mProgram) return;
+    // Detection of context loss: if we think we have handles, check if they are still valid
+    if (mProgram != 0) {
+        if (!glIsProgram(mProgram)) {
+            LOGI("GL context lost, resetting VoxelHash handles");
+            mProgram = 0;
+            mPointVbo = 0;
+        } else {
+            return;
+        }
+    }
 
     GLuint vs = compileShader(GL_VERTEX_SHADER, kVertexShader);
     GLuint fs = compileShader(GL_FRAGMENT_SHADER, kFragmentShader);
@@ -62,7 +75,8 @@ void VoxelHash::initGl() {
 
         glGenBuffers(1, &mPointVbo);
         glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
-        glBufferData(GL_ARRAY_BUFFER, MAX_SPLATS * sizeof(Splat), nullptr, GL_DYNAMIC_DRAW);
+        // Initial pre-allocation
+        glBufferData(GL_ARRAY_BUFFER, 100000 * sizeof(Splat), nullptr, GL_DYNAMIC_DRAW);
     }
 }
 
@@ -80,88 +94,91 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
     const float scaleX = (float)color.cols / depth.cols;
     const float scaleY = (float)color.rows / depth.rows;
 
-    std::lock_guard<std::mutex> lock(mMutex);
-    mDataDirty = true;
     glm::mat4 V = glm::make_mat4(viewMat);
     glm::mat4 invV = glm::inverse(V);
     bool needsPruning = false;
+    bool dataChanged = false;
 
-    // 1. Refinement & Decay Loop: Reproject EVERY existing splat
-    // This ensures every splat gets a fair chance to be reinforced or decayed, regardless of sampling step.
-    for (int i = 0; i < (int)mSplatData.size(); ++i) {
-        if (mSplatData[i].confidence >= 0.98f) continue;
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
 
-        glm::vec4 p_cam = V * glm::vec4(mSplatData[i].x, mSplatData[i].y, mSplatData[i].z, 1.0f);
-        if (p_cam.z >= -0.1f) continue;
+        // 1. Refinement & Decay Loop: Reproject EVERY existing splat
+        for (int i = 0; i < (int)mSplatData.size(); ++i) {
+            if (mSplatData[i].confidence >= 0.98f) continue;
 
-        float u_cam = (p_cam.x * fx / -p_cam.z) + cx;
-        float v_cam = (p_cam.y * -fy / -p_cam.z) + cy;
+            glm::vec4 p_cam = V * glm::vec4(mSplatData[i].x, mSplatData[i].y, mSplatData[i].z, 1.0f);
+            if (p_cam.z >= -0.1f) continue;
 
-        if (u_cam >= 0 && u_cam < depth.cols && v_cam >= 0 && v_cam < depth.rows) {
-            float d = depth.at<float>((int)v_cam, (int)u_cam);
-            if (d > 0.1f) {
-                float current_d = -p_cam.z;
-                if (std::abs(current_d - d) < 0.5f) { // High tolerance: 50cm
-                    // HIT! Rapid gain for immediate immutability
-                    mSplatData[i].confidence = std::min(1.0f, mSplatData[i].confidence + 0.4f);
+            float u_cam = (p_cam.x * fx / -p_cam.z) + cx;
+            float v_cam = (p_cam.y * -fy / -p_cam.z) + cy;
 
-                    // Spatial refinement only for developing points
-                    if (mSplatData[i].confidence < 0.9f) {
-                        glm::vec4 p_target_cam = p_cam * (d / current_d);
-                        p_target_cam.w = 1.0f;
-                        glm::vec4 p_target_world = invV * p_target_cam;
+            if (u_cam >= 0 && u_cam < depth.cols && v_cam >= 0 && v_cam < depth.rows) {
+                float d = depth.at<float>((int)v_cam, (int)u_cam);
+                if (d > 0.1f) {
+                    float current_d = -p_cam.z;
+                    if (std::abs(current_d - d) < 0.5f) {
+                        mSplatData[i].confidence = std::min(1.0f, mSplatData[i].confidence + 0.4f);
 
-                        float alpha = 0.15f;
-                        mSplatData[i].x += (p_target_world.x - mSplatData[i].x) * alpha;
-                        mSplatData[i].y += (p_target_world.y - mSplatData[i].y) * alpha;
-                        mSplatData[i].z += (p_target_world.z - mSplatData[i].z) * alpha;
-                    }
-                    continue;
-                }
-            }
-            // MISS: Very slow decay to survive noise
-            mSplatData[i].confidence -= 0.01f;
-            if (mSplatData[i].confidence <= 0.0f) needsPruning = true;
-        }
-    }
+                        if (mSplatData[i].confidence < 0.9f) {
+                            glm::vec4 p_target_cam = p_cam * (d / current_d);
+                            p_target_cam.w = 1.0f;
+                            glm::vec4 p_target_world = invV * p_target_cam;
 
-    // 2. Discovery Loop: Sample depth map to add NEW voxels
-    int step = 8; // Optimized sampling for battery efficiency
-    for (int r = 0; r < depth.rows - step; r += step) {
-        for (int c = 0; c < depth.cols - step; c += step) {
-            float d = depth.at<float>(r, c);
-            if (d > 0.1f && d < 7.0f) {
-                float xc = (static_cast<float>(c) - cx) * d / fx;
-                float yc = -(static_cast<float>(r) - cy) * d / fy;
-                float zc = -d;
-                float xw, yw, zw;
-                camToWorld(viewMat, xc, yc, zc, xw, yw, zw);
-
-                VoxelKey key{
-                    static_cast<int>(std::floor(xw / voxelSize)),
-                    static_cast<int>(std::floor(yw / voxelSize)),
-                    static_cast<int>(std::floor(zw / voxelSize))
-                };
-
-                if (mVoxelGrid.find(key) == mVoxelGrid.end()) {
-                    if (mSplatData.size() < MAX_SPLATS) {
-                        int colorR = static_cast<int>(r * scaleY);
-                        int colorC = static_cast<int>(c * scaleX);
-                        cv::Vec3b col = color.at<cv::Vec3b>(colorR, colorC);
-                        float r_f = col[2]/255.0f, g_f = col[1]/255.0f, b_f = col[0]/255.0f;
-
-                        // Start with high confidence: Ready to lock on next hit
-                        mSplatData.push_back({xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.8f, 0.0f, 0.0f, 1.0f, 0.004f});
-                        mVoxelGrid[key] = (int)mSplatData.size() - 1;
+                            float alpha = 0.15f;
+                            mSplatData[i].x += (p_target_world.x - mSplatData[i].x) * alpha;
+                            mSplatData[i].y += (p_target_world.y - mSplatData[i].y) * alpha;
+                            mSplatData[i].z += (p_target_world.z - mSplatData[i].z) * alpha;
+                        }
+                        dataChanged = true;
+                        continue;
                     }
                 }
+                mSplatData[i].confidence -= 0.01f;
+                dataChanged = true;
+                if (mSplatData[i].confidence <= 0.0f) needsPruning = true;
             }
         }
-    }
 
-    if (needsPruning || mSplatData.size() >= MAX_SPLATS * 0.95) {
-        pruneInternal(0.01f, voxelSize);
-        mDataDirty = true;
+        // 2. Discovery Loop: Sample depth map to add NEW voxels
+        int step = 6; // Balance between resolution and performance
+        for (int r = 0; r < depth.rows - step; r += step) {
+            for (int c = 0; c < depth.cols - step; c += step) {
+                float d = depth.at<float>(r, c);
+                if (d > 0.1f && d < 7.0f) {
+                    float xc = (static_cast<float>(c) - cx) * d / fx;
+                    float yc = -(static_cast<float>(r) - cy) * d / fy;
+                    float zc = -d;
+                    float xw, yw, zw;
+                    camToWorld(viewMat, xc, yc, zc, xw, yw, zw);
+
+                    VoxelKey key{
+                        static_cast<int>(std::floor(xw / voxelSize)),
+                        static_cast<int>(std::floor(yw / voxelSize)),
+                        static_cast<int>(std::floor(zw / voxelSize))
+                    };
+
+                    if (mVoxelGrid.find(key) == mVoxelGrid.end()) {
+                        if (mSplatData.size() < MAX_SPLATS) {
+                            int colorR = static_cast<int>(r * scaleY);
+                            int colorC = static_cast<int>(c * scaleX);
+                            cv::Vec3b col = color.at<cv::Vec3b>(colorR, colorC);
+                            float r_f = col[2]/255.0f, g_f = col[1]/255.0f, b_f = col[0]/255.0f;
+
+                            mSplatData.push_back({xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.8f, 0.0f, 0.0f, 1.0f, 0.012f});
+                            mVoxelGrid[key] = (int)mSplatData.size() - 1;
+                            dataChanged = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (needsPruning || mSplatData.size() >= MAX_SPLATS * 0.95) {
+            pruneInternal(0.01f, voxelSize);
+            dataChanged = true;
+        }
+
+        if (dataChanged) mDataDirty = true;
     }
 }
 
@@ -172,7 +189,9 @@ void VoxelHash::draw(const glm::mat4& mvp, float focalY, int screenHeight) {
 
     glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
     if (mDataDirty) {
-        glBufferData(GL_ARRAY_BUFFER, count * sizeof(Splat), mSplatData.data(), GL_DYNAMIC_DRAW);
+        // Mali optimization: use glBufferSubData if size is same, or orphaning if different
+        size_t currentSize = count * sizeof(Splat);
+        glBufferData(GL_ARRAY_BUFFER, currentSize, mSplatData.data(), GL_DYNAMIC_DRAW);
         mDataDirty = false;
     }
 
@@ -202,6 +221,7 @@ void VoxelHash::clear() {
     std::lock_guard<std::mutex> lock(mMutex);
     mSplatData.clear();
     mVoxelGrid.clear();
+    mDataDirty = true;
 }
 
 void VoxelHash::pruneInternal(float threshold, float voxelSize) {
@@ -221,6 +241,7 @@ void VoxelHash::pruneInternal(float threshold, float voxelSize) {
 void VoxelHash::prune(float threshold) {
     std::lock_guard<std::mutex> lock(mMutex);
     pruneInternal(threshold, mLastVoxelSize);
+    mDataDirty = true;
 }
 
 int VoxelHash::getSplatCount() const {

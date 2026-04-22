@@ -57,6 +57,12 @@
     <!-- Instructions for creating a new AR anchor by photographing a mark on the wall. -->
     <string name="nav_create_info">Photograph a reference mark on the wall to create a new AR anchor. The app will track this mark to keep your projection aligned.</string>
 
+    <string name="nav_coop">Co-op</string>
+    <string name="nav_host_coop">Host</string>
+    <string name="nav_host_coop_info">Host a co-op session to share your AR coordinate system with nearby peers.</string>
+    <string name="nav_join_coop">Join</string>
+    <string name="nav_join_coop_info">Join a nearby co-op session to align your AR view with the host.</string>
+
     <!-- Label for the action to refine an existing AR anchor. -->
     <string name="nav_refine">Refine</string>
     <!-- Description of the anchor refinement process. -->

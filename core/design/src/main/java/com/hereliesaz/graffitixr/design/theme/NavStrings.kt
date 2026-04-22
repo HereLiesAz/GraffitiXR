@@ -112,7 +112,12 @@ fun rememberNavStrings(): NavStrings {
         blur = stringResource(R.string.nav_blur),
         liquify = stringResource(R.string.nav_liquify),
         dodge = stringResource(R.string.nav_dodge),
-        burn = stringResource(R.string.nav_burn)
+        burn = stringResource(R.string.nav_burn),
+        coop = stringResource(R.string.nav_coop),
+        hostCoop = stringResource(R.string.nav_host_coop),
+        hostCoopInfo = stringResource(R.string.nav_host_coop_info),
+        joinCoop = stringResource(R.string.nav_join_coop),
+        joinCoopInfo = stringResource(R.string.nav_join_coop_info)
     )
 }
 
@@ -222,5 +227,10 @@ data class NavStrings(
     val blur: String,
     val liquify: String,
     val dodge: String,
-    val burn: String
+    val burn: String,
+    val coop: String,
+    val hostCoop: String,
+    val hostCoopInfo: String,
+    val joinCoop: String,
+    val joinCoopInfo: String
 )
