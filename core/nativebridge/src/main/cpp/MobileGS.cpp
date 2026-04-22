@@ -279,4 +279,80 @@ namespace mobilegs {
 
 bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) { return mSuperPoint.load(onnxBytes); }
 void MobileGS::setArtworkFingerprint(const cv::Mat& c, const uint8_t* d, int w, int h, int s, const float* i, const float* v) {}
-MobileGS::FingerprintData MobileGS::generateFingerprint(const cv::Mat& i, const cv::Mat& m, const uint8_t* d, int w, int h, int s, const float* intr, const float* v) { return {}; }
+MobileGS::FingerprintData MobileGS::generateFingerprint(const cv::Mat& i, const cv::Mat& m, const uint8_t* d, int w, int h, int s, const float* intr, const float* v) {
+    FingerprintData fd;
+    if (i.empty() || !d || !intr || !v) return fd;
+
+    cv::Mat gray;
+    if (i.channels() == 4) cv::cvtColor(i, gray, cv::COLOR_RGBA2GRAY);
+    else if (i.channels() == 3) cv::cvtColor(i, gray, cv::COLOR_RGB2GRAY);
+    else gray = i.clone();
+
+    // Mask processing: ORB expects 8-bit single channel mask (255=keep, 0=discard)
+    cv::Mat mask;
+    if (!m.empty()) {
+        if (m.channels() == 4) cv::cvtColor(m, mask, cv::COLOR_RGBA2GRAY);
+        else if (m.channels() == 3) cv::cvtColor(m, mask, cv::COLOR_RGB2GRAY);
+        else mask = m.clone();
+        // Ensure it's a proper binary mask
+        cv::threshold(mask, mask, 127, 255, cv::THRESH_BINARY);
+    }
+
+    std::vector<cv::KeyPoint> rawKps;
+    cv::Mat rawDescs;
+    mFeatureDetector->detectAndCompute(gray, mask, rawKps, rawDescs);
+
+    float fx = intr[0], fy = intr[1], cx = intr[2], cy = intr[3];
+
+    // Scaling factors between image coordinates and depth buffer coordinates
+    float scaleX = (float)w / (float)i.cols;
+    float scaleY = (float)h / (float)i.rows;
+
+    std::vector<int> keptIndices;
+    for (size_t idx = 0; idx < rawKps.size(); ++idx) {
+        const auto& kp = rawKps[idx];
+        
+        // Sample depth
+        int dx = (int)(kp.pt.x * scaleX);
+        int dy = (int)(kp.pt.y * scaleY);
+        
+        if (dx >= 0 && dx < w && dy >= 0 && dy < h) {
+            auto* rowPtr = reinterpret_cast<const uint16_t*>(d + (dy * s));
+            uint16_t raw = rowPtr[dx];
+            uint16_t depthMm = raw & 0x1FFFu;
+            uint8_t conf = (raw >> 13u) & 0x7u;
+
+            if (depthMm > 0 && conf > 0) {
+                float depthM = (float)depthMm / 1000.0f;
+                
+                // Camera Space
+                float xc = (kp.pt.x - cx) * depthM / fx;
+                float yc = (kp.pt.y - cy) * depthM / fy;
+                float zc = depthM;
+
+                // World Space
+                float xw, yw, zw;
+                camToWorld(v, xc, yc, zc, xw, yw, zw);
+
+                fd.keypoints.push_back(kp);
+                fd.points3d.push_back(xw);
+                fd.points3d.push_back(yw);
+                fd.points3d.push_back(zw);
+                keptIndices.push_back((int)idx);
+            }
+        }
+    }
+
+    // Filter descriptors to match kept keypoints
+    if (keptIndices.size() == rawKps.size()) {
+        fd.descriptors = rawDescs;
+    } else if (!keptIndices.empty()) {
+        fd.descriptors = cv::Mat(keptIndices.size(), rawDescs.cols, rawDescs.type());
+        for (size_t idx = 0; idx < keptIndices.size(); ++idx) {
+            rawDescs.row(keptIndices[idx]).copyTo(fd.descriptors.row(idx));
+        }
+    }
+
+    return fd;
+}
+

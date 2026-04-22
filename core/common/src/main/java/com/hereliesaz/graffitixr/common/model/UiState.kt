@@ -35,7 +35,9 @@ data class ArUiState(
     val magnifierPosition: Offset = Offset.Zero,
     val maskPath: androidx.compose.ui.graphics.Path? = null,
     val isCaptureRequested: Boolean = false,
+
     val undoCount: Int = 0,
+
     val gestureInProgress: Boolean = false,
 
     // Live diagnostic log lines for in-app debugging (newest entry replaces old)

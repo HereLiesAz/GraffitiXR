@@ -500,16 +500,39 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
 
     cv::drawKeypoints(annotated, kps, annotated, cv::Scalar(0, 255, 0, 255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 
-    // Add feature count label
-    std::string label = std::to_string(kps.size()) + " features";
-    int baseline = 0;
-    double scale = std::max(1.0, frame.cols / 640.0);
-    cv::Size textSize = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, scale, 2, &baseline);
-    cv::rectangle(annotated, cv::Point(8, 8), cv::Point(textSize.width + 16, textSize.height + baseline + 16), cv::Scalar(0, 0, 0, 180), cv::FILLED);
-    cv::putText(annotated, label, cv::Point(12, textSize.height + 12), cv::FONT_HERSHEY_SIMPLEX, scale, cv::Scalar(255, 220, 0, 255), 2);
-
     matToBitmap(env, annotated, bitmap);
 }
+
+JNIEXPORT jfloatArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetKeypoints(
+        JNIEnv* env, jobject thiz, jobject bitmap) {
+    cv::Mat frame;
+    bitmapToMat(env, bitmap, frame);
+    if (frame.empty()) return nullptr;
+
+    cv::Mat gray;
+    if (frame.channels() == 4) cv::cvtColor(frame, gray, cv::COLOR_RGBA2GRAY);
+    else if (frame.channels() == 3) cv::cvtColor(frame, gray, cv::COLOR_RGB2GRAY);
+    else gray = frame.clone();
+
+    std::vector<cv::KeyPoint> kps;
+    if (gSlamEngine) {
+        gSlamEngine->getMutex().lock();
+        cv::ORB::create(500)->detect(gray, kps);
+        gSlamEngine->getMutex().unlock();
+    }
+
+    jfloatArray result = env->NewFloatArray(kps.size() * 2);
+    jfloat* ptr = env->GetFloatArrayElements(result, nullptr);
+    for (size_t i = 0; i < kps.size(); ++i) {
+        ptr[i * 2] = kps[i].pt.x;
+        ptr[i * 2 + 1] = kps[i].pt.y;
+    }
+    env->ReleaseFloatArrayElements(result, ptr, 0);
+
+    return result;
+}
+
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetLastDepthTrace(JNIEnv* env, jobject) {

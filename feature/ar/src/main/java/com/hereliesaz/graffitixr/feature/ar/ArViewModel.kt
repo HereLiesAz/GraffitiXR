@@ -499,10 +499,10 @@ class ArViewModel @Inject constructor(
                     targetPhysicalExtent = extent,
                     isCaptureRequested = false,
                     tempCaptureBitmap = rotatedBmp,
-                    annotatedCaptureBitmap = null,
                     unwarpPoints = initialPoints
                 )
             }
+            detectTargetKeypoints(rotatedBmp)
             return
         }
 
@@ -513,7 +513,6 @@ class ArViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 tempCaptureBitmap = rotatedBmp,
-                annotatedCaptureBitmap = null,
                 targetRawBitmap = bitmap,
                 targetDisplayRotation = displayRotation,
                 targetDepthBuffer = depthBuffer,
@@ -528,65 +527,50 @@ class ArViewModel @Inject constructor(
                 isCaptureRequested = false
             )
         }
+        detectTargetKeypoints(rotatedBmp)
+    }
+
+    private fun detectTargetKeypoints(bitmap: Bitmap) {
         viewModelScope.launch {
-            val annotated = withContext(Dispatchers.Default) { slamManager.annotateKeypoints(rotatedBmp) }
-            _uiState.update { it.copy(annotatedCaptureBitmap = annotated) }
+            val kps = withContext(Dispatchers.Default) {
+                slamManager.getKeypoints(bitmap).map { Offset(it.first, it.second) }
+            }
+            val mask = withContext(Dispatchers.Default) {
+                generateInitialMask(bitmap.width, bitmap.height, kps)
+            }
+            _uiState.update { it.copy(tempCaptureBitmap = bitmap, annotatedCaptureBitmap = mask) }
         }
     }
 
-    fun beginErase() {
-        _uiState.update { it.copy(canUndoErase = false, canRedoErase = false) }
-        eraseUndoStack.clear()
-        eraseRedoStack.clear()
+
+    private fun generateInitialMask(w: Int, h: Int, kps: List<Offset>): Bitmap {
+        val mask = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(mask)
+        val paint = android.graphics.Paint().apply {
+            color = android.graphics.Color.CYAN // Use Cyan for a premium look
+            alpha = 180
+            style = android.graphics.Paint.Style.FILL
+        }
+        for (kp in kps) {
+            canvas.drawCircle(kp.x * w, kp.y * h, 8f, paint)
+        }
+        return mask
     }
 
-    fun eraseAtPoint(nx: Float, ny: Float) {
-        val current = _uiState.value.tempCaptureBitmap ?: return
+    fun applyEraseToMask(nx: Float, ny: Float, radius: Float) {
+        val currentMask = _uiState.value.annotatedCaptureBitmap ?: return
         viewModelScope.launch(Dispatchers.Default) {
-            eraseOpMutex.withLock {
-                val copy = current.copy(Bitmap.Config.ARGB_8888, true)
-                val updated = copy.eraseColorBlob(nx, ny)
-                if (updated != null) {
-                    eraseUndoStack.addLast(current)
-                    if (eraseUndoStack.size > MAX_ERASE_UNDO) eraseUndoStack.removeFirst()
-                    eraseRedoStack.clear()
-                    _uiState.update { it.copy(tempCaptureBitmap = updated, canUndoErase = true, canRedoErase = false) }
-                }
+            val copy = currentMask.copy(Bitmap.Config.ARGB_8888, true)
+            val canvas = android.graphics.Canvas(copy)
+            val paint = android.graphics.Paint().apply {
+                xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.CLEAR)
+                isAntiAlias = true
             }
+            canvas.drawCircle(nx * copy.width, ny * copy.height, radius * copy.width, paint)
+            _uiState.update { it.copy(annotatedCaptureBitmap = copy) }
         }
     }
 
-    fun undoErase() {
-        viewModelScope.launch {
-            eraseOpMutex.withLock {
-                if (eraseUndoStack.isNotEmpty()) {
-                    val prev = eraseUndoStack.removeLast()
-                    val current = _uiState.value.tempCaptureBitmap
-                    if (current != null) eraseRedoStack.addLast(current)
-                    _uiState.update { it.copy(tempCaptureBitmap = prev, canUndoErase = eraseUndoStack.isNotEmpty(), canRedoErase = true) }
-                }
-            }
-        }
-    }
-
-    fun redoErase() {
-        viewModelScope.launch {
-            eraseOpMutex.withLock {
-                if (eraseRedoStack.isNotEmpty()) {
-                    val next = eraseRedoStack.removeLast()
-                    val current = _uiState.value.tempCaptureBitmap
-                    if (current != null) eraseUndoStack.addLast(current)
-                    _uiState.update { it.copy(tempCaptureBitmap = next, canUndoErase = true, canRedoErase = eraseRedoStack.isNotEmpty()) }
-                }
-            }
-        }
-    }
-
-    fun clearEraseHistory() {
-        eraseUndoStack.clear()
-        eraseRedoStack.clear()
-        _uiState.update { it.copy(canUndoErase = false, canRedoErase = false) }
-    }
 
     fun onScreenTap(nx: Float, ny: Float) {
         pendingTapPosition = nx to ny
@@ -621,7 +605,6 @@ class ArViewModel @Inject constructor(
         val fx = intrinsics[0]
         val fy = intrinsics[1]
 
-        // Erring on side of caution: reduced multiplier to 0.18f for conservative initial dimensions
         val halfW = (depthM * (colorW / 2f) / fx) * 0.18f
         val halfH = (depthM * (colorH / 2f) / fy) * 0.18f
         
@@ -632,12 +615,12 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(tempCaptureBitmap = bitmap) }
     }
 
-    fun generateAnnotationsForReview(bitmap: Bitmap) {
-        viewModelScope.launch {
-            val annotated = withContext(Dispatchers.Default) { slamManager.annotateKeypoints(bitmap) }
-            _uiState.update { it.copy(annotatedCaptureBitmap = annotated) }
-        }
+    fun setAnnotatedCapture(bitmap: Bitmap?) {
+        _uiState.update { it.copy(annotatedCaptureBitmap = bitmap) }
     }
+
+
+
 
     fun onCaptureConsumed() {
         _uiState.update { it.copy(tempCaptureBitmap = null, annotatedCaptureBitmap = null) }

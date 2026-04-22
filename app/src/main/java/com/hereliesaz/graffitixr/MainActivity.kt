@@ -793,14 +793,27 @@ class MainActivity : ComponentActivity() {
                                                 }
                                                 // RESTORED WORKING UNWARP METHOD
                                                 val unwarped = ImageProcessor.unwarpImage(currentBitmap, pixelPoints)
+                                                val mask = arUiState.annotatedCaptureBitmap
+                                                val unwarpedMask = if (mask != null) ImageProcessor.unwarpImage(mask, pixelPoints) else null
                                                 
                                                 withContext(Dispatchers.Main) {
                                                     if (unwarped != null) {
                                                         arViewModel.setTempCapture(unwarped)
+                                                        arViewModel.setAnnotatedCapture(unwarpedMask)
                                                         // Save the target!
                                                         arViewModel.setInitialAnchorFromCapture()
-                                                        mainViewModel.onConfirmTargetCreation(unwarped, null, arUiState.targetDepthBuffer, arUiState.targetDepthBufferWidth, arUiState.targetDepthBufferHeight, arUiState.targetDepthStride, arUiState.targetIntrinsics, arUiState.targetCaptureViewMatrix)
+                                                        mainViewModel.onConfirmTargetCreation(
+                                                            unwarped, 
+                                                            unwarpedMask, 
+                                                            arUiState.targetDepthBuffer, 
+                                                            arUiState.targetDepthBufferWidth, 
+                                                            arUiState.targetDepthBufferHeight, 
+                                                            arUiState.targetDepthStride, 
+                                                            arUiState.targetIntrinsics, 
+                                                            arUiState.targetCaptureViewMatrix
+                                                        )
                                                     } else {
+
                                                         mainViewModel.setCaptureStep(CaptureStep.NONE)
                                                     }
                                                     isProcessing = false
@@ -810,15 +823,15 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onMaskConfirmed = { mask ->
                                         // Refinement finished, now move to RECTIFY (Unwarp)
-                                        arViewModel.setTempCapture(mask)
+                                        // The mask is now a bitmap of CYAN blobs where features are.
+                                        // We'll store it as the 'annotated' bitmap for native processing.
+                                        arViewModel.setAnnotatedCapture(mask)
                                         mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
                                     },
                                     onUpdateUnwarpPoints = { arViewModel.setUnwarpPoints(it) },
-                                    onBeginErase = { arViewModel.beginErase() },
-                                    onEraseAtPoint = { nx, ny -> arViewModel.eraseAtPoint(nx, ny) },
-                                    onUndoErase = { arViewModel.undoErase() },
-                                    onRedoErase = { arViewModel.redoErase() }
+                                    onEraseAtPoint = { nx, ny, r -> arViewModel.applyEraseToMask(nx, ny, r) }
                                 )
+
                             }
 
                             if (showSaveDialog) {

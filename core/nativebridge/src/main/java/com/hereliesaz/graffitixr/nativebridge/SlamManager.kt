@@ -178,12 +178,23 @@ class SlamManager @Inject constructor() {
         return mutable
     }
 
+    fun getKeypoints(bitmap: Bitmap): List<android.util.Pair<Float, Float>> {
+        val raw = nativeGetKeypoints(bitmap) ?: return emptyList()
+        val list = mutableListOf<android.util.Pair<Float, Float>>()
+        for (i in 0 until raw.size / 2) {
+            list.add(android.util.Pair(raw[i * 2], raw[i * 2 + 1]))
+        }
+        return list
+    }
+
     fun updateLightLevel(level: Float) {
         nativeUpdateLightLevel(level)
     }
 
     // Native methods
+    private external fun nativeGetKeypoints(bitmap: Bitmap): FloatArray?
     private external fun nativeInitialize()
+
     private external fun nativeInitGl()
     private external fun nativeResetGlContext()
     private external fun nativeSetViewportSize(width: Int, height: Int)

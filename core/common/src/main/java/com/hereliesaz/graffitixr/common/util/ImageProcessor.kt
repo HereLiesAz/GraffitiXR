@@ -31,31 +31,49 @@ object ImageProcessor {
             val src = Mat()
             Utils.bitmapToMat(bitmap, src)
 
-            val w = bitmap.width.toDouble()
-            val h = bitmap.height.toDouble()
+            // Geometric Sort: Ensure TL, TR, BR, BL order
+            val sortedByY = points.sortedBy { it.y }
+            val topRow = sortedByY.take(2).sortedBy { it.x }
+            val bottomRow = sortedByY.takeLast(2).sortedBy { it.x }
 
-            // Source points (already in pixel space from MainActivity)
+            val tl = topRow[0]
+            val tr = topRow[1]
+            val bl = bottomRow[0]
+            val br = bottomRow[1]
+
+            val sortedPoints = listOf(tl, tr, br, bl)
+
+            // Source points
             val srcPoints = MatOfPoint2f(
-                Point(points[0].x.toDouble(), points[0].y.toDouble()),
-                Point(points[1].x.toDouble(), points[1].y.toDouble()),
-                Point(points[2].x.toDouble(), points[2].y.toDouble()),
-                Point(points[3].x.toDouble(), points[3].y.toDouble())
+                Point(tl.x.toDouble(), tl.y.toDouble()),
+                Point(tr.x.toDouble(), tr.y.toDouble()),
+                Point(br.x.toDouble(), br.y.toDouble()),
+                Point(bl.x.toDouble(), bl.y.toDouble())
             )
 
-            // Destination points (Rectified to full original dimensions)
+            // Calculate ideal dimensions
+            val widthA = Math.sqrt(Math.pow((br.x - bl.x).toDouble(), 2.0) + Math.pow((br.y - bl.y).toDouble(), 2.0))
+            val widthB = Math.sqrt(Math.pow((tr.x - tl.x).toDouble(), 2.0) + Math.pow((tr.y - tl.y).toDouble(), 2.0))
+            val maxWidth = Math.max(widthA, widthB)
+
+            val heightA = Math.sqrt(Math.pow((tr.x - br.x).toDouble(), 2.0) + Math.pow((tr.y - br.y).toDouble(), 2.0))
+            val heightB = Math.sqrt(Math.pow((tl.x - bl.x).toDouble(), 2.0) + Math.pow((tl.y - bl.y).toDouble(), 2.0))
+            val maxHeight = Math.max(heightA, heightB)
+
+            // Destination points
             val dstPoints = MatOfPoint2f(
                 Point(0.0, 0.0),
-                Point(w, 0.0),
-                Point(w, h),
-                Point(0.0, h)
+                Point(maxWidth, 0.0),
+                Point(maxWidth, maxHeight),
+                Point(0.0, maxHeight)
             )
 
             val perspectiveTransform = Imgproc.getPerspectiveTransform(srcPoints, dstPoints)
             val dest = Mat()
 
-            Imgproc.warpPerspective(src, dest, perspectiveTransform, Size(w, h))
+            Imgproc.warpPerspective(src, dest, perspectiveTransform, Size(maxWidth, maxHeight))
 
-            val resultBitmap = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+            val resultBitmap = Bitmap.createBitmap(dest.cols(), dest.rows(), Bitmap.Config.ARGB_8888)
             Utils.matToBitmap(dest, resultBitmap)
 
             // Cleanup
@@ -71,6 +89,7 @@ object ImageProcessor {
             null
         }
     }
+
 
     fun removeBackground(bitmap: Bitmap): Bitmap? {
         return try {

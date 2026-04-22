@@ -67,47 +67,27 @@ fun TargetCreationUi(
     onUnwarpConfirm: (List<Offset>) -> Unit,
     onMaskConfirmed: (Bitmap) -> Unit,
     onUpdateUnwarpPoints: (List<Offset>) -> Unit,
-    onBeginErase: () -> Unit,
-    onEraseAtPoint: (Float, Float) -> Unit,
-    onUndoErase: () -> Unit,
-    onRedoErase: () -> Unit
+    onEraseAtPoint: (Float, Float, Float) -> Unit
 ) {
+
     Box(modifier = Modifier.fillMaxSize()) {
         when (captureStep) {
             CaptureStep.MASK, CaptureStep.REVIEW -> {
                 TargetRefinementScreen(
                     rawBitmap = uiState.tempCaptureBitmap,
-                    annotatedBitmap = uiState.annotatedCaptureBitmap,
-                    canUndo = uiState.canUndoErase,
-                    canRedo = uiState.canRedoErase,
+                    maskBitmap = uiState.annotatedCaptureBitmap,
                     strings = strings,
-                    onNext = { strokes ->
-                        val tempBmp = uiState.tempCaptureBitmap
-                        val mask = if (strokes.isEmpty()) null
-                        else rasterizeStrokes(
-                            strokes,
-                            tempBmp?.width ?: 512,
-                            tempBmp?.height ?: 512
-                        )
-
-                        val refined = if (mask != null && tempBmp != null) {
-                            applyMaskToBitmap(tempBmp, mask)
-                        } else {
-                            tempBmp
-                        }
-
-                        if (refined != null) {
-                            onMaskConfirmed(refined)
+                    onNext = { mask ->
+                        if (mask != null) {
+                            onMaskConfirmed(mask)
                         }
                     },
                     onRetake = onRetake,
                     onCancel = onCancel,
-                    onBeginErase = onBeginErase,
-                    onEraseAtPoint = onEraseAtPoint,
-                    onUndoErase = onUndoErase,
-                    onRedoErase = onRedoErase
+                    onEraseAtPoint = { nx, ny, r -> onEraseAtPoint(nx, ny, r) }
                 )
             }
+
             CaptureStep.RECTIFY -> {
                 uiState.tempCaptureBitmap?.let { bitmap ->
                     UnwarpScreen(
@@ -316,19 +296,13 @@ private fun UnwarpOverlay(
 @Composable
 private fun TargetRefinementScreen(
     rawBitmap: Bitmap?,
-    annotatedBitmap: Bitmap?,
-    canUndo: Boolean,
-    canRedo: Boolean,
+    maskBitmap: Bitmap?,
     strings: AppStrings,
-    onNext: (List<SelectionStroke>) -> Unit,
+    onNext: (Bitmap?) -> Unit,
     onRetake: () -> Unit,
     onCancel: () -> Unit,
-    onBeginErase: () -> Unit,
-    onEraseAtPoint: (Float, Float) -> Unit,
-    onUndoErase: () -> Unit,
-    onRedoErase: () -> Unit
+    onEraseAtPoint: (Float, Float, Float) -> Unit
 ) {
-    val strokes = remember { mutableStateListOf<SelectionStroke>() }
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
 
     Box(modifier = Modifier.fillMaxSize().onSizeChanged { boxSize = it }) {
@@ -343,11 +317,12 @@ private fun TargetRefinementScreen(
                 )
             }
 
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
-            annotatedBitmap?.let { bmp ->
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)))
+            
+            maskBitmap?.let { bmp ->
                 Image(
                     bitmap = bmp.asImageBitmap(),
-                    contentDescription = "Feature Review",
+                    contentDescription = "Feature Mask",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit
                 )
@@ -364,45 +339,29 @@ private fun TargetRefinementScreen(
                 val imgX = (boxW - imgW) / 2f
                 val imgY = (boxH - imgH) / 2f
 
-                Canvas(
+                Box(
                     modifier = Modifier.fillMaxSize()
                         .pointerInput(Unit) {
                             detectTapGestures { pos ->
                                 val nx = ((pos.x - imgX) / imgW).coerceIn(0f, 1f)
                                 val ny = ((pos.y - imgY) / imgH).coerceIn(0f, 1f)
-                                onBeginErase()
-                                onEraseAtPoint(nx, ny)
-                                recordStroke(pos, imgX, imgY, imgW, imgH, 80f / imgW, strokes)
+                                onEraseAtPoint(nx, ny, 0.05f) // 5% brush size
                             }
                         }
                         .pointerInput(Unit) {
-                            detectDragGestures(
-                                onDragStart = { pos -> recordStroke(pos, imgX, imgY, imgW, imgH, 80f / imgW, strokes) },
-                                onDrag = { change, _ -> recordStroke(change.position, imgX, imgY, imgW, imgH, 80f / imgW, strokes) }
-                            )
+                            detectDragGestures { change, _ ->
+                                val pos = change.position
+                                val nx = ((pos.x - imgX) / imgW).coerceIn(0f, 1f)
+                                val ny = ((pos.y - imgY) / imgH).coerceIn(0f, 1f)
+                                onEraseAtPoint(nx, ny, 0.05f)
+                            }
                         }
-                ) {
-                    drawStrokes(strokes, imgX, imgY, imgW, imgH)
-                }
+                )
             }
         }
 
         Column(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onUndoErase, enabled = canUndo) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Undo", tint = if (canUndo) Color.White else Color.Gray, modifier = Modifier.size(32.dp).graphicsLayer { rotationY = 180f })
-                }
-                IconButton(onClick = onRedoErase, enabled = canRedo) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Redo", tint = if (canRedo) Color.White else Color.Gray, modifier = Modifier.size(32.dp))
-                }
-                
-                Icon(
-                    imageVector = Icons.Default.Clear,
-                    contentDescription = "Reset Strokes",
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp).clickable { strokes.clear() }
-                )
-                
                 AzButton(text = "RETAKE", onClick = onRetake, color = HotPink, shape = AzButtonShape.RECTANGLE)
             }
             
@@ -413,11 +372,12 @@ private fun TargetRefinementScreen(
                 captureStep = CaptureStep.REVIEW,
                 strings = strings,
                 onCancel = onCancel,
-                onNext = { onNext(strokes) }
+                onNext = { onNext(maskBitmap) }
             )
         }
     }
 }
+
 
 private fun recordStroke(pos: Offset, imgX: Float, imgY: Float, imgW: Float, imgH: Float, brushNorm: Float, strokes: MutableList<SelectionStroke>) {
     val nx = ((pos.x - imgX) / imgW).coerceIn(0f, 1f)
