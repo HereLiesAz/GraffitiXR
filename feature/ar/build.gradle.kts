@@ -38,6 +38,7 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:domain"))
     implementation(project(":core:design"))
+    implementation(project(":core:data"))
 
     // Native Engine (MobileGS)
     implementation(project(":core:nativebridge"))
