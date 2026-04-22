@@ -26,7 +26,6 @@ import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
-import com.hereliesaz.graffitixr.data.ProjectManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -61,7 +60,7 @@ class ArViewModel @Inject constructor(
     private val stereoProvider: StereoDepthProvider,
     private val projectRepository: ProjectRepository,
     private val settingsRepository: SettingsRepository,
-    private val projectManager: ProjectManager,
+    private val projectManager: com.hereliesaz.graffitixr.data.ProjectManager,
     @param:ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
