@@ -96,6 +96,7 @@ fun MainScreen(
 
         if (hasCameraPermission && isCameraActive && uiState.editorMode != EditorMode.TRACE && uiState.editorMode != EditorMode.STENCIL) {
             when (uiState.editorMode) {
+                EditorMode.STENCIL -> {}
                 EditorMode.AR -> {
                     var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
 
@@ -126,6 +127,7 @@ fun MainScreen(
                     }
 
                     val visibleLayers = uiState.layers.filter { it.isVisible && it.bitmap != null }
+                    val showPlaneConfirm = mainUiState.isInPlaneRealignment
 
                     LaunchedEffect(visibleLayers, arUiState.isAnchorEstablished) {
                         if (!arUiState.isAnchorEstablished || visibleLayers.isEmpty()) {
