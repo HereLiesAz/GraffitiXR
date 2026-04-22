@@ -6,6 +6,9 @@ import kotlinx.coroutines.withContext
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.io.File
+import java.io.DataInputStream
+import java.io.DataOutputStream
 
 /**
  * Orchestrates AR synchronization between local peers.
@@ -21,14 +24,14 @@ class CollaborationManager(context: Context) {
     /**
      * Start accepting peer connections.
      */
-    suspend fun startServer() = withContext(Dispatchers.IO) {
-        serverSocket = ServerSocket(0) // Assign random available port
+    suspend fun startServer(projectFile: File) = withContext(Dispatchers.IO) {
+        serverSocket = ServerSocket(0)
         val port = serverSocket!!.localPort
         discovery.startBroadcasting(port)
 
         while (true) {
             val client = serverSocket?.accept() ?: break
-            handlePeerHandshake(client)
+            handlePeerHandshake(client, projectFile, isHost = true)
         }
     }
 
@@ -45,22 +48,42 @@ class CollaborationManager(context: Context) {
     /**
      * Connect to a discovered peer.
      */
-    suspend fun connectToPeer(host: InetAddress, port: Int) = withContext(Dispatchers.IO) {
+    suspend fun connectToPeer(host: InetAddress, port: Int, saveProjectTo: File) = withContext(Dispatchers.IO) {
         val socket = Socket(host, port)
-        handlePeerHandshake(socket)
+        handlePeerHandshake(socket, saveProjectTo, isHost = false)
     }
 
-    private fun handlePeerHandshake(socket: Socket) {
+    private fun handlePeerHandshake(socket: Socket, projectFile: File, isHost: Boolean) {
         socket.use { s ->
-            // 1. Get our visual fingerprint from MobileGS engine
-            val myData = nativeExportFingerprint()
-            
-            // 2. Exchange binary data
-            s.getOutputStream().write(myData)
-            val peerData = s.getInputStream().readBytes()
-            
-            // 3. Align local AR session to peer's coordinate system
-            nativeAlignToPeer(peerData)
+            val output = DataOutputStream(s.getOutputStream())
+            val input = DataInputStream(s.getInputStream())
+
+            if (isHost) {
+                // 1. Send Fingerprint
+                val myFingerprint = nativeExportFingerprint()
+                output.writeInt(myFingerprint.size)
+                output.write(myFingerprint)
+
+                // 2. Send Project File
+                val fileBytes = projectFile.readBytes()
+                output.writeInt(fileBytes.size)
+                output.write(fileBytes)
+                output.flush()
+            } else {
+                // 1. Receive Fingerprint
+                val fpSize = input.readInt()
+                val peerFingerprint = ByteArray(fpSize)
+                input.readFully(peerFingerprint)
+                
+                // 2. Receive Project File
+                val fileSize = input.readInt()
+                val fileBytes = ByteArray(fileSize)
+                input.readFully(fileBytes)
+                projectFile.writeBytes(fileBytes)
+
+                // 3. Align session
+                nativeAlignToPeer(peerFingerprint)
+            }
         }
     }
 

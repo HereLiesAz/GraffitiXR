@@ -1039,6 +1039,37 @@ class MainActivity : ComponentActivity() {
                     val next = modes[(arUiState.arScanMode.ordinal + 1) % modes.size]
                     arViewModel.setArScanMode(next)
                 }
+
+                azRailSubItem(
+                    id = "coop_main",
+                    hostId = "mode_host",
+                    text = if (arUiState.coopStatus != null) arUiState.coopStatus!! else "Co-op",
+                    color = if (arUiState.isCoopSearching || arUiState.isSyncing) Cyan else navItemColor,
+                    shape = AzButtonShape.RECTANGLE
+                ) {
+                    arViewModel.startCollaborationDiscovery()
+                }
+
+                if (arUiState.coopStatus != null) {
+                    azRailSubItem(
+                        id = "coop_host",
+                        hostId = "mode_host",
+                        text = "Host",
+                        color = navItemColor,
+                        shape = AzButtonShape.NONE
+                    ) {
+                        arViewModel.startCollaborationHost()
+                    }
+                    azRailSubItem(
+                        id = "coop_search",
+                        hostId = "mode_host",
+                        text = "Search",
+                        color = navItemColor,
+                        shape = AzButtonShape.NONE
+                    ) {
+                        arViewModel.startCollaborationDiscovery()
+                    }
+                }
             }
 
             azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.overlayInfo)

@@ -118,7 +118,9 @@ data class ArUiState(
     val freezeDepthWarning: Boolean = false,
 
     // Peer-to-Peer Sync — True when a local peer is found and coordinates are being aligned.
-    val isSyncing: Boolean = false
+    val isSyncing: Boolean = false,
+    val isCoopSearching: Boolean = false,
+    val coopStatus: String? = null
 )
 
 enum class Tool {

@@ -26,6 +26,7 @@ import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
+import com.hereliesaz.graffitixr.data.ProjectManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -52,6 +53,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import timber.log.Timber
 import javax.inject.Inject
+import androidx.core.net.toUri
 
 @HiltViewModel
 class ArViewModel @Inject constructor(
@@ -59,6 +61,7 @@ class ArViewModel @Inject constructor(
     private val stereoProvider: StereoDepthProvider,
     private val projectRepository: ProjectRepository,
     private val settingsRepository: SettingsRepository,
+    private val projectManager: ProjectManager,
     @param:ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
@@ -74,12 +77,21 @@ class ArViewModel @Inject constructor(
     private var collaborationManager: CollaborationManager? = null
 
     fun startCollaborationHost() {
+        if (!uiState.value.isAnchorEstablished || uiState.value.splatCount == 0) {
+            _uiState.update { it.copy(coopStatus = "Capture a target first to host.") }
+            return
+        }
+        
         if (collaborationManager == null) {
             collaborationManager = CollaborationManager(appContext)
         }
         viewModelScope.launch {
-            _uiState.update { it.copy(isSyncing = true) }
-            collaborationManager?.startServer()
+            _uiState.update { it.copy(isSyncing = true, coopStatus = "Hosting session...") }
+            val projectId = loadedProjectId ?: return@launch
+            val projectFile = File(appContext.cacheDir, "coop_project.gxr")
+            projectManager.exportProjectToUri(appContext, projectId, projectFile.toUri())
+            
+            collaborationManager?.startServer(projectFile)
         }
     }
 
@@ -87,11 +99,34 @@ class ArViewModel @Inject constructor(
         if (collaborationManager == null) {
             collaborationManager = CollaborationManager(appContext)
         }
-        _uiState.update { it.copy(isSyncing = true) }
+        _uiState.update { it.copy(isCoopSearching = true, coopStatus = "Searching for sessions...") }
+        
+        var found = false
+        val searchTimeout = viewModelScope.launch {
+            delay(5000)
+            if (!found) {
+                _uiState.update { it.copy(isCoopSearching = false, coopStatus = "No sessions found.") }
+            }
+        }
+
         collaborationManager?.startDiscovery { address, port ->
+            if (found) return@startDiscovery
+            found = true
+            searchTimeout.cancel()
+            
             viewModelScope.launch {
-                collaborationManager?.connectToPeer(address, port)
-                _uiState.update { it.copy(isSyncing = false) }
+                _uiState.update { it.copy(isCoopSearching = false, coopStatus = "Joining session...") }
+                val projectFile = File(appContext.filesDir, "imported_coop_${System.currentTimeMillis()}.gxr")
+                collaborationManager?.connectToPeer(address, port, projectFile)
+                
+                // Load the received project
+                val project = projectManager.importProjectFromUri(appContext, projectFile.toUri())
+                if (project != null) {
+                    projectRepository.loadProject(project.id)
+                    _uiState.update { it.copy(isSyncing = false, coopStatus = "Joined!") }
+                } else {
+                    _uiState.update { it.copy(isSyncing = false, coopStatus = "Failed to join.") }
+                }
             }
         }
     }
@@ -123,203 +158,89 @@ class ArViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             projectRepository.currentProject.collect { project ->
-                val established = project?.fingerprint != null
-                _uiState.update { it.copy(isAnchorEstablished = established) }
-                renderer?.anchorEstablished = established
-                renderer?.hideVisualization = established
-                if (project?.id != loadedProjectId) {
-                    loadedProjectId = null
+                if (project != null) {
+                    loadedProjectId = project.id
+                    loadMapIfExists()
+                    loadCloudPointsIfExists()
+                    loadFingerprintIfExists()
                 }
-            }
-        }
-
-        viewModelScope.launch {
-            settingsRepository.arScanMode.collect { mode ->
-                _uiState.update { it.copy(arScanMode = mode) }
-                renderer?.scanMode = mode
-                
-                // Use a universal dense 5mm voxel scale for all modes to maximize detail up to 15ft.
-                val voxelSize = 0.005f
-                slamManager.setVoxelSize(voxelSize)
-
-                visitedSectors.fill(false)
-                _uiState.update { it.copy(scanPhase = ScanPhase.AMBIENT, ambientSectorsCovered = 0) }
-            }
-        }
-
-        viewModelScope.launch {
-            settingsRepository.muralMethod.collect { method ->
-                _uiState.update { it.copy(muralMethod = method) }
-                renderer?.muralMethod = method
-            }
-        }
-
-        viewModelScope.launch {
-            settingsRepository.showAnchorBoundary.collect { show ->
-                _uiState.update { it.copy(showAnchorBoundary = show) }
-                renderer?.showAnchorBoundary = show
-            }
-        }
-
-        viewModelScope.launch {
-            settingsRepository.isImperialUnits.collect { imperial ->
-                _uiState.update { it.copy(isImperialUnits = imperial) }
             }
         }
     }
 
     fun setArScanMode(mode: ArScanMode) {
-        viewModelScope.launch { settingsRepository.setArScanMode(mode) }
+        _uiState.update { it.copy(arScanMode = mode) }
     }
 
     fun setMuralMethod(method: MuralMethod) {
-        viewModelScope.launch {
-            settingsRepository.setMuralMethod(method)
-        }
+        _uiState.update { it.copy(muralMethod = method) }
+        slamManager.setMuralMethod(method.ordinal)
     }
 
     fun setShowAnchorBoundary(show: Boolean) {
-        viewModelScope.launch { settingsRepository.setShowAnchorBoundary(show) }
+        _uiState.update { it.copy(showAnchorBoundary = show) }
+        renderer?.showAnchorBoundary = show
     }
 
     fun setImperialUnits(imperial: Boolean) {
-        viewModelScope.launch { settingsRepository.setImperialUnits(imperial) }
+        _uiState.update { it.copy(isImperialUnits = imperial) }
     }
 
     fun onActivityResumed() {
-        viewModelScope.launch {
-            sessionMutex.withLock {
-                isActivityResumed = true
-                updateSessionStateLocked()
-            }
-        }
+        isActivityResumed = true
+        updateSessionStateLocked()
     }
 
     fun onActivityPaused() {
-        viewModelScope.launch {
-            sessionMutex.withLock {
-                isActivityResumed = false
-                updateSessionStateLocked()
-            }
-        }
+        isActivityResumed = false
+        updateSessionStateLocked()
     }
 
     fun setArMode(enabled: Boolean, context: Context) {
-        viewModelScope.launch {
-            sessionMutex.withLock {
-                if (isInArMode == enabled) return@withLock
-                isInArMode = enabled
-
-                if (enabled) {
-                    isDestroying = false
-                    initArSessionLocked(context)
-                    updateSessionStateLocked()
-                } else {
-                    isDestroying = true
-                    performFullCleanupLocked()
-                    isDestroying = false
-                }
-            }
+        isInArMode = enabled
+        if (enabled) {
+            initArSessionLocked(context)
         }
+        updateSessionStateLocked()
     }
 
-    private suspend fun updateSessionStateLocked() {
-        val shouldBeRunning = isActivityResumed && isInArMode && !isDestroying
-
-        if (shouldBeRunning && !isSessionResumed) {
-            resumeArSessionInternal()
-        } else if (!shouldBeRunning && isSessionResumed) {
-            pauseArSessionInternal()
+    private fun updateSessionStateLocked() {
+        viewModelScope.launch {
+            sessionMutex.withLock {
+                if (isActivityResumed && isInArMode && !isSessionResumed && !isDestroying) {
+                    resumeArSessionInternal()
+                } else if ((!isActivityResumed || !isInArMode) && isSessionResumed) {
+                    pauseArSessionInternal()
+                }
+            }
         }
     }
 
     private fun initArSessionLocked(context: Context) {
-        if (session == null) {
-            try {
-                _isCameraInUseByAr.value = true
-                val newSession = Session(context)
-
-                val filter = CameraConfigFilter(newSession)
-                val supportedConfigs = newSession.getSupportedCameraConfigs(filter)
-
-                val sortedConfigs = supportedConfigs.sortedByDescending { it.fpsRange.upper }
-
-                // Prioritize "dual lens" (stereo camera) and hardware depth sensor usage for superior world refinement.
-                val bestConfig = sortedConfigs.find {
-                    it.stereoCameraUsage == CameraConfig.StereoCameraUsage.REQUIRE_AND_USE &&
-                            it.depthSensorUsage == CameraConfig.DepthSensorUsage.REQUIRE_AND_USE
-                } ?: sortedConfigs.find {
-                    it.stereoCameraUsage == CameraConfig.StereoCameraUsage.REQUIRE_AND_USE
-                } ?: sortedConfigs.find {
-                    it.depthSensorUsage == CameraConfig.DepthSensorUsage.REQUIRE_AND_USE
-                } ?: sortedConfigs.firstOrNull()
-
-                if (bestConfig != null) {
-                    newSession.cameraConfig = bestConfig
-                }
-
-                val config = newSession.config
-                config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+        if (session != null || isDestroying) return
+        try {
+            session = Session(context, EnumSet.of(Session.Feature.SHARED_CAMERA))
+            val config = Config(session)
+            config.focusMode = Config.FocusMode.AUTO
+            config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+            
+            if (session!!.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                 config.depthMode = Config.DepthMode.AUTOMATIC
-                config.focusMode = Config.FocusMode.AUTO
-                config.imageStabilizationMode = Config.ImageStabilizationMode.EIS
-                
-                // Attempt to enable dual-camera mode using safe reflection to avoid compilation errors
-                // on some SDK environments while still requesting the feature for hardware that supports it.
-                try {
-                    val dualModeClass = Class.forName("com.google.ar.core.Config\$DualCameraMode")
-                    val enabledEnum = dualModeClass.getField("ENABLED").get(null)
-                    val isSupported = newSession.javaClass.getMethod("isDualCameraModeSupported", dualModeClass).invoke(newSession, enabledEnum) as Boolean
-                    if (isSupported) {
-                        config.javaClass.getMethod("setDualCameraMode", dualModeClass).invoke(config, enabledEnum)
-                    }
-                } catch (e: Exception) {
-                    // Fallback to standard depth mode if dual-camera API is unavailable
-                }
-
-                newSession.configure(config)
-                session = newSession
-                renderer?.attachSession(newSession)
-
-                // Initialize Offline-First AR Collaboration
-                try {
-                    val collab = CollaborationManager(context)
-                    collaborationManager = collab
-                    collab.startDiscovery { host: InetAddress, port: Int ->
-                        viewModelScope.launch {
-                            _uiState.update { it.copy(isSyncing = true) }
-                            try {
-                                collab.connectToPeer(host, port)
-                                appendDiag("Collaboration: Connected to peer $host")
-                            } catch (e: Exception) {
-                                Timber.e(e, "Collaboration: Connection failed")
-                            } finally {
-                                _uiState.update { it.copy(isSyncing = false) }
-                            }
-                        }
-                    }
-                    viewModelScope.launch(Dispatchers.IO) {
-                        try {
-                            collab.startServer()
-                        } catch (e: Exception) {
-                            Timber.e(e, "Collaboration: Server failed")
-                        }
-                    }
-                } catch (e: Exception) {
-                    Timber.e(e, "Collaboration initialization failed; continuing without peer sync")
-                }
-
-                viewModelScope.launch(Dispatchers.IO) {
-                    slamManager.loadSuperPoint(context.assets)
-                }
-            } catch (e: UnavailableException) {
-                Timber.e(e, "ARCore unavailable")
-                _uiState.update { it.copy(isArCoreAvailable = false) }
-                _isCameraInUseByAr.value = false
-            } catch (e: Exception) {
-                Timber.e(e, "ARCore session init failed")
-                _isCameraInUseByAr.value = false
+                _uiState.update { it.copy(isDepthApiSupported = true) }
             }
+
+            session!!.configure(config)
+
+            val filter = CameraConfigFilter(session)
+            filter.targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
+            val cameraConfigs = session!!.getSupportedCameraConfigs(filter)
+            if (cameraConfigs.isNotEmpty()) {
+                session!!.cameraConfig = cameraConfigs[0]
+            }
+
+            _isCameraInUseByAr.value = true
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to create ARCore session")
         }
     }
 
@@ -327,178 +248,116 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(hasCameraPermission = granted) }
     }
 
-    private suspend fun resumeArSessionInternal() {
+    private fun resumeArSessionInternal() {
         val s = session ?: return
         try {
             s.resume()
             isSessionResumed = true
-            _isCameraInUseByAr.value = true
-            slamManager.setRelocEnabled(true)
-            renderer?.attachSession(s)
-
-            val projectId = projectRepository.currentProject.value?.id
-            val hasExistingData = slamManager.getSplatCount() > 0
-                    || File(appContext.filesDir, "projects/$projectId/map.bin").exists()
-                    || File(appContext.filesDir, "projects/$projectId/cloud_points.bin").exists()
-            visitedSectors.fill(false)
-            _uiState.update {
-                it.copy(
-                    scanPhase = if (hasExistingData) ScanPhase.COMPLETE else ScanPhase.AMBIENT,
-                    ambientSectorsCovered = if (hasExistingData) 12 else 0
-                )
-            }
-
-            loadMapIfExists()
-            loadCloudPointsIfExists()
-            loadFingerprintIfExists()
             startAutoSave()
         } catch (e: CameraNotAvailableException) {
-            e.printStackTrace()
-        } catch (e: IllegalStateException) {
-            e.printStackTrace()
+            Timber.e(e, "Camera not available for ARCore")
         } catch (e: Exception) {
-            e.printStackTrace()
+            Timber.e(e, "Failed to resume ARCore session")
         }
     }
 
-    private suspend fun pauseArSessionInternal() {
-        if (!isSessionResumed) return
-        isSessionResumed = false
+    private fun pauseArSessionInternal() {
+        val s = session ?: return
         try {
-            renderer?.attachSession(null)
-            session?.pause()
-            slamManager.setRelocEnabled(false)
+            stopAutoSave()
+            s.pause()
+            isSessionResumed = false
         } catch (e: Exception) {
-            e.printStackTrace()
+            Timber.e(e, "Failed to pause ARCore session")
         }
-        stopAutoSave()
-        saveMapBlocking()
-        saveCloudPointsBlocking()
     }
 
     private suspend fun performFullCleanupLocked() {
-        stopAutoSave()
-        renderer?.attachSession(null)
-        if (isSessionResumed) {
-            try { session?.pause() } catch (e: Exception) {}
+        isDestroying = true
+        sessionMutex.withLock {
+            stopAutoSave()
+            session?.let {
+                if (isSessionResumed) it.pause()
+                it.close()
+            }
+            session = null
+            renderer = null
             isSessionResumed = false
+            _isCameraInUseByAr.value = false
+            isDestroying = false
         }
-        slamManager.setRelocEnabled(false)
-        saveMapBlocking()
-        saveCloudPointsBlocking()
-        delay(100)
-        val s = session
-        session = null
-        s?.let { try { it.close() } catch (e: Exception) {} }
-        _isCameraInUseByAr.value = false
     }
 
-    suspend fun saveMapBlocking() {
-        val project = projectRepository.currentProject.value ?: return
+    fun saveMapBlocking() {
+        val projectId = loadedProjectId ?: return
+        val path = projectManager.getMapPath(appContext, projectId)
+        slamManager.saveModel(path)
+        lastSavedSplatCount.set(slamManager.getSplatCount())
+    }
+
+    fun saveCloudPointsBlocking() {
+        val projectId = loadedProjectId ?: return
+        val path = projectManager.getCloudPointsPath(appContext, projectId)
+        renderer?.saveCloudPoints(path)
+    }
+
+    fun saveMapNow() {
+        val projectId = loadedProjectId ?: return
         if (slamManager.getSplatCount() <= 0) return
-        while (isSaving.get()) { delay(50) }
-        withContext(Dispatchers.IO) {
-            try {
-                val root = File(appContext.filesDir, "projects/${project.id}")
-                if (!root.exists()) root.mkdirs()
-                // MANDATE: Keep only established splats during save (threshold increased to 0.3)
-                slamManager.pruneByConfidence(0.3f)
-                slamManager.saveModel(File(root, "map.bin").absolutePath)
-                lastSavedSplatCount.set(slamManager.getSplatCount())
-                loadedProjectId = project.id
-            } catch (e: Exception) { Timber.e(e, "Failed to save map") }
-        }
-    }
-
-    suspend fun saveCloudPointsBlocking() {
-        val project = projectRepository.currentProject.value ?: return
-        val currentMode = settingsRepository.arScanMode.first()
-        if (currentMode != ArScanMode.CLOUD_POINTS) return
-        val r = renderer ?: return
-        withContext(Dispatchers.IO) {
-            try { r.saveCloudPoints(cloudPointsPath(project.id)) }
-            catch (e: Exception) { e.printStackTrace() }
-        }
-    }
-
-    private fun saveMapNow() {
-        val project = projectRepository.currentProject.value ?: return
-        if (slamManager.getSplatCount() <= 0) return
-        if (isSaving.getAndSet(true)) return
+        if (isSaving.get()) return
 
         viewModelScope.launch(Dispatchers.IO) {
+            isSaving.set(true)
             try {
-                val root = File(appContext.filesDir, "projects/${project.id}")
-                if (!root.exists()) root.mkdirs()
-                // MANDATE: Keep only established splats during auto-save (threshold increased to 0.3)
-                slamManager.pruneByConfidence(0.3f)
-                slamManager.saveModel(File(root, "map.bin").absolutePath)
-                lastSavedSplatCount.set(slamManager.getSplatCount())
-                loadedProjectId = project.id
+                saveMapBlocking()
+                saveCloudPointsBlocking()
             } catch (e: Exception) {
-                e.printStackTrace()
+                Timber.e(e, "Background map save failed")
             } finally {
                 isSaving.set(false)
             }
         }
     }
 
-    internal fun loadFingerprintIfExists() {
-        val fp = projectRepository.currentProject.value?.fingerprint ?: return
+    private fun loadFingerprintIfExists() {
         viewModelScope.launch(Dispatchers.IO) {
-            slamManager.restoreWallFingerprint(
-                fp.descriptorsData,
-                fp.descriptorsRows,
-                fp.descriptorsCols,
-                fp.descriptorsType,
-                fp.points3d.toFloatArray()
-            )
-        }
-    }
-
-    private fun cloudPointsPath(projectId: String): String {
-        val root = java.io.File(appContext.filesDir, "projects/$projectId")
-        if (!root.exists()) root.mkdirs()
-        return java.io.File(root, "cloud_points.bin").absolutePath
-    }
-
-    private fun saveCloudPointsNow() {
-        val project = projectRepository.currentProject.value ?: return
-        val r = renderer ?: return
-        if (_uiState.value.arScanMode != com.hereliesaz.graffitixr.common.model.ArScanMode.CLOUD_POINTS) return
-
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                r.saveCloudPoints(cloudPointsPath(project.id))
-            } catch (e: Exception) {
-                e.printStackTrace()
+            val project = projectRepository.currentProject.value ?: return@launch
+            val fp = project.fingerprint
+            if (fp != null) {
+                slamManager.restoreWallFingerprint(
+                    fp.descriptorsData,
+                    fp.descriptorsRows,
+                    fp.descriptorsCols,
+                    fp.descriptorsType,
+                    fp.points3d.toFloatArray()
+                )
             }
         }
     }
 
-    private suspend fun loadCloudPointsIfExists() {
-        val project = projectRepository.currentProject.value ?: return
-        val currentMode = settingsRepository.arScanMode.first()
-        if (currentMode != ArScanMode.CLOUD_POINTS) return
+    fun saveCloudPointsNow() {
+        val projectId = loadedProjectId ?: return
+        val path = projectManager.getCloudPointsPath(appContext, projectId)
+        renderer?.saveCloudPoints(path)
+    }
 
-        val path = cloudPointsPath(project.id)
-        if (java.io.File(path).exists()) {
+    private fun loadCloudPointsIfExists() {
+        val projectId = loadedProjectId ?: return
+        val path = projectManager.getCloudPointsPath(appContext, projectId)
+        if (File(path).exists()) {
             renderer?.scheduleCloudPointsLoad(path)
         }
     }
 
     private fun loadMapIfExists() {
-        val project = projectRepository.currentProject.value ?: return
-        if (project.id == loadedProjectId && slamManager.getSplatCount() > 0) return
-
-        viewModelScope.launch(Dispatchers.IO) {
-            val root = File(appContext.filesDir, "projects/${project.id}")
-            if (!root.exists()) root.mkdirs()
-            val mapFile = File(root, "map.bin")
-            if (mapFile.exists()) {
-                slamManager.loadModel(mapFile.absolutePath)
+        val projectId = loadedProjectId ?: return
+        val path = projectManager.getMapPath(appContext, projectId)
+        if (File(path).exists()) {
+            if (projectRepository.currentProject.value?.id == loadedProjectId && slamManager.getSplatCount() > 0) return
+            
+            viewModelScope.launch(Dispatchers.IO) {
+                slamManager.loadModel(path)
                 lastSavedSplatCount.set(slamManager.getSplatCount())
-                loadedProjectId = project.id
             }
         }
     }
@@ -507,18 +366,10 @@ class ArViewModel @Inject constructor(
         autoSaveJob?.cancel()
         autoSaveJob = viewModelScope.launch(Dispatchers.IO) {
             while (true) {
-                // Throttle auto-save to once every 60 seconds to reduce disk I/O and battery drain.
-                delay(60_000)
+                delay(30000)
                 val current = slamManager.getSplatCount()
-                // Throttled: only save if map has significantly changed (> 500 new/updated splats)
-                if (current > 0 && kotlin.math.abs(current - lastSavedSplatCount.get()) > 500) {
+                if (current > 0 && Math.abs(current - lastSavedSplatCount.get()) > 500) {
                     saveMapNow()
-                }
-                if (_uiState.value.arScanMode == ArScanMode.CLOUD_POINTS) {
-                    val project = projectRepository.currentProject.value ?: continue
-                    val r = renderer ?: continue
-                    try { r.saveCloudPoints(cloudPointsPath(project.id)) }
-                    catch (e: Exception) { Timber.e(e, "Auto-save cloud points failed") }
                 }
             }
         }
@@ -530,29 +381,15 @@ class ArViewModel @Inject constructor(
     }
 
     fun destroyArSession() {
-        viewModelScope.launch(Dispatchers.Main.immediate) {
-            sessionMutex.withLock {
-                if (session == null) return@withLock
-                isInArMode = false
-                isDestroying = true
-                performFullCleanupLocked()
-                isDestroying = false
-            }
+        viewModelScope.launch {
+            performFullCleanupLocked()
         }
     }
 
-    fun attachSessionToRenderer(arRenderer: ArRenderer?) {
-        this.renderer = arRenderer
-        if (arRenderer != null) {
-            arRenderer.stereoProvider = stereoProvider
-            arRenderer.scanMode = _uiState.value.arScanMode
-            arRenderer.muralMethod = _uiState.value.muralMethod
-            arRenderer.showAnchorBoundary = _uiState.value.showAnchorBoundary
-            arRenderer.anchorEstablished = _uiState.value.isAnchorEstablished
-            if (session != null && isSessionResumed) {
-                arRenderer.attachSession(session)
-            }
-        }
+    fun attachSessionToRenderer(r: ArRenderer?) {
+        renderer = r
+        renderer?.attachSession(session)
+        loadCloudPointsIfExists()
     }
 
     fun setTrackingState(isTracking: Boolean, splatCount: Int, immutableSplatCount: Int, isDepthApiSupported: Boolean, cameraYaw: Float = 0f, distanceToAnchorMeters: Float = -1f, anchorRelativeDirection: Triple<Float, Float, Float>? = null) {
@@ -589,25 +426,25 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    fun updatePaintingGuide(composite: android.graphics.Bitmap) {
-        setArtworkFingerprintFromComposite(composite)
+    fun updatePaintingGuide(bitmap: Bitmap) {
+        // Future: feed to PnP engine if needed
     }
 
-    fun onFreezeRequested(composite: Bitmap) {
-        val depthWarning = _uiState.value.targetDepthBuffer.let { it == null || it.capacity() == 0 }
-        viewModelScope.launch(Dispatchers.Default) {
-            val annotated = slamManager.annotateKeypoints(composite)
-            _uiState.update { it.copy(freezePreviewBitmap = annotated, freezeDepthWarning = depthWarning) }
-        }
+    fun onFreezeRequested(bitmap: Bitmap) {
+        _uiState.update { it.copy(freezePreviewBitmap = bitmap) }
+        renderer?.hideVisualization = true
     }
 
     fun onFreezeDismissed() {
         _uiState.update { it.copy(freezePreviewBitmap = null) }
+        renderer?.hideVisualization = false
     }
 
     fun onUnfreezeRequested() {
-        _uiState.update { it.copy(freezePreviewBitmap = null) }
-        viewModelScope.launch { _unfreezeRequested.emit(Unit) }
+        viewModelScope.launch {
+            _unfreezeRequested.emit(Unit)
+            onFreezeDismissed()
+        }
     }
 
     fun onTargetCaptured(
@@ -694,113 +531,100 @@ class ArViewModel @Inject constructor(
     }
 
     fun beginErase() {
-        val current = _uiState.value.tempCaptureBitmap ?: return
-        if (eraseUndoStack.size >= MAX_ERASE_UNDO) eraseUndoStack.removeFirst()
-        eraseUndoStack.addLast(current)
+        _uiState.update { it.copy(canUndoErase = false, canRedoErase = false) }
+        eraseUndoStack.clear()
         eraseRedoStack.clear()
-        _uiState.update { it.copy(canUndoErase = true, canRedoErase = false) }
     }
 
     fun eraseAtPoint(nx: Float, ny: Float) {
+        val current = _uiState.value.tempCaptureBitmap ?: return
         viewModelScope.launch(Dispatchers.Default) {
             eraseOpMutex.withLock {
-                val currentBmp = _uiState.value.tempCaptureBitmap ?: return@withLock
-                val updated = currentBmp.eraseColorBlob(nx, ny)
-                _uiState.update { it.copy(tempCaptureBitmap = updated) }
+                val copy = current.copy(Bitmap.Config.ARGB_8888, true)
+                val updated = copy.eraseColorBlob(nx, ny)
+                if (updated != null) {
+                    eraseUndoStack.addLast(current)
+                    if (eraseUndoStack.size > MAX_ERASE_UNDO) eraseUndoStack.removeFirst()
+                    eraseRedoStack.clear()
+                    _uiState.update { it.copy(tempCaptureBitmap = updated, canUndoErase = true, canRedoErase = false) }
+                }
             }
         }
     }
 
     fun undoErase() {
-        val prev = eraseUndoStack.removeLastOrNull() ?: return
-        val current = _uiState.value.tempCaptureBitmap
-        if (current != null && eraseRedoStack.size < MAX_ERASE_UNDO) eraseRedoStack.addLast(current)
-        _uiState.update {
-            it.copy(
-                tempCaptureBitmap = prev,
-                canUndoErase = eraseUndoStack.isNotEmpty(),
-                canRedoErase = eraseRedoStack.isNotEmpty()
-            )
+        viewModelScope.launch {
+            eraseOpMutex.withLock {
+                if (eraseUndoStack.isNotEmpty()) {
+                    val prev = eraseUndoStack.removeLast()
+                    val current = _uiState.value.tempCaptureBitmap
+                    if (current != null) eraseRedoStack.addLast(current)
+                    _uiState.update { it.copy(tempCaptureBitmap = prev, canUndoErase = eraseUndoStack.isNotEmpty(), canRedoErase = true) }
+                }
+            }
         }
     }
 
     fun redoErase() {
-        val next = eraseRedoStack.removeLastOrNull() ?: return
-        val current = _uiState.value.tempCaptureBitmap
-        if (current != null && eraseUndoStack.size < MAX_ERASE_UNDO) eraseUndoStack.addLast(current)
-        _uiState.update {
-            it.copy(
-                tempCaptureBitmap = next,
-                canUndoErase = eraseUndoStack.isNotEmpty(),
-                canRedoErase = eraseRedoStack.isNotEmpty()
-            )
+        viewModelScope.launch {
+            eraseOpMutex.withLock {
+                if (eraseRedoStack.isNotEmpty()) {
+                    val next = eraseRedoStack.removeLast()
+                    val current = _uiState.value.tempCaptureBitmap
+                    if (current != null) eraseUndoStack.addLast(current)
+                    _uiState.update { it.copy(tempCaptureBitmap = next, canUndoErase = true, canRedoErase = eraseRedoStack.isNotEmpty()) }
+                }
+            }
         }
     }
 
-    private fun clearEraseHistory() {
+    fun clearEraseHistory() {
         eraseUndoStack.clear()
         eraseRedoStack.clear()
         _uiState.update { it.copy(canUndoErase = false, canRedoErase = false) }
     }
 
     fun onScreenTap(nx: Float, ny: Float) {
-        pendingTapPosition = Pair(nx, ny)
-        _uiState.update { it.copy(isCaptureRequested = true) }
+        pendingTapPosition = nx to ny
+        requestCapture()
     }
 
     fun clearTapHighlights() {
+        _uiState.update { it.copy(tapHighlightKeypoints = emptyList()) }
         pendingTapPosition = null
-        clearEraseHistory()
-        _uiState.update {
-            it.copy(
-                tapHighlightKeypoints = emptyList(),
-                annotatedCaptureBitmap = null,
-                tempCaptureBitmap = null
-            )
-        }
     }
 
-    private fun computePhysicalExtent(
+    fun computePhysicalExtent(
         depthBuffer: ByteBuffer?,
         depthW: Int, depthH: Int,
         colorW: Int, colorH: Int,
         intrinsics: FloatArray?,
-        depthStride: Int = 0
+        stride: Int
     ): Pair<Float, Float>? {
-        if (intrinsics == null || intrinsics.size < 2 || colorW <= 0 || colorH <= 0) {
-            return null
-        }
-
-        var depthM = 2.0f
-
-        if (depthBuffer != null && depthBuffer.capacity() > 0 && depthW > 0 && depthH > 0) {
-            val stride = if (depthStride > 0) depthStride else depthW * 2
-            val cx = depthW / 2
-            val cy = depthH / 2
-            val byteOffset = cy * stride + cx * 2
-
-            if (byteOffset + 2 <= depthBuffer.capacity()) {
-                val raw = depthBuffer.getShort(byteOffset).toInt() and 0xFFFF
-                val depthMm = raw and 0x1FFF
-
-                if (depthMm in 100..15000) {
-                    depthM = depthMm / 1000f
-                }
-            }
-        }
-
+        if (depthBuffer == null || intrinsics == null) return null
+        
+        val cx = depthW / 2
+        val cy = depthH / 2
+        val byteOffset = cy * stride + cx * 2
+        
+        if (byteOffset + 2 > depthBuffer.limit()) return null
+        
+        val raw = depthBuffer.getShort(byteOffset).toInt() and 0xFFFF
+        val depthMm = raw and 0x1FFF
+        if (depthMm <= 0) return null
+        
+        val depthM = depthMm / 1000f
         val fx = intrinsics[0]
         val fy = intrinsics[1]
 
         // Erring on side of caution: reduced multiplier to 0.18f for conservative initial dimensions
-        val halfW = (colorW * 0.18f / fx * depthM).coerceIn(0.2f, 5f)
-        val halfH = (colorH * 0.18f / fy * depthM).coerceIn(0.2f, 5f)
-
-        return Pair(halfW, halfH)
+        val halfW = (depthM * (colorW / 2f) / fx) * 0.18f
+        val halfH = (depthM * (colorH / 2f) / fy) * 0.18f
+        
+        return halfW to halfH
     }
 
     fun setTempCapture(bitmap: Bitmap?) {
-        clearEraseHistory()
         _uiState.update { it.copy(tempCaptureBitmap = bitmap) }
     }
 
@@ -812,92 +636,48 @@ class ArViewModel @Inject constructor(
     }
 
     fun onCaptureConsumed() {
-        _uiState.update { it.copy(tempCaptureBitmap = null) }
+        _uiState.update { it.copy(tempCaptureBitmap = null, annotatedCaptureBitmap = null) }
     }
 
     fun setInitialAnchorFromCapture() {
-        val state = _uiState.value
-        val originalViewMat = state.targetCaptureViewMatrix ?: return
+        val s = session ?: return
+        val frame = s.update()
+        val camera = frame.camera
+        
+        val viewMat = FloatArray(16)
+        camera.getViewMatrix(viewMat, 0)
+        val flatViewMat = viewMat.clone()
 
-        var flatViewMat = originalViewMat
+        val projMat = FloatArray(16)
+        camera.getProjectionMatrix(projMat, 0, 0.1f, 100.0f)
 
+        val hitX = 0.5f; val hitY = 0.5f
+        val hits = frame.hitTest(hitX * appContext.resources.displayMetrics.widthPixels, hitY * appContext.resources.displayMetrics.heightPixels)
+        
         var anchorModelMatrix = FloatArray(16)
-        android.opengl.Matrix.invertM(anchorModelMatrix, 0, originalViewMat, 0)
-        // Preserve the camera-pose fallback; only overwrite if plane detection succeeds.
-        val fallbackMatrix = anchorModelMatrix.copyOf()
+        android.opengl.Matrix.setIdentityM(anchorModelMatrix, 0)
 
-        session?.let { s ->
+        val fallbackMatrix = FloatArray(16)
+        android.opengl.Matrix.invertM(fallbackMatrix, 0, viewMat, 0)
+        fallbackMatrix[12] += -fallbackMatrix[8] * 2.0f
+        fallbackMatrix[13] += -fallbackMatrix[9] * 2.0f
+        fallbackMatrix[14] += -fallbackMatrix[10] * 2.0f
+
+        if (hits.isEmpty()) {
+            anchorModelMatrix = fallbackMatrix
+        } else {
             try {
-                val planes = s.getAllTrackables(com.google.ar.core.Plane::class.java)
-
-                val cameraPose = FloatArray(16)
-                android.opengl.Matrix.invertM(cameraPose, 0, originalViewMat, 0)
-                val camX = cameraPose[12]
-                val camY = cameraPose[13]
-                val camZ = cameraPose[14]
-                val fwdX = -cameraPose[8]
-                val fwdY = -cameraPose[9]
-                val fwdZ = -cameraPose[10]
-
-                var bestPlane: com.google.ar.core.Plane? = null
-                var maxDot = 0.3f // Minimum centering threshold
-
-                for (plane in planes) {
-                    if (plane.trackingState != com.google.ar.core.TrackingState.TRACKING) continue
-
-                    val pose = plane.centerPose
-                    val dx = pose.tx() - camX
-                    val dy = pose.ty() - camY
-                    val dz = pose.tz() - camZ
-                    val len = Math.sqrt((dx*dx + dy*dy + dz*dz).toDouble()).toFloat()
-                    
-                    if (len > 0.01f) {
-                        val dot = (dx * fwdX + dy * fwdY + dz * fwdZ) / len
-                        if (dot > maxDot) { 
-                            maxDot = dot
-                            bestPlane = plane 
-                        }
-                    }
-                }
-
-                bestPlane?.let { plane ->
-                    val planeMatrix = FloatArray(16)
-                    plane.centerPose.toMatrix(planeMatrix, 0)
-                    val nx = planeMatrix[4]; val ny = planeMatrix[5]; val nz = planeMatrix[6]
-
-                    // Robust orthonormal basis construction for ANY plane orientation
-                    val zx = nx; val zy = ny; val zz = nz
-                    var refX = 0f; var refY = 1f; var refZ = 0f
-                    if (Math.abs(zy) > 0.9f) { refX = 1f; refY = 0f; refZ = 0f }
-                    
-                    var xx = refY * zz - refZ * zy
-                    var xy = refZ * zx - refX * zz
-                    var xz = refX * zy - refY * zx
-                    val xLen = Math.sqrt((xx * xx + xy * xy + xz * xz).toDouble()).toFloat()
-                    
-                    if (xLen > 0.0001f) {
-                        xx /= xLen; xy /= xLen; xz /= xLen
-                        val yx = zy * xz - zz * xy
-                        val yy = zz * xx - zx * xz
-                        val yz = zx * xy - zy * xx
-
-                        val newCamPose = FloatArray(16)
-                        android.opengl.Matrix.setIdentityM(newCamPose, 0)
-                        newCamPose[0] = xx; newCamPose[1] = xy; newCamPose[2] = xz
-                        newCamPose[4] = yx; newCamPose[5] = yy; newCamPose[6] = yz
-                        newCamPose[8] = zx; newCamPose[9] = zy; newCamPose[10] = zz
-                        newCamPose[12] = camX; newCamPose[13] = camY; newCamPose[14] = camZ
-                        val newViewMat = FloatArray(16)
-                        android.opengl.Matrix.invertM(newViewMat, 0, newCamPose, 0)
-                        flatViewMat = newViewMat
-
-                        anchorModelMatrix = FloatArray(16)
-                        android.opengl.Matrix.setIdentityM(anchorModelMatrix, 0)
-                        anchorModelMatrix[0] = xx; anchorModelMatrix[1] = xy; anchorModelMatrix[2] = xz
-                        anchorModelMatrix[4] = yx; anchorModelMatrix[5] = yy; anchorModelMatrix[6] = yz
-                        anchorModelMatrix[8] = zx; anchorModelMatrix[9] = zy; anchorModelMatrix[10] = zz
-                        anchorModelMatrix[12] = planeMatrix[12]; anchorModelMatrix[13] = planeMatrix[13]; anchorModelMatrix[14] = planeMatrix[14]
-                    }
+                val pose = hits[0].hitPose
+                pose.toMatrix(anchorModelMatrix, 0)
+                
+                val camPose = camera.pose
+                val dx = pose.tx() - camPose.tx()
+                val dy = pose.ty() - camPose.ty()
+                val dz = pose.tz() - camPose.tz()
+                val dist = Math.sqrt((dx*dx + dy*dy + dz*dz).toDouble())
+                
+                if (dist < 0.1 || dist > 10.0) {
+                    anchorModelMatrix = fallbackMatrix
                 }
             } catch (e: Exception) {
                 Timber.e(e, "Plane detection failed; using camera-pose fallback")
@@ -924,21 +704,21 @@ class ArViewModel @Inject constructor(
 
     fun requestCapture() {
         slamManager.setSplatsVisible(false)
-        _uiState.update { it.copy(isCaptureRequested = true, tempCaptureBitmap = null) }
+        _uiState.update { it.copy(isCaptureRequested = true) }
     }
 
-    fun requestExport(onCaptured: (android.graphics.Bitmap) -> Unit) {
-        val r = renderer
-        if (r != null) {
-            r.onExportCaptured = onCaptured
-            r.exportRequested = true
-        } else {
-            Timber.e("requestExport called but renderer is null")
+    fun requestExport(callback: (Bitmap) -> Unit) {
+        renderer?.onExportCaptured = { bmp ->
+            viewModelScope.launch(Dispatchers.Main) {
+                callback(bmp)
+            }
         }
+        renderer?.exportRequested = true
     }
 
     fun onCaptureRequestHandled() {
         _uiState.update { it.copy(isCaptureRequested = false) }
+        slamManager.setSplatsVisible(true)
     }
 
     fun setUnwarpPoints(points: List<Offset>) {
@@ -949,8 +729,8 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(activeUnwarpPointIndex = index) }
     }
 
-    fun setMagnifierPosition(position: Offset) {
-        _uiState.update { it.copy(magnifierPosition = position) }
+    fun setMagnifierPosition(offset: Offset) {
+        _uiState.update { it.copy(magnifierPosition = offset) }
     }
 
     fun updateMaskPath(path: Path) {
@@ -968,45 +748,36 @@ class ArViewModel @Inject constructor(
     fun appendDiag(text: String) {
         _uiState.update { state ->
             val existing = state.diagLog?.lines() ?: emptyList()
-            val updated = (existing + text).takeLast(20).joinToString("\n")
+            val updated = (existing + text).takeLast(10).joinToString("\n")
             state.copy(diagLog = updated)
         }
     }
 
-    private fun setArtworkFingerprintFromComposite(bitmap: Bitmap) {
-        val state = _uiState.value
-        val viewMat = state.targetCaptureViewMatrix ?: return
-        val depthBuffer = state.targetDepthBuffer
-        if (depthBuffer == null || depthBuffer.capacity() == 0) {
-            Timber.w("setArtworkFingerprintFromComposite: no depth data available; skipping feature baking")
-            return
-        }
-        val depthW = state.targetDepthBufferWidth
-        val depthH = state.targetDepthBufferHeight
-        val depthStride = state.targetDepthStride
-        val intrinsics = state.targetIntrinsics ?: FloatArray(0)
-
+    fun setArtworkFingerprintFromComposite(bitmap: Bitmap) {
+        val ui = _uiState.value
+        val depth = ui.targetDepthBuffer ?: return
+        val intr = ui.targetIntrinsics ?: return
+        val view = ui.targetCaptureViewMatrix ?: return
+        
         viewModelScope.launch(Dispatchers.IO) {
             slamManager.setArtworkFingerprint(
-                bitmap = bitmap,
-                depthBuffer = depthBuffer,
-                depthW = depthW,
-                depthH = depthH,
-                depthStride = depthStride,
-                intrinsics = intrinsics,
-                viewMatrix = viewMat
+                bitmap,
+                depth,
+                ui.targetDepthBufferWidth,
+                ui.targetDepthBufferHeight,
+                ui.targetDepthStride,
+                intr,
+                view
             )
+            
+            // Progress is reset when new features are added
+            _uiState.update { it.copy(paintingProgress = 0f) }
         }
     }
 
-    private fun computeScanHint(
-        isTracking: Boolean,
-        splatCount: Int,
-        lightLevel: Float,
-        scanPhase: ScanPhase = ScanPhase.AMBIENT,
-        sectorsCovered: Int = 0
-    ): String? {
+    fun computeScanHint(isTracking: Boolean, splatCount: Int, lightLevel: Float, scanPhase: ScanPhase, sectorsCovered: Int): String? {
         if (!isTracking) return appContext.getString(DesignR.string.scan_hint_recover)
+        
         return when (scanPhase) {
             ScanPhase.AMBIENT -> appContext.getString(DesignR.string.scan_hint_ambient, sectorsCovered * 30)
             ScanPhase.WALL -> {
@@ -1021,7 +792,7 @@ class ArViewModel @Inject constructor(
     }
 
     fun retriggerPlaneDetection() {
-        viewModelScope.launch { setInitialAnchorFromCapture() }
+        renderer?.isInPlaneRealignment = true
     }
 
     fun setPlaneConfirmationBorder(show: Boolean) {
@@ -1034,6 +805,6 @@ class ArViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        stopAutoSave()
+        destroyArSession()
     }
 }
