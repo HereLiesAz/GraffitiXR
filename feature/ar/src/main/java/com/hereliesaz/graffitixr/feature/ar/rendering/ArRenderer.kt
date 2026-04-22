@@ -172,15 +172,13 @@ class ArRenderer(
 
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
-        frameCount++ // Increment every frame for consistent timing
+        frameCount++
 
         sessionLock.withLock {
             val activeSession = session ?: return
 
             activeSession.setCameraTextureName(backgroundRenderer.textureId)
             displayRotationHelper.updateSessionIfNeeded(activeSession)
-            
-            // ... (rest of session update)
 
             val frame: Frame = try {
                 activeSession.update()

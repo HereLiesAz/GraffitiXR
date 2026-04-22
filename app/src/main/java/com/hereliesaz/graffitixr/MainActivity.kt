@@ -753,6 +753,16 @@ class MainActivity : ComponentActivity() {
                                 screenSize = fullSize
                             )
 
+                            if (arUiState.showCoopNotFoundDialog) {
+                                CoopNotFoundDialog(
+                                    onDismiss = { arViewModel.dismissCoopNotFoundDialog() },
+                                    onHost = { arViewModel.startCollaborationHost() },
+                                    onSearch = { arViewModel.startCollaborationDiscovery() },
+                                    canHost = arUiState.isAnchorEstablished && arUiState.splatCount > 0,
+                                    strings = strings
+                                )
+                            }
+
                             if (mainUiState.isCapturingTarget) {
                                 TargetCreationUi(
                                     uiState = arUiState,
@@ -1049,27 +1059,6 @@ class MainActivity : ComponentActivity() {
                 ) {
                     arViewModel.startCollaborationDiscovery()
                 }
-
-                if (arUiState.coopStatus != null) {
-                    azRailSubItem(
-                        id = "coop_host",
-                        hostId = "mode_host",
-                        text = "Host",
-                        color = navItemColor,
-                        shape = AzButtonShape.NONE
-                    ) {
-                        arViewModel.startCollaborationHost()
-                    }
-                    azRailSubItem(
-                        id = "coop_search",
-                        hostId = "mode_host",
-                        text = "Search",
-                        color = navItemColor,
-                        shape = AzButtonShape.NONE
-                    ) {
-                        arViewModel.startCollaborationDiscovery()
-                    }
-                }
             }
 
             azRailSubItem(id = "overlay", hostId = "mode_host", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.overlayInfo)
@@ -1088,8 +1077,9 @@ class MainActivity : ComponentActivity() {
                 azDivider()
             }
 
+            val isGuest = arUiState.coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST
             val canEdit = if (isArMode)
-                arUiState.scanPhase == ScanPhase.COMPLETE || arUiState.isAnchorEstablished
+                (arUiState.scanPhase == ScanPhase.COMPLETE || arUiState.isAnchorEstablished) && !isGuest
             else true
 
             if (canEdit) {
@@ -1904,26 +1894,100 @@ private fun ScanCoachingOverlay(
 }
 
 @Composable
+private fun CoopNotFoundDialog(
+    onDismiss: () -> Unit,
+    onHost: () -> Unit,
+    onSearch: () -> Unit,
+    canHost: Boolean,
+    strings: AppStrings
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.5f))
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null
+            ) { onDismiss() },
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .widthIn(max = 340.dp)
+                .background(Color(0xEE1A1A1A), RoundedCornerShape(16.dp))
+                .border(2.dp, Color.Cyan, RoundedCornerShape(16.dp))
+                .padding(24.dp)
+                .clickable(enabled = false) { }
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "NO SESSIONS FOUND",
+                    color = Color.Cyan,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "Nearby GraffitiXR sessions could not be located. You can try searching again or host your own session.",
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+                Spacer(Modifier.height(24.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    AzButton(
+                        text = "HOST",
+                        onClick = { if (canHost) onHost() },
+                        color = if (canHost) HotPink else Color.Gray,
+                        shape = AzButtonShape.RECTANGLE,
+                        modifier = Modifier.weight(1f)
+                    )
+                    AzButton(
+                        text = "SEARCH",
+                        onClick = onSearch,
+                        color = HotPink,
+                        shape = AzButtonShape.RECTANGLE,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                if (!canHost) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "Establish a target first to host.",
+                        color = Color.Gray,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun PostTargetInstructionOverlay(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .background(Color(0xCC000000), RoundedCornerShape(20.dp))
+            .background(Color(0xEE1A1A1A), RoundedCornerShape(20.dp))
             .border(2.dp, Color.Cyan, RoundedCornerShape(20.dp))
-            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .padding(horizontal = 24.dp, vertical = 20.dp)
+            .widthIn(max = 340.dp)
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "TARGET LOCKED",
+                text = "TARGET ESTABLISHED",
                 color = Color.Cyan,
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
+                fontSize = 18.sp,
+                textAlign = TextAlign.Center
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
             Text(
-                text = "Click 'Design' in the rail and select Image, Sketch, or Text to create your first layer.",
+                text = "Now, open 'Design' in the sidebar and choose Image, Sketch, or Text to create your artwork layer.",
                 color = Color.White,
                 textAlign = TextAlign.Center,
-                fontSize = 14.sp
+                fontSize = 15.sp,
+                lineHeight = 22.sp
             )
         }
     }

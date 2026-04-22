@@ -9,7 +9,6 @@ import android.opengl.GLSurfaceView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -48,11 +47,9 @@ import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.editor.DrawingCanvas
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
-import kotlinx.coroutines.coroutineScope
 import com.hereliesaz.graffitixr.design.detectSmartOverlayGestures
 import android.graphics.Bitmap as AndroidBitmap
 import androidx.core.graphics.createBitmap
-import com.hereliesaz.graffitixr.design.theme.Black
 
 @Composable
 fun MainScreen(
@@ -96,7 +93,6 @@ fun MainScreen(
 
         if (hasCameraPermission && isCameraActive && uiState.editorMode != EditorMode.TRACE && uiState.editorMode != EditorMode.STENCIL) {
             when (uiState.editorMode) {
-                EditorMode.STENCIL -> {}
                 EditorMode.AR -> {
                     var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
 
@@ -127,13 +123,9 @@ fun MainScreen(
                     }
 
                     val visibleLayers = uiState.layers.filter { it.isVisible && it.bitmap != null }
-                    val showPlaneConfirm = mainUiState.isInPlaneRealignment
 
                     LaunchedEffect(visibleLayers, arUiState.isAnchorEstablished) {
                         if (!arUiState.isAnchorEstablished || visibleLayers.isEmpty()) {
-                            // No anchor or no layers to show.
-                            // Clear the image quad — the orange border line-loop is the only
-                            // anchor indicator needed. The quad renders nothing when cleared.
                             rendererRef.value?.updateOverlayBitmap(null)
                             return@LaunchedEffect
                         }
@@ -236,13 +228,9 @@ fun MainScreen(
 
         if (uiState.editorMode != EditorMode.AR && uiState.editorMode != EditorMode.STENCIL) {
             uiState.layers.filter { it.isVisible }.forEach { layer ->
-                // During an active stroke the working bitmap is tracked separately so
-                // Compose can re-render it every time a new segment is drawn.
                 val isLive = layer.id == uiState.liveStrokeLayerId
                 val bmp = if (isLive) uiState.liveStrokeBitmap ?: layer.bitmap else layer.bitmap
                 bmp?.let { displayBmp ->
-                    // For the live layer, re-wrap on every version tick so Compose sees a
-                    // new ImageBitmap reference and re-reads the modified pixel data.
                     val imageBitmap = if (isLive) {
                         val version = uiState.liveStrokeVersion
                         remember(version) { displayBmp.asImageBitmap() }
@@ -285,11 +273,15 @@ fun MainScreen(
             }
         }
 
+        val isGuest = arUiState.coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST
+
         if (uiState.editorMode != EditorMode.STENCIL) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isWaitingForTap, isTouchLocked) {
+                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isWaitingForTap, isTouchLocked, isGuest) {
+                        if (isGuest) return@pointerInput // Block ALL guest interaction with layers
+
                         if (isWaitingForTap) {
                             detectTapGestures { offset ->
                                 val nx = offset.x / size.width
@@ -330,7 +322,7 @@ fun MainScreen(
             ) {}
         }
 
-        if (!isTouchLocked && !isImageLocked && activeLayer != null) {
+        if (!isTouchLocked && !isImageLocked && activeLayer != null && !isGuest) {
             if (uiState.activeTool != Tool.NONE) {
                 DrawingCanvas(
                     activeTool = uiState.activeTool,

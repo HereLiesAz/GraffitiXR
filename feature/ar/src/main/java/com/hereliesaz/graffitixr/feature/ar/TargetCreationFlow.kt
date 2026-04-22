@@ -162,21 +162,21 @@ private fun TargetInstructionCard(
     ) {
         Box(
             modifier = Modifier
-                .background(Color.White, RoundedCornerShape(16.dp))
+                .background(Color(0xCC000000), RoundedCornerShape(16.dp))
                 .border(2.dp, Color.Cyan, RoundedCornerShape(16.dp))
                 .padding(20.dp)
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = title,
-                    color = Color(0xFF007788),
+                    color = Color.Cyan,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = text,
-                    color = Color(0xFF222222),
+                    color = Color.White,
                     textAlign = TextAlign.Center,
                     fontSize = 14.sp,
                     lineHeight = 20.sp

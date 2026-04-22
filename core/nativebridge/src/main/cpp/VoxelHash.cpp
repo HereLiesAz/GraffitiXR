@@ -36,9 +36,6 @@ static const char* kFragmentShader =
     "in float vAlpha;\n"
     "out vec4 oColor;\n"
     "void main() {\n"
-    "  // Circular points are more pleasing and robust\n"
-    "  vec2 circ = gl_PointCoord - vec2(0.5);\n"
-    "  if (dot(circ, circ) > 0.25) discard;\n"
     "  oColor = vec4(vColor.rgb, vAlpha);\n"
     "}\n";
 
@@ -116,8 +113,8 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                 float d = depth.at<float>((int)v_cam, (int)u_cam);
                 if (d > 0.1f) {
                     float current_d = -p_cam.z;
-                    if (std::abs(current_d - d) < 0.5f) {
-                        mSplatData[i].confidence = std::min(1.0f, mSplatData[i].confidence + 0.4f);
+                    if (std::abs(current_d - d) < 0.1f) { // Tighter tolerance: 10cm
+                        mSplatData[i].confidence = std::min(1.0f, mSplatData[i].confidence + 0.15f);
 
                         if (mSplatData[i].confidence < 0.9f) {
                             glm::vec4 p_target_cam = p_cam * (d / current_d);
@@ -133,7 +130,7 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                         continue;
                     }
                 }
-                mSplatData[i].confidence -= 0.01f;
+                mSplatData[i].confidence -= 0.03f; // Faster decay for noise pruning
                 dataChanged = true;
                 if (mSplatData[i].confidence <= 0.0f) needsPruning = true;
             }
@@ -164,7 +161,8 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                             cv::Vec3b col = color.at<cv::Vec3b>(colorR, colorC);
                             float r_f = col[2]/255.0f, g_f = col[1]/255.0f, b_f = col[0]/255.0f;
 
-                            mSplatData.push_back({xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.8f, 0.0f, 0.0f, 1.0f, 0.012f});
+                            // Balanced Birth: requires a few hits to become stable
+                            mSplatData.push_back({xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.3f, 0.0f, 0.0f, 1.0f, 0.012f});
                             mVoxelGrid[key] = (int)mSplatData.size() - 1;
                             dataChanged = true;
                         }

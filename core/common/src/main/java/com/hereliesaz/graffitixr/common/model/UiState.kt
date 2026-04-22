@@ -120,8 +120,12 @@ data class ArUiState(
     // Peer-to-Peer Sync — True when a local peer is found and coordinates are being aligned.
     val isSyncing: Boolean = false,
     val isCoopSearching: Boolean = false,
-    val coopStatus: String? = null
+    val coopStatus: String? = null,
+    val coopRole: CoopRole = CoopRole.NONE,
+    val showCoopNotFoundDialog: Boolean = false
 )
+
+enum class CoopRole { NONE, HOST, GUEST }
 
 enum class Tool {
     NONE, BRUSH, ERASER, BLUR, HEAL, BURN, DODGE, LIQUIFY, COLOR

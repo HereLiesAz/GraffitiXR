@@ -26,6 +26,7 @@ import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
+import com.hereliesaz.graffitixr.data.ProjectManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -77,7 +78,7 @@ class ArViewModel @Inject constructor(
 
     fun startCollaborationHost() {
         if (!uiState.value.isAnchorEstablished || uiState.value.splatCount == 0) {
-            _uiState.update { it.copy(coopStatus = "Capture a target first to host.") }
+            _uiState.update { it.copy(coopStatus = "Capture a target first to host.", showCoopNotFoundDialog = false) }
             return
         }
         
@@ -85,7 +86,7 @@ class ArViewModel @Inject constructor(
             collaborationManager = CollaborationManager(appContext)
         }
         viewModelScope.launch {
-            _uiState.update { it.copy(isSyncing = true, coopStatus = "Hosting session...") }
+            _uiState.update { it.copy(isSyncing = true, coopStatus = "Hosting session...", coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.HOST, showCoopNotFoundDialog = false) }
             val projectId = loadedProjectId ?: return@launch
             val projectFile = File(appContext.cacheDir, "coop_project.gxr")
             projectManager.exportProjectToUri(appContext, projectId, projectFile.toUri())
@@ -98,13 +99,13 @@ class ArViewModel @Inject constructor(
         if (collaborationManager == null) {
             collaborationManager = CollaborationManager(appContext)
         }
-        _uiState.update { it.copy(isCoopSearching = true, coopStatus = "Searching for sessions...") }
+        _uiState.update { it.copy(isCoopSearching = true, coopStatus = "Searching for sessions...", showCoopNotFoundDialog = false) }
         
         var found = false
         val searchTimeout = viewModelScope.launch {
             delay(5000)
             if (!found) {
-                _uiState.update { it.copy(isCoopSearching = false, coopStatus = "No sessions found.") }
+                _uiState.update { it.copy(isCoopSearching = false, coopStatus = null, showCoopNotFoundDialog = true) }
             }
         }
 
@@ -122,12 +123,16 @@ class ArViewModel @Inject constructor(
                 val project = projectManager.importProjectFromUri(appContext, projectFile.toUri())
                 if (project != null) {
                     projectRepository.loadProject(project.id)
-                    _uiState.update { it.copy(isSyncing = false, coopStatus = "Joined!") }
+                    _uiState.update { it.copy(isSyncing = false, coopStatus = "Joined!", coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) }
                 } else {
-                    _uiState.update { it.copy(isSyncing = false, coopStatus = "Failed to join.") }
+                    _uiState.update { it.copy(isSyncing = false, coopStatus = "Failed to join.", coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.NONE) }
                 }
             }
         }
+    }
+
+    fun dismissCoopNotFoundDialog() {
+        _uiState.update { it.copy(showCoopNotFoundDialog = false) }
     }
 
     private val _isCameraInUseByAr = MutableStateFlow(false)
