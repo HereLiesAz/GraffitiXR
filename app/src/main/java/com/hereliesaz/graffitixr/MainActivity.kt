@@ -59,6 +59,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.lifecycleScope
@@ -218,11 +219,11 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(currentTempCapture, currentCaptureStep, isWaitingForTap) {
                     if (currentTempCapture != null) {
                         if (currentCaptureStep == CaptureStep.NONE && isWaitingForTap) {
-                            // Phase 4: Captured frame from tap. Transition to RECTIFY.
-                            mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
+                            // Phase 4: Captured frame from tap. Transition to MASK (Refinement).
+                            mainViewModel.setCaptureStep(CaptureStep.MASK)
                         } else if (currentCaptureStep == CaptureStep.CAPTURE) {
-                            // Manual capture from rail. Transition to RECTIFY.
-                            mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
+                            // Manual capture from rail. Transition to MASK.
+                            mainViewModel.setCaptureStep(CaptureStep.MASK)
                         }
                     }
                 }
@@ -791,20 +792,31 @@ class MainActivity : ComponentActivity() {
                                         if (currentBitmap != null && points.size == 4) {
                                             isProcessing = true
                                             lifecycleScope.launch(Dispatchers.Default) {
+                                                // Convert normalized points [0..1] to actual bitmap pixels for OpenCV
                                                 val pixelPoints = points.map {
                                                     Offset(it.x * currentBitmap.width, it.y * currentBitmap.height)
                                                 }
+                                                // RESTORED WORKING UNWARP METHOD
                                                 val unwarped = ImageProcessor.unwarpImage(currentBitmap, pixelPoints)
-                                                if (unwarped != null) {
-                                                    val isolated = unwarped.isolateMarkings(null)
-                                                    arViewModel.setTempCapture(isolated)
+                                                
+                                                withContext(Dispatchers.Main) {
+                                                    if (unwarped != null) {
+                                                        arViewModel.setTempCapture(unwarped)
+                                                        // Save the target!
+                                                        arViewModel.setInitialAnchorFromCapture()
+                                                        mainViewModel.onConfirmTargetCreation(unwarped, null, arUiState.targetDepthBuffer, arUiState.targetDepthBufferWidth, arUiState.targetDepthBufferHeight, arUiState.targetDepthStride, arUiState.targetIntrinsics, arUiState.targetCaptureViewMatrix)
+                                                    } else {
+                                                        mainViewModel.setCaptureStep(CaptureStep.NONE)
+                                                    }
+                                                    isProcessing = false
                                                 }
-                                                mainViewModel.setCaptureStep(CaptureStep.REVIEW)
-                                                isProcessing = false
                                             }
-                                        } else {
-                                            mainViewModel.setCaptureStep(CaptureStep.REVIEW)
                                         }
+                                    },
+                                    onMaskConfirmed = { mask ->
+                                        // Refinement finished, now move to RECTIFY (Unwarp)
+                                        arViewModel.setTempCapture(mask)
+                                        mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
                                     },
                                     onRequestCapture = { arViewModel.requestCapture() },
                                     onUpdateUnwarpPoints = { arViewModel.setUnwarpPoints(it) },

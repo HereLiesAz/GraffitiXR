@@ -163,7 +163,7 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
             float d = depth.at<float>((int)v_cam, (int)u_cam);
             if (d > 0.1f && d < 10.0f) {
                 float current_d = -p_cam.z;
-                if (std::abs(current_d - d) < 0.1f) { // Tighter tolerance: 10cm
+                if (std::abs(current_d - d) < 0.05f) { // High Precision: 5cm
                     glm::vec4 p_target_cam = p_cam * (d / current_d);
                     p_target_cam.w = 1.0f;
                     glm::vec4 p_target_anchor = invVA * p_target_cam;
@@ -193,8 +193,8 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
             mPersistentMesh[i].confidence = std::min(1.0f, mPersistentMesh[i].confidence + gain);
         } else if (inView[i]) {
             // In-view Miss: Balanced decay for better accuracy
-            mPersistentMesh[i].confidence = std::max(0.0f, mPersistentMesh[i].confidence - 0.02f);
-            float resetAlpha = 0.05f;
+            mPersistentMesh[i].confidence = std::max(0.0f, mPersistentMesh[i].confidence - 0.05f);
+            float resetAlpha = 0.1f;
             mPersistentMesh[i].z *= (1.0f - resetAlpha);
         }
         // If not in view, confidence and position are preserved (No global decay)

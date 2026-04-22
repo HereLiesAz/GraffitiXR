@@ -113,7 +113,7 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                 float d = depth.at<float>((int)v_cam, (int)u_cam);
                 if (d > 0.1f) {
                     float current_d = -p_cam.z;
-                    if (std::abs(current_d - d) < 0.1f) { // Tighter tolerance: 10cm
+                    if (std::abs(current_d - d) < 0.05f) { // High Precision: 5cm
                         mSplatData[i].confidence = std::min(1.0f, mSplatData[i].confidence + 0.15f);
 
                         if (mSplatData[i].confidence < 0.9f) {
@@ -130,7 +130,7 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                         continue;
                     }
                 }
-                mSplatData[i].confidence -= 0.03f; // Faster decay for noise pruning
+                mSplatData[i].confidence -= 0.05f; // Faster pruning for accuracy
                 dataChanged = true;
                 if (mSplatData[i].confidence <= 0.0f) needsPruning = true;
             }

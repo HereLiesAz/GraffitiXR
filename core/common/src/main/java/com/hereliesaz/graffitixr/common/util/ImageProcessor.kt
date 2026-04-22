@@ -4,7 +4,6 @@ package com.hereliesaz.graffitixr.common.util
 import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 import org.opencv.android.Utils
-import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
 import org.opencv.core.MatOfPoint2f
@@ -13,56 +12,58 @@ import org.opencv.core.Rect
 import org.opencv.core.Scalar
 import org.opencv.core.Size
 import org.opencv.imgproc.Imgproc
-import kotlin.math.hypot
-import kotlin.math.max
 
 object ImageProcessor {
 
+    /**
+     * Unwarps an image using a perspective transform based on 4 corner points.
+     * Restored to the working method from early project history.
+     *
+     * @param bitmap The source image.
+     * @param points List of 4 Offsets representing the corners in pixel coordinates.
+     *               Expected order: TL, TR, BR, BL.
+     * @return The unwarped bitmap.
+     */
     fun unwarpImage(bitmap: Bitmap, points: List<Offset>): Bitmap? {
         if (points.size != 4) return null
 
         return try {
-            val srcMat = Mat()
-            Utils.bitmapToMat(bitmap, srcMat)
+            val src = Mat()
+            Utils.bitmapToMat(bitmap, src)
 
-            val p0 = Point(points[0].x.toDouble(), points[0].y.toDouble()) // TL
-            val p1 = Point(points[1].x.toDouble(), points[1].y.toDouble()) // TR
-            val p2 = Point(points[2].x.toDouble(), points[2].y.toDouble()) // BR
-            val p3 = Point(points[3].x.toDouble(), points[3].y.toDouble()) // BL
+            val w = bitmap.width.toDouble()
+            val h = bitmap.height.toDouble()
 
-            val widthA = hypot(p2.x - p3.x, p2.y - p3.y)
-            val widthB = hypot(p1.x - p0.x, p1.y - p0.y)
-            val maxWidth = max(widthA, widthB).toInt()
-
-            val heightA = hypot(p1.x - p2.x, p1.y - p2.y)
-            val heightB = hypot(p0.x - p3.x, p0.y - p3.y)
-            val maxHeight = max(heightA, heightB).toInt()
-
-            if (maxWidth <= 0 || maxHeight <= 0) {
-                srcMat.release()
-                return null
-            }
-
-            val srcPts = MatOfPoint2f(p0, p1, p2, p3)
-            val dstPts = MatOfPoint2f(
-                Point(0.0, 0.0),
-                Point(maxWidth.toDouble() - 1, 0.0),
-                Point(maxWidth.toDouble() - 1, maxHeight.toDouble() - 1),
-                Point(0.0, maxHeight.toDouble() - 1)
+            // Source points (already in pixel space from MainActivity)
+            val srcPoints = MatOfPoint2f(
+                Point(points[0].x.toDouble(), points[0].y.toDouble()),
+                Point(points[1].x.toDouble(), points[1].y.toDouble()),
+                Point(points[2].x.toDouble(), points[2].y.toDouble()),
+                Point(points[3].x.toDouble(), points[3].y.toDouble())
             )
 
-            val transform = Imgproc.getPerspectiveTransform(srcPts, dstPts)
-            val dstMat = Mat()
-            Imgproc.warpPerspective(srcMat, dstMat, transform, Size(maxWidth.toDouble(), maxHeight.toDouble()))
+            // Destination points (Rectified to full original dimensions)
+            val dstPoints = MatOfPoint2f(
+                Point(0.0, 0.0),
+                Point(w, 0.0),
+                Point(w, h),
+                Point(0.0, h)
+            )
 
-            val resultBitmap = Bitmap.createBitmap(maxWidth, maxHeight, Bitmap.Config.ARGB_8888)
-            Utils.matToBitmap(dstMat, resultBitmap)
+            val perspectiveTransform = Imgproc.getPerspectiveTransform(srcPoints, dstPoints)
+            val dest = Mat()
 
-            srcMat.release()
-            dstMat.release()
-            transform.release()
-            srcPts.release()
-            dstPts.release()
+            Imgproc.warpPerspective(src, dest, perspectiveTransform, Size(w, h))
+
+            val resultBitmap = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+            Utils.matToBitmap(dest, resultBitmap)
+
+            // Cleanup
+            src.release()
+            srcPoints.release()
+            dstPoints.release()
+            perspectiveTransform.release()
+            dest.release()
 
             resultBitmap
         } catch (e: Exception) {

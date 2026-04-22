@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.Canvas as AndroidCanvas
 import java.nio.ByteBuffer
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -65,6 +67,7 @@ fun TargetCreationUi(
     onRetake: () -> Unit,
     onCancel: () -> Unit,
     onUnwarpConfirm: (List<Offset>) -> Unit,
+    onMaskConfirmed: (Bitmap) -> Unit,
     onRequestCapture: () -> Unit,
     onUpdateUnwarpPoints: (List<Offset>) -> Unit,
     onSetActiveUnwarpPoint: (Int) -> Unit,
@@ -77,6 +80,31 @@ fun TargetCreationUi(
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         when (captureStep) {
+            CaptureStep.MASK, CaptureStep.REVIEW -> {
+                TargetRefinementScreen(
+                    rawBitmap = uiState.tempCaptureBitmap,
+                    annotatedBitmap = uiState.annotatedCaptureBitmap,
+                    canUndo = uiState.canUndoErase,
+                    canRedo = uiState.canRedoErase,
+                    strings = strings,
+                    onNext = { strokes ->
+                         val mask = if (strokes.isEmpty()) null 
+                                    else rasterizeStrokes(strokes, uiState.tempCaptureBitmap?.width ?: 512, uiState.tempCaptureBitmap?.height ?: 512)
+                         
+                         val refined = if (mask != null && uiState.tempCaptureBitmap != null) {
+                             applyMaskToBitmap(uiState.tempCaptureBitmap, mask)
+                         } else uiState.tempCaptureBitmap
+                         
+                         if (refined != null) onMaskConfirmed(refined)
+                    },
+                    onRetake = onRetake,
+                    onCancel = onCancel,
+                    onBeginErase = onBeginErase,
+                    onEraseAtPoint = onEraseAtPoint,
+                    onUndoErase = onUndoErase,
+                    onRedoErase = onRedoErase
+                )
+            }
             CaptureStep.RECTIFY -> {
                 uiState.tempCaptureBitmap?.let { bitmap ->
                     UnwarpScreen(
@@ -88,31 +116,6 @@ fun TargetCreationUi(
                         strings = strings
                     )
                 }
-            }
-            CaptureStep.MASK, CaptureStep.REVIEW -> {
-                TargetRefinementScreen(
-                    rawBitmap = uiState.tempCaptureBitmap,
-                    annotatedBitmap = uiState.annotatedCaptureBitmap,
-                    depthBuffer = uiState.targetDepthBuffer,
-                    depthW = uiState.targetDepthBufferWidth,
-                    depthH = uiState.targetDepthBufferHeight,
-                    depthStride = uiState.targetDepthStride,
-                    intrinsics = uiState.targetIntrinsics,
-                    viewMatrix = uiState.targetCaptureViewMatrix,
-                    isAnnotating = uiState.annotatedCaptureBitmap == null && uiState.tempCaptureBitmap != null,
-                    canUndo = uiState.canUndoErase,
-                    canRedo = uiState.canRedoErase,
-                    strings = strings,
-                    onConfirm = { mask, depth, dw, dh, ds, intr, view ->
-                        onConfirm(uiState.tempCaptureBitmap, mask, depth, dw, dh, ds, intr, view)
-                    },
-                    onRetake = onRetake,
-                    onCancel = onCancel,
-                    onBeginErase = onBeginErase,
-                    onEraseAtPoint = onEraseAtPoint,
-                    onUndoErase = onUndoErase,
-                    onRedoErase = onRedoErase
-                )
             }
             else -> {
                 if (isWaitingForTap) {
@@ -149,7 +152,7 @@ private fun TargetInstructionCard(
 ) {
     val data = when {
         isWaitingForTap -> Pair(strings.ar.targetCreationTitle, strings.ar.targetCreationText)
-        captureStep == CaptureStep.RECTIFY -> Pair("RECTIFY SURFACE", "Drag the corners to align the cyan frame with the flat surface of your wall.")
+        captureStep == CaptureStep.RECTIFY -> Pair("RECTIFY SURFACE", "Now, drag the corners to align the cyan frame with the flat surface of your wall.")
         captureStep == CaptureStep.MASK || captureStep == CaptureStep.REVIEW -> Pair("REFINE TARGET", "Tap any area to remove it, or drag your finger through markings you want to exclude.")
         else -> Pair("", "")
     }
@@ -186,7 +189,7 @@ private fun TargetInstructionCard(
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             AzButton(
-                text = if (isWaitingForTap) strings.common.cancel else "CANCEL",
+                text = "CANCEL",
                 onClick = onCancel,
                 color = HotPink,
                 shape = AzButtonShape.RECTANGLE
@@ -311,17 +314,10 @@ private fun UnwarpOverlay(
 private fun TargetRefinementScreen(
     rawBitmap: Bitmap?,
     annotatedBitmap: Bitmap?,
-    depthBuffer: ByteBuffer?,
-    depthW: Int,
-    depthH: Int,
-    depthStride: Int,
-    intrinsics: FloatArray?,
-    viewMatrix: FloatArray?,
-    isAnnotating: Boolean,
     canUndo: Boolean,
     canRedo: Boolean,
     strings: AppStrings,
-    onConfirm: (mask: Bitmap?, depthBuffer: ByteBuffer?, depthW: Int, depthH: Int, depthStride: Int, intrinsics: FloatArray?, viewMatrix: FloatArray?) -> Unit,
+    onNext: (List<SelectionStroke>) -> Unit,
     onRetake: () -> Unit,
     onCancel: () -> Unit,
     onBeginErase: () -> Unit,
@@ -331,7 +327,6 @@ private fun TargetRefinementScreen(
 ) {
     val strokes = remember { mutableStateListOf<SelectionStroke>() }
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
-    var showFeatures by remember { mutableStateOf(true) }
 
     Box(modifier = Modifier.fillMaxSize().onSizeChanged { boxSize = it }) {
 
@@ -345,16 +340,14 @@ private fun TargetRefinementScreen(
                 )
             }
 
-            if (showFeatures) {
-                Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
-                annotatedBitmap?.let { bmp ->
-                    Image(
-                        bitmap = bmp.asImageBitmap(),
-                        contentDescription = "Feature Review",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit
-                    )
-                }
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
+            annotatedBitmap?.let { bmp ->
+                Image(
+                    bitmap = bmp.asImageBitmap(),
+                    contentDescription = "Feature Review",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
             }
 
             if (rawBitmap != null && boxSize != IntSize.Zero) {
@@ -376,6 +369,7 @@ private fun TargetRefinementScreen(
                                 val ny = ((pos.y - imgY) / imgH).coerceIn(0f, 1f)
                                 onBeginErase()
                                 onEraseAtPoint(nx, ny)
+                                recordStroke(pos, imgX, imgY, imgW, imgH, 80f / imgW, strokes)
                             }
                         }
                         .pointerInput(Unit) {
@@ -388,10 +382,6 @@ private fun TargetRefinementScreen(
                     drawStrokes(strokes, imgX, imgY, imgW, imgH)
                 }
             }
-        }
-
-        if (isAnnotating) {
-            CircularProgressIndicator(modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp), color = HotPink)
         }
 
         Column(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -420,10 +410,7 @@ private fun TargetRefinementScreen(
                 captureStep = CaptureStep.REVIEW,
                 strings = strings,
                 onCancel = onCancel,
-                onNext = {
-                    val mask = if (strokes.isEmpty()) null else rasterizeStrokes(strokes, rawBitmap?.width ?: 512, rawBitmap?.height ?: 512)
-                    onConfirm(mask, depthBuffer, depthW, depthH, depthStride, intrinsics, viewMatrix)
-                }
+                onNext = { onNext(strokes) }
             )
         }
     }
@@ -449,12 +436,25 @@ private fun rasterizeStrokes(strokes: List<SelectionStroke>, width: Int, height:
     val mask = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val canvas = AndroidCanvas(mask)
     canvas.drawColor(android.graphics.Color.WHITE)
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { 
+        style = Paint.Style.FILL 
+        xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+    }
     for (s in strokes) {
-        paint.color = android.graphics.Color.BLACK
         canvas.drawCircle(s.nx * width, s.ny * height, s.nr * width, paint)
     }
     return mask
+}
+
+private fun applyMaskToBitmap(bitmap: Bitmap, mask: Bitmap): Bitmap {
+    val out = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+    val canvas = AndroidCanvas(out)
+    canvas.drawBitmap(bitmap, 0f, 0f, null)
+    val paint = Paint().apply {
+        xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+    }
+    canvas.drawBitmap(mask, 0f, 0f, paint)
+    return out
 }
 
 @Composable
