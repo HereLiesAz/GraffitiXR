@@ -202,16 +202,17 @@ class ArViewModel @Inject constructor(
 
     fun setArMode(enabled: Boolean, context: Context) {
         isInArMode = enabled
-        if (enabled) {
-            initArSessionLocked(context)
-        }
-        updateSessionStateLocked()
+        updateSessionStateLocked(context)
     }
 
-    private fun updateSessionStateLocked() {
+    private fun updateSessionStateLocked(context: Context? = null) {
         viewModelScope.launch {
             sessionMutex.withLock {
-                if (isActivityResumed && isInArMode && !isSessionResumed && !isDestroying) {
+                if (isInArMode && session == null && context != null && !isDestroying) {
+                    initArSessionLocked(context)
+                }
+
+                if (isActivityResumed && isInArMode && !isSessionResumed && !isDestroying && session != null) {
                     resumeArSessionInternal()
                 } else if ((!isActivityResumed || !isInArMode) && isSessionResumed) {
                     pauseArSessionInternal()
@@ -223,26 +224,30 @@ class ArViewModel @Inject constructor(
     private fun initArSessionLocked(context: Context) {
         if (session != null || isDestroying) return
         try {
-            session = Session(context, EnumSet.of(Session.Feature.SHARED_CAMERA))
-            val config = Config(session)
+            val s = Session(context)
+            val config = Config(s)
             config.focusMode = Config.FocusMode.AUTO
             config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
             
-            if (session!!.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
+            if (s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                 config.depthMode = Config.DepthMode.AUTOMATIC
                 _uiState.update { it.copy(isDepthApiSupported = true) }
             }
 
-            session!!.configure(config)
+            s.configure(config)
 
-            val filter = CameraConfigFilter(session)
+            val filter = CameraConfigFilter(s)
             filter.targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
-            val cameraConfigs = session!!.getSupportedCameraConfigs(filter)
+            val cameraConfigs = s.getSupportedCameraConfigs(filter)
             if (cameraConfigs.isNotEmpty()) {
-                session!!.cameraConfig = cameraConfigs[0]
+                s.cameraConfig = cameraConfigs[0]
             }
 
+            session = s
             _isCameraInUseByAr.value = true
+            
+            // Critical: if the renderer is already attached, update it with the new session
+            renderer?.attachSession(s)
         } catch (e: Exception) {
             Timber.e(e, "Failed to create ARCore session")
         }

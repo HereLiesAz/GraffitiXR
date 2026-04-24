@@ -109,6 +109,11 @@ fun MainScreen(
 
                     DisposableEffect(lifecycleOwner, glView) {
                         if (glView == null) return@DisposableEffect onDispose {}
+
+                        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                            glView?.onResume()
+                        }
+
                         val observer = LifecycleEventObserver { _, event ->
                             when (event) {
                                 Lifecycle.Event.ON_RESUME -> glView?.onResume()
