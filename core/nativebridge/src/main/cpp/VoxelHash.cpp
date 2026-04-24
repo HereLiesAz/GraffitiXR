@@ -121,7 +121,11 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                     float d = depth.at<float>((int)v_cam, (int)u_cam);
                     if (d > 0.1f) {
                         float current_d = -p_cam.z;
-                        if (std::abs(current_d - d) < 0.05f) { // High Precision: 5cm
+                        // Use a wider tolerance (12cm) during mapping to allow splats to be born while moving
+                        // but keep a tighter refinement (6cm) for established points.
+                        float tolerance = (mSplatData[idx].confidence > 0.6f) ? 0.06f : 0.12f;
+
+                        if (std::abs(current_d - d) < tolerance) {
                             mSplatData[idx].confidence = std::min(1.0f, mSplatData[idx].confidence + 0.15f);
 
                             if (mSplatData[idx].confidence < 0.9f) {
@@ -138,7 +142,8 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                             continue;
                         }
                     }
-                    mSplatData[idx].confidence -= 0.05f; // Faster pruning for accuracy
+                    // Slower decay during motion to prevent pruning legitimate points during quick sweeps
+                    mSplatData[idx].confidence -= 0.02f;
                     dataChanged = true;
                     if (mSplatData[idx].confidence <= 0.0f) needsPruning = true;
                 }
@@ -146,11 +151,17 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
         }
 
         // 2. Discovery Loop: Sample depth map to add NEW voxels
-        int step = 6; // Balance between resolution and performance
-        for (int r = 0; r < depth.rows - step; r += step) {
-            for (int c = 0; c < depth.cols - step; c += step) {
+        int step = 8; // Slightly larger step for performance at higher frequency
+        for (int r = step; r < depth.rows - step; r += step) {
+            for (int c = step; c < depth.cols - step; c += step) {
                 float d = depth.at<float>(r, c);
                 if (d > 0.1f && d < 7.0f) {
+                    // Accuracy Fix: Neighborhood stability check.
+                    // Only add a voxel if neighbors agree on depth (avoids edges and noise).
+                    float d_left = depth.at<float>(r, c - 2);
+                    float d_right = depth.at<float>(r, c + 2);
+                    if (std::abs(d - d_left) > 0.08f || std::abs(d - d_right) > 0.08f) continue;
+
                     float xc = (static_cast<float>(c) - cx) * d / fx;
                     float yc = -(static_cast<float>(r) - cy) * d / fy;
                     float zc = -d;
@@ -170,8 +181,8 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                             cv::Vec3b col = color.at<cv::Vec3b>(colorR, colorC);
                             float r_f = col[2]/255.0f, g_f = col[1]/255.0f, b_f = col[0]/255.0f;
 
-                            // Balanced Birth: requires a few hits to become stable
-                            mSplatData.push_back({xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.3f, 0.0f, 0.0f, 1.0f, 0.012f});
+                            // Birth confidence: start lower but allow faster growth with motion-friendly tolerance
+                            mSplatData.push_back({xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.2f, 0.0f, 0.0f, 1.0f, 0.012f});
                             mVoxelGrid[key] = (int)mSplatData.size() - 1;
                             dataChanged = true;
                         }

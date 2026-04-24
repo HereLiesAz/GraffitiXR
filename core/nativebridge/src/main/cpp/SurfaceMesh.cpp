@@ -171,13 +171,14 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
             float d = depth.at<float>((int)v_cam, (int)u_cam);
             if (d > 0.1f && d < 10.0f) {
                 float current_d = -p_cam.z;
-                if (std::abs(current_d - d) < 0.05f) { // High Precision: 5cm
+                // Use adaptive tolerance: tighter for established vertices, looser for mapping
+                float tolerance = (v.confidence > 0.6f) ? 0.06f : 0.15f;
+
+                if (std::abs(current_d - d) < tolerance) {
                     glm::vec4 p_target_cam = p_cam * (d / current_d);
                     p_target_cam.w = 1.0f;
                     glm::vec4 p_target_anchor = invVA * p_target_cam;
 
-                    // Relaxed Immutability: Position is locked for high-confidence vertices to prevent jitter,
-                    // but we no longer skip the hit test entirely. This allows for decay if the plane is lost.
                     if (v.confidence < 0.8f) {
                         float alpha = 0.10f;
                         v.x += (p_target_anchor.x - v.x) * alpha;

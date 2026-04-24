@@ -356,8 +356,8 @@ class ArRenderer(
 
             // Throttle frame feeding to 15Hz (every 4 frames at 60Hz) to halve processing-related power draw.
             // When tracking is stable and the device is stationary, we could throttle even further.
-            // ── Frame Data Pipeline (Throttle to 10Hz or 2Hz for Battery Efficiency) ──
-            val throttleRate = if (anchorEstablished) 30 else 6 // 2Hz vs 10Hz
+            // ── Frame Data Pipeline (Throttle to 20Hz or 2Hz for Battery Efficiency) ──
+            val throttleRate = if (anchorEstablished) 30 else 3 // 2Hz vs 20Hz
             if (isTracking && frameCount % throttleRate == 0) {
                 // Calculate rotation code to align sensor-native data with display orientation
                 val displayRotation = displayRotationHelper.getRotation()
