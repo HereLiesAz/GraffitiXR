@@ -49,16 +49,15 @@ VoxelHash::~VoxelHash() {
 
 void VoxelHash::initGl() {
     std::lock_guard<std::mutex> lock(mMutex);
-    // Detection of context loss: if we think we have handles, check if they are still valid
-    if (mProgram != 0) {
-        if (!glIsProgram(mProgram)) {
-            LOGI("GL context lost, resetting VoxelHash handles");
-            mProgram = 0;
-            mPointVbo = 0;
-        } else {
-            return;
-        }
+
+    // Check if current handles are valid in this GL context
+    if (mProgram != 0 && glIsProgram(mProgram)) {
+        return;
     }
+
+    LOGI("Initializing VoxelHash GL handles (new context)");
+    mProgram = 0;
+    mPointVbo = 0;
 
     GLuint vs = compileShader(GL_VERTEX_SHADER, kVertexShader);
     GLuint fs = compileShader(GL_FRAGMENT_SHADER, kFragmentShader);
@@ -75,6 +74,9 @@ void VoxelHash::initGl() {
         // Initial pre-allocation
         glBufferData(GL_ARRAY_BUFFER, 100000 * sizeof(Splat), nullptr, GL_DYNAMIC_DRAW);
     }
+
+    // Force re-upload of any existing data into the new VBO
+    mDataDirty = true;
 }
 
 void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, float voxelSize, float /*lightLevel*/) {

@@ -78,6 +78,10 @@ fun MainScreen(
     Box(modifier = Modifier.fillMaxSize().background(bgColor)) {
 
         DisposableEffect(lifecycleOwner) {
+            if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                arViewModel.onActivityResumed()
+            }
+
             val observer = LifecycleEventObserver { _, event ->
                 when (event) {
                     Lifecycle.Event.ON_RESUME -> arViewModel.onActivityResumed()

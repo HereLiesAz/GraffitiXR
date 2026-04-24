@@ -66,14 +66,18 @@ SurfaceMesh::~SurfaceMesh() {
 
 void SurfaceMesh::initGl() {
     std::lock_guard<std::mutex> lock(mMutex);
-    if (mProgram) {
-        glDeleteProgram(mProgram);
-        mProgram = 0;
+
+    // Check if current handles are valid in this GL context
+    if (mProgram != 0 && glIsProgram(mProgram)) {
+        return;
     }
-    if (mVbo) { glDeleteBuffers(1, &mVbo); mVbo = 0; }
-    if (mIbo) { glDeleteBuffers(1, &mIbo); mIbo = 0; }
-    if (mWireIbo) { glDeleteBuffers(1, &mWireIbo); mWireIbo = 0; }
-    if (mTextureId) { glDeleteTextures(1, &mTextureId); mTextureId = 0; }
+
+    LOGI("Initializing SurfaceMesh GL handles (new context)");
+    mProgram = 0;
+    mVbo = 0;
+    mIbo = 0;
+    mWireIbo = 0;
+    mTextureId = 0;
 
     GLuint vs = compileShader(GL_VERTEX_SHADER, kVertexShader);
     GLuint fs = compileShader(GL_FRAGMENT_SHADER, kFragmentShader);
@@ -95,7 +99,9 @@ void SurfaceMesh::initGl() {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
         mTextureDirty = true;
+        mMeshDirty = true;
         mIndicesUploaded = false;
     }
 }
