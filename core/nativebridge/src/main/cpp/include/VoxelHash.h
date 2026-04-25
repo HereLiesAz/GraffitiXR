@@ -14,6 +14,16 @@ struct Splat {
     float scale[3];         // Scaling factors (Anisotropic)
     float rot[4];           // Rotation (Quaternion)
     float confidence;       // Persistence/Certainty
+    float velocity[3];      // [DEBLUR] Linear velocity for motion compensation
+};
+
+struct Keyframe {
+    cv::Mat depth;
+    cv::Mat color;
+    float viewMatrix[16];
+    float projMatrix[16];
+    float angularVelocity[3]; // [DEBLUR] From IMU
+    float linearVelocity[3];  // [DEBLUR] From VIO/IMU
 };
 
 struct VoxelKey {
@@ -37,6 +47,7 @@ public:
     void initGl();
     void update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, float voxelSize, float lightLevel);
     void addSparsePoints(const std::vector<float>& points, const float* viewMat, const float* projMat);
+    void addKeyframe(const Keyframe& kf);
     void draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, int screenHeight);
     void clear();
     void prune(float threshold);
@@ -51,6 +62,7 @@ private:
 
     mutable std::mutex mMutex;
     std::vector<Splat> mSplatData;
+    std::vector<Keyframe> mKeyframes;
     std::unordered_map<VoxelKey, int, VoxelKeyHash> mVoxelGrid;
 
     float mLastVoxelSize = 0.005f;
