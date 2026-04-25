@@ -3,6 +3,7 @@
 #include <android/log.h>
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -183,10 +184,13 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                             mSplatData[idx].confidence = std::min(1.0f, mSplatData[idx].confidence + 0.15f);
                             dataChanged = true;
                             continue;
+                        } else if (current_d < d - 0.15f) {
+                            // Splat is in front of the observed depth, and doesn't match it -> degrade
+                            mSplatData[idx].confidence -= 0.05f;
+                            dataChanged = true;
                         }
+                        // If current_d > d + 0.15f, it's occluded, don't degrade.
                     }
-                    mSplatData[idx].confidence -= 0.05f;
-                    dataChanged = true;
                 }
             }
         }
@@ -256,10 +260,11 @@ void VoxelHash::addSparsePoints(const std::vector<float>& points, const float* v
             if (mSplatData.size() < MAX_SPLATS) {
                 Splat s{};
                 s.x = xw; s.y = yw; s.z = zw;
-                s.r = 1.0f; s.g = 1.0f; s.b = 1.0f; s.a = 0.3f;
-                s.scale[0] = s.scale[1] = s.scale[2] = 0.02f;
+                // [FIX] Use a neutral, semi-transparent grey instead of white cubes for sparse points
+                s.r = 0.6f; s.g = 0.65f; s.b = 0.7f; s.a = 0.15f;
+                s.scale[0] = s.scale[1] = s.scale[2] = 0.008f; // Smaller
                 s.rot[3] = 1.0f;
-                s.confidence = 0.6f;
+                s.confidence = 0.4f;
                 mSplatData.push_back(s);
                 mVoxelGrid[key] = static_cast<int>(mSplatData.size() - 1);
             }
@@ -309,7 +314,8 @@ void VoxelHash::optimize(const cv::Mat& depth, const cv::Mat& color, const float
         if (u_cam >= 0 && u_cam < depth.cols && v_cam >= 0 && v_cam < depth.rows) {
             float d = depth.at<float>(static_cast<int>(v_cam), static_cast<int>(u_cam));
             if (d > 0.1f) {
-                float err = std::abs(-p_cam.z - d);
+                float current_d = -p_cam.z;
+                float err = std::abs(current_d - d);
                 if (err < 0.15f) {
                     mSplatData[idx].confidence = std::min(1.0f, mSplatData[idx].confidence + 0.08f);
                     cv::Vec3b obs_col = color.at<cv::Vec3b>(static_cast<int>(v_cam), static_cast<int>(u_cam));
@@ -331,7 +337,9 @@ void VoxelHash::optimize(const cv::Mat& depth, const cv::Mat& color, const float
                     if (mSplatData[idx].confidence > 0.8f && mSplatData[idx].scale[0] < 0.005f) {
                         mSplatData[idx].scale[0] *= 1.1f; mSplatData[idx].scale[1] *= 1.1f;
                     }
-                } else { mSplatData[idx].confidence -= 0.04f; }
+                } else if (current_d < d - 0.20f) {
+                    mSplatData[idx].confidence -= 0.04f;
+                }
             }
         }
     }
@@ -402,6 +410,35 @@ void VoxelHash::prune(float threshold) {
     std::lock_guard<std::mutex> lock(mMutex);
     pruneInternal(threshold, mLastVoxelSize);
     mDataDirty = true;
+}
+
+void VoxelHash::save(const std::string& path) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    std::ofstream out(path, std::ios::binary);
+    if (!out) return;
+    int count = static_cast<int>(mSplatData.size());
+    out.write(reinterpret_cast<const char*>(&count), sizeof(int));
+    out.write(reinterpret_cast<const char*>(mSplatData.data()), count * sizeof(Splat));
+    LOGI("Saved %d splats to %s", count, path.c_str());
+}
+
+void VoxelHash::load(const std::string& path) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    std::ifstream in(path, std::ios::binary);
+    if (!in) return;
+    int count;
+    in.read(reinterpret_cast<char*>(&count), sizeof(int));
+    if (count < 0 || count > MAX_SPLATS) return;
+    mSplatData.resize(count);
+    in.read(reinterpret_cast<char*>(mSplatData.data()), count * sizeof(Splat));
+
+    mVoxelGrid.clear();
+    for (int i = 0; i < count; ++i) {
+        VoxelKey key{ static_cast<int>(std::floor(mSplatData[i].x / mLastVoxelSize)), static_cast<int>(std::floor(mSplatData[i].y / mLastVoxelSize)), static_cast<int>(std::floor(mSplatData[i].z / mLastVoxelSize)) };
+        mVoxelGrid[key] = i;
+    }
+    mDataDirty = true;
+    LOGI("Loaded %d splats from %s", count, path.c_str());
 }
 
 int VoxelHash::getSplatCount() const {

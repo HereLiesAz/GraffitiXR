@@ -252,6 +252,11 @@ void MobileGS::optimizeThreadFunc() {
             else colorRGB = latestFrame.color;
 
             mVoxelHash.optimize(latestFrame.depth, colorRGB, latestFrame.viewMatrix, latestFrame.projMatrix);
+
+            // [OPTIMIZATION] When global confidence is high, bake the results into the persistent textured mesh
+            if (mVoxelHash.getGlobalConfidenceAvg() > 0.80f) {
+                mSurfaceMesh.update(latestFrame.depth, colorRGB, latestFrame.viewMatrix, latestFrame.projMatrix, mAnchorMatrix, mLightLevel);
+            }
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
@@ -269,8 +274,12 @@ void MobileGS::destroy() {
     if (mRelocThread.joinable()) mRelocThread.join();
 }
 
-void MobileGS::saveModel(const std::string& p) {}
-void MobileGS::loadModel(const std::string& p) {}
+void MobileGS::saveModel(const std::string& p) {
+    mVoxelHash.save(p);
+}
+void MobileGS::loadModel(const std::string& p) {
+    mVoxelHash.load(p);
+}
 bool MobileGS::importModel3D(const std::string& p) { return false; }
 void MobileGS::setViewportSize(int w, int h) { mScreenWidth = w; mScreenHeight = h; }
 void MobileGS::setRelocEnabled(bool e) { mRelocEnabled = e; }

@@ -305,6 +305,8 @@ class ArViewModel @Inject constructor(
         isDestroying = true
         sessionMutex.withLock {
             stopAutoSave()
+            saveMapBlocking()
+            saveCloudPointsBlocking()
             session?.let {
                 if (isSessionResumed) it.pause()
                 it.close()

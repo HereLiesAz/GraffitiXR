@@ -51,6 +51,8 @@ public:
     void draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, int screenHeight);
     void clear();
     void prune(float threshold);
+    void save(const std::string& path);
+    void load(const std::string& path);
     int getSplatCount() const;
     int getImmutableSplatCount() const;
     void optimize(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat);
