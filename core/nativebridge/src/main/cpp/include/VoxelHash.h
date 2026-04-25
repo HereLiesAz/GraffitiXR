@@ -8,11 +8,12 @@
 #include <glm/gtc/type_ptr.hpp>
 
 struct Splat {
-    float x, y, z;          // Position (World Space)
-    float r, g, b, a;       // Color
-    float confidence;       // Persistence
-    float nx, ny, nz;       // Surface Normal
-    float radius;           // Splat Scale
+    float x, y, z;          // Mean (Position)
+    float r, g, b, a;       // Color (SH base) and Opacity
+    float sh[9];            // Spherical Harmonics (Level 1, view-dependent color)
+    float scale[3];         // Scaling factors (Anisotropic)
+    float rot[4];           // Rotation (Quaternion)
+    float confidence;       // Persistence/Certainty
 };
 
 struct VoxelKey {
@@ -35,11 +36,13 @@ public:
 
     void initGl();
     void update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, float voxelSize, float lightLevel);
-    void draw(const glm::mat4& mvp, float focalY, int screenHeight);
+    void addSparsePoints(const std::vector<float>& points, const float* viewMat, const float* projMat);
+    void draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, int screenHeight);
     void clear();
     void prune(float threshold);
     int getSplatCount() const;
     int getImmutableSplatCount() const;
+    void optimize(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat);
     float getVisibleConfidenceAvg() const;
     float getGlobalConfidenceAvg() const;
 

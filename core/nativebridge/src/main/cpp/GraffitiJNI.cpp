@@ -270,6 +270,17 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
 }
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedPointCloud(JNIEnv* env, jobject thiz, jfloatArray points) {
+    if (gSlamEngine) {
+        jsize len = env->GetArrayLength(points);
+        jfloat* ptr = env->GetFloatArrayElements(points, nullptr);
+        std::vector<float> pts(ptr, ptr + len);
+        gSlamEngine->pushPointCloud(pts);
+        env->ReleaseFloatArrayElements(points, ptr, JNI_ABORT);
+    }
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
         JNIEnv* env, jobject thiz, jobject depthBuffer, jint width, jint height, jint rowStride, jfloatArray intrArray, jint cpuW, jint cpuH, jint cvRotateCode) {
 

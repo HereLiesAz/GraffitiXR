@@ -264,7 +264,8 @@ class ArRenderer(
                             if (offset + 2 <= plane.buffer.limit()) {
                                 val raw = plane.buffer.getShort(offset).toInt() and 0xFFFF
                                 val depthMm = raw and 0x1FFF
-                                if (depthMm > 0) {
+                                // Filter out invalid range jumps (like the ghost 7.94m reading)
+                                if (depthMm > 0 && depthMm < 7900) {
                                     centerDepth = depthMm / 1000f
                                 }
                             }
@@ -412,10 +413,17 @@ class ArRenderer(
                 }
 
                 // 1. Point Cloud acquisition (only when scanning in CLOUD_POINTS mode)
-                if (currentScanMode == ArScanMode.CLOUD_POINTS && !anchorEstablished) {
+                if (!anchorEstablished) {
                     try {
                         frame.acquirePointCloud().use { pointCloud ->
-                            pointCloudRenderer.update(pointCloud)
+                            if (currentScanMode == ArScanMode.CLOUD_POINTS) {
+                                pointCloudRenderer.update(pointCloud)
+                            }
+                            
+                            // Feed sparse points to Gaussian engine for seeding
+                            val pts = FloatArray(pointCloud.points.remaining())
+                            pointCloud.points.get(pts)
+                            slamManager.feedPointCloud(pts)
                         }
                     } catch (e: Exception) {
                         Timber.w(e, "Failed to acquire point cloud")

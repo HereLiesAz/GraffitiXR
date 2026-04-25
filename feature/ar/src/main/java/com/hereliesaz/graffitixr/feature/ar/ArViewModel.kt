@@ -236,11 +236,31 @@ class ArViewModel @Inject constructor(
 
             s.configure(config)
 
-            val filter = CameraConfigFilter(s)
-            filter.targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
+            // Task: Engage dual lens depth mapping if device is capable.
+            // ARCore 1.53 uses setStereoCameraUsage on the CameraConfigFilter.
+            val filter = CameraConfigFilter(s).apply {
+                targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
+                try {
+                    // Filter for configs that support stereo camera usage
+                    setStereoCameraUsage(EnumSet.of(CameraConfig.StereoCameraUsage.REQUIRE_AND_USE))
+                } catch (e: NoSuchMethodError) {
+                    Timber.w("StereoCameraUsage not supported on this ARCore version")
+                }
+            }
+            
             val cameraConfigs = s.getSupportedCameraConfigs(filter)
             if (cameraConfigs.isNotEmpty()) {
                 s.cameraConfig = cameraConfigs[0]
+                _uiState.update { it.copy(isDualLensActive = true) }
+            } else {
+                // Fallback to standard mono config if stereo isn't available
+                val fallbackFilter = CameraConfigFilter(s).apply {
+                    targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
+                }
+                val fallbackConfigs = s.getSupportedCameraConfigs(fallbackFilter)
+                if (fallbackConfigs.isNotEmpty()) {
+                    s.cameraConfig = fallbackConfigs[0]
+                }
             }
 
             session = s

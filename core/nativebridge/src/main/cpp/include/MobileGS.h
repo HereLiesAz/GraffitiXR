@@ -30,6 +30,7 @@ public:
     // Restoration: World-space processing pipeline
     void processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv);
     void pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv);
+    void pushPointCloud(const std::vector<float>& points);
 
     void setArCoreTrackingState(bool isTracking);
     void restoreWallFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
@@ -55,10 +56,7 @@ public:
 
     int getSplatCount() const { return mVoxelHash.getSplatCount(); }
     int getImmutableSplatCount() const { return mVoxelHash.getImmutableSplatCount(); }
-    void getConfidenceAvgs(float& outVisible, float& outGlobal) const {
-        outVisible = mVoxelHash.getVisibleConfidenceAvg();
-        outGlobal = mVoxelHash.getGlobalConfidenceAvg();
-    }
+    void getConfidenceAvgs(float& outVisible, float& outGlobal) const;
     void setSplatsVisible(bool visible) { mSplatsVisible = visible; }
     float getPaintingProgress() const { return mPaintingProgress.load(std::memory_order_relaxed); }
 
@@ -84,6 +82,7 @@ private:
 
     std::mutex mMapMutex;
     void mapThreadFunc();
+    void optimizeThreadFunc();
     struct FrameData {
         cv::Mat depth;
         cv::Mat color;
@@ -98,6 +97,9 @@ private:
     std::condition_variable mQueueCv;
     std::vector<FrameData> mFrameQueue;
     std::atomic<bool> mMapRunning{false};
+
+    std::thread mOptimizeThread;
+    std::atomic<bool> mOptimizeRunning{false};
 
     void sortThreadFunc();
     cv::Point3f getCameraWorldPosition() const;

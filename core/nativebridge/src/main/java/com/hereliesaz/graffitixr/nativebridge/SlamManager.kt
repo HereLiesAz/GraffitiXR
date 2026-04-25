@@ -107,6 +107,10 @@ class SlamManager @Inject constructor() {
         }
     }
 
+    fun feedPointCloud(points: FloatArray) {
+        nativeFeedPointCloud(points)
+    }
+
     fun feedYuvFrame(
         yBuffer: ByteBuffer,
         uBuffer: ByteBuffer,
@@ -248,6 +252,7 @@ class SlamManager @Inject constructor() {
     )
     private external fun nativeSetRelocEnabled(enabled: Boolean)
     private external fun nativeSetVoxelSize(size: Float)
+    private external fun nativeFeedPointCloud(points: FloatArray)
     private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int, intrinsics: FloatArray, intrW: Int, intrH: Int, cvRotateCode: Int)
     private external fun nativeFeedYuvFrame(
         yBuffer: ByteBuffer,

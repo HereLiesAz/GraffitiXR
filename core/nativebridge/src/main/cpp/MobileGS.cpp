@@ -62,6 +62,10 @@ void MobileGS::initialize(int width, int height) {
         mMapRunning = true;
         mMapThread = std::thread(&MobileGS::mapThreadFunc, this);
     }
+    if (!mOptimizeRunning) {
+        mOptimizeRunning = true;
+        mOptimizeThread = std::thread(&MobileGS::optimizeThreadFunc, this);
+    }
 }
 
 void MobileGS::initGl() {
@@ -84,11 +88,16 @@ void MobileGS::draw() {
 
     if (mScanMode == 1) { // MURAL
         if (mMuralMethod == 0) { // VOXEL_HASH
-            mVoxelHash.draw(mvp, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight);
+            mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight);
         } else { // SURFACE_MESH
             mSurfaceMesh.draw(mvp);
         }
     }
+}
+
+void MobileGS::pushPointCloud(const std::vector<float>& points) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mVoxelHash.addSparsePoints(points, mViewMatrix, mProjMatrix);
 }
 
 void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv) {
@@ -186,6 +195,11 @@ void MobileGS::getAnchorTransform(float* outMat16) const {
     memcpy(outMat16, mAnchorMatrix, 16 * sizeof(float));
 }
 
+void MobileGS::getConfidenceAvgs(float& outVisible, float& outGlobal) const {
+    outVisible = mVoxelHash.getVisibleConfidenceAvg();
+    outGlobal = mVoxelHash.getGlobalConfidenceAvg();
+}
+
 void MobileGS::updatePersistentMesh(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat) {
     mSurfaceMesh.update(depth, color, viewMat, projMat, mAnchorMatrix, mLightLevel);
 }
@@ -200,7 +214,41 @@ void MobileGS::runPnPMatch(const cv::Mat& frame) { /* ... kept from stable ... *
 void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, const float* viewMat, const float* projMat) { /* ... kept ... */ }
 void MobileGS::interpolateAnchorStep() { /* ... kept ... */ }
 void MobileGS::setArCoreTrackingState(bool t) { mIsArCoreTracking = t; }
-void MobileGS::destroy() { mMapRunning = false; mRelocRunning = false; mQueueCv.notify_all(); mRelocCv.notify_all(); if (mMapThread.joinable()) mMapThread.join(); if (mRelocThread.joinable()) mRelocThread.join(); }
+void MobileGS::optimizeThreadFunc() {
+    setpriority(PRIO_PROCESS, 0, 19); // Background priority
+    while (mOptimizeRunning) {
+        FrameData latestFrame;
+        bool hasFrame = false;
+        {
+            std::lock_guard<std::mutex> lock(mQueueMutex);
+            if (!mFrameQueue.empty()) {
+                latestFrame = mFrameQueue.back(); // Optimize against the latest keyframe
+                hasFrame = true;
+            }
+        }
+
+        if (hasFrame) {
+            cv::Mat colorRGB;
+            if (latestFrame.isYuv) cv::cvtColor(latestFrame.color, colorRGB, cv::COLOR_YUV2RGB_NV21);
+            else colorRGB = latestFrame.color;
+
+            mVoxelHash.optimize(latestFrame.depth, colorRGB, latestFrame.viewMatrix, latestFrame.projMatrix);
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+}
+
+void MobileGS::destroy() {
+    mMapRunning = false;
+    mOptimizeRunning = false;
+    mRelocRunning = false;
+    mQueueCv.notify_all();
+    mRelocCv.notify_all();
+    if (mMapThread.joinable()) mMapThread.join();
+    if (mOptimizeThread.joinable()) mOptimizeThread.join();
+    if (mRelocThread.joinable()) mRelocThread.join();
+}
 
 void MobileGS::saveModel(const std::string& p) {}
 void MobileGS::loadModel(const std::string& p) {}
