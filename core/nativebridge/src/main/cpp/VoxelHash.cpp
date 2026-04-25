@@ -180,16 +180,40 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                     float d = depth.at<float>(static_cast<int>(v_cam), static_cast<int>(u_cam));
                     if (d > 0.1f) {
                         float current_d = -p_cam.z;
-                        if (std::abs(current_d - d) < 0.10f) {
-                            mSplatData[idx].confidence = std::min(1.0f, mSplatData[idx].confidence + 0.15f);
+                        float err = d - current_d; // Positive = PUSH, Negative = PULL
+
+                        if (std::abs(err) < 0.25f) {
+                            // [PUSH/PULL] Refine position along the camera ray
+                            float alpha_pos = 0.2f;
+                            float new_d = current_d + err * alpha_pos;
+                            glm::vec4 p_cam_new = p_cam * (new_d / current_d);
+                            p_cam_new.w = 1.0f;
+                            glm::vec4 p_world_new = invV * p_cam_new;
+
+                            // Update voxel grid if moved significantly
+                            VoxelKey oldKey{ static_cast<int>(std::floor(mSplatData[idx].x / voxelSize)), static_cast<int>(std::floor(mSplatData[idx].y / voxelSize)), static_cast<int>(std::floor(mSplatData[idx].z / voxelSize)) };
+                            VoxelKey newKey{ static_cast<int>(std::floor(p_world_new.x / voxelSize)), static_cast<int>(std::floor(p_world_new.y / voxelSize)), static_cast<int>(std::floor(p_world_new.z / voxelSize)) };
+
+                            mSplatData[idx].x = p_world_new.x;
+                            mSplatData[idx].y = p_world_new.y;
+                            mSplatData[idx].z = p_world_new.z;
+
+                            if (!(oldKey == newKey)) {
+                                mVoxelGrid.erase(oldKey);
+                                mVoxelGrid[newKey] = idx;
+                            }
+
+                            if (std::abs(new_d - d) < 0.08f) {
+                                mSplatData[idx].confidence = std::min(1.0f, mSplatData[idx].confidence + 0.10f);
+                            }
                             dataChanged = true;
                             continue;
-                        } else if (current_d < d - 0.15f) {
+                        } else if (err < -0.25f) {
                             // Splat is in front of the observed depth, and doesn't match it -> degrade
                             mSplatData[idx].confidence -= 0.05f;
                             dataChanged = true;
                         }
-                        // If current_d > d + 0.15f, it's occluded, don't degrade.
+                        // If err > 0.25f, it's occluded, don't degrade or pull.
                     }
                 }
             }
@@ -315,15 +339,39 @@ void VoxelHash::optimize(const cv::Mat& depth, const cv::Mat& color, const float
             float d = depth.at<float>(static_cast<int>(v_cam), static_cast<int>(u_cam));
             if (d > 0.1f) {
                 float current_d = -p_cam.z;
-                float err = std::abs(current_d - d);
-                if (err < 0.15f) {
-                    mSplatData[idx].confidence = std::min(1.0f, mSplatData[idx].confidence + 0.08f);
+                float err = d - current_d; // Positive = PUSH, Negative = PULL
+
+                if (std::abs(err) < 0.35f) {
+                    // [PUSH/PULL] Refine position along the camera ray
+                    float alpha_pos = 0.15f;
+                    float new_d = current_d + err * alpha_pos;
+                    glm::vec4 p_cam_new = p_cam * (new_d / current_d);
+                    p_cam_new.w = 1.0f;
+                    glm::vec4 p_world_new = glm::inverse(V) * p_cam_new;
+
+                    // Update voxel grid if moved significantly
+                    VoxelKey oldKey{ static_cast<int>(std::floor(mSplatData[idx].x / mLastVoxelSize)), static_cast<int>(std::floor(mSplatData[idx].y / mLastVoxelSize)), static_cast<int>(std::floor(mSplatData[idx].z / mLastVoxelSize)) };
+                    VoxelKey newKey{ static_cast<int>(std::floor(p_world_new.x / mLastVoxelSize)), static_cast<int>(std::floor(p_world_new.y / mLastVoxelSize)), static_cast<int>(std::floor(p_world_new.z / mLastVoxelSize)) };
+
+                    mSplatData[idx].x = p_world_new.x;
+                    mSplatData[idx].y = p_world_new.y;
+                    mSplatData[idx].z = p_world_new.z;
+
+                    if (!(oldKey == newKey)) {
+                        mVoxelGrid.erase(oldKey);
+                        mVoxelGrid[newKey] = idx;
+                    }
+
+                    if (std::abs(new_d - d) < 0.10f) {
+                        mSplatData[idx].confidence = std::min(1.0f, mSplatData[idx].confidence + 0.08f);
+                    }
+
                     cv::Vec3b obs_col = color.at<cv::Vec3b>(static_cast<int>(v_cam), static_cast<int>(u_cam));
                     float r_obs = obs_col[2]/255.0f, g_obs = obs_col[1]/255.0f, b_obs = obs_col[0]/255.0f;
-                    float alpha = 0.1f;
-                    mSplatData[idx].r += (r_obs - mSplatData[idx].r) * alpha;
-                    mSplatData[idx].g += (g_obs - mSplatData[idx].g) * alpha;
-                    mSplatData[idx].b += (b_obs - mSplatData[idx].b) * alpha;
+                    float alpha_col = 0.1f;
+                    mSplatData[idx].r += (r_obs - mSplatData[idx].r) * alpha_col;
+                    mSplatData[idx].g += (g_obs - mSplatData[idx].g) * alpha_col;
+                    mSplatData[idx].b += (b_obs - mSplatData[idx].b) * alpha_col;
 
                     float dz_dx = (depth.at<float>(static_cast<int>(v_cam), std::min(depth.cols-1, static_cast<int>(u_cam)+1)) - depth.at<float>(static_cast<int>(v_cam), std::max(0, static_cast<int>(u_cam)-1))) / (2.0f / fx);
                     float dz_dy = (depth.at<float>(std::min(depth.rows-1, static_cast<int>(v_cam)+1), static_cast<int>(u_cam)) - depth.at<float>(std::max(0, static_cast<int>(v_cam)-1), static_cast<int>(u_cam))) / (2.0f / fy);
@@ -337,7 +385,7 @@ void VoxelHash::optimize(const cv::Mat& depth, const cv::Mat& color, const float
                     if (mSplatData[idx].confidence > 0.8f && mSplatData[idx].scale[0] < 0.005f) {
                         mSplatData[idx].scale[0] *= 1.1f; mSplatData[idx].scale[1] *= 1.1f;
                     }
-                } else if (current_d < d - 0.20f) {
+                } else if (err < -0.35f) {
                     mSplatData[idx].confidence -= 0.04f;
                 }
             }
