@@ -39,6 +39,10 @@ struct VoxelKeyHash {
     }
 };
 
+struct ProtoSplat {
+    float x, y, z;
+};
+
 class VoxelHash {
 public:
     VoxelHash();
@@ -64,6 +68,7 @@ private:
 
     mutable std::mutex mMutex;
     std::vector<Splat> mSplatData;
+    std::vector<ProtoSplat> mProtoSplats;
     std::vector<Keyframe> mKeyframes;
     std::unordered_map<VoxelKey, int, VoxelKeyHash> mVoxelGrid;
 

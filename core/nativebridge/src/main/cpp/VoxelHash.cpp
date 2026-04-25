@@ -190,7 +190,7 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
     {
         std::lock_guard<std::mutex> lock(mMutex);
 
-        // 1. Refinement Loop: Subset optimization for efficiency
+        // 1. Refinement & Promotion Loop: Subset optimization for efficiency
         int totalSplats = static_cast<int>(mSplatData.size());
         if (totalSplats > 0) {
             int itemsToProcess = std::max(100, totalSplats / 4);
@@ -198,7 +198,7 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                 int idx = mNextRefineIndex % totalSplats;
                 mNextRefineIndex++;
 
-                if (mSplatData[idx].confidence >= 0.98f) continue;
+                if (mSplatData[idx].a >= 0.98f) continue;
 
                 glm::vec4 p_cam = V * glm::vec4(mSplatData[idx].x, mSplatData[idx].y, mSplatData[idx].z, 1.0f);
                 if (p_cam.z >= -0.1f) continue;
@@ -234,66 +234,61 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                             }
 
                             if (std::abs(new_d - d) < 0.08f) {
-                                mSplatData[idx].confidence = std::min(1.0f, mSplatData[idx].confidence + 0.10f);
+                                mSplatData[idx].a = std::min(1.0f, mSplatData[idx].a + 0.10f);
+                                mSplatData[idx].confidence = std::min(1.0f, mSplatData[idx].confidence + 0.15f);
                             }
                             dataChanged = true;
                             continue;
                         } else if (err < -0.25f) {
                             // Splat is in front of the observed depth, and doesn't match it -> degrade
-                            mSplatData[idx].confidence -= 0.05f;
+                            mSplatData[idx].a -= 0.05f;
                             dataChanged = true;
                         }
-                        // If err > 0.25f, it's occluded, don't degrade or pull.
                     }
                 }
             }
         }
 
-        // 2. Discovery loop
-        int step = 6;
-        for (int r = step; r < depth.rows - step; r += step) {
-            for (int c = step; c < depth.cols - step; c += step) {
-                float d = depth.at<float>(r, c);
-                if (d > 0.1f && d < 7.0f) {
-                    int colorR = static_cast<int>(r * scaleY);
-                    int colorC = static_cast<int>(c * scaleX);
-                    const auto& col = color.at<cv::Vec3b>(colorR, colorC);
-                    const auto& col_alt = color.at<cv::Vec3b>(std::max(0, colorR - 4), std::max(0, colorC - 4));
-                    float color_var = std::abs(static_cast<float>(col[0]) - col_alt[0]) +
-                                     std::abs(static_cast<float>(col[1]) - col_alt[1]) +
-                                     std::abs(static_cast<float>(col[2]) - col_alt[2]);
-                    if (color_var < 8.0f) continue;
+        // 2. Proto-Splat Promotion
+        if (!mProtoSplats.empty()) {
+            int itemsToProcess = std::max(50, (int)mProtoSplats.size() / 10);
+            for (int i = 0; i < itemsToProcess; ++i) {
+                int pIdx = rand() % mProtoSplats.size();
+                const auto& ps = mProtoSplats[pIdx];
 
-                    float xc = (static_cast<float>(c) - cx) * d / fx;
-                    float yc = -(static_cast<float>(r) - cy) * d / fy;
-                    float zc = -d;
-                    glm::vec4 p_world = invV * glm::vec4(xc, yc, zc, 1.0f);
+                glm::vec4 p_cam = V * glm::vec4(ps.x, ps.y, ps.z, 1.0f);
+                if (p_cam.z >= -0.1f) continue;
 
-                    VoxelKey key{ static_cast<int>(std::floor(p_world.x / voxelSize)), static_cast<int>(std::floor(p_world.y / voxelSize)), static_cast<int>(std::floor(p_world.z / voxelSize)) };
+                float u_cam = (p_cam.x * fx / -p_cam.z) + cx;
+                float v_cam = (p_cam.y * -fy / -p_cam.z) + cy;
 
-                    if (mVoxelGrid.find(key) == mVoxelGrid.end()) {
-                        if (mSplatData.size() < MAX_SPLATS) {
+                if (u_cam >= 0 && u_cam < (float)depth.cols && v_cam >= 0 && v_cam < (float)depth.rows) {
+                    float d = depth.at<float>(static_cast<int>(v_cam), static_cast<int>(u_cam));
+                    if (d > 0.1f && std::abs(-p_cam.z - d) < 0.20f) {
+                        VoxelKey key{ static_cast<int>(std::floor(ps.x / voxelSize)), static_cast<int>(std::floor(ps.y / voxelSize)), static_cast<int>(std::floor(ps.z / voxelSize)) };
+                        if (mVoxelGrid.find(key) == mVoxelGrid.end() && mSplatData.size() < MAX_SPLATS) {
                             Splat s{};
-                            s.x = p_world.x; s.y = p_world.y; s.z = p_world.z;
-                            s.r = col[2]/255.0f; s.g = col[1]/255.0f; s.b = col[0]/255.0f; s.a = 0.5f;
+                            s.x = ps.x; s.y = ps.y; s.z = ps.z;
 
+                            int colorR = static_cast<int>(v_cam * scaleY);
+                            int colorC = static_cast<int>(u_cam * scaleX);
+                            const auto& col = color.at<cv::Vec3b>(std::min(colorR, color.rows-1), std::min(colorC, color.cols-1));
+
+                            s.r = col[2]/255.0f; s.g = col[1]/255.0f; s.b = col[0]/255.0f; s.a = 0.8f;
                             s.sh[0] = (s.r - 0.5f) / 0.282095f;
                             s.sh[1] = (s.g - 0.5f) / 0.282095f;
                             s.sh[2] = (s.b - 0.5f) / 0.282095f;
 
-                            float s_val = d / fx * 2.0f;
+                            float s_val = d / fx * 1.2f;
                             s.scale[0] = s_val; s.scale[1] = s_val; s.scale[2] = s_val * 0.1f;
+                            s.rot[3] = 1.0f;
+                            s.confidence = 0.5f;
 
-                            float dz_dx = (depth.at<float>(r, std::min(depth.cols-1, c+1)) - depth.at<float>(r, std::max(0, c-1))) / (2.0f / fx);
-                            float dz_dy = (depth.at<float>(std::min(depth.rows-1, r+1), c) - depth.at<float>(std::max(0, r-1), c)) / (2.0f / fy);
-                            glm::vec3 normal = glm::normalize(glm::vec3(-dz_dx, -dz_dy, 1.0f));
-                            glm::vec3 normalW = glm::normalize(glm::mat3(invV) * normal);
-                            glm::quat q = glm::rotation(glm::vec3(0, 0, 1), normalW);
-                            s.rot[0] = q.x; s.rot[1] = q.y; s.rot[2] = q.z; s.rot[3] = q.w;
-
-                            s.confidence = 0.25f;
                             mSplatData.push_back(s);
                             mVoxelGrid[key] = static_cast<int>(mSplatData.size() - 1);
+
+                            // Remove from proto list
+                            mProtoSplats.erase(mProtoSplats.begin() + pIdx);
                             dataChanged = true;
                         }
                     }
@@ -308,23 +303,11 @@ void VoxelHash::addSparsePoints(const std::vector<float>& points, const float* v
     std::lock_guard<std::mutex> lock(mMutex);
     for (size_t i = 0; i < points.size(); i += 4) {
         float xw = points[i], yw = points[i+1], zw = points[i+2];
-        VoxelKey key{ static_cast<int>(std::floor(xw / mLastVoxelSize)), static_cast<int>(std::floor(yw / mLastVoxelSize)), static_cast<int>(std::floor(zw / mLastVoxelSize)) };
-
-        if (mVoxelGrid.find(key) == mVoxelGrid.end()) {
-            if (mSplatData.size() < MAX_SPLATS) {
-                Splat s{};
-                s.x = xw; s.y = yw; s.z = zw;
-                // [FIX] Use a neutral, semi-transparent grey seed state for sparse points
-                s.r = 0.5f; s.g = 0.5f; s.b = 0.5f; s.a = 0.05f;
-                s.scale[0] = s.scale[1] = s.scale[2] = 0.005f; // Very small seed
-                s.rot[3] = 1.0f;
-                s.confidence = 0.3f;
-                mSplatData.push_back(s);
-                mVoxelGrid[key] = static_cast<int>(mSplatData.size() - 1);
-            }
+        // Store as ProtoSplat; will be promoted to a full Splat in the update loop when seen by camera.
+        if (mProtoSplats.size() < MAX_SPLATS) {
+            mProtoSplats.push_back({xw, yw, zw});
         }
     }
-    mDataDirty = true;
 }
 
 void VoxelHash::addKeyframe(const Keyframe& kf) {
@@ -343,6 +326,7 @@ void VoxelHash::optimize(const cv::Mat& depth, const cv::Mat& color, const float
     if (!mKeyframes.empty()) { kf = &mKeyframes[rand() % mKeyframes.size()]; }
 
     glm::mat4 V = glm::make_mat4(viewMat);
+    glm::vec3 camPos = glm::vec3(glm::inverse(V)[3]);
     const float halfW = (float)depth.cols / 2.0f;
     const float halfH = (float)depth.rows / 2.0f;
     float fx = projMat[0] * halfW;
@@ -353,7 +337,7 @@ void VoxelHash::optimize(const cv::Mat& depth, const cv::Mat& color, const float
     int batchSize = std::max(500, splatCount / 8);
     for (int i = 0; i < batchSize; ++i) {
         int idx = rand() % splatCount;
-        if (mSplatData[idx].confidence >= 0.99f) continue;
+        if (mSplatData[idx].a >= 0.99f && mSplatData[idx].confidence >= 0.99f) continue;
 
         if (kf) {
             for(int j=0; j<3; ++j) mSplatData[idx].velocity[j] += (kf->linearVelocity[j] - mSplatData[idx].velocity[j]) * 0.05f;
@@ -393,24 +377,43 @@ void VoxelHash::optimize(const cv::Mat& depth, const cv::Mat& color, const float
                     }
 
                     if (std::abs(new_d - d) < 0.10f) {
+                        mSplatData[idx].a = std::min(1.0f, mSplatData[idx].a + 0.05f);
                         mSplatData[idx].confidence = std::min(1.0f, mSplatData[idx].confidence + 0.08f);
                     }
 
-                    // [EVOLUTION] Aggressively update seed splats with real color and scale
+                    // [SH OPTIMIZATION] Update view-dependent color coefficients (SH Level 1)
                     cv::Vec3b obs_col = color.at<cv::Vec3b>(static_cast<int>(v_cam), static_cast<int>(u_cam));
-                    float r_obs = obs_col[2]/255.0f, g_obs = obs_col[1]/255.0f, b_obs = obs_col[0]/255.0f;
-                    float alpha_col = 0.2f;
-                    mSplatData[idx].r += (r_obs - mSplatData[idx].r) * alpha_col;
-                    mSplatData[idx].g += (g_obs - mSplatData[idx].g) * alpha_col;
-                    mSplatData[idx].b += (b_obs - mSplatData[idx].b) * alpha_col;
-                    mSplatData[idx].a = std::min(0.8f, mSplatData[idx].a + 0.05f);
+                    glm::vec3 obs_rgb = {obs_col[2]/255.0f, obs_col[1]/255.0f, obs_col[0]/255.0f};
 
-                    float target_scale = d / fx * 1.5f;
-                    mSplatData[idx].scale[0] += (target_scale - mSplatData[idx].scale[0]) * 0.1f;
-                    mSplatData[idx].scale[1] += (target_scale - mSplatData[idx].scale[1]) * 0.1f;
-                    mSplatData[idx].scale[2] = mSplatData[idx].scale[0] * 0.1f;
+                    glm::vec3 dir = glm::normalize(glm::vec3(mSplatData[idx].x, mSplatData[idx].y, mSplatData[idx].z) - camPos);
+                    float SH_C1 = 0.4886025f;
+
+                    // Current prediction
+                    glm::vec3 pred_rgb = {mSplatData[idx].r, mSplatData[idx].g, mSplatData[idx].b};
+                    pred_rgb.r += SH_C1 * (mSplatData[idx].sh[0] * dir.y + mSplatData[idx].sh[1] * dir.z + mSplatData[idx].sh[2] * dir.x);
+                    pred_rgb.g += SH_C1 * (mSplatData[idx].sh[3] * dir.y + mSplatData[idx].sh[4] * dir.z + mSplatData[idx].sh[5] * dir.x);
+                    pred_rgb.b += SH_C1 * (mSplatData[idx].sh[6] * dir.y + mSplatData[idx].sh[7] * dir.z + mSplatData[idx].sh[8] * dir.x);
+
+                    glm::vec3 color_err = obs_rgb - pred_rgb;
+                    float alpha_sh = 0.15f;
+
+                    // Gradient descent on base color and SH
+                    mSplatData[idx].r += color_err.r * 0.1f;
+                    mSplatData[idx].g += color_err.g * 0.1f;
+                    mSplatData[idx].b += color_err.b * 0.1f;
+
+                    mSplatData[idx].sh[0] += color_err.r * SH_C1 * dir.y * alpha_sh;
+                    mSplatData[idx].sh[1] += color_err.r * SH_C1 * dir.z * alpha_sh;
+                    mSplatData[idx].sh[2] += color_err.r * SH_C1 * dir.x * alpha_sh;
+                    mSplatData[idx].sh[3] += color_err.g * SH_C1 * dir.y * alpha_sh;
+                    mSplatData[idx].sh[4] += color_err.g * SH_C1 * dir.z * alpha_sh;
+                    mSplatData[idx].sh[5] += color_err.g * SH_C1 * dir.x * alpha_sh;
+                    mSplatData[idx].sh[6] += color_err.b * SH_C1 * dir.y * alpha_sh;
+                    mSplatData[idx].sh[7] += color_err.b * SH_C1 * dir.z * alpha_sh;
+                    mSplatData[idx].sh[8] += color_err.b * SH_C1 * dir.x * alpha_sh;
+
                 } else if (err < -0.35f) {
-                    mSplatData[idx].confidence -= 0.04f;
+                    mSplatData[idx].a -= 0.04f;
                 }
             }
         }
@@ -453,6 +456,7 @@ void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, 
 void VoxelHash::clear() {
     std::lock_guard<std::mutex> lock(mMutex);
     mSplatData.clear();
+    mProtoSplats.clear();
     mVoxelGrid.clear();
     mKeyframes.clear();
     mDataDirty = true;
@@ -460,7 +464,7 @@ void VoxelHash::clear() {
 
 void VoxelHash::pruneInternal(float threshold, float voxelSize) {
     mSplatData.erase(std::remove_if(mSplatData.begin(), mSplatData.end(),
-        [threshold](const Splat& s) { return s.confidence < threshold; }), mSplatData.end());
+        [threshold](const Splat& s) { return s.a < threshold; }), mSplatData.end());
     mVoxelGrid.clear();
     for (int i = 0; i < static_cast<int>(mSplatData.size()); ++i) {
         VoxelKey key{ static_cast<int>(std::floor(mSplatData[i].x / voxelSize)), static_cast<int>(std::floor(mSplatData[i].y / voxelSize)), static_cast<int>(std::floor(mSplatData[i].z / voxelSize)) };
