@@ -19,23 +19,23 @@
 static const char* kVertexShader =
     "#version 300 es\n"
     "precision highp float;\n"
-    "layout(location = 0) in vec3 aPosition;\n"
-    "layout(location = 1) in vec4 aColor;\n"
-    "layout(location = 2) in vec3 aScale;\n"
-    "layout(location = 3) in vec4 aRot;\n"
-    "layout(location = 4) in float aConfidence;\n"
-    "layout(location = 5) in vec3 aVelocity;\n"
-    "layout(location = 6) in vec3 aSH_R;\n"
-    "layout(location = 7) in vec3 aSH_G;\n"
-    "layout(location = 8) in vec3 aSH_B;\n"
+    "layout(location = 0) in vec2 aQuadPos;\n" // (-0.5, -0.5) to (0.5, 0.5)
+    "layout(location = 1) in vec3 aPosition;\n"
+    "layout(location = 2) in vec4 aColor;\n"
+    "layout(location = 3) in vec3 aScale;\n"
+    "layout(location = 4) in vec4 aRot;\n"
+    "layout(location = 5) in float aConfidence;\n"
+    "layout(location = 6) in vec3 aVelocity;\n"
+    "layout(location = 7) in vec3 aSH_R;\n"
+    "layout(location = 8) in vec3 aSH_G;\n"
+    "layout(location = 9) in vec3 aSH_B;\n"
     "uniform mat4 uMvp;\n"
     "uniform mat4 uView;\n"
     "uniform float uFocalY;\n"
     "uniform float uTimeStep;\n"
     "uniform vec3 uCamPos;\n"
     "out vec4 vColor;\n"
-    "out mat3 vCov2DInv;\n"
-    "out float vDepth;\n"
+    "out vec2 vLocalPos;\n"
     "\n"
     "mat3 quatToMat3(vec4 q) {\n"
     "  float x = q.x, y = q.y, z = q.z, w = q.w;\n"
@@ -49,8 +49,7 @@ static const char* kVertexShader =
     "void main() {\n"
     "  vec3 integratedPos = aPosition + aVelocity * uTimeStep;\n"
     "  vec4 posCam = uView * vec4(integratedPos, 1.0);\n"
-    "  gl_Position = uMvp * vec4(integratedPos, 1.0);\n"
-    "  vDepth = -posCam.z;\n"
+    "  if (posCam.z >= -0.1) { gl_Position = vec4(0,0,0,1); return; }\n"
     "\n"
     "  vec3 dir = normalize(integratedPos - uCamPos);\n"
     "  float SH_C1 = 0.4886025;\n"
@@ -72,37 +71,39 @@ static const char* kVertexShader =
     "  mat3 J = mat3(J11, 0.0, J13, 0.0, J22, J23, 0.0, 0.0, 0.0);\n"
     "  mat3 T = J * W;\n"
     "  mat3 Sigma2D = T * Sigma3D * transpose(T);\n"
+    "  Sigma2D[0][0] += 0.3; Sigma2D[1][1] += 0.3;\n" // Smoothing
     "\n"
-    "  Sigma2D[0][0] += 0.3;\n"
-    "  Sigma2D[1][1] += 0.3;\n"
-    "\n"
-    "  float det = Sigma2D[0][0] * Sigma2D[1][1] - Sigma2D[0][1] * Sigma2D[0][1];\n"
-    "  if (det <= 0.0) { gl_Position = vec4(0,0,0,-1); return; }\n"
-    "\n"
-    "  vCov2DInv = inverse(Sigma2D);\n"
-    "  vColor = vec4(max(vec3(0.0), resColor), aColor.a * clamp(aConfidence, 0.0, 1.0));\n"
-    "\n"
+    "  // Eigenvalue decomp for 2D ellipse\n"
     "  float mid = 0.5 * (Sigma2D[0][0] + Sigma2D[1][1]);\n"
-    "  float lambda1 = mid + sqrt(max(0.1, mid*mid - det));\n"
-    "  float radius = ceil(3.0 * sqrt(lambda1));\n"
-    "  gl_PointSize = clamp(radius * 2.0, 4.0, 128.0);\n"
+    "  float det = Sigma2D[0][0] * Sigma2D[1][1] - Sigma2D[0][1] * Sigma2D[0][1];\n"
+    "  float delta = max(0.0, mid * mid - det);\n"
+    "  float lambda1 = mid + sqrt(delta);\n"
+    "  float lambda2 = mid - sqrt(delta);\n"
+    "  float scale2D_x = sqrt(max(0.1, lambda1));\n"
+    "  float scale2D_y = sqrt(max(0.1, lambda2));\n"
+    "  float angle = 0.5 * atan(2.0 * Sigma2D[0][1], Sigma2D[0][0] - Sigma2D[1][1]);\n"
+    "\n"
+    "  vec2 cosSin = vec2(cos(angle), sin(angle));\n"
+    "  mat2 rot2D = mat2(cosSin.x, cosSin.y, -cosSin.y, cosSin.x);\n"
+    "  vec2 offset = rot2D * (aQuadPos * vec2(scale2D_x, scale2D_y) * 4.0);\n"
+    "\n"
+    "  gl_Position = uMvp * vec4(integratedPos, 1.0);\n"
+    "  gl_Position.xy += offset * gl_Position.w / uFocalY;\n"
+    "  vColor = vec4(max(vec3(0.0), resColor), aColor.a * clamp(aConfidence, 0.0, 1.0));\n"
+    "  vLocalPos = aQuadPos * 4.0;\n"
     "}\n";
 
 static const char* kFragmentShader =
     "#version 300 es\n"
     "precision mediump float;\n"
     "in vec4 vColor;\n"
-    "in mat3 vCov2DInv;\n"
-    "in float vDepth;\n"
+    "in vec2 vLocalPos;\n"
     "out vec4 oColor;\n"
-    "\n"
     "void main() {\n"
-    "  vec2 d = gl_PointCoord - vec2(0.5);\n"
-    "  float power = -0.5 * (d.x*d.x*vCov2DInv[0][0] + 2.0*d.x*d.y*vCov2DInv[0][1] + d.y*d.y*vCov2DInv[1][1]);\n"
+    "  float power = -0.5 * dot(vLocalPos, vLocalPos);\n"
     "  float g = exp(power);\n"
-    "  float weight = g * vColor.a * (1.0 / (1.0 + vDepth * 0.05));\n"
-    "  if (weight < 0.1) discard;\n"
-    "  oColor = vec4(vColor.rgb, weight);\n"
+    "  if (g < 0.1) discard;\n"
+    "  oColor = vec4(vColor.rgb, vColor.a * g);\n"
     "}\n";
 
 VoxelHash::VoxelHash() : mNextRefineIndex(0) {
@@ -114,9 +115,11 @@ VoxelHash::~VoxelHash() {}
 void VoxelHash::initGl() {
     std::lock_guard<std::mutex> lock(mMutex);
     if (mProgram != 0 && glIsProgram(mProgram)) return;
-    LOGI("Initializing Advanced Gaussian Engine");
+    LOGI("Initializing Advanced Gaussian Engine with Instanced Quads");
     mProgram = 0;
     mPointVbo = 0;
+    mQuadVbo = 0;
+    mVao = 0;
 
     GLuint vs = compileShader(GL_VERTEX_SHADER, kVertexShader);
     GLuint fs = compileShader(GL_FRAGMENT_SHADER, kFragmentShader);
@@ -128,9 +131,36 @@ void VoxelHash::initGl() {
         glDeleteShader(vs);
         glDeleteShader(fs);
 
+        glGenVertexArrays(1, &mVao);
+        glBindVertexArray(mVao);
+
         glGenBuffers(1, &mPointVbo);
         glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
         glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(MAX_SPLATS * sizeof(Splat)), nullptr, GL_DYNAMIC_DRAW);
+
+        glGenBuffers(1, &mQuadVbo);
+        glBindBuffer(GL_ARRAY_BUFFER, mQuadVbo);
+        float quad[] = { -0.5f,-0.5f, 0.5f,-0.5f, -0.5f,0.5f, 0.5f,0.5f };
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
+
+        // Quad positions
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+
+        // Instanced Splat data
+        glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
+        glEnableVertexAttribArray(1); glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)0);
+        glEnableVertexAttribArray(2); glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(12));
+        glEnableVertexAttribArray(3); glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(64));
+        glEnableVertexAttribArray(4); glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(76));
+        glEnableVertexAttribArray(5); glVertexAttribPointer(5, 1, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(92));
+        glEnableVertexAttribArray(6); glVertexAttribPointer(6, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(96));
+        glEnableVertexAttribArray(7); glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(28));
+        glEnableVertexAttribArray(8); glVertexAttribPointer(8, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(40));
+        glEnableVertexAttribArray(9); glVertexAttribPointer(9, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(52));
+
+        for(int i=1; i<=9; ++i) glVertexAttribDivisor(i, 1);
+        glBindVertexArray(0);
     }
     mDataDirty = true;
 }
@@ -284,11 +314,11 @@ void VoxelHash::addSparsePoints(const std::vector<float>& points, const float* v
             if (mSplatData.size() < MAX_SPLATS) {
                 Splat s{};
                 s.x = xw; s.y = yw; s.z = zw;
-                // [FIX] Use a neutral, semi-transparent grey instead of white cubes for sparse points
-                s.r = 0.6f; s.g = 0.65f; s.b = 0.7f; s.a = 0.15f;
-                s.scale[0] = s.scale[1] = s.scale[2] = 0.008f; // Smaller
+                // [FIX] Use a neutral, semi-transparent grey seed state for sparse points
+                s.r = 0.5f; s.g = 0.5f; s.b = 0.5f; s.a = 0.05f;
+                s.scale[0] = s.scale[1] = s.scale[2] = 0.005f; // Very small seed
                 s.rot[3] = 1.0f;
-                s.confidence = 0.4f;
+                s.confidence = 0.3f;
                 mSplatData.push_back(s);
                 mVoxelGrid[key] = static_cast<int>(mSplatData.size() - 1);
             }
@@ -366,25 +396,19 @@ void VoxelHash::optimize(const cv::Mat& depth, const cv::Mat& color, const float
                         mSplatData[idx].confidence = std::min(1.0f, mSplatData[idx].confidence + 0.08f);
                     }
 
+                    // [EVOLUTION] Aggressively update seed splats with real color and scale
                     cv::Vec3b obs_col = color.at<cv::Vec3b>(static_cast<int>(v_cam), static_cast<int>(u_cam));
                     float r_obs = obs_col[2]/255.0f, g_obs = obs_col[1]/255.0f, b_obs = obs_col[0]/255.0f;
-                    float alpha_col = 0.1f;
+                    float alpha_col = 0.2f;
                     mSplatData[idx].r += (r_obs - mSplatData[idx].r) * alpha_col;
                     mSplatData[idx].g += (g_obs - mSplatData[idx].g) * alpha_col;
                     mSplatData[idx].b += (b_obs - mSplatData[idx].b) * alpha_col;
+                    mSplatData[idx].a = std::min(0.8f, mSplatData[idx].a + 0.05f);
 
-                    float dz_dx = (depth.at<float>(static_cast<int>(v_cam), std::min(depth.cols-1, static_cast<int>(u_cam)+1)) - depth.at<float>(static_cast<int>(v_cam), std::max(0, static_cast<int>(u_cam)-1))) / (2.0f / fx);
-                    float dz_dy = (depth.at<float>(std::min(depth.rows-1, static_cast<int>(v_cam)+1), static_cast<int>(u_cam)) - depth.at<float>(std::max(0, static_cast<int>(v_cam)-1), static_cast<int>(u_cam))) / (2.0f / fy);
-                    glm::vec3 normal = glm::normalize(glm::vec3(-dz_dx, -dz_dy, 1.0f));
-                    glm::vec3 normalW = glm::normalize(glm::mat3(glm::inverse(V)) * normal);
-                    glm::quat target_q = glm::rotation(glm::vec3(0, 0, 1), normalW);
-                    glm::quat current_q(mSplatData[idx].rot[3], mSplatData[idx].rot[0], mSplatData[idx].rot[1], mSplatData[idx].rot[2]);
-                    glm::quat refined_q = glm::slerp(current_q, target_q, 0.1f);
-                    mSplatData[idx].rot[0] = refined_q.x; mSplatData[idx].rot[1] = refined_q.y; mSplatData[idx].rot[2] = refined_q.z; mSplatData[idx].rot[3] = refined_q.w;
-
-                    if (mSplatData[idx].confidence > 0.8f && mSplatData[idx].scale[0] < 0.005f) {
-                        mSplatData[idx].scale[0] *= 1.1f; mSplatData[idx].scale[1] *= 1.1f;
-                    }
+                    float target_scale = d / fx * 1.5f;
+                    mSplatData[idx].scale[0] += (target_scale - mSplatData[idx].scale[0]) * 0.1f;
+                    mSplatData[idx].scale[1] += (target_scale - mSplatData[idx].scale[1]) * 0.1f;
+                    mSplatData[idx].scale[2] = mSplatData[idx].scale[0] * 0.1f;
                 } else if (err < -0.35f) {
                     mSplatData[idx].confidence -= 0.04f;
                 }
@@ -399,8 +423,8 @@ void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, 
     int count = static_cast<int>(mSplatData.size());
     if (!mProgram || count == 0) return;
 
-    glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
     if (mDataDirty) {
+        glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
         glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(count * sizeof(Splat)), mSplatData.data(), GL_DYNAMIC_DRAW);
         mDataDirty = false;
     }
@@ -414,24 +438,14 @@ void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, 
     glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, glm::value_ptr(camPos));
 
     glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE);
+    glBlendFunc(GL_ONE, GL_ONE); // Additive for GS look
     glDepthMask(GL_FALSE);
     glDisable(GL_DEPTH_TEST);
 
-    glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)0);
-    glEnableVertexAttribArray(1); glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(12));
-    glEnableVertexAttribArray(2); glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(64));
-    glEnableVertexAttribArray(3); glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(76));
-    glEnableVertexAttribArray(4); glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(92));
-    glEnableVertexAttribArray(5); glVertexAttribPointer(5, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(96));
-    glEnableVertexAttribArray(6); glVertexAttribPointer(6, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(28));
-    glEnableVertexAttribArray(7); glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(40));
-    glEnableVertexAttribArray(8); glVertexAttribPointer(8, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(52));
+    glBindVertexArray(mVao);
+    glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, count);
+    glBindVertexArray(0);
 
-    glDrawArrays(GL_POINTS, 0, count);
-
-    glDisableVertexAttribArray(0); glDisableVertexAttribArray(1); glDisableVertexAttribArray(2); glDisableVertexAttribArray(3);
-    glDisableVertexAttribArray(4); glDisableVertexAttribArray(5); glDisableVertexAttribArray(6); glDisableVertexAttribArray(7); glDisableVertexAttribArray(8);
     glDepthMask(GL_TRUE);
     glEnable(GL_DEPTH_TEST);
 }

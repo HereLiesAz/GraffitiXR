@@ -70,6 +70,8 @@ private:
     float mLastVoxelSize = 0.005f;
     GLuint mProgram = 0;
     GLuint mPointVbo = 0;
+    GLuint mQuadVbo = 0;
+    GLuint mVao = 0;
     bool mDataDirty = false;
     int mNextRefineIndex = 0;
 
