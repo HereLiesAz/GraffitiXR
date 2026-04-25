@@ -7,16 +7,13 @@
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
+#include <glm/gtx/norm.hpp>
+#include <glm/gtx/component_wise.hpp>
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "GaussianEngine", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "GaussianEngine", __VA_ARGS__)
 
 // ~~~ Advanced Gaussian Splatting Implementation ~~~
-// Integrated Techniques:
-// 1. Motion Deblurring (Kinematic Optimization) - inspired by SpectacularAI
-// 2. Coarse-to-Fine Refinement - inspired by CF-3DGS
-// 3. Atomization & Proliferation - inspired by AtomGS
-// 4. Order-Independent Rendering (OIR) - inspired by Mobile-GS
 
 static const char* kVertexShader =
     "#version 300 es\n"
@@ -33,7 +30,7 @@ static const char* kVertexShader =
     "uniform mat4 uMvp;\n"
     "uniform mat4 uView;\n"
     "uniform float uFocalY;\n"
-    "uniform float uTimeStep;\n" // Exposure time integration
+    "uniform float uTimeStep;\n"
     "uniform vec3 uCamPos;\n"
     "out vec4 vColor;\n"
     "out mat3 vCov2DInv;\n"
@@ -49,13 +46,11 @@ static const char* kVertexShader =
     "}\n"
     "\n"
     "void main() {\n"
-    "  // Motion compensation: Integrate velocity over exposure time\n"
     "  vec3 integratedPos = aPosition + aVelocity * uTimeStep;\n"
     "  vec4 posCam = uView * vec4(integratedPos, 1.0);\n"
     "  gl_Position = uMvp * vec4(integratedPos, 1.0);\n"
     "  vDepth = -posCam.z;\n"
     "\n"
-    "  // View-dependent color (Spherical Harmonics Level 1)\n"
     "  vec3 dir = normalize(integratedPos - uCamPos);\n"
     "  float SH_C1 = 0.4886025;\n"
     "  vec3 resColor = aColor.rgb;\n"
@@ -68,7 +63,6 @@ static const char* kVertexShader =
     "  mat3 M = R * S;\n"
     "  mat3 Sigma3D = M * transpose(M);\n"
     "\n"
-    "  // EWA Projection\n"
     "  mat3 W = mat3(uView);\n"
     "  float J11 = uFocalY / posCam.z;\n"
     "  float J13 = - (posCam.x * uFocalY) / (posCam.z * posCam.z);\n"
@@ -105,7 +99,6 @@ static const char* kFragmentShader =
     "  vec2 d = gl_PointCoord - vec2(0.5);\n"
     "  float power = -0.5 * (d.x*d.x*vCov2DInv[0][0] + 2.0*d.x*d.y*vCov2DInv[0][1] + d.y*d.y*vCov2DInv[1][1]);\n"
     "  float g = exp(power);\n"
-    "  // Mobile-GS OIR depth-aware additive weight\n"
     "  float weight = g * vColor.a * (1.0 / (1.0 + vDepth * 0.05));\n"
     "  if (weight < 0.1) discard;\n"
     "  oColor = vec4(vColor.rgb, weight);\n"
@@ -144,8 +137,8 @@ void VoxelHash::initGl() {
 void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, float voxelSize, float /*lightLevel*/) {
     if (depth.empty() || color.empty()) return;
     mLastVoxelSize = voxelSize;
-    const float halfW = depth.cols / 2.0f;
-    const float halfH = depth.rows / 2.0f;
+    const float halfW = (float)depth.cols / 2.0f;
+    const float halfH = (float)depth.rows / 2.0f;
     float fx = projMat[0] * halfW;
     float fy = projMat[5] * halfH;
     float cx = (projMat[8]  + 1.0f) * halfW;
@@ -157,7 +150,6 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
     glm::mat4 invV = glm::inverse(V);
     bool dataChanged = false;
 
-    // Coarse Filtering (Ghost removal)
     double minD = 0.3, maxD = 4.0;
     cv::Mat depthMask = (depth > 0.1f) & (depth < 7.5f);
     if (cv::countNonZero(depthMask) > 100) {
@@ -167,7 +159,7 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
     {
         std::lock_guard<std::mutex> lock(mMutex);
 
-        // 1. Refinement Loop: Reproject a SUBSET of existing splats
+        // 1. Refinement Loop: Subset optimization for efficiency
         int totalSplats = static_cast<int>(mSplatData.size());
         if (totalSplats > 0) {
             int itemsToProcess = std::max(100, totalSplats / 4);
@@ -195,18 +187,16 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                     }
                     mSplatData[idx].confidence -= 0.05f;
                     dataChanged = true;
-                    if (mSplatData[idx].confidence <= 0.0f) dataChanged = true; // Needs pruning
                 }
             }
         }
 
-        // 2. Discovery loop with Non-Uniformity check
+        // 2. Discovery loop
         int step = 6;
         for (int r = step; r < depth.rows - step; r += step) {
             for (int c = step; c < depth.cols - step; c += step) {
                 float d = depth.at<float>(r, c);
                 if (d > 0.1f && d < 7.0f) {
-                    // Texture awareness
                     int colorR = static_cast<int>(r * scaleY);
                     int colorC = static_cast<int>(c * scaleX);
                     const auto& col = color.at<cv::Vec3b>(colorR, colorC);
@@ -221,11 +211,7 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                     float zc = -d;
                     glm::vec4 p_world = invV * glm::vec4(xc, yc, zc, 1.0f);
 
-                    VoxelKey key{
-                        static_cast<int>(std::floor(p_world.x / voxelSize)),
-                        static_cast<int>(std::floor(p_world.y / voxelSize)),
-                        static_cast<int>(std::floor(p_world.z / voxelSize))
-                    };
+                    VoxelKey key{ static_cast<int>(std::floor(p_world.x / voxelSize)), static_cast<int>(std::floor(p_world.y / voxelSize)), static_cast<int>(std::floor(p_world.z / voxelSize)) };
 
                     if (mVoxelGrid.find(key) == mVoxelGrid.end()) {
                         if (mSplatData.size() < MAX_SPLATS) {
@@ -240,7 +226,13 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                             float s_val = d / fx * 2.0f;
                             s.scale[0] = s_val; s.scale[1] = s_val; s.scale[2] = s_val * 0.1f;
 
-                            s.rot[3] = 1.0f;
+                            float dz_dx = (depth.at<float>(r, std::min(depth.cols-1, c+1)) - depth.at<float>(r, std::max(0, c-1))) / (2.0f / fx);
+                            float dz_dy = (depth.at<float>(std::min(depth.rows-1, r+1), c) - depth.at<float>(std::max(0, r-1), c)) / (2.0f / fy);
+                            glm::vec3 normal = glm::normalize(glm::vec3(-dz_dx, -dz_dy, 1.0f));
+                            glm::vec3 normalW = glm::normalize(glm::mat3(invV) * normal);
+                            glm::quat q = glm::rotation(glm::vec3(0, 0, 1), normalW);
+                            s.rot[0] = q.x; s.rot[1] = q.y; s.rot[2] = q.z; s.rot[3] = q.w;
+
                             s.confidence = 0.25f;
                             mSplatData.push_back(s);
                             mVoxelGrid[key] = static_cast<int>(mSplatData.size() - 1);
@@ -267,7 +259,7 @@ void VoxelHash::addSparsePoints(const std::vector<float>& points, const float* v
                 s.r = 1.0f; s.g = 1.0f; s.b = 1.0f; s.a = 0.3f;
                 s.scale[0] = s.scale[1] = s.scale[2] = 0.02f;
                 s.rot[3] = 1.0f;
-                s.confidence = 0.6f; // High confidence from SfM/ARCore
+                s.confidence = 0.6f;
                 mSplatData.push_back(s);
                 mVoxelGrid[key] = static_cast<int>(mSplatData.size() - 1);
             }
@@ -285,8 +277,11 @@ void VoxelHash::addKeyframe(const Keyframe& kf) {
 void VoxelHash::optimize(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat) {
     if (depth.empty() || color.empty()) return;
     std::lock_guard<std::mutex> lock(mMutex);
-    int count = static_cast<int>(mSplatData.size());
-    if (count == 0) return;
+    int splatCount = static_cast<int>(mSplatData.size());
+    if (splatCount == 0) return;
+
+    const Keyframe* kf = nullptr;
+    if (!mKeyframes.empty()) { kf = &mKeyframes[rand() % mKeyframes.size()]; }
 
     glm::mat4 V = glm::make_mat4(viewMat);
     const float halfW = (float)depth.cols / 2.0f;
@@ -296,17 +291,13 @@ void VoxelHash::optimize(const cv::Mat& depth, const cv::Mat& color, const float
     float cx = (projMat[8]  + 1.0f) * halfW;
     float cy = (-projMat[9] + 1.0f) * halfH;
 
-    // Advanced: Multi-View Consistency & Motion-Aware Refinement
-    int batchSize = std::max(500, count / 8);
+    int batchSize = std::max(500, splatCount / 8);
     for (int i = 0; i < batchSize; ++i) {
-        int idx = rand() % count;
+        int idx = rand() % splatCount;
         if (mSplatData[idx].confidence >= 0.99f) continue;
 
-        // Kinematic Refinement: align velocity with latest keyframe motion
-        if (!mKeyframes.empty()) {
-            const auto& kf = mKeyframes.back();
-            // Gradient descent on velocity to minimize temporal drift
-            for(int j=0; j<3; ++j) mSplatData[idx].velocity[j] += (kf.linearVelocity[j] - mSplatData[idx].velocity[j]) * 0.1f;
+        if (kf) {
+            for(int j=0; j<3; ++j) mSplatData[idx].velocity[j] += (kf->linearVelocity[j] - mSplatData[idx].velocity[j]) * 0.05f;
         }
 
         glm::vec4 p_cam = V * glm::vec4(mSplatData[idx].x, mSplatData[idx].y, mSplatData[idx].z, 1.0f);
@@ -321,14 +312,26 @@ void VoxelHash::optimize(const cv::Mat& depth, const cv::Mat& color, const float
                 float err = std::abs(-p_cam.z - d);
                 if (err < 0.15f) {
                     mSplatData[idx].confidence = std::min(1.0f, mSplatData[idx].confidence + 0.08f);
+                    cv::Vec3b obs_col = color.at<cv::Vec3b>(static_cast<int>(v_cam), static_cast<int>(u_cam));
+                    float r_obs = obs_col[2]/255.0f, g_obs = obs_col[1]/255.0f, b_obs = obs_col[0]/255.0f;
+                    float alpha = 0.1f;
+                    mSplatData[idx].r += (r_obs - mSplatData[idx].r) * alpha;
+                    mSplatData[idx].g += (g_obs - mSplatData[idx].g) * alpha;
+                    mSplatData[idx].b += (b_obs - mSplatData[idx].b) * alpha;
 
-                    // Atomization: refine scale based on reconstruction stability
+                    float dz_dx = (depth.at<float>(static_cast<int>(v_cam), std::min(depth.cols-1, static_cast<int>(u_cam)+1)) - depth.at<float>(static_cast<int>(v_cam), std::max(0, static_cast<int>(u_cam)-1))) / (2.0f / fx);
+                    float dz_dy = (depth.at<float>(std::min(depth.rows-1, static_cast<int>(v_cam)+1), static_cast<int>(u_cam)) - depth.at<float>(std::max(0, static_cast<int>(v_cam)-1), static_cast<int>(u_cam))) / (2.0f / fy);
+                    glm::vec3 normal = glm::normalize(glm::vec3(-dz_dx, -dz_dy, 1.0f));
+                    glm::vec3 normalW = glm::normalize(glm::mat3(glm::inverse(V)) * normal);
+                    glm::quat target_q = glm::rotation(glm::vec3(0, 0, 1), normalW);
+                    glm::quat current_q(mSplatData[idx].rot[3], mSplatData[idx].rot[0], mSplatData[idx].rot[1], mSplatData[idx].rot[2]);
+                    glm::quat refined_q = glm::slerp(current_q, target_q, 0.1f);
+                    mSplatData[idx].rot[0] = refined_q.x; mSplatData[idx].rot[1] = refined_q.y; mSplatData[idx].rot[2] = refined_q.z; mSplatData[idx].rot[3] = refined_q.w;
+
                     if (mSplatData[idx].confidence > 0.8f && mSplatData[idx].scale[0] < 0.005f) {
                         mSplatData[idx].scale[0] *= 1.1f; mSplatData[idx].scale[1] *= 1.1f;
                     }
-                } else {
-                    mSplatData[idx].confidence -= 0.04f;
-                }
+                } else { mSplatData[idx].confidence -= 0.04f; }
             }
         }
     }
@@ -350,9 +353,7 @@ void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, 
     glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMvp"), 1, GL_FALSE, glm::value_ptr(mvp));
     glUniformMatrix4fv(glGetUniformLocation(mProgram, "uView"), 1, GL_FALSE, glm::value_ptr(view));
     glUniform1f(glGetUniformLocation(mProgram, "uFocalY"), focalY);
-    glUniform1f(glGetUniformLocation(mProgram, "uTimeStep"), 0.016f); // Placeholder for 60fps exposure
-
-    // Calculate camera position in world space for SH
+    glUniform1f(glGetUniformLocation(mProgram, "uTimeStep"), 0.016f);
     glm::vec3 camPos = glm::vec3(glm::inverse(view)[3]);
     glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, glm::value_ptr(camPos));
 
@@ -361,20 +362,12 @@ void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, 
     glDepthMask(GL_FALSE);
     glDisable(GL_DEPTH_TEST);
 
-    // Attribute layout based on Splat struct
-    // 0: Mean (x,y,z) [0-12]
     glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)0);
-    // 1: Color (r,g,b,a) [12-28]
     glEnableVertexAttribArray(1); glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(12));
-    // 2: Scale (scale[0,1,2]) [offset: 64]
     glEnableVertexAttribArray(2); glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(64));
-    // 3: Rotation (rot[0,1,2,3]) [offset: 76]
     glEnableVertexAttribArray(3); glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(76));
-    // 4: Confidence [offset: 92]
     glEnableVertexAttribArray(4); glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(92));
-    // 5: Velocity [offset: 96]
     glEnableVertexAttribArray(5); glVertexAttribPointer(5, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(96));
-    // 6..8: SH Coefficients [offset: 28, 40, 52]
     glEnableVertexAttribArray(6); glVertexAttribPointer(6, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(28));
     glEnableVertexAttribArray(7); glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(40));
     glEnableVertexAttribArray(8); glVertexAttribPointer(8, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(52));
