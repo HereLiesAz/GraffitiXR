@@ -135,8 +135,10 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             val currentProject = projectRepository.currentProject.value ?: return@launch
 
-            // The ARCore camera sensor is natively landscape; un-rotate any portrait bitmap.
-            val isRotatedForUi = bitmap.height > bitmap.width
+            val display = (context.getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager).defaultDisplay
+            val isPortrait = display.rotation == android.view.Surface.ROTATION_0 || display.rotation == android.view.Surface.ROTATION_180
+            val isRotatedForUi = isPortrait && bitmap.height > bitmap.width
+
             val sensorBmp = if (isRotatedForUi) {
                 val matrix = android.graphics.Matrix().apply { postRotate(-90f) }
                 Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)

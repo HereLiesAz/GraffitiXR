@@ -279,13 +279,28 @@ class EditorViewModel @Inject constructor(
             var currentBitmap = base.copy(Bitmap.Config.ARGB_8888, true)
 
             for (stroke in strokes) {
-                val mapped = com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor.mapScreenToBitmap(
-                    stroke.path, stroke.canvasSize.width, stroke.canvasSize.height, currentBitmap.width, currentBitmap.height,
-                    stroke.layerScale, stroke.layerOffset, stroke.layerRotationZ
-                )
-                currentBitmap = com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor.applyToolToBitmap(
-                    currentBitmap, mapped, stroke.tool, stroke.brushSize, stroke.brushColor, stroke.intensity, true, stroke.feathering
-                )
+                if (stroke.tool == Tool.LIQUIFY) {
+                    slamManager.prepareLiquify(currentBitmap)
+                    val mapped = ImageProcessor.mapScreenToBitmap(
+                        stroke.path, stroke.canvasSize.width, stroke.canvasSize.height, currentBitmap.width, currentBitmap.height,
+                        stroke.layerScale, stroke.layerOffset, stroke.layerRotationZ
+                    )
+                    // We need a flat array for JNI
+                    val flatArr = FloatArray(mapped.size * 2)
+                    mapped.forEachIndexed { i, pt -> flatArr[i*2] = pt.x; flatArr[i*2+1] = pt.y }
+                    slamManager.applyLiquify(flatArr, stroke.brushSize, 0.5f)
+                    val baked = currentBitmap.copy(Bitmap.Config.ARGB_8888, true)
+                    slamManager.bakeLiquify(baked)
+                    currentBitmap = baked
+                } else {
+                    val mapped = com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor.mapScreenToBitmap(
+                        stroke.path, stroke.canvasSize.width, stroke.canvasSize.height, currentBitmap.width, currentBitmap.height,
+                        stroke.layerScale, stroke.layerOffset, stroke.layerRotationZ
+                    )
+                    currentBitmap = com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor.applyToolToBitmap(
+                        currentBitmap, mapped, stroke.tool, stroke.brushSize, stroke.brushColor, stroke.intensity, true, stroke.feathering
+                    )
+                }
             }
 
             withContext(dispatchers.main) {
@@ -1044,6 +1059,7 @@ class EditorViewModel @Inject constructor(
         if (state.activeTool == Tool.LIQUIFY) {
             // Store the original bitmap so live-preview warps can be applied from a clean copy.
             liquifyOriginalBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, false)
+            slamManager.prepareLiquify(originalBitmap)
             _uiState.update { it.copy(liveStrokeLayerId = layerId) }
             return
         }
@@ -1104,27 +1120,34 @@ class EditorViewModel @Inject constructor(
         // original bitmap so each drag frame shows the full accumulated warp.
         if (_uiState.value.activeTool == Tool.LIQUIFY) {
             val layerId = strokeLayerId ?: return
-            val origBmp = liquifyOriginalBitmap ?: return
             val points = strokeCollectedPoints.toList()
             val canvasW = strokeCanvasW
             val canvasH = strokeCanvasH
             val brushSize = _uiState.value.brushSize
-            val argb = _uiState.value.activeColor.toArgb()
             val capturedScale = strokeLayerScale
             val capturedOffset = strokeLayerOffset
             val capturedRotZ = strokeLayerRotationZ
-            val feathering = _uiState.value.brushFeathering
+
+            // Apply incremental liquify to the native engine
+            if (points.size >= 2) {
+                val p1 = points[points.size - 2]
+                val p2 = points.last()
+                
+                // We need to map these screen points to the bitmap space
+                val mapped = ImageProcessor.mapScreenToBitmap(
+                    listOf(p1, p2), canvasW, canvasH, liquifyOriginalBitmap!!.width, liquifyOriginalBitmap!!.height,
+                    capturedScale, capturedOffset, capturedRotZ
+                )
+                
+                val strokeArr = floatArrayOf(mapped[0].x, mapped[0].y, mapped[1].x, mapped[1].y)
+                slamManager.applyLiquify(strokeArr, brushSize, 0.5f)
+            }
 
             liquifyJob?.cancel()
             liquifyJob = viewModelScope.launch(dispatchers.default) {
-                val warpBitmap = origBmp.copy(Bitmap.Config.ARGB_8888, true)
-                val mappedPoints = ImageProcessor.mapScreenToBitmap(
-                    points, canvasW, canvasH, warpBitmap.width, warpBitmap.height,
-                    capturedScale, capturedOffset, capturedRotZ
-                )
-                ImageProcessor.applyToolToBitmap(
-                    warpBitmap, mappedPoints, Tool.LIQUIFY, brushSize, argb, 0.5f, true, feathering
-                )
+                val warpBitmap = liquifyOriginalBitmap!!.copy(Bitmap.Config.ARGB_8888, true)
+                slamManager.bakeLiquify(warpBitmap)
+
                 if (isActive) {
                     withContext(dispatchers.main) {
                         _uiState.update { it.copy(
@@ -1173,6 +1196,15 @@ class EditorViewModel @Inject constructor(
             // Liquify (or a stroke so fast the background copy hadn't finished):
             // fall back to the full whole-stroke approach.
             val bitmap = layer.bitmap ?: return
+            
+            val finalBitmap = if (state.activeTool == Tool.LIQUIFY) {
+                val baked = liquifyOriginalBitmap!!.copy(Bitmap.Config.ARGB_8888, true)
+                slamManager.bakeLiquify(baked)
+                baked
+            } else {
+                bitmap // Should not happen for non-liquify if strokeWorkingBitmap is null but it's a safety
+            }
+
             val command = StrokeCommand(
                 path = points,
                 canvasSize = IntSize(canvasW, canvasH),
@@ -1185,7 +1217,24 @@ class EditorViewModel @Inject constructor(
                 layerOffset = capturedOffset,
                 layerRotationZ = capturedRotationZ
             )
-            processNewStroke(layerId, bitmap, command, layer)
+
+            // Add stroke to history
+            val currentStrokes = layerStrokes[layerId] ?: mutableListOf()
+            currentStrokes.add(command)
+            layerStrokes[layerId] = currentStrokes
+            undoStack.addLast(EditCommand.Draw(layerId, command))
+            if (undoStack.size > maxStackSize) undoStack.removeFirst()
+            redoStack.clear()
+            updateHistoryCounts()
+
+            _uiState.update { s ->
+                s.copy(
+                    layers = s.layers.map { if (it.id == layerId) it.copy(bitmap = finalBitmap) else it },
+                    liveStrokeLayerId = null,
+                    liveStrokeBitmap = null
+                )
+            }
+            scheduleDiskSave(layerId, finalBitmap, layer.uri)
         } else {
             // Real-time path: the working bitmap already contains the complete stroke.
             val workBitmap = strokeWorkingBitmap!!

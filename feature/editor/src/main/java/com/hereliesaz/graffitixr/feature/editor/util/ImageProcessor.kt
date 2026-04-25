@@ -207,32 +207,8 @@ object ImageProcessor {
                 }
 
                     private fun applyLiquifyNative(bitmap: Bitmap, stroke: List<Offset>, brushSize: Float, intensity: Float) {
-                                val canvas = Canvas(bitmap)
-                                        val meshWidth = 20
-                                val meshHeight = 20
-                                val verts = FloatArray((meshWidth + 1) * (meshHeight + 1) * 2)
-                                        var index = 0
-                                for (y in 0..meshHeight) {
-                                                val fy = y.toFloat() / meshHeight * bitmap.height
-                                                for (x in 0..meshWidth) {
-                                                                    val fx = x.toFloat() / meshWidth * bitmap.width
-                                                                    var dx = 0f
-                                                                    var dy = 0f
-                                                                    stroke.forEach { pt ->
-                                                                                            val dist = Math.hypot((fx - pt.x).toDouble(), (fy - pt.y).toDouble()).toFloat()
-                                                                                                                if (dist < brushSize) {
-                                                                                                                                            val force = (1f - dist / brushSize) * intensity * 10f
-                                                                                                                                            dx += force
-                                                                                                                                            dy += force
-                                                                                                                }
-                                                                    }
-                                                                                    verts[index++] = fx + dx
-                                                                    verts[index++] = fy + dy
-                                                }
-                                }
-                                        val tempBmp = bitmap.copy(Bitmap.Config.ARGB_8888, false)
-                                                canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
-                                                        canvas.drawBitmapMesh(tempBmp, meshWidth, meshHeight, verts, 0, null, 0, null)
+                        // This is now handled by SlamManager's native ImageWarper
+                        // This method is called at the end of the stroke to bake the results.
                     }
 
             /**

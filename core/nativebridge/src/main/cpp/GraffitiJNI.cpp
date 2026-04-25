@@ -7,6 +7,7 @@
 #include "include/MobileGS.h"
 #include "include/SurfaceUnroller.h"
 #include "include/StereoProcessor.h"
+#include "include/ImageWarper.h"
 
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "GraffitiJNI", __VA_ARGS__)
 
@@ -17,6 +18,7 @@ static std::string gLastSplatTrace;
 
 MobileGS* gSlamEngine = nullptr;
 StereoProcessor* gStereoProcessor = nullptr;
+ImageWarper* gImageWarper = nullptr;
 cv::Mat gLastColorFrame; // MANDATE: Kept in Sensor-Native (Landscape) orientation
 int gFrameCount = 0;
 JavaVM* gJvm = nullptr;
@@ -94,11 +96,15 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitialize(JNIEnv*
         gSlamEngine = new MobileGS();
         gSlamEngine->initialize(1920, 1080);
     }
+    if (!gImageWarper) {
+        gImageWarper = new ImageWarper();
+    }
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitGl(JNIEnv* env, jobject thiz) {
     if (gSlamEngine) gSlamEngine->initGl();
+    if (gImageWarper) gImageWarper->init();
 }
 
 JNIEXPORT void JNICALL
@@ -110,6 +116,7 @@ JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDestroy(JNIEnv* env, jobject thiz) {
     if (gSlamEngine) { delete gSlamEngine; gSlamEngine = nullptr; }
     if (gStereoProcessor) { delete gStereoProcessor; gStereoProcessor = nullptr; }
+    if (gImageWarper) { delete gImageWarper; gImageWarper = nullptr; }
 }
 
 JNIEXPORT jint JNICALL
@@ -687,6 +694,46 @@ Java_com_hereliesaz_graffitixr_core_collaboration_CollaborationManager_nativeAli
     jbyte* buffer = env->GetByteArrayElements(data, nullptr);
     mobilegs::alignToFingerprint((uint8_t*)buffer, size);
     env->ReleaseByteArrayElements(data, buffer, JNI_ABORT);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativePrepareLiquify(JNIEnv* env, jobject, jobject bitmap) {
+    if (!gImageWarper) return;
+    AndroidBitmapInfo info;
+    void* pixels = 0;
+    AndroidBitmap_getInfo(env, bitmap, &info);
+    AndroidBitmap_lockPixels(env, bitmap, &pixels);
+    gImageWarper->setSourceImage(static_cast<uint8_t*>(pixels), info.width, info.height);
+    AndroidBitmap_unlockPixels(env, bitmap);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeApplyLiquify(JNIEnv* env, jobject, jfloatArray strokeArr, jfloat brushSize, jfloat intensity) {
+    if (!gImageWarper) return;
+    jsize len = env->GetArrayLength(strokeArr);
+    jfloat* ptr = env->GetFloatArrayElements(strokeArr, nullptr);
+    std::vector<glm::vec2> stroke;
+    for (int i = 0; i < len; i += 2) {
+        stroke.push_back({ptr[i], ptr[i+1]});
+    }
+    gImageWarper->applyLiquify(stroke, brushSize, intensity);
+    env->ReleaseFloatArrayElements(strokeArr, ptr, JNI_ABORT);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDrawLiquify(JNIEnv* env, jobject, jint width, jint height) {
+    if (gImageWarper) gImageWarper->draw(width, height);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeBakeLiquify(JNIEnv* env, jobject, jobject outBitmap) {
+    if (!gImageWarper) return;
+    AndroidBitmapInfo info;
+    void* pixels = 0;
+    AndroidBitmap_getInfo(env, outBitmap, &info);
+    AndroidBitmap_lockPixels(env, outBitmap, &pixels);
+    gImageWarper->bakeToBitmap(static_cast<uint8_t*>(pixels));
+    AndroidBitmap_unlockPixels(env, outBitmap);
 }
 
 } // extern "C"

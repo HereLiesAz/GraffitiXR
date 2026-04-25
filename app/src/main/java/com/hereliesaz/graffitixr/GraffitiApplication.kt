@@ -1,3 +1,4 @@
+// FILE: app/src/main/java/com/hereliesaz/graffitixr/GraffitiApplication.kt
 package com.hereliesaz.graffitixr
 
 import android.app.Application
@@ -5,14 +6,13 @@ import android.util.Log
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.google.android.gms.security.ProviderInstaller
 import dagger.hilt.android.HiltAndroidApp
-import org.opencv.android.OpenCVLoader
 import timber.log.Timber
 import javax.inject.Inject
 
 /**
  * The Application class.
  * Triggers Dagger Hilt code generation and dependency injection initialization.
- * Initializes global libraries like OpenCV.
+ * Initializes global libraries.
  */
 @HiltAndroidApp
 class GraffitiApplication : Application() {
@@ -28,16 +28,7 @@ class GraffitiApplication : Application() {
             Timber.plant(Timber.DebugTree())
         }
 
-        // 2. Initialize OpenCV
-        // CRITICAL: We use initLocal() instead of initDebug() to utilize the bundled
-        // static OpenCV libraries linked in our C++ core, preventing runtime crashes.
-        if (OpenCVLoader.initLocal()) {
-            Timber.d("GraffitiXR: OpenCV loaded successfully.")
-        } else {
-            Timber.e("GraffitiXR: Could not load OpenCV!")
-        }
-
-        // 3. Update Security Provider (Fix for SSLHandshakeException)
+        // 2. Update Security Provider (Fix for SSLHandshakeException)
         // Using explicit listener implementation instead of lambda for clarity/compatibility if needed
         ProviderInstaller.installIfNeededAsync(this, object : ProviderInstaller.ProviderInstallListener {
             override fun onProviderInstalled() {

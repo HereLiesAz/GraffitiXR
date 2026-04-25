@@ -1,3 +1,4 @@
+// FILE: app/build.gradle.kts
 import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
@@ -140,7 +141,6 @@ dependencies {
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
-    implementation(project(":opencv"))
 
     implementation(libs.play.services.base)
 

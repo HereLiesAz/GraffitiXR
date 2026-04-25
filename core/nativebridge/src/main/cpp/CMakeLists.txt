@@ -22,6 +22,7 @@ add_library(graffitixr SHARED
     SurfaceUnroller.cpp
     StereoProcessor.cpp
     SuperPointDetector.cpp
+    ImageWarper.cpp
 )
 
 # Include directories

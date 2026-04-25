@@ -393,14 +393,36 @@ fun MainScreen(
     }
 }
 
-private const val COMPOSITE_CANVAS_SIZE = 2048
-
 internal fun compositeLayersForAr(layers: List<Layer>): AndroidBitmap {
-    val w = COMPOSITE_CANVAS_SIZE
-    val h = COMPOSITE_CANVAS_SIZE
-    val result = createBitmap(w, h, AndroidBitmap.Config.ARGB_8888)
+    if (layers.isEmpty()) return createBitmap(1, 1, AndroidBitmap.Config.ARGB_8888)
+
+    var minX = Float.MAX_VALUE
+    var minY = Float.MAX_VALUE
+    var maxX = Float.MIN_VALUE
+    var maxY = Float.MIN_VALUE
+
+    for (layer in layers) {
+        val bmp = layer.bitmap ?: continue
+        val halfW = bmp.width / 2f * layer.scale
+        val halfH = bmp.height / 2f * layer.scale
+        val left = layer.offset.x - halfW
+        val top = layer.offset.y - halfH
+        val right = layer.offset.x + halfW
+        val bottom = layer.offset.y + halfH
+
+        if (left < minX) minX = left
+        if (top < minY) minY = top
+        if (right > maxX) maxX = right
+        if (bottom > maxY) maxY = bottom
+    }
+
+    val width = (maxX - minX).coerceAtLeast(1f).toInt()
+    val height = (maxY - minY).coerceAtLeast(1f).toInt()
+
+    val result = createBitmap(width, height, AndroidBitmap.Config.ARGB_8888)
     val canvas = Canvas(result)
     val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
     for (layer in layers) {
         val bmp = layer.bitmap ?: continue
         paint.alpha = (layer.opacity.coerceIn(0f, 1f) * 255).toInt()
@@ -420,7 +442,7 @@ internal fun compositeLayersForAr(layers: List<Layer>): AndroidBitmap {
         matrix.postTranslate(-bmp.width / 2f, -bmp.height / 2f)
         matrix.postScale(layer.scale, layer.scale)
         matrix.postRotate(layer.rotationZ)
-        matrix.postTranslate(w / 2f + layer.offset.x, h / 2f + layer.offset.y)
+        matrix.postTranslate(layer.offset.x - minX, layer.offset.y - minY)
         canvas.drawBitmap(bmp, matrix, paint)
     }
     return result

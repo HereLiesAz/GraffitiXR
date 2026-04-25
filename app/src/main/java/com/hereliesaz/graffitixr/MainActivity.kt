@@ -106,8 +106,6 @@ import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.feature.editor.MockupScreen
 import com.hereliesaz.graffitixr.feature.editor.OverlayScreen
 import com.hereliesaz.graffitixr.feature.editor.TraceScreen
-import com.hereliesaz.graffitixr.feature.editor.MockupScreen
-import com.hereliesaz.graffitixr.feature.editor.OverlayScreen
 import com.hereliesaz.graffitixr.data.OnboardingManager
 import com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor as EditorImageProcessor
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
@@ -219,16 +217,12 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(currentTempCapture, currentCaptureStep, isWaitingForTap) {
                     if (currentTempCapture != null) {
                         if (currentCaptureStep == CaptureStep.NONE && isWaitingForTap) {
-                            // Phase 4: Captured frame from tap. Transition to MASK (Refinement).
                             mainViewModel.setCaptureStep(CaptureStep.MASK)
                         } else if (currentCaptureStep == CaptureStep.CAPTURE) {
-                            // Manual capture from rail. Transition to MASK.
                             mainViewModel.setCaptureStep(CaptureStep.MASK)
                         }
                     }
                 }
-
-                // Removed auto-confirm LaunchedEffect to allow target review
 
                 LaunchedEffect(dashboardNavigation) {
                     dashboardNavigation?.let { destination ->
@@ -244,12 +238,8 @@ class MainActivity : ComponentActivity() {
                     navController.currentBackStackEntryFlow.collect { entry ->
                         val route = entry.destination.route
                         if (route != null) {
-                            try {
-                                val mode = EditorMode.valueOf(route)
+                            runCatching { EditorMode.valueOf(route) }.getOrNull()?.let { mode ->
                                 if (editorUiState.editorMode != mode) editorViewModel.setEditorMode(mode)
-                            } catch (_: Exception) {
-                                // Intentional: NavController iterates all destinations including non-EditorMode routes;
-                                // IllegalArgumentException from EditorMode.valueOf() on those routes is expected and safe to discard.
                             }
                         }
                     }
@@ -269,14 +259,12 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // If the anchor is lost, auto-clear.
                 LaunchedEffect(arUiState.isAnchorEstablished) {
                     if (!arUiState.isAnchorEstablished && mainViewModel.uiState.value.isInPlaneRealignment) {
                         mainViewModel.endPlaneRealignment()
                     }
                 }
 
-                // Task 4e: Mark tutorials complete on meaningful actions.
                 LaunchedEffect(arUiState.isAnchorEstablished) {
                     if (arUiState.isAnchorEstablished) {
                         settingsViewModel.markTutorialComplete("tut_ar")
@@ -289,7 +277,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Back-press escape hatches — defined lowest-priority first (Compose uses LIFO).
                 BackHandler(enabled = showLibrary) { showLibrary = false }
                 BackHandler(enabled = showSettings) { showSettings = false }
                 BackHandler(enabled = mainUiState.isInPlaneRealignment) {
@@ -324,8 +311,6 @@ class MainActivity : ComponentActivity() {
                     permissionRequestedAtLeastOnce = true
                 }
 
-                // Keep ArUiState in sync with the runtime camera permission so AR
-                // overlays can react to it without receiving the raw flag directly.
                 LaunchedEffect(hasCameraPermission) {
                     arViewModel.setCameraPermission(hasCameraPermission)
                 }
@@ -354,10 +339,11 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Task 6: Auto-open image picker once anchor is established and no layers exist yet.
+                var showDesignInstructionsDialog by remember { mutableStateOf(false) }
+
                 LaunchedEffect(arUiState.isAnchorEstablished) {
                     if (arUiState.isAnchorEstablished && editorUiState.layers.isEmpty()) {
-                        overlayImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        showDesignInstructionsDialog = true
                     }
                 }
 
@@ -369,40 +355,33 @@ class MainActivity : ComponentActivity() {
 
                 val context = LocalContext.current
                 val canvasBg = editorUiState.canvasBackground
+
                 val navItemColor = remember(canvasBg) {
-                    Color(1f - canvasBg.red, 1f - canvasBg.green, 1f - canvasBg.blue, alpha = 1f)
+                    val luminance = 0.299f * canvasBg.red + 0.587f * canvasBg.green + 0.114f * canvasBg.blue
+                    if (luminance > 0.5f) Color.Black else Color.White
                 }
 
                 val mainHelpItems = remember(editorUiState.layers) {
                     val base = mutableMapOf<String, Any>(
-                        // ─── Mode Menu ──────────────────────────────────────────────────
                         "mode_host" to strings.help.modeHost,
                         "ar" to strings.help.ar,
                         "overlay" to strings.help.overlay,
                         "mockup" to strings.help.mockup,
                         "trace" to strings.help.trace,
-
-                        // ─── Target Menu ────────────────────────────────────────────────
                         "target_host" to strings.help.targetHost,
                         "scan_mode_toggle" to strings.help.scanModeToggle,
                         "create" to strings.help.create,
-
-                        // ─── Design Menu ────────────────────────────────────────────────
                         "design_host" to strings.help.designHost,
                         "add_img" to strings.help.addImg,
                         "add_draw" to strings.help.addDraw,
                         "add_text" to strings.help.addText,
                         "wall" to strings.help.wall,
-
-                        // ─── Project Menu ───────────────────────────────────────────────
                         "project_host" to strings.help.projectHost,
                         "new" to strings.help.newProject,
                         "save" to strings.help.saveProject,
                         "load" to strings.help.loadProject,
                         "export" to strings.help.exportImage,
                         "settings" to strings.help.appSettings,
-
-                        // ─── Global Tools ───────────────────────────────────────────────
                         "light" to strings.help.flashlight,
                         "lock_trace" to strings.help.lockTrace,
                         "help_main" to strings.help.helpMain
@@ -444,14 +423,12 @@ class MainActivity : ComponentActivity() {
                     base
                 }
 
-                // Help View Model and items... (removed global onboarding manager)
                 val helpViewModel: HelpViewModel =
                     hiltViewModel(checkNotNull<ViewModelStoreOwner>(LocalViewModelStoreOwner.current) {
                         "No ViewModelStoreOwner was provided via LocalViewModelStoreOwner"
                     }, null)
                 val activeHelpList by helpViewModel.activeHelpList.collectAsState()
 
-                // Logic to switch active help list based on UI context
                 LaunchedEffect(editorUiState.activeLayerId) {
                     Timber.tag("GraffitiXR_Help")
                         .d("Active layer ID changed to: ${editorUiState.activeLayerId}")
@@ -520,11 +497,6 @@ class MainActivity : ComponentActivity() {
                     onscreen {
                         if (isExporting) return@onscreen
 
-                        // Auto-show the mode tutorial on first visit using the v8.0 controller API.
-                        // DataStore (completedTutorials) persists "seen" state across app restarts.
-                        // showLibrary is included as a key so the effect re-fires when the library
-                        // closes — without this guard the tutorial fires while the library is still
-                        // covering the editor, marking it "complete" before the user ever sees it.
                         val tutorialController = LocalAzTutorialController.current
                         LaunchedEffect(editorUiState.editorMode, showLibrary, completedTutorials) {
                             if (showLibrary) return@LaunchedEffect
@@ -631,7 +603,6 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            // Error: ARCore not installed or device not supported
                             if (editorUiState.editorMode == EditorMode.AR
                                 && !arUiState.isArCoreAvailable
                                 && !showLibrary && !showSettings
@@ -641,7 +612,6 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            // Error: camera permission permanently denied
                             if (editorUiState.editorMode == EditorMode.AR
                                 && permissionRequestedAtLeastOnce
                                 && !arUiState.hasCameraPermission
@@ -660,8 +630,8 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            val showPostTargetHint = arUiState.isAnchorEstablished 
-                                    && editorUiState.layers.isEmpty() 
+                            val showPostTargetHint = arUiState.isAnchorEstablished
+                                    && editorUiState.layers.isEmpty()
                                     && !mainUiState.isCapturingTarget
                                     && editorUiState.editorMode == EditorMode.AR
                                     && !showLibrary && !showSettings
@@ -691,7 +661,7 @@ class MainActivity : ComponentActivity() {
                                     && arUiState.paintingProgress > 0.01f
                                     && !mainUiState.isCapturingTarget
                                     && !showLibrary && !showSettings
-                                    && false // HIDE ALWAYS ONCE TARGET CREATED (USER REQUEST)
+                                    && false
                             if (showProgress) {
                                 PaintingProgressIndicator(
                                     progress = arUiState.paintingProgress,
@@ -706,7 +676,7 @@ class MainActivity : ComponentActivity() {
                                 && arUiState.isAnchorEstablished
                                 && distanceM > 0f
                                 && !showLibrary && !showSettings
-                                && false // HIDE ALWAYS ONCE TARGET CREATED (USER REQUEST)
+                                && false
                             ) {
                                 DistanceBadge(
                                     distanceMeters = distanceM,
@@ -791,33 +761,29 @@ class MainActivity : ComponentActivity() {
                                         if (currentBitmap != null && points.size == 4) {
                                             isProcessing = true
                                             lifecycleScope.launch(Dispatchers.Default) {
-                                                // Convert normalized points [0..1] to actual bitmap pixels for OpenCV
                                                 val pixelPoints = points.map {
                                                     Offset(it.x * currentBitmap.width, it.y * currentBitmap.height)
                                                 }
-                                                // RESTORED WORKING UNWARP METHOD
                                                 val unwarped = ImageProcessor.unwarpImage(currentBitmap, pixelPoints)
                                                 val mask = arUiState.annotatedCaptureBitmap
                                                 val unwarpedMask = if (mask != null) ImageProcessor.unwarpImage(mask, pixelPoints) else null
-                                                
+
                                                 withContext(Dispatchers.Main) {
                                                     if (unwarped != null) {
                                                         arViewModel.setTempCapture(unwarped)
                                                         arViewModel.setAnnotatedCapture(unwarpedMask)
-                                                        // Save the target!
                                                         arViewModel.setInitialAnchorFromCapture()
                                                         mainViewModel.onConfirmTargetCreation(
-                                                            unwarped, 
-                                                            unwarpedMask, 
-                                                            arUiState.targetDepthBuffer, 
-                                                            arUiState.targetDepthBufferWidth, 
-                                                            arUiState.targetDepthBufferHeight, 
-                                                            arUiState.targetDepthStride, 
-                                                            arUiState.targetIntrinsics, 
+                                                            unwarped,
+                                                            unwarpedMask,
+                                                            arUiState.targetDepthBuffer,
+                                                            arUiState.targetDepthBufferWidth,
+                                                            arUiState.targetDepthBufferHeight,
+                                                            arUiState.targetDepthStride,
+                                                            arUiState.targetIntrinsics,
                                                             arUiState.targetCaptureViewMatrix
                                                         )
                                                     } else {
-
                                                         mainViewModel.setCaptureStep(CaptureStep.NONE)
                                                     }
                                                     isProcessing = false
@@ -826,9 +792,6 @@ class MainActivity : ComponentActivity() {
                                         }
                                     },
                                     onMaskConfirmed = { mask ->
-                                        // Refinement finished, now move to RECTIFY (Unwarp)
-                                        // The mask is now a bitmap of CYAN blobs where features are.
-                                        // We'll store it as the 'annotated' bitmap for native processing.
                                         arViewModel.setAnnotatedCapture(mask)
                                         mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
                                     },
@@ -910,6 +873,18 @@ class MainActivity : ComponentActivity() {
                                         }
                                     },
                                     strings = strings
+                                )
+                            }
+
+                            if (showDesignInstructionsDialog) {
+                                androidx.compose.material3.AlertDialog(
+                                    onDismissRequest = { showDesignInstructionsDialog = false },
+                                    title = { Text("Design Your Mural", color = Color.White) },
+                                    text = { Text("Tap 'Design' in the menu, then press 'Image' to import one, 'Sketch' to draw one, or 'Text' to write one.", color = Color.White) },
+                                    containerColor = Color(0xEE1A1A1A),
+                                    confirmButton = {
+                                        AzButton(text = "Got it", onClick = { showDesignInstructionsDialog = false }, shape = AzButtonShape.RECTANGLE)
+                                    }
                                 )
                             }
 
@@ -1204,7 +1179,6 @@ class MainActivity : ComponentActivity() {
                                                     if (!isEnabled) return@pointerInput
                                                     detectDragGestures { change, dragAmount ->
                                                         change.consume()
-                                                        // Vertical drag → size, horizontal drag → feathering
                                                         if (kotlin.math.abs(dragAmount.y) >= kotlin.math.abs(dragAmount.x)) {
                                                             val currentSize = editorViewModel.uiState.value.brushSize
                                                             editorViewModel.setBrushSize(
@@ -1239,7 +1213,6 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             }
 
-                                            // Solid inner circle = hard core; outer ring (darker) = feathering amount
                                             Box(contentAlignment = Alignment.Center) {
                                                 if (liveState.brushFeathering > 0.05f) {
                                                     Box(
@@ -1528,7 +1501,6 @@ class MainActivity : ComponentActivity() {
                         }
                         listItem(text = strings.editor.duplicate) { editorViewModel.onLayerDuplicated(layer.id) }
 
-                        // Check if part of a linked group (contiguous links)
                         val layers = editorUiState.layers
                         val idx = layers.indexOfFirst { it.id == layer.id }
                         val isPartToUnlink = if (idx >= 0) {
@@ -1734,11 +1706,15 @@ private fun DiagPopup(
     modifier: Modifier = Modifier,
     strings: AppStrings
 ) {
+    val context = LocalContext.current
+    val displayMetrics = context.resources.displayMetrics
+    val screenWidthPx = displayMetrics.widthPixels.toFloat()
+    val screenHeightPx = displayMetrics.heightPixels.toFloat()
+
     var offsetX by remember { mutableFloatStateOf(16f) }
     var offsetY by remember { mutableFloatStateOf(80f) }
     var visible by remember { mutableStateOf(true) }
     var copied by remember { mutableStateOf(false) }
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     if (!visible) return
@@ -1749,8 +1725,8 @@ private fun DiagPopup(
             .pointerInput(Unit) {
                 detectDragGestures { change, dragAmount ->
                     change.consume()
-                    offsetX += dragAmount.x
-                    offsetY += dragAmount.y
+                    offsetX = (offsetX + dragAmount.x).coerceIn(0f, screenWidthPx - 200f)
+                    offsetY = (offsetY + dragAmount.y).coerceIn(0f, screenHeightPx - 200f)
                 }
             }
             .pointerInput(diagLog) {
@@ -1892,7 +1868,7 @@ private fun ScanCoachingOverlay(
                             text = "${ambientSectorsCovered * 30}° / 360°",
                             color = Color.LightGray,
 
-                        )
+                            )
                     } else {
                         LinearProgressIndicator(
                             progress = { (splatCount / 50_000f).coerceIn(0f, 1f) },
@@ -2011,15 +1987,15 @@ private fun DiagnosticOverlay(
             }
             DiagnosticRow("Lens Mode", lensMode, if (uiState.isDualLensActive) Cyan else Color.Gray)
             DiagnosticRow("Depth (Ctr)", if (uiState.currentCenterDepth > 0) "%.2fm".format(uiState.currentCenterDepth) else "---", Color.White)
-            
+
             Spacer(Modifier.height(4.dp))
-            
+
             Text(text = "CONFIDENCE", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             ConfidenceProgressBar("Visible", uiState.visibleSplatConfidenceAvg)
             ConfidenceProgressBar("Global", uiState.globalSplatConfidenceAvg)
-            
+
             Spacer(Modifier.height(4.dp))
-            
+
             DiagnosticRow("Splats", "${uiState.splatCount}", Color.White)
             DiagnosticRow("Immutable", "${uiState.immutableSplatCount}", if (uiState.immutableSplatCount > 0) HotPink else Color.White)
 
@@ -2339,7 +2315,7 @@ private fun PaintingProgressIndicator(
                 text = "$pct%",
                 color = Color.White,
 
-            )
+                )
         }
     }
 }
@@ -2389,4 +2365,3 @@ private fun FontPickerDialog(
         confirmButton = {}
     )
 }
-

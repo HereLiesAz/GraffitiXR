@@ -43,22 +43,24 @@ buildscript {
 }
 
 
-        plugins {
-            alias(libs.plugins.android.application) apply false
-            alias(libs.plugins.android.library) apply false
-            alias(libs.plugins.kotlin.android) apply false
-            alias(libs.plugins.jetbrains.kotlin.compose) apply false
-            alias(libs.plugins.hilt) apply false
-            alias(libs.plugins.ksp) apply false
-            alias(libs.plugins.kotlinx.serialization) apply false
-            alias(libs.plugins.kotlin.parcelize) apply false
-        }
+plugins {
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.jetbrains.kotlin.compose) apply false
+    alias(libs.plugins.hilt) apply false
+    alias(libs.plugins.ksp) apply false
+    alias(libs.plugins.kotlinx.serialization) apply false
+    alias(libs.plugins.kotlin.parcelize) apply false
+    id("io.gitlab.arturbosch.detekt") version "1.23.6"
+}
 
 allprojects {
-    apply(plugin = "checkstyle")
-    configure<CheckstyleExtension> {
-        toolVersion = "10.12.0"
-        configFile = rootProject.file("config/checkstyle/checkstyle.xml")
+    apply(plugin = "io.gitlab.arturbosch.detekt")
+    detekt {
+        buildUponDefaultConfig = true
+        allRules = false
+        config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
     }
 
     @Suppress("UNCHECKED_CAST")

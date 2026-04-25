@@ -24,6 +24,11 @@ class SlamManager @Inject constructor() {
         }
     }
 
+    fun prepareLiquify(bitmap: Bitmap) = nativePrepareLiquify(bitmap)
+    fun applyLiquify(stroke: FloatArray, brushSize: Float, intensity: Float) = nativeApplyLiquify(stroke, brushSize, intensity)
+    fun drawLiquify(width: Int, height: Int) = nativeDrawLiquify(width, height)
+    fun bakeLiquify(outBitmap: Bitmap) = nativeBakeLiquify(outBitmap)
+
     fun getSplatCount(): Int = nativeGetSplatCount()
     fun getImmutableSplatCount(): Int = nativeGetImmutableSplatCount()
     fun getVisibleConfidenceAvg(): Float = nativeGetVisibleConfidenceAvg()
@@ -275,4 +280,9 @@ class SlamManager @Inject constructor() {
     private external fun nativeDestroy()
     private external fun nativeAnnotateKeypoints(bitmap: Bitmap)
     private external fun nativeFeedStereoData(leftBuffer: ByteBuffer, rightBuffer: ByteBuffer, width: Int, height: Int, timestamp: Long)
+
+    private external fun nativePrepareLiquify(bitmap: Bitmap)
+    private external fun nativeApplyLiquify(stroke: FloatArray, brushSize: Float, intensity: Float)
+    private external fun nativeDrawLiquify(width: Int, height: Int)
+    private external fun nativeBakeLiquify(outBitmap: Bitmap)
 }

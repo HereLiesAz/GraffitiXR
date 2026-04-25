@@ -1,4 +1,4 @@
-// FILE: app/src/main/java/com/hereliesaz/graffitixr/crash/CrashActivity.kt
+// FILE: app/src/main/java/com/hereliesaz/graffitixr/CrashActivity.kt
 package com.hereliesaz.graffitixr
 
 import android.app.Activity
@@ -38,11 +38,13 @@ class CrashActivity : Activity() {
                 causeLines = 0
                 causes.append("\n...[FRAMEWORK NOISE EXCISED]...\n")
             }
-            if (parsingCause && causeLines < 8) {
-                causes.append(line).append("\n")
-                causeLines++
-            } else if (parsingCause && causeLines == 8) {
-                parsingCause = false
+            if (parsingCause) {
+                if (causeLines < 8) {
+                    causes.append(line).append("\n")
+                    causeLines++
+                } else if (causeLines == 8) {
+                    parsingCause = false
+                }
             }
         }
 
