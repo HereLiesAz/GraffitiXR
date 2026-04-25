@@ -138,7 +138,10 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                     int colorR = (int)(v_cam * scaleY);
                     int colorC = (int)(u_cam * scaleX);
                     const auto& current_color = color.at<cv::Vec3b>(colorR, colorC);
-                    float r_f = current_color[2]/255.0f, g_f = current_color[1]/255.0f, b_f = current_color[0]/255.0f;
+
+                    // FIX: Color indexing for RGB
+                    float r_f = current_color[0]/255.0f, g_f = current_color[1]/255.0f, b_f = current_color[2]/255.0f;
+
                     float color_diff = std::sqrt(std::pow(r_f - mSplatData[idx].r, 2.0f) +
                                                  std::pow(g_f - mSplatData[idx].g, 2.0f) +
                                                  std::pow(b_f - mSplatData[idx].b, 2.0f));
@@ -160,11 +163,9 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                                 glm::vec4 p_target_cam = p_cam * (d / current_d);
                                 p_target_cam.w = 1.0f;
                                 glm::vec4 p_target_world = invV * p_target_cam;
-
-                                float alpha = 0.15f;
-                                mSplatData[idx].x += (p_target_world.x - mSplatData[idx].x) * alpha;
-                                mSplatData[idx].y += (p_target_world.y - mSplatData[idx].y) * alpha;
-                                mSplatData[idx].z += (p_target_world.z - mSplatData[idx].z) * alpha;
+                                mSplatData[idx].x += (p_target_world.x - mSplatData[idx].x) * 0.15f;
+                                mSplatData[idx].y += (p_target_world.y - mSplatData[idx].y) * 0.15f;
+                                mSplatData[idx].z += (p_target_world.z - mSplatData[idx].z) * 0.15f;
                             }
                             dataChanged = true;
                             continue;
@@ -180,43 +181,53 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
         }
 
         // 2. Discovery Loop: Sample depth map to add NEW voxels
-        int step = 8; // Slightly larger step for performance at higher frequency
+        int step = 6; // FIX: Denser sampling for more splats
         for (int r = step; r < depth.rows - step; r += step) {
             for (int c = step; c < depth.cols - step; c += step) {
                 float d = depth.at<float>(r, c);
-                if (d > 0.1f && d < 7.0f) {
-                    // Accuracy Fix: Neighborhood stability check.
-                    // Only add a voxel if neighbors agree on depth (avoids edges and noise).
-                    float d_left = depth.at<float>(r, c - 2);
-                    float d_right = depth.at<float>(r, c + 2);
-                    if (std::abs(d - d_left) > 0.08f || std::abs(d - d_right) > 0.08f) continue;
+                    if (d > 0.1f && d < 8.0f) { // FIX: Increased range to 8m
+                        // Accuracy Fix: Relaxed Neighborhood stability check.
+                        // Relaxing to 25cm difference to allow splatting while moving.
+                        float d_left = depth.at<float>(r, c - 2);
+                        float d_right = depth.at<float>(r, c + 2);
+                        if (std::abs(d - d_left) > 0.25f || std::abs(d - d_right) > 0.25f) continue;
 
-                    float xc = (static_cast<float>(c) - cx) * d / fx;
-                    float yc = -(static_cast<float>(r) - cy) * d / fy;
-                    float zc = -d;
-                    float xw, yw, zw;
-                    camToWorld(viewMat, xc, yc, zc, xw, yw, zw);
+                        // NEW: Require NON-UNIFORMITY (visual texture) for splat locations.
+                        int colorR = static_cast<int>(r * scaleY);
+                        int colorC = static_cast<int>(c * scaleX);
+                        cv::Vec3b col = color.at<cv::Vec3b>(colorR, colorC);
+                        cv::Vec3b col_left = color.at<cv::Vec3b>(colorR, std::max(0, colorC - 4));
+                        float color_var = std::abs((float)col[0] - col_left[0]) +
+                                         std::abs((float)col[1] - col_left[1]) +
+                                         std::abs((float)col[2] - col_left[2]);
+                        if (color_var < 10.0f) continue; // Skip if color is too uniform (low texture)
 
-                    VoxelKey key{
-                        static_cast<int>(std::floor(xw / voxelSize)),
-                        static_cast<int>(std::floor(yw / voxelSize)),
-                        static_cast<int>(std::floor(zw / voxelSize))
-                    };
+                        float xc = (static_cast<float>(c) - cx) * d / fx;
+                        float yc = -(static_cast<float>(r) - cy) * d / fy;
+                        float zc = -d;
 
-                    if (mVoxelGrid.find(key) == mVoxelGrid.end()) {
-                        if (mSplatData.size() < MAX_SPLATS) {
-                            int colorR = static_cast<int>(r * scaleY);
-                            int colorC = static_cast<int>(c * scaleX);
-                            cv::Vec3b col = color.at<cv::Vec3b>(colorR, colorC);
-                            float r_f = col[2]/255.0f, g_f = col[1]/255.0f, b_f = col[0]/255.0f;
+                        // Optimized: Use pre-calculated invV from outer scope
+                        glm::vec4 p_world = invV * glm::vec4(xc, yc, zc, 1.0f);
+                        float xw = p_world.x, yw = p_world.y, zw = p_world.z;
 
-                            // Birth confidence: start lower but allow faster growth with motion-friendly tolerance
-                            mSplatData.push_back({xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.2f, 0.0f, 0.0f, 1.0f, 0.012f});
-                            mVoxelGrid[key] = (int)mSplatData.size() - 1;
-                            dataChanged = true;
+                        VoxelKey key{
+                            static_cast<int>(std::floor(xw / voxelSize)),
+                            static_cast<int>(std::floor(yw / voxelSize)),
+                            static_cast<int>(std::floor(zw / voxelSize))
+                        };
+
+                        if (mVoxelGrid.find(key) == mVoxelGrid.end()) {
+                            if (mSplatData.size() < MAX_SPLATS) {
+                                // FIX: Color indexing (RGB from conversion)
+                                float r_f = col[0]/255.0f, g_f = col[1]/255.0f, b_f = col[2]/255.0f;
+
+                                // Birth confidence: start lower but allow faster growth with motion-friendly tolerance
+                                mSplatData.push_back({xw, yw, zw, r_f, g_f, b_f, 1.0f, 0.2f, 0.0f, 0.0f, 1.0f, 0.012f});
+                                mVoxelGrid[key] = (int)mSplatData.size() - 1;
+                                dataChanged = true;
+                            }
                         }
                     }
-                }
             }
         }
 

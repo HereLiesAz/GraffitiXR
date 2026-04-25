@@ -194,7 +194,7 @@ private:
 
     int mScreenWidth = 1920;
     int mScreenHeight = 1080;
-    float mVoxelSize = 0.02f; // Restored to 20mm for stability
+    float mVoxelSize = 0.012f; // HIGHER RESOLUTION: 12mm voxels for denser splatting
 
     static constexpr float MIN_RENDER_CONFIDENCE = 0.1f; // Restored for immediate feedback
 };

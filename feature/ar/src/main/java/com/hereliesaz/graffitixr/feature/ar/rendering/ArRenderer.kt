@@ -263,7 +263,10 @@ class ArRenderer(
                             val offset = cy * stride + cx * 2
                             if (offset + 2 <= plane.buffer.limit()) {
                                 val raw = plane.buffer.getShort(offset).toInt() and 0xFFFF
-                                centerDepth = (raw and 0x1FFF) / 1000f
+                                val depthMm = raw and 0x1FFF
+                                if (depthMm > 0) {
+                                    centerDepth = depthMm / 1000f
+                                }
                             }
                         }
                     } catch (e: Exception) { /* ignore */ }
