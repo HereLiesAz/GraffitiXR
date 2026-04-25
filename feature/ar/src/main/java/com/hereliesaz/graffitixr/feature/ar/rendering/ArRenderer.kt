@@ -32,7 +32,7 @@ class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
     private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int) -> Unit,
-    private val onTrackingUpdated: (Boolean, Int, Int, Boolean, Float, Float, Triple<Float, Float, Float>?) -> Unit,
+    private val onTrackingUpdated: (Boolean, Int, Int, Boolean, Float, Float, Triple<Float, Float, Float>?, Boolean, Float, Float, Float) -> Unit,
     private val onLightUpdated: (Float) -> Unit,
     private val onDiag: (String) -> Unit = {}
 ) : GLSurfaceView.Renderer {
@@ -249,6 +249,25 @@ class ArRenderer(
                         slamManager.getSplatCount() to slamManager.getImmutableSplatCount()
                     }
 
+                    val visConf = slamManager.getVisibleConfidenceAvg()
+                    val globConf = slamManager.getGlobalConfidenceAvg()
+                    val isDualLens = stereoProvider?.isDualLensActive == true
+
+                    var centerDepth = -1f
+                    try {
+                        frame.acquireDepthImage16Bits().use { depthImage ->
+                            val plane = depthImage.planes[0]
+                            val cx = depthImage.width / 2
+                            val cy = depthImage.height / 2
+                            val stride = plane.rowStride
+                            val offset = cy * stride + cx * 2
+                            if (offset + 2 <= plane.buffer.limit()) {
+                                val raw = plane.buffer.getShort(offset).toInt() and 0xFFFF
+                                centerDepth = (raw and 0x1FFF) / 1000f
+                            }
+                        }
+                    } catch (e: Exception) { /* ignore */ }
+
                     var relDir: Triple<Float, Float, Float>? = null
                     val distanceMeters = run {
                         if (!anchorEstablished) return@run -1f
@@ -270,7 +289,7 @@ class ArRenderer(
                         if (len > 0.01f && fwdDot > 0f) len else -1f
                     }
 
-                    onTrackingUpdated(isTracking, count, immutableCount, depthSupported, yawDeg, distanceMeters, relDir)
+                    onTrackingUpdated(isTracking, count, immutableCount, depthSupported, yawDeg, distanceMeters, relDir, isDualLens, centerDepth, visConf, globConf)
                 }
             }
 

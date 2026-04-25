@@ -98,6 +98,15 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
     bool needsPruning = false;
     bool dataChanged = false;
 
+    // Calculate current distance range in view for relative scrutiny
+    double minD = 0.3, maxD = 5.0;
+    cv::Mat mask = (depth > 0.1f);
+    if (cv::countNonZero(mask) > 100) {
+        cv::minMaxLoc(depth, &minD, &maxD, nullptr, nullptr, mask);
+    }
+    auto rangeD = (float)(maxD - minD);
+    if (rangeD < 0.1f) rangeD = 1.0f;
+
     {
         std::lock_guard<std::mutex> lock(mMutex);
 
@@ -117,16 +126,35 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                 float u_cam = (p_cam.x * fx / -p_cam.z) + cx;
                 float v_cam = (p_cam.y * -fy / -p_cam.z) + cy;
 
-                if (u_cam >= 0 && u_cam < depth.cols && v_cam >= 0 && v_cam < depth.rows) {
+                if (u_cam >= 0 && u_cam < (float)depth.cols && v_cam >= 0 && v_cam < (float)depth.rows) {
                     float d = depth.at<float>((int)v_cam, (int)u_cam);
+                    float current_d = -p_cam.z;
+
+                    // Relative Scrutiny: closer points (low rel_d) get more scrutiny
+                    float rel_d = std::max(0.0f, std::min(1.0f, (current_d - (float)minD) / rangeD));
+                    float scrutiny = 1.0f - rel_d;
+
+                    // Color Influence: least influential factor
+                    int colorR = (int)(v_cam * scaleY);
+                    int colorC = (int)(u_cam * scaleX);
+                    const auto& current_color = color.at<cv::Vec3b>(colorR, colorC);
+                    float r_f = current_color[2]/255.0f, g_f = current_color[1]/255.0f, b_f = current_color[0]/255.0f;
+                    float color_diff = std::sqrt(std::pow(r_f - mSplatData[idx].r, 2.0f) +
+                                                 std::pow(g_f - mSplatData[idx].g, 2.0f) +
+                                                 std::pow(b_f - mSplatData[idx].b, 2.0f));
+                    float color_sim = 1.0f - std::max(0.0f, std::min(1.0f, color_diff / 1.732f));
+
                     if (d > 0.1f) {
-                        float current_d = -p_cam.z;
-                        // Use a wider tolerance (12cm) during mapping to allow splats to be born while moving
-                        // but keep a tighter refinement (6cm) for established points.
-                        float tolerance = (mSplatData[idx].confidence > 0.6f) ? 0.06f : 0.12f;
+                        // Adaptive tolerance: tighter when scrutinized (close) or high confidence.
+                        // Range: 4cm (close/stable) to 14cm (far/new)
+                        float base_tol = 0.04f + (rel_d * 0.08f);
+                        if (mSplatData[idx].confidence < 0.6f) base_tol += 0.02f;
+                        float tolerance = base_tol + (color_sim * 0.02f); // color sim gives 2cm slack
 
                         if (std::abs(current_d - d) < tolerance) {
-                            mSplatData[idx].confidence = std::min(1.0f, mSplatData[idx].confidence + 0.15f);
+                            // Hit: earn confidence slower if scrutinized
+                            float gain = (0.05f + (rel_d * 0.10f)) * (0.8f + 0.2f * color_sim);
+                            mSplatData[idx].confidence = std::min(1.0f, mSplatData[idx].confidence + gain);
 
                             if (mSplatData[idx].confidence < 0.9f) {
                                 glm::vec4 p_target_cam = p_cam * (d / current_d);
@@ -142,8 +170,9 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                             continue;
                         }
                     }
-                    // Slower decay during motion to prevent pruning legitimate points during quick sweeps
-                    mSplatData[idx].confidence -= 0.02f;
+                    // Miss or poor match: decay faster if scrutinized
+                    float decay = 0.02f + (scrutiny * 0.04f) + (1.0f - color_sim) * 0.01f;
+                    mSplatData[idx].confidence -= decay;
                     dataChanged = true;
                     if (mSplatData[idx].confidence <= 0.0f) needsPruning = true;
                 }
@@ -274,4 +303,27 @@ int VoxelHash::getImmutableSplatCount() const {
         if (s.confidence >= 0.98f) count++;
     }
     return count;
+}
+
+float VoxelHash::getVisibleConfidenceAvg() const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    float sum = 0;
+    int count = 0;
+    for (const auto& s : mSplatData) {
+        if (s.confidence > 0.15f) { // Only count "stable-ish" points for visibility avg
+            sum += s.confidence;
+            count++;
+        }
+    }
+    return count > 0 ? sum / static_cast<float>(count) : 0.0f;
+}
+
+float VoxelHash::getGlobalConfidenceAvg() const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    float sum = 0;
+    if (mSplatData.empty()) return 0.0f;
+    for (const auto& s : mSplatData) {
+        sum += s.confidence;
+    }
+    return sum / static_cast<float>(mSplatData.size());
 }

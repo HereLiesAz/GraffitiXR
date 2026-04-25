@@ -153,9 +153,20 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
     float cx = (projMat[8] + 1.0f) * (depth.cols / 2.0f);
     float cy = (-projMat[9] + 1.0f) * (depth.rows / 2.0f);
 
+    // Calculate current distance range for relative scrutiny
+    double minD = 0.3, maxD = 5.0;
+    cv::Mat mask = (depth > 0.1f);
+    if (cv::countNonZero(mask) > 100) {
+        cv::minMaxLoc(depth, &minD, &maxD, NULL, NULL, mask);
+    }
+    float rangeD = (float)(maxD - minD);
+    if (rangeD < 0.1f) rangeD = 1.0f;
+
     std::vector<bool> vertexHits(mPersistentMesh.size(), false);
     std::vector<bool> inView(mPersistentMesh.size(), false);
     std::vector<glm::vec2> camPoints(mPersistentMesh.size(), glm::vec2(-1.0f));
+    std::vector<float> vertexScrutiny(mPersistentMesh.size(), 0.0f);
+    std::vector<float> vertexColorSim(mPersistentMesh.size(), 1.0f);
 
     for (int i = 0; i < (int)mPersistentMesh.size(); ++i) {
         auto& v = mPersistentMesh[i];
@@ -171,8 +182,28 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
             float d = depth.at<float>((int)v_cam, (int)u_cam);
             if (d > 0.1f && d < 10.0f) {
                 float current_d = -p_cam.z;
-                // Use adaptive tolerance: tighter for established vertices, looser for mapping
-                float tolerance = (v.confidence > 0.6f) ? 0.06f : 0.15f;
+
+                // Relative Scrutiny
+                float rel_d = std::max(0.0f, std::min(1.0f, (current_d - (float)minD) / rangeD));
+                vertexScrutiny[i] = 1.0f - rel_d;
+
+                // Color Influence: least influential factor
+                int texX = (int)(v.u * TEXTURE_SIZE);
+                int texY = (int)(v.v * TEXTURE_SIZE);
+                if (texX >= 0 && texX < TEXTURE_SIZE && texY >= 0 && texY < TEXTURE_SIZE) {
+                    cv::Vec3b world_col = mMuralTexture.at<cv::Vec3b>(texY, texX);
+                    cv::Vec3b cam_col = color.at<cv::Vec3b>((int)(v_cam * ((float)color.rows / depth.rows)),
+                                                            (int)(u_cam * ((float)color.cols / depth.cols)));
+
+                    float color_diff = std::sqrt(std::pow((cam_col[2] - world_col[2])/255.0f, 2) +
+                                                 std::pow((cam_col[1] - world_col[1])/255.0f, 2) +
+                                                 std::pow((cam_col[0] - world_col[0])/255.0f, 2));
+                    vertexColorSim[i] = 1.0f - std::max(0.0f, std::min(1.0f, color_diff / 1.732f));
+                }
+
+                // Adaptive tolerance: tighter when scrutinized (close)
+                float tolerance = 0.05f + (rel_d * 0.10f) + (vertexColorSim[i] * 0.02f);
+                if (v.confidence > 0.6f) tolerance -= 0.02f;
 
                 if (std::abs(current_d - d) < tolerance) {
                     glm::vec4 p_target_cam = p_cam * (d / current_d);
@@ -197,13 +228,14 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
         if (mPersistentMesh[i].confidence >= 0.98f) continue; // Real Immutability
 
         if (vertexHits[i]) {
-            // Reinforced established vertex: Balanced lock
-            float gain = 0.25f;
+            // Reinforced established vertex: lock slower if scrutinized
+            float gain = (0.15f + (1.0f - vertexScrutiny[i]) * 0.2f) * (0.9f + 0.1f * vertexColorSim[i]);
             mPersistentMesh[i].confidence = std::min(1.0f, mPersistentMesh[i].confidence + gain);
         } else if (inView[i]) {
-            // In-view Miss: Balanced decay for better accuracy
-            mPersistentMesh[i].confidence = std::max(0.0f, mPersistentMesh[i].confidence - 0.05f);
-            float resetAlpha = 0.1f;
+            // Miss: decay faster if scrutinized
+            float decay = 0.03f + (vertexScrutiny[i] * 0.07f) + (1.0f - vertexColorSim[i]) * 0.01f;
+            mPersistentMesh[i].confidence = std::max(0.0f, mPersistentMesh[i].confidence - decay);
+            float resetAlpha = 0.05f + (vertexScrutiny[i] * 0.15f);
             mPersistentMesh[i].z *= (1.0f - resetAlpha);
         }
         // If not in view, confidence and position are preserved (No global decay)

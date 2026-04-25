@@ -40,6 +40,8 @@ public:
     void prune(float threshold);
     int getSplatCount() const;
     int getImmutableSplatCount() const;
+    float getVisibleConfidenceAvg() const;
+    float getGlobalConfidenceAvg() const;
 
 private:
     void pruneInternal(float threshold, float voxelSize);

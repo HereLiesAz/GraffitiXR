@@ -26,6 +26,8 @@ class SlamManager @Inject constructor() {
 
     fun getSplatCount(): Int = nativeGetSplatCount()
     fun getImmutableSplatCount(): Int = nativeGetImmutableSplatCount()
+    fun getVisibleConfidenceAvg(): Float = nativeGetVisibleConfidenceAvg()
+    fun getGlobalConfidenceAvg(): Float = nativeGetGlobalConfidenceAvg()
     fun setSplatsVisible(visible: Boolean) = nativeSetSplatsVisible(visible)
     fun getLastDepthTrace(): String = nativeGetLastDepthTrace()
     fun getLastSplatTrace(): String = nativeGetLastSplatTrace()
@@ -209,6 +211,8 @@ class SlamManager @Inject constructor() {
     private external fun nativeDraw()
     private external fun nativeGetSplatCount(): Int
     private external fun nativeGetImmutableSplatCount(): Int
+    private external fun nativeGetVisibleConfidenceAvg(): Float
+    private external fun nativeGetGlobalConfidenceAvg(): Float
     private external fun nativeSetSplatsVisible(visible: Boolean)
     private external fun nativeGetLastDepthTrace(): String
     private external fun nativeGetLastSplatTrace(): String

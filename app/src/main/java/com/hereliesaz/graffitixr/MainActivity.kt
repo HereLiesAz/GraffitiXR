@@ -729,6 +729,10 @@ class MainActivity : ComponentActivity() {
                             }
 
                             if (editorUiState.editorMode == EditorMode.AR && editorUiState.showDiagOverlay && !arUiState.isAnchorEstablished) {
+                                DiagnosticOverlay(
+                                    uiState = arUiState,
+                                    modifier = Modifier.align(Alignment.TopStart).padding(top = 100.dp, start = 16.dp)
+                                )
                                 DiagPopup(
                                     diagLog = arUiState.diagLog,
                                     modifier = Modifier.align(Alignment.TopStart),
@@ -1977,6 +1981,87 @@ private fun CoopNotFoundDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DiagnosticOverlay(
+    uiState: ArUiState,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+            .border(1.dp, Cyan.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+            .padding(12.dp)
+            .width(220.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "AR DIAGNOSTICS",
+                color = Cyan,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp
+            )
+
+            DiagnosticRow("Dual Lens", if (uiState.isDualLensActive) "ACTIVE" else "SINGLE", if (uiState.isDualLensActive) Cyan else Color.Gray)
+            DiagnosticRow("Depth (Ctr)", if (uiState.currentCenterDepth > 0) "%.2fm".format(uiState.currentCenterDepth) else "---", Color.White)
+            
+            Spacer(Modifier.height(4.dp))
+            
+            Text(text = "CONFIDENCE", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            ConfidenceProgressBar("Visible", uiState.visibleSplatConfidenceAvg)
+            ConfidenceProgressBar("Global", uiState.globalSplatConfidenceAvg)
+            
+            Spacer(Modifier.height(4.dp))
+            
+            DiagnosticRow("Splats", "${uiState.splatCount}", Color.White)
+            DiagnosticRow("Immutable", "${uiState.immutableSplatCount}", if (uiState.immutableSplatCount > 0) HotPink else Color.White)
+
+            val sensors = uiState.sensorData
+            if (sensors != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(text = "SENSOR DATA", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "A: %.1f° P: %.1f° R: %.1f°".format(sensors.azimuth, sensors.pitch, sensors.roll),
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DiagnosticRow(label: String, value: String, color: Color) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(text = label, color = Color.Gray, fontSize = 11.sp)
+        Text(text = value, color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun ConfidenceProgressBar(label: String, progress: Float) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = label, color = Color.White, fontSize = 10.sp)
+            Text(text = "${(progress * 100).toInt()}%", color = Cyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(2.dp))
+        LinearProgressIndicator(
+            progress = { progress },
+            modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+            color = Cyan,
+            trackColor = Color.White.copy(alpha = 0.1f)
+        )
     }
 }
 

@@ -124,7 +124,15 @@ data class ArUiState(
     val isCoopSearching: Boolean = false,
     val coopStatus: String? = null,
     val coopRole: CoopRole = CoopRole.NONE,
-    val showCoopNotFoundDialog: Boolean = false
+    val showCoopNotFoundDialog: Boolean = false,
+
+    // ── Enhanced Diagnostics ──────────────
+    val isDualLensActive: Boolean = false,
+    val currentCenterDepth: Float = -1f,
+    val visibleSplatConfidenceAvg: Float = 0f,
+    val globalSplatConfidenceAvg: Float = 0f,
+    val fpsAr: Float = 0f,
+    val rawSensorReadings: String? = null
 )
 
 enum class CoopRole { NONE, HOST, GUEST }

@@ -57,6 +57,26 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 
 extern "C" {
 
+JNIEXPORT jfloat JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetVisibleConfidenceAvg(JNIEnv* env, jobject thiz) {
+    if (gSlamEngine) {
+        float vis, glob;
+        gSlamEngine->getConfidenceAvgs(vis, glob);
+        return vis;
+    }
+    return 0.0f;
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetGlobalConfidenceAvg(JNIEnv* env, jobject thiz) {
+    if (gSlamEngine) {
+        float vis, glob;
+        gSlamEngine->getConfidenceAvgs(vis, glob);
+        return glob;
+    }
+    return 0.0f;
+}
+
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitialize(JNIEnv* env, jobject thiz) {
     if (!gSlamEngine) {

@@ -401,7 +401,19 @@ class ArViewModel @Inject constructor(
         loadCloudPointsIfExists()
     }
 
-    fun setTrackingState(isTracking: Boolean, splatCount: Int, immutableSplatCount: Int, isDepthApiSupported: Boolean, cameraYaw: Float = 0f, distanceToAnchorMeters: Float = -1f, anchorRelativeDirection: Triple<Float, Float, Float>? = null) {
+    fun setTrackingState(
+        isTracking: Boolean,
+        splatCount: Int,
+        immutableSplatCount: Int,
+        isDepthApiSupported: Boolean,
+        cameraYaw: Float = 0f,
+        distanceToAnchorMeters: Float = -1f,
+        anchorRelativeDirection: Triple<Float, Float, Float>? = null,
+        isDualLens: Boolean = false,
+        centerDepth: Float = -1f,
+        visConf: Float = 0f,
+        globConf: Float = 0f
+    ) {
         val progress = if (isTracking) slamManager.getPaintingProgress() else _uiState.value.paintingProgress
 
         val sector = (((cameraYaw % 360f) + 360f) % 360f / 30f).toInt().coerceIn(0, 11)
@@ -430,7 +442,11 @@ class ArViewModel @Inject constructor(
                     sectorsCovered = sectorsCovered
                 ),
                 distanceToAnchorMeters = distanceToAnchorMeters,
-                anchorRelativeDirection = anchorRelativeDirection
+                anchorRelativeDirection = anchorRelativeDirection,
+                isDualLensActive = isDualLens,
+                currentCenterDepth = centerDepth,
+                visibleSplatConfidenceAvg = visConf,
+                globalSplatConfidenceAvg = globConf
             )
         }
     }

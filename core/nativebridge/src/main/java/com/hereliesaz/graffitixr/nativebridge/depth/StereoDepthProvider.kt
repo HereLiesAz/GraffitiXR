@@ -26,6 +26,9 @@ class StereoDepthProvider @Inject constructor(
     private var prevWidth: Int = 0
     private var prevHeight: Int = 0
 
+    val isDualLensActive: Boolean
+        get() = stereoLeft != null && stereoRight != null
+
     /**
      * Processes incoming stereo frames by mapping them into native memory space.
      *
