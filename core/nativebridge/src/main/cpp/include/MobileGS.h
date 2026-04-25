@@ -19,6 +19,8 @@
 
 class MobileGS {
 public:
+    MobileGS() {}
+
     void initialize(int width, int height);
     void initGl();
     void resetGlContext();
@@ -26,6 +28,7 @@ public:
     void updateMappingCamera(float* viewMat, float* projMat);
     void updateLightLevel(float level);
     void updateAnchorTransform(float* transformMat);
+    void updateDeviceMotion(float* angularVel, float* linearVel);
 
     // Restoration: World-space processing pipeline
     void processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv);
@@ -186,6 +189,8 @@ private:
 
     uint64_t mFrameCounter = 0;
     float mLightLevel = 1.0f;
+    float mLastAngularVelocity[3] = {0,0,0};
+    float mLastLinearVelocity[3] = {0,0,0};
 
     float mViewMatrix[16];
     float mProjMatrix[16];

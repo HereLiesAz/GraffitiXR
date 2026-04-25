@@ -116,6 +116,19 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     if (mScanMode == 1) { // MURAL
         if (mMuralMethod == 0) { // VOXEL_HASH
             mVoxelHash.update(depth, colorRGB, viewMat, projMat, mVoxelSize, mLightLevel);
+
+            // Task: Store keyframes for background optimization
+            // We use every 15th frame as a keyframe to ensure multi-view diversity
+            if (mFrameCounter % 15 == 0) {
+                Keyframe kf;
+                kf.depth = depth.clone();
+                kf.color = colorRGB.clone();
+                memcpy(kf.viewMatrix, viewMat, 16 * sizeof(float));
+                memcpy(kf.projMatrix, projMat, 16 * sizeof(float));
+                memcpy(kf.angularVelocity, mLastAngularVelocity, 3 * sizeof(float));
+                memcpy(kf.linearVelocity, mLastLinearVelocity, 3 * sizeof(float));
+                mVoxelHash.addKeyframe(kf);
+            }
         } else { // SURFACE_MESH
             mSurfaceMesh.update(depth, colorRGB, viewMat, projMat, mAnchorMatrix, mLightLevel);
         }
@@ -188,6 +201,12 @@ void MobileGS::updateLightLevel(float level) {
 void MobileGS::updateAnchorTransform(float* transformMat) {
     std::lock_guard<std::mutex> lock(mMutex);
     memcpy(mAnchorMatrix, transformMat, 16 * sizeof(float));
+}
+
+void MobileGS::updateDeviceMotion(float* angularVel, float* linearVel) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    memcpy(mLastAngularVelocity, angularVel, 3 * sizeof(float));
+    memcpy(mLastLinearVelocity, linearVel, 3 * sizeof(float));
 }
 
 void MobileGS::getAnchorTransform(float* outMat16) const {

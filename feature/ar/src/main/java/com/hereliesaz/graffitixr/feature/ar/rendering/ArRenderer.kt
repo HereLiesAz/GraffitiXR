@@ -76,6 +76,10 @@ class ArRenderer(
     private var sensorOrientation = 90
     private var isSurfaceCreated = false
 
+    private var lastPoseX = 0f
+    private var lastPoseY = 0f
+    private var lastPoseZ = 0f
+
     @Volatile var captureRequested: Boolean = false
     @Volatile var isCapturingTarget: Boolean = false
     @Volatile var isInPlaneRealignment: Boolean = false
@@ -382,6 +386,23 @@ class ArRenderer(
             // ── Frame Data Pipeline (Throttle to 20Hz or 2Hz for Battery Efficiency) ──
             val throttleRate = if (anchorEstablished) 30 else 3 // 2Hz vs 20Hz
             if (isTracking && frameCount % throttleRate == 0) {
+                // Calculate device motion (linear and angular velocity) for deblurring
+                val currentPose = camera.displayOrientedPose
+                if (frameCount > 0) {
+                    // Simple delta-based velocity estimation
+                    // In a production app, we'd use raw IMU high-frequency data.
+                    val dt = 1.0f / 20.0f // Approx 20Hz throttle
+                    val linVel = floatArrayOf(
+                        (currentPose.tx() - lastPoseX) / dt,
+                        (currentPose.ty() - lastPoseY) / dt,
+                        (currentPose.tz() - lastPoseZ) / dt
+                    )
+                    // Angular velocity approx from quaternion delta
+                    val angVel = floatArrayOf(0f, 0f, 0f) // Stub for now
+                    slamManager.updateDeviceMotion(angVel, linVel)
+                }
+                lastPoseX = currentPose.tx(); lastPoseY = currentPose.ty(); lastPoseZ = currentPose.tz()
+
                 // Calculate rotation code to align sensor-native data with display orientation
                 val displayRotation = displayRotationHelper.getRotation()
                 val cvRotateCode = when ((sensorOrientation - displayRotation * 90 + 360) % 360) {

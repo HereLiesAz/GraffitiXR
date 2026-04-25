@@ -27,10 +27,14 @@ static const char* kVertexShader =
     "layout(location = 3) in vec4 aRot;\n"
     "layout(location = 4) in float aConfidence;\n"
     "layout(location = 5) in vec3 aVelocity;\n"
+    "layout(location = 6) in vec3 aSH_R;\n"
+    "layout(location = 7) in vec3 aSH_G;\n"
+    "layout(location = 8) in vec3 aSH_B;\n"
     "uniform mat4 uMvp;\n"
     "uniform mat4 uView;\n"
     "uniform float uFocalY;\n"
     "uniform float uTimeStep;\n" // Exposure time integration
+    "uniform vec3 uCamPos;\n"
     "out vec4 vColor;\n"
     "out mat3 vCov2DInv;\n"
     "out float vDepth;\n"
@@ -50,6 +54,14 @@ static const char* kVertexShader =
     "  vec4 posCam = uView * vec4(integratedPos, 1.0);\n"
     "  gl_Position = uMvp * vec4(integratedPos, 1.0);\n"
     "  vDepth = -posCam.z;\n"
+    "\n"
+    "  // View-dependent color (Spherical Harmonics Level 1)\n"
+    "  vec3 dir = normalize(integratedPos - uCamPos);\n"
+    "  float SH_C1 = 0.4886025;\n"
+    "  vec3 resColor = aColor.rgb;\n"
+    "  resColor.r += SH_C1 * (aSH_R.x * dir.y + aSH_R.y * dir.z + aSH_R.z * dir.x);\n"
+    "  resColor.g += SH_C1 * (aSH_G.x * dir.y + aSH_G.y * dir.z + aSH_G.z * dir.x);\n"
+    "  resColor.b += SH_C1 * (aSH_B.x * dir.y + aSH_B.y * dir.z + aSH_B.z * dir.x);\n"
     "\n"
     "  mat3 R = quatToMat3(aRot);\n"
     "  mat3 S = mat3(aScale.x, 0.0, 0.0, 0.0, aScale.y, 0.0, 0.0, 0.0, aScale.z);\n"
@@ -73,7 +85,7 @@ static const char* kVertexShader =
     "  if (det <= 0.0) { gl_Position = vec4(0,0,0,-1); return; }\n"
     "\n"
     "  vCov2DInv = inverse(Sigma2D);\n"
-    "  vColor = vec4(aColor.rgb, aColor.a * clamp(aConfidence, 0.0, 1.0));\n"
+    "  vColor = vec4(max(vec3(0.0), resColor), aColor.a * clamp(aConfidence, 0.0, 1.0));\n"
     "\n"
     "  float mid = 0.5 * (Sigma2D[0][0] + Sigma2D[1][1]);\n"
     "  float lambda1 = mid + sqrt(max(0.1, mid*mid - det));\n"
@@ -99,7 +111,7 @@ static const char* kFragmentShader =
     "  oColor = vec4(vColor.rgb, weight);\n"
     "}\n";
 
-VoxelHash::VoxelHash() {
+VoxelHash::VoxelHash() : mNextRefineIndex(0) {
     mSplatData.reserve(MAX_SPLATS);
 }
 
@@ -155,7 +167,40 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
     {
         std::lock_guard<std::mutex> lock(mMutex);
 
-        // Discovery loop with Non-Uniformity check
+        // 1. Refinement Loop: Reproject a SUBSET of existing splats
+        int totalSplats = static_cast<int>(mSplatData.size());
+        if (totalSplats > 0) {
+            int itemsToProcess = std::max(100, totalSplats / 4);
+            for (int i = 0; i < itemsToProcess; ++i) {
+                int idx = mNextRefineIndex % totalSplats;
+                mNextRefineIndex++;
+
+                if (mSplatData[idx].confidence >= 0.98f) continue;
+
+                glm::vec4 p_cam = V * glm::vec4(mSplatData[idx].x, mSplatData[idx].y, mSplatData[idx].z, 1.0f);
+                if (p_cam.z >= -0.1f) continue;
+
+                float u_cam = (p_cam.x * fx / -p_cam.z) + cx;
+                float v_cam = (p_cam.y * -fy / -p_cam.z) + cy;
+
+                if (u_cam >= 0 && u_cam < (float)depth.cols && v_cam >= 0 && v_cam < (float)depth.rows) {
+                    float d = depth.at<float>(static_cast<int>(v_cam), static_cast<int>(u_cam));
+                    if (d > 0.1f) {
+                        float current_d = -p_cam.z;
+                        if (std::abs(current_d - d) < 0.10f) {
+                            mSplatData[idx].confidence = std::min(1.0f, mSplatData[idx].confidence + 0.15f);
+                            dataChanged = true;
+                            continue;
+                        }
+                    }
+                    mSplatData[idx].confidence -= 0.05f;
+                    dataChanged = true;
+                    if (mSplatData[idx].confidence <= 0.0f) dataChanged = true; // Needs pruning
+                }
+            }
+        }
+
+        // 2. Discovery loop with Non-Uniformity check
         int step = 6;
         for (int r = step; r < depth.rows - step; r += step) {
             for (int c = step; c < depth.cols - step; c += step) {
@@ -244,18 +289,25 @@ void VoxelHash::optimize(const cv::Mat& depth, const cv::Mat& color, const float
     if (count == 0) return;
 
     glm::mat4 V = glm::make_mat4(viewMat);
-    const float halfW = depth.cols / 2.0f;
-    const float halfH = depth.rows / 2.0f;
+    const float halfW = (float)depth.cols / 2.0f;
+    const float halfH = (float)depth.rows / 2.0f;
     float fx = projMat[0] * halfW;
     float fy = projMat[5] * halfH;
     float cx = (projMat[8]  + 1.0f) * halfW;
     float cy = (-projMat[9] + 1.0f) * halfH;
 
-    // Kinematic & Proliferation Optimization pass
+    // Advanced: Multi-View Consistency & Motion-Aware Refinement
     int batchSize = std::max(500, count / 8);
     for (int i = 0; i < batchSize; ++i) {
         int idx = rand() % count;
         if (mSplatData[idx].confidence >= 0.99f) continue;
+
+        // Kinematic Refinement: align velocity with latest keyframe motion
+        if (!mKeyframes.empty()) {
+            const auto& kf = mKeyframes.back();
+            // Gradient descent on velocity to minimize temporal drift
+            for(int j=0; j<3; ++j) mSplatData[idx].velocity[j] += (kf.linearVelocity[j] - mSplatData[idx].velocity[j]) * 0.1f;
+        }
 
         glm::vec4 p_cam = V * glm::vec4(mSplatData[idx].x, mSplatData[idx].y, mSplatData[idx].z, 1.0f);
         if (p_cam.z >= -0.1f) continue;
@@ -269,9 +321,10 @@ void VoxelHash::optimize(const cv::Mat& depth, const cv::Mat& color, const float
                 float err = std::abs(-p_cam.z - d);
                 if (err < 0.15f) {
                     mSplatData[idx].confidence = std::min(1.0f, mSplatData[idx].confidence + 0.08f);
-                    // AtomGS inspired: If highly confident but small, proliferate?
-                    if (mSplatData[idx].confidence > 0.9f && mSplatData[idx].scale[0] < 0.01f) {
-                        mSplatData[idx].scale[0] *= 1.2f; mSplatData[idx].scale[1] *= 1.2f;
+
+                    // Atomization: refine scale based on reconstruction stability
+                    if (mSplatData[idx].confidence > 0.8f && mSplatData[idx].scale[0] < 0.005f) {
+                        mSplatData[idx].scale[0] *= 1.1f; mSplatData[idx].scale[1] *= 1.1f;
                     }
                 } else {
                     mSplatData[idx].confidence -= 0.04f;
@@ -299,6 +352,10 @@ void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, 
     glUniform1f(glGetUniformLocation(mProgram, "uFocalY"), focalY);
     glUniform1f(glGetUniformLocation(mProgram, "uTimeStep"), 0.016f); // Placeholder for 60fps exposure
 
+    // Calculate camera position in world space for SH
+    glm::vec3 camPos = glm::vec3(glm::inverse(view)[3]);
+    glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, glm::value_ptr(camPos));
+
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE);
     glDepthMask(GL_FALSE);
@@ -309,18 +366,23 @@ void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, 
     glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)0);
     // 1: Color (r,g,b,a) [12-28]
     glEnableVertexAttribArray(1); glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(12));
-    // 2: Scale (scale[0,1,2]) [offset: mean(12)+color(16)+sh(36) = 64]
+    // 2: Scale (scale[0,1,2]) [offset: 64]
     glEnableVertexAttribArray(2); glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(64));
-    // 3: Rotation (rot[0,1,2,3]) [offset: 64+scale(12) = 76]
+    // 3: Rotation (rot[0,1,2,3]) [offset: 76]
     glEnableVertexAttribArray(3); glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(76));
-    // 4: Confidence [offset: 76+rot(16) = 92]
+    // 4: Confidence [offset: 92]
     glEnableVertexAttribArray(4); glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(92));
-    // 5: Velocity [offset: 92+conf(4) = 96]
+    // 5: Velocity [offset: 96]
     glEnableVertexAttribArray(5); glVertexAttribPointer(5, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(96));
+    // 6..8: SH Coefficients [offset: 28, 40, 52]
+    glEnableVertexAttribArray(6); glVertexAttribPointer(6, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(28));
+    glEnableVertexAttribArray(7); glVertexAttribPointer(7, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(40));
+    glEnableVertexAttribArray(8); glVertexAttribPointer(8, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(52));
 
     glDrawArrays(GL_POINTS, 0, count);
 
-    glDisableVertexAttribArray(0); glDisableVertexAttribArray(1); glDisableVertexAttribArray(2); glDisableVertexAttribArray(3); glDisableVertexAttribArray(4); glDisableVertexAttribArray(5);
+    glDisableVertexAttribArray(0); glDisableVertexAttribArray(1); glDisableVertexAttribArray(2); glDisableVertexAttribArray(3);
+    glDisableVertexAttribArray(4); glDisableVertexAttribArray(5); glDisableVertexAttribArray(6); glDisableVertexAttribArray(7); glDisableVertexAttribArray(8);
     glDepthMask(GL_TRUE);
     glEnable(GL_DEPTH_TEST);
 }

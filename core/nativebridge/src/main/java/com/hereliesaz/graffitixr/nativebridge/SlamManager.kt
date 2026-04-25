@@ -34,6 +34,10 @@ class SlamManager @Inject constructor() {
 
     fun updateAnchorTransform(transform: FloatArray) = nativeUpdateAnchorTransform(transform)
 
+    fun updateDeviceMotion(angularVel: FloatArray, linearVel: FloatArray) {
+        nativeUpdateDeviceMotion(angularVel, linearVel)
+    }
+
     fun getPaintingProgress(): Float = nativeGetPaintingProgress()
 
     fun getAnchorTransform(): FloatArray = nativeGetAnchorTransform()
@@ -228,6 +232,7 @@ class SlamManager @Inject constructor() {
     private external fun nativeImportModel3D(path: String): Boolean
     private external fun nativeLoadSuperPoint(assetManager: AssetManager): Boolean
     private external fun nativeUpdateAnchorTransform(transform: FloatArray)
+    private external fun nativeUpdateDeviceMotion(angularVel: FloatArray, linearVel: FloatArray)
     private external fun nativeGetAnchorTransform(): FloatArray
     private external fun nativeGetPaintingProgress(): Float
     private external fun nativeSetArScanMode(mode: Int)

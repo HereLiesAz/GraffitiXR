@@ -78,6 +78,17 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetGlobalConfidenc
 }
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateDeviceMotion(JNIEnv* env, jobject thiz, jfloatArray angularVel, jfloatArray linearVel) {
+    if (gSlamEngine) {
+        jfloat* a = env->GetFloatArrayElements(angularVel, nullptr);
+        jfloat* l = env->GetFloatArrayElements(linearVel, nullptr);
+        gSlamEngine->updateDeviceMotion(a, l);
+        env->ReleaseFloatArrayElements(angularVel, a, JNI_ABORT);
+        env->ReleaseFloatArrayElements(linearVel, l, JNI_ABORT);
+    }
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitialize(JNIEnv* env, jobject thiz) {
     if (!gSlamEngine) {
         gSlamEngine = new MobileGS();
