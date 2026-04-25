@@ -32,7 +32,7 @@ class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
     private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int) -> Unit,
-    private val onTrackingUpdated: (Boolean, Int, Int, Boolean, Float, Float, Triple<Float, Float, Float>?, Boolean, Float, Float, Float) -> Unit,
+    private val onTrackingUpdated: (Boolean, Int, Int, Boolean, Float, Float, Triple<Float, Float, Float>?, Boolean, Boolean, Float, Float, Float) -> Unit,
     private val onLightUpdated: (Float) -> Unit,
     private val onDiag: (String) -> Unit = {}
 ) : GLSurfaceView.Renderer {
@@ -201,6 +201,9 @@ class ArRenderer(
 
             val camera = frame.camera
 
+            val isDualLensHardware = activeSession.cameraConfig.stereoCameraUsage == com.google.ar.core.CameraConfig.StereoCameraUsage.REQUIRE_AND_USE
+            val isDualLens = isDualLensHardware || (stereoProvider?.isDualLensActive == true)
+
             val viewMatrix = FloatArray(16)
             val projMatrix = FloatArray(16)
             camera.getViewMatrix(viewMatrix, 0)
@@ -255,7 +258,6 @@ class ArRenderer(
 
                     val visConf = slamManager.getVisibleConfidenceAvg()
                     val globConf = slamManager.getGlobalConfidenceAvg()
-                    val isDualLens = stereoProvider?.isDualLensActive == true
 
                     var centerDepth = -1f
                     try {
@@ -297,7 +299,7 @@ class ArRenderer(
                         if (len > 0.01f && fwdDot > 0f) len else -1f
                     }
 
-                    onTrackingUpdated(isTracking, count, immutableCount, depthSupported, yawDeg, distanceMeters, relDir, isDualLens, centerDepth, visConf, globConf)
+                    onTrackingUpdated(isTracking, count, immutableCount, depthSupported, yawDeg, distanceMeters, relDir, isDualLens, isDualLensHardware, centerDepth, visConf, globConf)
                 }
             }
 
@@ -422,8 +424,8 @@ class ArRenderer(
                             frame.timestamp,
                             cvRotateCode
                         )
-                        // Feed temporal stereo ONLY when mapping
-                        if (!anchorEstablished) {
+                        // Feed temporal stereo ONLY when mapping AND if hardware stereo isn't active
+                        if (!anchorEstablished && !isDualLensHardware) {
                             stereoProvider?.submitFrame(planes[0].buffer, image.width, image.height, frame.timestamp)
                         }
                     }

@@ -238,29 +238,34 @@ class ArViewModel @Inject constructor(
 
             // Task: Engage dual lens depth mapping if device is capable.
             // ARCore 1.53 uses setStereoCameraUsage on the CameraConfigFilter.
-            val filter = CameraConfigFilter(s).apply {
-                targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
+            val stereoFilter = CameraConfigFilter(s).apply {
                 try {
-                    // Filter for configs that support stereo camera usage
-                    setStereoCameraUsage(EnumSet.of(CameraConfig.StereoCameraUsage.REQUIRE_AND_USE))
-                } catch (e: NoSuchMethodError) {
-                    Timber.w("StereoCameraUsage not supported on this ARCore version")
+                    setStereoCameraUsage(EnumSet.of(com.google.ar.core.CameraConfig.StereoCameraUsage.REQUIRE_AND_USE))
+                } catch (e: Exception) {
+                    Timber.w(e, "Stereo filter not supported")
                 }
             }
             
-            val cameraConfigs = s.getSupportedCameraConfigs(filter)
-            if (cameraConfigs.isNotEmpty()) {
-                s.cameraConfig = cameraConfigs[0]
+            val stereoConfigs = s.getSupportedCameraConfigs(stereoFilter)
+            if (stereoConfigs.isNotEmpty()) {
+                // Prefer 30fps if available
+                val bestStereo = stereoConfigs.find { 
+                    it.fpsRange.upper == 30 
+                } ?: stereoConfigs[0]
+                
+                s.cameraConfig = bestStereo
                 _uiState.update { it.copy(isDualLensActive = true) }
+                Timber.i("Dual lens hardware stereo enabled: ${bestStereo.cameraId} FPS: ${bestStereo.fpsRange}")
             } else {
-                // Fallback to standard mono config if stereo isn't available
+                // Fallback to standard config
                 val fallbackFilter = CameraConfigFilter(s).apply {
-                    targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
+                    setTargetFps(EnumSet.of(com.google.ar.core.CameraConfig.TargetFps.TARGET_FPS_30))
                 }
                 val fallbackConfigs = s.getSupportedCameraConfigs(fallbackFilter)
                 if (fallbackConfigs.isNotEmpty()) {
                     s.cameraConfig = fallbackConfigs[0]
                 }
+                Timber.i("Hardware stereo not available; falling back to mono config.")
             }
 
             session = s
@@ -419,6 +424,7 @@ class ArViewModel @Inject constructor(
 
     fun attachSessionToRenderer(r: ArRenderer?) {
         renderer = r
+        renderer?.stereoProvider = stereoProvider
         renderer?.attachSession(session)
         loadCloudPointsIfExists()
     }
@@ -432,6 +438,7 @@ class ArViewModel @Inject constructor(
         distanceToAnchorMeters: Float = -1f,
         anchorRelativeDirection: Triple<Float, Float, Float>? = null,
         isDualLens: Boolean = false,
+        isHardwareStereo: Boolean = false,
         centerDepth: Float = -1f,
         visConf: Float = 0f,
         globConf: Float = 0f
@@ -466,6 +473,7 @@ class ArViewModel @Inject constructor(
                 distanceToAnchorMeters = distanceToAnchorMeters,
                 anchorRelativeDirection = anchorRelativeDirection,
                 isDualLensActive = isDualLens,
+                isHardwareStereoActive = isHardwareStereo,
                 currentCenterDepth = centerDepth,
                 visibleSplatConfidenceAvg = visConf,
                 globalSplatConfidenceAvg = globConf

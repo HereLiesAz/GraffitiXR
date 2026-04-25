@@ -128,6 +128,7 @@ data class ArUiState(
 
     // ── Enhanced Diagnostics ──────────────
     val isDualLensActive: Boolean = false,
+    val isHardwareStereoActive: Boolean = false,
     val currentCenterDepth: Float = -1f,
     val visibleSplatConfidenceAvg: Float = 0f,
     val globalSplatConfidenceAvg: Float = 0f,

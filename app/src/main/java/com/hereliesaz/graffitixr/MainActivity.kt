@@ -2004,7 +2004,12 @@ private fun DiagnosticOverlay(
                 fontSize = 12.sp
             )
 
-            DiagnosticRow("Dual Lens", if (uiState.isDualLensActive) "ACTIVE" else "SINGLE", if (uiState.isDualLensActive) Cyan else Color.Gray)
+            val lensMode = when {
+                uiState.isHardwareStereoActive -> "HW STEREO"
+                uiState.isDualLensActive -> "SW STEREO"
+                else -> "SINGLE"
+            }
+            DiagnosticRow("Lens Mode", lensMode, if (uiState.isDualLensActive) Cyan else Color.Gray)
             DiagnosticRow("Depth (Ctr)", if (uiState.currentCenterDepth > 0) "%.2fm".format(uiState.currentCenterDepth) else "---", Color.White)
             
             Spacer(Modifier.height(4.dp))
