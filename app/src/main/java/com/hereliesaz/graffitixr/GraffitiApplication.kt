@@ -5,8 +5,12 @@ import android.app.Application
 import android.util.Log
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.google.android.gms.security.ProviderInstaller
+import com.hereliesaz.graffitixr.common.crash.CrashReporter
+import com.hereliesaz.graffitixr.common.crash.CrashUploadWorker
 import com.meta.wearable.dat.core.Wearables
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
