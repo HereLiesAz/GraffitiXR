@@ -7,13 +7,13 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-// Dense Opaque Surfel Structure
+// Real Gaussian Splat Structure (Mobile-Optimized)
 struct Splat {
     float x, y, z;          // Position (Mean)
-    float r, g, b, a;       // Color and Opacity (Opaque)
-    float nx, ny, nz;       // Surface Normal
-    float radius;           // Calculated physical scale
-    float confidence;       // Observation count
+    float r, g, b, a;       // Color and Opacity
+    float scale[3];         // 3D Scaling (Anisotropic)
+    float rot[4];           // 3D Rotation (Quaternion)
+    float confidence;       // Observation count / Quality
 };
 
 struct Keyframe {
@@ -43,9 +43,10 @@ public:
 
     void initGl();
     void update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, float voxelSize, float initialConfidence);
-    void addSparsePoints(const std::vector<float>& points);
+    void addSparsePoints(const std::vector<float>& points, const float* viewMat, const float* projMat, float initialConfidence);
     void addKeyframe(const Keyframe& kf);
     void draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, int screenHeight);
+    void sort(const glm::vec3& camPos);
     void clear();
     void prune(float threshold);
     void save(const std::string& path);
@@ -67,8 +68,10 @@ private:
     float mLastVoxelSize = 0.02f;
     GLuint mProgram = 0;
     GLuint mPointVbo = 0;
+    GLuint mQuadVbo = 0;
+    GLuint mVao = 0;
     bool mDataDirty = false;
     int mNextRefineIndex = 0;
 
-    static constexpr int MAX_SPLATS = 500000;
+    static constexpr int MAX_SPLATS = 100000; // Appropriate cap for mobile sorting
 };

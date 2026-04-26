@@ -201,8 +201,8 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
                     vertexColorSim[i] = 1.0f - std::max(0.0f, std::min(1.0f, color_diff / 1.732f));
                 }
 
-                // Adaptive tolerance: tighter when scrutinized (close)
-                float tolerance = 0.05f + (rel_d * 0.10f) + (vertexColorSim[i] * 0.02f);
+                // Adaptive tolerance: massive when uninitialized to allow "snapping" to surfaces
+                float tolerance = (v.confidence < 0.1f) ? 0.50f : (0.05f + (rel_d * 0.10f) + (vertexColorSim[i] * 0.02f));
                 if (v.confidence > 0.6f) tolerance -= 0.02f;
 
                 if (std::abs(current_d - d) < tolerance) {
@@ -210,12 +210,11 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
                     p_target_cam.w = 1.0f;
                     glm::vec4 p_target_anchor = invVA * p_target_cam;
 
-                    if (v.confidence < 0.8f) {
-                        float alpha = 0.10f;
-                        v.x += (p_target_anchor.x - v.x) * alpha;
-                        v.y += (p_target_anchor.y - v.y) * alpha;
-                        v.z += (p_target_anchor.z - v.z) * alpha;
-                    }
+                    // Faster adaptation for low-confidence vertices
+                    float alpha = (v.confidence < 0.2f) ? 0.30f : 0.10f;
+                    v.x += (p_target_anchor.x - v.x) * alpha;
+                    v.y += (p_target_anchor.y - v.y) * alpha;
+                    v.z += (p_target_anchor.z - v.z) * alpha;
 
                     vertexHits[i] = true;
                     camPoints[i] = glm::vec2(u_cam * ((float)color.cols / depth.cols), v_cam * ((float)color.rows / depth.rows));
@@ -243,23 +242,21 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
 
     updateTexture(color, camPoints);
 
-    // Laplacian Smoothing (only for established vertices)
-    std::vector<float> nextZ(mPersistentMesh.size());
-    for (int i = 1; i < MESH_GRID_DIM - 1; ++i) {
-        for (int j = 1; j < MESH_GRID_DIM - 1; ++j) {
-            int idx = i * MESH_GRID_DIM + j;
-            if (mPersistentMesh[idx].confidence < 0.1f) {
-                nextZ[idx] = mPersistentMesh[idx].z;
-                continue;
+    // Laplacian Smoothing (Iterative to ensure watertight shell)
+    for (int iter = 0; iter < 3; ++iter) {
+        std::vector<float> nextZ(mPersistentMesh.size());
+        for (int i = 1; i < MESH_GRID_DIM - 1; ++i) {
+            for (int j = 1; j < MESH_GRID_DIM - 1; ++j) {
+                int idx = i * MESH_GRID_DIM + j;
+                float sum = mPersistentMesh[idx - 1].z + mPersistentMesh[idx + 1].z +
+                            mPersistentMesh[idx - MESH_GRID_DIM].z + mPersistentMesh[idx + MESH_GRID_DIM].z;
+                nextZ[idx] = mPersistentMesh[idx].z * 0.6f + (sum / 4.0f) * 0.4f;
             }
-            float sum = mPersistentMesh[idx - 1].z + mPersistentMesh[idx + 1].z +
-                        mPersistentMesh[idx - MESH_GRID_DIM].z + mPersistentMesh[idx + MESH_GRID_DIM].z;
-            nextZ[idx] = mPersistentMesh[idx].z * 0.8f + (sum / 4.0f) * 0.2f;
         }
-    }
-    for (int i = 1; i < MESH_GRID_DIM - 1; ++i) {
-        for (int j = 1; j < MESH_GRID_DIM - 1; ++j) {
-            mPersistentMesh[i * MESH_GRID_DIM + j].z = nextZ[i * MESH_GRID_DIM + j];
+        for (int i = 1; i < MESH_GRID_DIM - 1; ++i) {
+            for (int j = 1; j < MESH_GRID_DIM - 1; ++j) {
+                mPersistentMesh[i * MESH_GRID_DIM + j].z = nextZ[i * MESH_GRID_DIM + j];
+            }
         }
     }
 }
@@ -380,8 +377,8 @@ void SurfaceMesh::updateTexture(const cv::Mat& color, const std::vector<glm::vec
             {mPersistentMesh[i01].u * TEXTURE_SIZE, mPersistentMesh[i01].v * TEXTURE_SIZE}
         };
 
-        // Only update if the quad is not yet fully established
-        if (mPersistentMesh[i00].confidence < 0.2f) continue;
+        // Only update if the quad has begun to align
+        if (mPersistentMesh[i00].confidence < 0.05f) continue;
 
         cv::Mat H = cv::getPerspectiveTransform(src, dst);
 

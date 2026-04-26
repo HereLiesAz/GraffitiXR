@@ -1,4 +1,3 @@
-
 #pragma once
 #include <opencv2/opencv.hpp>
 #include "SuperPointDetector.h"
@@ -10,8 +9,6 @@
 #include <atomic>
 #include <condition_variable>
 #include <GLES3/gl3.h>
-
-// ~~~ RESTORED TO MARCH 9TH STABLE ARCHITECTURE ~~~
 
 #include "VoxelHash.h"
 #include "SurfaceMesh.h"
@@ -30,7 +27,6 @@ public:
     void updateAnchorTransform(float* transformMat);
     void updateDeviceMotion(float* angularVel, float* linearVel);
 
-    // Restoration: World-space processing pipeline
     void processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence);
     void pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence);
     void pushPointCloud(const std::vector<float>& points);
@@ -79,13 +75,10 @@ public:
     std::mutex& getMutex() { return mMutex; }
 
 private:
-    void pruneMap();
-    void continuousOptimize();
-    void initShaders();
-
-    std::mutex mMapMutex;
     void mapThreadFunc();
     void optimizeThreadFunc();
+    void sortThreadFunc();
+
     struct FrameData {
         cv::Mat depth;
         cv::Mat color;
@@ -96,6 +89,7 @@ private:
         bool hasIntrinsics = false;
         float confidence = 0.5f;
     };
+
     std::thread mMapThread;
     std::mutex mQueueMutex;
     std::condition_variable mQueueCv;
@@ -105,13 +99,13 @@ private:
     std::thread mOptimizeThread;
     std::atomic<bool> mOptimizeRunning{false};
 
-    void sortThreadFunc();
-    cv::Point3f getCameraWorldPosition() const;
-    void interpolateAnchorStep();
+    std::thread mSortThread;
+    std::atomic<bool> mSortRunning{false};
 
     void relocThreadFunc();
     void runPnPMatch(const cv::Mat& frame);
     void tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, const float* viewMat, const float* projMat);
+    void interpolateAnchorStep();
 
     mutable std::mutex mMutex;
     bool mIsArCoreTracking = false;
@@ -129,65 +123,7 @@ private:
     VoxelHash   mVoxelHash;
     SurfaceMesh mSurfaceMesh;
 
-    std::thread mSortThread;
-    std::mutex mSortMutex;
-    std::condition_variable mSortCv;
-    std::atomic<bool> mSortRunning{false};
-    std::atomic<bool> mSortRequested{false};
-
-    float mTargetAnchorMatrix[16];
-    bool  mAnchorInterpolating   = false;
-    float mInterpolationProgress = 0.0f;
-    static constexpr int   INTERP_FRAMES = 30;
-    static constexpr float INTERP_STEP   = 1.0f / 30.0f;
-
-    std::thread             mRelocThread;
-    std::mutex              mRelocMutex;
-    std::condition_variable mRelocCv;
-    std::atomic<bool>       mRelocRunning{false};
-    std::atomic<bool>       mRelocRequested{false};
-    std::atomic<bool>       mRelocEnabled{true};
-    cv::Mat                 mRelocColorFrame;
-    uint64_t                mLastRelocTriggerFrame = 0;
-    static constexpr uint64_t LOOP_CLOSURE_INTERVAL = 120;
-    static constexpr float    DRIFT_THRESHOLD_M     = 0.003f;
-
-    std::atomic<bool>       mFingerprintRequested{false};
-    cv::Mat                 mFingerprintColorFrame;
-    cv::Mat                 mFingerprintDepthFrame;
-    float                   mFingerprintViewMatrix[16];
-    float                   mFingerprintProjMatrix[16];
-
-    uint64_t mLastFingerprintUpdateFrame = 0;
-    static constexpr uint64_t FINGERPRINT_UPDATE_INTERVAL = 600;
-    static constexpr size_t   MAX_FINGERPRINT_KEYPOINTS   = 2000;
-
-    std::atomic<int> mPointCount{0};
-    bool mSplatsVisible{true};
-    int mScanMode = 0; // 0=CLOUD, 1=MURAL
-    int mMuralMethod = 0; // 0=VOXEL_HASH, 1=SURFACE_MESH
-
-    GLuint mMeshProgram = 0;
-    GLuint mMeshVbo = 0;
-    GLuint mMeshIbo = 0;
-    std::atomic<int> mMeshIndexCount{0};
-    std::vector<float> mMeshVertices;
-    std::vector<uint32_t> mMeshIndices;
-
-    std::mutex mGlDataMutex;
-    std::vector<Splat> mPendingSplatData;
-    std::vector<float> mPendingMeshVertices;
-    std::vector<uint32_t> mPendingMeshIndices;
-    bool mGlDataDirty = false;
-
-    // Persistent Surface Mesh (Twindo-style)
-    static constexpr int MESH_GRID_DIM = 32;
-    std::vector<MeshVertex> mPersistentMesh;
-    std::vector<uint32_t> mPersistentMeshIndices;
-    GLuint mPersistentMeshVbo = 0;
-    GLuint mPersistentMeshIbo = 0;
-    bool mPersistentMeshInitialized = false;
-
+    float mAnchorMatrix[16];
     uint64_t mFrameCounter = 0;
     float mLightLevel = 1.0f;
     float mLastAngularVelocity[3] = {0,0,0};
@@ -197,18 +133,22 @@ private:
     float mProjMatrix[16];
     float mMappingViewMatrix[16];
     float mMappingProjMatrix[16];
-    float mAnchorMatrix[16];
     bool mCameraReady = false;
 
     int mScreenWidth = 1920;
     int mScreenHeight = 1080;
-    float mVoxelSize = 0.012f; // HIGHER RESOLUTION: 12mm voxels for denser splatting
+    float mVoxelSize = 0.02f;
+    bool mSplatsVisible{true};
+    int mScanMode = 0; // 0=CLOUD, 1=MURAL
+    int mMuralMethod = 0; // 0=VOXEL_HASH, 1=SURFACE_MESH
 
-    static constexpr float MIN_RENDER_CONFIDENCE = 0.1f; // Restored for immediate feedback
+    std::thread             mRelocThread;
+    std::mutex              mRelocMutex;
+    std::condition_variable mRelocCv;
+    std::atomic<bool>       mRelocRunning{false};
+    std::atomic<bool>       mRelocRequested{false};
+    std::atomic<bool>       mRelocEnabled{true};
+    cv::Mat                 mRelocColorFrame;
+
+    std::thread mSortThread_deprecated; // cleanup
 };
-
-namespace mobilegs {
-    std::vector<uint8_t> exportFingerprint();
-    void alignToFingerprint(const uint8_t* data, size_t size);
-}
-

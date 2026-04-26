@@ -239,33 +239,32 @@ class ArViewModel @Inject constructor(
             // Task: Engage dual lens depth mapping if device is capable.
             // ARCore 1.53 uses setStereoCameraUsage on the CameraConfigFilter.
             val stereoFilter = CameraConfigFilter(s).apply {
+                facingDirection = CameraConfig.FacingDirection.BACK
                 try {
-                    setStereoCameraUsage(EnumSet.of(com.google.ar.core.CameraConfig.StereoCameraUsage.REQUIRE_AND_USE))
+                    setStereoCameraUsage(EnumSet.of(CameraConfig.StereoCameraUsage.REQUIRE_AND_USE))
                 } catch (e: Exception) {
-                    Timber.w(e, "Stereo filter not supported")
+                    Timber.w(e, "Stereo camera usage not supported on this device/version")
                 }
             }
             
             val stereoConfigs = s.getSupportedCameraConfigs(stereoFilter)
             if (stereoConfigs.isNotEmpty()) {
-                // Prefer 30fps if available
-                val bestStereo = stereoConfigs.find { 
-                    it.fpsRange.upper == 30 
-                } ?: stereoConfigs[0]
-                
+                // ABSOLUTELY use the first available stereo config
+                val bestStereo = stereoConfigs[0]
                 s.cameraConfig = bestStereo
                 _uiState.update { it.copy(isDualLensActive = true) }
-                Timber.i("Dual lens hardware stereo enabled: ${bestStereo.cameraId} FPS: ${bestStereo.fpsRange}")
+                Timber.i("ABSOLUTE: Hardware stereo enabled. Camera ID: ${bestStereo.cameraId}")
             } else {
-                // Fallback to standard config
+                // Fallback to standard config only if NO stereo is found
                 val fallbackFilter = CameraConfigFilter(s).apply {
-                    setTargetFps(EnumSet.of(com.google.ar.core.CameraConfig.TargetFps.TARGET_FPS_30))
+                    facingDirection = CameraConfig.FacingDirection.BACK
+                    targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
                 }
                 val fallbackConfigs = s.getSupportedCameraConfigs(fallbackFilter)
                 if (fallbackConfigs.isNotEmpty()) {
                     s.cameraConfig = fallbackConfigs[0]
                 }
-                Timber.i("Hardware stereo not available; falling back to mono config.")
+                Timber.i("Hardware stereo not available; using standard fallback.")
             }
 
             session = s
