@@ -19,7 +19,7 @@ dependencyResolutionManagement {
             url = uri("https://maven.pkg.github.com/facebook/meta-wearables-dat-android")
             credentials {
                 username = "unused"
-                password = System.getenv("GH_TOKEN") ?: localProperties.getProperty("GH_TOKEN") ?: ""
+                password = System.getenv("GH_TOKEN")?.trim() ?: localProperties.getProperty("GH_TOKEN")?.trim() ?: ""
             }
         }
     }
