@@ -83,7 +83,7 @@ class ArViewModel @Inject constructor(
         }
         
         if (collaborationManager == null) {
-            collaborationManager = CollaborationManager(appContext)
+            collaborationManager = CollaborationManager(appContext, slamManager)
         }
         viewModelScope.launch {
             _uiState.update { it.copy(isSyncing = true, coopStatus = "Hosting session...", coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.HOST, showCoopNotFoundDialog = false) }
@@ -97,7 +97,7 @@ class ArViewModel @Inject constructor(
 
     fun startCollaborationDiscovery() {
         if (collaborationManager == null) {
-            collaborationManager = CollaborationManager(appContext)
+            collaborationManager = CollaborationManager(appContext, slamManager)
         }
         _uiState.update { it.copy(isCoopSearching = true, coopStatus = "Searching for sessions...", showCoopNotFoundDialog = false) }
         
@@ -582,29 +582,11 @@ class ArViewModel @Inject constructor(
 
     private fun detectTargetKeypoints(bitmap: Bitmap) {
         viewModelScope.launch {
-            val kps = withContext(Dispatchers.Default) {
-                slamManager.getKeypoints(bitmap).map { Offset(it.first, it.second) }
+            val annotated = withContext(Dispatchers.Default) {
+                slamManager.annotateKeypoints(bitmap)
             }
-            val mask = withContext(Dispatchers.Default) {
-                generateInitialMask(bitmap.width, bitmap.height, kps)
-            }
-            _uiState.update { it.copy(tempCaptureBitmap = bitmap, annotatedCaptureBitmap = mask) }
+            _uiState.update { it.copy(tempCaptureBitmap = bitmap, annotatedCaptureBitmap = annotated) }
         }
-    }
-
-
-    private fun generateInitialMask(w: Int, h: Int, kps: List<Offset>): Bitmap {
-        val mask = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        val canvas = android.graphics.Canvas(mask)
-        val paint = android.graphics.Paint().apply {
-            color = android.graphics.Color.CYAN // Use Cyan for a premium look
-            alpha = 180
-            style = android.graphics.Paint.Style.FILL
-        }
-        for (kp in kps) {
-            canvas.drawCircle(kp.x * w, kp.y * h, 8f, paint)
-        }
-        return mask
     }
 
     fun applyEraseToMask(nx: Float, ny: Float, radius: Float) {

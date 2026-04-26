@@ -42,7 +42,7 @@ class ArSessionTest {
         every { settingsRepository.showAnchorBoundary } returns flowOf(false)
         every { projectRepository.currentProject } returns MutableStateFlow(null)
         every { context.filesDir } returns File("/tmp")
-        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, context)
+        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, mockk(relaxed = true), context)
     }
 
     @After

@@ -679,27 +679,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAlignToFingerprint
     env->ReleaseByteArrayElements(data, buffer, JNI_ABORT);
 }
 
-extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_hereliesaz_graffitixr_core_collaboration_CollaborationManager_nativeExportFingerprint(
-        JNIEnv* env, jobject thiz) {
-    if (!gSlamEngine) return nullptr;
-    std::vector<uint8_t> fingerprint = gSlamEngine->exportFingerprint();
-    if (fingerprint.empty()) return nullptr;
-    jbyteArray result = env->NewByteArray(fingerprint.size());
-    env->SetByteArrayRegion(result, 0, fingerprint.size(), (jbyte*)fingerprint.data());
-    return result;
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_core_collaboration_CollaborationManager_nativeAlignToPeer(
-        JNIEnv* env, jobject thiz, jbyteArray data) {
-    if (!gSlamEngine) return;
-    jsize size = env->GetArrayLength(data);
-    jbyte* buffer = env->GetByteArrayElements(data, nullptr);
-    gSlamEngine->alignToFingerprint((uint8_t*)buffer, size);
-    env->ReleaseByteArrayElements(data, buffer, JNI_ABORT);
-}
-
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativePrepareLiquify(JNIEnv* env, jobject, jobject bitmap) {
     if (!gImageWarper) return;

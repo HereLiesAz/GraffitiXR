@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.core.collaboration
 
 import android.content.Context
+import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.InetAddress
@@ -13,13 +14,9 @@ import java.io.DataOutputStream
 /**
  * Orchestrates AR synchronization between local peers.
  */
-class CollaborationManager(context: Context) {
+class CollaborationManager(context: Context, private val slamManager: SlamManager) {
     private val discovery = DiscoveryManager(context)
     private var serverSocket: ServerSocket? = null
-
-    init {
-        System.loadLibrary("graffitixr")
-    }
 
     /**
      * Start accepting peer connections.
@@ -60,7 +57,7 @@ class CollaborationManager(context: Context) {
 
             if (isHost) {
                 // 1. Send Fingerprint
-                val myFingerprint = nativeExportFingerprint()
+                val myFingerprint = slamManager.exportFingerprint() ?: byteArrayOf()
                 output.writeInt(myFingerprint.size)
                 output.write(myFingerprint)
 
@@ -82,12 +79,8 @@ class CollaborationManager(context: Context) {
                 projectFile.writeBytes(fileBytes)
 
                 // 3. Align session
-                nativeAlignToPeer(peerFingerprint)
+                slamManager.alignToFingerprint(peerFingerprint)
             }
         }
     }
-
-    // Native Bridge Hooks
-    private external fun nativeExportFingerprint(): ByteArray
-    private external fun nativeAlignToPeer(data: ByteArray)
 }
