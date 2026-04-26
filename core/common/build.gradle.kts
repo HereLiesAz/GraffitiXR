@@ -57,7 +57,7 @@ dependencies {
     implementation(libs.play.services.base)
 
     // OpenCV (Fixes Unresolved reference 'opencv', 'Mat', 'Imgproc')
-    implementation(project(":opencv"))
+    api(project(":opencv"))
 
     // AzNavRail (Fixes NoClassDefFoundError for AzOrientation)
     api(libs.az.nav.rail)

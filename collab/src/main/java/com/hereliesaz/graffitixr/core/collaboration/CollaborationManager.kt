@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.core.collaboration
 
 import android.content.Context
+import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.InetAddress
@@ -19,7 +20,7 @@ class CollaborationManager(context: Context) {
     private var isRunning = false
 
     init {
-        System.loadLibrary("graffitixr")
+        NativeLibLoader.loadAll()
     }
 
     /**

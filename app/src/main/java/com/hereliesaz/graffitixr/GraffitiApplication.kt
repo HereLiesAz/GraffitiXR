@@ -7,6 +7,7 @@ import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.google.android.gms.security.ProviderInstaller
 import com.hereliesaz.graffitixr.common.crash.CrashReporter
 import com.hereliesaz.graffitixr.common.crash.CrashUploadWorker
+import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.meta.wearable.dat.core.Wearables
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.MainScope
@@ -32,6 +33,9 @@ class GraffitiApplication : Application() {
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
+
+        // 1.1. Load Native Libraries (OpenCV + GraffitiXR)
+        NativeLibLoader.loadAll()
 
         // 1.2. Setup Crash Reporting
         CrashReporter(this).initialize()

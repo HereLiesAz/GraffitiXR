@@ -4,6 +4,7 @@ package com.hereliesaz.graffitixr.nativebridge
 import android.content.res.AssetManager
 import android.graphics.Bitmap
 import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import java.nio.ByteBuffer
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -12,7 +13,7 @@ import javax.inject.Singleton
 class SlamManager @Inject constructor() {
 
     init {
-        System.loadLibrary("graffitixr")
+        NativeLibLoader.loadAll()
     }
 
     private var isInitialized = false
