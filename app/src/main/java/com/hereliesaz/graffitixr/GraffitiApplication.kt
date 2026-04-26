@@ -33,6 +33,12 @@ class GraffitiApplication : Application() {
             Timber.plant(Timber.DebugTree())
         }
 
+        // 1.2. Setup Crash Reporting
+        CrashReporter(this).initialize()
+        MainScope().launch {
+            CrashUploadWorker(this@GraffitiApplication).checkAndUpload(BuildConfig.GH_TOKEN)
+        }
+
         // 1.5. Initialize Meta Wearables SDK
         Wearables.initialize(this)
 
