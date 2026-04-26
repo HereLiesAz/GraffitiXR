@@ -17,6 +17,7 @@ import org.opencv.core.Mat
 import org.opencv.core.MatOfPoint
 import org.opencv.core.Point
 import org.opencv.imgproc.Imgproc
+import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import java.io.File
 import java.io.FileOutputStream
 import javax.inject.Inject
@@ -36,6 +37,10 @@ import kotlin.math.ceil
  *   - Divider pages between layers (plain text, white background)
  */
 class StencilPrintEngine @Inject constructor() {
+
+    init {
+        NativeLibLoader.loadAll()
+    }
 
     companion object {
         private const val DPI = 300f

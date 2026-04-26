@@ -18,6 +18,7 @@ import org.opencv.core.Mat
 import org.opencv.core.Size
 import org.opencv.core.TermCriteria
 import org.opencv.imgproc.Imgproc
+import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import javax.inject.Inject
 
 /**
@@ -44,6 +45,10 @@ sealed class StencilProgress {
  * All processing runs on Dispatchers.Default. Progress is emitted via Flow.
  */
 class StencilProcessor @Inject constructor() {
+
+    init {
+        NativeLibLoader.loadAll()
+    }
 
     companion object {
         // Morphological closing kernel size for edge smoothing

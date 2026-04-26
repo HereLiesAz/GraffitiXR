@@ -10,8 +10,14 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.encoding.decodeStructure
 import kotlinx.serialization.encoding.encodeStructure
 import org.opencv.core.Mat
+import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 
 object MatSerializer : KSerializer<Mat> {
+
+    init {
+        NativeLibLoader.loadAll()
+    }
+
     override val descriptor: SerialDescriptor = buildClassSerialDescriptor("Mat") {
         element<Int>("rows")
         element<Int>("cols")

@@ -11,20 +11,39 @@ object NativeLibLoader {
         if (isLoaded) return
         
         try {
-            // Load OpenCV Java JNI wrapper
-            if (OpenCVLoader.initLocal()) {
-                Log.d("NativeLibLoader", "OpenCV loaded successfully.")
-            } else {
-                Log.e("NativeLibLoader", "OpenCV initialization failed via OpenCVLoader!")
+            // Priority 1: Try exact versioned name (v4)
+            // Priority 2: Try generic name
+            // Priority 3: Try OpenCVLoader.initLocal()
+            val loadSuccess = try {
+                System.loadLibrary("opencv_java4")
+                Log.i("NativeLibLoader", "libopencv_java4.so loaded directly.")
+                true
+            } catch (e: UnsatisfiedLinkError) {
+                try {
+                    System.loadLibrary("opencv_java")
+                    Log.i("NativeLibLoader", "libopencv_java.so loaded directly.")
+                    true
+                } catch (e2: UnsatisfiedLinkError) {
+                    Log.w("NativeLibLoader", "Direct load failed (${e.message} / ${e2.message}), trying OpenCVLoader fallback...")
+                    OpenCVLoader.initLocal()
+                }
+            }
+
+            if (!loadSuccess) {
+                val errorMsg = "OpenCV initialization failed via all methods! Java JNI symbols will be missing."
+                Log.e("NativeLibLoader", errorMsg)
+                throw RuntimeException(errorMsg)
             }
 
             // Load our primary C++ engine
             System.loadLibrary("graffitixr")
-            Log.d("NativeLibLoader", "libgraffitixr.so loaded successfully.")
+            Log.i("NativeLibLoader", "libgraffitixr.so loaded successfully.")
             
             isLoaded = true
         } catch (e: UnsatisfiedLinkError) {
-            Log.e("NativeLibLoader", "Critical failure: native libraries could not be loaded!", e)
+            val errorMsg = "CRITICAL: Native libraries could not be loaded!"
+            Log.e("NativeLibLoader", errorMsg, e)
+            throw RuntimeException("$errorMsg ${e.message}", e)
         }
     }
 }

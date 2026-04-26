@@ -15,6 +15,10 @@ import org.opencv.imgproc.Imgproc
 
 object ImageProcessor {
 
+    init {
+        NativeLibLoader.loadAll()
+    }
+
     /**
      * Unwarps an image using a perspective transform based on 4 corner points.
      * Restored to the working method from early project history.

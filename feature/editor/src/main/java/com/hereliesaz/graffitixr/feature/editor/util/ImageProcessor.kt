@@ -14,6 +14,7 @@ import kotlinx.coroutines.withContext
 import org.opencv.android.Utils
 import org.opencv.core.Mat
 import org.opencv.imgproc.Imgproc
+import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 
 /**
  * Kotlin UI layer implementation of image manipulation tools.
@@ -21,6 +22,10 @@ import org.opencv.imgproc.Imgproc
    * JNI boundary calls have been fully eradicated.
     */
 object ImageProcessor {
+
+    init {
+        NativeLibLoader.loadAll()
+    }
 
         /**
              * Maps screen-space touch coordinates to pixel-space bitmap coordinates,

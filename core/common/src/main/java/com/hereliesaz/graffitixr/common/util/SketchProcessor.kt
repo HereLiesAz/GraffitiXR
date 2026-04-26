@@ -18,6 +18,10 @@ import org.opencv.imgproc.Imgproc
  */
 object SketchProcessor {
 
+    init {
+        NativeLibLoader.loadAll()
+    }
+
     /**
      * Applies a pencil-sketch (dodge-blend) effect to [bitmap].
      *
