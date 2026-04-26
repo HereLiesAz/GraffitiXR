@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include <cstdlib>
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/quaternion.hpp>
