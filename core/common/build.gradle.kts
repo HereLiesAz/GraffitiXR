@@ -70,6 +70,12 @@ dependencies {
     implementation(libs.mwdat.camera)
     implementation(libs.mwdat.mockdevice)
 
+    // Networking (Crash Reporting)
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging)
+
     // Logging
     implementation(libs.timber)
 

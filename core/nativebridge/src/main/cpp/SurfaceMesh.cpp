@@ -295,6 +295,7 @@ void SurfaceMesh::draw(const glm::mat4& mvp) {
     }
 
     glUseProgram(mProgram);
+    glBindBuffer(GL_ARRAY_BUFFER, mVbo);
     glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMvp"), 1, GL_FALSE, glm::value_ptr(mvp));
     glUniform1i(glGetUniformLocation(mProgram, "uTexture"), 0);
 

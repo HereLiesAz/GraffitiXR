@@ -166,6 +166,7 @@ void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, 
     }
 
     glUseProgram(mProgram);
+    glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
     glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMvp"), 1, GL_FALSE, glm::value_ptr(mvp));
     glUniform1f(glGetUniformLocation(mProgram, "uFocalY"), focalY);
 

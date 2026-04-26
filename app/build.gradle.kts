@@ -20,6 +20,14 @@ val versionProps = Properties().apply {
     }
 }
 
+// Load local properties
+val localProperties = Properties().apply {
+    val localPropertiesFile = project.rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { load(it) }
+    }
+}
+
 var currentVersionCode = versionProps.getProperty("versionBuild", "1").toInt()
 
 // Automatically increment versionCode for release builds
@@ -58,6 +66,8 @@ android {
                 cppFlags += "-std=c++17"
             }
         }
+
+        buildConfigField("String", "GH_TOKEN", "\"${localProperties.getProperty("GH_TOKEN") ?: ""}\"")
     }
 
     buildTypes {
