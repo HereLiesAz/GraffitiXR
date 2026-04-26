@@ -251,8 +251,9 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
 
         // 2. Proto-Splat Promotion
         if (!mProtoSplats.empty()) {
-            int itemsToProcess = std::max(50, (int)mProtoSplats.size() / 10);
+            int itemsToProcess = std::max(100, (int)mProtoSplats.size() / 5);
             for (int i = 0; i < itemsToProcess; ++i) {
+                if (mProtoSplats.empty()) break;
                 int pIdx = rand() % mProtoSplats.size();
                 const auto& ps = mProtoSplats[pIdx];
 
@@ -262,9 +263,21 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                 float u_cam = (p_cam.x * fx / -p_cam.z) + cx;
                 float v_cam = (p_cam.y * -fy / -p_cam.z) + cy;
 
-                if (u_cam >= 0 && u_cam < (float)depth.cols && v_cam >= 0 && v_cam < (float)depth.rows) {
-                    float d = depth.at<float>(static_cast<int>(v_cam), static_cast<int>(u_cam));
-                    if (d > 0.1f && std::abs(-p_cam.z - d) < 0.20f) {
+                if (u_cam >= 1.0f && u_cam < (float)depth.cols - 1.0f && v_cam >= 1.0f && v_cam < (float)depth.rows - 1.0f) {
+                    float d = 0.0f;
+                    bool foundDepth = false;
+                    for (int dy = -1; dy <= 1 && !foundDepth; ++dy) {
+                        for (int dx = -1; dx <= 1; ++dx) {
+                            float val = depth.at<float>(static_cast<int>(v_cam) + dy, static_cast<int>(u_cam) + dx);
+                            if (val > 0.1f) {
+                                d = val;
+                                foundDepth = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (foundDepth && std::abs(-p_cam.z - d) < 0.25f) {
                         VoxelKey key{ static_cast<int>(std::floor(ps.x / voxelSize)), static_cast<int>(std::floor(ps.y / voxelSize)), static_cast<int>(std::floor(ps.z / voxelSize)) };
                         if (mVoxelGrid.find(key) == mVoxelGrid.end() && mSplatData.size() < MAX_SPLATS) {
                             Splat s{};
@@ -274,10 +287,9 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                             int colorC = static_cast<int>(u_cam * scaleX);
                             const auto& col = color.at<cv::Vec3b>(std::min(colorR, color.rows-1), std::min(colorC, color.cols-1));
 
-                            s.r = col[2]/255.0f; s.g = col[1]/255.0f; s.b = col[0]/255.0f; s.a = 0.8f;
-                            s.sh[0] = (s.r - 0.5f) / 0.282095f;
-                            s.sh[1] = (s.g - 0.5f) / 0.282095f;
-                            s.sh[2] = (s.b - 0.5f) / 0.282095f;
+                            // MANDATE: Correct RGB Mapping (col[0]=R, col[1]=G, col[2]=B)
+                            s.r = col[0]/255.0f; s.g = col[1]/255.0f; s.b = col[2]/255.0f; s.a = 0.5f;
+                            for(int j=0; j<9; ++j) s.sh[j] = 0.0f;
 
                             float s_val = d / fx * 1.2f;
                             s.scale[0] = s_val; s.scale[1] = s_val; s.scale[2] = s_val * 0.1f;
@@ -287,8 +299,8 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                             mSplatData.push_back(s);
                             mVoxelGrid[key] = static_cast<int>(mSplatData.size() - 1);
 
-                            // Remove from proto list
                             mProtoSplats.erase(mProtoSplats.begin() + pIdx);
+                            mProtoGrid.erase(key);
                             dataChanged = true;
                         }
                     }
@@ -301,11 +313,17 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
 
 void VoxelHash::addSparsePoints(const std::vector<float>& points, const float* viewMat, const float* projMat) {
     std::lock_guard<std::mutex> lock(mMutex);
+    float voxelSize = mLastVoxelSize;
     for (size_t i = 0; i < points.size(); i += 4) {
         float xw = points[i], yw = points[i+1], zw = points[i+2];
-        // Store as ProtoSplat; will be promoted to a full Splat in the update loop when seen by camera.
-        if (mProtoSplats.size() < MAX_SPLATS) {
-            mProtoSplats.push_back({xw, yw, zw});
+        VoxelKey key{ static_cast<int>(std::floor(xw / voxelSize)), static_cast<int>(std::floor(yw / voxelSize)), static_cast<int>(std::floor(zw / voxelSize)) };
+
+        // Disciplined Seeding: Discard if we already have a Splat or ProtoSplat in this 1cm voxel.
+        if (mVoxelGrid.find(key) == mVoxelGrid.end() && mProtoGrid.find(key) == mProtoGrid.end()) {
+            if (mProtoSplats.size() < MAX_SPLATS) {
+                mProtoSplats.push_back({xw, yw, zw});
+                mProtoGrid.insert(key);
+            }
         }
     }
 }
@@ -441,7 +459,7 @@ void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, 
     glUniform3fv(glGetUniformLocation(mProgram, "uCamPos"), 1, glm::value_ptr(camPos));
 
     glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE); // Additive for GS look
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Standard Alpha Blending for 3DGS
     glDepthMask(GL_FALSE);
     glDisable(GL_DEPTH_TEST);
 
@@ -453,10 +471,32 @@ void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, 
     glEnable(GL_DEPTH_TEST);
 }
 
+void VoxelHash::sort(const glm::vec3& camPos) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (mSplatData.empty()) return;
+
+    // Standard back-to-front sorting for correct alpha blending
+    std::sort(mSplatData.begin(), mSplatData.end(), [&camPos](const Splat& a, const Splat& b) {
+        float da = glm::distance2(glm::vec3(a.x, a.y, a.z), camPos);
+        float db = glm::distance2(glm::vec3(b.x, b.y, b.z), camPos);
+        return da > db;
+    });
+
+    // Update voxel grid indices after sort
+    mVoxelGrid.clear();
+    float voxelSize = mLastVoxelSize;
+    for (int i = 0; i < static_cast<int>(mSplatData.size()); ++i) {
+        VoxelKey key{ static_cast<int>(std::floor(mSplatData[i].x / voxelSize)), static_cast<int>(std::floor(mSplatData[i].y / voxelSize)), static_cast<int>(std::floor(mSplatData[i].z / voxelSize)) };
+        mVoxelGrid[key] = i;
+    }
+    mDataDirty = true;
+}
+
 void VoxelHash::clear() {
     std::lock_guard<std::mutex> lock(mMutex);
     mSplatData.clear();
     mProtoSplats.clear();
+    mProtoGrid.clear();
     mVoxelGrid.clear();
     mKeyframes.clear();
     mDataDirty = true;

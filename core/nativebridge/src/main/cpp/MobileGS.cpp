@@ -66,6 +66,10 @@ void MobileGS::initialize(int width, int height) {
         mOptimizeRunning = true;
         mOptimizeThread = std::thread(&MobileGS::optimizeThreadFunc, this);
     }
+    if (!mSortRunning) {
+        mSortRunning = true;
+        mSortThread = std::thread(&MobileGS::sortThreadFunc, this);
+    }
 }
 
 void MobileGS::initGl() {
@@ -227,6 +231,26 @@ void MobileGS::getPersistentMesh(std::vector<float>& outVertices, std::vector<fl
     mSurfaceMesh.getMesh(outVertices, outWeights);
 }
 
+void MobileGS::sortThreadFunc() {
+    setpriority(PRIO_PROCESS, 0, 18);
+    while (mSortRunning) {
+        glm::vec3 camPos;
+        {
+            std::lock_guard<std::mutex> lock(mMutex);
+            if (!mCameraReady) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                continue;
+            }
+            camPos = glm::vec3(glm::inverse(glm::make_mat4(mViewMatrix))[3]);
+        }
+
+        mVoxelHash.sort(camPos);
+
+        // Back-to-front sorting frequency (10Hz)
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+}
+
 // ... Rest of Reloc/Fingerprint methods (kept for tracking stability) ...
 void MobileGS::relocThreadFunc() { /* ... kept from stable ... */ }
 void MobileGS::runPnPMatch(const cv::Mat& frame) { /* ... kept from stable ... */ }
@@ -267,11 +291,13 @@ void MobileGS::destroy() {
     mMapRunning = false;
     mOptimizeRunning = false;
     mRelocRunning = false;
+    mSortRunning = false;
     mQueueCv.notify_all();
     mRelocCv.notify_all();
     if (mMapThread.joinable()) mMapThread.join();
     if (mOptimizeThread.joinable()) mOptimizeThread.join();
     if (mRelocThread.joinable()) mRelocThread.join();
+    if (mSortThread.joinable()) mSortThread.join();
 }
 
 void MobileGS::saveModel(const std::string& p) {

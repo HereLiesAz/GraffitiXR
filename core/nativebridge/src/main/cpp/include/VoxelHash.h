@@ -1,7 +1,7 @@
 #pragma once
 #include <opencv2/opencv.hpp>
 #include <vector>
-#include <unordered_map>
+#include <unordered_set>
 #include <mutex>
 #include <GLES3/gl3.h>
 #include <glm/glm.hpp>
@@ -53,6 +53,7 @@ public:
     void addSparsePoints(const std::vector<float>& points, const float* viewMat, const float* projMat);
     void addKeyframe(const Keyframe& kf);
     void draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, int screenHeight);
+    void sort(const glm::vec3& camPos);
     void clear();
     void prune(float threshold);
     void save(const std::string& path);
@@ -69,6 +70,7 @@ private:
     mutable std::mutex mMutex;
     std::vector<Splat> mSplatData;
     std::vector<ProtoSplat> mProtoSplats;
+    std::unordered_set<VoxelKey, VoxelKeyHash> mProtoGrid;
     std::vector<Keyframe> mKeyframes;
     std::unordered_map<VoxelKey, int, VoxelKeyHash> mVoxelGrid;
 
