@@ -138,7 +138,7 @@ private:
     int mScreenWidth = 1920;
     int mScreenHeight = 1080;
     float mVoxelSize = 0.02f;
-    bool mSplatsVisible{true};
+    bool mSplatsVisible{false};
     int mScanMode = 0; // 0=CLOUD, 1=MURAL
     int mMuralMethod = 0; // 0=VOXEL_HASH, 1=SURFACE_MESH
 

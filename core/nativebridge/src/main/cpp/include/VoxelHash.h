@@ -58,6 +58,8 @@ private:
     GLuint mProgram = 0;
     GLuint mPointVbo = 0;
     bool mDataDirty = false;
+    size_t mLastUploadCount = 0;
+    int64_t mLastUploadTimeMs = 0;
 
     static constexpr int MAX_SPLATS = 250000; // Optimal balance for persistence
 };

@@ -87,10 +87,12 @@ void MobileGS::draw() {
     glm::mat4 mvp = P * V;
 
     if (mScanMode == 1) { // MURAL
-        if (mMuralMethod == 0) { // VOXEL_HASH
-            mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight);
-        } else { // SURFACE_MESH
-            mSurfaceMesh.draw(mvp);
+        if (mSplatsVisible) {
+            if (mMuralMethod == 0) { // VOXEL_HASH
+                mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight);
+            } else { // SURFACE_MESH
+                mSurfaceMesh.draw(mvp);
+            }
         }
     }
 }
@@ -320,8 +322,12 @@ void MobileGS::destroy() {
     if (mRelocThread.joinable()) mRelocThread.join();
 }
 
-void MobileGS::saveModel(const std::string& p) {}
-void MobileGS::loadModel(const std::string& p) {}
+void MobileGS::saveModel(const std::string& p) {
+    mVoxelHash.save(p);
+}
+void MobileGS::loadModel(const std::string& p) {
+    mVoxelHash.load(p);
+}
 bool MobileGS::importModel3D(const std::string& p) { return false; }
 void MobileGS::setViewportSize(int w, int h) { mScreenWidth = w; mScreenHeight = h; }
 void MobileGS::setRelocEnabled(bool e) { mRelocEnabled = e; }

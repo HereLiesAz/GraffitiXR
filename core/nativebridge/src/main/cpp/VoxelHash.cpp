@@ -5,6 +5,7 @@
 #include <cmath>
 #include <fstream>
 #include <random>
+#include <chrono>
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
@@ -94,9 +95,14 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
         std::uniform_int_distribution<> disR(0, depth.rows - 1);
         std::uniform_int_distribution<> disC(0, depth.cols - 1);
 
+        const float* depthPtr = (const float*)depth.data;
+        const uint8_t* colorPtr = (const uint8_t*)color.data;
+        size_t depthStep = depth.step1();
+        size_t colorStep = color.step1();
+
         for (int i = 0; i < 2048; ++i) {
             int r = disR(gen); int c = disC(gen);
-            float d = depth.at<float>(r, c);
+            float d = depthPtr[r * depthStep + c];
             if (d < 0.1f || d > 6.0f) continue;
 
             float xc = (static_cast<float>(c) - cx) * d / fx;
@@ -110,12 +116,20 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                 if (mSplatData.size() < MAX_SPLATS) {
                     Splat s{};
                     s.x = p_world.x; s.y = p_world.y; s.z = p_world.z;
-                    cv::Vec3b col = color.at<cv::Vec3b>(r * color.rows / depth.rows, c * color.cols / depth.cols);
-                    s.r = col[0]/255.0f; s.g = col[1]/255.0f; s.b = col[2]/255.0f; s.a = 1.0f;
+
+                    int cr = r * color.rows / depth.rows;
+                    int cc = c * color.cols / depth.cols;
+                    const uint8_t* bgr = &colorPtr[cr * colorStep + cc * 3];
+                    s.r = bgr[2]/255.0f; s.g = bgr[1]/255.0f; s.b = bgr[0]/255.0f; s.a = 1.0f;
                     s.confidence = initialConfidence;
 
-                    float dz_dx = (depth.at<float>(r, std::min(depth.cols-1, c+1)) - depth.at<float>(r, std::max(0, c-1))) / (2.0f / fx);
-                    float dz_dy = (depth.at<float>(std::min(depth.rows-1, r+1), c) - depth.at<float>(std::max(0, r-1), c)) / (2.0f / fy);
+                    int r_next = std::min(depth.rows-1, r+1);
+                    int r_prev = std::max(0, r-1);
+                    int c_next = std::min(depth.cols-1, c+1);
+                    int c_prev = std::max(0, c-1);
+
+                    float dz_dx = (depthPtr[r * depthStep + c_next] - depthPtr[r * depthStep + c_prev]) / (2.0f / fx);
+                    float dz_dy = (depthPtr[r_next * depthStep + c] - depthPtr[r_prev * depthStep + c]) / (2.0f / fy);
                     glm::vec3 normalW = glm::normalize(glm::mat3(invV) * glm::normalize(glm::vec3(-dz_dx, -dz_dy, 1.0f)));
                     s.nx = normalW.x; s.ny = normalW.y; s.nz = normalW.z;
 
@@ -159,10 +173,18 @@ void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, 
     std::lock_guard<std::mutex> lock(mMutex);
     if (!mProgram || mSplatData.empty()) return;
 
+    auto now = std::chrono::steady_clock::now();
+    int64_t nowMs = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+
     if (mDataDirty) {
-        glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
-        glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(mSplatData.size() * sizeof(Splat)), mSplatData.data(), GL_DYNAMIC_DRAW);
-        mDataDirty = false;
+        // Throttled upload: Only re-sync if 100ms passed OR > 1000 new points added
+        if (nowMs - mLastUploadTimeMs > 100 || mSplatData.size() - mLastUploadCount > 1000) {
+            glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
+            glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(mSplatData.size() * sizeof(Splat)), mSplatData.data(), GL_DYNAMIC_DRAW);
+            mDataDirty = false;
+            mLastUploadCount = mSplatData.size();
+            mLastUploadTimeMs = nowMs;
+        }
     }
 
     glUseProgram(mProgram);
