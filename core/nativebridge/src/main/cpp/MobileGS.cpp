@@ -91,6 +91,7 @@ void MobileGS::draw() {
     glm::mat4 mvp = P * V;
 
     if (mScanMode == 1) { // MURAL
+        mFrameCounter++;
         if (mMuralMethod == 0) { // VOXEL_HASH
             mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight);
         } else { // SURFACE_MESH
@@ -104,7 +105,7 @@ void MobileGS::pushPointCloud(const std::vector<float>& points) {
     mVoxelHash.addSparsePoints(points, mViewMatrix, mProjMatrix);
 }
 
-void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv) {
+void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence) {
     bool isTrackingState = false;
     {
         std::lock_guard<std::mutex> lock(mMutex);
@@ -118,8 +119,9 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     else colorRGB = color;
 
     if (mScanMode == 1) { // MURAL
+        mFrameCounter++;
         if (mMuralMethod == 0) { // VOXEL_HASH
-            mVoxelHash.update(depth, colorRGB, viewMat, projMat, mVoxelSize, mLightLevel);
+            mVoxelHash.update(depth, colorRGB, viewMat, projMat, mVoxelSize, confidence);
 
             // Task: Store keyframes for background optimization
             // We use every 15th frame as a keyframe to ensure multi-view diversity
@@ -152,16 +154,16 @@ void MobileGS::mapThreadFunc() {
             mFrameQueue.erase(mFrameQueue.begin());
         }
         processDepthFrame(frame.depth, frame.color, frame.viewMatrix, frame.projMatrix,
-                          frame.hasIntrinsics ? frame.intrinsics : nullptr, frame.isYuv);
+                          frame.hasIntrinsics ? frame.intrinsics : nullptr, frame.isYuv, frame.confidence);
     }
 }
 
-void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv) {
+void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence) {
     if (!mMapRunning) return;
     std::lock_guard<std::mutex> lock(mQueueMutex);
     if (mFrameQueue.size() >= 2) mFrameQueue.erase(mFrameQueue.begin());
     FrameData data;
-    data.depth = depth.clone(); data.color = color.clone(); data.isYuv = isYuv;
+    data.depth = depth.clone(); data.color = color.clone(); data.isYuv = isYuv; data.confidence = confidence;
     memcpy(data.viewMatrix, viewMat, 16 * sizeof(float));
     memcpy(data.projMatrix, projMat, 16 * sizeof(float));
     if (intrinsics) { memcpy(data.intrinsics, intrinsics, 4 * sizeof(float)); data.hasIntrinsics = true; }

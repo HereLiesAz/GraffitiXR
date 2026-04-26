@@ -469,7 +469,8 @@ class ArRenderer(
                                 depthImage.width, depthImage.height,
                                 depthPlane.rowStride,
                                 intrArr, cpuDim[0], cpuDim[1],
-                                cvRotateCode
+                                cvRotateCode,
+                                if (isDualLensHardware) 0.9f else 0.5f
                             )
                         }
                     } catch (e: com.google.ar.core.exceptions.NotYetAvailableException) {

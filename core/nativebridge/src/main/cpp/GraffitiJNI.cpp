@@ -300,7 +300,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedPointCloud(JNI
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
-        JNIEnv* env, jobject thiz, jobject depthBuffer, jint width, jint height, jint rowStride, jfloatArray intrArray, jint cpuW, jint cpuH, jint cvRotateCode) {
+        JNIEnv* env, jobject thiz, jobject depthBuffer, jint width, jint height, jint rowStride, jfloatArray intrArray, jint cpuW, jint cpuH, jint cvRotateCode, jfloat confidence) {
 
     gLastDepthTrace.clear();
     if (!gSlamEngine) return;
@@ -348,7 +348,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
     bool isYuv = (gLastColorFrame.rows == gColorImageHeight + gColorImageHeight / 2);
 
     // MANDATE: Pass sensor-native depth map with Physical Pose (gLastMappingViewMatrix)
-    gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastMappingViewMatrix, gLastMappingProjMatrix, finalIntrinsics, isYuv);
+    gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastMappingViewMatrix, gLastMappingProjMatrix, finalIntrinsics, isYuv, confidence);
 }
 
 JNIEXPORT void JNICALL
@@ -375,7 +375,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
         cv::Mat depthFromStereo;
         disparity.convertTo(depthFromStereo, CV_32F, 1.0/16.0);
         bool isYuv = (gLastColorFrame.rows == gColorImageHeight + gColorImageHeight / 2);
-        gSlamEngine->pushFrame(depthFromStereo, gLastColorFrame, gLastMappingViewMatrix, gLastMappingProjMatrix, nullptr, isYuv);
+        // Stereo depth gets higher confidence (0.9)
+        gSlamEngine->pushFrame(depthFromStereo, gLastColorFrame, gLastMappingViewMatrix, gLastMappingProjMatrix, nullptr, isYuv, 0.9f);
     }
 }
 

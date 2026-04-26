@@ -31,8 +31,8 @@ public:
     void updateDeviceMotion(float* angularVel, float* linearVel);
 
     // Restoration: World-space processing pipeline
-    void processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv);
-    void pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv);
+    void processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence);
+    void pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence);
     void pushPointCloud(const std::vector<float>& points);
 
     void setArCoreTrackingState(bool isTracking);
@@ -94,6 +94,7 @@ private:
         float projMatrix[16];
         float intrinsics[4];
         bool hasIntrinsics = false;
+        float confidence = 0.5f;
     };
     std::thread mMapThread;
     std::mutex mQueueMutex;

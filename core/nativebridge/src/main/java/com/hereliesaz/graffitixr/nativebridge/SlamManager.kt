@@ -109,10 +109,11 @@ class SlamManager @Inject constructor() {
         intrinsics: FloatArray,
         intrW: Int,
         intrH: Int,
-        cvRotateCode: Int? = null
+        cvRotateCode: Int? = null,
+        confidence: Float = 0.5f
     ) {
         if (depthBuffer.isDirect) {
-            nativeFeedArCoreDepth(depthBuffer, width, height, rowStride, intrinsics, intrW, intrH, cvRotateCode ?: -1)
+            nativeFeedArCoreDepth(depthBuffer, width, height, rowStride, intrinsics, intrW, intrH, cvRotateCode ?: -1, confidence)
         }
     }
 
@@ -263,7 +264,7 @@ class SlamManager @Inject constructor() {
     private external fun nativeSetRelocEnabled(enabled: Boolean)
     private external fun nativeSetVoxelSize(size: Float)
     private external fun nativeFeedPointCloud(points: FloatArray)
-    private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int, intrinsics: FloatArray, intrW: Int, intrH: Int, cvRotateCode: Int)
+    private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int, intrinsics: FloatArray, intrW: Int, intrH: Int, cvRotateCode: Int, confidence: Float)
     private external fun nativeFeedYuvFrame(
         yBuffer: ByteBuffer,
         uBuffer: ByteBuffer,

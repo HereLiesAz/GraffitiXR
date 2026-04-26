@@ -49,7 +49,7 @@ public:
     ~VoxelHash();
 
     void initGl();
-    void update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, float voxelSize, float lightLevel);
+    void update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, float voxelSize, float initialConfidence);
     void addSparsePoints(const std::vector<float>& points, const float* viewMat, const float* projMat);
     void addKeyframe(const Keyframe& kf);
     void draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, int screenHeight);
