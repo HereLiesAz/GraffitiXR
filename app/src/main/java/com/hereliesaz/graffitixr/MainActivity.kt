@@ -1060,6 +1060,17 @@ class MainActivity : ComponentActivity() {
             azRailSubItem(id = "mockup", hostId = "mode_host", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.mockupInfo)
             azRailSubItem(id = "trace", hostId = "mode_host", text = navStrings.trace, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE, info = navStrings.traceInfo)
 
+            azRailSubItem(
+                id = "wearable",
+                hostId = "mode_host",
+                text = navStrings.wearable,
+                info = navStrings.wearableInfo,
+                color = navItemColor,
+                shape = AzButtonShape.RECTANGLE
+            ) {
+                // Future: launch wearable connection flow
+            }
+
             azDivider()
 
             if (isArMode) {

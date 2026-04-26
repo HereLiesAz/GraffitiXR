@@ -63,6 +63,9 @@
     <string name="nav_join_coop">Join</string>
     <string name="nav_join_coop_info">Join a nearby co-op session to align your AR view with the host.</string>
 
+    <string name="nav_wearable">Wearable</string>
+    <string name="nav_wearable_info">Connect to smart glasses for a hands-free AR experience and perspective-aligned camera input.</string>
+
     <!-- Label for the action to refine an existing AR anchor. -->
     <string name="nav_refine">Refine</string>
     <!-- Description of the anchor refinement process. -->

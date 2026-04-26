@@ -86,6 +86,9 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        jniLibs {
+            pickFirsts += "**/libc++_shared.so"
+        }
     }
 }
 
@@ -147,6 +150,10 @@ dependencies {
     implementation(libs.az.nav.rail)
     implementation(libs.coil.compose)
     implementation(libs.compose.ui.text.google.fonts)
+
+    implementation(libs.mwdat.core)
+    implementation(libs.mwdat.camera)
+    implementation(libs.mwdat.mockdevice)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

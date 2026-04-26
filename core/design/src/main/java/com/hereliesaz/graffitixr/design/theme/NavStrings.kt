@@ -117,7 +117,9 @@ fun rememberNavStrings(): NavStrings {
         hostCoop = stringResource(R.string.nav_host_coop),
         hostCoopInfo = stringResource(R.string.nav_host_coop_info),
         joinCoop = stringResource(R.string.nav_join_coop),
-        joinCoopInfo = stringResource(R.string.nav_join_coop_info)
+        joinCoopInfo = stringResource(R.string.nav_join_coop_info),
+        wearable = stringResource(R.string.nav_wearable),
+        wearableInfo = stringResource(R.string.nav_wearable_info)
     )
 }
 
@@ -232,5 +234,7 @@ data class NavStrings(
     val hostCoop: String,
     val hostCoopInfo: String,
     val joinCoop: String,
-    val joinCoopInfo: String
+    val joinCoopInfo: String,
+    val wearable: String,
+    val wearableInfo: String
 )

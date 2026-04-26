@@ -65,6 +65,11 @@ dependencies {
     // Serialization (Fixes Unresolved reference 'serializer')
     implementation(libs.kotlinx.serialization.json)
 
+    // Meta Wearables SDK
+    implementation(libs.mwdat.core)
+    implementation(libs.mwdat.camera)
+    implementation(libs.mwdat.mockdevice)
+
     // Logging
     implementation(libs.timber)
 

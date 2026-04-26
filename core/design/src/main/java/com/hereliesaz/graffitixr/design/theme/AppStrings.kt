@@ -64,7 +64,8 @@ fun rememberAppStrings(): AppStrings {
             granted = stringResource(R.string.settings_granted),
             denied = stringResource(R.string.settings_denied),
             openAppSettings = stringResource(R.string.settings_open_app_settings),
-            copyright = stringResource(R.string.settings_copyright)
+            copyright = stringResource(R.string.settings_copyright),
+            wearable = stringResource(R.string.nav_wearable)
         ),
         editor = AppStrings.Editor(
             layers = stringResource(R.string.layers_title),
@@ -251,7 +252,8 @@ data class AppStrings(
         val granted: String,
         val denied: String,
         val openAppSettings: String,
-        val copyright: String
+        val copyright: String,
+        val wearable: String
     )
     data class Editor(
         val layers: String,

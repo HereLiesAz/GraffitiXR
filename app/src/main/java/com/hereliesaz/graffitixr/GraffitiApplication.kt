@@ -5,6 +5,7 @@ import android.app.Application
 import android.util.Log
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.google.android.gms.security.ProviderInstaller
+import com.meta.wearable.dat.core.Wearables
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
 import javax.inject.Inject
@@ -27,6 +28,9 @@ class GraffitiApplication : Application() {
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
+
+        // 1.5. Initialize Meta Wearables SDK
+        Wearables.initialize(this)
 
         // 2. Update Security Provider (Fix for SSLHandshakeException)
         // Using explicit listener implementation instead of lambda for clarity/compatibility if needed
