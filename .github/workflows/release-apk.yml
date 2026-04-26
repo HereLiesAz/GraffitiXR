@@ -84,6 +84,7 @@ jobs:
 
       - name: Build Release APK
         env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
