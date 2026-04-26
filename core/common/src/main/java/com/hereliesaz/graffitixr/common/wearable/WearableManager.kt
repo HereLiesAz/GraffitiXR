@@ -1,37 +1,49 @@
 package com.hereliesaz.graffitixr.common.wearable
 
 import android.app.Activity
-import android.content.Context
-import com.meta.wearable.dat.core.Wearables
-import com.meta.wearable.dat.core.types.RegistrationState
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Manages the connection and lifecycle of Meta Wearable devices.
+ * Orchestrates connection and lifecycle management for all supported AI/AR glasses.
  */
 @Singleton
-class WearableManager @Inject constructor() {
+class WearableManager @Inject constructor(
+    private val providers: Set<@JvmSuppressWildcards SmartGlassProvider>
+) {
+    private val _activeProvider = MutableStateFlow<SmartGlassProvider?>(null)
+    val activeProvider: StateFlow<SmartGlassProvider?> = _activeProvider.asStateFlow()
 
     /**
-     * Observe the registration state with Meta wearables.
+     * Get the list of all supported hardware providers.
      */
-    val registrationState: StateFlow<RegistrationState> get() = Wearables.registrationState
+    fun getAvailableProviders(): List<SmartGlassProvider> = providers.toList()
 
     /**
-     * Start the registration process with the Meta AI app.
+     * Select a specific hardware provider to use.
+     */
+    fun selectProvider(provider: SmartGlassProvider) {
+        _activeProvider.value?.disconnect()
+        _activeProvider.value = provider
+        provider.connect()
+    }
+
+    /**
+     * Start the registration/setup flow for the currently active provider.
      */
     fun startRegistration(activity: Activity) {
-        Wearables.startRegistration(activity)
+        _activeProvider.value?.startRegistration(activity)
     }
 
     /**
-     * Check if a wearable device is currently connected and registered.
+     * Shortcut to check if the Meta provider is registered (backward compatibility).
      */
     fun isRegistered(): Boolean {
-        return Wearables.registrationState.value is RegistrationState.Registered
+        return _activeProvider.value?.let { 
+            it.name.contains("Meta") && it.connectionState.value == ConnectionState.Connected
+        } ?: false
     }
-
-    // Additional session and camera management can be added here
 }
