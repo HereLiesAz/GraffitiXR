@@ -15,6 +15,8 @@ struct Splat {
     float rot[4];           // Rotation (Quaternion)
     float confidence;       // Persistence/Certainty
     float velocity[3];      // [DEBLUR] Linear velocity for motion compensation
+    float gradAccum;        // [3DGS] Accumulated view-space position gradients
+    int gradCount;          // [3DGS] Number of gradient samples
 };
 
 struct Keyframe {
@@ -61,6 +63,7 @@ public:
     int getSplatCount() const;
     int getImmutableSplatCount() const;
     void optimize(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat);
+    void densify(float threshold, float scaleLimit);
     float getVisibleConfidenceAvg() const;
     float getGlobalConfidenceAvg() const;
 

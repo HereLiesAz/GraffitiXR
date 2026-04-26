@@ -261,6 +261,7 @@ void MobileGS::interpolateAnchorStep() { /* ... kept ... */ }
 void MobileGS::setArCoreTrackingState(bool t) { mIsArCoreTracking = t; }
 void MobileGS::optimizeThreadFunc() {
     setpriority(PRIO_PROCESS, 0, 19); // Background priority
+    int cycleCount = 0;
     while (mOptimizeRunning) {
         FrameData latestFrame;
         bool hasFrame = false;
@@ -278,6 +279,12 @@ void MobileGS::optimizeThreadFunc() {
             else colorRGB = latestFrame.color;
 
             mVoxelHash.optimize(latestFrame.depth, colorRGB, latestFrame.viewMatrix, latestFrame.projMatrix);
+
+            // [ADAPTIVE DENSIFICATION] Periodically split or clone Gaussians with high positional gradients
+            if (++cycleCount % 200 == 0) {
+                // threshold = 0.4, scaleLimit = 0.05m
+                mVoxelHash.densify(0.4f, 0.05f);
+            }
 
             // [OPTIMIZATION] When global confidence is high, bake the results into the persistent textured mesh
             if (mVoxelHash.getGlobalConfidenceAvg() > 0.80f) {

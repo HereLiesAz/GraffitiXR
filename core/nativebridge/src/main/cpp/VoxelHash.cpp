@@ -280,6 +280,8 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                             float s_val = d / fx * 1.5f;
                             s.scale[0] = s_val; s.scale[1] = s_val; s.scale[2] = s_val * 0.1f; // Flatten along normal
                             s.confidence = initialConfidence;
+                            s.gradAccum = 0.0f;
+                            s.gradCount = 0;
 
                             mSplatData.push_back(s);
                             mVoxelGrid[key] = static_cast<int>(mSplatData.size() - 1);
@@ -347,6 +349,8 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                             float s_val = d / fx * 1.5f;
                             s.scale[0] = s_val; s.scale[1] = s_val; s.scale[2] = s_val * 0.1f; // Flatten along normal
                             s.confidence = initialConfidence;
+                            s.gradAccum = 0.0f;
+                            s.gradCount = 0;
 
                             mSplatData.push_back(s);
                             mVoxelGrid[key] = static_cast<int>(mSplatData.size() - 1);
@@ -493,6 +497,10 @@ void VoxelHash::optimize(const cv::Mat& depth, const cv::Mat& color, const float
                     mSplatData[idx].sh[7] += color_err.b * SH_C1 * dir.z * alpha_sh;
                     mSplatData[idx].sh[8] += color_err.b * SH_C1 * dir.x * alpha_sh;
 
+                    // [GRADIENT TRACKING] Accumulate view-space error as a proxy for the 3DGS gradient
+                    mSplatData[idx].gradAccum += glm::length(color_err) + std::abs(err);
+                    mSplatData[idx].gradCount++;
+
                 } else if (err < -0.35f) {
                     mSplatData[idx].a -= 0.04f;
                 }
@@ -500,6 +508,47 @@ void VoxelHash::optimize(const cv::Mat& depth, const cv::Mat& color, const float
         }
     }
     mDataDirty = true;
+}
+
+void VoxelHash::densify(float threshold, float scaleLimit) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    int splatCount = static_cast<int>(mSplatData.size());
+    if (splatCount >= MAX_SPLATS) return;
+
+    std::vector<Splat> newSplats;
+    for (int i = 0; i < splatCount; ++i) {
+        auto& s = mSplatData[i];
+        if (s.gradCount == 0) continue;
+
+        float avgGrad = s.gradAccum / s.gradCount;
+        s.gradAccum = 0; s.gradCount = 0; // Reset for next cycle
+
+        if (avgGrad > threshold) {
+            float s_max = std::max({s.scale[0], s.scale[1], s.scale[2]});
+
+            if (s_max > scaleLimit) {
+                // [SPLIT] Large Gaussian into two smaller ones
+                s.scale[0] /= 1.6f; s.scale[1] /= 1.6f; s.scale[2] /= 1.6f;
+                Splat s2 = s;
+                // Shift positions slightly along the scale vector (simplification of Inria SPLIT)
+                float shift = s_max * 0.5f;
+                s.x += shift; s2.x -= shift;
+                newSplats.push_back(s2);
+            } else {
+                // [CLONE] Small Gaussian to increase density
+                Splat s2 = s;
+                newSplats.push_back(s2);
+            }
+        }
+        if (mSplatData.size() + newSplats.size() >= MAX_SPLATS) break;
+    }
+
+    if (!newSplats.empty()) {
+        mSplatData.insert(mSplatData.end(), newSplats.begin(), newSplats.end());
+        mDataDirty = true;
+        // Grid will be rebuilt on the next Sort cycle or Update
+        LOGI("3DGS: Densified map with %zu new splats", newSplats.size());
+    }
 }
 
 void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, int screenHeight) {
