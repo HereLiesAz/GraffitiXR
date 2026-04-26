@@ -1,39 +1,24 @@
 #pragma once
 #include <opencv2/opencv.hpp>
 #include <vector>
-#include <unordered_map>
 #include <mutex>
 #include <GLES3/gl3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-// Real Gaussian Splat Structure (Mobile-Optimized)
+// High-Performance Voxel Memory Structure
 struct Splat {
-    float x, y, z;          // Position (Mean)
-    float r, g, b, a;       // Color and Opacity
-    float scale[3];         // 3D Scaling (Anisotropic)
-    float rot[4];           // 3D Rotation (Quaternion)
-    float confidence;       // Observation count / Quality
+    float x, y, z;          // Position (World Space)
+    float r, g, b, a;       // Color and Rendering Opacity
+    float nx, ny, nz;       // Surface Normal
+    float confidence;       // Observation stability
 };
 
-struct Keyframe {
+struct VoxelFrame {
     cv::Mat depth;
     cv::Mat color;
     float viewMatrix[16];
     float projMatrix[16];
-};
-
-struct VoxelKey {
-    int x, y, z;
-    bool operator==(const VoxelKey& other) const {
-        return x == other.x && y == other.y && z == other.z;
-    }
-};
-
-struct VoxelKeyHash {
-    std::size_t operator()(const VoxelKey& k) const {
-        return ((std::hash<int>()(k.x) ^ (std::hash<int>()(k.y) << 1)) >> 1) ^ (std::hash<int>()(k.z) << 1);
-    }
 };
 
 class VoxelHash {
@@ -44,13 +29,14 @@ public:
     void initGl();
     void update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, float voxelSize, float initialConfidence);
     void addSparsePoints(const std::vector<float>& points, const float* viewMat, const float* projMat, float initialConfidence);
-    void addKeyframe(const Keyframe& kf);
+    void addKeyframe(const VoxelFrame& kf);
     void draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, int screenHeight);
     void sort(const glm::vec3& camPos);
     void clear();
     void prune(float threshold);
     void save(const std::string& path);
     void load(const std::string& path);
+
     int getSplatCount() const;
     int getImmutableSplatCount() const;
     void optimize(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat);
@@ -58,20 +44,20 @@ public:
     float getGlobalConfidenceAvg() const;
 
 private:
-    void pruneInternal(float threshold, float voxelSize);
+    uint32_t getVoxelHash(float x, float y, float z, float voxelSize);
 
     mutable std::mutex mMutex;
     std::vector<Splat> mSplatData;
-    std::vector<Keyframe> mKeyframes;
-    std::unordered_map<VoxelKey, int, VoxelKeyHash> mVoxelGrid;
+    std::vector<VoxelFrame> mRecentFrames;
+
+    // Fixed-size spatial hash table (Zero-allocation during tracking)
+    static constexpr int HASH_SIZE = 262144; // 2^18
+    int32_t mSpatialHash[HASH_SIZE];
 
     float mLastVoxelSize = 0.02f;
     GLuint mProgram = 0;
     GLuint mPointVbo = 0;
-    GLuint mQuadVbo = 0;
-    GLuint mVao = 0;
     bool mDataDirty = false;
-    int mNextRefineIndex = 0;
 
-    static constexpr int MAX_SPLATS = 100000; // Appropriate cap for mobile sorting
+    static constexpr int MAX_SPLATS = 250000; // Optimal balance for persistence
 };

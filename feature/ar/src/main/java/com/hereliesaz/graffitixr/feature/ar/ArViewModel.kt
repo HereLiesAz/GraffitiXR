@@ -117,18 +117,28 @@ class ArViewModel @Inject constructor(
             viewModelScope.launch {
                 _uiState.update { it.copy(isCoopSearching = false, coopStatus = "Joining session...") }
                 val projectFile = File(appContext.filesDir, "imported_coop_${System.currentTimeMillis()}.gxr")
-                collaborationManager?.connectToPeer(address, port, projectFile)
+                val success = collaborationManager?.connectToPeer(address, port, projectFile) ?: false
                 
-                // Load the received project
-                val project = projectManager.importProjectFromUri(appContext, projectFile.toUri())
-                if (project != null) {
-                    projectRepository.loadProject(project.id)
-                    _uiState.update { it.copy(isSyncing = false, coopStatus = "Joined!", coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) }
+                if (success) {
+                    // Load the received project
+                    val project = projectManager.importProjectFromUri(appContext, projectFile.toUri())
+                    if (project != null) {
+                        projectRepository.loadProject(project.id)
+                        _uiState.update { it.copy(isSyncing = false, coopStatus = "Joined!", coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) }
+                    } else {
+                        _uiState.update { it.copy(isSyncing = false, coopStatus = "Failed to import project.", coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.NONE) }
+                    }
                 } else {
-                    _uiState.update { it.copy(isSyncing = false, coopStatus = "Failed to join.", coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.NONE) }
+                    _uiState.update { it.copy(isSyncing = false, coopStatus = "Connection failed.", coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.NONE) }
                 }
             }
         }
+    }
+
+    fun stopCollaboration() {
+        collaborationManager?.stopServer()
+        collaborationManager?.stopDiscovery()
+        _uiState.update { it.copy(isSyncing = false, isCoopSearching = false, coopStatus = null) }
     }
 
     fun dismissCoopNotFoundDialog() {
@@ -237,25 +247,25 @@ class ArViewModel @Inject constructor(
             s.configure(config)
 
             // Task: Engage dual lens depth mapping if device is capable.
-            // ARCore 1.53 uses setStereoCameraUsage on the CameraConfigFilter.
+            // MANDATORY: We force REQUIRE_AND_USE if the device supports it.
             val stereoFilter = CameraConfigFilter(s).apply {
                 facingDirection = CameraConfig.FacingDirection.BACK
                 try {
                     setStereoCameraUsage(EnumSet.of(CameraConfig.StereoCameraUsage.REQUIRE_AND_USE))
                 } catch (e: Exception) {
-                    Timber.w(e, "Stereo camera usage not supported on this device/version")
+                    Timber.w(e, "Stereo camera usage filter not supported")
                 }
             }
             
             val stereoConfigs = s.getSupportedCameraConfigs(stereoFilter)
             if (stereoConfigs.isNotEmpty()) {
-                // ABSOLUTELY use the first available stereo config
-                val bestStereo = stereoConfigs[0]
-                s.cameraConfig = bestStereo
-                _uiState.update { it.copy(isDualLensActive = true) }
-                Timber.i("ABSOLUTE: Hardware stereo enabled. Camera ID: ${bestStereo.cameraId}")
+                // MANDATORY HW STEREO: Use the first available stereo config
+                val mandatoryStereo = stereoConfigs[0]
+                s.cameraConfig = mandatoryStereo
+                _uiState.update { it.copy(isDualLensActive = true, isHardwareStereoActive = true) }
+                Timber.i("MANDATORY: Hardware dual-lens depth enabled. Camera ID: ${mandatoryStereo.cameraId}")
             } else {
-                // Fallback to standard config only if NO stereo is found
+                // Fallback to highest quality mono config only if NO stereo is found
                 val fallbackFilter = CameraConfigFilter(s).apply {
                     facingDirection = CameraConfig.FacingDirection.BACK
                     targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
@@ -264,7 +274,8 @@ class ArViewModel @Inject constructor(
                 if (fallbackConfigs.isNotEmpty()) {
                     s.cameraConfig = fallbackConfigs[0]
                 }
-                Timber.i("Hardware stereo not available; using standard fallback.")
+                _uiState.update { it.copy(isHardwareStereoActive = false) }
+                Timber.w("Hardware stereo NOT available on this device. Using mono fallback.")
             }
 
             session = s
@@ -842,6 +853,7 @@ class ArViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
+        stopCollaboration()
         destroyArSession()
     }
 }

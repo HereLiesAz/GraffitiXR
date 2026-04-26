@@ -19,16 +19,33 @@ class DiscoveryManager(private val context: Context) {
     private val SERVICE_TYPE = "_graffitixr._tcp"
     private val TAG = "GXR_Discovery"
 
+    private var registrationListener: NsdManager.RegistrationListener? = null
+    private var discoveryListener: NsdManager.DiscoveryListener? = null
+
     /**
      * Start broadcasting presence on the local network (Wi-Fi).
      */
     fun startBroadcasting(port: Int) {
+        stopBroadcasting()
         val serviceInfo = NsdServiceInfo().apply {
             serviceName = "GXR_${Build.MODEL}"
             serviceType = SERVICE_TYPE
             setPort(port)
         }
-        nsdManager.registerService(serviceInfo, NsdManager.PROTOCOL_DNS_SD, null)
+        registrationListener = object : NsdManager.RegistrationListener {
+            override fun onServiceRegistered(p0: NsdServiceInfo?) {}
+            override fun onRegistrationFailed(p0: NsdServiceInfo?, p1: Int) {}
+            override fun onServiceUnregistered(p0: NsdServiceInfo?) {}
+            override fun onUnregistrationFailed(p0: NsdServiceInfo?, p1: Int) {}
+        }
+        nsdManager.registerService(serviceInfo, NsdManager.PROTOCOL_DNS_SD, registrationListener)
+    }
+
+    fun stopBroadcasting() {
+        registrationListener?.let {
+            nsdManager.unregisterService(it)
+            registrationListener = null
+        }
     }
 
     /**
@@ -50,9 +67,10 @@ class DiscoveryManager(private val context: Context) {
      * Start looking for peers on the local Wi-Fi network (NSD).
      */
     fun discoverNSD(onPeerFound: (NsdServiceInfo) -> Unit) {
+        stopDiscovery()
         val listener = object : NsdManager.DiscoveryListener {
             override fun onServiceFound(service: NsdServiceInfo) {
-                if (service.serviceType == SERVICE_TYPE) {
+                if (service.serviceType == SERVICE_TYPE || service.serviceType.contains("graffitixr")) {
                     nsdManager.resolveService(service, object : NsdManager.ResolveListener {
                         override fun onServiceResolved(resolved: NsdServiceInfo) {
                             onPeerFound(resolved)
@@ -67,6 +85,14 @@ class DiscoveryManager(private val context: Context) {
             override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {}
             override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {}
         }
+        discoveryListener = listener
         nsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, listener)
+    }
+
+    fun stopDiscovery() {
+        discoveryListener?.let {
+            nsdManager.stopServiceDiscovery(it)
+            discoveryListener = null
+        }
     }
 }

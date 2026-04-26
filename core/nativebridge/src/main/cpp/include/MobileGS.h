@@ -149,6 +149,4 @@ private:
     std::atomic<bool>       mRelocRequested{false};
     std::atomic<bool>       mRelocEnabled{true};
     cv::Mat                 mRelocColorFrame;
-
-    std::thread mSortThread_deprecated; // cleanup
 };

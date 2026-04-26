@@ -1981,9 +1981,9 @@ private fun DiagnosticOverlay(
             )
 
             val lensMode = when {
-                uiState.isHardwareStereoActive -> "HW STEREO"
+                uiState.isHardwareStereoActive -> "MANDATORY HW"
                 uiState.isDualLensActive -> "SW STEREO"
-                else -> "SINGLE"
+                else -> "SINGLE (HW NOT FOUND)"
             }
             DiagnosticRow("Lens Mode", lensMode, if (uiState.isDualLensActive) Cyan else Color.Gray)
             DiagnosticRow("Depth (Ctr)", if (uiState.currentCenterDepth > 0) "%.2fm".format(uiState.currentCenterDepth) else "---", Color.White)

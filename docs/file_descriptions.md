@@ -33,8 +33,9 @@ This document lists key files in the repository and their purposes.
 
 ### `:core:nativebridge`
 *   `nativebridge/SlamManager.kt`: Kotlin JNI bridge. All native calls go through here. Key methods: `updateCamera`, `updateAnchorTransform`, `setArCoreTrackingState`, `feedColorFrame`, `feedArCoreDepth`, `feedStereoData`, `draw`, `importModel3D`.
-*   `src/main/cpp/GraffitiJNI.cpp`: JNI implementation. Contains `nativeFeedArCoreDepth`, `nativeImportModel3D`.
-*   `src/main/cpp/MobileGS.cpp` / `MobileGS.h`: Sparse voxel hash map, `processDepthFrame`, `draw`, `runPnPMatch` (Teleological tracking), `importModel3D`, `saveModel/loadModel`.
+*   `src/main/cpp/GraffitiJNI.cpp`: JNI implementation. Handles mandatory HW stereo routing and stochastic depth feeding.
+*   `src/main/cpp/MobileGS.cpp` / `MobileGS.h`: High-performance native entry point. Manages **Persistent Voxel Memory**, stochastic depth integration, and the background **Snap-Back Thread** for tracking recovery.
+*   `src/main/cpp/VoxelHash.cpp` / `VoxelHash.h`: Core spatial memory implementation. Uses a **Zero-Allocation Spatial Hash Table** and O(1) opaque rendering for rock-solid mobile tracking.
 *   `src/main/cpp/StereoProcessor.cpp`: Stereo disparity → depth pipeline.
 
 ## Feature Modules

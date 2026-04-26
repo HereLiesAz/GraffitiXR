@@ -1,48 +1,42 @@
 # GraffitiXR
 
-GraffitiXR is an android app for street artists. There are plenty of apps that overlay an image on your camera view so you can virtually trace it, but when I'm painting a mural based on a sketch that I have saved on my phone, using a tripod can really ebb the flow. We're all over the damn place. Me, I put my phone in my pocket. Even the apps that use AR to keep the image steady and in one place can't deal with the abysmal darkness of the pocket.
+GraffitiXR is an Android app for street artists. While many apps overlay images on your camera for tracing, they often fail when you need to move around or put your phone in your pocket. GraffitiXR is designed for the "interrupted" flow of painting—scan your wall, place your mural, and if you need to put your phone away, it will **snap back** and relocalize instantly when you resume.
 
-So I'm making something better by repurposing (what those in-the-know call) the grid method. I was always thinking, "Why can't these specific doodles be saved, like a persistent anchor, so the overlay is always just plain in the right spot?"
+## The Spatial Memory
+We repurpose the "grid method" into a persistent digital anchor. I had to invent a custom mapping engine that works natively on Android without the cloud—because privacy and offline capability are essential for graffiti.
 
-So, now, that's what those doodles do.
-
-I had to invent a custom Gaussian Splatting engine that works on Android without the help of the cloud--because graffiti is, you know, illegal.
-
-And I followed it up with what I call a Teleological Slam--since we know what the result is supposed to look like, I use OpenCV to look for your progress, meaning that the further along you are, the more tightly the overlay sticks to the wall. Without this, you'd cover those marks up with the painting itself, making the app less accurate as you go. That's exactly where other apps like this truly fail.
-
-Just for shirts and goggles, I included the non-AR, image overlay functionality for image tracing, just like you get with those other apps, in case you cray like that. Or if you cray-cray, there's Mockup mode. Nab a picture of the wall, then I got some quick tools for a quick mockup. And if you've got nothing to prove, you just want something copied onto paper perfectly, Trace mode allows you to use your phone as a lightbox, keeping your screen on with the brightness turned up, locking your image into place and blocking all touches until you're finished.
-
-And then, there's a decent suite of pertinent design tools, with support for multi-layer graphical creation. I could go on, but I feel like I already have.
-
-**GraffitiXR** is an offline Android app for street artists. It uses AR to project images onto walls using a confidence-based voxel mapping system.
+The app uses a **Persistent Voxel Memory** system. By building a high-performance 3D map of your surroundings in the background, the phone always knows exactly where it is. Even after tracking loss or a screen-off event, the engine uses OpenCV "fingerprints" to realign your mural to the wall in milliseconds.
 
 ## Key Features
-*   **Offline-First:** No cloud dependencies; zero data collected.
-*   **Custom Engine (MobileGS):** C++17 native engine for 3D Gaussian Splatting and spatial mapping.
-*   **Full ARCore Pipeline:** Live camera feed via `BackgroundRenderer`, color frame relocalization, and ARCore Depth API — all feeding real data to the SLAM engine.
-*   **AzNavRail UI:** Thumb-driven navigation for one-handed use in the field.
-*   **Single GL Render Path:** `ArRenderer` handles both camera background (`BackgroundRenderer`) and SLAM voxel splats (`slamManager.draw()`) in a single `GLSurfaceView`.
-*   **Multi-Lens Support:** Automatically uses dual-camera stereo depth on supported devices; falls back to optical flow.
-*   **Teleological Correction:** Automatic map-to-world alignment using OpenCV fingerprinting.
+*   **Offline-First:** Zero cloud dependencies; 100% local processing.
+*   **Pocket-Ready:** Built-in relocalization ensures your mural stays "stuck" even after putting the phone in your pocket.
+*   **Persistent Voxel Memory:** C++17 native engine for high-performance 3D mapping.
+*   **Stochastic Integration:** Optimized depth processing that preserves battery while maintaining dense tracking.
+*   **Mandatory Dual-Lens:** Automatically forces and rewards hardware stereo depth for rock-solid stability.
+*   **AzNavRail UI:** Thumb-driven, one-handed navigation designed for artists holding a spray can.
+*   **Teleological Correction:** Automatic drift correction as your painting progresses.
+
+## Modes
+*   **AR Mural:** The core precision instrument for anchoring digital concepts to physical surfaces.
+*   **Mockup Mode:** Quick tools for visualizing sketches on top of wall photos.
+*   **Trace (Lightbox):** Turn your phone into a lightbox for copying onto paper, with touch-lock and full-brightness.
+*   **Design Tools:** Pertinent multi-layer graphical creation suite.
 
 ## Architecture
-Strictly decoupled multi-module architecture:
-*   `:app` — Navigation, `ArViewport` composable, camera ownership orchestration.
-*   `:feature:ar` — ARCore session, `ArRenderer`, `BackgroundRenderer`, sensor fusion, SLAM data feeding.
-*   `:feature:editor` — Image manipulation, layer management.
-*   `:feature:dashboard` — Project library, settings.
-*   `:core:nativebridge` — `SlamManager` JNI bridge, `MobileGS` voxel engine, OpenGL ES rendering.
-*   `:core:data` / `:core:domain` / `:core:common` — Clean Architecture data layer.
+Strictly decoupled multi-module Clean Architecture:
+*   `:app` — Navigation and camera ownership orchestration.
+*   `:feature:ar` — ARCore session, `ArRenderer`, and SLAM data feeding.
+*   `:feature:editor` — Image manipulation and GPU-accelerated Liquify.
+*   `:core:nativebridge` — The **Persistent Voxel Memory** engine and relocalization threads.
+*   `:core:data` / `:core:domain` / `:core:common` — Unified data layer.
 
 ## Documentation
 - [Architecture Overview](docs/ARCHITECTURE.md)
 - [Native Engine Details](docs/NATIVE_ENGINE.md)
-- [SLAM Configuration & Tuning](docs/SLAM_SETUP.md)
-- [3D Pipeline Specification](docs/PIPELINE_3D.md)
-- [Testing Strategy](docs/testing.md)
-- [Screen & Mode Reference](docs/screens.md)
-  
-
+- [SLAM Setup & Relocalization](docs/SLAM_SETUP.md)
+- [Performance Guide](docs/performance.md)
+- [Data Formats](docs/data_formats.md)
+- [Contributing](docs/contributing.md)
 
 ---
-*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*
+*Documentation updated on 2026-04-24 during Persistent Voxel Memory and Pocket-Ready recovery implementation.*

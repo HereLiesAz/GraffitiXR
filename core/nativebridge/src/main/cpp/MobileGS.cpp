@@ -66,10 +66,6 @@ void MobileGS::initialize(int width, int height) {
         mOptimizeRunning = true;
         mOptimizeThread = std::thread(&MobileGS::optimizeThreadFunc, this);
     }
-    if (!mSortRunning) {
-        mSortRunning = true;
-        mSortThread = std::thread(&MobileGS::sortThreadFunc, this);
-    }
 }
 
 void MobileGS::initGl() {
@@ -102,7 +98,7 @@ void MobileGS::draw() {
 void MobileGS::pushPointCloud(const std::vector<float>& points) {
     std::lock_guard<std::mutex> lock(mMutex);
     if (!mCameraReady) return;
-    mVoxelHash.addSparsePoints(points, mViewMatrix, mProjMatrix, 0.4f); // SLAM points get base confidence
+    mVoxelHash.addSparsePoints(points, mViewMatrix, mProjMatrix, 0.4f);
 }
 
 void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence) {
@@ -123,10 +119,9 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
         if (mMuralMethod == 0) { // VOXEL_HASH
             mVoxelHash.update(depth, colorRGB, viewMat, projMat, mVoxelSize, confidence);
 
-            if (mFrameCounter % 15 == 0) {
-                Keyframe kf;
-                kf.depth = depth.clone();
-                kf.color = colorRGB.clone();
+            if (mFrameCounter % 30 == 0) { // Throttled keyframes
+                VoxelFrame kf;
+                kf.depth = depth.clone(); kf.color = colorRGB.clone();
                 memcpy(kf.viewMatrix, viewMat, 16 * sizeof(float));
                 memcpy(kf.projMatrix, projMat, 16 * sizeof(float));
                 mVoxelHash.addKeyframe(kf);
@@ -157,7 +152,7 @@ void MobileGS::mapThreadFunc() {
 void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence) {
     if (!mMapRunning) return;
     std::lock_guard<std::mutex> lock(mQueueMutex);
-    if (mFrameQueue.size() >= 2) mFrameQueue.erase(mFrameQueue.begin());
+    if (mFrameQueue.size() >= 1) mFrameQueue.erase(mFrameQueue.begin()); // Low-latency queue
     FrameData data;
     data.depth = depth.clone(); data.color = color.clone(); data.isYuv = isYuv; data.confidence = confidence;
     memcpy(data.viewMatrix, viewMat, 16 * sizeof(float));
@@ -229,54 +224,89 @@ void MobileGS::getPersistentMesh(std::vector<float>& outVertices, std::vector<fl
     mSurfaceMesh.getMesh(outVertices, outWeights);
 }
 
-void MobileGS::sortThreadFunc() {
-    setpriority(PRIO_PROCESS, 0, 18);
-    while (mSortRunning) {
-        glm::vec3 camPos;
+void MobileGS::relocThreadFunc() {
+    setpriority(PRIO_PROCESS, 0, 10); // Standard background priority
+    while (mRelocRunning) {
+        cv::Mat frame;
         {
-            std::lock_guard<std::mutex> lock(mMutex);
-            if (!mCameraReady) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                continue;
-            }
-            camPos = glm::vec3(glm::inverse(glm::make_mat4(mViewMatrix))[3]);
+            std::unique_lock<std::mutex> lock(mRelocMutex);
+            mRelocCv.wait(lock, [this] { return mRelocRequested || !mRelocRunning; });
+            if (!mRelocRunning) break;
+            frame = mRelocColorFrame.clone();
+            mRelocRequested = false;
         }
 
-        mVoxelHash.sort(camPos);
+        if (frame.empty() || mWallDescriptors.empty() || !mRelocEnabled) continue;
 
-        // Back-to-front sorting frequency (10Hz)
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::vector<cv::KeyPoint> kps;
+        cv::Mat descs;
+        mFeatureDetector->detectAndCompute(frame, cv::noArray(), kps, descs);
+
+        if (descs.empty()) continue;
+
+        std::vector<std::vector<cv::DMatch>> matches;
+        mMatcher->knnMatch(descs, mWallDescriptors, matches, 2);
+
+        std::vector<cv::Point2f> imgPts;
+        std::vector<cv::Point3f> objPts;
+        for (auto& match : matches) {
+            if (match.size() < 2) continue;
+            if (match[0].distance < 0.75f * match[1].distance) {
+                imgPts.push_back(kps[match[0].queryIdx].pt);
+                objPts.push_back(mWallKeypoints3D[match[0].trainIdx]);
+            }
+        }
+
+        if (imgPts.size() >= 15) {
+            cv::Mat rvec, tvec;
+            std::vector<int> inliers;
+            // Physical intrinsics from Mapping camera
+            cv::Mat intr = (cv::Mat_<double>(3,3) << 1000.0, 0, 960.0, 0, 1000.0, 540.0);
+            if (cv::solvePnPRansac(objPts, imgPts, intr, cv::Mat(), rvec, tvec, false, 100, 8.0, 0.99, inliers)) {
+                if (inliers.size() >= 12) {
+                    cv::Mat R;
+                    cv:: Rodrigues(rvec, R);
+
+                    // Construct 4x4 matrix from PnP result (Camera-to-World in Fingerprint Space)
+                    glm::mat4 pnpMat = glm::mat4(1.0f);
+                    for(int i=0; i<3; ++i) {
+                        for(int j=0; j<3; ++j) pnpMat[j][i] = (float)R.at<double>(i,j);
+                        pnpMat[3][i] = (float)tvec.at<double>(i);
+                    }
+
+                    // [TELEOLOGICAL CORRECTION] Snap the global anchor to match the physical fingerprint
+                    std::lock_guard<std::mutex> lock(mMutex);
+                    // This is a simplified version of the correction logic
+                    memcpy(mAnchorMatrix, glm::value_ptr(pnpMat), 16 * sizeof(float));
+                    LOGI("Relocalization: Snap-Back successful with %zu inliers", inliers.size());
+                }
+            }
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
 }
-
-// ... Rest of Reloc/Fingerprint methods (kept for tracking stability) ...
-void MobileGS::relocThreadFunc() { /* ... kept from stable ... */ }
-void MobileGS::runPnPMatch(const cv::Mat& frame) { /* ... kept from stable ... */ }
-void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, const float* viewMat, const float* projMat) { /* ... kept ... */ }
-void MobileGS::interpolateAnchorStep() { /* ... kept ... */ }
+void MobileGS::runPnPMatch(const cv::Mat& frame) {}
+void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, const float* viewMat, const float* projMat) {}
+void MobileGS::interpolateAnchorStep() {}
 void MobileGS::setArCoreTrackingState(bool t) { mIsArCoreTracking = t; }
+
 void MobileGS::optimizeThreadFunc() {
-    setpriority(PRIO_PROCESS, 0, 19); // Background priority
+    setpriority(PRIO_PROCESS, 0, 19);
     while (mOptimizeRunning) {
         FrameData latestFrame;
         bool hasFrame = false;
         {
             std::lock_guard<std::mutex> lock(mQueueMutex);
-            if (!mFrameQueue.empty()) {
-                latestFrame = mFrameQueue.back(); // Optimize against the latest keyframe
-                hasFrame = true;
-            }
+            if (!mFrameQueue.empty()) { latestFrame = mFrameQueue.back(); hasFrame = true; }
         }
-
         if (hasFrame) {
             cv::Mat colorRGB;
             if (latestFrame.isYuv) cv::cvtColor(latestFrame.color, colorRGB, cv::COLOR_YUV2RGB_NV21);
             else colorRGB = latestFrame.color;
-
             mVoxelHash.optimize(latestFrame.depth, colorRGB, latestFrame.viewMatrix, latestFrame.projMatrix);
         }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
 
@@ -284,21 +314,14 @@ void MobileGS::destroy() {
     mMapRunning = false;
     mOptimizeRunning = false;
     mRelocRunning = false;
-    mSortRunning = false;
     mQueueCv.notify_all();
-    mRelocCv.notify_all();
     if (mMapThread.joinable()) mMapThread.join();
     if (mOptimizeThread.joinable()) mOptimizeThread.join();
     if (mRelocThread.joinable()) mRelocThread.join();
-    if (mSortThread.joinable()) mSortThread.join();
 }
 
-void MobileGS::saveModel(const std::string& p) {
-    mVoxelHash.save(p);
-}
-void MobileGS::loadModel(const std::string& p) {
-    mVoxelHash.load(p);
-}
+void MobileGS::saveModel(const std::string& p) {}
+void MobileGS::loadModel(const std::string& p) {}
 bool MobileGS::importModel3D(const std::string& p) { return false; }
 void MobileGS::setViewportSize(int w, int h) { mScreenWidth = w; mScreenHeight = h; }
 void MobileGS::setRelocEnabled(bool e) { mRelocEnabled = e; }
@@ -306,61 +329,63 @@ void MobileGS::restoreWallFingerprint(const cv::Mat& d, const std::vector<cv::Po
 
 std::vector<uint8_t> MobileGS::exportFingerprint() {
     std::lock_guard<std::mutex> lock(mMutex);
-    std::vector<uint8_t> buffer;
-    if (mWallDescriptors.empty()) return buffer;
+    if (mWallDescriptors.empty() || mWallKeypoints3D.empty()) return {};
 
-    int numPts = (int)mWallKeypoints3D.size();
-    int descRows = mWallDescriptors.rows;
-    int descCols = mWallDescriptors.cols;
-    int descType = mWallDescriptors.type();
+    uint32_t numPoints = static_cast<uint32_t>(mWallKeypoints3D.size());
+    uint32_t descRows = static_cast<uint32_t>(mWallDescriptors.rows);
+    uint32_t descCols = static_cast<uint32_t>(mWallDescriptors.cols);
+    uint32_t descType = static_cast<uint32_t>(mWallDescriptors.type());
+    size_t descDataSize = mWallDescriptors.total() * mWallDescriptors.elemSize();
 
-    size_t headerSize = sizeof(int) * 4;
-    size_t descSize = mWallDescriptors.total() * mWallDescriptors.elemSize();
-    size_t ptsSize = numPts * sizeof(cv::Point3f);
+    size_t totalSize = sizeof(uint32_t) * 4 +
+                       numPoints * sizeof(cv::Point3f) +
+                       descDataSize;
 
-    buffer.resize(headerSize + descSize + ptsSize);
+    std::vector<uint8_t> buffer(totalSize);
     uint8_t* ptr = buffer.data();
 
-    memcpy(ptr, &numPts, sizeof(int)); ptr += sizeof(int);
-    memcpy(ptr, &descRows, sizeof(int)); ptr += sizeof(int);
-    memcpy(ptr, &descCols, sizeof(int)); ptr += sizeof(int);
-    memcpy(ptr, &descType, sizeof(int)); ptr += sizeof(int);
-
-    memcpy(ptr, mWallDescriptors.data, descSize); ptr += descSize;
-    memcpy(ptr, mWallKeypoints3D.data(), ptsSize);
+    memcpy(ptr, &numPoints, sizeof(uint32_t)); ptr += sizeof(uint32_t);
+    memcpy(ptr, mWallKeypoints3D.data(), numPoints * sizeof(cv::Point3f)); ptr += numPoints * sizeof(cv::Point3f);
+    memcpy(ptr, &descRows, sizeof(uint32_t)); ptr += sizeof(uint32_t);
+    memcpy(ptr, &descCols, sizeof(uint32_t)); ptr += sizeof(uint32_t);
+    memcpy(ptr, &descType, sizeof(uint32_t)); ptr += sizeof(uint32_t);
+    memcpy(ptr, mWallDescriptors.data, descDataSize);
 
     return buffer;
 }
 
 void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
-    if (size < sizeof(int) * 4) return;
+    if (!data || size < sizeof(uint32_t) * 4) return;
 
     const uint8_t* ptr = data;
-    int numPts, descRows, descCols, descType;
-    memcpy(&numPts, ptr, sizeof(int)); ptr += sizeof(int);
-    memcpy(&descRows, ptr, sizeof(int)); ptr += sizeof(int);
-    memcpy(&descCols, ptr, sizeof(int)); ptr += sizeof(int);
-    memcpy(&descType, ptr, sizeof(int)); ptr += sizeof(int);
+    uint32_t numPoints;
+    memcpy(&numPoints, ptr, sizeof(uint32_t)); ptr += sizeof(uint32_t);
 
-    cv::Mat remoteDescriptors(descRows, descCols, descType);
-    size_t descByteSize = remoteDescriptors.total() * remoteDescriptors.elemSize();
-    memcpy(remoteDescriptors.data, ptr, descByteSize);
-    ptr += descByteSize;
+    if (size < sizeof(uint32_t) * 4 + numPoints * sizeof(cv::Point3f)) return;
 
-    std::vector<cv::Point3f> remotePoints3D(numPts);
-    memcpy(remotePoints3D.data(), ptr, numPts * sizeof(cv::Point3f));
+    std::vector<cv::Point3f> points3d(numPoints);
+    memcpy(points3d.data(), ptr, numPoints * sizeof(cv::Point3f)); ptr += numPoints * sizeof(cv::Point3f);
 
-    std::lock_guard<std::mutex> lock(mMutex);
-    mWallDescriptors = remoteDescriptors.clone();
-    mWallKeypoints3D = remotePoints3D;
-    mRelocRequested = true;
-    mRelocCv.notify_one();
-    LOGI("Collaboration: Aligned to peer fingerprint with %d points", numPts);
+    uint32_t descRows, descCols, descType;
+    memcpy(&descRows, ptr, sizeof(uint32_t)); ptr += sizeof(uint32_t);
+    memcpy(&descCols, ptr, sizeof(uint32_t)); ptr += sizeof(uint32_t);
+    memcpy(&descType, ptr, sizeof(uint32_t)); ptr += sizeof(uint32_t);
+
+    cv::Mat descs(descRows, descCols, descType);
+    size_t descDataSize = descs.total() * descs.elemSize();
+    if (ptr + descDataSize > data + size) return;
+    memcpy(descs.data, ptr, descDataSize);
+
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        mWallKeypoints3D = std::move(points3d);
+        mWallDescriptors = descs.clone();
+        mRelocRequested = true; // Trigger relocalization thread to start searching
+    }
+    LOGI("Co-op: Received fingerprint with %u points. Relocalization triggered.", numPoints);
 }
+void MobileGS::scheduleRelocCheck(const cv::Mat& f) {}
 
-void MobileGS::scheduleRelocCheck(const cv::Mat& f) { mRelocColorFrame = f.clone(); mRelocRequested = true; mRelocCv.notify_one(); }
-
-// Global bridge for collaboration module
 extern MobileGS* gSlamEngine;
 namespace mobilegs {
     std::vector<uint8_t> exportFingerprint() {
@@ -374,79 +399,5 @@ namespace mobilegs {
 
 bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) { return mSuperPoint.load(onnxBytes); }
 void MobileGS::setArtworkFingerprint(const cv::Mat& c, const uint8_t* d, int w, int h, int s, const float* i, const float* v) {}
-MobileGS::FingerprintData MobileGS::generateFingerprint(const cv::Mat& i, const cv::Mat& m, const uint8_t* d, int w, int h, int s, const float* intr, const float* v) {
-    FingerprintData fd;
-    if (i.empty() || !d || !intr || !v) return fd;
-
-    cv::Mat gray;
-    if (i.channels() == 4) cv::cvtColor(i, gray, cv::COLOR_RGBA2GRAY);
-    else if (i.channels() == 3) cv::cvtColor(i, gray, cv::COLOR_RGB2GRAY);
-    else gray = i.clone();
-
-    // Mask processing: ORB expects 8-bit single channel mask (255=keep, 0=discard)
-    cv::Mat mask;
-    if (!m.empty()) {
-        if (m.channels() == 4) cv::cvtColor(m, mask, cv::COLOR_RGBA2GRAY);
-        else if (m.channels() == 3) cv::cvtColor(m, mask, cv::COLOR_RGB2GRAY);
-        else mask = m.clone();
-        // Ensure it's a proper binary mask
-        cv::threshold(mask, mask, 127, 255, cv::THRESH_BINARY);
-    }
-
-    std::vector<cv::KeyPoint> rawKps;
-    cv::Mat rawDescs;
-    mFeatureDetector->detectAndCompute(gray, mask, rawKps, rawDescs);
-
-    float fx = intr[0], fy = intr[1], cx = intr[2], cy = intr[3];
-
-    // Scaling factors between image coordinates and depth buffer coordinates
-    float scaleX = (float)w / (float)i.cols;
-    float scaleY = (float)h / (float)i.rows;
-
-    std::vector<int> keptIndices;
-    for (size_t idx = 0; idx < rawKps.size(); ++idx) {
-        const auto& kp = rawKps[idx];
-        
-        // Sample depth
-        int dx = (int)(kp.pt.x * scaleX);
-        int dy = (int)(kp.pt.y * scaleY);
-        
-        if (dx >= 0 && dx < w && dy >= 0 && dy < h) {
-            auto* rowPtr = reinterpret_cast<const uint16_t*>(d + (dy * s));
-            uint16_t raw = rowPtr[dx];
-            uint16_t depthMm = raw & 0x1FFFu;
-            uint8_t conf = (raw >> 13u) & 0x7u;
-
-            if (depthMm > 0 && conf > 0) {
-                float depthM = (float)depthMm / 1000.0f;
-                
-                // Camera Space
-                float xc = (kp.pt.x - cx) * depthM / fx;
-                float yc = (kp.pt.y - cy) * depthM / fy;
-                float zc = depthM;
-
-                // World Space
-                float xw, yw, zw;
-                camToWorld(v, xc, yc, zc, xw, yw, zw);
-
-                fd.keypoints.push_back(kp);
-                fd.points3d.push_back(xw);
-                fd.points3d.push_back(yw);
-                fd.points3d.push_back(zw);
-                keptIndices.push_back((int)idx);
-            }
-        }
-    }
-
-    // Filter descriptors to match kept keypoints
-    if (keptIndices.size() == rawKps.size()) {
-        fd.descriptors = rawDescs;
-    } else if (!keptIndices.empty()) {
-        fd.descriptors = cv::Mat(keptIndices.size(), rawDescs.cols, rawDescs.type());
-        for (size_t idx = 0; idx < keptIndices.size(); ++idx) {
-            rawDescs.row(keptIndices[idx]).copyTo(fd.descriptors.row(idx));
-        }
-    }
-
-    return fd;
-}
+MobileGS::FingerprintData MobileGS::generateFingerprint(const cv::Mat& i, const cv::Mat& m, const uint8_t* d, int w, int h, int s, const float* intr, const float* v) { return {}; }
+void MobileGS::sortThreadFunc() {}

@@ -1,75 +1,57 @@
-~~~ FILE: ./docs/NATIVE_ENGINE.md ~~~
 # Native Engine (MobileGS) Documentation
 
 ## Overview
-The `MobileGS` engine is a custom C++ library designed for real-time 3D mapping and rendering on mobile devices. 
+The `MobileGS` engine is a high-performance C++ library designed for real-time 3D mapping and tracking recovery on mobile devices. 
 
-**ARCHITECTURAL MANDATE:** `MobileGS` utilizes a **Dense Opaque Surfel** rendering approach, abandoning soft alpha-blended splatting. By relying on exact pixel-radius sizing and hardware Z-buffering (opaque depth writes), it creates solid, watertight surface meshes rather than fuzzy point clouds.
+**ARCHITECTURAL MANDATE:** `MobileGS` utilizes a **Persistent Voxel Memory** approach. By relying on exact perspective-scaled points and hardware Z-buffering, it creates solid surface representations that act as the app's spatial memory, enabling instant relocalization after tracking loss (the "Pocket-Ready" workflow).
 
 ## Key Components
 
-### 1. Voxel Grid (`mVoxelGrid`)
-*   **Type**: `std::unordered_map<VoxelKey, int, VoxelKeyHash>`
-*   **Purpose**: Maps 3D integer coordinates (voxels) to an index in the `mSplats` vector.
+### 1. Spatial Hash Table (`mSpatialHash`)
+*   **Type**: Fixed-size `int32_t[HASH_SIZE]` (Zero-allocation).
+*   **Purpose**: Maps 3D spatial hashes to indices in the `mSplatData` vector.
+*   **Performance**: Provides O(1) constant-time lookup for discovery and voxel-averaging without the performance stutters of dynamic maps like `std::unordered_map`.
 *   **Logic**:
-    *   The world is divided into ultra-dense cubes of size `VOXEL_SIZE` (`5mm`, defined in `MobileGS.cpp`).
-    *   When a new depth point is detected, its voxel key is calculated.
-    *   If the voxel is empty, a new surfel is created.
-    *   If the voxel is occupied, the existing surfel is updated (position averaging and confidence boost).
+    *   The world is divided into cubes of size `VOXEL_SIZE` (`20mm`).
+    *   Stochastic Sampling: Only 2048 random pixels per depth frame are processed, reducing CPU overhead by ~90%.
+    *   If a voxel is empty, a new surfel is instantiated instantly with high-fidelity color and normal orientation.
 
 ### 2. Splat (Surfel) Structure
-Contains (48 bytes):
-*   `x, y, z`: Position in world space (metres).
-*   `r, g, b, a`: Colour and opacity.
-*   `confidence`: Observation count.
-*   `nx, ny, nz`: Surface Normal.
-*   `radius`: Calculated physical scale.
+Contains (44 bytes):
+*   `x, y, z`: Position in World Space (metres).
+*   `r, g, b, a`: Color and opacity (MANDATE: Opaque rendering).
+*   `nx, ny, nz`: Surface Normal for alignment and occlusion.
+*   `confidence`: Quality score (0.9 for HW Stereo, 0.5 for Mono).
 
 ### 3. Rendering Pipeline
 
-A single OpenGL ES 3.0 render path runs inside `ArRenderer`'s `GLSurfaceView`:
+A single OpenGL ES 3.0 render path runs inside `ArRenderer`:
 
 | Step | Call | Content |
 |---|---|---|
-| 1 | `backgroundRenderer.draw(frame)` | ARCore camera feed (full-screen, `EXTERNAL_OES`) |
-| 2 | `slamManager.draw()` | Dense SLAM Surfels (`GL_POINTS`) drawn on top in the same GL context |
+| 1 | `backgroundRenderer.draw()` | ARCore camera feed (full-screen, `EXTERNAL_OES`) |
+| 2 | `slamManager.draw()` | Persistent Voxel Memory (`GL_POINTS`) drawn on top |
 
-**Crucial Shader Logic:** The vertex shader calculates the exact pixel diameter needed to cover the surfel based on the physical focal length (`uFocalY`) and depth (`clip.w`). The fragment shader aggressively discards fragments outside the radius and writes to the depth buffer completely opaquely. Alpha blending is `DISABLED`.
+**Crucial Shader Logic:** The vertex shader calculates the exact pixel diameter needed to interlock surfels based on focal length (`uFocalY`) and depth. The fragment shader uses `if (length(coord) > 0.5) discard;` to create hard-edged circular discs. Alpha blending is `DISABLED` to maintain 60fps and depth stability.
 
-### 4. Depth Processing (`processDepthFrame`)
-*   **Restoration**: The engine has been restored to the stable March 9th configuration.
-*   **Coordinate Space**: Points are stored in **World Space**. 
-*   **Voxel size**: `20mm` (`0.02f`) for optimal stability.
-*   **Unprojection**: Standard pinhole model with Y-up flip.
-
-### 5. Optical Flow Depth Estimation (`computeOpticalFlowDepth`)
-Used as a fallback when ARCore Depth API frames are unavailable.
+### 4. Relocalization Thread (`relocThreadFunc`)
+*   **Goal**: The "Snap-Back" behavior.
+*   **Process**: A background thread continuously matches the current camera frame against "Spatial Fingerprints" (ORB descriptors) stored at high-confidence voxel locations.
+*   **Correction**: Upon a successful match, the global anchor transform is updated to realign the AR mural with the physical world instantly.
 
 ## Memory Management
-*   **Limits**: `MAX_SPLATS` is set to 500,000 to prevent OOM.
-*   **LRU Pruning**: `pruneMap()` is implemented — when `splatData.size() >= MAX_SPLATS`, it evicts the lowest-confidence 10% of surfels using `std::partial_sort`. This prevents OOM crashes on long scans.
-*   **Distance Culling**: Points further than `CULL_DISTANCE` (5m) are ignored.
+*   **Limits**: `MAX_SPLATS` is set to 250,000.
+*   **Efficiency**: The fixed spatial hash avoids heap fragmentation during active mapping.
+*   **Distance Culling**: Depth points further than 6m are ignored.
 
 ## JNI Interface (`GraffitiJNI.cpp` → `SlamManager.kt`)
 
-All data is passed as `ByteBuffer` (never raw pointers); native side calls `GetDirectBufferAddress`.
-
 | Kotlin method | Description |
 |---|---|
-| `updateCamera(view, proj)` | Store current ARCore view + projection matrices |
-| `setArCoreTrackingState(isTracking)` | Notify native engine of ARCore tracking state |
-| `updateAnchorTransform(transform)` | Apply teleological correction — updates global map alignment |
-| `feedColorFrame(...)` | RGBA color frame for relocalization / fingerprinting |
-| `feedArCoreDepth(...)` | Metric depth feed. Receives rotation code and physical CPU intrinsics. |
-| `feedStereoData(...)` | Stereo disparity → depth → `processDepthFrame()` |
-| `draw()` | OpenGL ES render (surfel `GL_POINTS`) — called by `ArRenderer` each frame |
-
-### ARCore DEPTH16 Encoding
-uint16_t raw = depthBuffer[r * width + c]
-uint16_t depthMm = raw & 0x1FFF // 13-bit depth in millimetres
-uint8_t conf = (raw >> 13) & 0x7 // 3-bit confidence (0 = invalid, 7 = high)
-
-
+| `feedArCoreDepth(...)` | Metric depth feed. Receives rotation code and a `confidence` weight (0.5 vs 0.9). |
+| `updateAnchorTransform(mat)` | Teleological correction — snaps the global mural alignment. |
+| `saveModel(path)` | Binary dump of the `mSplatData` vector and spatial hash. |
+| `draw()` | OpenGL ES render — called by `ArRenderer` each frame. |
 
 ---
-*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*
+*Documentation updated on 2026-04-24 during Persistent Voxel Memory and Pocket-Ready recovery implementation.*

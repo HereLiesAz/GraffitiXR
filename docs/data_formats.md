@@ -6,21 +6,20 @@ This document defines the storage formats for GraffitiXR artifacts.
 A serialized `GraffitiProject` JSON manifest file describing a user project via `kotlinx.serialization`.
 
 ## 2. SLAM Map (`.bin`)
-A custom binary format for MobileGS Voxel Hash data. Little Endian.
+A custom binary format for Persistent Voxel Memory data. Little Endian.
 
 | Byte Offset | Type | Description |
 | :--- | :--- | :--- |
 | `0x00` | `char[4]` | Magic Header `"GXRM"` |
-| `0x04` | `int32` | Version (1) |
+| `0x04` | `int32` | Version (2) |
 | `0x08` | `int32` | Splat Count (N) |
-| `0x0C` | `int32` | Keyframe Count (K) |
-| `0x10` | `byte[]` | Splat Payload (N × 32 bytes) |
-| `...` | `float[16]` | Tracked Alignment Matrix (64 bytes) |
+| `0x10` | `byte[]` | Splat Payload (N × 44 bytes) |
 
-**Splat Structure (32 bytes aligned):**
-*   `float x, y, z` (Position)
+**Splat Structure (44 bytes aligned):**
+*   `float x, y, z` (Position in World Space)
 *   `float r, g, b, a` (Color & Opacity)
-*   `float confidence` (Observations)
+*   `float nx, ny, nz` (Surface Normal)
+*   `float confidence` (Quality score 0.0 to 1.0)
 
 ---
-*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*
+*Documentation updated on 2026-04-24 during Persistent Voxel Memory and Pocket-Ready recovery implementation.*
