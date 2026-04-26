@@ -18,8 +18,9 @@ dependencyResolutionManagement {
         maven {
             url = uri("https://maven.pkg.github.com/facebook/meta-wearables-dat-android")
             credentials {
-                username = "unused"
-                password = System.getenv("GH_TOKEN")?.trim() ?: localProperties.getProperty("GH_TOKEN")?.trim() ?: ""
+                username = System.getenv("GITHUB_ACTOR") ?: "unused"
+                password = (System.getenv("GITHUB_TOKEN") ?: System.getenv("GH_TOKEN") ?: 
+                            localProperties.getProperty("GH_TOKEN") ?: localProperties.getProperty("github_token") ?: "").trim()
             }
         }
     }
@@ -34,3 +35,4 @@ project(":android_collaboration_module").projectDir = file("collab")
 
 include(":opencv")
 project(":opencv").projectDir = file("core/nativebridge/libs/opencv/sdk")
+
