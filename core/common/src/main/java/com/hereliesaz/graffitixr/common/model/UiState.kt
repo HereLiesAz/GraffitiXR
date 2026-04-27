@@ -35,6 +35,7 @@ data class ArUiState(
     val magnifierPosition: Offset = Offset.Zero,
     val maskPath: androidx.compose.ui.graphics.Path? = null,
     val isCaptureRequested: Boolean = false,
+    val isAnchorEstablishmentRequested: Boolean = false,
 
     val undoCount: Int = 0,
 

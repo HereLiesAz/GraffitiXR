@@ -36,6 +36,10 @@ struct JniThreadAttacher {
     }
 };
 
+MobileGS::~MobileGS() {
+    destroy();
+}
+
 void MobileGS::initialize(int width, int height) {
     std::lock_guard<std::mutex> lock(mMutex);
     mScreenWidth = width;
@@ -107,7 +111,7 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     bool isTrackingState = false;
     {
         std::lock_guard<std::mutex> lock(mMutex);
-        if (depth.empty() || color.empty() || !mCameraReady) return;
+        if (depth.empty() || color.empty() || !mCameraReady || mMappingPaused) return;
         isTrackingState = mIsArCoreTracking;
     }
     if (!isTrackingState) return;
@@ -316,10 +320,16 @@ void MobileGS::destroy() {
     mMapRunning = false;
     mOptimizeRunning = false;
     mRelocRunning = false;
+    mSortRunning = false;
     mQueueCv.notify_all();
+    {
+        std::lock_guard<std::mutex> lock(mRelocMutex);
+        mRelocCv.notify_all();
+    }
     if (mMapThread.joinable()) mMapThread.join();
     if (mOptimizeThread.joinable()) mOptimizeThread.join();
     if (mRelocThread.joinable()) mRelocThread.join();
+    if (mSortThread.joinable()) mSortThread.join();
 }
 
 void MobileGS::saveModel(const std::string& p) {

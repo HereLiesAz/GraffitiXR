@@ -697,81 +697,16 @@ class ArViewModel @Inject constructor(
 
     fun onCaptureConsumed() {
         _uiState.update { it.copy(tempCaptureBitmap = null, annotatedCaptureBitmap = null) }
+        slamManager.setMappingPaused(false)
     }
 
     fun setInitialAnchorFromCapture() {
-        val s = session ?: return
-        val frame = s.update()
-        val camera = frame.camera
-        
-        val viewMat = FloatArray(16)
-        camera.getViewMatrix(viewMat, 0)
-        val flatViewMat = viewMat.clone()
-
-        val projMat = FloatArray(16)
-        camera.getProjectionMatrix(projMat, 0, 0.1f, 100.0f)
-
-        val hitX = 0.5f; val hitY = 0.5f
-        val hits = frame.hitTest(hitX * appContext.resources.displayMetrics.widthPixels, hitY * appContext.resources.displayMetrics.heightPixels)
-        
-        var anchorModelMatrix = FloatArray(16)
-        android.opengl.Matrix.setIdentityM(anchorModelMatrix, 0)
-
-        val fallbackMatrix = FloatArray(16)
-        android.opengl.Matrix.invertM(fallbackMatrix, 0, viewMat, 0)
-        fallbackMatrix[12] += -fallbackMatrix[8] * 2.0f
-        fallbackMatrix[13] += -fallbackMatrix[9] * 2.0f
-        fallbackMatrix[14] += -fallbackMatrix[10] * 2.0f
-
-        if (hits.isEmpty()) {
-            anchorModelMatrix = fallbackMatrix
-        } else {
-            try {
-                val pose = hits[0].hitPose
-                pose.toMatrix(anchorModelMatrix, 0)
-                
-                val camPose = camera.pose
-                val dx = pose.tx() - camPose.tx()
-                val dy = pose.ty() - camPose.ty()
-                val dz = pose.tz() - camPose.tz()
-                val dist = Math.sqrt((dx*dx + dy*dy + dz*dz).toDouble())
-                
-                if (dist < 0.1 || dist > 10.0) {
-                    anchorModelMatrix = fallbackMatrix
-                }
-            } catch (e: Exception) {
-                Timber.e(e, "Plane detection failed; using camera-pose fallback")
-                anchorModelMatrix = fallbackMatrix
-            }
-        }
-
-        // --- ARCore democratic consensus initialization ---
-        // Construct ARCore anchor at the hit location (or fallback)
-        val anchor = s.createAnchor(com.google.ar.core.Pose(
-            floatArrayOf(anchorModelMatrix[12], anchorModelMatrix[13], anchorModelMatrix[14]),
-            floatArrayOf(0f, 0f, 0f, 1f) // Identity for now, or extract from matrix
-        ))
-
-        slamManager.updateAnchorTransform(anchorModelMatrix)
-        renderer?.setPrimaryAnchor(anchor)
-
-        _uiState.value.targetPhysicalExtent?.let { (halfW, halfH) ->
-            renderer?.updateOverlayExtent(halfW, halfH)
-        }
-
-        _uiState.update {
-            it.copy(
-                isAnchorEstablished = true,
-                targetCaptureViewMatrix = flatViewMat,
-                scanPhase = ScanPhase.COMPLETE
-            )
-        }
-        renderer?.anchorEstablished = true
-        renderer?.hideVisualization = true
+        renderer?.pendingAnchorEstablishment = true
     }
 
     fun requestCapture() {
         slamManager.setSplatsVisible(false)
+        slamManager.setMappingPaused(true)
         _uiState.update { it.copy(isCaptureRequested = true) }
     }
 

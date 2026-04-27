@@ -83,6 +83,7 @@ class SlamManager @Inject constructor() {
 
     fun setRelocEnabled(enabled: Boolean) = nativeSetRelocEnabled(enabled)
     fun setVoxelSize(size: Float) = nativeSetVoxelSize(size)
+    fun setMappingPaused(paused: Boolean) = nativeSetMappingPaused(paused)
 
     fun initGl() {
         nativeInitGl()
@@ -269,6 +270,7 @@ class SlamManager @Inject constructor() {
     )
     private external fun nativeSetRelocEnabled(enabled: Boolean)
     private external fun nativeSetVoxelSize(size: Float)
+    private external fun nativeSetMappingPaused(paused: Boolean)
     private external fun nativeFeedPointCloud(points: FloatArray)
     private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int, intrinsics: FloatArray, intrW: Int, intrH: Int, cvRotateCode: Int, confidence: Float)
     private external fun nativeFeedYuvFrame(

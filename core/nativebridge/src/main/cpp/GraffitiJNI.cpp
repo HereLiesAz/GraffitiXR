@@ -178,6 +178,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetVoxelSize(JNIEn
     if (gSlamEngine) gSlamEngine->setVoxelSize(size);
 }
 
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMappingPaused(JNIEnv* env, jobject thiz, jboolean paused) {
+    if (gSlamEngine) gSlamEngine->setMappingPaused(paused);
+}
+
 float gLastViewMatrix[16];
 float gLastProjMatrix[16];
 float gLastMappingViewMatrix[16];

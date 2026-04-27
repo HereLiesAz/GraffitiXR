@@ -201,7 +201,13 @@ private fun UnwarpScreen(
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
     
     Box(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxSize().padding(top = 40.dp, bottom = 260.dp).onSizeChanged { boxSize = it }, contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 40.dp, bottom = 260.dp)
+                .onSizeChanged { boxSize = it },
+            contentAlignment = Alignment.TopStart // CRITICAL: Align to top-start for absolute coordinate mapping
+        ) {
             Image(
                 bitmap = bitmap.asImageBitmap(),
                 contentDescription = "Unwarp Base",
@@ -283,8 +289,8 @@ private fun UnwarpOverlay(
                         val ny = dragAmount.y / imgH
                         val newList = points.toMutableList()
                         newList[index] = Offset(
-                            (points[index].x + nx).coerceIn(0f, 1f),
-                            (points[index].y + ny).coerceIn(0f, 1f)
+                            (newList[index].x + nx).coerceIn(0f, 1f),
+                            (newList[index].y + ny).coerceIn(0f, 1f)
                         )
                         onUpdatePoints(newList)
                     }
@@ -307,7 +313,12 @@ private fun TargetRefinementScreen(
 
     Box(modifier = Modifier.fillMaxSize().onSizeChanged { boxSize = it }) {
 
-        Box(modifier = Modifier.fillMaxSize().padding(top = 40.dp, bottom = 260.dp), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 40.dp, bottom = 260.dp),
+            contentAlignment = Alignment.TopStart
+        ) {
             rawBitmap?.let { bmp ->
                 Image(
                     bitmap = bmp.asImageBitmap(),

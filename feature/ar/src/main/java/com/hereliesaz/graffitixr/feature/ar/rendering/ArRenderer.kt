@@ -89,6 +89,7 @@ class ArRenderer(
     @Volatile var captureRequested: Boolean = false
     @Volatile var isCapturingTarget: Boolean = false
     @Volatile var isInPlaneRealignment: Boolean = false
+    @Volatile var pendingAnchorEstablishment: Boolean = false
 
     @Volatile var exportRequested: Boolean = false
     var onExportCaptured: ((Bitmap) -> Unit)? = null
@@ -200,6 +201,56 @@ class ArRenderer(
             }
 
             backgroundRenderer.draw(frame)
+
+            if (pendingAnchorEstablishment) {
+                pendingAnchorEstablishment = false
+                try {
+                    val camera = frame.camera
+                    val viewMat = FloatArray(16)
+                    camera.getViewMatrix(viewMat, 0)
+                    
+                    val hitX = 0.5f; val hitY = 0.5f
+                    val hits = frame.hitTest(hitX * context.resources.displayMetrics.widthPixels.toFloat(), hitY * context.resources.displayMetrics.heightPixels.toFloat())
+                    
+                    var anchorModelMatrix = FloatArray(16)
+                    android.opengl.Matrix.setIdentityM(anchorModelMatrix, 0)
+
+                    val fallbackMatrix = FloatArray(16)
+                    android.opengl.Matrix.invertM(fallbackMatrix, 0, viewMat, 0)
+                    fallbackMatrix[12] += -fallbackMatrix[8] * 2.0f
+                    fallbackMatrix[13] += -fallbackMatrix[9] * 2.0f
+                    fallbackMatrix[14] += -fallbackMatrix[10] * 2.0f
+
+                    if (hits.isEmpty()) {
+                        anchorModelMatrix = fallbackMatrix
+                    } else {
+                        val pose = hits[0].hitPose
+                        pose.toMatrix(anchorModelMatrix, 0)
+                        val camPose = camera.pose
+                        val dx = pose.tx() - camPose.tx()
+                        val dy = pose.ty() - camPose.ty()
+                        val dz = pose.tz() - camPose.tz()
+                        val dist = Math.sqrt((dx*dx + dy*dy + dz*dz).toDouble())
+                        if (dist < 0.1 || dist > 10.0) {
+                            anchorModelMatrix = fallbackMatrix
+                        }
+                    }
+
+                    val anchor = activeSession.createAnchor(com.google.ar.core.Pose(
+                        floatArrayOf(anchorModelMatrix[12], anchorModelMatrix[13], anchorModelMatrix[14]),
+                        floatArrayOf(0f, 0f, 0f, 1f)
+                    ))
+
+                    slamManager.updateAnchorTransform(anchorModelMatrix)
+                    setPrimaryAnchor(anchor)
+                    anchorEstablished = true
+                    hideVisualization = true
+                    
+                    Timber.d("Anchor established on GL thread via consensus orchestrator.")
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to establish anchor on GL thread")
+                }
+            }
 
             GLES30.glDepthMask(true)
             GLES30.glEnable(GLES30.GL_DEPTH_TEST)

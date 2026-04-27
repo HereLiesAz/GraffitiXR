@@ -17,6 +17,7 @@
 class MobileGS {
 public:
     MobileGS() {}
+    ~MobileGS();
 
     void initialize(int width, int height);
     void initGl();
@@ -52,6 +53,7 @@ public:
     void setViewportSize(int width, int height);
     void setRelocEnabled(bool enabled);
     void setVoxelSize(float size);
+    void setMappingPaused(bool paused) { mMappingPaused = paused; }
 
     int getSplatCount() const { return mVoxelHash.getSplatCount(); }
     int getImmutableSplatCount() const { return mVoxelHash.getImmutableSplatCount(); }
@@ -139,6 +141,7 @@ private:
     int mScreenWidth = 1920;
     int mScreenHeight = 1080;
     float mVoxelSize = 0.02f;
+    std::atomic<bool> mMappingPaused{false};
     bool mSplatsVisible{false};
     int mScanMode = 0; // 0=CLOUD, 1=MURAL
     int mMuralMethod = 0; // 0=VOXEL_HASH, 1=SURFACE_MESH
