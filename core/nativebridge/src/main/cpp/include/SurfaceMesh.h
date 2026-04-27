@@ -22,6 +22,8 @@ public:
     void draw(const glm::mat4& mvp);
     void clear();
     void getMesh(std::vector<float>& outVertices, std::vector<float>& outWeights);
+    void save(const std::string& path);
+    void load(const std::string& path);
 
 private:
     void updateTexture(const cv::Mat& color, const std::vector<glm::vec2>& camPoints);
@@ -44,6 +46,6 @@ private:
     GLuint mIbo = 0;
     GLuint mWireIbo = 0;
 
-    static constexpr int MESH_GRID_DIM = 32;
+    static constexpr int MESH_GRID_DIM = 128;
     static constexpr int TEXTURE_SIZE = 1024;
 };

@@ -15,6 +15,7 @@ import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
 import com.hereliesaz.graffitixr.feature.ar.DisplayRotationHelper
+import com.hereliesaz.graffitixr.feature.ar.anchor.AnchorOrchestrator
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,12 +49,17 @@ class ArRenderer(
     private val overlayRenderer = OverlayRenderer(context)
     private val pointCloudRenderer = PointCloudRenderer()
     private val planeRenderer = PlaneRenderer()
+    private val anchorOrchestrator = AnchorOrchestrator()
 
     @Volatile var scanMode: ArScanMode = ArScanMode.MURAL
     @Volatile var muralMethod: MuralMethod = MuralMethod.VOXEL_HASH
     @Volatile var showAnchorBoundary: Boolean = false
     @Volatile var showBorderForConfirmation: Boolean = false
     @Volatile var anchorEstablished: Boolean = false
+        set(value) {
+            field = value
+            if (!value) anchorOrchestrator.clear()
+        }
     /** When true the SLAM/cloud visualization is suppressed — processing continues but nothing is drawn. */
     @Volatile var hideVisualization: Boolean = false
     var stereoProvider: com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider? = null
@@ -242,10 +248,32 @@ class ArRenderer(
 
             slamManager.setArCoreTrackingState(isTracking)
 
+            if (anchorEstablished && frameCount % 60 == 0) {
+                // Promotion: Check for support anchor candidates
+                val candidates = slamManager.getAnchorCandidates(0.95f, 3)
+                candidates?.let { data ->
+                    for (i in 0 until (data.size / 3)) {
+                        val worldPos = com.google.ar.core.Pose(
+                            floatArrayOf(data[i*3], data[i*3+1], data[i*3+2]),
+                            floatArrayOf(0f,0f,0f,1f)
+                        )
+                        anchorOrchestrator.addSupportAnchor(activeSession, worldPos)
+                    }
+                }
+            }
+
             val currentScanMode = scanMode
             slamManager.setArScanMode(currentScanMode.ordinal)
             slamManager.setMuralMethod(muralMethod.ordinal)
-            val anchorMatrix = slamManager.getAnchorTransform()
+            
+            // --- Democratic Consensus Transformation ---
+            val anchorMatrix = FloatArray(16)
+            if (anchorEstablished) {
+                anchorOrchestrator.getConsensusMatrix(anchorMatrix)
+            } else {
+                val rawAnchor = slamManager.getAnchorTransform()
+                System.arraycopy(rawAnchor, 0, anchorMatrix, 0, 16)
+            }
 
             // Throttle UI and distance updates to 15Hz to match SLAM processing frequency and reduce state churn.
             if (frameCount % 4 == 0) {
@@ -569,6 +597,10 @@ class ArRenderer(
                 overlayRenderer.drawAnchorBorder(viewMatrix, projMatrix, anchorMatrix)
             }
         }
+    }
+
+    fun setPrimaryAnchor(anchor: com.google.ar.core.Anchor) {
+        anchorOrchestrator.setInitialAnchor(anchor)
     }
 
     /**

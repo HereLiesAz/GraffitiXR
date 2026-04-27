@@ -324,9 +324,11 @@ void MobileGS::destroy() {
 
 void MobileGS::saveModel(const std::string& p) {
     mVoxelHash.save(p);
+    mSurfaceMesh.save(p + ".mesh");
 }
 void MobileGS::loadModel(const std::string& p) {
     mVoxelHash.load(p);
+    mSurfaceMesh.load(p + ".mesh");
 }
 bool MobileGS::importModel3D(const std::string& p) { return false; }
 void MobileGS::setViewportSize(int w, int h) { mScreenWidth = w; mScreenHeight = h; }

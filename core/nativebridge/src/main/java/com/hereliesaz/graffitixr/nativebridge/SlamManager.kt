@@ -182,6 +182,10 @@ class SlamManager @Inject constructor() {
     fun exportFingerprint(): ByteArray? = nativeExportFingerprint()
     fun alignToFingerprint(data: ByteArray) = nativeAlignToFingerprint(data)
 
+    fun getAnchorCandidates(threshold: Float, maxCount: Int): FloatArray? {
+        return nativeGetAnchorCandidates(threshold, maxCount)
+    }
+
     fun destroy() {
         if (isInitialized) {
             nativeDestroy()
@@ -247,6 +251,7 @@ class SlamManager @Inject constructor() {
     private external fun nativeGetPersistentMesh(vertices: FloatArray, weights: FloatArray)
     private external fun nativeUnrollMesh(vertices: FloatArray): FloatArray
     private external fun nativeExportFingerprint(): ByteArray?
+    private external fun nativeGetAnchorCandidates(threshold: Float, maxCount: Int): FloatArray?
     private external fun nativeAlignToFingerprint(data: ByteArray)
     private external fun nativeSetWallFingerprint(
         bitmap: Bitmap, mask: Bitmap?,

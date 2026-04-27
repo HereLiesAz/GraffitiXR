@@ -2,6 +2,7 @@
 #include <android/log.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
+#include <fstream>
 #include <opencv2/imgproc.hpp>
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "SurfaceMesh", __VA_ARGS__)
@@ -114,16 +115,19 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
     if (!mInitialized) {
         float extent = 5.0f;
         float step = (extent * 2.0f) / (MESH_GRID_DIM - 1);
-        mPersistentMesh.reserve(MESH_GRID_DIM * MESH_GRID_DIM);
+        mPersistentMesh.assign(MESH_GRID_DIM * MESH_GRID_DIM, {0,0,0,0,0,0});
         for (int i = 0; i < MESH_GRID_DIM; ++i) {
             for (int j = 0; j < MESH_GRID_DIM; ++j) {
                 float u = (float)j / (MESH_GRID_DIM - 1);
                 float v = (float)i / (MESH_GRID_DIM - 1);
-                mPersistentMesh.push_back({-extent + j * step, -extent + i * step, 0.0f, u, v, 0.0f});
+                int idx = i * MESH_GRID_DIM + j;
+                mPersistentMesh[idx] = {-extent + j * step, -extent + i * step, 0.0f, u, v, 0.0f};
             }
         }
         mPersistentMeshIndices.reserve((MESH_GRID_DIM - 1) * (MESH_GRID_DIM - 1) * 6);
+        mPersistentMeshIndices.clear();
         mWireframeIndices.reserve((MESH_GRID_DIM - 1) * (MESH_GRID_DIM - 1) * 4);
+        mWireframeIndices.clear();
         for (int i = 0; i < MESH_GRID_DIM - 1; ++i) {
             for (int j = 0; j < MESH_GRID_DIM - 1; ++j) {
                 int bl = i * MESH_GRID_DIM + j;
@@ -133,14 +137,13 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
                 mPersistentMeshIndices.push_back(bl); mPersistentMeshIndices.push_back(br); mPersistentMeshIndices.push_back(tl);
                 mPersistentMeshIndices.push_back(br); mPersistentMeshIndices.push_back(tr); mPersistentMeshIndices.push_back(tl);
 
-                // Wireframe Grid
                 mWireframeIndices.push_back(bl); mWireframeIndices.push_back(br);
                 mWireframeIndices.push_back(bl); mWireframeIndices.push_back(tl);
             }
         }
         mMuralTexture = cv::Mat::zeros(TEXTURE_SIZE, TEXTURE_SIZE, CV_8UC3);
         mInitialized = true;
-        mIndicesUploaded = false; // Reset to ensure upload on next draw
+        mIndicesUploaded = false;
     }
 
     glm::mat4 V = glm::make_mat4(viewMat);
@@ -153,104 +156,60 @@ void SurfaceMesh::update(const cv::Mat& depth, const cv::Mat& color, const float
     float cx = (projMat[8] + 1.0f) * (depth.cols / 2.0f);
     float cy = (-projMat[9] + 1.0f) * (depth.rows / 2.0f);
 
-    // Calculate current distance range for relative scrutiny
-    double minD = 0.3, maxD = 5.0;
-    cv::Mat mask = (depth > 0.1f);
-    if (cv::countNonZero(mask) > 100) {
-        cv::minMaxLoc(depth, &minD, &maxD, NULL, NULL, mask);
-    }
-    float rangeD = (float)(maxD - minD);
-    if (rangeD < 0.1f) rangeD = 1.0f;
+    const float* depthPtr = (const float*)depth.data;
+    int dRows = depth.rows, dCols = depth.cols;
 
-    std::vector<bool> vertexHits(mPersistentMesh.size(), false);
-    std::vector<bool> inView(mPersistentMesh.size(), false);
     std::vector<glm::vec2> camPoints(mPersistentMesh.size(), glm::vec2(-1.0f));
-    std::vector<float> vertexScrutiny(mPersistentMesh.size(), 0.0f);
-    std::vector<float> vertexColorSim(mPersistentMesh.size(), 1.0f);
 
-    for (int i = 0; i < (int)mPersistentMesh.size(); ++i) {
-        auto& v = mPersistentMesh[i];
-        glm::vec4 p_cam = VA * glm::vec4(v.x, v.y, v.z, 1.0f);
-        if (p_cam.z >= -0.1f) continue;
-        
-        float u_cam = (p_cam.x * fx / -p_cam.z) + cx;
-        float v_cam = (p_cam.y * -fy / -p_cam.z) + cy;
-        
-        if (u_cam >= 0 && u_cam < depth.cols && v_cam >= 0 && v_cam < depth.rows) {
-            inView[i] = true;
+    // SLAMesh: Voxel-based surface averaging
+    // We sample a subset of the depth map to update the mesh vertices
+    for (int r = 0; r < dRows; r += 4) {
+        for (int c = 0; c < dCols; c += 4) {
+            float d = depthPtr[r * dCols + c];
+            if (d < 0.3f || d > 5.0f) continue;
 
-            float d = depth.at<float>((int)v_cam, (int)u_cam);
-            if (d > 0.1f && d < 10.0f) {
-                float current_d = -p_cam.z;
+            float xc = (static_cast<float>(c) - cx) * d / fx;
+            float yc = -(static_cast<float>(r) - cy) * d / fy;
+            glm::vec4 p_cam = glm::vec4(xc, yc, -d, 1.0f);
+            glm::vec4 p_anchor = invVA * p_cam;
 
-                // Relative Scrutiny
-                float rel_d = std::max(0.0f, std::min(1.0f, (current_d - (float)minD) / rangeD));
-                vertexScrutiny[i] = 1.0f - rel_d;
+            // Project anchor-space point to our grid
+            float extent = 5.0f;
+            float gridX = (p_anchor.x + extent) / (extent * 2.0f) * (MESH_GRID_DIM - 1);
+            float gridY = (p_anchor.y + extent) / (extent * 2.0f) * (MESH_GRID_DIM - 1);
 
-                // Color Influence: least influential factor
-                int texX = (int)(v.u * TEXTURE_SIZE);
-                int texY = (int)(v.v * TEXTURE_SIZE);
-                if (texX >= 0 && texX < TEXTURE_SIZE && texY >= 0 && texY < TEXTURE_SIZE) {
-                    cv::Vec3b world_col = mMuralTexture.at<cv::Vec3b>(texY, texX);
-                    cv::Vec3b cam_col = color.at<cv::Vec3b>((int)(v_cam * ((float)color.rows / depth.rows)),
-                                                            (int)(u_cam * ((float)color.cols / depth.cols)));
+            int gi = (int)std::round(gridY);
+            int gj = (int)std::round(gridX);
 
-                    float color_diff = std::sqrt(std::pow((cam_col[2] - world_col[2])/255.0f, 2) +
-                                                 std::pow((cam_col[1] - world_col[1])/255.0f, 2) +
-                                                 std::pow((cam_col[0] - world_col[0])/255.0f, 2));
-                    vertexColorSim[i] = 1.0f - std::max(0.0f, std::min(1.0f, color_diff / 1.732f));
-                }
+            if (gi >= 0 && gi < MESH_GRID_DIM && gj >= 0 && gj < MESH_GRID_DIM) {
+                int idx = gi * MESH_GRID_DIM + gj;
+                auto& v = mPersistentMesh[idx];
 
-                // Adaptive tolerance: massive when uninitialized to allow "snapping" to surfaces
-                float tolerance = (v.confidence < 0.1f) ? 0.50f : (0.05f + (rel_d * 0.10f) + (vertexColorSim[i] * 0.02f));
-                if (v.confidence > 0.6f) tolerance -= 0.02f;
+                // Running average of Z based on confidence
+                float alpha = (v.confidence < 0.1f) ? 0.5f : 0.1f;
+                v.z = v.z * (1.0f - alpha) + p_anchor.z * alpha;
+                v.confidence = std::min(1.0f, v.confidence + 0.05f);
 
-                if (std::abs(current_d - d) < tolerance) {
-                    glm::vec4 p_target_cam = p_cam * (d / current_d);
-                    p_target_cam.w = 1.0f;
-                    glm::vec4 p_target_anchor = invVA * p_target_cam;
-
-                    // Faster adaptation for low-confidence vertices
-                    float alpha = (v.confidence < 0.2f) ? 0.30f : 0.10f;
-                    v.x += (p_target_anchor.x - v.x) * alpha;
-                    v.y += (p_target_anchor.y - v.y) * alpha;
-                    v.z += (p_target_anchor.z - v.z) * alpha;
-
-                    vertexHits[i] = true;
-                    camPoints[i] = glm::vec2(u_cam * ((float)color.cols / depth.cols), v_cam * ((float)color.rows / depth.rows));
-                }
+                camPoints[idx] = glm::vec2(c * (float)color.cols / dCols, r * (float)color.rows / dRows);
             }
         }
     }
 
-    for (int i = 0; i < (int)mPersistentMesh.size(); ++i) {
-        if (mPersistentMesh[i].confidence >= 0.98f) continue; // Real Immutability
-
-        if (vertexHits[i]) {
-            // Reinforced established vertex: lock slower if scrutinized
-            float gain = (0.15f + (1.0f - vertexScrutiny[i]) * 0.2f) * (0.9f + 0.1f * vertexColorSim[i]);
-            mPersistentMesh[i].confidence = std::min(1.0f, mPersistentMesh[i].confidence + gain);
-        } else if (inView[i]) {
-            // Miss: decay faster if scrutinized
-            float decay = 0.03f + (vertexScrutiny[i] * 0.07f) + (1.0f - vertexColorSim[i]) * 0.01f;
-            mPersistentMesh[i].confidence = std::max(0.0f, mPersistentMesh[i].confidence - decay);
-            float resetAlpha = 0.05f + (vertexScrutiny[i] * 0.15f);
-            mPersistentMesh[i].z *= (1.0f - resetAlpha);
-        }
-        // If not in view, confidence and position are preserved (No global decay)
-    }
-
     updateTexture(color, camPoints);
 
-    // Laplacian Smoothing (Iterative to ensure watertight shell)
+    // Laplacian Smoothing (Weighted by confidence to preserve features)
     for (int iter = 0; iter < 3; ++iter) {
         std::vector<float> nextZ(mPersistentMesh.size());
         for (int i = 1; i < MESH_GRID_DIM - 1; ++i) {
             for (int j = 1; j < MESH_GRID_DIM - 1; ++j) {
                 int idx = i * MESH_GRID_DIM + j;
+                auto& v = mPersistentMesh[idx];
+                if (v.confidence < 0.01f) {
+                    nextZ[idx] = 0; continue;
+                }
                 float sum = mPersistentMesh[idx - 1].z + mPersistentMesh[idx + 1].z +
                             mPersistentMesh[idx - MESH_GRID_DIM].z + mPersistentMesh[idx + MESH_GRID_DIM].z;
-                nextZ[idx] = mPersistentMesh[idx].z * 0.6f + (sum / 4.0f) * 0.4f;
+                nextZ[idx] = v.z * 0.7f + (sum / 4.0f) * 0.3f;
             }
         }
         for (int i = 1; i < MESH_GRID_DIM - 1; ++i) {
@@ -345,10 +304,53 @@ void SurfaceMesh::getMesh(std::vector<float>& outVertices, std::vector<float>& o
     }
 }
 
+void SurfaceMesh::save(const std::string& path) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    std::ofstream out(path, std::ios::binary);
+    if (!out) return;
+    uint32_t count = static_cast<uint32_t>(mPersistentMesh.size());
+    out.write(reinterpret_cast<const char*>(&count), sizeof(uint32_t));
+    out.write(reinterpret_cast<const char*>(mPersistentMesh.data()), static_cast<std::streamsize>(count * sizeof(MeshVertex)));
+
+    // Save texture as binary blob
+    if (mMuralTexture.data) {
+        int rows = mMuralTexture.rows, cols = mMuralTexture.cols, type = mMuralTexture.type();
+        out.write(reinterpret_cast<const char*>(&rows), sizeof(int));
+        out.write(reinterpret_cast<const char*>(&cols), sizeof(int));
+        out.write(reinterpret_cast<const char*>(&type), sizeof(int));
+        out.write(reinterpret_cast<const char*>(mMuralTexture.data), static_cast<std::streamsize>(mMuralTexture.total() * mMuralTexture.elemSize()));
+    }
+}
+
+void SurfaceMesh::load(const std::string& path) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    std::ifstream in(path, std::ios::binary);
+    if (!in) return;
+    mPersistentMesh.clear();
+    uint32_t count;
+    in.read(reinterpret_cast<char*>(&count), sizeof(uint32_t));
+    if (count > MESH_GRID_DIM * MESH_GRID_DIM) count = MESH_GRID_DIM * MESH_GRID_DIM;
+    mPersistentMesh.resize(count);
+    in.read(reinterpret_cast<char*>(mPersistentMesh.data()), static_cast<std::streamsize>(count * sizeof(MeshVertex)));
+
+    int rows, cols, type;
+    if (in.read(reinterpret_cast<char*>(&rows), sizeof(int))) {
+        in.read(reinterpret_cast<char*>(&cols), sizeof(int));
+        in.read(reinterpret_cast<char*>(&type), sizeof(int));
+        mMuralTexture = cv::Mat(rows, cols, type);
+        in.read(reinterpret_cast<char*>(mMuralTexture.data), static_cast<std::streamsize>(mMuralTexture.total() * mMuralTexture.elemSize()));
+    }
+
+    mInitialized = true;
+    mMeshDirty = true;
+    mTextureDirty = true;
+    mIndicesUploaded = false;
+}
+
 void SurfaceMesh::updateTexture(const cv::Mat& color, const std::vector<glm::vec2>& camPoints) {
     // Piecewise warp: Optimized to warp a SUBSET of patches directly into mMuralTexture to save battery.
     int totalPatches = (MESH_GRID_DIM - 1) * (MESH_GRID_DIM - 1);
-    int patchesToProcess = 32;
+    int patchesToProcess = 128; // Increased for higher resolution grid
 
     for (int p = 0; p < patchesToProcess; ++p) {
         int patchIdx = mNextTexturePatchIndex % totalPatches;

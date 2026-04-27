@@ -39,6 +39,7 @@ public:
 
     int getSplatCount() const;
     int getImmutableSplatCount() const;
+    void getAnchorCandidates(std::vector<Splat>& out, float threshold, int maxCount) const;
     void optimize(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat);
     float getVisibleConfidenceAvg() const;
     float getGlobalConfidenceAvg() const;

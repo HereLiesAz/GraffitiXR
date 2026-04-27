@@ -56,6 +56,7 @@ public:
     int getSplatCount() const { return mVoxelHash.getSplatCount(); }
     int getImmutableSplatCount() const { return mVoxelHash.getImmutableSplatCount(); }
     void getConfidenceAvgs(float& outVisible, float& outGlobal) const;
+    void getAnchorCandidates(std::vector<Splat>& out, float threshold, int maxCount) const { mVoxelHash.getAnchorCandidates(out, threshold, maxCount); }
     void setSplatsVisible(bool visible) { mSplatsVisible = visible; }
     float getPaintingProgress() const { return mPaintingProgress.load(std::memory_order_relaxed); }
 

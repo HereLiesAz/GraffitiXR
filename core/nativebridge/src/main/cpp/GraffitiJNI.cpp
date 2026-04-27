@@ -59,6 +59,23 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 
 extern "C" {
 
+JNIEXPORT jfloatArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetAnchorCandidates(
+        JNIEnv* env, jobject thiz, jfloat threshold, jint maxCount) {
+    if (!gSlamEngine) return nullptr;
+    std::vector<Splat> candidates;
+    gSlamEngine->getAnchorCandidates(candidates, threshold, maxCount);
+    if (candidates.empty()) return nullptr;
+
+    jfloatArray result = env->NewFloatArray(candidates.size() * 3);
+    std::vector<float> flat;
+    for (const auto& s : candidates) {
+        flat.push_back(s.x); flat.push_back(s.y); flat.push_back(s.z);
+    }
+    env->SetFloatArrayRegion(result, 0, flat.size(), flat.data());
+    return result;
+}
+
 JNIEXPORT jfloat JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetVisibleConfidenceAvg(JNIEnv* env, jobject thiz) {
     if (gSlamEngine) {

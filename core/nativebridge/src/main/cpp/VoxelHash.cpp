@@ -247,6 +247,18 @@ int VoxelHash::getImmutableSplatCount() const {
     for (const auto& s : mSplatData) if (s.confidence >= 0.95f) c++;
     return c;
 }
+
+void VoxelHash::getAnchorCandidates(std::vector<Splat>& out, float threshold, int maxCount) const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    out.clear();
+    for (const auto& s : mSplatData) {
+        if (s.confidence >= threshold) {
+            out.push_back(s);
+            if ((int)out.size() >= maxCount) break;
+        }
+    }
+}
+
 float VoxelHash::getVisibleConfidenceAvg() const { return 0.5f; }
 float VoxelHash::getGlobalConfidenceAvg() const { return 0.5f; }
 void VoxelHash::addKeyframe(const VoxelFrame& kf) {

@@ -733,7 +733,15 @@ class ArViewModel @Inject constructor(
             }
         }
 
+        // --- ARCore democratic consensus initialization ---
+        // Construct ARCore anchor at the hit location (or fallback)
+        val anchor = s.createAnchor(com.google.ar.core.Pose(
+            floatArrayOf(anchorModelMatrix[12], anchorModelMatrix[13], anchorModelMatrix[14]),
+            floatArrayOf(0f, 0f, 0f, 1f) // Identity for now, or extract from matrix
+        ))
+
         slamManager.updateAnchorTransform(anchorModelMatrix)
+        renderer?.setPrimaryAnchor(anchor)
 
         _uiState.value.targetPhysicalExtent?.let { (halfW, halfH) ->
             renderer?.updateOverlayExtent(halfW, halfH)
