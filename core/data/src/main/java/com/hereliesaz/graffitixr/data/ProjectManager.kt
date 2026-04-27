@@ -64,6 +64,13 @@ class ProjectManager @Inject constructor(
         return File(root, "map.bin").absolutePath
     }
 
+    /**
+     * Returns the path to the auxiliary mesh persistence file used by SurfaceMesh.
+     */
+    fun getMeshPath(context: Context, projectId: String): String {
+        return getMapPath(context, projectId) + ".mesh"
+    }
+
     fun getCloudPointsPath(context: Context, projectId: String): String {
         val root = File(context.filesDir, "projects/$projectId")
         if (!root.exists()) root.mkdirs()

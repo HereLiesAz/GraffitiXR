@@ -162,7 +162,7 @@ class ArViewModel @Inject constructor(
     @Volatile
     private var pendingTapPosition: Pair<Float, Float>? = null
 
-    private val visitedSectors = BooleanArray(12)
+    private val visitedSectors = BooleanArray(36) // 10 degree sectors for higher resolution feedback
 
     private val eraseUndoStack = ArrayDeque<Bitmap>()
     private val eraseRedoStack = ArrayDeque<Bitmap>()
@@ -250,11 +250,7 @@ class ArViewModel @Inject constructor(
             // MANDATORY: We force REQUIRE_AND_USE if the device supports it.
             val stereoFilter = CameraConfigFilter(s).apply {
                 facingDirection = CameraConfig.FacingDirection.BACK
-                try {
-                    setStereoCameraUsage(EnumSet.of(CameraConfig.StereoCameraUsage.REQUIRE_AND_USE))
-                } catch (e: Exception) {
-                    Timber.w(e, "Stereo camera usage filter not supported")
-                }
+                setStereoCameraUsage(EnumSet.of(CameraConfig.StereoCameraUsage.REQUIRE_AND_USE))
             }
             
             val stereoConfigs = s.getSupportedCameraConfigs(stereoFilter)
@@ -336,9 +332,15 @@ class ArViewModel @Inject constructor(
 
     fun saveMapBlocking() {
         val projectId = loadedProjectId ?: return
-        val path = projectManager.getMapPath(appContext, projectId)
-        slamManager.saveModel(path)
+        val mapPath = projectManager.getMapPath(appContext, projectId)
+        val cloudPath = projectManager.getCloudPointsPath(appContext, projectId)
+        
+        // Save both native engine state (Voxel + Mesh) and ARCore Point Cloud
+        slamManager.saveModel(mapPath)
+        renderer?.saveCloudPoints(cloudPath)
+        
         lastSavedSplatCount.set(slamManager.getSplatCount())
+        Timber.d("Atomic persistence complete: Saved all mapping components for $projectId")
     }
 
     fun saveCloudPointsBlocking() {
@@ -397,13 +399,21 @@ class ArViewModel @Inject constructor(
 
     private fun loadMapIfExists() {
         val projectId = loadedProjectId ?: return
-        val path = projectManager.getMapPath(appContext, projectId)
-        if (File(path).exists()) {
+        val mapPath = projectManager.getMapPath(appContext, projectId)
+        val cloudPath = projectManager.getCloudPointsPath(appContext, projectId)
+        
+        if (File(mapPath).exists() || File(cloudPath).exists()) {
             if (projectRepository.currentProject.value?.id == loadedProjectId && slamManager.getSplatCount() > 0) return
             
             viewModelScope.launch(Dispatchers.IO) {
-                slamManager.loadModel(path)
-                lastSavedSplatCount.set(slamManager.getSplatCount())
+                if (File(mapPath).exists()) {
+                    slamManager.loadModel(mapPath)
+                    lastSavedSplatCount.set(slamManager.getSplatCount())
+                }
+                if (File(cloudPath).exists()) {
+                    renderer?.scheduleCloudPointsLoad(cloudPath)
+                }
+                Timber.d("Atomic persistence complete: Loaded available mapping components for $projectId")
             }
         }
     }
@@ -455,13 +465,14 @@ class ArViewModel @Inject constructor(
     ) {
         val progress = if (isTracking) slamManager.getPaintingProgress() else _uiState.value.paintingProgress
 
-        val sector = (((cameraYaw % 360f) + 360f) % 360f / 30f).toInt().coerceIn(0, 11)
+        val sector = (((cameraYaw % 360f) + 360f) % 360f / 10f).toInt().coerceIn(0, 35)
         visitedSectors[sector] = true
         val sectorsCovered = visitedSectors.count { it }
+        val mappingProgress = sectorsCovered / 36f
 
         _uiState.update { state ->
             val newPhase = when (state.scanPhase) {
-                ScanPhase.AMBIENT -> if (sectorsCovered >= 6) ScanPhase.WALL else ScanPhase.AMBIENT
+                ScanPhase.AMBIENT -> if (sectorsCovered >= 18) ScanPhase.WALL else ScanPhase.AMBIENT
                 ScanPhase.WALL -> if (splatCount >= 30_000 || state.isAnchorEstablished) ScanPhase.COMPLETE else ScanPhase.WALL
                 ScanPhase.COMPLETE -> ScanPhase.COMPLETE
             }
@@ -472,13 +483,14 @@ class ArViewModel @Inject constructor(
                 isDepthApiSupported = isDepthApiSupported,
                 paintingProgress = progress,
                 scanPhase = newPhase,
-                ambientSectorsCovered = sectorsCovered,
+                ambientSectorsCovered = sectorsCovered / 3, // Keep backward compatibility for 30 degree UI units if needed
+                worldMappingProgress = mappingProgress,
                 scanHint = computeScanHint(
                     isTracking = isTracking,
                     splatCount = splatCount,
                     lightLevel = state.lightLevel,
                     scanPhase = newPhase,
-                    sectorsCovered = sectorsCovered
+                    sectorsCovered = sectorsCovered / 3
                 ),
                 distanceToAnchorMeters = distanceToAnchorMeters,
                 anchorRelativeDirection = anchorRelativeDirection,

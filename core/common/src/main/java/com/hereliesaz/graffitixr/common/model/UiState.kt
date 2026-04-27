@@ -92,6 +92,8 @@ data class ArUiState(
     val scanPhase: ScanPhase = ScanPhase.AMBIENT,
     // How many 30° sectors (0..12) the user has swept during the AMBIENT phase.
     val ambientSectorsCovered: Int = 0,
+    // 360° angular coverage progress [0,1].
+    val worldMappingProgress: Float = 0f,
 
     // Erase history — whether undo/redo are available during the REVIEW mark-removal step.
     val canUndoErase: Boolean = false,

@@ -585,6 +585,8 @@ class MainActivity : ComponentActivity() {
                                     hint = arUiState.scanHint,
                                     scanPhase = arUiState.scanPhase,
                                     ambientSectorsCovered = arUiState.ambientSectorsCovered,
+                                    worldMappingProgress = arUiState.worldMappingProgress,
+                                    muralMethod = arUiState.muralMethod,
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
                                         .padding(bottom = 96.dp)

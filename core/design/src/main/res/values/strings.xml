@@ -399,6 +399,7 @@
     <string name="status_scan_surfaces">Scan surfaces around you.</string>
     <string name="status_tap_surface">Tap a surface to place anchor.</string>
     <string name="status_looking_grid">Looking for your Grid...</string>
+    <string name="status_world_mapped">WORLD MAPPED: %1$d%%</string>
     <string name="status_ready">Ready. (%1$d pts)</string>
     <string name="unlock_hint">Tap 4 times to unlock</string>
 
