@@ -514,7 +514,7 @@ class MainActivity : ComponentActivity() {
                                     else               -> null
                                 }
                                 val key = "tut_${editorUiState.editorMode.name.lowercase()}"
-                                if (tutorialId != null && key !in completedTutorials) {
+                                if (tutorialId != null) {
                                     tutorialController.startTutorial(tutorialId)
                                     settingsViewModel.markTutorialComplete(key)
                                 }
@@ -546,19 +546,19 @@ class MainActivity : ComponentActivity() {
                         Box(Modifier.fillMaxSize().onSizeChanged { fullSize = it }) {
                             AzNavHost(startDestination = EditorMode.TRACE.name) {
                                 composable(EditorMode.AR.name) {
-                                    ModeOnboarding(EditorMode.AR, showLibrary, editorViewModel)
+                                    ModeOnboarding(EditorMode.AR, showLibrary, editorViewModel, arUiState)
                                     EditorOverlay(editorViewModel, mainUiState, strings)
                                 }
                                 composable(EditorMode.OVERLAY.name) {
-                                    OverlayScreen(editorViewModel, showLibrary)
+                                    OverlayScreen(editorViewModel, showLibrary, arUiState)
                                     EditorOverlay(editorViewModel, mainUiState, strings)
                                 }
                                 composable(EditorMode.MOCKUP.name) {
-                                    MockupScreen(editorViewModel, showLibrary)
+                                    MockupScreen(editorViewModel, showLibrary, arUiState)
                                     EditorOverlay(editorViewModel, mainUiState, strings)
                                 }
                                 composable(EditorMode.TRACE.name) {
-                                    TraceScreen(editorViewModel, showLibrary)
+                                    TraceScreen(editorViewModel, showLibrary, arUiState)
                                     EditorOverlay(editorViewModel, mainUiState, strings)
                                 }
                             }
@@ -961,16 +961,22 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun ModeOnboarding(mode: EditorMode, isLibraryVisible: Boolean, viewModel: EditorViewModel) {
+    private fun ModeOnboarding(mode: EditorMode, isLibraryVisible: Boolean, viewModel: EditorViewModel, arUiState: ArUiState) {
         val context = LocalContext.current
         val uiState by viewModel.uiState.collectAsState()
         val onboardingManager = remember(context) { OnboardingManager(context) }
         var showOnboarding by remember(mode) { mutableStateOf(false) }
 
-        LaunchedEffect(isLibraryVisible, uiState.editorMode, mode) {
-            if (!isLibraryVisible && uiState.editorMode == mode && onboardingManager.isFirstTime(mode.name)) {
-                showOnboarding = true
-                onboardingManager.markAsSeen(mode.name)
+        LaunchedEffect(isLibraryVisible, uiState.editorMode, mode, arUiState.isAnchorEstablished) {
+            if (!isLibraryVisible && uiState.editorMode == mode) {
+                val noLayers = uiState.layers.isEmpty()
+                val noAnchor = !arUiState.isAnchorEstablished
+                val isScreenEmpty = noLayers && (mode != EditorMode.AR || noAnchor)
+
+                if (isScreenEmpty || onboardingManager.isFirstTime(mode.name)) {
+                    showOnboarding = true
+                    onboardingManager.markAsSeen(mode.name)
+                }
             }
         }
 

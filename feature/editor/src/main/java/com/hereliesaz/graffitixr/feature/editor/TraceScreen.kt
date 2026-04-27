@@ -11,21 +11,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.data.OnboardingManager
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.design.components.OnboardingDialog
 
 @Composable
-fun TraceScreen(viewModel: EditorViewModel, isLibraryVisible: Boolean) {
+fun TraceScreen(viewModel: EditorViewModel, isLibraryVisible: Boolean, arUiState: ArUiState) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val onboardingManager = remember(context) { OnboardingManager(context) }
     var showOnboarding by remember { mutableStateOf(false) }
 
-    LaunchedEffect(isLibraryVisible, uiState.editorMode) {
+    LaunchedEffect(isLibraryVisible, uiState.editorMode, arUiState.isAnchorEstablished) {
         // Only show if library is hidden AND we are actually in TRACE mode in the ViewModel
         if (!isLibraryVisible && uiState.editorMode == EditorMode.TRACE) {
-            if (onboardingManager.isFirstTime(EditorMode.TRACE.name)) {
+            val isScreenEmpty = uiState.layers.isEmpty()
+            if (isScreenEmpty || onboardingManager.isFirstTime(EditorMode.TRACE.name)) {
                 showOnboarding = true
                 onboardingManager.markAsSeen(EditorMode.TRACE.name)
             }
