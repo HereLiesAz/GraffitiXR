@@ -72,6 +72,7 @@ import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.*
 import com.hereliesaz.aznavrail.tutorial.LocalAzTutorialController
 import com.hereliesaz.graffitixr.common.model.ArScanMode
+import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.model.EditorMode
@@ -1807,6 +1808,8 @@ private fun ScanCoachingOverlay(
     modifier: Modifier = Modifier,
     scanPhase: ScanPhase = ScanPhase.AMBIENT,
     ambientSectorsCovered: Int = 0,
+    worldMappingProgress: Float = 0f,
+    muralMethod: MuralMethod = MuralMethod.VOXEL_HASH
 ) {
     val phaseLabel = when (scanPhase) {
         ScanPhase.AMBIENT -> stringResource(DesignR.string.scan_step_1)
@@ -1862,7 +1865,6 @@ private fun ScanCoachingOverlay(
                     Text(
                         text = phaseLabel,
                         color = Color.Cyan,
-
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -1871,17 +1873,18 @@ private fun ScanCoachingOverlay(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (scanPhase == ScanPhase.AMBIENT) {
-                        LinearProgressIndicator(
-                            progress = { (ambientSectorsCovered / 12f).coerceIn(0f, 1f) },
-                            modifier = Modifier.width(100.dp),
+                        RadarMappingIndicator(progress = worldMappingProgress)
+                        
+                        Text(
+                            text = "${(worldMappingProgress * 100).toInt()}%",
                             color = Color.Cyan,
-                            trackColor = Color.White.copy(alpha = 0.2f)
+                            fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "${ambientSectorsCovered * 30}° / 360°",
+                            text = "360° MAPPED",
                             color = Color.LightGray,
-
-                            )
+                            fontSize = 12.sp
+                        )
                     } else {
                         LinearProgressIndicator(
                             progress = { (splatCount / 50_000f).coerceIn(0f, 1f) },
@@ -1900,6 +1903,38 @@ private fun ScanCoachingOverlay(
             }
         }
     }
+}
+
+@Composable
+private fun RadarMappingIndicator(progress: Float) {
+    Box(
+        modifier = Modifier
+            .size(24.dp)
+            .drawBehind {
+                val strokeWidth = 2.dp.toPx()
+                // Background circle
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.2f),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth)
+                )
+                // Progress arc
+                drawArc(
+                    color = Color.Cyan,
+                    startAngle = -90f,
+                    sweepAngle = 360f * progress,
+                    useCenter = false,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(
+                        width = strokeWidth,
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                )
+                // Center dot
+                drawCircle(
+                    color = Color.Cyan,
+                    radius = 2.dp.toPx()
+                )
+            }
+    )
 }
 
 @Composable
