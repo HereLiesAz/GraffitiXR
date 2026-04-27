@@ -90,13 +90,14 @@ void MobileGS::draw() {
     glm::mat4 P = glm::make_mat4(mProjMatrix);
     glm::mat4 mvp = P * V;
 
-    if (mScanMode == 1) { // MURAL
-        if (mSplatsVisible) {
-            if (mMuralMethod == 0) { // VOXEL_HASH
-                mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight);
-            } else { // SURFACE_MESH
-                mSurfaceMesh.draw(mvp);
-            }
+    if (mSplatsVisible) {
+        if (mMuralMethod == 0) { // VOXEL_HASH
+            mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight);
+        } else if (mMuralMethod == 1) { // SURFACE_MESH
+            mSurfaceMesh.draw(mvp);
+        } else if (mMuralMethod == 2) { // CLOUD_OFFSET
+            // Use VoxelHash renderer as fallback for Point Cloud Offset visualization
+            mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight);
         }
     }
 }
@@ -120,21 +121,24 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     if (isYuv) cv::cvtColor(color, colorRGB, cv::COLOR_YUV2RGB_NV21);
     else colorRGB = color;
 
-    if (mScanMode == 1) { // MURAL
-        mFrameCounter++;
-        if (mMuralMethod == 0) { // VOXEL_HASH
-            mVoxelHash.update(depth, colorRGB, viewMat, projMat, mVoxelSize, confidence);
+    // Universal Ingestion: Build the Voxel Map in ALL modes to enable Snap-Back relocalization.
+    mVoxelHash.update(depth, colorRGB, viewMat, projMat, mVoxelSize, confidence);
 
-            if (mFrameCounter % 30 == 0) { // Throttled keyframes
-                VoxelFrame kf;
-                kf.depth = depth.clone(); kf.color = colorRGB.clone();
-                memcpy(kf.viewMatrix, viewMat, 16 * sizeof(float));
-                memcpy(kf.projMatrix, projMat, 16 * sizeof(float));
-                mVoxelHash.addKeyframe(kf);
-            }
-        } else { // SURFACE_MESH
-            mSurfaceMesh.update(depth, colorRGB, viewMat, projMat, mAnchorMatrix, mLightLevel);
+    if (mScanMode == 0) return; // Canvas mode only needs the voxel map for background recovery.
+
+    mFrameCounter++;
+    if (mMuralMethod == 0) { // VOXEL_HASH
+        if (mFrameCounter % 30 == 0) { // Throttled keyframes
+            VoxelFrame kf;
+            kf.depth = depth.clone(); kf.color = colorRGB.clone();
+            memcpy(kf.viewMatrix, viewMat, 16 * sizeof(float));
+            memcpy(kf.projMatrix, projMat, 16 * sizeof(float));
+            mVoxelHash.addKeyframe(kf);
         }
+    } else if (mMuralMethod == 1) { // SURFACE_MESH
+        mSurfaceMesh.update(depth, colorRGB, viewMat, projMat, mAnchorMatrix, mLightLevel);
+    } else if (mMuralMethod == 2) { // CLOUD_OFFSET
+        // Cloud Offset mode leverages the mVoxelHash map updated above.
     }
 }
 

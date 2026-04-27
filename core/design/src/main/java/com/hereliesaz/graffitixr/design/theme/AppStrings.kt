@@ -47,6 +47,7 @@ fun rememberAppStrings(): AppStrings {
             voxelHash = stringResource(R.string.settings_scan_mode_voxel_hash),
             muralMethod = stringResource(R.string.settings_mural_method_label),
             surfaceMesh = stringResource(R.string.settings_scan_mode_surface_mesh),
+            cloudOffset = stringResource(R.string.settings_scan_mode_cloud_offset),
             anchorBoundary = stringResource(R.string.settings_anchor_boundary_label),
             units = stringResource(R.string.settings_units_label),
             imperial = stringResource(R.string.settings_units_imperial),
@@ -170,6 +171,7 @@ fun rememberAppStrings(): AppStrings {
             burn = R.string.help_burn,
             iso = R.string.help_iso,
             line = R.string.help_line,
+            cloudOffset = R.string.help_cloud_offset,
             helpLayer = R.string.help_help_layer
         ),
         adj = AppStrings.Adjustments(
@@ -235,6 +237,7 @@ data class AppStrings(
         val voxelHash: String,
         val muralMethod: String,
         val surfaceMesh: String,
+        val cloudOffset: String,
         val anchorBoundary: String,
         val units: String,
         val imperial: String,
@@ -358,6 +361,7 @@ data class AppStrings(
         val burn: Int,
         val iso: Int,
         val line: Int,
+        val cloudOffset: Int,
         val helpLayer: Int
     )
     data class Adjustments(

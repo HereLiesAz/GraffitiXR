@@ -474,7 +474,15 @@ class ArViewModel @Inject constructor(
 
         _uiState.update { state ->
             val newPhase = when (state.scanPhase) {
-                ScanPhase.AMBIENT -> if (sectorsCovered >= 18) ScanPhase.WALL else ScanPhase.AMBIENT
+                ScanPhase.AMBIENT -> {
+                    // Task: Canvas mode (CLOUD_POINTS) skips the ambient 360-scan.
+                    // All MURAL modes MUST complete the 360-scan for spatial memory.
+                    if (state.arScanMode == ArScanMode.CLOUD_POINTS || sectorsCovered >= 36) {
+                        ScanPhase.WALL
+                    } else {
+                        ScanPhase.AMBIENT
+                    }
+                }
                 ScanPhase.WALL -> if (splatCount >= 30_000 || state.isAnchorEstablished) ScanPhase.COMPLETE else ScanPhase.WALL
                 ScanPhase.COMPLETE -> ScanPhase.COMPLETE
             }

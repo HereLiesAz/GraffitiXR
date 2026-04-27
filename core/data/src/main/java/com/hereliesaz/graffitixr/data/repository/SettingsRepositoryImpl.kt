@@ -66,6 +66,7 @@ class SettingsRepositoryImpl @Inject constructor(
         .map { preferences ->
             when (preferences[MURAL_METHOD]) {
                 MuralMethod.SURFACE_MESH.name -> MuralMethod.SURFACE_MESH
+                MuralMethod.CLOUD_OFFSET.name -> MuralMethod.CLOUD_OFFSET
                 else -> MuralMethod.VOXEL_HASH // default
             }
         }

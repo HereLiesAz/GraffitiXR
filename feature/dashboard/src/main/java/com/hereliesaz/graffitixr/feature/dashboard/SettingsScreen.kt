@@ -232,6 +232,7 @@ fun SettingsScreen(
                                 val muralMethodValue = when (muralMethod) {
                                     MuralMethod.VOXEL_HASH -> strings.settings.voxelHash
                                     MuralMethod.SURFACE_MESH -> strings.settings.surfaceMesh
+                                    MuralMethod.CLOUD_OFFSET -> strings.settings.cloudOffset
                                 }
                                 SettingsItem(
                                     label = strings.settings.muralMethod,

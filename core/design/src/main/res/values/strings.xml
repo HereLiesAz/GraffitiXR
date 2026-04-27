@@ -428,6 +428,7 @@
     <string name="settings_scan_mode_voxel_hash">Voxel Hash</string>
     <string name="settings_mural_method_label">Mural Engine</string>
     <string name="settings_scan_mode_surface_mesh">Surface Mesh</string>
+    <string name="settings_scan_mode_cloud_offset">Cloud Offset</string>
     <string name="settings_anchor_boundary_label">Show Anchor Boundary</string>
     <string name="settings_units_label">Distance Units</string>
     <string name="settings_units_imperial">Imperial (ft)</string>
@@ -497,6 +498,8 @@
     <string name="help_target_host">Target Management: Tools for AR anchors. Instructions: Tap to access tools for creating or re-aligning the mural\'s position.</string>
     <!-- Scan Resolution help text. -->
     <string name="help_scan_mode_toggle">Scan Resolution: Switch between Mural (large scale) and Canvas (small scale). Mural uses Voxel-based tracking for walls; Canvas uses Point Clouds for detailed desk-scale art.</string>
+    <!-- Cloud Offset help text. -->
+    <string name="help_cloud_offset">Anchor Offset Handoff: High-precision point cloud tracking for large-scale murals. Instructions: Complete 360-scan, then tap to place anchor.</string>
     <!-- Create Anchor help text. -->
     <string name="help_create">Create Anchor: Photograph a mark on the wall to lock projection. Instructions: Point at a distinct texture and tap. The app will track this mark.</string>
     <!-- Layer Management help text. -->
