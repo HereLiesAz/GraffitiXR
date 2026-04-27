@@ -255,47 +255,80 @@ private fun UnwarpOverlay(
     val imgY = (boxH - imgH) / 2f
 
     val density = LocalDensity.current
-
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        if (points.size == 4) {
-            val path = Path().apply {
-                moveTo(imgX + points[0].x * imgW, imgY + points[0].y * imgH)
-                lineTo(imgX + points[1].x * imgW, imgY + points[1].y * imgH)
-                lineTo(imgX + points[2].x * imgW, imgY + points[2].y * imgH)
-                lineTo(imgX + points[3].x * imgW, imgY + points[3].y * imgH)
-                close()
-            }
-            drawPath(path, Color.Cyan, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4f))
-        }
-    }
     
-    points.forEachIndexed { index, point ->
-        val screenX = imgX + point.x * imgW
-        val screenY = imgY + point.y * imgH
-        
-        Box(
-            modifier = Modifier
-                .offset(
-                    x = with(density) { (screenX).toDp() } - 20.dp,
-                    y = with(density) { (screenY).toDp() } - 20.dp
+    // Prevent stale captures during drag gestures
+    val currentPoints by rememberUpdatedState(points)
+    val currentOnUpdate by rememberUpdatedState(onUpdatePoints)
+
+    var activePointIndex by remember { mutableIntStateOf(-1) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(imgW, imgH) {
+                detectDragGestures(
+                    onDragStart = { pos ->
+                        // Hit-test to find which corner is being grabbed
+                        val thresholdPx = with(density) { 40.dp.toPx() }
+                        activePointIndex = currentPoints.indexOfFirst { p ->
+                            val sx = imgX + p.x * imgW
+                            val sy = imgY + p.y * imgH
+                            val dist = Math.sqrt(((pos.x - sx) * (pos.x - sx) + (pos.y - sy) * (pos.y - sy)).toDouble())
+                            dist < thresholdPx
+                        }
+                    },
+                    onDrag = { change, dragAmount ->
+                        if (activePointIndex != -1) {
+                            change.consume()
+                            val nx = dragAmount.x / imgW
+                            val ny = dragAmount.y / imgH
+                            
+                            val newList = currentPoints.toMutableList()
+                            val p = newList[activePointIndex]
+                            newList[activePointIndex] = Offset(
+                                (p.x + nx).coerceIn(0f, 1f),
+                                (p.y + ny).coerceIn(0f, 1f)
+                            )
+                            currentOnUpdate(newList)
+                        }
+                    },
+                    onDragEnd = { activePointIndex = -1 },
+                    onDragCancel = { activePointIndex = -1 }
                 )
-                .size(40.dp)
-                .background(Color.White.copy(alpha = 0.5f), CircleShape)
-                .border(2.dp, Color.Cyan, CircleShape)
-                .pointerInput(index) {
-                    detectDragGestures { change, dragAmount ->
-                        change.consume()
-                        val nx = dragAmount.x / imgW
-                        val ny = dragAmount.y / imgH
-                        val newList = points.toMutableList()
-                        newList[index] = Offset(
-                            (newList[index].x + nx).coerceIn(0f, 1f),
-                            (newList[index].y + ny).coerceIn(0f, 1f)
-                        )
-                        onUpdatePoints(newList)
-                    }
+            }
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            if (currentPoints.size == 4) {
+                val path = Path().apply {
+                    moveTo(imgX + currentPoints[0].x * imgW, imgY + currentPoints[0].y * imgH)
+                    lineTo(imgX + currentPoints[1].x * imgW, imgY + currentPoints[1].y * imgH)
+                    lineTo(imgX + currentPoints[2].x * imgW, imgY + currentPoints[2].y * imgH)
+                    lineTo(imgX + currentPoints[3].x * imgW, imgY + currentPoints[3].y * imgH)
+                    close()
                 }
-        )
+                drawPath(path, Color.Cyan, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4f))
+            }
+        }
+        
+        currentPoints.forEachIndexed { index, point ->
+            val screenX = imgX + point.x * imgW
+            val screenY = imgY + point.y * imgH
+            
+            Box(
+                modifier = Modifier
+                    .offset(
+                        x = with(density) { screenX.toDp() } - 20.dp,
+                        y = with(density) { screenY.toDp() } - 20.dp
+                    )
+                    .size(40.dp)
+                    .background(
+                        if (activePointIndex == index) Color.Cyan.copy(alpha = 0.5f) 
+                        else Color.White.copy(alpha = 0.5f), 
+                        CircleShape
+                    )
+                    .border(2.dp, Color.Cyan, CircleShape)
+            )
+        }
     }
 }
 

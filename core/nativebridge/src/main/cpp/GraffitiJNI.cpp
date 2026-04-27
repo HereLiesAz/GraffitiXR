@@ -546,6 +546,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArtworkFingerpr
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
         JNIEnv* env, jobject thiz, jobject bitmap) {
+    if (!gSlamEngine) return;
     cv::Mat frame;
     bitmapToMat(env, bitmap, frame);
     if (frame.empty()) return;
@@ -578,6 +579,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
 JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetKeypoints(
         JNIEnv* env, jobject thiz, jobject bitmap) {
+    if (!gSlamEngine) return nullptr;
     cv::Mat frame;
     bitmapToMat(env, bitmap, frame);
     if (frame.empty()) return nullptr;

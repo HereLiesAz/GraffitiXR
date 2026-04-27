@@ -19,6 +19,7 @@ import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.ScanPhase
+import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.common.util.eraseColorBlob
 import com.hereliesaz.graffitixr.core.collaboration.CollaborationManager
@@ -170,6 +171,7 @@ class ArViewModel @Inject constructor(
     private val MAX_ERASE_UNDO = 10
 
     init {
+        NativeLibLoader.loadAll()
         viewModelScope.launch {
             projectRepository.currentProject.collect { project ->
                 if (project != null) {

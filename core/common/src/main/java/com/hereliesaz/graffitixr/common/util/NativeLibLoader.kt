@@ -2,19 +2,21 @@ package com.hereliesaz.graffitixr.common.util
 
 import android.util.Log
 import org.opencv.android.OpenCVLoader
+import java.util.concurrent.atomic.AtomicBoolean
 
 object NativeLibLoader {
-    private var isLoaded = false
+    private val isLoaded = AtomicBoolean(false)
 
     @Synchronized
     fun loadAll() {
-        if (isLoaded) return
+        if (isLoaded.get()) return
         
         try {
+            // Step 1: Ensure OpenCV is loaded. GraffitiXR depends on its native symbols.
             // Priority 1: Try exact versioned name (v4)
             // Priority 2: Try generic name
             // Priority 3: Try OpenCVLoader.initLocal()
-            val loadSuccess = try {
+            val opencvLoaded = try {
                 System.loadLibrary("opencv_java4")
                 Log.i("NativeLibLoader", "libopencv_java4.so loaded directly.")
                 true
@@ -29,17 +31,18 @@ object NativeLibLoader {
                 }
             }
 
-            if (!loadSuccess) {
-                val errorMsg = "OpenCV initialization failed via all methods! Java JNI symbols will be missing."
+            if (!opencvLoaded) {
+                val errorMsg = "CRITICAL: OpenCV native symbols could not be registered."
                 Log.e("NativeLibLoader", errorMsg)
                 throw RuntimeException(errorMsg)
             }
 
-            // Load our primary C++ engine
+            // Step 2: Load our primary C++ engine (depends on symbols from Step 1)
             System.loadLibrary("graffitixr")
             Log.i("NativeLibLoader", "libgraffitixr.so loaded successfully.")
             
-            isLoaded = true
+            // Only set to true if BOTH loaded successfully
+            isLoaded.set(true)
         } catch (e: UnsatisfiedLinkError) {
             val errorMsg = "CRITICAL: Native libraries could not be loaded!"
             Log.e("NativeLibLoader", errorMsg, e)

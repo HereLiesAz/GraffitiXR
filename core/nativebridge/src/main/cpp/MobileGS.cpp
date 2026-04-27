@@ -232,6 +232,7 @@ void MobileGS::getPersistentMesh(std::vector<float>& outVertices, std::vector<fl
 
 void MobileGS::relocThreadFunc() {
     setpriority(PRIO_PROCESS, 0, 10); // Standard background priority
+    JniThreadAttacher attacher;
     while (mRelocRunning) {
         cv::Mat frame;
         {
@@ -299,6 +300,7 @@ void MobileGS::setArCoreTrackingState(bool t) { mIsArCoreTracking = t; }
 
 void MobileGS::optimizeThreadFunc() {
     setpriority(PRIO_PROCESS, 0, 19);
+    JniThreadAttacher attacher;
     while (mOptimizeRunning) {
         FrameData latestFrame;
         bool hasFrame = false;
