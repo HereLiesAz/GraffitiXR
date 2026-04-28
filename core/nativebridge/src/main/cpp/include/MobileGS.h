@@ -114,7 +114,8 @@ private:
     bool mIsArCoreTracking = false;
 
     cv::Ptr<cv::ORB> mFeatureDetector;
-    cv::Ptr<cv::DescriptorMatcher> mMatcher;
+    cv::Ptr<cv::DescriptorMatcher> mMatcher;    // BruteForce-Hamming for ORB (CV_8U)
+    cv::Ptr<cv::DescriptorMatcher> mL2Matcher;  // BruteForce-L2 for SuperPoint (CV_32F)
     SuperPointDetector mSuperPoint;
 
     cv::Mat mWallDescriptors;

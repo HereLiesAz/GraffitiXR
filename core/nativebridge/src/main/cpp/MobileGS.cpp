@@ -46,6 +46,7 @@ void MobileGS::initialize(int width, int height) {
     mScreenHeight = height;
     mFeatureDetector = cv::ORB::create(500);
     mMatcher = cv::DescriptorMatcher::create("BruteForce-Hamming");
+    mL2Matcher = cv::DescriptorMatcher::create("BruteForce-L2");
 
     memset(mViewMatrix, 0, sizeof(mViewMatrix));
     memset(mProjMatrix, 0, sizeof(mProjMatrix));
@@ -249,14 +250,28 @@ void MobileGS::relocThreadFunc() {
 
         if (frame.empty() || mWallDescriptors.empty() || !mRelocEnabled) continue;
 
+        // Convert RGB frame to grayscale for SuperPoint
+        cv::Mat gray;
+        cv::cvtColor(frame, gray, cv::COLOR_RGB2GRAY);
+
         std::vector<cv::KeyPoint> kps;
         cv::Mat descs;
-        mFeatureDetector->detectAndCompute(frame, cv::noArray(), kps, descs);
+        // Use SuperPoint if loaded and wall fingerprint type matches (float) or is absent
+        bool useSuperPoint = mSuperPoint.isLoaded() &&
+            (mWallDescriptors.empty() || mWallDescriptors.type() == CV_32F);
+        if (useSuperPoint && !mSuperPoint.detect(gray, kps, descs)) {
+            useSuperPoint = false;
+        }
+        if (!useSuperPoint) {
+            mFeatureDetector->detectAndCompute(gray, cv::noArray(), kps, descs);
+        }
 
         if (descs.empty()) continue;
 
+        cv::Ptr<cv::DescriptorMatcher>& activeMatcher =
+            (descs.type() == CV_32F) ? mL2Matcher : mMatcher;
         std::vector<std::vector<cv::DMatch>> matches;
-        mMatcher->knnMatch(descs, mWallDescriptors, matches, 2);
+        activeMatcher->knnMatch(descs, mWallDescriptors, matches, 2);
 
         std::vector<cv::Point2f> imgPts;
         std::vector<cv::Point3f> objPts;
