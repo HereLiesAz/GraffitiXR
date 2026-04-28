@@ -1,6 +1,7 @@
 #pragma once
 #include <opencv2/opencv.hpp>
 #include "SuperPointDetector.h"
+#include "LowLightEnhancer.h"
 #include <mutex>
 #include <vector>
 #include <unordered_map>
@@ -46,6 +47,7 @@ public:
     FingerprintData generateFingerprint(const cv::Mat& image, const cv::Mat& mask, const uint8_t* depthData, int depthW, int depthH, int depthStride, const float* intrinsics, const float* viewMat);
 
     bool loadSuperPoint(const std::vector<uchar>& onnxBytes);
+    bool loadLowLightEnhancer(const std::vector<uchar>& onnxBytes);
     void clearMap();
     void pruneByConfidence(float threshold);
     void setArScanMode(int mode);
@@ -117,6 +119,8 @@ private:
     cv::Ptr<cv::DescriptorMatcher> mMatcher;    // BruteForce-Hamming for ORB (CV_8U)
     cv::Ptr<cv::DescriptorMatcher> mL2Matcher;  // BruteForce-L2 for SuperPoint (CV_32F)
     SuperPointDetector mSuperPoint;
+    LowLightEnhancer mEnhancer;
+    static constexpr float kLowLightThreshold = 0.35f;
 
     cv::Mat mWallDescriptors;
     std::vector<cv::Point3f> mWallKeypoints3D;

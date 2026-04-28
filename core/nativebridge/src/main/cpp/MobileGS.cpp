@@ -250,9 +250,14 @@ void MobileGS::relocThreadFunc() {
 
         if (frame.empty() || mWallDescriptors.empty() || !mRelocEnabled) continue;
 
-        // Convert RGB frame to grayscale for SuperPoint
+        // Optionally enhance the RGB frame under low light before grayscale conversion
+        cv::Mat workFrame = frame;
+        if (mEnhancer.isLoaded() && mLightLevel < kLowLightThreshold) {
+            cv::Mat enhanced;
+            if (mEnhancer.enhance(frame, enhanced)) workFrame = enhanced;
+        }
         cv::Mat gray;
-        cv::cvtColor(frame, gray, cv::COLOR_RGB2GRAY);
+        cv::cvtColor(workFrame, gray, cv::COLOR_RGB2GRAY);
 
         std::vector<cv::KeyPoint> kps;
         cv::Mat descs;
@@ -437,6 +442,7 @@ namespace mobilegs {
 }
 
 bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) { return mSuperPoint.load(onnxBytes); }
+bool MobileGS::loadLowLightEnhancer(const std::vector<uchar>& onnxBytes) { return mEnhancer.load(onnxBytes); }
 void MobileGS::setArtworkFingerprint(const cv::Mat& c, const uint8_t* d, int w, int h, int s, const float* i, const float* v) {}
 MobileGS::FingerprintData MobileGS::generateFingerprint(const cv::Mat& i, const cv::Mat& m, const uint8_t* d, int w, int h, int s, const float* intr, const float* v) { return {}; }
 void MobileGS::sortThreadFunc() {}
