@@ -22,6 +22,7 @@ add_library(graffitixr SHARED
     SurfaceUnroller.cpp
     StereoProcessor.cpp
     SuperPointDetector.cpp
+    LowLightEnhancer.cpp
     ImageWarper.cpp
 )
 
