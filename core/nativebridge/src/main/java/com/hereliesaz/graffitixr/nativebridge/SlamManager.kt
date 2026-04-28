@@ -173,6 +173,7 @@ class SlamManager @Inject constructor() {
     }
 
     fun loadSuperPoint(assetManager: AssetManager): Boolean = nativeLoadSuperPoint(assetManager)
+    fun loadLowLightEnhancer(assetManager: AssetManager) = nativeLoadLowLightEnhancer(assetManager)
 
     fun setArScanMode(mode: Int) = nativeSetArScanMode(mode)
     fun setMuralMethod(method: Int) = nativeSetMuralMethod(method)
@@ -243,6 +244,7 @@ class SlamManager @Inject constructor() {
     private external fun nativeLoadModel(path: String)
     private external fun nativeImportModel3D(path: String): Boolean
     private external fun nativeLoadSuperPoint(assetManager: AssetManager): Boolean
+    private external fun nativeLoadLowLightEnhancer(assetManager: AssetManager)
     private external fun nativeUpdateAnchorTransform(transform: FloatArray)
     private external fun nativeUpdateDeviceMotion(angularVel: FloatArray, linearVel: FloatArray)
     private external fun nativeGetAnchorTransform(): FloatArray
