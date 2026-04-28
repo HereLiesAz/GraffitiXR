@@ -447,6 +447,23 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadSuperPoint(
 }
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadLowLightEnhancer(
+        JNIEnv* env, jobject thiz, jobject assetManager) {
+    if (!gSlamEngine) return;
+    AAssetManager* mgr = AAssetManager_fromJava(env, assetManager);
+    AAsset* asset = AAssetManager_open(mgr, "zerodce.onnx", AASSET_MODE_BUFFER);
+    if (!asset) {
+        __android_log_print(ANDROID_LOG_WARN, "GraffitiJNI", "zerodce.onnx not found in assets");
+        return;
+    }
+    size_t size = (size_t)AAsset_getLength(asset);
+    std::vector<uchar> buf(size);
+    AAsset_read(asset, buf.data(), (off_t)size);
+    AAsset_close(asset);
+    gSlamEngine->loadLowLightEnhancer(buf);
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerprint(
         JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type, jfloatArray ptsArray) {
     if (gSlamEngine) {
