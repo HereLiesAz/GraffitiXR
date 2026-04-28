@@ -14,7 +14,13 @@ bool SuperPointDetector::load(const std::vector<uchar>& onnxBytes) {
     try {
         mNet = cv::dnn::readNetFromONNX(onnxBytes);
         mNet.setPreferableBackend(cv::dnn::DNN_BACKEND_DEFAULT);
-        mNet.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+        if (cv::ocl::haveOpenCL()) {
+            mNet.setPreferableTarget(cv::dnn::DNN_TARGET_OPENCL);
+            LOGD("SuperPoint: using OpenCL backend");
+        } else {
+            mNet.setPreferableTarget(cv::dnn::DNN_TARGET_CPU);
+            LOGD("SuperPoint: OpenCL unavailable, using CPU backend");
+        }
         bool ok = !mNet.empty();
         mLoaded = ok;
         return ok;

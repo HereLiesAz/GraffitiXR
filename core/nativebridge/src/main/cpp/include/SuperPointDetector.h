@@ -1,6 +1,7 @@
 #pragma once
 #include <opencv2/opencv.hpp>
 #include <opencv2/dnn.hpp>
+#include <opencv2/core/ocl.hpp>
 #include <atomic>
 #include <mutex>
 #include <vector>
