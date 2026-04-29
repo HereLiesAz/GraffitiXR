@@ -248,7 +248,7 @@ void MobileGS::relocThreadFunc() {
             mRelocRequested = false;
         }
 
-        if (frame.empty() || mWallDescriptors.empty() || !mRelocEnabled) continue;
+        if (frame.empty() || mWallDescriptors.empty() || mWallKeypoints3D.empty() || !mRelocEnabled) continue;
 
         // Optionally enhance the RGB frame under low light before grayscale conversion
         cv::Mat workFrame = frame;
@@ -444,5 +444,117 @@ namespace mobilegs {
 bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) { return mSuperPoint.load(onnxBytes); }
 bool MobileGS::loadLowLightEnhancer(const std::vector<uchar>& onnxBytes) { return mEnhancer.load(onnxBytes); }
 void MobileGS::setArtworkFingerprint(const cv::Mat& c, const uint8_t* d, int w, int h, int s, const float* i, const float* v) {}
-MobileGS::FingerprintData MobileGS::generateFingerprint(const cv::Mat& i, const cv::Mat& m, const uint8_t* d, int w, int h, int s, const float* intr, const float* v) { return {}; }
+
+MobileGS::FingerprintData MobileGS::generateFingerprint(
+        const cv::Mat& image, const cv::Mat& mask,
+        const uint8_t* depthData, int depthW, int depthH, int depthStride,
+        const float* intr, const float* /*viewMat*/)
+{
+    if (image.empty()) return {};
+
+    cv::Mat gray;
+    if (image.channels() == 4)
+        cv::cvtColor(image, gray, cv::COLOR_RGBA2GRAY);
+    else if (image.channels() == 3)
+        cv::cvtColor(image, gray, cv::COLOR_RGB2GRAY);
+    else
+        gray = image;
+
+    cv::Mat orbMask;
+    if (!mask.empty()) {
+        cv::Mat singleCh;
+        if (mask.channels() > 1)
+            cv::cvtColor(mask, singleCh, cv::COLOR_RGBA2GRAY);
+        else
+            singleCh = mask;
+        // ORB mask must be CV_8UC1 with 255=valid
+        cv::threshold(singleCh, orbMask, 1, 255, cv::THRESH_BINARY);
+    }
+
+    auto orb = cv::ORB::create(1000);
+    std::vector<cv::KeyPoint> kps;
+    cv::Mat descs;
+    orb->detectAndCompute(gray, orbMask, kps, descs);
+
+    if (kps.empty() || descs.empty()) {
+        LOGE("generateFingerprint: no keypoints detected on %dx%d image", image.cols, image.rows);
+        return {};
+    }
+
+    LOGI("generateFingerprint: %zu keypoints on %dx%d image", kps.size(), image.cols, image.rows);
+
+    if (!depthData || depthW <= 0 || depthH <= 0 || depthStride <= 0) {
+        LOGI("generateFingerprint: no depth — returning 2D-only fingerprint");
+        FingerprintData fd;
+        fd.keypoints = kps;
+        fd.descriptors = descs.clone();
+        // Don't populate mWallKeypoints3D so reloc loop skips PnP safely
+        {
+            std::lock_guard<std::mutex> lock(mMutex);
+            mWallDescriptors = cv::Mat();
+            mWallKeypoints3D.clear();
+        }
+        return fd;
+    }
+
+    float fx = intr[0], fy = intr[1], cx = intr[2], cy = intr[3];
+    float scaleX = (float)depthW  / (float)image.cols;
+    float scaleY = (float)depthH  / (float)image.rows;
+
+    std::vector<cv::KeyPoint>  validKps;
+    std::vector<cv::Point3f>   pts3d;
+    std::vector<int>           validIdx;
+
+    for (int i = 0; i < (int)kps.size(); ++i) {
+        const auto& kp = kps[i];
+        int dx = std::max(0, std::min((int)std::round(kp.pt.x * scaleX), depthW - 1));
+        int dy = std::max(0, std::min((int)std::round(kp.pt.y * scaleY), depthH - 1));
+
+        const auto* row = reinterpret_cast<const uint16_t*>(depthData + (size_t)dy * depthStride);
+        float depthMm = (float)(row[dx] & 0x1FFF);
+        if (depthMm < 100.0f) continue;  // missing / too close
+
+        float Z = depthMm / 1000.0f;
+        float X = (kp.pt.x - cx) / fx * Z;
+        float Y = (kp.pt.y - cy) / fy * Z;
+
+        validKps.push_back(kp);
+        pts3d.emplace_back(X, Y, Z);
+        validIdx.push_back(i);
+    }
+
+    LOGI("generateFingerprint: %zu/%zu keypoints have valid depth",
+         validKps.size(), kps.size());
+
+    if (validKps.empty()) {
+        LOGE("generateFingerprint: no keypoints with valid depth — check depth buffer");
+        return {};
+    }
+
+    // Build aligned descriptor matrix (rows matching validKps only)
+    cv::Mat validDescs((int)validIdx.size(), descs.cols, descs.type());
+    for (int i = 0; i < (int)validIdx.size(); ++i)
+        descs.row(validIdx[i]).copyTo(validDescs.row(i));
+
+    std::vector<float> pts3dFlat;
+    pts3dFlat.reserve(pts3d.size() * 3);
+    for (const auto& p : pts3d) {
+        pts3dFlat.push_back(p.x);
+        pts3dFlat.push_back(p.y);
+        pts3dFlat.push_back(p.z);
+    }
+
+    FingerprintData fd;
+    fd.keypoints   = validKps;
+    fd.points3d    = std::move(pts3dFlat);
+    fd.descriptors = validDescs.clone();
+
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        mWallDescriptors  = fd.descriptors.clone();
+        mWallKeypoints3D  = std::move(pts3d);
+    }
+
+    return fd;
+}
 void MobileGS::sortThreadFunc() {}

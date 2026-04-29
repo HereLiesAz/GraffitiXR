@@ -96,6 +96,10 @@ data class ArUiState(
     // 360° angular coverage progress [0,1].
     val worldMappingProgress: Float = 0f,
 
+    // Bitmask of visited 10° sectors (bit N = sector N, 36 bits total, 0 = north/up).
+    // Used to render the per-sector coverage ring in the scan coaching overlay.
+    val visitedSectorsMask: Long = 0L,
+
     // Erase history — whether undo/redo are available during the REVIEW mark-removal step.
     val canUndoErase: Boolean = false,
     val canRedoErase: Boolean = false,

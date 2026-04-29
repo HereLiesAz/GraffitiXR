@@ -34,6 +34,7 @@ import android.content.ClipData
 import android.content.ClipboardManager as AndroidClipboardManager
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.rememberCoroutineScope
@@ -578,6 +579,7 @@ class MainActivity : ComponentActivity() {
                                     scanPhase = arUiState.scanPhase,
                                     ambientSectorsCovered = arUiState.ambientSectorsCovered,
                                     worldMappingProgress = arUiState.worldMappingProgress,
+                                    visitedSectorsMask = arUiState.visitedSectorsMask,
                                     muralMethod = arUiState.muralMethod,
                                     modifier = Modifier
                                         .align(Alignment.BottomCenter)
@@ -2004,6 +2006,7 @@ private fun ScanCoachingOverlay(
     scanPhase: ScanPhase = ScanPhase.AMBIENT,
     ambientSectorsCovered: Int = 0,
     worldMappingProgress: Float = 0f,
+    visitedSectorsMask: Long = 0L,
     muralMethod: MuralMethod = MuralMethod.VOXEL_HASH
 ) {
     val phaseLabel = when (scanPhase) {
@@ -2068,8 +2071,8 @@ private fun ScanCoachingOverlay(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (scanPhase == ScanPhase.AMBIENT) {
-                        RadarMappingIndicator(progress = worldMappingProgress)
-                        
+                        SectorRingIndicator(visitedSectorsMask = visitedSectorsMask)
+
                         Text(
                             text = "${(worldMappingProgress * 100).toInt()}%",
                             color = Color.Cyan,
@@ -2101,35 +2104,29 @@ private fun ScanCoachingOverlay(
 }
 
 @Composable
-private fun RadarMappingIndicator(progress: Float) {
-    Box(
-        modifier = Modifier
-            .size(24.dp)
-            .drawBehind {
-                val strokeWidth = 2.dp.toPx()
-                // Background circle
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.2f),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth)
+private fun SectorRingIndicator(visitedSectorsMask: Long, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.size(40.dp)) {
+        val ringRadius = size.minDimension / 2f * 0.70f
+        val strokeW    = size.minDimension / 2f * 0.45f
+        val gapDeg     = 3f
+        val sweepDeg   = 360f / 36f - gapDeg
+        for (i in 0..35) {
+            val startAngle = -90f + i * (360f / 36f) + gapDeg / 2f
+            val isVisited  = (visitedSectorsMask ushr i) and 1L != 0L
+            drawArc(
+                color      = if (isVisited) Color.Cyan else Color.White.copy(alpha = 0.18f),
+                startAngle = startAngle,
+                sweepAngle = sweepDeg,
+                useCenter  = false,
+                topLeft    = androidx.compose.ui.geometry.Offset(center.x - ringRadius, center.y - ringRadius),
+                size       = androidx.compose.ui.geometry.Size(ringRadius * 2, ringRadius * 2),
+                style      = androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = strokeW,
+                    cap   = androidx.compose.ui.graphics.StrokeCap.Butt
                 )
-                // Progress arc
-                drawArc(
-                    color = Color.Cyan,
-                    startAngle = -90f,
-                    sweepAngle = 360f * progress,
-                    useCenter = false,
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(
-                        width = strokeWidth,
-                        cap = androidx.compose.ui.graphics.StrokeCap.Round
-                    )
-                )
-                // Center dot
-                drawCircle(
-                    color = Color.Cyan,
-                    radius = 2.dp.toPx()
-                )
-            }
-    )
+            )
+        }
+    }
 }
 
 @Composable

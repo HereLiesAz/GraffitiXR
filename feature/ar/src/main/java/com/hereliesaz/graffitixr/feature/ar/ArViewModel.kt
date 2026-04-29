@@ -495,6 +495,7 @@ class ArViewModel @Inject constructor(
         visitedSectors[sector] = true
         val sectorsCovered = visitedSectors.count { it }
         val mappingProgress = sectorsCovered / 36f
+        val sectorMask = (0..35).fold(0L) { acc, i -> if (visitedSectors[i]) acc or (1L shl i) else acc }
 
         _uiState.update { state ->
             val newPhase = when (state.scanPhase) {
@@ -519,6 +520,7 @@ class ArViewModel @Inject constructor(
                 scanPhase = newPhase,
                 ambientSectorsCovered = sectorsCovered / 3, // Keep backward compatibility for 30 degree UI units if needed
                 worldMappingProgress = mappingProgress,
+                visitedSectorsMask = sectorMask,
                 scanHint = computeScanHint(
                     isTracking = isTracking,
                     splatCount = splatCount,
