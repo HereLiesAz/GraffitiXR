@@ -452,13 +452,20 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
 {
     if (image.empty()) return {};
 
+    // Optionally enhance the RGB frame under low light before grayscale conversion
+    cv::Mat workFrame = image;
+    if (mEnhancer.isLoaded() && mLightLevel < kLowLightThreshold) {
+        cv::Mat enhanced;
+        if (mEnhancer.enhance(image, enhanced)) workFrame = enhanced;
+    }
+
     cv::Mat gray;
-    if (image.channels() == 4)
-        cv::cvtColor(image, gray, cv::COLOR_RGBA2GRAY);
-    else if (image.channels() == 3)
-        cv::cvtColor(image, gray, cv::COLOR_RGB2GRAY);
+    if (workFrame.channels() == 4)
+        cv::cvtColor(workFrame, gray, cv::COLOR_RGBA2GRAY);
+    else if (workFrame.channels() == 3)
+        cv::cvtColor(workFrame, gray, cv::COLOR_RGB2GRAY);
     else
-        gray = image;
+        gray = workFrame;
 
     cv::Mat orbMask;
     if (!mask.empty()) {
@@ -471,10 +478,17 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
         cv::threshold(singleCh, orbMask, 1, 255, cv::THRESH_BINARY);
     }
 
-    auto orb = cv::ORB::create(1000);
     std::vector<cv::KeyPoint> kps;
     cv::Mat descs;
-    orb->detectAndCompute(gray, orbMask, kps, descs);
+    // Use SuperPoint if loaded
+    bool useSuperPoint = mSuperPoint.isLoaded();
+    if (useSuperPoint && !mSuperPoint.detect(gray, kps, descs, orbMask)) {
+        useSuperPoint = false;
+    }
+    if (!useSuperPoint) {
+        auto orb = cv::ORB::create(1000);
+        orb->detectAndCompute(gray, orbMask, kps, descs);
+    }
 
     if (kps.empty() || descs.empty()) {
         LOGE("generateFingerprint: no keypoints detected on %dx%d image", image.cols, image.rows);
