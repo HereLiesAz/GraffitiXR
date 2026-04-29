@@ -20,8 +20,10 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.mockkObject
+import io.mockk.mockkConstructor
 import io.mockk.unmockkStatic
 import io.mockk.unmockkObject
+import io.mockk.unmockkConstructor
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -58,8 +60,10 @@ class ArViewModelTest {
         every { NativeLibLoader.loadAll() } returns Unit
         mockkStatic(Bitmap::class)
         mockkStatic(Canvas::class)
+        mockkConstructor(Canvas::class)
         mockkStatic(Matrix::class)
         mockkStatic(Paint::class)
+        mockkConstructor(Paint::class)
         val fakeBitmap = mockk<Bitmap>(relaxed = true)
         every { fakeBitmap.width } returns 100
         every { fakeBitmap.height } returns 100
@@ -88,8 +92,10 @@ class ArViewModelTest {
         unmockkStatic("com.hereliesaz.graffitixr.common.util.ImageExtKt")
         unmockkStatic(Bitmap::class)
         unmockkStatic(Canvas::class)
+        unmockkConstructor(Canvas::class)
         unmockkStatic(Matrix::class)
         unmockkStatic(Paint::class)
+        unmockkConstructor(Paint::class)
         unmockkObject(NativeLibLoader)
     }
 
