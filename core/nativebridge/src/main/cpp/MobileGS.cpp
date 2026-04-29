@@ -46,7 +46,7 @@ void MobileGS::initialize(int width, int height) {
     mScreenHeight = height;
     mFeatureDetector = cv::ORB::create(500);
     mMatcher = cv::DescriptorMatcher::create("BruteForce-Hamming");
-    mL2Matcher = cv::DescriptorMatcher::create("BruteForce-L2");
+    mL2Matcher = cv::DescriptorMatcher::create("BruteForce");
 
     memset(mViewMatrix, 0, sizeof(mViewMatrix));
     memset(mProjMatrix, 0, sizeof(mProjMatrix));
