@@ -89,7 +89,7 @@ This is a prerequisite. No code changes. Do this before any other task.
 
 Currently `load()` hardcodes `DNN_TARGET_CPU`. This task switches to OpenCL when available, falling back gracefully.
 
-- [ ] **Step 1: Edit SuperPointDetector.cpp**
+- [x] **Step 1: Edit SuperPointDetector.cpp**
 
   Open `core/nativebridge/src/main/cpp/SuperPointDetector.cpp`. Find the `load()` method. Replace lines 17–18:
 
@@ -111,14 +111,14 @@ Currently `load()` hardcodes `DNN_TARGET_CPU`. This task switches to OpenCL when
   }
   ```
 
-- [ ] **Step 2: Build to verify compilation**
+- [x] **Step 2: Build to verify compilation**
 
   ```bash
   ./gradlew :core:nativebridge:assembleDebug 2>&1 | tail -20
   ```
   Expected: `BUILD SUCCESSFUL`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
   ```bash
   git add core/nativebridge/src/main/cpp/SuperPointDetector.cpp
@@ -135,7 +135,7 @@ Currently `load()` hardcodes `DNN_TARGET_CPU`. This task switches to OpenCL when
 
 ORB descriptors are binary (`CV_8U`) matched with BruteForce-Hamming. SuperPoint descriptors are float (`CV_32F`) and require BruteForce-L2. We add a second matcher and select the right one by descriptor type, preserving backward compatibility with any ORB-derived wall fingerprints saved to disk.
 
-- [ ] **Step 1: Add mL2Matcher to MobileGS.h**
+- [x] **Step 1: Add mL2Matcher to MobileGS.h**
 
   Open `core/nativebridge/src/main/cpp/include/MobileGS.h`. In the private section, find:
 
@@ -154,7 +154,7 @@ ORB descriptors are binary (`CV_8U`) matched with BruteForce-Hamming. SuperPoint
   SuperPointDetector mSuperPoint;
   ```
 
-- [ ] **Step 2: Initialize mL2Matcher in MobileGS::initialize()**
+- [x] **Step 2: Initialize mL2Matcher in MobileGS::initialize()**
 
   Open `core/nativebridge/src/main/cpp/MobileGS.cpp`. Find line 48:
 
@@ -169,7 +169,7 @@ ORB descriptors are binary (`CV_8U`) matched with BruteForce-Hamming. SuperPoint
   mL2Matcher = cv::DescriptorMatcher::create("BruteForce-L2");
   ```
 
-- [ ] **Step 3: Wire SuperPoint into the relocalization loop**
+- [x] **Step 3: Wire SuperPoint into the relocalization loop**
 
   In `MobileGS::relocThreadFunc()`, find the block starting at line 252:
 
@@ -211,14 +211,14 @@ ORB descriptors are binary (`CV_8U`) matched with BruteForce-Hamming. SuperPoint
   activeMatcher->knnMatch(descs, mWallDescriptors, matches, 2);
   ```
 
-- [ ] **Step 4: Build to verify compilation**
+- [x] **Step 4: Build to verify compilation**
 
   ```bash
   ./gradlew :core:nativebridge:assembleDebug 2>&1 | tail -20
   ```
   Expected: `BUILD SUCCESSFUL`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
   ```bash
   git add core/nativebridge/src/main/cpp/include/MobileGS.h \
@@ -237,7 +237,7 @@ ORB descriptors are binary (`CV_8U`) matched with BruteForce-Hamming. SuperPoint
 
 Mirrors the `SuperPointDetector` pattern exactly: loads ONNX via `cv::dnn::Net`, OpenCL-first backend, mutex-guarded inference. Takes and returns `CV_8UC3` RGB images; internally resizes to 600×400 for inference, then resizes output back to the original dimensions.
 
-- [ ] **Step 1: Create LowLightEnhancer.h**
+- [x] **Step 1: Create LowLightEnhancer.h**
 
   Create `core/nativebridge/src/main/cpp/include/LowLightEnhancer.h` with this content:
 
@@ -266,7 +266,7 @@ Mirrors the `SuperPointDetector` pattern exactly: loads ONNX via `cv::dnn::Net`,
   };
   ```
 
-- [ ] **Step 2: Create LowLightEnhancer.cpp**
+- [x] **Step 2: Create LowLightEnhancer.cpp**
 
   Create `core/nativebridge/src/main/cpp/LowLightEnhancer.cpp` with this content:
 
@@ -344,7 +344,7 @@ Mirrors the `SuperPointDetector` pattern exactly: loads ONNX via `cv::dnn::Net`,
   }
   ```
 
-- [ ] **Step 3: Add LowLightEnhancer.cpp to CMakeLists.txt**
+- [x] **Step 3: Add LowLightEnhancer.cpp to CMakeLists.txt**
 
   Open `core/nativebridge/src/main/cpp/CMakeLists.txt`. Find the `add_library` block:
 
@@ -377,14 +377,14 @@ Mirrors the `SuperPointDetector` pattern exactly: loads ONNX via `cv::dnn::Net`,
   )
   ```
 
-- [ ] **Step 4: Build to verify the new class compiles**
+- [x] **Step 4: Build to verify the new class compiles**
 
   ```bash
   ./gradlew :core:nativebridge:assembleDebug 2>&1 | tail -20
   ```
   Expected: `BUILD SUCCESSFUL`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
   ```bash
   git add core/nativebridge/src/main/cpp/include/LowLightEnhancer.h \
@@ -403,7 +403,7 @@ Mirrors the `SuperPointDetector` pattern exactly: loads ONNX via `cv::dnn::Net`,
 
 Adds the enhancer member, the brightness threshold constant, the loader method, and the brightness-gated enhancement step in the reloc loop. Enhancement runs on the RGB frame before grayscale conversion, so the improved image feeds into SuperPoint detection.
 
-- [ ] **Step 1: Update MobileGS.h**
+- [x] **Step 1: Update MobileGS.h**
 
   Open `core/nativebridge/src/main/cpp/include/MobileGS.h`.
 
@@ -426,7 +426,7 @@ Adds the enhancer member, the brightness threshold constant, the loader method, 
   static constexpr float kLowLightThreshold = 0.35f;
   ```
 
-- [ ] **Step 2: Add loader implementation to MobileGS.cpp**
+- [x] **Step 2: Add loader implementation to MobileGS.cpp**
 
   Open `core/nativebridge/src/main/cpp/MobileGS.cpp`. Find line 424:
 
@@ -440,7 +440,7 @@ Adds the enhancer member, the brightness threshold constant, the loader method, 
   bool MobileGS::loadLowLightEnhancer(const std::vector<uchar>& onnxBytes) { return mEnhancer.load(onnxBytes); }
   ```
 
-- [ ] **Step 3: Add enhancement gate in relocThreadFunc**
+- [x] **Step 3: Add enhancement gate in relocThreadFunc**
 
   In `MobileGS::relocThreadFunc()`, find the gray conversion line you added in Task 2:
 
@@ -462,14 +462,14 @@ Adds the enhancer member, the brightness threshold constant, the loader method, 
   cv::cvtColor(workFrame, gray, cv::COLOR_RGB2GRAY);
   ```
 
-- [ ] **Step 4: Build to verify**
+- [x] **Step 4: Build to verify**
 
   ```bash
   ./gradlew :core:nativebridge:assembleDebug 2>&1 | tail -20
   ```
   Expected: `BUILD SUCCESSFUL`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
   ```bash
   git add core/nativebridge/src/main/cpp/include/MobileGS.h \
@@ -486,7 +486,7 @@ Adds the enhancer member, the brightness threshold constant, the loader method, 
 
 Adds `nativeLoadLowLightEnhancer`, mirroring the existing `nativeLoadSuperPoint` function at line 434.
 
-- [ ] **Step 1: Add the JNI function to GraffitiJNI.cpp**
+- [x] **Step 1: Add the JNI function to GraffitiJNI.cpp**
 
   Open `core/nativebridge/src/main/cpp/GraffitiJNI.cpp`. Find the closing brace of `nativeLoadSuperPoint` (around line 447). Add immediately after:
 
@@ -509,14 +509,14 @@ Adds `nativeLoadLowLightEnhancer`, mirroring the existing `nativeLoadSuperPoint`
   }
   ```
 
-- [ ] **Step 2: Build to verify**
+- [x] **Step 2: Build to verify**
 
   ```bash
   ./gradlew :core:nativebridge:assembleDebug 2>&1 | tail -20
   ```
   Expected: `BUILD SUCCESSFUL`
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
   ```bash
   git add core/nativebridge/src/main/cpp/GraffitiJNI.cpp
@@ -531,7 +531,7 @@ Adds `nativeLoadLowLightEnhancer`, mirroring the existing `nativeLoadSuperPoint`
 - Modify: `core/nativebridge/src/main/java/com/hereliesaz/graffitixr/nativebridge/SlamManager.kt`
 - Create: `core/nativebridge/src/test/java/com/hereliesaz/graffitixr/nativebridge/SlamManagerModelLoadingTest.kt`
 
-- [ ] **Step 1: Write the failing test first**
+- [x] **Step 1: Write the failing test first**
 
   Create `core/nativebridge/src/test/java/com/hereliesaz/graffitixr/nativebridge/SlamManagerModelLoadingTest.kt`:
 
@@ -562,14 +562,14 @@ Adds `nativeLoadLowLightEnhancer`, mirroring the existing `nativeLoadSuperPoint`
   }
   ```
 
-- [ ] **Step 2: Run tests to confirm the second test fails**
+- [x] **Step 2: Run tests to confirm the second test fails**
 
   ```bash
   ./gradlew :core:nativebridge:testDebugUnitTest 2>&1 | grep -E "FAIL|PASS|ERROR|loadLowLight"
   ```
   Expected: `loadLowLightEnhancer is callable on SlamManager` → FAIL (method doesn't exist yet)
 
-- [ ] **Step 3: Add loadLowLightEnhancer to SlamManager.kt**
+- [x] **Step 3: Add loadLowLightEnhancer to SlamManager.kt**
 
   Open `core/nativebridge/src/main/java/com/hereliesaz/graffitixr/nativebridge/SlamManager.kt`. Find line 175:
 
@@ -595,14 +595,14 @@ Adds `nativeLoadLowLightEnhancer`, mirroring the existing `nativeLoadSuperPoint`
   private external fun nativeLoadLowLightEnhancer(assetManager: AssetManager)
   ```
 
-- [ ] **Step 4: Run tests to confirm both pass**
+- [x] **Step 4: Run tests to confirm both pass**
 
   ```bash
   ./gradlew :core:nativebridge:testDebugUnitTest 2>&1 | grep -E "FAIL|PASS|ERROR|tests"
   ```
   Expected: All tests pass, including `SlamManagerModelLoadingTest`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
   ```bash
   git add core/nativebridge/src/main/java/com/hereliesaz/graffitixr/nativebridge/SlamManager.kt \
@@ -620,7 +620,7 @@ Adds `nativeLoadLowLightEnhancer`, mirroring the existing `nativeLoadSuperPoint`
 
 `ArViewModel` has `appContext: Context` injected and `slamManager: SlamManager` injected. The `init` block is the right place to load models — it runs once at ViewModel creation, on a background coroutine so it doesn't block the main thread.
 
-- [ ] **Step 1: Write the failing test in ArViewModelTest.kt**
+- [x] **Step 1: Write the failing test in ArViewModelTest.kt**
 
   Open `feature/ar/src/test/java/com/hereliesaz/graffitixr/feature/ar/ArViewModelTest.kt`. Add this test to the existing class (after the `@Before` block, before existing tests):
 
@@ -633,14 +633,14 @@ Adds `nativeLoadLowLightEnhancer`, mirroring the existing `nativeLoadSuperPoint`
   }
   ```
 
-- [ ] **Step 2: Run test to confirm it fails**
+- [x] **Step 2: Run test to confirm it fails**
 
   ```bash
   ./gradlew :feature:ar:testDebugUnitTest --tests "*ArViewModelTest.init loads AI models*" 2>&1 | tail -15
   ```
   Expected: FAIL — `loadSuperPoint` and `loadLowLightEnhancer` are never called.
 
-- [ ] **Step 3: Add model loading to ArViewModel.init**
+- [x] **Step 3: Add model loading to ArViewModel.init**
 
   Open `feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/ArViewModel.kt`. Find the `init` block at line 173:
 

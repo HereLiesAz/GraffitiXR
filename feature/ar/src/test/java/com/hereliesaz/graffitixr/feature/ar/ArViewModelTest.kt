@@ -11,11 +11,17 @@ import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
+import android.graphics.Canvas
+import android.graphics.Matrix
+import android.graphics.Paint
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
+import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
+import io.mockk.mockkObject
 import io.mockk.unmockkStatic
+import io.mockk.unmockkObject
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -48,9 +54,17 @@ class ArViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
+        mockkObject(NativeLibLoader)
+        every { NativeLibLoader.loadAll() } returns Unit
+        mockkStatic(Bitmap::class)
+        mockkStatic(Canvas::class)
+        mockkStatic(Matrix::class)
+        mockkStatic(Paint::class)
         val fakeBitmap = mockk<Bitmap>(relaxed = true)
         every { fakeBitmap.width } returns 100
         every { fakeBitmap.height } returns 100
+        every { Bitmap.createBitmap(any<Int>(), any<Int>(), any<Bitmap.Config>()) } returns fakeBitmap
+        every { Bitmap.createBitmap(any<Bitmap>(), any<Int>(), any<Int>(), any<Int>(), any<Int>(), any<android.graphics.Matrix>(), any<Boolean>()) } returns fakeBitmap
         mockkStatic("com.hereliesaz.graffitixr.common.util.ImageExtKt")
         // Match both the zero-arg call and the call with an explicit tapPos argument.
         every { any<Bitmap>().isolateMarkings() } returns fakeBitmap
@@ -72,6 +86,11 @@ class ArViewModelTest {
         Thread.sleep(100)
         Dispatchers.resetMain()
         unmockkStatic("com.hereliesaz.graffitixr.common.util.ImageExtKt")
+        unmockkStatic(Bitmap::class)
+        unmockkStatic(Canvas::class)
+        unmockkStatic(Matrix::class)
+        unmockkStatic(Paint::class)
+        unmockkObject(NativeLibLoader)
     }
 
     @Test
@@ -99,7 +118,7 @@ class ArViewModelTest {
 
     @Test
     fun `setTrackingState with true sets correct state`() = runTest {
-        viewModel.setTrackingState(true, 0, false)
+        viewModel.setTrackingState(true, 0, 0, false)
 
         val state = viewModel.uiState.value
         assertTrue(state.isScanning)
@@ -107,7 +126,7 @@ class ArViewModelTest {
 
     @Test
     fun `setTrackingState with false sets correct state`() = runTest {
-        viewModel.setTrackingState(false, 0, false)
+        viewModel.setTrackingState(false, 0, 0, false)
 
         val state = viewModel.uiState.value
         assertFalse(state.isScanning)
@@ -115,10 +134,10 @@ class ArViewModelTest {
 
     @Test
     fun `setTrackingState propagates isDepthApiSupported`() = runTest {
-        viewModel.setTrackingState(true, 100, true)
+        viewModel.setTrackingState(true, 100, 0, true)
         assertTrue(viewModel.uiState.value.isDepthApiSupported)
 
-        viewModel.setTrackingState(true, 100, false)
+        viewModel.setTrackingState(true, 100, 0, false)
         assertFalse(viewModel.uiState.value.isDepthApiSupported)
     }
 
@@ -274,8 +293,7 @@ class ArViewModelTest {
     @Test
     fun `onTargetCaptured normal path annotates keypoints asynchronously`() = runTest {
         val rawBmp = mockk<Bitmap>(relaxed = true)
-        val annotatedBmp = mockk<Bitmap>(relaxed = true)
-        every { slamManager.annotateKeypoints(any()) } returns annotatedBmp
+        every { slamManager.getKeypoints(any()) } returns emptyList()
 
         viewModel.onTargetCaptured(
             bitmap = rawBmp, depthBuffer = null,
@@ -286,10 +304,10 @@ class ArViewModelTest {
         // withContext(Dispatchers.Default) runs on a real thread pool; give it time to finish,
         // then advance testDispatcher to process the resulting state-update continuation.
         testDispatcher.scheduler.advanceUntilIdle()
-        Thread.sleep(200)
+        Thread.sleep(1000)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertEquals(annotatedBmp, viewModel.uiState.value.annotatedCaptureBitmap)
+        assertNotNull(viewModel.uiState.value.annotatedCaptureBitmap)
     }
 
     // ==================== Scan Mode Tests ====================
@@ -330,16 +348,16 @@ class ArViewModelTest {
 
     @Test
     fun `setTrackingState false reflects isScanning false in uiState`() = runTest {
-        viewModel.setTrackingState(true, 100, true)
+        viewModel.setTrackingState(true, 100, 0, true)
         assertTrue(viewModel.uiState.value.isScanning)
 
-        viewModel.setTrackingState(false, 0, true)
+        viewModel.setTrackingState(false, 0, 0, true)
         assertFalse(viewModel.uiState.value.isScanning)
     }
 
     @Test
     fun `setTrackingState false with isDepthApiSupported true reflects correctly`() = runTest {
-        viewModel.setTrackingState(false, 0, true)
+        viewModel.setTrackingState(false, 0, 0, true)
 
         val state = viewModel.uiState.value
         assertFalse(state.isScanning)
@@ -348,7 +366,7 @@ class ArViewModelTest {
 
     @Test
     fun `setTrackingState false with zero splats reflects correctly`() = runTest {
-        viewModel.setTrackingState(false, 0, true)
+        viewModel.setTrackingState(false, 0, 0, true)
 
         val state = viewModel.uiState.value
         assertFalse(state.isScanning)

@@ -100,8 +100,10 @@ data class ArUiState(
     val canUndoErase: Boolean = false,
     val canRedoErase: Boolean = false,
 
-    // Distance from camera to anchor in metres, or -1f when not in front of camera / not established.
+    // distance from camera to anchor in metres, or -1f when not in front of camera / not established.
     val distanceToAnchorMeters: Float = -1f,
+    // Whether the user is right-handed (UI orientation)
+    val isRightHanded: Boolean = true,
     // Whether to display distances in imperial units (feet) rather than metric.
     val isImperialUnits: Boolean = false,
 

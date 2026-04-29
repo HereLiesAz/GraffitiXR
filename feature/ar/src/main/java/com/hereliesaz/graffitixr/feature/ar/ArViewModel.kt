@@ -186,6 +186,26 @@ class ArViewModel @Inject constructor(
                 }
             }
         }
+        viewModelScope.launch {
+            settingsRepository.arScanMode.collect { mode ->
+                _uiState.update { it.copy(arScanMode = mode) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.isRightHanded.collect { isRight ->
+                _uiState.update { it.copy(isRightHanded = isRight) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.showAnchorBoundary.collect { show ->
+                _uiState.update { it.copy(showAnchorBoundary = show) }
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.isImperialUnits.collect { imperial ->
+                _uiState.update { it.copy(isImperialUnits = imperial) }
+            }
+        }
     }
 
     fun setArScanMode(mode: ArScanMode) {
