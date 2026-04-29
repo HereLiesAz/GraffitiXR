@@ -40,6 +40,7 @@ class ArViewModelTest {
     private val stereoProvider: StereoDepthProvider = mockk(relaxed = true)
     private val projectRepository: ProjectRepository = mockk(relaxed = true)
     private val settingsRepository: SettingsRepository = mockk(relaxed = true)
+    private val projectManager: com.hereliesaz.graffitixr.data.ProjectManager = mockk(relaxed = true)
     private val session: Session = mockk(relaxed = true)
     private val context: Context = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
@@ -60,7 +61,7 @@ class ArViewModelTest {
         every { settingsRepository.isImperialUnits } returns flowOf(false)
         every { projectRepository.currentProject } returns MutableStateFlow(null)
         every { context.filesDir } returns File("/tmp")
-        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, context)
+        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, projectManager, context)
     }
 
     @After
@@ -71,6 +72,13 @@ class ArViewModelTest {
         Thread.sleep(100)
         Dispatchers.resetMain()
         unmockkStatic("com.hereliesaz.graffitixr.common.util.ImageExtKt")
+    }
+
+    @Test
+    fun `init loads AI models via slamManager`() = runTest {
+        testDispatcher.scheduler.advanceUntilIdle()
+        verify { slamManager.loadSuperPoint(any()) }
+        verify { slamManager.loadLowLightEnhancer(any()) }
     }
 
     @Test
@@ -289,14 +297,14 @@ class ArViewModelTest {
     @Test
     fun `setArScanMode to MURAL updates arScanMode in uiState`() = runTest {
         every { settingsRepository.arScanMode } returns MutableStateFlow(ArScanMode.CLOUD_POINTS)
-        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, context)
+        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, projectManager, context)
         testDispatcher.scheduler.advanceUntilIdle()
 
         every { settingsRepository.arScanMode } returns MutableStateFlow(ArScanMode.MURAL)
         // Simulate what setArScanMode does: push the new mode through the settings flow
         val modeFlow = MutableStateFlow(ArScanMode.CLOUD_POINTS)
         every { settingsRepository.arScanMode } returns modeFlow
-        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, context)
+        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, projectManager, context)
         testDispatcher.scheduler.advanceUntilIdle()
 
         modeFlow.value = ArScanMode.MURAL
@@ -309,7 +317,7 @@ class ArViewModelTest {
     fun `setArScanMode to CLOUD_POINTS updates arScanMode in uiState`() = runTest {
         val modeFlow = MutableStateFlow(ArScanMode.MURAL)
         every { settingsRepository.arScanMode } returns modeFlow
-        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, context)
+        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, projectManager, context)
         testDispatcher.scheduler.advanceUntilIdle()
 
         modeFlow.value = ArScanMode.CLOUD_POINTS
@@ -363,8 +371,6 @@ class ArViewModelTest {
         val state = viewModel.uiState.value
         assertNull(state.annotatedCaptureBitmap)
         assertEquals(4, state.unwarpPoints.size)
-    }
-        assertEquals(annotatedBmp, viewModel.uiState.value.annotatedCaptureBitmap)
     }
 
     private fun setPrivateField(obj: Any, fieldName: String, value: Any?) {

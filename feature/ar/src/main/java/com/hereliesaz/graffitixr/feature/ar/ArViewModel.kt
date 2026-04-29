@@ -172,6 +172,10 @@ class ArViewModel @Inject constructor(
 
     init {
         NativeLibLoader.loadAll()
+        viewModelScope.launch(Dispatchers.IO) {
+            slamManager.loadSuperPoint(appContext.assets)
+            slamManager.loadLowLightEnhancer(appContext.assets)
+        }
         viewModelScope.launch {
             projectRepository.currentProject.collect { project ->
                 if (project != null) {
