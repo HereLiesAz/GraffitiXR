@@ -85,9 +85,10 @@ class ArViewModelTest {
     @After
     fun tearDown() {
         viewModel.viewModelScope.cancel()
-        // Allow any in-flight Dispatchers.Default coroutines to complete or observe cancellation
-        // before removing static mocks, preventing UncaughtExceptionsBeforeTest.
-        Thread.sleep(100)
+        // Drain real threads, then flush job-cleanup tasks queued on the test dispatcher before
+        // resetMain(), preventing UncaughtExceptionsBeforeTest in subsequent tests.
+        Thread.sleep(200)
+        testDispatcher.scheduler.advanceUntilIdle()
         Dispatchers.resetMain()
         unmockkStatic("com.hereliesaz.graffitixr.common.util.ImageExtKt")
         unmockkStatic(Bitmap::class)

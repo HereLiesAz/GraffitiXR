@@ -639,10 +639,8 @@ class ArViewModel @Inject constructor(
 
     private fun detectTargetKeypoints(bitmap: Bitmap) {
         viewModelScope.launch {
-            val kps = withContext(Dispatchers.Default) {
-                slamManager.getKeypoints(bitmap).map { Offset(it.first, it.second) }
-            }
             val mask = withContext(Dispatchers.Default) {
+                val kps = slamManager.getKeypoints(bitmap).map { Offset(it.first, it.second) }
                 generateInitialMask(bitmap.width, bitmap.height, kps)
             }
             _uiState.update { it.copy(tempCaptureBitmap = bitmap, annotatedCaptureBitmap = mask) }

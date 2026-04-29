@@ -664,7 +664,7 @@ Adds `nativeLoadLowLightEnhancer`, mirroring the existing `nativeLoadSuperPoint`
           projectRepository.currentProject.collect { project ->
   ```
 
-- [ ] **Step 4: Run test to confirm it passes**
+- [x] **Step 4: Run test to confirm it passes**
 
   ```bash
   ./gradlew :feature:ar:testDebugUnitTest --tests "*ArViewModelTest.init loads AI models*" 2>&1 | tail -10
