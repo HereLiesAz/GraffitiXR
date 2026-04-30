@@ -94,24 +94,24 @@ fun getGraffitiTutorials(context: Context): Map<String, AzTutorial> {
                 content = { Box(Modifier.fillMaxSize()) }
             ) {
                 card(
-                    title = context.getString(DesignR.string.tut_trace_title),
-                    text = context.getString(DesignR.string.tut_trace_text),
-                    highlight = AzHighlight.Item("trace")
+                    title = "",
+                    text = "This is Trace mode.",
+                    highlight = AzHighlight.None
                 )
                 card(
-                    title = context.getString(DesignR.string.tut_trace_step1_title),
-                    text = context.getString(DesignR.string.tut_trace_step1_text),
-                    highlight = AzHighlight.FullScreen
+                    title = "",
+                    text = "Arrange and edit your photos, sketches, and text by pressing the Design button.",
+                    highlight = AzHighlight.None
                 )
                 card(
-                    title = context.getString(DesignR.string.tut_trace_step2_title),
-                    text = context.getString(DesignR.string.tut_trace_step2_text),
-                    highlight = AzHighlight.FullScreen
+                    title = "",
+                    text = "When they are where and how you want them, press the Freeze button to turn your phone into a lightbox for tracing onto paper.",
+                    highlight = AzHighlight.None
                 )
                 card(
-                    title = context.getString(DesignR.string.tut_trace_step3_title),
-                    text = context.getString(DesignR.string.tut_trace_step3_text),
-                    highlight = AzHighlight.FullScreen
+                    title = "",
+                    text = "We recommend using either Trace mode or Mockup mode for editing.",
+                    highlight = AzHighlight.None
                 )
             }
         }
