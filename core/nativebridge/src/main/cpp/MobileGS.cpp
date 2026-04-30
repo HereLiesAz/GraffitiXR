@@ -469,45 +469,45 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
 
     cv::Mat orbMask;
     if (!mask.empty()) {
-        cv::Mat singleCh;
-        if (mask.channels() > 1)
-            cv::cvtColor(mask, singleCh, cv::COLOR_RGBA2GRAY);
-        else
-            singleCh = mask;
-        // ORB mask must be CV_8UC1 with 255=valid
-        cv::threshold(singleCh, orbMask, 1, 255, cv::THRESH_BINARY);
+        if (mask.channels() == 4) {
+            // isolateMarkings() produces a bitmap where markings are OPAQUE (alpha 255)
+            // and background is TRANSPARENT (alpha 0).
+            std::vector<cv::Mat> channels;
+            cv::split(mask, channels);
+            orbMask = channels[3];
+        } else {
+            cv::Mat singleCh;
+            if (mask.channels() == 3)
+                cv::cvtColor(mask, singleCh, cv::COLOR_RGB2GRAY);
+            else
+                singleCh = mask;
+            cv::threshold(singleCh, orbMask, 1, 255, cv::THRESH_BINARY);
+        }
     }
 
     std::vector<cv::KeyPoint> kps;
     cv::Mat descs;
-    // Use SuperPoint if loaded
+
+    // SuperPoint detection with fallback to ORB
     bool useSuperPoint = mSuperPoint.isLoaded();
     if (useSuperPoint && !mSuperPoint.detect(gray, kps, descs, orbMask)) {
         useSuperPoint = false;
     }
-    if (!useSuperPoint) {
+
+    if (!useSuperPoint || kps.empty()) {
         auto orb = cv::ORB::create(1000);
         orb->detectAndCompute(gray, orbMask, kps, descs);
     }
 
     if (kps.empty() || descs.empty()) {
-        LOGE("generateFingerprint: no keypoints detected on %dx%d image", image.cols, image.rows);
+        LOGE("generateFingerprint: no keypoints detected");
         return {};
     }
 
-    LOGI("generateFingerprint: %zu keypoints on %dx%d image", kps.size(), image.cols, image.rows);
-
     if (!depthData || depthW <= 0 || depthH <= 0 || depthStride <= 0) {
-        LOGI("generateFingerprint: no depth — returning 2D-only fingerprint");
         FingerprintData fd;
         fd.keypoints = kps;
         fd.descriptors = descs.clone();
-        // Don't populate mWallKeypoints3D so reloc loop skips PnP safely
-        {
-            std::lock_guard<std::mutex> lock(mMutex);
-            mWallDescriptors = cv::Mat();
-            mWallKeypoints3D.clear();
-        }
         return fd;
     }
 
@@ -519,14 +519,19 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
     std::vector<cv::Point3f>   pts3d;
     std::vector<int>           validIdx;
 
+    int tooClose = 0, tooFar = 0, missing = 0;
+
     for (int i = 0; i < (int)kps.size(); ++i) {
         const auto& kp = kps[i];
         int dx = std::max(0, std::min((int)std::round(kp.pt.x * scaleX), depthW - 1));
         int dy = std::max(0, std::min((int)std::round(kp.pt.y * scaleY), depthH - 1));
 
         const auto* row = reinterpret_cast<const uint16_t*>(depthData + (size_t)dy * depthStride);
-        float depthMm = (float)(row[dx] & 0x1FFF);
-        if (depthMm < 100.0f) continue;  // missing / too close
+        uint16_t val = row[dx];
+        float depthMm = (float)(val & 0x1FFF);
+
+        if (depthMm == 0) { missing++; continue; }
+        if (depthMm < 100.0f) { tooClose++; continue; }
 
         float Z = depthMm / 1000.0f;
         float X = (kp.pt.x - cx) / fx * Z;
@@ -537,11 +542,11 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
         validIdx.push_back(i);
     }
 
-    LOGI("generateFingerprint: %zu/%zu keypoints have valid depth",
-         validKps.size(), kps.size());
-
+    LOGI("generateFingerprint: %zu/%zu keypoints have valid depth (scaleX=%.4f, scaleY=%.4f, depthW=%d, depthH=%d)",
+         validKps.size(), kps.size(), scaleX, scaleY, depthW, depthH);
     if (validKps.empty()) {
-        LOGE("generateFingerprint: no keypoints with valid depth — check depth buffer");
+        LOGE("generateFingerprint: no valid depth. Counts: tooClose=%d, tooFar=%d, missing=%d. Total kps=%zu",
+             tooClose, tooFar, missing, kps.size());
         return {};
     }
 

@@ -85,13 +85,23 @@ bool SuperPointDetector::detect(const cv::Mat& gray,
         std::vector<cv::Mat> outputs;
         mNet.forward(outputs, outNames);
 
+        if (outputs.empty()) {
+            LOGE("SuperPoint: forward() produced no outputs");
+            return false;
+        }
+
         const cv::Mat* semiPtr = nullptr;
         const cv::Mat* descPtr = nullptr;
         for (const cv::Mat& o : outputs) {
             if (o.dims < 4) continue;
+            LOGD("SuperPoint: Output shape [%d, %d, %d, %d]", o.size[0], o.size[1], o.size[2], o.size[3]);
             if (o.size[1] == 65)  semiPtr = &o;
             if (o.size[1] == 256) descPtr = &o;
         }
+
+        if (!semiPtr) LOGE("SuperPoint: heatmap output (65 channels) not found");
+        if (!descPtr) LOGE("SuperPoint: descriptor output (256 channels) not found");
+
         if (!semiPtr || !descPtr) return false;
 
         kps.clear();

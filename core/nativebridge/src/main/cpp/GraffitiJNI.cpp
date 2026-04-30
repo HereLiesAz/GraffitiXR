@@ -608,9 +608,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetKeypoints(
 
     std::vector<cv::KeyPoint> kps;
     if (gSlamEngine) {
-        gSlamEngine->getMutex().lock();
+        std::lock_guard<std::mutex> lock(gSlamEngine->getMutex());
         cv::ORB::create(500)->detect(gray, kps);
-        gSlamEngine->getMutex().unlock();
     }
 
     jfloatArray result = env->NewFloatArray(kps.size() * 2);
