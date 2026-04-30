@@ -1685,9 +1685,8 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            azHelpSubItem(
+                            azHelpRailItem(
                                 id = "help_layer_${layer.id}",
-                                hostId = "layer_${layer.id}",
                                 text = navStrings.help,
                                 color = navItemColor,
                                 shape = AzButtonShape.RECTANGLE
