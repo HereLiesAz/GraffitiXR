@@ -608,10 +608,10 @@ class ArViewModel @Inject constructor(
                     targetPhysicalExtent = extent,
                     isCaptureRequested = false,
                     tempCaptureBitmap = rotatedBmp,
+                    annotatedCaptureBitmap = rotatedBmp.isolateMarkings(),
                     unwarpPoints = initialPoints
                 )
             }
-            detectTargetKeypoints(rotatedBmp)
             return
         }
 
@@ -622,6 +622,7 @@ class ArViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 tempCaptureBitmap = rotatedBmp,
+                annotatedCaptureBitmap = rotatedBmp.isolateMarkings(),
                 targetRawBitmap = bitmap,
                 targetDisplayRotation = displayRotation,
                 targetDepthBuffer = depthBuffer,
@@ -636,32 +637,6 @@ class ArViewModel @Inject constructor(
                 isCaptureRequested = false
             )
         }
-        detectTargetKeypoints(rotatedBmp)
-    }
-
-    private fun detectTargetKeypoints(bitmap: Bitmap) {
-        viewModelScope.launch {
-            val mask = withContext(Dispatchers.Default) {
-                val kps = slamManager.getKeypoints(bitmap).map { Offset(it.first, it.second) }
-                generateInitialMask(bitmap.width, bitmap.height, kps)
-            }
-            _uiState.update { it.copy(tempCaptureBitmap = bitmap, annotatedCaptureBitmap = mask) }
-        }
-    }
-
-
-    private fun generateInitialMask(w: Int, h: Int, kps: List<Offset>): Bitmap {
-        val mask = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        val canvas = android.graphics.Canvas(mask)
-        val paint = android.graphics.Paint().apply {
-            color = android.graphics.Color.CYAN // Use Cyan for a premium look
-            alpha = 180
-            style = android.graphics.Paint.Style.FILL
-        }
-        for (kp in kps) {
-            canvas.drawCircle(kp.x * w, kp.y * h, 8f, paint)
-        }
-        return mask
     }
 
     fun applyEraseToMask(nx: Float, ny: Float, radius: Float) {
