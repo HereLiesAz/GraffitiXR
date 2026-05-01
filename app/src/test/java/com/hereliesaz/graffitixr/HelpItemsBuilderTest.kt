@@ -30,18 +30,23 @@ class HelpItemsBuilderTest {
     }
 
     @Test
-    fun `result contains 23 dynamic keys per layer`() {
+    fun `result contains 23 dynamic keys per layer using layerId convention`() {
         val layers = listOf(Layer(id = "L1", name = "one"), Layer(id = "L2", name = "two"))
         val map = buildHelpItems(strings(), layers)
-        val perLayerKeys = listOf(
-            "layer_", "edit_text_", "size_", "font_", "color_", "kern_",
-            "bold_", "italic_", "outline_", "shadow_", "stencil_", "blend_",
-            "adj_", "invert_", "balance_", "eraser_", "blur_", "liquify_",
-            "dodge_", "burn_", "iso_", "line_", "help_layer_"
+        val toolKeys = listOf(
+            null, "editText", "size", "font", "color", "kern",
+            "bold", "italic", "outline", "shadow", "stencil", "blend",
+            "adj", "invert", "balance", "eraser", "blur", "liquify",
+            "dodge", "burn", "iso", "line", "help",
         )
         layers.forEach { layer ->
-            perLayerKeys.forEach { prefix ->
-                assertTrue("expected '$prefix${layer.id}'", "$prefix${layer.id}" in map)
+            toolKeys.forEach { tool ->
+                val expected = when (tool) {
+                    null -> layerId(layer)
+                    "help" -> "${layerId(layer)}.help"
+                    else -> layerId(layer, tool)
+                }
+                assertTrue("expected '$expected' in map", expected in map)
             }
         }
     }

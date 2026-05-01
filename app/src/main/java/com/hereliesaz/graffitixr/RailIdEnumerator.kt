@@ -49,15 +49,30 @@ internal fun enumerateRailItemIds(layers: List<Layer>, mode: EditorMode): Set<St
 
     // Per-layer
     layers.forEach { layer ->
-        val id = layer.id
         ids += setOf(
-            "layer_$id",
-            "edit_text_$id", "size_$id", "font_$id", "color_$id",
-            "kern_$id", "bold_$id", "italic_$id", "outline_$id",
-            "shadow_$id", "stencil_$id", "blend_$id", "adj_$id",
-            "invert_$id", "balance_$id", "eraser_$id", "blur_$id",
-            "liquify_$id", "dodge_$id", "burn_$id", "iso_$id",
-            "line_$id", "help_layer_$id",
+            layerId(layer),
+            layerId(layer, "editText"),
+            layerId(layer, "size"),
+            layerId(layer, "font"),
+            layerId(layer, "color"),
+            layerId(layer, "kern"),
+            layerId(layer, "bold"),
+            layerId(layer, "italic"),
+            layerId(layer, "outline"),
+            layerId(layer, "shadow"),
+            layerId(layer, "stencil"),
+            layerId(layer, "blend"),
+            layerId(layer, "adj"),
+            layerId(layer, "invert"),
+            layerId(layer, "balance"),
+            layerId(layer, "eraser"),
+            layerId(layer, "blur"),
+            layerId(layer, "liquify"),
+            layerId(layer, "dodge"),
+            layerId(layer, "burn"),
+            layerId(layer, "iso"),
+            layerId(layer, "line"),
+            "${layerId(layer)}.help",
         )
     }
 

@@ -37,30 +37,29 @@ internal fun buildHelpItems(strings: AppStrings, layers: List<Layer>): Map<Strin
     )
 
     layers.forEach { layer ->
-        val id = layer.id
-        base["layer_$id"] = strings.help.layer(layer.name)
-        base["edit_text_$id"] = strings.help.editText
-        base["size_$id"] = strings.help.size
-        base["font_$id"] = strings.help.font
-        base["color_$id"] = strings.help.color
-        base["kern_$id"] = strings.help.kern
-        base["bold_$id"] = strings.help.bold
-        base["italic_$id"] = strings.help.italic
-        base["outline_$id"] = strings.help.outline
-        base["shadow_$id"] = strings.help.shadow
-        base["stencil_$id"] = strings.help.stencilGen
-        base["blend_$id"] = strings.help.blend
-        base["adj_$id"] = strings.help.adj
-        base["invert_$id"] = strings.help.invert
-        base["balance_$id"] = strings.help.balance
-        base["eraser_$id"] = strings.help.eraser
-        base["blur_$id"] = strings.help.blur
-        base["liquify_$id"] = strings.help.liquify
-        base["dodge_$id"] = strings.help.dodge
-        base["burn_$id"] = strings.help.burn
-        base["iso_$id"] = strings.help.iso
-        base["line_$id"] = strings.help.line
-        base["help_layer_$id"] = strings.help.helpLayer
+        base[layerId(layer)] = strings.help.layer(layer.name)
+        base[layerId(layer, "editText")] = strings.help.editText
+        base[layerId(layer, "size")] = strings.help.size
+        base[layerId(layer, "font")] = strings.help.font
+        base[layerId(layer, "color")] = strings.help.color
+        base[layerId(layer, "kern")] = strings.help.kern
+        base[layerId(layer, "bold")] = strings.help.bold
+        base[layerId(layer, "italic")] = strings.help.italic
+        base[layerId(layer, "outline")] = strings.help.outline
+        base[layerId(layer, "shadow")] = strings.help.shadow
+        base[layerId(layer, "stencil")] = strings.help.stencilGen
+        base[layerId(layer, "blend")] = strings.help.blend
+        base[layerId(layer, "adj")] = strings.help.adj
+        base[layerId(layer, "invert")] = strings.help.invert
+        base[layerId(layer, "balance")] = strings.help.balance
+        base[layerId(layer, "eraser")] = strings.help.eraser
+        base[layerId(layer, "blur")] = strings.help.blur
+        base[layerId(layer, "liquify")] = strings.help.liquify
+        base[layerId(layer, "dodge")] = strings.help.dodge
+        base[layerId(layer, "burn")] = strings.help.burn
+        base[layerId(layer, "iso")] = strings.help.iso
+        base[layerId(layer, "line")] = strings.help.line
+        base["${layerId(layer)}.help"] = strings.help.helpLayer
     }
 
     return base
