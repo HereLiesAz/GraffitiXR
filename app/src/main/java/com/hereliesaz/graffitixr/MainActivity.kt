@@ -382,6 +382,15 @@ class MainActivity : ComponentActivity() {
                 val modeTutorials = remember(context) { getGraffitiTutorials(context) }
                 val tutorials = getTutorials(editorUiState.layers, strings) + modeTutorials
 
+                if (BuildConfig.DEBUG) {
+                    RailIntegrityCheck.verify(
+                        layers = editorUiState.layers,
+                        mode = editorUiState.editorMode,
+                        helpList = allHelpItems,
+                        tutorials = tutorials,
+                    )
+                }
+
                 AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
                     azTheme(
                         activeColor = Cyan,
