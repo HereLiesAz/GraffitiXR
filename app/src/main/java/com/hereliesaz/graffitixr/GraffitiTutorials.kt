@@ -12,7 +12,7 @@ import com.hereliesaz.graffitixr.design.R as DesignR
 
 fun getGraffitiTutorials(context: Context): Map<String, AzTutorial> {
     return mapOf(
-        "ar_mode" to azTutorial {
+        "mode.ar.firstRun" to azTutorial {
             scene(
                 id = "ar_scene",
                 content = { Box(Modifier.fillMaxSize()) }
@@ -20,7 +20,7 @@ fun getGraffitiTutorials(context: Context): Map<String, AzTutorial> {
                 card(
                     title = context.getString(DesignR.string.tut_ar_title),
                     text = context.getString(DesignR.string.tut_ar_text),
-                    highlight = AzHighlight.Item("ar")
+                    highlight = AzHighlight.Item("mode.ar")
                 )
                 card(
                     title = context.getString(DesignR.string.tut_ar_step1_title),
@@ -44,7 +44,7 @@ fun getGraffitiTutorials(context: Context): Map<String, AzTutorial> {
                 )
             }
         },
-        "overlay_mode" to azTutorial {
+        "mode.overlay.firstRun" to azTutorial {
             scene(
                 id = "overlay_scene",
                 content = { Box(Modifier.fillMaxSize()) }
@@ -52,7 +52,7 @@ fun getGraffitiTutorials(context: Context): Map<String, AzTutorial> {
                 card(
                     title = context.getString(DesignR.string.tut_overlay_title),
                     text = context.getString(DesignR.string.tut_overlay_text),
-                    highlight = AzHighlight.Item("overlay")
+                    highlight = AzHighlight.Item("mode.overlay")
                 )
                 card(
                     title = context.getString(DesignR.string.tut_overlay_step1_title),
@@ -66,7 +66,7 @@ fun getGraffitiTutorials(context: Context): Map<String, AzTutorial> {
                 )
             }
         },
-        "mockup_mode" to azTutorial {
+        "mode.mockup.firstRun" to azTutorial {
             scene(
                 id = "mockup_scene",
                 content = { Box(Modifier.fillMaxSize()) }
@@ -74,7 +74,7 @@ fun getGraffitiTutorials(context: Context): Map<String, AzTutorial> {
                 card(
                     title = context.getString(DesignR.string.tut_mockup_title),
                     text = context.getString(DesignR.string.tut_mockup_text),
-                    highlight = AzHighlight.Item("mockup")
+                    highlight = AzHighlight.Item("mode.mockup")
                 )
                 card(
                     title = context.getString(DesignR.string.tut_mockup_step1_title),
@@ -88,7 +88,7 @@ fun getGraffitiTutorials(context: Context): Map<String, AzTutorial> {
                 )
             }
         },
-        "trace_mode" to azTutorial {
+        "mode.trace.firstRun" to azTutorial {
             scene(
                 id = "trace_scene",
                 content = { Box(Modifier.fillMaxSize()) }
