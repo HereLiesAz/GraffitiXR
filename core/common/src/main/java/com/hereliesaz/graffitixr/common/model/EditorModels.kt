@@ -6,14 +6,23 @@ import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import com.hereliesaz.graffitixr.common.serialization.BlendModeSerializer
+import com.hereliesaz.graffitixr.common.serialization.OffsetSerializer
+import com.hereliesaz.graffitixr.common.serialization.UriSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 /**
  * Represents a single graphical layer in the editor with all aesthetic and spatial parameters.
+ * Serializable fields cover all wire-transferable state. Bitmap is runtime-only and excluded.
  */
+@Serializable
 data class Layer(
     val id: String,
     val name: String,
+    @Serializable(with = UriSerializer::class)
     val uri: Uri? = null,
+    @Transient
     val bitmap: Bitmap? = null,
     val isVisible: Boolean = true,
     val opacity: Float = 1.0f,
@@ -27,8 +36,10 @@ data class Layer(
     val isSketch: Boolean = false,
     val textParams: TextLayerParams? = null,
     val isLinked: Boolean = false,
+    @Serializable(with = BlendModeSerializer::class)
     val blendMode: BlendMode = BlendMode.SrcOver,
     val warpMesh: List<Float> = emptyList(),
+    @Serializable(with = OffsetSerializer::class)
     val offset: Offset = Offset.Zero,
     val rotationX: Float = 0f,
     val rotationY: Float = 0f,
@@ -37,6 +48,39 @@ data class Layer(
     val isInverted: Boolean = false,
     val stencilType: StencilLayerType? = null,
     val stencilSourceId: String? = null
+)
+
+/**
+ * The subset of a layer's visual/aesthetic properties that can be changed without replacing
+ * the whole layer. Used by Op.LayerPropsChange to stream property-only mutations over the wire.
+ */
+@Serializable
+data class LayerProps(
+    val isVisible: Boolean = true,
+    val opacity: Float = 1.0f,
+    val brightness: Float = 0.0f,
+    val contrast: Float = 1.0f,
+    val saturation: Float = 1.0f,
+    val colorBalanceR: Float = 1.0f,
+    val colorBalanceG: Float = 1.0f,
+    val colorBalanceB: Float = 1.0f,
+    val isImageLocked: Boolean = false,
+    val isInverted: Boolean = false,
+    @Serializable(with = BlendModeSerializer::class)
+    val blendMode: BlendMode = BlendMode.SrcOver
+)
+
+/**
+ * A completed brush stroke, coarse-grained: only emitted once the user lifts their finger.
+ * Points are encoded as interleaved [x0, y0, x1, y1, ...] for compact wire transfer.
+ */
+@Serializable
+data class BrushStroke(
+    val points: List<Float> = emptyList(),
+    val colorArgb: Long = 0xFFFFFFFF,
+    val brushSize: Float = 50f,
+    val brushFeathering: Float = 0f,
+    val blendModeOrdinal: Int = 3 // BlendMode.SrcOver ordinal
 )
 
 /**
