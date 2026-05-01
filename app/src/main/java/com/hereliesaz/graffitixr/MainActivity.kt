@@ -379,7 +379,8 @@ class MainActivity : ComponentActivity() {
                     helpViewModel.setActiveHelpList(allHelpItems)
                 }
 
-                val tutorials = getTutorials(editorUiState.layers, strings)
+                val modeTutorials = remember(context) { getGraffitiTutorials(context) }
+                val tutorials = getTutorials(editorUiState.layers, strings) + modeTutorials
 
                 AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
                     azTheme(
@@ -449,10 +450,10 @@ class MainActivity : ComponentActivity() {
 
                             if (noLayers && (editorUiState.editorMode != EditorMode.AR || noAnchor)) {
                                 val tutorialId = when (editorUiState.editorMode) {
-                                    EditorMode.AR      -> "ar_mode"
-                                    EditorMode.OVERLAY -> "overlay_mode"
-                                    EditorMode.MOCKUP  -> "mockup_mode"
-                                    EditorMode.TRACE   -> "trace_mode"
+                                    EditorMode.AR      -> "mode.ar.firstRun"
+                                    EditorMode.OVERLAY -> "mode.overlay.firstRun"
+                                    EditorMode.MOCKUP  -> "mode.mockup.firstRun"
+                                    EditorMode.TRACE   -> "mode.trace.firstRun"
                                     else               -> null
                                 }
                                 val key = "tut_${editorUiState.editorMode.name.lowercase()}"
