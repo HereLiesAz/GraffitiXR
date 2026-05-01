@@ -18,33 +18,34 @@ internal fun enumerateRailItemIds(layers: List<Layer>, mode: EditorMode): Set<St
 
     // Mode menu
     ids += setOf(
-        "mode_host", "ar", "overlay", "mockup", "trace",
-        "wearable",
+        "mode.host", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace",
+        "wearable.main",
     )
     if (mode == EditorMode.AR) {
-        ids += setOf("scan_mode_cycle", "coop_main")
+        ids += setOf("target.scanModeCycle", "coop.main")
     }
 
     // Target menu (AR only)
     if (mode == EditorMode.AR) {
-        ids += setOf("target_host", "create")
+        ids += setOf("target.host", "target.create")
     }
 
     // Design menu
     ids += setOf(
-        "design_host", "add_img", "add_draw", "add_text",
+        "design.host", "design.addImg", "design.addDraw", "design.addText",
     )
     if (mode == EditorMode.MOCKUP) {
-        ids += "wall"
+        ids += "design.wall"
     }
 
     // Project menu
     ids += setOf(
-        "project_host", "new", "save", "load", "export", "settings",
+        "project.host", "project.new", "project.save", "project.load",
+        "project.export", "project.settings",
     )
 
     // Global tools
-    ids += setOf("light", "lock_trace", "help_main")
+    ids += setOf("tool.light", "tool.lockTrace", "tool.helpMain")
 
     // Per-layer
     layers.forEach { layer ->

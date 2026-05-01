@@ -19,11 +19,11 @@ class HelpItemsBuilderTest {
     fun `result contains every static key`() {
         val map = buildHelpItems(strings(), emptyList())
         listOf(
-            "mode_host", "ar", "overlay", "mockup", "trace",
-            "target_host", "scan_mode_toggle", "create",
-            "design_host", "add_img", "add_draw", "add_text", "wall",
-            "project_host", "new", "save", "load", "export", "settings",
-            "light", "lock_trace", "help_main",
+            "mode.host", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace",
+            "target.host", "target.scanModeToggle", "target.create",
+            "design.host", "design.addImg", "design.addDraw", "design.addText", "design.wall",
+            "project.host", "project.new", "project.save", "project.load", "project.export", "project.settings",
+            "tool.light", "tool.lockTrace", "tool.helpMain",
         ).forEach { id ->
             assertTrue("expected key '$id' in helpItems", id in map)
         }
