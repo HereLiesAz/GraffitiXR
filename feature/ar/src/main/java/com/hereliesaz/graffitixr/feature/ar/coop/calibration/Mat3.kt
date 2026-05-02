@@ -36,6 +36,23 @@ internal data class Mat3(
         m01 * (m10 * m22 - m12 * m20) +
         m02 * (m10 * m21 - m11 * m20)
 
+    fun inverse(): Mat3? {
+        val d = det()
+        if (kotlin.math.abs(d) < 1e-9f) return null
+        val invD = 1f / d
+        return Mat3(
+             (m11 * m22 - m12 * m21) * invD,
+            -(m01 * m22 - m02 * m21) * invD,
+             (m01 * m12 - m02 * m11) * invD,
+            -(m10 * m22 - m12 * m20) * invD,
+             (m00 * m22 - m02 * m20) * invD,
+            -(m00 * m12 - m02 * m10) * invD,
+             (m10 * m21 - m11 * m20) * invD,
+            -(m00 * m21 - m01 * m20) * invD,
+             (m00 * m11 - m01 * m10) * invD,
+        )
+    }
+
     companion object {
         val IDENTITY = Mat3(1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f)
     }

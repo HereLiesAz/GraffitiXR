@@ -29,21 +29,29 @@ internal object Procrustes {
         }
         val h = Mat3(h00, h01, h02, h10, h11, h12, h20, h21, h22)
 
-        val rotation = kabschRotation(h) ?: return null
+        // Kabsch: for H = Σ s_i ⊗ d_i = M R^T (M sym-pos), polar decomp gives the
+        // orthogonal factor as R^T, so transpose to recover R.
+        val rotation = kabschRotation(h)?.transpose() ?: return null
         val translation = dstCentroid - (rotation * srcCentroid)
         return Mat4.fromRotationTranslation(rotation, translation)
     }
 
+    /**
+     * Polar-decomposition Newton iteration: X_{k+1} = 0.5 (X_k + (X_k^T)^{-1}).
+     * Converges quadratically to the orthogonal factor R of H = R P
+     * for any non-singular H. Reflection-guarded so det(R) > 0.
+     */
     private fun kabschRotation(h: Mat3): Mat3? {
-        var r = Mat3.IDENTITY
-        var current = h
-        repeat(10) {
-            val rNext = current
-            val rt = rNext.transpose()
-            val rtR = rt * rNext
-            val invSqrt = invSqrtSymmetric3x3(rtR) ?: return null
-            current = rNext * invSqrt
-            r = current
+        if (kotlin.math.abs(h.det()) < 1e-9f) return null
+        var r = h
+        var prevDiff = Float.MAX_VALUE
+        repeat(40) {
+            val rt = r.transpose()
+            val rtInv = rt.inverse() ?: return null
+            val next = avg(r, rtInv)
+            prevDiff = frobeniusDiff(next, r)
+            r = next
+            if (prevDiff < 1e-7f) return@repeat
         }
         return if (r.det() < 0f) {
             Mat3(
@@ -54,27 +62,20 @@ internal object Procrustes {
         } else r
     }
 
-    private fun invSqrtSymmetric3x3(m: Mat3): Mat3? {
-        var x = Mat3.IDENTITY
-        repeat(20) {
-            val xx = x * x
-            val mxx = m * xx
-            val term = Mat3(
-                3f - mxx.m00, -mxx.m01, -mxx.m02,
-                -mxx.m10, 3f - mxx.m11, -mxx.m12,
-                -mxx.m20, -mxx.m21, 3f - mxx.m22,
-            )
-            x = scaledMultiply(x, term, 0.5f)
-        }
-        return x
-    }
+    private fun avg(a: Mat3, b: Mat3): Mat3 = Mat3(
+        (a.m00 + b.m00) * 0.5f, (a.m01 + b.m01) * 0.5f, (a.m02 + b.m02) * 0.5f,
+        (a.m10 + b.m10) * 0.5f, (a.m11 + b.m11) * 0.5f, (a.m12 + b.m12) * 0.5f,
+        (a.m20 + b.m20) * 0.5f, (a.m21 + b.m21) * 0.5f, (a.m22 + b.m22) * 0.5f,
+    )
 
-    private fun scaledMultiply(a: Mat3, b: Mat3, scale: Float): Mat3 {
-        val p = a * b
-        return Mat3(
-            p.m00 * scale, p.m01 * scale, p.m02 * scale,
-            p.m10 * scale, p.m11 * scale, p.m12 * scale,
-            p.m20 * scale, p.m21 * scale, p.m22 * scale,
+    private fun frobeniusDiff(a: Mat3, b: Mat3): Float {
+        val d00 = a.m00 - b.m00; val d01 = a.m01 - b.m01; val d02 = a.m02 - b.m02
+        val d10 = a.m10 - b.m10; val d11 = a.m11 - b.m11; val d12 = a.m12 - b.m12
+        val d20 = a.m20 - b.m20; val d21 = a.m21 - b.m21; val d22 = a.m22 - b.m22
+        return kotlin.math.sqrt(
+            d00 * d00 + d01 * d01 + d02 * d02 +
+            d10 * d10 + d11 * d11 + d12 * d12 +
+            d20 * d20 + d21 * d21 + d22 * d22
         )
     }
 }

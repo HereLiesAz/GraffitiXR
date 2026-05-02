@@ -41,7 +41,12 @@ class CalibrationSolverTest {
             sin(angle),  cos(angle), 0f,
             0f, 0f, 1f,
         )
-        val src = (1..10).map { Vec3(it.toFloat(), it * 0.3f, it * -0.2f) }
+        // Non-colinear points so rotation is uniquely determined.
+        val src = listOf(
+            Vec3(1f, 0f, 0f), Vec3(0f, 1f, 0f), Vec3(0f, 0f, 1f),
+            Vec3(2f, 1f, 0f), Vec3(1f, 2f, 1f), Vec3(0f, 1f, 2f),
+            Vec3(2f, 0f, 1f), Vec3(1f, 1f, 1f), Vec3(3f, 1f, 0f), Vec3(0f, 2f, 1f),
+        )
         val dst = src.map { rot * it }
         val out = Procrustes.solve(src, dst)
         assertNotNull(out)
@@ -56,7 +61,10 @@ class CalibrationSolverTest {
         val angle = 0.3f
         val rot = Mat3(cos(angle), 0f, sin(angle), 0f, 1f, 0f, -sin(angle), 0f, cos(angle))
         val t = Vec3(1f, 2f, 3f)
-        val src = (1..20).map { Vec3(it * 0.1f, it * -0.1f, it * 0.05f) }
+        // Non-colinear point cloud sampled per-axis so rotation is uniquely determined.
+        val src = (1..20).map {
+            Vec3(rng.nextFloat() * 2f - 1f, rng.nextFloat() * 2f - 1f, rng.nextFloat() * 2f - 1f)
+        }
         val dst = src.map { (rot * it) + t + Vec3(rng.nextFloat() * 0.005f, rng.nextFloat() * 0.005f, rng.nextFloat() * 0.005f) }
 
         val out = Procrustes.solve(src, dst)
