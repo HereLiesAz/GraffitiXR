@@ -3,14 +3,29 @@ package com.hereliesaz.graffitixr.nativebridge
 
 import android.content.res.AssetManager
 import android.graphics.Bitmap
+import android.util.Log
 import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.sensor.CameraFrame
+import com.hereliesaz.graffitixr.common.sensor.ImuSample
+import com.hereliesaz.graffitixr.common.sensor.PixelFormat
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
+import com.hereliesaz.graffitixr.common.wearable.WearableManager
 import java.nio.ByteBuffer
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 @Singleton
-class SlamManager @Inject constructor() {
+class SlamManager @Inject constructor(
+    private val wearableManager: WearableManager,
+) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var collectionJob: Job? = null
 
     init {
         NativeLibLoader.loadAll()
@@ -191,7 +206,51 @@ class SlamManager @Inject constructor() {
         return nativeGetAnchorCandidates(threshold, maxCount)
     }
 
+    fun startSensorCollection() {
+        collectionJob?.cancel()
+        collectionJob = scope.launch {
+            wearableManager.activeSensorSource.collectLatest { source ->
+                launch {
+                    source.cameraFrames.collect { frame -> forwardFrame(frame) }
+                }
+                launch {
+                    source.imuSamples.collect { sample -> forwardImu(sample) }
+                }
+            }
+        }
+    }
+
+    fun stopSensorCollection() {
+        collectionJob?.cancel()
+        collectionJob = null
+    }
+
+    private fun forwardFrame(frame: CameraFrame) {
+        if (!frame.pixels.isDirect) {
+            Log.w(TAG, "skipping non-direct ByteBuffer frame")
+            return
+        }
+        when (frame.format) {
+            PixelFormat.RGBA_8888 -> {
+                feedColorFrame(frame.pixels, frame.width, frame.height, frame.timestampNs, null)
+            }
+            PixelFormat.YUV_420_888 -> {
+                // Single-buffer YUV from CameraFrame doesn't expose Y/U/V planes separately;
+                // feedYuvFrame requires 3 plane buffers + strides. Forwarding YUV through the
+                // SensorSource path needs CameraFrame to carry plane info — out of scope here.
+                Log.w(TAG, "YUV frame forwarding not yet wired through SensorSource path")
+            }
+        }
+    }
+
+    private fun forwardImu(sample: ImuSample) {
+        val gyro = floatArrayOf(sample.gyro.x, sample.gyro.y, sample.gyro.z)
+        val accel = floatArrayOf(sample.accel.x, sample.accel.y, sample.accel.z)
+        updateDeviceMotion(gyro, accel)
+    }
+
     fun destroy() {
+        stopSensorCollection()
         if (isInitialized) {
             nativeDestroy()
             isInitialized = false
@@ -299,4 +358,8 @@ class SlamManager @Inject constructor() {
     private external fun nativeApplyLiquify(stroke: FloatArray, brushSize: Float, intensity: Float)
     private external fun nativeDrawLiquify(width: Int, height: Int)
     private external fun nativeBakeLiquify(outBitmap: Bitmap)
+
+    private companion object {
+        private const val TAG = "SlamManager"
+    }
 }

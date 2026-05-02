@@ -1,19 +1,10 @@
 package com.hereliesaz.graffitixr.nativebridge.di
 
-import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.Module
-import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import javax.inject.Singleton
 
+// SlamManager is @Singleton @Inject constructor — Hilt injects it directly; no manual @Provides needed.
 @Module
 @InstallIn(SingletonComponent::class)
-object NativeBridgeModule {
-
-    @Provides
-    @Singleton
-    fun provideSlamManager(): SlamManager {
-        return SlamManager()
-    }
-}
+object NativeBridgeModule
