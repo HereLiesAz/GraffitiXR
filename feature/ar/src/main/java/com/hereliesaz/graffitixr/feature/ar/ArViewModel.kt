@@ -100,45 +100,12 @@ class ArViewModel @Inject constructor(
         if (collaborationManager == null) {
             collaborationManager = CollaborationManager(appContext)
         }
-        _uiState.update { it.copy(isCoopSearching = true, coopStatus = "Searching for sessions...", showCoopNotFoundDialog = false) }
-        
-        var found = false
-        val searchTimeout = viewModelScope.launch {
-            delay(5000)
-            if (!found) {
-                _uiState.update { it.copy(isCoopSearching = false, coopStatus = null, showCoopNotFoundDialog = true) }
-            }
-        }
-
-        collaborationManager?.startDiscovery { address, port ->
-            if (found) return@startDiscovery
-            found = true
-            searchTimeout.cancel()
-            
-            viewModelScope.launch {
-                _uiState.update { it.copy(isCoopSearching = false, coopStatus = "Joining session...") }
-                val projectFile = File(appContext.filesDir, "imported_coop_${System.currentTimeMillis()}.gxr")
-                val success = collaborationManager?.connectToPeer(address, port, projectFile) ?: false
-                
-                if (success) {
-                    // Load the received project
-                    val project = projectManager.importProjectFromUri(appContext, projectFile.toUri())
-                    if (project != null) {
-                        projectRepository.loadProject(project.id)
-                        _uiState.update { it.copy(isSyncing = false, coopStatus = "Joined!", coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) }
-                    } else {
-                        _uiState.update { it.copy(isSyncing = false, coopStatus = "Failed to import project.", coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.NONE) }
-                    }
-                } else {
-                    _uiState.update { it.copy(isSyncing = false, coopStatus = "Connection failed.", coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.NONE) }
-                }
-            }
-        }
+        // Discovery removed — rewritten in Task 12.
+        _uiState.update { it.copy(isCoopSearching = false, coopStatus = null, showCoopNotFoundDialog = true) }
     }
 
     fun stopCollaboration() {
         collaborationManager?.stopServer()
-        collaborationManager?.stopDiscovery()
         _uiState.update { it.copy(isSyncing = false, isCoopSearching = false, coopStatus = null) }
     }
 

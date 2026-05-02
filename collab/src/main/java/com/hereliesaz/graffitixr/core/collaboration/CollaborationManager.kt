@@ -13,9 +13,9 @@ import java.io.DataOutputStream
 
 /**
  * Orchestrates AR synchronization between local peers.
+ * NOTE: Discovery logic removed — rewritten in Task 12.
  */
 class CollaborationManager(context: Context) {
-    private val discovery = DiscoveryManager(context)
     private var serverSocket: ServerSocket? = null
     private var isRunning = false
 
@@ -29,8 +29,6 @@ class CollaborationManager(context: Context) {
     suspend fun startServer(projectFile: File) = withContext(Dispatchers.IO) {
         try {
             serverSocket = ServerSocket(0)
-            val port = serverSocket!!.localPort
-            discovery.startBroadcasting(port)
             isRunning = true
 
             while (isRunning) {
@@ -39,7 +37,7 @@ class CollaborationManager(context: Context) {
                 } catch (e: Exception) {
                     null
                 } ?: break
-                
+
                 // Handle each client in a separate coroutine if we want multi-peer,
                 // but for now, the original logic is fine for a simple session.
                 handlePeerHandshake(client, projectFile, isHost = true)
@@ -55,21 +53,6 @@ class CollaborationManager(context: Context) {
         isRunning = false
         serverSocket?.close()
         serverSocket = null
-        discovery.stopBroadcasting()
-    }
-
-    /**
-     * Start looking for peers.
-     */
-    fun startDiscovery(onPeerFound: (java.net.InetAddress, Int) -> Unit) {
-        discovery.discoverNSD { info ->
-            onPeerFound(info.host, info.port)
-        }
-        discovery.discoverP2P()
-    }
-
-    fun stopDiscovery() {
-        discovery.stopDiscovery()
     }
 
     /**
