@@ -35,6 +35,7 @@ class ArSessionTest {
     private val projectRepository: ProjectRepository = mockk(relaxed = true)
     private val settingsRepository: SettingsRepository = mockk(relaxed = true)
     private val projectManager: com.hereliesaz.graffitixr.data.ProjectManager = mockk(relaxed = true)
+    private val collaborationManager: com.hereliesaz.graffitixr.core.collaboration.CollaborationManager = mockk(relaxed = true)
     private val context: Context = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
@@ -48,7 +49,7 @@ class ArSessionTest {
         every { settingsRepository.showAnchorBoundary } returns flowOf(false)
         every { projectRepository.currentProject } returns MutableStateFlow(null)
         every { context.filesDir } returns File("/tmp")
-        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, projectManager, context)
+        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, projectManager, collaborationManager, context)
     }
 
     @After
