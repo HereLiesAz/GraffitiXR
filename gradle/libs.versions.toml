@@ -41,6 +41,8 @@ inkBrush = "1.0.0"
 mwdat = "0.6.0"
 retrofit = "2.11.0"
 okhttp = "4.12.0"
+zxingCore = "3.5.3"
+zxingAndroidEmbedded = "4.3.0"
 
 [libraries]
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
@@ -107,6 +109,8 @@ androidx-ink-brush = { group = "androidx.ink", name = "ink-brush", version.ref =
 mwdat-core = { group = "com.meta.wearable", name = "mwdat-core", version.ref = "mwdat" }
 mwdat-camera = { group = "com.meta.wearable", name = "mwdat-camera", version.ref = "mwdat" }
 mwdat-mockdevice = { group = "com.meta.wearable", name = "mwdat-mockdevice", version.ref = "mwdat" }
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxingCore" }
+zxing-android-embedded = { group = "com.journeyapps", name = "zxing-android-embedded", version.ref = "zxingAndroidEmbedded" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
