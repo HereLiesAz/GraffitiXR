@@ -1182,29 +1182,29 @@ class MainActivity : ComponentActivity() {
 
                 azDivider()
             }
-        }
 
-        azRailHostItem(id = "project.host", text = navStrings.project, color = navItemColor)
-        azRailSubItem(id = "project.new", hostId = "project.host", text = navStrings.new, color = navItemColor, shape = AzButtonShape.NONE) {
-            dashboardViewModel.onNewProjectTriggered()
-        }
-        azRailSubItem(id = "project.save", hostId = "project.host", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE) {
-            showSaveDialog = true
-        }
-        azRailSubItem(id = "project.load", hostId = "project.host", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {
-            this@MainActivity.showLibrary = true
-        }
-        azRailSubItem(id = "project.export", hostId = "project.host", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE) {
-            if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
-                arViewModel.requestExport { bgBitmap ->
-                    editorViewModel.exportImage(bgBitmap)
-                }
-            } else {
-                editorViewModel.exportImage(null)
+            azRailHostItem(id = "project.host", text = navStrings.project, color = navItemColor)
+            azRailSubItem(id = "project.new", hostId = "project.host", text = navStrings.new, color = navItemColor, shape = AzButtonShape.NONE) {
+                dashboardViewModel.onNewProjectTriggered()
             }
-        }
-        azRailSubItem(id = "project.settings", hostId = "project.host", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE) {
-            showSettings = true
+            azRailSubItem(id = "project.save", hostId = "project.host", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE) {
+                showSaveDialog = true
+            }
+            azRailSubItem(id = "project.load", hostId = "project.host", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {
+                this@MainActivity.showLibrary = true
+            }
+            azRailSubItem(id = "project.export", hostId = "project.host", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE) {
+                if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
+                    arViewModel.requestExport { bgBitmap ->
+                        editorViewModel.exportImage(bgBitmap)
+                    }
+                } else {
+                    editorViewModel.exportImage(null)
+                }
+            }
+            azRailSubItem(id = "project.settings", hostId = "project.host", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE) {
+                showSettings = true
+            }
         }
 
         azDivider()
