@@ -121,6 +121,7 @@ androidComponents {
 }
 
 dependencies {
+    implementation(project(":android_collaboration_module"))
     implementation(project(":core:nativebridge"))
     implementation(project(":feature:ar"))
     implementation(project(":feature:editor"))
@@ -175,4 +176,7 @@ dependencies {
     debugImplementation(libs.compose.ui.test.manifest)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
+
+    implementation(libs.zxing.core)
+    implementation(libs.zxing.android.embedded)
 }

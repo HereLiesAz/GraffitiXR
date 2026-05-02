@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.DispatcherProvider
+import com.hereliesaz.graffitixr.common.coop.OpEmitter
 import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.common.util.ImageUtils
 import com.hereliesaz.graffitixr.common.util.saveBitmapToGallery
@@ -75,7 +76,8 @@ class EditorViewModel @Inject constructor(
     private val stencilProcessor: StencilProcessor,
     private val stencilPrintEngine: StencilPrintEngine,
     internal val slamManager: SlamManager,
-    private val dispatchers: DispatcherProvider
+    private val dispatchers: DispatcherProvider,
+    private val opEmitter: OpEmitter,
 ) : ViewModel(), EditorActions {
 
     private val _uiState = MutableStateFlow(EditorUiState())
@@ -394,6 +396,7 @@ class EditorViewModel @Inject constructor(
 
                 withContext(dispatchers.main) {
                     _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE, activePanel = EditorPanel.NONE) }
+                    opEmitter.emit(Op.LayerAdd(newLayer))
                     saveProject()
                 }
             } else {
@@ -431,6 +434,7 @@ class EditorViewModel @Inject constructor(
                 layerStrokes[newLayer.id] = mutableListOf()
 
                 _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE, activePanel = EditorPanel.NONE) }
+                opEmitter.emit(Op.LayerAdd(newLayer))
                 saveProject()
             }
         }
@@ -591,6 +595,7 @@ class EditorViewModel @Inject constructor(
         }
         baseBitmaps.remove(id)
         layerStrokes.remove(id)
+        opEmitter.emit(Op.LayerRemove(id))
         saveProject()
     }
 
@@ -600,6 +605,7 @@ class EditorViewModel @Inject constructor(
             val map = state.layers.associateBy { it.id }
             state.copy(layers = newOrder.mapNotNull { map[it] })
         }
+        opEmitter.emit(Op.LayerReorder(newOrder))
         saveProject()
     }
 
@@ -906,13 +912,43 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    override fun onGestureEnd() { saveProject(); _uiState.update { it.copy(gestureInProgress = false) } }
+    override fun onGestureEnd() {
+        saveProject()
+        _uiState.update { it.copy(gestureInProgress = false) }
+        // Emit LayerTransform for the active layer. The editor stores transform as
+        // scale/offset/rotationX/Y/Z rather than a Matrix, so we encode them in the
+        // first 6 slots of a 16-float list (slots 6-15 are zeros).
+        // applySpectatorOp must decode using the same convention.
+        val state = _uiState.value
+        val activeId = state.activeLayerId ?: return
+        val layer = state.layers.find { it.id == activeId } ?: return
+        val encodedMatrix = listOf(
+            layer.scale, layer.offset.x, layer.offset.y,
+            layer.rotationX, layer.rotationY, layer.rotationZ,
+            0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f
+        )
+        opEmitter.emit(Op.LayerTransform(activeId, encodedMatrix))
+    }
     override fun onGestureStart() { 
         pushHistory()
         _uiState.update { it.copy(gestureInProgress = true, activePanel = EditorPanel.NONE) } 
     }
-    override fun toggleImageLock() { pushHistory(); updateActiveLayer { it.copy(isImageLocked = !it.isImageLocked) }; saveProject() }
-    override fun onToggleInvert() { pushHistory(); updateActiveLayer { it.copy(isInverted = !it.isInverted) }; saveProject() }
+    override fun toggleImageLock() {
+        pushHistory()
+        updateActiveLayer { it.copy(isImageLocked = !it.isImageLocked) }
+        saveProject()
+        _uiState.value.activeLayerId?.let { id ->
+            _uiState.value.layers.find { it.id == id }?.let { opEmitter.emit(Op.LayerPropsChange(id, it.toLayerProps())) }
+        }
+    }
+    override fun onToggleInvert() {
+        pushHistory()
+        updateActiveLayer { it.copy(isInverted = !it.isInverted) }
+        saveProject()
+        _uiState.value.activeLayerId?.let { id ->
+            _uiState.value.layers.find { it.id == id }?.let { opEmitter.emit(Op.LayerPropsChange(id, it.toLayerProps())) }
+        }
+    }
     override fun onOpacityChanged(v: Float) = updateActiveLayer { it.copy(opacity = v) }
     override fun onBrightnessChanged(v: Float) = updateActiveLayer { it.copy(brightness = v) }
     override fun onContrastChanged(v: Float) = updateActiveLayer { it.copy(contrast = v) }
@@ -937,6 +973,11 @@ class EditorViewModel @Inject constructor(
     override fun onAdjustmentEnd() {
         _uiState.update { it.copy(gestureInProgress = false) }
         saveProject()
+        // Emit LayerPropsChange for the active layer after adjustment is committed.
+        val state = _uiState.value
+        val activeId = state.activeLayerId ?: return
+        val layer = state.layers.find { it.id == activeId } ?: return
+        opEmitter.emit(Op.LayerPropsChange(activeId, layer.toLayerProps()))
     }
 
     override fun setLayerTransform(scale: Float, offset: Offset, rx: Float, ry: Float, rz: Float) {
@@ -967,6 +1008,9 @@ class EditorViewModel @Inject constructor(
             layer.copy(blendMode = domainModes[nextIndex].toComposeBlendMode())
         }
         saveProject()
+        _uiState.value.activeLayerId?.let { id ->
+            _uiState.value.layers.find { it.id == id }?.let { opEmitter.emit(Op.LayerPropsChange(id, it.toLayerProps())) }
+        }
     }
 
     override fun onLayerDuplicated(id: String) {
@@ -1007,6 +1051,20 @@ class EditorViewModel @Inject constructor(
         _uiState.update { state -> state.copy(layers = state.layers.map { if (it.id == id) it.copy(name = name) else it }) }
         saveProject()
     }
+
+    private fun Layer.toLayerProps() = LayerProps(
+        isVisible = isVisible,
+        opacity = opacity,
+        brightness = brightness,
+        contrast = contrast,
+        saturation = saturation,
+        colorBalanceR = colorBalanceR,
+        colorBalanceG = colorBalanceG,
+        colorBalanceB = colorBalanceB,
+        isImageLocked = isImageLocked,
+        isInverted = isInverted,
+        blendMode = blendMode
+    )
 
     private fun updateActiveLayer(transform: (Layer) -> Layer) {
         _uiState.update { state -> val id = state.activeLayerId ?: return@update state; state.copy(layers = state.layers.map { if (it.id == id) transform(it) else it }) }
@@ -1271,6 +1329,20 @@ class EditorViewModel @Inject constructor(
             scheduleDiskSave(layerId, workBitmap, layer.uri)
         }
 
+        // Emit StrokeComplete for non-Liquify strokes only (Liquify bakes into the bitmap
+        // and doesn't map cleanly to a BrushStroke replay; leave Liquify sync as a TODO).
+        if (state.activeTool != Tool.LIQUIFY) {
+            val pointsFlat = points.flatMap { listOf(it.x, it.y) }
+            val brushStroke = BrushStroke(
+                points = pointsFlat,
+                colorArgb = state.activeColor.toArgb().toLong() and 0xFFFFFFFFL,
+                brushSize = state.brushSize,
+                brushFeathering = state.brushFeathering,
+                blendModeOrdinal = state.activeTool.ordinal // NOTE: Tool ordinal != BlendMode ordinal; spectator applies by re-rasterizing
+            )
+            opEmitter.emit(Op.StrokeComplete(layerId, brushStroke))
+        }
+
         // Clear stroke working state.
         strokeWorkingBitmap = null
         strokeWorkingCanvas = null
@@ -1423,6 +1495,7 @@ class EditorViewModel @Inject constructor(
             state.copy(layers = updatedLayers)
         }
         saveProject()
+        _uiState.value.layers.find { it.id == layerId }?.let { opEmitter.emit(Op.LayerPropsChange(layerId, it.toLayerProps())) }
     }
 
     fun setLayers(layers: List<Layer>) {
@@ -1461,6 +1534,7 @@ class EditorViewModel @Inject constructor(
 
             withContext(dispatchers.main) {
                 _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE, activePanel = EditorPanel.NONE) }
+                opEmitter.emit(Op.LayerAdd(newLayer))
                 saveProject()
             }
         }
@@ -1503,6 +1577,7 @@ class EditorViewModel @Inject constructor(
         pushHistory()
         val updated = params.copy(text = text)
         rerasterizeTextLayer(layerId, updated)
+        opEmitter.emit(Op.TextContentChange(layerId, text))
         viewModelScope.launch(dispatchers.main) { saveProject() }
     }
 
@@ -1675,6 +1750,95 @@ class EditorViewModel @Inject constructor(
 
     override fun onGeneratePoster(layerId: String) {
         // This is called from the PosterOptionsDialog
+    }
+
+    // -------------------------------------------------------------------------
+    // Co-op spectator API
+    // -------------------------------------------------------------------------
+
+    /** Applies a remote Op received from the host, without echoing it back through opEmitter. */
+    fun applySpectatorOp(op: Op) {
+        when (op) {
+            is Op.LayerAdd -> _uiState.update { it.copy(layers = it.layers + op.layer) }
+            is Op.LayerRemove -> _uiState.update { state ->
+                state.copy(layers = state.layers.filterNot { it.id == op.layerId })
+            }
+            is Op.LayerReorder -> _uiState.update { state ->
+                val byId = state.layers.associateBy { it.id }
+                state.copy(layers = op.newOrder.mapNotNull { byId[it] })
+            }
+            is Op.LayerTransform -> {
+                // The host encodes transform as [scale, offsetX, offsetY, rotX, rotY, rotZ, 0...0].
+                // Apply the first 6 slots back to the matching layer.
+                if (op.matrix.size >= 6) {
+                    val scale = op.matrix[0]
+                    val offsetX = op.matrix[1]
+                    val offsetY = op.matrix[2]
+                    val rx = op.matrix[3]
+                    val ry = op.matrix[4]
+                    val rz = op.matrix[5]
+                    _uiState.update { state ->
+                        state.copy(layers = state.layers.map {
+                            if (it.id == op.layerId)
+                                it.copy(
+                                    scale = scale,
+                                    offset = androidx.compose.ui.geometry.Offset(offsetX, offsetY),
+                                    rotationX = rx,
+                                    rotationY = ry,
+                                    rotationZ = rz
+                                )
+                            else it
+                        })
+                    }
+                }
+            }
+            is Op.LayerPropsChange -> _uiState.update { state ->
+                state.copy(layers = state.layers.map {
+                    if (it.id == op.layerId)
+                        it.copy(
+                            isVisible = op.props.isVisible,
+                            opacity = op.props.opacity,
+                            brightness = op.props.brightness,
+                            contrast = op.props.contrast,
+                            saturation = op.props.saturation,
+                            colorBalanceR = op.props.colorBalanceR,
+                            colorBalanceG = op.props.colorBalanceG,
+                            colorBalanceB = op.props.colorBalanceB,
+                            isImageLocked = op.props.isImageLocked,
+                            isInverted = op.props.isInverted,
+                            blendMode = op.props.blendMode
+                        )
+                    else it
+                })
+            }
+            is Op.StrokeComplete -> {
+                // TODO: Wire StrokeComplete application — see Task 17.
+                // The editor stores strokes as rendered bitmaps rather than a List<BrushStroke>,
+                // so replaying a remote stroke requires re-rasterizing into the layer bitmap.
+                // Left as a stub until a spectator-side rasterization path is implemented.
+                android.util.Log.d("EditorViewModel", "applySpectatorOp: StrokeComplete stub for layer ${op.layerId}")
+            }
+            is Op.TextContentChange -> _uiState.update { state ->
+                state.copy(layers = state.layers.map {
+                    if (it.id == op.layerId) {
+                        val updatedParams = it.textParams?.copy(text = op.text)
+                        if (updatedParams != null) {
+                            rerasterizeTextLayer(it.id, updatedParams)
+                            it // rerasterize updates state asynchronously; return unchanged for now
+                        } else it
+                    } else it
+                })
+            }
+        }
+    }
+
+    /**
+     * Loads the editor state from a serialized project snapshot received as a spectator.
+     * Stub: ProjectManager.deserialize was stubbed in Task 14.
+     * When Task 14-equivalent fills in real deserialization, wire this.
+     */
+    fun loadAsSpectator(projectBytes: ByteArray) {
+        android.util.Log.w("EditorViewModel", "loadAsSpectator received ${projectBytes.size} bytes (stub)")
     }
 
     fun generatePosterPdf(selectedLayerIds: List<String>, outputSizeMm: Float) {

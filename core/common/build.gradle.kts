@@ -64,6 +64,7 @@ dependencies {
 
     // Serialization (Fixes Unresolved reference 'serializer')
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.serialization.cbor)
 
     // Meta Wearables SDK
     implementation(libs.mwdat.core)

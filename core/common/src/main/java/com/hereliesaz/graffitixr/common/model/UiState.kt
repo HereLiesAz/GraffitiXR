@@ -128,11 +128,8 @@ data class ArUiState(
     // True when target was captured without depth data; shown as banner in FreezePreviewScreen
     val freezeDepthWarning: Boolean = false,
 
-    // Peer-to-Peer Sync — True when a local peer is found and coordinates are being aligned.
-    val isSyncing: Boolean = false,
-    val isCoopSearching: Boolean = false,
-    val coopStatus: String? = null,
     val coopRole: CoopRole = CoopRole.NONE,
+    val coopSessionState: CoopSessionState = CoopSessionState.Idle,
     val showCoopNotFoundDialog: Boolean = false,
 
     // ── Enhanced Diagnostics ──────────────

@@ -95,6 +95,11 @@ import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
 import com.hereliesaz.graffitixr.design.theme.HotPink
 import com.hereliesaz.graffitixr.design.theme.NavStrings
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
+import com.hereliesaz.graffitixr.common.model.CoopSessionState
+import com.hereliesaz.graffitixr.common.model.CoopRole
+import com.hereliesaz.graffitixr.ui.coop.CoopHostQrOverlay
+import com.hereliesaz.graffitixr.ui.coop.CoopJoinQrScannerOverlay
+import com.hereliesaz.graffitixr.ui.coop.CoopSpectatorBanner
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationBackground
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
 import com.hereliesaz.graffitixr.feature.ar.rememberCameraController
@@ -198,6 +203,9 @@ class MainActivity : ComponentActivity() {
                 val editorUiState by editorViewModel.uiState.collectAsState()
                 val mainUiState by mainViewModel.uiState.collectAsState()
                 val arUiState by arViewModel.uiState.collectAsState()
+                val coopState = arUiState.coopSessionState
+                var showJoinScanner by remember { mutableStateOf(false) }
+                val hostQr by arViewModel.hostQrPayload.collectAsState()
                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
                 val dashboardNavigation by dashboardViewModel.navigationTrigger.collectAsState()
                 val completedTutorials by settingsViewModel.completedTutorials.collectAsState()
@@ -329,6 +337,10 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                LaunchedEffect(arViewModel, editorViewModel) {
+                    arViewModel.spectatorOpHandler = { op -> editorViewModel.applySpectatorOp(op) }
+                }
+
                 val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                     uri?.let { editorViewModel.onAddLayer(it) }
                 }
@@ -417,7 +429,9 @@ class MainActivity : ComponentActivity() {
                             navItemColor = navItemColor,
                             onShowFontPicker = { layerId -> fontPickerLayerId = layerId; showFontPicker = true },
                             layerMenusOpen = layerMenusOpen,
-                            showLibrary = showLibrary
+                            showLibrary = showLibrary,
+                            coopState = coopState,
+                            onShowJoinScanner = { showJoinScanner = true }
                         )
                     }
 
@@ -671,7 +685,8 @@ class MainActivity : ComponentActivity() {
                             }
 
                             SyncingBadge(
-                                isSyncing = arUiState.isSyncing,
+                                isSyncing = coopState is CoopSessionState.Connected
+                                        || coopState is CoopSessionState.Reconnecting,
                                 modifier = Modifier
                                     .align(Alignment.Center)
                                     .padding(bottom = 120.dp),
@@ -687,8 +702,8 @@ class MainActivity : ComponentActivity() {
                             if (arUiState.showCoopNotFoundDialog) {
                                 CoopNotFoundDialog(
                                     onDismiss = { arViewModel.dismissCoopNotFoundDialog() },
-                                    onHost = { arViewModel.startCollaborationHost() },
-                                    onSearch = { arViewModel.startCollaborationDiscovery() },
+                                    onHost = { arViewModel.startHosting() },
+                                    onSearch = { /* TODO Task 15: open QR scanner for joinFromQr */ arViewModel.dismissCoopNotFoundDialog() },
                                     canHost = arUiState.isAnchorEstablished && arUiState.splatCount > 0,
                                     strings = strings
                                 )
@@ -893,6 +908,31 @@ class MainActivity : ComponentActivity() {
                                     strings = strings
                                 )
                             }
+
+                            if (hostQr != null && coopState is CoopSessionState.WaitingForGuest) {
+                                CoopHostQrOverlay(
+                                    qrPayload = hostQr!!,
+                                    onStopSharing = { arViewModel.leaveSession() },
+                                )
+                            }
+                            if (showJoinScanner) {
+                                CoopJoinQrScannerOverlay(
+                                    onScanned = { qr ->
+                                        showJoinScanner = false
+                                        arViewModel.joinFromQr(qr)
+                                    },
+                                    onCancelled = { showJoinScanner = false },
+                                )
+                            }
+                            if (arUiState.coopRole == CoopRole.GUEST &&
+                                (coopState is CoopSessionState.Connected || coopState is CoopSessionState.Reconnecting)) {
+                                CoopSpectatorBanner(
+                                    peerName = (coopState as? CoopSessionState.Connected)?.peerName ?: "host",
+                                    isReconnecting = coopState is CoopSessionState.Reconnecting,
+                                    onLeave = { arViewModel.leaveSession() },
+                                    modifier = Modifier.align(Alignment.TopCenter),
+                                )
+                            }
                         }
                     }
                 }
@@ -972,7 +1012,9 @@ class MainActivity : ComponentActivity() {
         navItemColor: Color = Color.White,
         onShowFontPicker: (String) -> Unit = {},
         layerMenusOpen: MutableMap<String, Boolean>,
-        showLibrary: Boolean
+        showLibrary: Boolean,
+        coopState: CoopSessionState = CoopSessionState.Idle,
+        onShowJoinScanner: () -> Unit = {}
     ) {
         val navStrings = strings.nav
         val requestPermissions = {
@@ -1009,11 +1051,43 @@ class MainActivity : ComponentActivity() {
                 azRailSubItem(
                     id = "coop.main",
                     hostId = "mode.host",
-                    text = arUiState.coopStatus ?: "Co-op",
-                    color = if (arUiState.isCoopSearching || arUiState.isSyncing) Cyan else navItemColor,
+                    text = when (coopState) {
+                        is CoopSessionState.Idle -> "Co-op"
+                        is CoopSessionState.WaitingForGuest -> "Waiting…"
+                        is CoopSessionState.Connected -> "Connected"
+                        is CoopSessionState.Reconnecting -> "Reconnecting…"
+                        is CoopSessionState.Ended -> "Co-op"
+                    },
+                    color = when (coopState) {
+                        is CoopSessionState.WaitingForGuest,
+                        is CoopSessionState.Reconnecting,
+                        is CoopSessionState.Connected -> Cyan
+                        else -> navItemColor
+                    },
                     shape = AzButtonShape.RECTANGLE
                 ) {
-                    arViewModel.startCollaborationDiscovery()
+                    when (coopState) {
+                        is CoopSessionState.Idle, is CoopSessionState.Ended -> {
+                            if (arUiState.coopRole == CoopRole.NONE) {
+                                arViewModel.startHosting()
+                            } else if (arUiState.coopRole == CoopRole.GUEST) {
+                                arViewModel.leaveSession()
+                            }
+                        }
+                        is CoopSessionState.WaitingForGuest, is CoopSessionState.Connected -> {
+                            arViewModel.leaveSession()
+                        }
+                        is CoopSessionState.Reconnecting -> { /* no-op */ }
+                    }
+                }
+                azRailSubItem(
+                    id = "coop.join",
+                    hostId = "mode.host",
+                    text = "Join",
+                    color = navItemColor,
+                    shape = AzButtonShape.RECTANGLE,
+                ) {
+                    onShowJoinScanner()
                 }
             }
 
@@ -1043,12 +1117,12 @@ class MainActivity : ComponentActivity() {
                 azDivider()
             }
 
-            val isGuest = arUiState.coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST
+            val isGuest = arUiState.coopRole == CoopRole.GUEST
             val canEdit = if (isArMode)
                 (arUiState.scanPhase == ScanPhase.COMPLETE || arUiState.isAnchorEstablished) && !isGuest
             else true
 
-            if (canEdit) {
+            if (canEdit && arUiState.coopRole != CoopRole.GUEST) {
                 azRailHostItem(id = "design.host", text = navStrings.design, color = navItemColor)
                 azRailSubItem(id = "design.addImg", hostId = "design.host", text = navStrings.image, color = navItemColor, shape = AzButtonShape.NONE) {
                     overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -1101,7 +1175,7 @@ class MainActivity : ComponentActivity() {
                 arUiState.scanPhase == ScanPhase.COMPLETE || arUiState.isAnchorEstablished
             else true
 
-            if (canEdit) {
+            if (canEdit && arUiState.coopRole != CoopRole.GUEST) {
                 editorUiState.layers.reversed().forEach { layer ->
                     val activeTool = editorUiState.activeTool
                     val forceOpenHiddenMenu = layerMenusOpen[layer.id] ?: false

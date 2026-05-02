@@ -1,134 +1,108 @@
 package com.hereliesaz.graffitixr.core.collaboration
 
-import android.content.Context
-import com.hereliesaz.graffitixr.common.util.NativeLibLoader
+import com.hereliesaz.graffitixr.common.model.CoopSessionState
+import com.hereliesaz.graffitixr.common.model.Op
+import com.hereliesaz.graffitixr.core.collaboration.session.GuestSession
+import com.hereliesaz.graffitixr.core.collaboration.session.HostSession
+import com.hereliesaz.graffitixr.core.collaboration.wire.QrPayload
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.net.InetAddress
-import java.net.ServerSocket
-import java.net.Socket
-import java.io.File
-import java.io.DataInputStream
-import java.io.DataOutputStream
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+import javax.inject.Singleton
 
-/**
- * Orchestrates AR synchronization between local peers.
- */
-class CollaborationManager(context: Context) {
-    private val discovery = DiscoveryManager(context)
-    private var serverSocket: ServerSocket? = null
-    private var isRunning = false
+/** Public API. Editor + AR features depend on this surface only. */
+@Singleton
+class CollaborationManager @Inject constructor() {
 
-    init {
-        NativeLibLoader.loadAll()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    private val _state: MutableStateFlow<CoopSessionState> = MutableStateFlow(CoopSessionState.Idle)
+    val state: StateFlow<CoopSessionState> get() = _state
+
+    @Volatile private var hostSession: HostSession? = null
+    @Volatile private var guestSession: GuestSession? = null
+    @Volatile private var lastQrPayload: QrPayload? = null
+
+    /** Begin hosting. Returns the QR payload to display. */
+    suspend fun startHosting(
+        projectId: String,
+        layerCount: Int,
+        fingerprintBytes: ByteArray,
+        projectBytes: ByteArray,
+        localDeviceName: String,
+        protocolVersion: Int = 1,
+    ): String {
+        check(hostSession == null && guestSession == null) { "already in a session" }
+        val token = QrPayload.newToken()
+        val session = HostSession(
+            token = token,
+            protocolVersion = protocolVersion,
+            localDeviceName = localDeviceName,
+            fingerprintBytes = fingerprintBytes,
+            projectBytes = projectBytes,
+            projectId = projectId,
+            layerCount = layerCount,
+        )
+        hostSession = session
+        observe(session.state)
+        val port = session.startListening()
+        val payload = QrPayload(
+            host = LocalIp.discover() ?: "127.0.0.1",
+            port = port,
+            token = token,
+            protocolVersion = protocolVersion,
+        )
+        lastQrPayload = payload
+        return payload.encode()
     }
 
-    /**
-     * Start accepting peer connections.
-     */
-    suspend fun startServer(projectFile: File) = withContext(Dispatchers.IO) {
-        try {
-            serverSocket = ServerSocket(0)
-            val port = serverSocket!!.localPort
-            discovery.startBroadcasting(port)
-            isRunning = true
+    suspend fun stopHosting() {
+        hostSession?.close(CoopSessionState.EndReason.UserLeft)
+        hostSession = null
+    }
 
-            while (isRunning) {
-                val client = try {
-                    serverSocket?.accept()
-                } catch (e: Exception) {
-                    null
-                } ?: break
-                
-                // Handle each client in a separate coroutine if we want multi-peer,
-                // but for now, the original logic is fine for a simple session.
-                handlePeerHandshake(client, projectFile, isHost = true)
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("CollabManager", "Server error", e)
-        } finally {
-            stopServer()
+    suspend fun joinFromQr(
+        qr: String,
+        localDeviceName: String,
+        onBulkReceived: suspend (fingerprint: ByteArray, project: ByteArray) -> Unit,
+        onOp: suspend (Op) -> Unit,
+    ) {
+        check(hostSession == null && guestSession == null) { "already in a session" }
+        val payload = QrPayload.parse(qr)
+        val session = GuestSession(
+            host = payload.host,
+            port = payload.port,
+            token = payload.token,
+            protocolVersion = payload.protocolVersion,
+            localDeviceName = localDeviceName,
+            onBulkReceived = onBulkReceived,
+            onOp = onOp,
+        )
+        guestSession = session
+        observe(session.state)
+        session.connect()
+    }
+
+    suspend fun leaveSession() {
+        guestSession?.close(CoopSessionState.EndReason.UserLeft)
+        guestSession = null
+        hostSession?.close(CoopSessionState.EndReason.UserLeft)
+        hostSession = null
+        _state.value = CoopSessionState.Idle
+    }
+
+    /** Called by OpEmitterImpl on every editor mutation. */
+    internal fun enqueueHostOp(op: Op) {
+        hostSession?.enqueueOp(op)
+    }
+
+    private fun observe(stateFlow: StateFlow<CoopSessionState>) {
+        scope.launch {
+            stateFlow.collect { _state.value = it }
         }
     }
-
-    fun stopServer() {
-        isRunning = false
-        serverSocket?.close()
-        serverSocket = null
-        discovery.stopBroadcasting()
-    }
-
-    /**
-     * Start looking for peers.
-     */
-    fun startDiscovery(onPeerFound: (java.net.InetAddress, Int) -> Unit) {
-        discovery.discoverNSD { info ->
-            onPeerFound(info.host, info.port)
-        }
-        discovery.discoverP2P()
-    }
-
-    fun stopDiscovery() {
-        discovery.stopDiscovery()
-    }
-
-    /**
-     * Connect to a discovered peer.
-     */
-    suspend fun connectToPeer(host: InetAddress, port: Int, saveProjectTo: File): Boolean = withContext(Dispatchers.IO) {
-        return@withContext try {
-            val socket = Socket()
-            socket.connect(java.net.InetSocketAddress(host, port), 5000) // 5s timeout
-            handlePeerHandshake(socket, saveProjectTo, isHost = false)
-            true
-        } catch (e: Exception) {
-            android.util.Log.e("CollabManager", "Connection failed", e)
-            false
-        }
-    }
-
-    private fun handlePeerHandshake(socket: Socket, projectFile: File, isHost: Boolean) {
-        socket.use { s ->
-            s.soTimeout = 10000 // 10s timeout for data transfer
-            val output = DataOutputStream(s.getOutputStream())
-            val input = DataInputStream(s.getInputStream())
-
-            try {
-                if (isHost) {
-                    // 1. Send Fingerprint
-                    val myFingerprint = nativeExportFingerprint() ?: byteArrayOf()
-                    output.writeInt(myFingerprint.size)
-                    output.write(myFingerprint)
-
-                    // 2. Send Project File
-                    val fileBytes = projectFile.readBytes()
-                    output.writeInt(fileBytes.size)
-                    output.write(fileBytes)
-                    output.flush()
-                } else {
-                    // 1. Receive Fingerprint
-                    val fpSize = input.readInt()
-                    if (fpSize > 0 && fpSize < 10 * 1024 * 1024) { // Safety check 10MB
-                        val peerFingerprint = ByteArray(fpSize)
-                        input.readFully(peerFingerprint)
-                        nativeAlignToPeer(peerFingerprint)
-                    }
-                    
-                    // 2. Receive Project File
-                    val fileSize = input.readInt()
-                    if (fileSize > 0 && fileSize < 100 * 1024 * 1024) { // Safety check 100MB
-                        val fileBytes = ByteArray(fileSize)
-                        input.readFully(fileBytes)
-                        projectFile.writeBytes(fileBytes)
-                    }
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("CollabManager", "Handshake failed", e)
-            }
-        }
-    }
-
-    // Native Bridge Hooks
-    private external fun nativeExportFingerprint(): ByteArray?
-    private external fun nativeAlignToPeer(data: ByteArray)
 }

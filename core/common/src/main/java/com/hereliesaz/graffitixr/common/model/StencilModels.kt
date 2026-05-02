@@ -4,6 +4,7 @@ package com.hereliesaz.graffitixr.common.model
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
+import kotlinx.serialization.Serializable
 
 /**
  * The tonal role of a generated stencil layer.
@@ -11,6 +12,7 @@ import android.net.Uri
  * OVERPAINT topology means no bridging is required — upper-layer islands are
  * physically supported by the surrounding sheet material.
  */
+@Serializable
 enum class StencilLayerType(val label: String, val order: Int, val color: Int) {
     SILHOUETTE("Silhouette", 1, Color.BLACK),
     MIDTONE("Midtone", 2, Color.GRAY),
