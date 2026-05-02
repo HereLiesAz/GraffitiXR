@@ -75,21 +75,21 @@ class ArViewModel @Inject constructor(
     // TODO Task 14: inject CollaborationManager and rewrite full co-op VM logic
     fun startCollaborationHost() {
         if (!uiState.value.isAnchorEstablished || uiState.value.splatCount == 0) {
-            _uiState.update { it.copy(coopStatus = "Capture a target first to host.", showCoopNotFoundDialog = false) }
+            _uiState.update { it.copy(showCoopNotFoundDialog = false) }
             return
         }
         // TODO Task 14: call collaborationManager.startHosting(...)
-        _uiState.update { it.copy(isSyncing = true, coopStatus = "Hosting session...", coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.HOST, showCoopNotFoundDialog = false) }
+        _uiState.update { it.copy(coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.HOST, coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.WaitingForGuest, showCoopNotFoundDialog = false) }
     }
 
     fun startCollaborationDiscovery() {
         // TODO Task 14: rewritten — discovery removed in Task 12.
-        _uiState.update { it.copy(isCoopSearching = false, coopStatus = null, showCoopNotFoundDialog = true) }
+        _uiState.update { it.copy(showCoopNotFoundDialog = true) }
     }
 
     fun stopCollaboration() {
         // TODO Task 14: call collaborationManager.leaveSession()
-        _uiState.update { it.copy(isSyncing = false, isCoopSearching = false, coopStatus = null) }
+        _uiState.update { it.copy(coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.Idle) }
     }
 
     fun dismissCoopNotFoundDialog() {

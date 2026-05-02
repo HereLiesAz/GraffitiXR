@@ -671,7 +671,8 @@ class MainActivity : ComponentActivity() {
                             }
 
                             SyncingBadge(
-                                isSyncing = arUiState.isSyncing,
+                                isSyncing = arUiState.coopSessionState is com.hereliesaz.graffitixr.common.model.CoopSessionState.Connected
+                                        || arUiState.coopSessionState is com.hereliesaz.graffitixr.common.model.CoopSessionState.Reconnecting,
                                 modifier = Modifier
                                     .align(Alignment.Center)
                                     .padding(bottom = 120.dp),
@@ -1009,8 +1010,19 @@ class MainActivity : ComponentActivity() {
                 azRailSubItem(
                     id = "coop.main",
                     hostId = "mode.host",
-                    text = arUiState.coopStatus ?: "Co-op",
-                    color = if (arUiState.isCoopSearching || arUiState.isSyncing) Cyan else navItemColor,
+                    text = when (arUiState.coopSessionState) {
+                        is com.hereliesaz.graffitixr.common.model.CoopSessionState.Idle -> "Co-op"
+                        is com.hereliesaz.graffitixr.common.model.CoopSessionState.WaitingForGuest -> "Waiting…"
+                        is com.hereliesaz.graffitixr.common.model.CoopSessionState.Connected -> "Connected"
+                        is com.hereliesaz.graffitixr.common.model.CoopSessionState.Reconnecting -> "Reconnecting…"
+                        is com.hereliesaz.graffitixr.common.model.CoopSessionState.Ended -> "Co-op"
+                    },
+                    color = when (arUiState.coopSessionState) {
+                        is com.hereliesaz.graffitixr.common.model.CoopSessionState.WaitingForGuest,
+                        is com.hereliesaz.graffitixr.common.model.CoopSessionState.Reconnecting,
+                        is com.hereliesaz.graffitixr.common.model.CoopSessionState.Connected -> Cyan
+                        else -> navItemColor
+                    },
                     shape = AzButtonShape.RECTANGLE
                 ) {
                     arViewModel.startCollaborationDiscovery()
