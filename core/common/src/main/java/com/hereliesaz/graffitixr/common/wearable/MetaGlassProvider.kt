@@ -35,7 +35,6 @@ class MetaGlassProvider @Inject constructor(
 
     override val capabilities: Set<GlassCapability> = setOf(
         GlassCapability.CAMERA_FEED,
-        GlassCapability.IMU_TRACKING
     )
 
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected)
