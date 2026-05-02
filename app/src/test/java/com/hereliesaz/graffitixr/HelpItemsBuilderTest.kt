@@ -22,19 +22,20 @@ class HelpItemsBuilderTest {
             "mode.host", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace",
             "target.host", "target.scanModeToggle", "target.create",
             "design.host", "design.addImg", "design.addDraw", "design.addText", "design.wall",
-            "project.host", "project.new", "project.save", "project.load", "project.export", "project.settings",
+            "project.host.main", "project.new", "project.save", "project.load", "project.export", "project.settings",
             "tool.light", "tool.lockTrace", "tool.helpMain",
+            "wearable.main",
         ).forEach { id ->
             assertTrue("expected key '$id' in helpItems", id in map)
         }
     }
 
     @Test
-    fun `result contains 23 dynamic keys per layer using layerId convention`() {
+    fun `result contains every dynamic key per layer using layerId convention`() {
         val layers = listOf(Layer(id = "L1", name = "one"), Layer(id = "L2", name = "two"))
         val map = buildHelpItems(strings(), layers)
         val toolKeys = listOf(
-            null, "editText", "size", "font", "color", "kern",
+            null, "editText", "size.brush", "size.text", "font", "color", "kern",
             "bold", "italic", "outline", "shadow", "stencil", "blend",
             "adj", "invert", "balance", "eraser", "blur", "liquify",
             "dodge", "burn", "iso", "line", "help",

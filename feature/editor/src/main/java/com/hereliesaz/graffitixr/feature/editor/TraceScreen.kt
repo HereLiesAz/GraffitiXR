@@ -1,45 +1,8 @@
-
 package com.hereliesaz.graffitixr.feature.editor
 
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectTransformGestures
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.Composable
 import com.hereliesaz.graffitixr.common.model.ArUiState
-import com.hereliesaz.graffitixr.data.OnboardingManager
-import com.hereliesaz.graffitixr.common.model.EditorMode
-import com.hereliesaz.graffitixr.design.components.OnboardingDialog
 
 @Composable
 fun TraceScreen(viewModel: EditorViewModel, isLibraryVisible: Boolean, arUiState: ArUiState) {
-    val context = LocalContext.current
-    val uiState by viewModel.uiState.collectAsState()
-    val onboardingManager = remember(context) { OnboardingManager(context) }
-    var showOnboarding by remember { mutableStateOf(false) }
-
-    LaunchedEffect(isLibraryVisible, uiState.editorMode, arUiState.isAnchorEstablished) {
-        // Only show if library is hidden AND we are actually in TRACE mode in the ViewModel
-        if (!isLibraryVisible && uiState.editorMode == EditorMode.TRACE) {
-            val isScreenEmpty = uiState.layers.isEmpty()
-            if (isScreenEmpty || onboardingManager.isFirstTime(EditorMode.TRACE.name)) {
-                showOnboarding = true
-                onboardingManager.markAsSeen(EditorMode.TRACE.name)
-            }
-        }
-    }
-
-    if (showOnboarding) {
-        OnboardingDialog(
-            mode = EditorMode.TRACE,
-            onDismiss = { showOnboarding = false }
-        )
-    }
-
-    // GESTURE HANDLING REMOVED: Managed centrally by MainScreen's background block.
 }

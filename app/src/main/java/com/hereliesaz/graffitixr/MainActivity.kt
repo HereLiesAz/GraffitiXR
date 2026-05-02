@@ -115,7 +115,6 @@ import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.feature.editor.MockupScreen
 import com.hereliesaz.graffitixr.feature.editor.OverlayScreen
 import com.hereliesaz.graffitixr.feature.editor.TraceScreen
-import com.hereliesaz.graffitixr.data.OnboardingManager
 import com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor as EditorImageProcessor
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.common.model.RelocState
@@ -142,8 +141,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.core.os.LocaleListCompat
 import androidx.core.net.toUri
-import androidx.lifecycle.ViewModelStoreOwner
-import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.hereliesaz.graffitixr.design.theme.AppStrings
 import com.hereliesaz.graffitixr.design.theme.rememberAppStrings
 import com.hereliesaz.graffitixr.design.theme.rememberNavStrings
@@ -368,7 +365,6 @@ class MainActivity : ComponentActivity() {
                 val navStrings = strings.nav
                 var showFontPicker by remember { mutableStateOf(false) }
                 var fontPickerLayerId by remember { mutableStateOf<String?>(null) }
-                var showHelp by remember { mutableStateOf(false) }
                 val layerMenusOpen = remember { mutableStateMapOf<String, Boolean>() }
 
                 val context = LocalContext.current
@@ -379,19 +375,8 @@ class MainActivity : ComponentActivity() {
                     if (luminance > 0.5f) Color.Black else Color.White
                 }
 
-                val allHelpItems = remember(editorUiState.layers, strings, context) {
-                    buildHelpItems(strings, editorUiState.layers) +
-                            ("wearable.main" to context.getString(DesignR.string.nav_wearable_info))
-                }
-
-                val helpViewModel: HelpViewModel =
-                    hiltViewModel(checkNotNull<ViewModelStoreOwner>(LocalViewModelStoreOwner.current) {
-                        "No ViewModelStoreOwner was provided via LocalViewModelStoreOwner"
-                    }, null)
-                val activeHelpList by helpViewModel.activeHelpList.collectAsState()
-
-                LaunchedEffect(allHelpItems) {
-                    helpViewModel.setActiveHelpList(allHelpItems)
+                val allHelpItems = remember(editorUiState.layers, strings) {
+                    buildHelpItems(strings, editorUiState.layers)
                 }
 
                 val modeTutorials = remember(context) { getGraffitiTutorials(context) }
@@ -419,9 +404,7 @@ class MainActivity : ComponentActivity() {
                         noMenu = !isRailVisible
                     )
                     azAdvanced(
-                        helpEnabled = showHelp,
-                        helpList = activeHelpList,
-                        onDismissHelp = { showHelp = false },
+                        helpList = allHelpItems,
                         tutorials = tutorials
                     )
 
@@ -483,7 +466,7 @@ class MainActivity : ComponentActivity() {
                                     else               -> null
                                 }
                                 val key = "tut_${editorUiState.editorMode.name.lowercase()}"
-                                if (tutorialId != null) {
+                                if (tutorialId != null && key !in completedTutorials) {
                                     tutorialController.startTutorial(tutorialId)
                                     settingsViewModel.markTutorialComplete(key)
                                 }
@@ -515,7 +498,6 @@ class MainActivity : ComponentActivity() {
                         Box(Modifier.fillMaxSize().onSizeChanged { fullSize = it }) {
                             AzNavHost(startDestination = EditorMode.TRACE.name) {
                                 composable(EditorMode.AR.name) {
-                                    ModeOnboarding(EditorMode.AR, showLibrary, editorViewModel, arUiState)
                                     EditorOverlay(editorViewModel, mainUiState, strings)
                                 }
                                 composable(EditorMode.OVERLAY.name) {
@@ -988,34 +970,6 @@ class MainActivity : ComponentActivity() {
             strings = strings,
             isCapturingTarget = mainUiState.isCapturingTarget
         )
-    }
-
-    @Composable
-    private fun ModeOnboarding(mode: EditorMode, isLibraryVisible: Boolean, viewModel: EditorViewModel, arUiState: ArUiState) {
-        val context = LocalContext.current
-        val uiState by viewModel.uiState.collectAsState()
-        val onboardingManager = remember(context) { OnboardingManager(context) }
-        var showOnboarding by remember(mode) { mutableStateOf(false) }
-
-        LaunchedEffect(isLibraryVisible, uiState.editorMode, mode, arUiState.isAnchorEstablished) {
-            if (!isLibraryVisible && uiState.editorMode == mode) {
-                val noLayers = uiState.layers.isEmpty()
-                val noAnchor = !arUiState.isAnchorEstablished
-                val isScreenEmpty = noLayers && (mode != EditorMode.AR || noAnchor)
-
-                if (isScreenEmpty || onboardingManager.isFirstTime(mode.name)) {
-                    showOnboarding = true
-                    onboardingManager.markAsSeen(mode.name)
-                }
-            }
-        }
-
-        if (showOnboarding) {
-            com.hereliesaz.graffitixr.design.components.OnboardingDialog(
-                mode = mode,
-                onDismiss = { showOnboarding = false }
-            )
-        }
     }
 
     override fun onResume() {

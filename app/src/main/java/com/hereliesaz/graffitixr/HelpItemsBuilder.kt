@@ -34,6 +34,7 @@ internal fun buildHelpItems(strings: AppStrings, layers: List<Layer>): Map<Strin
         "tool.light" to strings.help.flashlight,
         "tool.lockTrace" to strings.help.lockTrace,
         "tool.helpMain" to strings.help.helpMain,
+        "wearable.main" to strings.nav.wearableInfo,
     )
 
     layers.forEach { layer ->
