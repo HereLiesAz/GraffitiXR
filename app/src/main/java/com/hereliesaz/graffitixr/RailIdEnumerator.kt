@@ -40,7 +40,7 @@ internal fun enumerateRailItemIds(layers: List<Layer>, mode: EditorMode): Set<St
 
     // Project menu
     ids += setOf(
-        "project.host", "project.new", "project.save", "project.load",
+        "project.host.main", "project.new", "project.save", "project.load",
         "project.export", "project.settings",
     )
 

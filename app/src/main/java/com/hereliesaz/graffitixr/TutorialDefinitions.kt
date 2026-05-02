@@ -167,7 +167,7 @@ fun getTutorials(layers: List<Layer>, strings: AppStrings): Map<String, AzTutori
     tutorials["design.wall"] = createSimpleTutorial("design.wall", navWall, helpWall)
 
     // --- Project Menu ---
-    tutorials["project.host"] = createSimpleTutorial("project.host", navProject, helpProjectHost)
+    tutorials["project.host.main"] = createSimpleTutorial("project.host.main", navProject, helpProjectHost)
     tutorials["project.new"] = createSimpleTutorial("project.new", navNew, helpNewProject)
     tutorials["project.save"] = createSimpleTutorial("project.save", navSave, helpSaveProject)
     tutorials["project.load"] = createSimpleTutorial("project.load", navLoad, helpLoadProject)

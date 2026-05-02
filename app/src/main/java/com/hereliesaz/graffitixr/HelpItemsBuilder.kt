@@ -25,7 +25,7 @@ internal fun buildHelpItems(strings: AppStrings, layers: List<Layer>): Map<Strin
         "design.addDraw" to strings.help.addDraw,
         "design.addText" to strings.help.addText,
         "design.wall" to strings.help.wall,
-        "project.host" to strings.help.projectHost,
+        "project.host.main" to strings.help.projectHost,
         "project.new" to strings.help.newProject,
         "project.save" to strings.help.saveProject,
         "project.load" to strings.help.loadProject,

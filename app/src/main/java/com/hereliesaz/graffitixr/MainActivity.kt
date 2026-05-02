@@ -71,6 +71,8 @@ import java.io.File
 import com.google.android.gms.common.GoogleApiAvailability
 import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.*
+import com.hereliesaz.aznavrail.tutorial.*
+import com.hereliesaz.aznavrail.HiddenMenuScope
 import com.hereliesaz.aznavrail.tutorial.LocalAzTutorialController
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.MuralMethod
@@ -416,6 +418,13 @@ class MainActivity : ComponentActivity() {
                         dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT,
                         noMenu = !isRailVisible
                     )
+                    azAdvanced(
+                        helpEnabled = showHelp,
+                        helpList = activeHelpList,
+                        onDismissHelp = { showHelp = false },
+                        tutorials = tutorials
+                    )
+
                     if (isRailVisible) {
                         ConfigureRailItems(
                             mainViewModel, editorViewModel, arViewModel, dashboardViewModel, context,
@@ -428,13 +437,6 @@ class MainActivity : ComponentActivity() {
                             onShowJoinScanner = { showJoinScanner = true }
                         )
                     }
-
-                    azAdvanced(
-                        helpEnabled = showHelp,
-                        helpList = activeHelpList,
-                        onDismissHelp = { showHelp = false },
-                        tutorials = tutorials
-                    )
 
                     background(weight = 0) {
                         MainScreen(
@@ -1183,17 +1185,17 @@ class MainActivity : ComponentActivity() {
                 azDivider()
             }
 
-            azRailHostItem(id = "project.host", text = navStrings.project, color = navItemColor)
-            azRailSubItem(id = "project.new", hostId = "project.host", text = navStrings.new, color = navItemColor, shape = AzButtonShape.NONE) {
+            azRailHostItem(id = "project.host.main", text = navStrings.project, color = navItemColor)
+            azRailSubItem(id = "project.new", hostId = "project.host.main", text = navStrings.new, color = navItemColor, shape = AzButtonShape.NONE) {
                 dashboardViewModel.onNewProjectTriggered()
             }
-            azRailSubItem(id = "project.save", hostId = "project.host", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE) {
+            azRailSubItem(id = "project.save", hostId = "project.host.main", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE) {
                 showSaveDialog = true
             }
-            azRailSubItem(id = "project.load", hostId = "project.host", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {
+            azRailSubItem(id = "project.load", hostId = "project.host.main", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {
                 this@MainActivity.showLibrary = true
             }
-            azRailSubItem(id = "project.export", hostId = "project.host", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE) {
+            azRailSubItem(id = "project.export", hostId = "project.host.main", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE) {
                 if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
                     arViewModel.requestExport { bgBitmap ->
                         editorViewModel.exportImage(bgBitmap)
@@ -1202,20 +1204,17 @@ class MainActivity : ComponentActivity() {
                     editorViewModel.exportImage(null)
                 }
             }
-            azRailSubItem(id = "project.settings", hostId = "project.host", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE) {
+            azRailSubItem(id = "project.settings", hostId = "project.host.main", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE) {
                 showSettings = true
             }
-        }
 
-        azDivider()
+            azDivider()
 
-        if (!showLibrary) {
-            val isArMode = editorUiState.editorMode == EditorMode.AR
-            val canEdit = if (isArMode)
+            val canEditLayers = if (isArMode)
                 arUiState.scanPhase == ScanPhase.COMPLETE || arUiState.isAnchorEstablished
             else true
 
-            if (canEdit && arUiState.coopRole != CoopRole.GUEST) {
+            if (canEditLayers && arUiState.coopRole != CoopRole.GUEST) {
                 editorUiState.layers.reversed().forEach { layer ->
                     val activeTool = editorUiState.activeTool
                     val forceOpenHiddenMenu = layerMenusOpen[layer.id] ?: false
@@ -1233,7 +1232,7 @@ class MainActivity : ComponentActivity() {
                             editorViewModel.onLayerActivated(layer.id)
                             editorViewModel.setActiveTool(Tool.NONE)
                         },
-                        onRelocate = { _, _, new: List<String> -> editorViewModel.onLayerReordered(new.map { it.removePrefix("layer.") }.reversed()) },
+                        onRelocate = { _: Int, _: Int, new: List<String> -> editorViewModel.onLayerReordered(new.map { it.removePrefix("layer.") }.reversed()) },
                         nestedContent = {
                             val activate = { editorViewModel.onLayerActivated(layer.id) }
 
