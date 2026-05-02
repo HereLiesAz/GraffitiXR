@@ -146,6 +146,7 @@ import com.hereliesaz.graffitixr.design.theme.AppStrings
 import com.hereliesaz.graffitixr.design.theme.rememberAppStrings
 import com.hereliesaz.graffitixr.design.theme.rememberNavStrings
 import timber.log.Timber
+import kotlin.math.abs
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -415,13 +416,6 @@ class MainActivity : ComponentActivity() {
                         dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT,
                         noMenu = !isRailVisible
                     )
-                    azAdvanced(
-                        helpEnabled = showHelp,
-                        helpList = activeHelpList,
-                        onDismissHelp = { showHelp = false },
-                        tutorials = tutorials
-                    )
-
                     if (isRailVisible) {
                         ConfigureRailItems(
                             mainViewModel, editorViewModel, arViewModel, dashboardViewModel, context,
@@ -434,6 +428,13 @@ class MainActivity : ComponentActivity() {
                             onShowJoinScanner = { showJoinScanner = true }
                         )
                     }
+
+                    azAdvanced(
+                        helpEnabled = showHelp,
+                        helpList = activeHelpList,
+                        onDismissHelp = { showHelp = false },
+                        tutorials = tutorials
+                    )
 
                     background(weight = 0) {
                         MainScreen(
@@ -1032,7 +1033,7 @@ class MainActivity : ComponentActivity() {
         if (isFinishing) slamManager.destroy()
     }
 
-    private fun AzHostActivityLayoutScope.ConfigureRailItems(
+    private fun AzNavHostScope.ConfigureRailItems(
         mainViewModel: MainViewModel,
         editorViewModel: EditorViewModel,
         arViewModel: ArViewModel,
@@ -1232,7 +1233,7 @@ class MainActivity : ComponentActivity() {
                             editorViewModel.onLayerActivated(layer.id)
                             editorViewModel.setActiveTool(Tool.NONE)
                         },
-                        onRelocate = { _, _, new -> editorViewModel.onLayerReordered(new.map { it.removePrefix("layer.") }.reversed()) },
+                        onRelocate = { _, _, new: List<String> -> editorViewModel.onLayerReordered(new.map { it.removePrefix("layer.") }.reversed()) },
                         nestedContent = {
                             val activate = { editorViewModel.onLayerActivated(layer.id) }
 
@@ -1266,7 +1267,7 @@ class MainActivity : ComponentActivity() {
                                                     if (!isEnabled) return@pointerInput
                                                     detectDragGestures { change, dragAmount ->
                                                         change.consume()
-                                                        if (kotlin.math.abs(dragAmount.y) >= kotlin.math.abs(dragAmount.x)) {
+                                                        if (abs(dragAmount.y) >= abs(dragAmount.x)) {
                                                             val currentSize = editorViewModel.uiState.value.brushSize
                                                             editorViewModel.setBrushSize(
                                                                 (currentSize - dragAmount.y * 0.5f).coerceIn(1f, itemRadiusPx)
