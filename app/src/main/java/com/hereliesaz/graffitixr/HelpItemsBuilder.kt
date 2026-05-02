@@ -39,7 +39,8 @@ internal fun buildHelpItems(strings: AppStrings, layers: List<Layer>): Map<Strin
     layers.forEach { layer ->
         base[layerId(layer)] = strings.help.layer(layer.name)
         base[layerId(layer, "editText")] = strings.help.editText
-        base[layerId(layer, "size")] = strings.help.size
+        base[layerId(layer, "size.brush")] = strings.help.size
+        base[layerId(layer, "size.text")] = strings.help.size
         base[layerId(layer, "font")] = strings.help.font
         base[layerId(layer, "color")] = strings.help.color
         base[layerId(layer, "kern")] = strings.help.kern

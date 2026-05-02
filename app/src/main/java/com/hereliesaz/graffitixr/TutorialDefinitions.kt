@@ -195,7 +195,8 @@ fun getTutorials(layers: List<Layer>, strings: AppStrings): Map<String, AzTutori
 
         tutorials[layerId(layer)] = createSimpleTutorial(layerId(layer), layerNameHelp, layerNameHelp)
         tutorials[layerId(layer, "editText")] = createSimpleTutorial(layerId(layer, "editText"), navEdit, helpEditText)
-        tutorials[layerId(layer, "size")] = createSimpleTutorial(layerId(layer, "size"), strings.editor.brushSize, helpSize)
+        tutorials[layerId(layer, "size.brush")] = createSimpleTutorial(layerId(layer, "size.brush"), strings.editor.brushSize, helpSize)
+        tutorials[layerId(layer, "size.text")] = createSimpleTutorial(layerId(layer, "size.text"), strings.editor.brushSize, helpSize)
         tutorials[layerId(layer, "font")] = createSimpleTutorial(layerId(layer, "font"), navFont, helpFont)
         tutorials[layerId(layer, "color")] = createSimpleTutorial(layerId(layer, "color"), navColor, helpColor)
         tutorials[layerId(layer, "kern")] = createSimpleTutorial(layerId(layer, "kern"), navKern, helpKern)

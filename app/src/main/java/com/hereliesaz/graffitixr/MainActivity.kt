@@ -1032,7 +1032,7 @@ class MainActivity : ComponentActivity() {
         if (isFinishing) slamManager.destroy()
     }
 
-    private fun AzNavHostScope.ConfigureRailItems(
+    private fun AzHostActivityLayoutScope.ConfigureRailItems(
         mainViewModel: MainViewModel,
         editorViewModel: EditorViewModel,
         arViewModel: ArViewModel,
@@ -1071,7 +1071,7 @@ class MainActivity : ComponentActivity() {
                     ArScanMode.MURAL -> navStrings.mural
                 }
                 azRailSubItem(
-                    id = "target.scanModeCycle",
+                    id = "target.scanModeToggle",
                     hostId = "mode.host",
                     text = scanModeText,
                     color = Cyan,
@@ -1250,7 +1250,7 @@ class MainActivity : ComponentActivity() {
 
                             val addSizeItem: () -> Unit = {
                                 azRailItem(
-                                    id = layerId(layer, "size"),
+                                    id = layerId(layer, "size.brush"),
                                     text = navStrings.size,
                                     color = navItemColor,
                                     shape = AzButtonShape.RECTANGLE,
@@ -1338,7 +1338,7 @@ class MainActivity : ComponentActivity() {
                                         onShowFontPicker(layer.id)
                                     }
                                     azRailItem(
-                                        id = layerId(layer, "size"),
+                                        id = layerId(layer, "size.text"),
                                         text = navStrings.size,
                                         color = navItemColor,
                                         shape = AzButtonShape.RECTANGLE,

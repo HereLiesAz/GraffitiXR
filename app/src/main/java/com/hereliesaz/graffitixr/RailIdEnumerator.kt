@@ -22,7 +22,7 @@ internal fun enumerateRailItemIds(layers: List<Layer>, mode: EditorMode): Set<St
         "wearable.main",
     )
     if (mode == EditorMode.AR) {
-        ids += setOf("target.scanModeCycle", "coop.main")
+        ids += setOf("target.scanModeToggle", "coop.main")
     }
 
     // Target menu (AR only)
@@ -52,7 +52,8 @@ internal fun enumerateRailItemIds(layers: List<Layer>, mode: EditorMode): Set<St
         ids += setOf(
             layerId(layer),
             layerId(layer, "editText"),
-            layerId(layer, "size"),
+            layerId(layer, "size.brush"),
+            layerId(layer, "size.text"),
             layerId(layer, "font"),
             layerId(layer, "color"),
             layerId(layer, "kern"),
