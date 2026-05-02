@@ -31,6 +31,7 @@ playServicesBase = "18.10.0"
 playServicesLocation = "21.3.0"
 segmentationSelfie = "16.0.0-beta6" # ACCEPTED RISK: no stable release as of 2026-04-02
 timber = "5.0.1"
+robolectric = "4.16.1"
 uiGeometry = "1.11.0"
 accompanistPermissions = "0.37.3"
 datastore = "1.2.1"
@@ -100,6 +101,7 @@ retrofit-converter-gson = { group = "com.squareup.retrofit2", name = "converter-
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 androidx-room-external-antlr = { group = "androidx.room", name = "room-external-antlr", version.ref = "roomExternalAntlr" }
 androidx-ink-brush = { group = "androidx.ink", name = "ink-brush", version.ref = "inkBrush" }
 mwdat-core = { group = "com.meta.wearable", name = "mwdat-core", version.ref = "mwdat" }
