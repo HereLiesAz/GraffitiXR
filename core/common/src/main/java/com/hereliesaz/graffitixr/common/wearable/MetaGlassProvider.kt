@@ -6,6 +6,7 @@ import android.util.Log
 import com.hereliesaz.graffitixr.common.sensor.CameraFrame
 import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsics
 import com.hereliesaz.graffitixr.common.sensor.PixelFormat
+import com.hereliesaz.graffitixr.common.sensor.YuvLayout
 import com.meta.wearable.dat.camera.Stream
 import com.meta.wearable.dat.camera.addStream
 import com.meta.wearable.dat.camera.types.StreamConfiguration
@@ -127,6 +128,10 @@ class MetaGlassProvider @Inject constructor(
 
                 stream.videoStream.collect { frame ->
                     val timestampNs = normalizeTimestamp(frame.presentationTimeUs * 1000)
+                    // Meta SDK 0.6.0 with compressVideo=false emits I420-packed YUV.
+                    // Layout confirmation requires on-device byte inspection — adjust
+                    // here once verified (e.g. NV12 if uvPixelStride should be 2).
+                    val layout = YuvLayout.i420(frame.width, frame.height)
                     _cameraFrames.tryEmit(
                         CameraFrame(
                             pixels = frame.buffer,
@@ -134,6 +139,7 @@ class MetaGlassProvider @Inject constructor(
                             width = frame.width,
                             height = frame.height,
                             timestampNs = timestampNs,
+                            yuvLayout = layout,
                         )
                     )
                 }

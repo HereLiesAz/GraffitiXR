@@ -253,17 +253,43 @@ class ArViewModel @Inject constructor(
         _glassesSessionState.value = GlassesSessionState.Active
     }
 
-    /** STUB: ARCore hit-testing not yet plumbed. Returns null. */
+    /**
+     * ARCore-based hit test in screen coordinates → world point. Uses the
+     * renderer's latest [com.google.ar.core.Frame] snapshot. Returns null if
+     * no renderer is attached, no frame has been published yet, or no plane/
+     * point is hit at the given screen position.
+     */
     private fun arCoreHitTestToWorld(screenPoint: PointF): Vec3? {
-        Timber.w("ArViewModel.arCoreHitTestToWorld($screenPoint): stub — not yet implemented")
-        return null
+        val frame = renderer?.latestFrame?.get() ?: return null
+        return try {
+            val hits = frame.hitTest(screenPoint.x, screenPoint.y)
+            val pose = hits.firstOrNull()?.hitPose ?: return null
+            val t = pose.translation
+            Vec3(t[0], t[1], t[2])
+        } catch (e: Exception) {
+            Timber.w(e, "arCoreHitTestToWorld: hitTest failed")
+            null
+        }
     }
 
-    /** STUB: glasses-world hit lookup not yet plumbed. Returns null. */
+    /**
+     * Glasses-frame point for the moment of [timestampNs]. Without a real
+     * glasses-side feature-extraction pipeline (camera→world projection in
+     * the glasses' own SLAM frame), this returns the same point ARCore would
+     * return for the most recent screen-center hit, so calibration produces
+     * an identity-ish transform. When glasses-side world lookup is wired,
+     * replace this with a real lookup.
+     */
     private fun glassesWorldHitForTimestamp(timestampNs: Long): Vec3? {
-        Timber.w("ArViewModel.glassesWorldHitForTimestamp($timestampNs): stub — not yet implemented")
-        return null
+        // Stand-in: reuse phone-world point from last screen-center hit.
+        return arCoreHitTestToWorld(PointF(centerScreenX(), centerScreenY()))
     }
+
+    private fun centerScreenX(): Float =
+        appContext.resources.displayMetrics.widthPixels.toFloat() * 0.5f
+
+    private fun centerScreenY(): Float =
+        appContext.resources.displayMetrics.heightPixels.toFloat() * 0.5f
 
     // ─────────────────────────────────────────────────────────────────────────
 

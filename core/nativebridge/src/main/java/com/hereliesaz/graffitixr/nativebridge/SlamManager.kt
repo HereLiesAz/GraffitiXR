@@ -234,13 +234,45 @@ class SlamManager @Inject constructor(
             PixelFormat.RGBA_8888 -> {
                 feedColorFrame(frame.pixels, frame.width, frame.height, frame.timestampNs, null)
             }
-            PixelFormat.YUV_420_888 -> {
-                // Single-buffer YUV from CameraFrame doesn't expose Y/U/V planes separately;
-                // feedYuvFrame requires 3 plane buffers + strides. Forwarding YUV through the
-                // SensorSource path needs CameraFrame to carry plane info — out of scope here.
-                Log.w(TAG, "YUV frame forwarding not yet wired through SensorSource path")
-            }
+            PixelFormat.YUV_420_888 -> forwardYuvFrame(frame)
         }
+    }
+
+    private fun forwardYuvFrame(frame: CameraFrame) {
+        val layout = frame.yuvLayout
+        if (layout == null) {
+            Log.w(TAG, "YUV frame missing yuvLayout — dropping")
+            return
+        }
+        val full = frame.pixels
+        val y = sliceDirect(full, layout.yOffset, layout.ySize) ?: return
+        val u = sliceDirect(full, layout.uOffset, layout.uSize) ?: return
+        val v = sliceDirect(full, layout.vOffset, layout.vSize) ?: return
+        feedYuvFrame(
+            yBuffer = y,
+            uBuffer = u,
+            vBuffer = v,
+            width = frame.width,
+            height = frame.height,
+            yStride = layout.yStride,
+            uvStride = layout.uvStride,
+            uvPixelStride = layout.uvPixelStride,
+            timestampNs = frame.timestampNs,
+            cvRotateCode = null,
+        )
+    }
+
+    /** Returns a direct-byte-buffer view over [offset, offset+size) of [src]. */
+    private fun sliceDirect(src: ByteBuffer, offset: Int, size: Int): ByteBuffer? {
+        if (offset < 0 || size <= 0 || offset + size > src.capacity()) {
+            Log.w(TAG, "slice out of bounds: off=$offset size=$size cap=${src.capacity()}")
+            return null
+        }
+        val dup = src.duplicate()
+        dup.position(offset)
+        dup.limit(offset + size)
+        val slice = dup.slice()
+        return if (slice.isDirect) slice else null
     }
 
     private fun forwardImu(sample: ImuSample) {

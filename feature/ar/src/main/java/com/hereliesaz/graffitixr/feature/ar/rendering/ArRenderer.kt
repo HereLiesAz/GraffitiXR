@@ -24,6 +24,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.nio.ByteBuffer
+import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -43,6 +44,12 @@ class ArRenderer(
 
     var session: Session? = null
         private set
+
+    /**
+     * Latest ARCore [Frame] snapshot, refreshed each tick. Read-only for off-thread
+     * callers (e.g. UI hit-testing); may be null before the first successful update.
+     */
+    val latestFrame: AtomicReference<Frame?> = AtomicReference(null)
 
     private val backgroundRenderer = BackgroundRenderer()
     private val displayRotationHelper = DisplayRotationHelper(context)
@@ -200,6 +207,7 @@ class ArRenderer(
                 return
             }
 
+            latestFrame.set(frame)
             backgroundRenderer.draw(frame)
 
             if (pendingAnchorEstablishment) {
