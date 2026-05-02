@@ -184,6 +184,9 @@ class SlamManager @Inject constructor() {
     fun exportFingerprint(): ByteArray? = nativeExportFingerprint()
     fun alignToFingerprint(data: ByteArray) = nativeAlignToFingerprint(data)
 
+    /** Co-op alias: align local SLAM state to the peer's fingerprint bytes. */
+    fun alignToPeer(fingerprint: ByteArray) = alignToFingerprint(fingerprint)
+
     fun getAnchorCandidates(threshold: Float, maxCount: Int): FloatArray? {
         return nativeGetAnchorCandidates(threshold, maxCount)
     }

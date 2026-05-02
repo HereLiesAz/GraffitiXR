@@ -688,8 +688,8 @@ class MainActivity : ComponentActivity() {
                             if (arUiState.showCoopNotFoundDialog) {
                                 CoopNotFoundDialog(
                                     onDismiss = { arViewModel.dismissCoopNotFoundDialog() },
-                                    onHost = { arViewModel.startCollaborationHost() },
-                                    onSearch = { arViewModel.startCollaborationDiscovery() },
+                                    onHost = { arViewModel.startHosting() },
+                                    onSearch = { /* TODO Task 15: open QR scanner for joinFromQr */ arViewModel.dismissCoopNotFoundDialog() },
                                     canHost = arUiState.isAnchorEstablished && arUiState.splatCount > 0,
                                     strings = strings
                                 )
@@ -1025,7 +1025,7 @@ class MainActivity : ComponentActivity() {
                     },
                     shape = AzButtonShape.RECTANGLE
                 ) {
-                    arViewModel.startCollaborationDiscovery()
+                    arViewModel.dismissCoopNotFoundDialog() // TODO Task 15: open QR entry UI
                 }
             }
 

@@ -310,6 +310,28 @@ class ProjectManager @Inject constructor(
         else                        -> ModelBlendMode.SrcOver
     }
 
+    // --- Co-op stubs (Task 14 — real implementation in Task 17) ---
+
+    /**
+     * Returns the ID of the currently open project, or "unknown" if none is loaded.
+     * TODO Task 17: thread through ProjectRepository.currentProject.value?.id
+     */
+    fun currentProjectId(): String = "unknown"
+
+    /**
+     * Serialises the current project to bytes for bulk-transfer to a guest device.
+     * TODO Task 17: implement real project serialisation.
+     */
+    fun serializeCurrentProject(): ByteArray = ByteArray(0)
+
+    /**
+     * Loads a project received as raw bytes from a host device (spectator/guest path).
+     * TODO Task 17: implement real deserialisation and project load.
+     */
+    fun loadAsSpectator(@Suppress("UNUSED_PARAMETER") bytes: ByteArray) { /* no-op stub */ }
+
+    // --- End co-op stubs ---
+
     private fun zipFolder(folder: File, parentFolder: String, zos: ZipOutputStream) {
         for (file in folder.listFiles() ?: emptyArray()) {
             // Use relative path from the source folder to avoid nested parent directories in the ZIP.

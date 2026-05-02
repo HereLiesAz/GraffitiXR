@@ -60,6 +60,7 @@ class ArViewModel @Inject constructor(
     private val projectRepository: ProjectRepository,
     private val settingsRepository: SettingsRepository,
     private val projectManager: com.hereliesaz.graffitixr.data.ProjectManager,
+    private val collaborationManager: com.hereliesaz.graffitixr.core.collaboration.CollaborationManager,
     @param:ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
@@ -69,27 +70,81 @@ class ArViewModel @Inject constructor(
     private val _unfreezeRequested = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val unfreezeRequested: SharedFlow<Unit> = _unfreezeRequested.asSharedFlow()
 
+    private val _hostQrPayload = MutableStateFlow<String?>(null)
+    val hostQrPayload: StateFlow<String?> = _hostQrPayload
+
+    /**
+     * Set by MainActivity to route incoming spectator Ops to EditorViewModel
+     * without ArViewModel knowing about the editor module. Avoids the
+     * ViewModel-of-ViewModel anti-pattern.
+     */
+    @Volatile var spectatorOpHandler: ((com.hereliesaz.graffitixr.common.model.Op) -> Unit)? = null
+
     private var session: Session? = null
     private var renderer: ArRenderer? = null
 
-    // TODO Task 14: inject CollaborationManager and rewrite full co-op VM logic
-    fun startCollaborationHost() {
-        if (!uiState.value.isAnchorEstablished || uiState.value.splatCount == 0) {
-            _uiState.update { it.copy(showCoopNotFoundDialog = false) }
-            return
+    fun startHosting() {
+        viewModelScope.launch {
+            try {
+                val fingerprint = slamManager.exportFingerprint() ?: ByteArray(0)
+                val projectBytes = projectManager.serializeCurrentProject()
+                val qrString = collaborationManager.startHosting(
+                    projectId = projectManager.currentProjectId(),
+                    layerCount = 0, // TODO Task 17: wire to real layer count
+                    fingerprintBytes = fingerprint,
+                    projectBytes = projectBytes,
+                    localDeviceName = android.os.Build.MODEL,
+                )
+                _uiState.update {
+                    it.copy(
+                        coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.HOST,
+                        coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.WaitingForGuest,
+                    )
+                }
+                _hostQrPayload.value = qrString
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.Ended(com.hereliesaz.graffitixr.common.model.CoopSessionState.EndReason.NetworkLost))
+                }
+                return@launch
+            }
+            // Observe collaborationManager.state and propagate.
+            collaborationManager.state.collect { newState ->
+                _uiState.update { it.copy(coopSessionState = newState) }
+            }
         }
-        // TODO Task 14: call collaborationManager.startHosting(...)
-        _uiState.update { it.copy(coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.HOST, coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.WaitingForGuest, showCoopNotFoundDialog = false) }
     }
 
-    fun startCollaborationDiscovery() {
-        // TODO Task 14: rewritten — discovery removed in Task 12.
-        _uiState.update { it.copy(showCoopNotFoundDialog = true) }
+    fun joinFromQr(qr: String) {
+        viewModelScope.launch {
+            try {
+                collaborationManager.joinFromQr(
+                    qr = qr,
+                    localDeviceName = android.os.Build.MODEL,
+                    onBulkReceived = { fingerprint, project ->
+                        slamManager.alignToPeer(fingerprint)
+                        projectManager.loadAsSpectator(project)
+                    },
+                    onOp = { op -> spectatorOpHandler?.invoke(op) },
+                )
+                _uiState.update { it.copy(coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) }
+                collaborationManager.state.collect { newState ->
+                    _uiState.update { it.copy(coopSessionState = newState) }
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.Ended(com.hereliesaz.graffitixr.common.model.CoopSessionState.EndReason.NetworkLost))
+                }
+            }
+        }
     }
 
-    fun stopCollaboration() {
-        // TODO Task 14: call collaborationManager.leaveSession()
-        _uiState.update { it.copy(coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.Idle) }
+    fun leaveSession() {
+        viewModelScope.launch {
+            collaborationManager.leaveSession()
+            _uiState.update { it.copy(coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.NONE, coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.Idle) }
+            _hostQrPayload.value = null
+        }
     }
 
     fun dismissCoopNotFoundDialog() {
@@ -767,7 +822,7 @@ class ArViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        stopCollaboration()
+        leaveSession()
         destroyArSession()
     }
 }
