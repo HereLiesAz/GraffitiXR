@@ -22,7 +22,6 @@ import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.common.util.eraseColorBlob
-import com.hereliesaz.graffitixr.core.collaboration.CollaborationManager
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
@@ -47,14 +46,12 @@ import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.design.R as DesignR
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
-import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.util.EnumSet
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import timber.log.Timber
 import javax.inject.Inject
-import androidx.core.net.toUri
 
 @HiltViewModel
 class ArViewModel @Inject constructor(
@@ -75,37 +72,23 @@ class ArViewModel @Inject constructor(
     private var session: Session? = null
     private var renderer: ArRenderer? = null
 
-    private var collaborationManager: CollaborationManager? = null
-
+    // TODO Task 14: inject CollaborationManager and rewrite full co-op VM logic
     fun startCollaborationHost() {
         if (!uiState.value.isAnchorEstablished || uiState.value.splatCount == 0) {
             _uiState.update { it.copy(coopStatus = "Capture a target first to host.", showCoopNotFoundDialog = false) }
             return
         }
-        
-        if (collaborationManager == null) {
-            collaborationManager = CollaborationManager(appContext)
-        }
-        viewModelScope.launch {
-            _uiState.update { it.copy(isSyncing = true, coopStatus = "Hosting session...", coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.HOST, showCoopNotFoundDialog = false) }
-            val projectId = loadedProjectId ?: return@launch
-            val projectFile = File(appContext.cacheDir, "coop_project.gxr")
-            projectManager.exportProjectToUri(appContext, projectId, projectFile.toUri())
-            
-            collaborationManager?.startServer(projectFile)
-        }
+        // TODO Task 14: call collaborationManager.startHosting(...)
+        _uiState.update { it.copy(isSyncing = true, coopStatus = "Hosting session...", coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.HOST, showCoopNotFoundDialog = false) }
     }
 
     fun startCollaborationDiscovery() {
-        if (collaborationManager == null) {
-            collaborationManager = CollaborationManager(appContext)
-        }
-        // Discovery removed — rewritten in Task 12.
+        // TODO Task 14: rewritten — discovery removed in Task 12.
         _uiState.update { it.copy(isCoopSearching = false, coopStatus = null, showCoopNotFoundDialog = true) }
     }
 
     fun stopCollaboration() {
-        collaborationManager?.stopServer()
+        // TODO Task 14: call collaborationManager.leaveSession()
         _uiState.update { it.copy(isSyncing = false, isCoopSearching = false, coopStatus = null) }
     }
 

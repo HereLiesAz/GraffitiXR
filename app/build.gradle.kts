@@ -121,6 +121,7 @@ androidComponents {
 }
 
 dependencies {
+    implementation(project(":android_collaboration_module"))
     implementation(project(":core:nativebridge"))
     implementation(project(":feature:ar"))
     implementation(project(":feature:editor"))
