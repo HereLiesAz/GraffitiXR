@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.common.wearable
 
 import android.content.Context
 import android.hardware.usb.UsbManager
+import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsics
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,6 +14,8 @@ import javax.inject.Singleton
 class XrealGlassProvider @Inject constructor(
     @ApplicationContext private val context: Context
 ) : SmartGlassProvider {
+    override val cameraIntrinsics: CameraIntrinsics = CameraIntrinsics.UNKNOWN
+
     override val name: String = "Xreal Air"
 
     override val capabilities: Set<GlassCapability> = setOf(

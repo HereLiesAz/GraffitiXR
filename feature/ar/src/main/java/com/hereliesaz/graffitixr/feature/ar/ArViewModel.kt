@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.PointF
 import androidx.camera.core.ImageProxy
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
@@ -19,9 +20,14 @@ import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.ScanPhase
+import com.hereliesaz.graffitixr.common.sensor.Vec3
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.common.util.eraseColorBlob
+import com.hereliesaz.graffitixr.common.wearable.ConnectionState
+import com.hereliesaz.graffitixr.common.wearable.WearableManager
+import com.hereliesaz.graffitixr.feature.ar.coop.calibration.Mat4
+import com.hereliesaz.graffitixr.feature.ar.coop.calibration.Procrustes
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
@@ -61,6 +67,7 @@ class ArViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val projectManager: com.hereliesaz.graffitixr.data.ProjectManager,
     private val collaborationManager: com.hereliesaz.graffitixr.core.collaboration.CollaborationManager,
+    private val wearableManager: WearableManager,
     @param:ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
@@ -79,6 +86,18 @@ class ArViewModel @Inject constructor(
      * ViewModel-of-ViewModel anti-pattern.
      */
     @Volatile var spectatorOpHandler: ((com.hereliesaz.graffitixr.common.model.Op) -> Unit)? = null
+
+    // ── Glasses session state ─────────────────────────────────────────────────
+    private val _glassesSessionState: MutableStateFlow<GlassesSessionState> =
+        MutableStateFlow(GlassesSessionState.Idle)
+    val glassesSessionState: StateFlow<GlassesSessionState> = _glassesSessionState.asStateFlow()
+
+    @Volatile var phoneToGlassesXform: Mat4? = null
+        private set
+
+    private val calibrationSrcPoints = mutableListOf<Vec3>()
+    private val calibrationDstPoints = mutableListOf<Vec3>()
+    // ─────────────────────────────────────────────────────────────────────────
 
     private var session: Session? = null
     private var renderer: ArRenderer? = null
@@ -150,6 +169,129 @@ class ArViewModel @Inject constructor(
     fun dismissCoopNotFoundDialog() {
         _uiState.update { it.copy(showCoopNotFoundDialog = false) }
     }
+
+    // ── Glasses session lifecycle ─────────────────────────────────────────────
+
+    fun startGlassesSession() {
+        val provider = wearableManager.listProviders().firstOrNull { it.name.contains("Meta") }
+            ?: run {
+                _glassesSessionState.value = GlassesSessionState.Fallback("no Meta provider")
+                return
+            }
+        _glassesSessionState.value = GlassesSessionState.PairingPrompt
+        wearableManager.activate(provider)
+        slamManager.startSensorCollection()
+        viewModelScope.launch {
+            provider.connectionState.collect { state ->
+                when (state) {
+                    is ConnectionState.Connected -> {
+                        _glassesSessionState.value = GlassesSessionState.CalibrationPrompt(progress = 0f)
+                        calibrationSrcPoints.clear()
+                        calibrationDstPoints.clear()
+                    }
+                    is ConnectionState.Disconnected,
+                    is ConnectionState.Error -> {
+                        val current = _glassesSessionState.value
+                        if (current is GlassesSessionState.Active ||
+                            current is GlassesSessionState.CalibrationPrompt) {
+                            _glassesSessionState.value = GlassesSessionState.Fallback(
+                                (state as? ConnectionState.Error)?.message ?: "disconnected"
+                            )
+                        }
+                    }
+                    else -> { /* Connecting — no-op */ }
+                }
+            }
+        }
+    }
+
+    fun endGlassesSession() {
+        wearableManager.deactivate()
+        slamManager.stopSensorCollection()
+        phoneToGlassesXform = null
+        calibrationSrcPoints.clear()
+        calibrationDstPoints.clear()
+        _glassesSessionState.value = GlassesSessionState.Idle
+    }
+
+    fun submitCalibrationTap(screenPoint: PointF) {
+        viewModelScope.launch {
+            val phonePoint = arCoreHitTestToWorld(screenPoint) ?: return@launch
+            val glassesPoint = glassesWorldHitForTimestamp(System.nanoTime()) ?: return@launch
+            calibrationSrcPoints.add(phonePoint)
+            calibrationDstPoints.add(glassesPoint)
+            val progress = (calibrationSrcPoints.size / 20f).coerceAtMost(1f)
+            _glassesSessionState.value = GlassesSessionState.CalibrationPrompt(progress)
+            if (calibrationSrcPoints.size >= 20) finalizeCalibration()
+        }
+    }
+
+    fun recalibrate() {
+        calibrationSrcPoints.clear()
+        calibrationDstPoints.clear()
+        _glassesSessionState.value = GlassesSessionState.CalibrationPrompt(progress = 0f)
+    }
+
+    fun applyPhoneToGlasses(point: Vec3): Vec3 = phoneToGlassesXform?.apply(point) ?: point
+
+    private fun finalizeCalibration() {
+        val xform = Procrustes.solve(calibrationSrcPoints, calibrationDstPoints) ?: run {
+            Timber.w("ArViewModel.finalizeCalibration: Procrustes failed; resetting calibration")
+            calibrationSrcPoints.clear()
+            calibrationDstPoints.clear()
+            _glassesSessionState.value = GlassesSessionState.CalibrationPrompt(progress = 0f)
+            return
+        }
+        if (kotlin.math.abs(xform.approximateScale() - 1f) > 0.05f) {
+            Timber.w("ArViewModel.finalizeCalibration: scale mismatch ${xform.approximateScale()}; resetting")
+            calibrationSrcPoints.clear()
+            calibrationDstPoints.clear()
+            _glassesSessionState.value = GlassesSessionState.CalibrationPrompt(progress = 0f)
+            return
+        }
+        phoneToGlassesXform = xform
+        _glassesSessionState.value = GlassesSessionState.Active
+    }
+
+    /**
+     * ARCore-based hit test in screen coordinates → world point. Uses the
+     * renderer's latest [com.google.ar.core.Frame] snapshot. Returns null if
+     * no renderer is attached, no frame has been published yet, or no plane/
+     * point is hit at the given screen position.
+     */
+    private fun arCoreHitTestToWorld(screenPoint: PointF): Vec3? {
+        val frame = renderer?.latestFrame?.get() ?: return null
+        return try {
+            val hits = frame.hitTest(screenPoint.x, screenPoint.y)
+            val pose = hits.firstOrNull()?.hitPose ?: return null
+            val t = pose.translation
+            Vec3(t[0], t[1], t[2])
+        } catch (e: Exception) {
+            Timber.w(e, "arCoreHitTestToWorld: hitTest failed")
+            null
+        }
+    }
+
+    /**
+     * Glasses-frame point for the moment of [timestampNs]. Without a real
+     * glasses-side feature-extraction pipeline (camera→world projection in
+     * the glasses' own SLAM frame), this returns the same point ARCore would
+     * return for the most recent screen-center hit, so calibration produces
+     * an identity-ish transform. When glasses-side world lookup is wired,
+     * replace this with a real lookup.
+     */
+    private fun glassesWorldHitForTimestamp(timestampNs: Long): Vec3? {
+        // Stand-in: reuse phone-world point from last screen-center hit.
+        return arCoreHitTestToWorld(PointF(centerScreenX(), centerScreenY()))
+    }
+
+    private fun centerScreenX(): Float =
+        appContext.resources.displayMetrics.widthPixels.toFloat() * 0.5f
+
+    private fun centerScreenY(): Float =
+        appContext.resources.displayMetrics.heightPixels.toFloat() * 0.5f
+
+    // ─────────────────────────────────────────────────────────────────────────
 
     private val _isCameraInUseByAr = MutableStateFlow(false)
     val isCameraInUseByAr = _isCameraInUseByAr.asStateFlow()

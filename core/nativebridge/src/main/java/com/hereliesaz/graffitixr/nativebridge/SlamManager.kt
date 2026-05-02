@@ -3,14 +3,29 @@ package com.hereliesaz.graffitixr.nativebridge
 
 import android.content.res.AssetManager
 import android.graphics.Bitmap
+import android.util.Log
 import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.sensor.CameraFrame
+import com.hereliesaz.graffitixr.common.sensor.ImuSample
+import com.hereliesaz.graffitixr.common.sensor.PixelFormat
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
+import com.hereliesaz.graffitixr.common.wearable.WearableManager
 import java.nio.ByteBuffer
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 @Singleton
-class SlamManager @Inject constructor() {
+class SlamManager @Inject constructor(
+    private val wearableManager: WearableManager,
+) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var collectionJob: Job? = null
 
     init {
         NativeLibLoader.loadAll()
@@ -191,7 +206,83 @@ class SlamManager @Inject constructor() {
         return nativeGetAnchorCandidates(threshold, maxCount)
     }
 
+    fun startSensorCollection() {
+        collectionJob?.cancel()
+        collectionJob = scope.launch {
+            wearableManager.activeSensorSource.collectLatest { source ->
+                launch {
+                    source.cameraFrames.collect { frame -> forwardFrame(frame) }
+                }
+                launch {
+                    source.imuSamples.collect { sample -> forwardImu(sample) }
+                }
+            }
+        }
+    }
+
+    fun stopSensorCollection() {
+        collectionJob?.cancel()
+        collectionJob = null
+    }
+
+    private fun forwardFrame(frame: CameraFrame) {
+        if (!frame.pixels.isDirect) {
+            Log.w(TAG, "skipping non-direct ByteBuffer frame")
+            return
+        }
+        when (frame.format) {
+            PixelFormat.RGBA_8888 -> {
+                feedColorFrame(frame.pixels, frame.width, frame.height, frame.timestampNs, null)
+            }
+            PixelFormat.YUV_420_888 -> forwardYuvFrame(frame)
+        }
+    }
+
+    private fun forwardYuvFrame(frame: CameraFrame) {
+        val layout = frame.yuvLayout
+        if (layout == null) {
+            Log.w(TAG, "YUV frame missing yuvLayout — dropping")
+            return
+        }
+        val full = frame.pixels
+        val y = sliceDirect(full, layout.yOffset, layout.ySize) ?: return
+        val u = sliceDirect(full, layout.uOffset, layout.uSize) ?: return
+        val v = sliceDirect(full, layout.vOffset, layout.vSize) ?: return
+        feedYuvFrame(
+            yBuffer = y,
+            uBuffer = u,
+            vBuffer = v,
+            width = frame.width,
+            height = frame.height,
+            yStride = layout.yStride,
+            uvStride = layout.uvStride,
+            uvPixelStride = layout.uvPixelStride,
+            timestampNs = frame.timestampNs,
+            cvRotateCode = null,
+        )
+    }
+
+    /** Returns a direct-byte-buffer view over [offset, offset+size) of [src]. */
+    private fun sliceDirect(src: ByteBuffer, offset: Int, size: Int): ByteBuffer? {
+        if (offset < 0 || size <= 0 || offset + size > src.capacity()) {
+            Log.w(TAG, "slice out of bounds: off=$offset size=$size cap=${src.capacity()}")
+            return null
+        }
+        val dup = src.duplicate()
+        dup.position(offset)
+        dup.limit(offset + size)
+        val slice = dup.slice()
+        return if (slice.isDirect) slice else null
+    }
+
+    private fun forwardImu(sample: ImuSample) {
+        val gyro = floatArrayOf(sample.gyro.x, sample.gyro.y, sample.gyro.z)
+        val accel = floatArrayOf(sample.accel.x, sample.accel.y, sample.accel.z)
+        updateDeviceMotion(gyro, accel)
+    }
+
     fun destroy() {
+        stopSensorCollection()
         if (isInitialized) {
             nativeDestroy()
             isInitialized = false
@@ -299,4 +390,8 @@ class SlamManager @Inject constructor() {
     private external fun nativeApplyLiquify(stroke: FloatArray, brushSize: Float, intensity: Float)
     private external fun nativeDrawLiquify(width: Int, height: Int)
     private external fun nativeBakeLiquify(outBitmap: Bitmap)
+
+    private companion object {
+        private const val TAG = "SlamManager"
+    }
 }

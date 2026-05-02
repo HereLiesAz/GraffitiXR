@@ -933,6 +933,40 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier.align(Alignment.TopCenter),
                                 )
                             }
+
+                            val glassesState by arViewModel.glassesSessionState.collectAsState()
+                            when (val s = glassesState) {
+                                is com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.PairingPrompt -> {
+                                    com.hereliesaz.graffitixr.ui.glasses.GlassesPairingOverlay(
+                                        onCancel = { arViewModel.endGlassesSession() },
+                                    )
+                                }
+                                is com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.CalibrationPrompt -> {
+                                    com.hereliesaz.graffitixr.ui.glasses.CalibrationOverlay(
+                                        progress = s.progress,
+                                        onTap = { point -> arViewModel.submitCalibrationTap(point) },
+                                    )
+                                }
+                                is com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.Active -> {
+                                    com.hereliesaz.graffitixr.ui.glasses.GlassesStatusBanner(
+                                        isFallback = false,
+                                        fallbackReason = null,
+                                        onReconnect = {},
+                                        onLeave = { arViewModel.endGlassesSession() },
+                                        modifier = Modifier.align(Alignment.TopCenter),
+                                    )
+                                }
+                                is com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.Fallback -> {
+                                    com.hereliesaz.graffitixr.ui.glasses.GlassesStatusBanner(
+                                        isFallback = true,
+                                        fallbackReason = s.reason,
+                                        onReconnect = { arViewModel.startGlassesSession() },
+                                        onLeave = { arViewModel.endGlassesSession() },
+                                        modifier = Modifier.align(Alignment.TopCenter),
+                                    )
+                                }
+                                com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.Idle -> Unit
+                            }
                         }
                     }
                 }
@@ -1102,7 +1136,12 @@ class MainActivity : ComponentActivity() {
                 color = navItemColor,
                 shape = AzButtonShape.RECTANGLE
             ) {
-                // Future: launch wearable connection flow
+                when (arViewModel.glassesSessionState.value) {
+                    com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.Idle ->
+                        arViewModel.startGlassesSession()
+                    else ->
+                        arViewModel.endGlassesSession()
+                }
             }
 
             azDivider()

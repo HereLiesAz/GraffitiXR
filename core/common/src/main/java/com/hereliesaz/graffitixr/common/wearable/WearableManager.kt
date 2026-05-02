@@ -1,49 +1,48 @@
 package com.hereliesaz.graffitixr.common.wearable
 
-import android.app.Activity
+import com.hereliesaz.graffitixr.common.sensor.PhoneSensorSource
+import com.hereliesaz.graffitixr.common.sensor.SensorSource
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Orchestrates connection and lifecycle management for all supported AI/AR glasses.
- */
 @Singleton
 class WearableManager @Inject constructor(
-    private val providers: Set<@JvmSuppressWildcards SmartGlassProvider>
+    private val providers: Set<@JvmSuppressWildcards SmartGlassProvider>,
+    private val phoneSensorSource: PhoneSensorSource,
 ) {
-    private val _activeProvider = MutableStateFlow<SmartGlassProvider?>(null)
-    val activeProvider: StateFlow<SmartGlassProvider?> = _activeProvider.asStateFlow()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    /**
-     * Get the list of all supported hardware providers.
-     */
-    fun getAvailableProviders(): List<SmartGlassProvider> = providers.toList()
+    private val _activeSensorSource: MutableStateFlow<SensorSource> = MutableStateFlow(phoneSensorSource)
+    val activeSensorSource: StateFlow<SensorSource> = _activeSensorSource
 
-    /**
-     * Select a specific hardware provider to use.
-     */
-    fun selectProvider(provider: SmartGlassProvider) {
-        _activeProvider.value?.disconnect()
-        _activeProvider.value = provider
+    @Volatile private var activeProvider: SmartGlassProvider? = null
+
+    fun listProviders(): List<SmartGlassProvider> = providers.toList()
+
+    fun activate(provider: SmartGlassProvider) {
+        activeProvider = provider
         provider.connect()
+        scope.launch {
+            provider.connectionState.collect { state ->
+                _activeSensorSource.value = when (state) {
+                    is ConnectionState.Connected -> provider
+                    is ConnectionState.Disconnected,
+                    is ConnectionState.Error -> phoneSensorSource
+                    else -> _activeSensorSource.value
+                }
+            }
+        }
     }
 
-    /**
-     * Start the registration/setup flow for the currently active provider.
-     */
-    fun startRegistration(activity: Activity) {
-        _activeProvider.value?.startRegistration(activity)
-    }
-
-    /**
-     * Shortcut to check if the Meta provider is registered (backward compatibility).
-     */
-    fun isRegistered(): Boolean {
-        return _activeProvider.value?.let { 
-            it.name.contains("Meta") && it.connectionState.value == ConnectionState.Connected
-        } ?: false
+    fun deactivate() {
+        activeProvider?.disconnect()
+        activeProvider = null
+        _activeSensorSource.value = phoneSensorSource
     }
 }
