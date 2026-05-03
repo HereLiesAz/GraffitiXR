@@ -434,6 +434,8 @@
     <string name="settings_units_imperial">Imperial (ft)</string>
     <string name="settings_units_metric">Metric (m)</string>
     <string name="settings_canvas_bg_label">Canvas Background</string>
+    <string name="settings_reset_tutorials_label">Reset Tutorials</string>
+    <string name="settings_reset_tutorials_value">Show first-run guides again</string>
     <string name="settings_info_section">App Information</string>
     <string name="settings_version_label">Version</string>
     <string name="settings_updates_section">Updates</string>
@@ -586,43 +588,31 @@
     <string name="unit_centimeters">cm</string>
     <!-- Abbreviation for meters. -->
     <string name="unit_meters">m</string>
-    <!-- Tutorial: AR Mode -->
-    <string name="tut_ar_title">AR Projection</string>
-    <string name="tut_ar_text">Projects your design onto a real wall using the phone\'s depth sensor and spatial tracking.</string>
-    <string name="tut_ar_step1_title">Step 1: Scan</string>
-    <string name="tut_ar_step1_text">Point at the wall and move slowly side-to-side. Coloured shapes appear as the engine maps the surface. Wait until the wall area is covered.</string>
-    <string name="tut_ar_step2_title">Step 2: Tap to Place</string>
-    <string name="tut_ar_step2_text">Just tap the screen. The app photographs the wall, extracts tracking features, and locks the anchor instantly.</string>
-    <string name="tut_ar_step3_title">Step 3: Add Your Artwork</string>
-    <string name="tut_ar_step3_text">Press \'Design\' to access your layer tools. Use \'Image\' to import photos, \'Draw\' to sketch, or \'Text\' to type.</string>
-    <string name="tut_ar_tip_title">Tip: Texture Matters</string>
-    <string name="tut_ar_tip_text">Blank white walls, smooth concrete, and single-colour surfaces won\'t track. Aim your anchor point at graffiti, rough plaster, or any distinct mark.</string>
-
-    <!-- Tutorial: Overlay Mode -->
-    <string name="tut_overlay_title">Live Overlay</string>
-    <string name="tut_overlay_text">Your design floats over the live camera view — no surface scanning needed.</string>
-    <string name="tut_overlay_step1_title">Step 1: Add Your Artwork</string>
-    <string name="tut_overlay_step1_text">Press \'Design\' to access layer tools. Use \'Image\' to import photos, \'Draw\' to sketch, or \'Text\' to type.</string>
-    <string name="tut_overlay_step2_title">Step 2: Position It</string>
-    <string name="tut_overlay_step2_text">Pinch to scale, drag to reposition. The overlay stays fixed to your screen — step back to see how it fits the wall.</string>
-
-    <!-- Tutorial: Mockup Mode -->
-    <string name="tut_mockup_title">Photo Mockup</string>
-    <string name="tut_mockup_text">Preview your design on a photo before you ever pick up a brush.</string>
-    <string name="tut_mockup_step1_title">Step 1: Set the Wall</string>
-    <string name="tut_mockup_step1_text">Open \'Design\' and tap \'Wall\' to choose or take a photo of your surface. Do this first!</string>
-    <string name="tut_mockup_step2_title">Step 2: Add Your Artwork</string>
-    <string name="tut_mockup_step2_text">Use \'Image\', \'Draw\', or \'Text\' to add layers on top of the wall. Pinch and drag to size and position them.</string>
-
-    <!-- Tutorial: Trace Mode -->
-    <string name="tut_trace_title">Lightbox Mode</string>
-    <string name="tut_trace_text">Turns your screen into a bright lightbox for tracing your design onto paper.</string>
-    <string name="tut_trace_step1_title">Step 1: Open Design Menu</string>
-    <string name="tut_trace_step1_text">Tap \'Design\' to access layer tools.</string>
-    <string name="tut_trace_step2_title">Step 2: Add Content</string>
-    <string name="tut_trace_step2_text">Use \'Image\' to import photos, \'Draw\' to sketch, or \'Text\' to type.</string>
-    <string name="tut_trace_step3_title">Step 3: Tracing</string>
-    <string name="tut_trace_step3_text">Lay paper over the screen and trace. Triple-tap anywhere to exit.</string>
+    <!-- Mode onboarding scripts (chromeless tap-to-advance overlay) -->
+    <string-array name="onboarding_trace">
+        <item>This is Trace mode.</item>
+        <item>Arrange and edit your photos, sketches, and text by pressing the Design button.</item>
+        <item>When they are where and how you want them, press the Freeze button to turn your phone into a lightbox for tracing onto paper.</item>
+        <item>We recommend using either Trace mode or Mockup mode for editing.</item>
+        <item>That way your imagery is all ready to go and your phone can focus on augmenting reality when you press the AR button.</item>
+    </string-array>
+    <string-array name="onboarding_ar">
+        <item>AR Projection — projects your design onto a real wall using the phone\'s depth sensor and spatial tracking.</item>
+        <item>Point at the wall and move slowly side-to-side. Coloured shapes appear as the engine maps the surface. Wait until the wall area is covered.</item>
+        <item>Just tap the screen. The app photographs the wall, extracts tracking features, and locks the anchor instantly.</item>
+        <item>Press \'Design\' to access your layer tools. Use \'Image\' to import photos, \'Draw\' to sketch, or \'Text\' to type.</item>
+        <item>Tip — blank white walls, smooth concrete, and single-colour surfaces won\'t track. Aim your anchor point at graffiti, rough plaster, or any distinct mark.</item>
+    </string-array>
+    <string-array name="onboarding_overlay">
+        <item>Live Overlay — your design floats over the live camera view, no surface scanning needed.</item>
+        <item>Press \'Design\' to access layer tools. Use \'Image\' to import photos, \'Draw\' to sketch, or \'Text\' to type.</item>
+        <item>Pinch to scale, drag to reposition. The overlay stays fixed to your screen — step back to see how it fits the wall.</item>
+    </string-array>
+    <string-array name="onboarding_mockup">
+        <item>Photo Mockup — preview your design on a photo before you ever pick up a brush.</item>
+        <item>Open \'Design\' and tap \'Wall\' to choose or take a photo of your surface. Do this first!</item>
+        <item>Use \'Image\', \'Draw\', or \'Text\' to add layers on top of the wall. Pinch and drag to size and position them.</item>
+    </string-array>
 
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
     <string name="tut_create_anchor_title">Create Anchor</string>

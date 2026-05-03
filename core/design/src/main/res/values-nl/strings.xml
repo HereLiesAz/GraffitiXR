@@ -568,42 +568,12 @@
 
     <string name="unit_meters">M</string>
 
-    <string name="tut_ar_title">AR-projectie</string>
-    <string name="tut_ar_text">Projecteert uw ontwerp op een echte muur met behulp van de dieptesensor en ruimtelijke tracking van de telefoon.</string>
-    <string name="tut_ar_step1_title">Stap 1: Scannen</string>
-    <string name="tut_ar_step1_text">Wijs naar de muur en beweeg langzaam heen en weer. Er verschijnen gekleurde vlekken terwijl de motor het oppervlak in kaart brengt. Wacht tot de splats het muurgedeelte bedekken.</string>
-    <string name="tut_ar_step2_title">Stap 2: Tik om te plaatsen</string>
-    <string name="tut_ar_step2_text">Tik gewoon op het scherm. De app fotografeert de muur, extraheert trackingfuncties en vergrendelt het anker onmiddellijk.</string>
-    <string name="tut_ar_step3_title">Stap 3: Voeg uw kunstwerk toe</string>
-    <string name="tut_ar_step3_text">Druk op \'Ontwerpen\' om toegang te krijgen tot uw laaggereedschappen. Gebruik \'Afbeelding\' om foto\'s te importeren, \'Tekenen\' om te schetsen of \'Tekst\' om te typen.</string>
-    <string name="tut_ar_tip_title">Tip: textuur is belangrijk</string>
-    <string name="tut_ar_tip_text">Blanke witte muren, glad beton en effen oppervlakken laten zich niet volgen. Richt uw ankerpunt op graffiti, ruw gips of een ander duidelijk merkteken.</string>
 
 
-    <string name="tut_overlay_title">Live-overlay</string>
-    <string name="tut_overlay_text">Uw ontwerp zweeft over het live camerabeeld – er is geen oppervlaktescan nodig.</string>
-    <string name="tut_overlay_step1_title">Stap 1: Voeg uw kunstwerk toe</string>
-    <string name="tut_overlay_step1_text">Druk op \'Ontwerpen\' om toegang te krijgen tot laaggereedschappen. Gebruik \'Afbeelding\' om foto\'s te importeren, \'Tekenen\' om te schetsen of \'Tekst\' om te typen.</string>
-    <string name="tut_overlay_step2_title">Stap 2: Plaats het</string>
-    <string name="tut_overlay_step2_text">Knijp om te schalen, sleep om te verplaatsen. De overlay blijft op uw scherm zitten. Doe een stap achteruit om te zien hoe deze op de muur past.</string>
 
 
-    <string name="tut_mockup_title">Fotomodel</string>
-    <string name="tut_mockup_text">Bekijk een voorbeeld van uw ontwerp op een foto voordat u ooit een penseel oppakt.</string>
-    <string name="tut_mockup_step1_title">Stap 1: Plaats de muur</string>
-    <string name="tut_mockup_step1_text">Open \'Ontwerp\' en tik op \'Muur\' om een ​​foto van uw oppervlak te kiezen of te maken. Doe dit eerst!</string>
-    <string name="tut_mockup_step2_title">Stap 2: Voeg uw kunstwerk toe</string>
-    <string name="tut_mockup_step2_text">Gebruik \'Afbeelding\', \'Tekenen\' of \'Tekst\' om lagen bovenop de muur toe te voegen. Knijp en sleep ze op maat en positioneer ze.</string>
 
 
-    <string name="tut_trace_title">Lightbox-modus</string>
-    <string name="tut_trace_text">Verandert uw scherm in een heldere lichtbak waarmee u uw ontwerp op papier kunt overtrekken.</string>
-    <string name="tut_trace_step1_title">Stap 1: Open het ontwerpmenu</string>
-    <string name="tut_trace_step1_text">Tik op \'Ontwerp\' om toegang te krijgen tot laagtools.</string>
-    <string name="tut_trace_step2_title">Stap 2: inhoud toevoegen</string>
-    <string name="tut_trace_step2_text">Gebruik \'Afbeelding\' om foto\'s te importeren, \'Tekenen\' om te schetsen of \'Tekst\' om te typen.</string>
-    <string name="tut_trace_step3_title">Stap 3: Traceren</string>
-    <string name="tut_trace_step3_text">Leg papier over het scherm en teken het over. Tik driemaal ergens om af te sluiten.</string>
 
 
     <string name="tut_create_anchor_title">Anker maken</string>

@@ -568,42 +568,12 @@
 
     <string name="unit_meters">m</string>
 
-    <string name="tut_ar_title">AR Vetítés</string>
-    <string name="tut_ar_text">Kivetíti a tervedet egy valódi falra a telefon mélységérzékelője és a térbeli követés segítségével.</string>
-    <string name="tut_ar_step1_title">1. lépés: Szkennelés</string>
-    <string name="tut_ar_step1_text">Mutass a falra, és mozogj lassan oldalra. Színes splattek jelennek meg, ahogy a motor feltérképezi a felületet. Várj, amíg a splattek beborítják a falfelületet.</string>
-    <string name="tut_ar_step2_title">2. lépés: Koppints az elhelyezéshez</string>
-    <string name="tut_ar_step2_text">Csak koppints a képernyőre. Az alkalmazás lefényképezi a falat, kinyeri a követési funkciókat, és azonnal rögzíti a horgonyt.</string>
-    <string name="tut_ar_step3_title">3. lépés: Add hozzá a művedet</string>
-    <string name="tut_ar_step3_text">Nyomd meg a \'Tervezés\' gombot a rétegeszközök eléréséhez. Használd a \'Kép\' lehetőséget fotók importálásához, a \'Rajz\' lehetőséget a vázlatkészítéshez, vagy a \'Szöveg\' lehetőséget a gépeléshez.</string>
-    <string name="tut_ar_tip_title">Tipp: A textúra számít</string>
-    <string name="tut_ar_tip_text">Az üres fehér falak, a sima beton és az egyszínű felületek nem követhetők. Irányítsd a horgonypontot graffitire, durva vakolatra vagy bármilyen jellegzetes jelre.</string>
 
 
-    <string name="tut_overlay_title">Élő Rétegzés</string>
-    <string name="tut_overlay_text">A terved az élő kameranézet felett lebeg - nincs szükség felületszkennelésre.</string>
-    <string name="tut_overlay_step1_title">1. lépés: Add hozzá a művedet</string>
-    <string name="tut_overlay_step1_text">Nyomd meg a \'Tervezés\' gombot a rétegeszközök eléréséhez. Használd a \'Kép\' lehetőséget fotók importálásához, a \'Rajz\' lehetőséget a vázlatkészítéshez, vagy a \'Szöveg\' lehetőséget a gépeléshez.</string>
-    <string name="tut_overlay_step2_title">2. lépés: Pozicionáld</string>
-    <string name="tut_overlay_step2_text">Csippents a méretezéshez, húzd az áthelyezéshez. A rétegzés a képernyődhöz rögzülve marad – lépj hátra, hogy lásd, hogyan illeszkedik a falhoz.</string>
 
 
-    <string name="tut_mockup_title">Fotó Makett</string>
-    <string name="tut_mockup_text">Tekintsd meg a terved előnézetét egy fotón, mielőtt egyáltalán ecsetet fognál.</string>
-    <string name="tut_mockup_step1_title">1. lépés: Állítsd be a falat</string>
-    <string name="tut_mockup_step1_text">Nyisd meg a \'Tervezés\' menüt, és koppints a \'Fal\' lehetőségre a felületed fotójának kiválasztásához vagy elkészítéséhez. Ezt tedd először!</string>
-    <string name="tut_mockup_step2_title">2. lépés: Add hozzá a művedet</string>
-    <string name="tut_mockup_step2_text">Használd a \'Kép\', \'Rajz\' vagy \'Szöveg\' lehetőséget, hogy rétegeket adj a fal tetejére. Csippents és húzd a méretezésükhöz és pozicionálásukhoz.</string>
 
 
-    <string name="tut_trace_title">Világítótábla Mód</string>
-    <string name="tut_trace_text">Fényes világítótáblává változtatja a képernyődet, amellyel a tervedet papírra rajzolhatod.</string>
-    <string name="tut_trace_step1_title">1. lépés: Tervezés Menü megnyitása</string>
-    <string name="tut_trace_step1_text">Koppints a \'Tervezés\' gombra a rétegeszközök eléréséhez.</string>
-    <string name="tut_trace_step2_title">2. lépés: Tartalom hozzáadása</string>
-    <string name="tut_trace_step2_text">Használd a \'Kép\' lehetőséget fotók importálásához, a \'Rajz\' lehetőséget a vázlatkészítéshez, vagy a \'Szöveg\' lehetőséget a gépeléshez.</string>
-    <string name="tut_trace_step3_title">3. lépés: Rajzolás</string>
-    <string name="tut_trace_step3_text">Helyezz papírt a képernyőre és rajzolj. Koppints háromszor bárhová a kilépéshez.</string>
 
 
     <string name="tut_create_anchor_title">Horgony létrehozása</string>

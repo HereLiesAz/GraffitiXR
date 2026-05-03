@@ -61,4 +61,7 @@ interface SettingsRepository {
     val completedTutorials: Flow<Set<String>>
 
     suspend fun markTutorialComplete(key: String)
+
+    /** Clears every completed-tutorial key, allowing first-run flows to fire again. */
+    suspend fun clearCompletedTutorials()
 }

@@ -568,42 +568,12 @@
     <!-- Abbreviation for meters. -->
     <string name="unit_meters">m</string>
     <!-- Tutorial: AR Mode -->
-    <string name="tut_ar_title">Proiezione AR</string>
-    <string name="tut_ar_text">Proietta il tuo design su un muro reale usando il sensore di profondità del telefono e il tracciamento spaziale.</string>
-    <string name="tut_ar_step1_title">Passo 1: Scansione</string>
-    <string name="tut_ar_step1_text">Punta verso il muro e muoviti lentamente da un lato all\'altro. I Gaussian Splats colorati appaiono mentre il motore mappa la superficie. Attendi che i punti coprano l\'area del muro.</string>
-    <string name="tut_ar_step2_title">Passo 2: Tocca per Posizionare</string>
-    <string name="tut_ar_step2_text">Tocca semplicemente lo schermo. L\'app fotografa il muro, estrae le funzionalità di tracciamento e blocca l\'ancora istantaneamente.</string>
-    <string name="tut_ar_step3_title">Passo 3: Aggiungi la tua Opera d\'arte</string>
-    <string name="tut_ar_step3_text">Premi \'Design\' per accedere agli strumenti del livello. Usa \'Immagine\' per importare foto, \'Disegna\' per fare uno schizzo o \'Testo\' per scrivere.</string>
-    <string name="tut_ar_tip_title">Suggerimento: La Texture è Importante</string>
-    <string name="tut_ar_tip_text">Muri bianchi vuoti, cemento liscio e superfici a tinta unita non verranno tracciate. Punta il punto di ancoraggio verso graffiti, intonaco ruvido o qualsiasi segno distintivo.</string>
 
     <!-- Tutorial: Overlay Mode -->
-    <string name="tut_overlay_title">Sovrapposizione dal Vivo</string>
-    <string name="tut_overlay_text">Il tuo design galleggia sulla vista della telecamera dal vivo — non è necessaria alcuna scansione della superficie.</string>
-    <string name="tut_overlay_step1_title">Passo 1: Aggiungi la tua Opera d\'arte</string>
-    <string name="tut_overlay_step1_text">Premi \'Design\' per accedere agli strumenti del livello. Usa \'Immagine\' per importare foto, \'Disegna\' per fare uno schizzo o \'Testo\' per scrivere.</string>
-    <string name="tut_overlay_step2_title">Passo 2: Posizionalo</string>
-    <string name="tut_overlay_step2_text">Pizzica per ridimensionare, trascina per riposizionare. La sovrapposizione rimane fissa sullo schermo — fai un passo indietro per vedere come si adatta al muro.</string>
 
     <!-- Tutorial: Mockup Mode -->
-    <string name="tut_mockup_title">Mockup Fotografico</string>
-    <string name="tut_mockup_text">Visualizza in anteprima il tuo design su una foto prima di prendere in mano un pennello.</string>
-    <string name="tut_mockup_step1_title">Passo 1: Imposta il Muro</string>
-    <string name="tut_mockup_step1_text">Apri \'Design\' e tocca \'Muro\' per scegliere o scattare una foto della tua superficie. Fallo per primo!</string>
-    <string name="tut_mockup_step2_title">Passo 2: Aggiungi la tua Opera d\'arte</string>
-    <string name="tut_mockup_step2_text">Usa \'Immagine\', \'Disegna\' o \'Testo\' per aggiungere livelli sopra il muro. Pizzica e trascina per dimensionarli e posizionarli.</string>
 
     <!-- Tutorial: Trace Mode -->
-    <string name="tut_trace_title">Modalità Tavolo luminoso</string>
-    <string name="tut_trace_text">Trasforma il tuo schermo in un tavolo luminoso brillante per ricalcare il tuo design su carta.</string>
-    <string name="tut_trace_step1_title">Passo 1: Apri il Menu Design</string>
-    <string name="tut_trace_step1_text">Tocca \'Design\' per accedere agli strumenti del livello.</string>
-    <string name="tut_trace_step2_title">Passo 2: Aggiungi Contenuto</string>
-    <string name="tut_trace_step2_text">Usa \'Immagine\' per importare foto, \'Disegna\' per fare uno schizzo o \'Testo\' per scrivere.</string>
-    <string name="tut_trace_step3_title">Passo 3: Ricalco</string>
-    <string name="tut_trace_step3_text">Poggia la carta sullo schermo e ricalca. Tocca tre volte ovunque per uscire.</string>
 
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
     <string name="tut_create_anchor_title">Crea Ancora</string>

@@ -568,42 +568,12 @@
 
     <string name="unit_meters">m</string>
 
-    <string name="tut_ar_title">AR-projektion</string>
-    <string name="tut_ar_text">Projicerar din design på en riktig vägg med telefonens djupsensor och rumslig spårning.</string>
-    <string name="tut_ar_step1_title">Steg 1: Skanna</string>
-    <string name="tut_ar_step1_text">Peka på väggen och rör dig långsamt sida till sida. Färgade fläckar visas när motorn kartlägger ytan. Vänta tills fläckarna täcker väggområdet.</string>
-    <string name="tut_ar_step2_title">Steg 2: Tryck för att placera</string>
-    <string name="tut_ar_step2_text">Tryck bara på skärmen. Appen fotograferar väggen, extraherar spårningsfunktioner och låser ankaret direkt.</string>
-    <string name="tut_ar_step3_title">Steg 3: Lägg till ditt konstverk</string>
-    <string name="tut_ar_step3_text">Tryck på "Design" för att komma åt dina lagerverktyg. Använd "Bild" för att importera foton, "Rita" för att skissa eller "Text" för att skriva.</string>
-    <string name="tut_ar_tip_title">Tips: Texture Matters</string>
-    <string name="tut_ar_tip_text">Tomma vita väggar, slät betong och enfärgade ytor kommer inte att spåra. Rikta din ankarpunkt mot graffiti, grov gips eller något tydligt märke.</string>
 
 
-    <string name="tut_overlay_title">Live Overlay</string>
-    <string name="tut_overlay_text">Din design svävar över livekameravyn – ingen ytskanning behövs.</string>
-    <string name="tut_overlay_step1_title">Steg 1: Lägg till ditt konstverk</string>
-    <string name="tut_overlay_step1_text">Tryck på "Design" för att komma åt lagerverktyg. Använd "Bild" för att importera foton, "Rita" för att skissa eller "Text" för att skriva.</string>
-    <string name="tut_overlay_step2_title">Steg 2: Placera den</string>
-    <string name="tut_overlay_step2_text">Nyp för att skala, dra för att flytta om. Överlägget förblir fixerat på din skärm – gå tillbaka för att se hur det passar väggen.</string>
 
 
-    <string name="tut_mockup_title">Fotomodell</string>
-    <string name="tut_mockup_text">Förhandsgranska din design på ett foto innan du någonsin tar upp en pensel.</string>
-    <string name="tut_mockup_step1_title">Steg 1: Ställ in väggen</string>
-    <string name="tut_mockup_step1_text">Öppna "Design" och tryck på "Vägg" för att välja eller ta ett foto av din yta. Gör detta först!</string>
-    <string name="tut_mockup_step2_title">Steg 2: Lägg till ditt konstverk</string>
-    <string name="tut_mockup_step2_text">Använd \'Bild\', \'Rita\' eller \'Text\' för att lägga till lager ovanpå väggen. Nyp och dra till storlek och placera dem.</string>
 
 
-    <string name="tut_trace_title">Lightbox-läge</string>
-    <string name="tut_trace_text">Förvandlar din skärm till en ljus ljuslåda för att spåra din design på papper.</string>
-    <string name="tut_trace_step1_title">Steg 1: Öppna Design Menu</string>
-    <string name="tut_trace_step1_text">Tryck på "Design" för att komma åt lagerverktyg.</string>
-    <string name="tut_trace_step2_title">Steg 2: Lägg till innehåll</string>
-    <string name="tut_trace_step2_text">Använd "Bild" för att importera foton, "Rita" för att skissa eller "Text" för att skriva.</string>
-    <string name="tut_trace_step3_title">Steg 3: Spårning</string>
-    <string name="tut_trace_step3_text">Lägg papper över skärmen och rita. Tryck tre gånger var som helst för att avsluta.</string>
 
 
     <string name="tut_create_anchor_title">Skapa ankare</string>

@@ -586,42 +586,12 @@
 
     <string name="unit_meters">m</string>
 
-    <string name="tut_ar_title">ARプロジェクション</string>
-    <string name="tut_ar_text">携帯電話の深度センサーと空間トラッキングを使用して、デザインを実際の壁に投影します。</string>
-    <string name="tut_ar_step1_title">ステップ 1: スキャン</string>
-    <string name="tut_ar_step1_text">壁に向けてゆっくりと左右に動かします。エンジンが表面をマッピングすると、色付きのスプラットが表示されます。スプラットが壁の領域を覆うまで待ちます。</string>
-    <string name="tut_ar_step2_title">ステップ 2: タップして配置</string>
-    <string name="tut_ar_step2_text">画面をタップするだけです。アプリが壁を撮影し、トラッキング機能を抽出して、アンカーを瞬時にロックします。</string>
-    <string name="tut_ar_step3_title">ステップ 3: アートワークの追加</string>
-    <string name="tut_ar_step3_text">「デザイン」を押してレイヤーツールにアクセスします。「画像」を使用して写真をインポートするか、「描画」でスケッチするか、「テキスト」で入力します。</string>
-    <string name="tut_ar_tip_title">ヒント: テクスチャが重要</string>
-    <string name="tut_ar_tip_text">真っ白な壁、滑らかなコンクリート、単色の表面は追跡されません。アンカーポイントをグラフィティ、粗い漆喰、または目立つマークに向けます。</string>
 
 
-    <string name="tut_overlay_title">ライブオーバーレイ</string>
-    <string name="tut_overlay_text">デザインがライブカメラビュー上に浮かびます — 表面のスキャンは不要です。</string>
-    <string name="tut_overlay_step1_title">ステップ 1: アートワークの追加</string>
-    <string name="tut_overlay_step1_text">「デザイン」を押してレイヤーツールにアクセスします。「画像」を使用して写真をインポートするか、「描画」でスケッチするか、「テキスト」で入力します。</string>
-    <string name="tut_overlay_step2_title">ステップ 2: 配置</string>
-    <string name="tut_overlay_step2_text">ピンチして拡大縮小し、ドラッグして位置を変更します。オーバーレイは画面に固定されたままです — 一歩下がって壁にどのようにフィットするか確認してください。</string>
 
 
-    <string name="tut_mockup_title">写真のモックアップ</string>
-    <string name="tut_mockup_text">ブラシを手に取る前に、写真上でデザインをプレビューします。</string>
-    <string name="tut_mockup_step1_title">ステップ 1: 壁の設定</string>
-    <string name="tut_mockup_step1_text">「デザイン」を開き、「壁」をタップして表面の写真を選択するか撮影します。これを最初に行ってください！</string>
-    <string name="tut_mockup_step2_title">ステップ 2: アートワークの追加</string>
-    <string name="tut_mockup_step2_text">「画像」、「描画」、または「テキスト」を使用して、壁の上にレイヤーを追加します。ピンチしてドラッグし、サイズと位置を調整します。</string>
 
 
-    <string name="tut_trace_title">ライトボックスモード</string>
-    <string name="tut_trace_text">画面を明るいライトボックスに変えて、デザインを紙にトレースします。</string>
-    <string name="tut_trace_step1_title">ステップ 1: デザインメニューを開く</string>
-    <string name="tut_trace_step1_text">「デザイン」をタップしてレイヤーツールにアクセスします。</string>
-    <string name="tut_trace_step2_title">ステップ 2: コンテンツの追加</string>
-    <string name="tut_trace_step2_text">「画像」を使用して写真をインポートするか、「描画」でスケッチするか、「テキスト」で入力します。</string>
-    <string name="tut_trace_step3_title">ステップ 3: トレース</string>
-    <string name="tut_trace_step3_text">画面の上に紙を置き、トレースします。どこでも3回タップすると終了します。</string>
 
 
     <string name="tut_create_anchor_title">アンカーの作成</string>

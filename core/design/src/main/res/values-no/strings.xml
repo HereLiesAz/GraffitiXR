@@ -568,42 +568,12 @@
     <!-- Abbreviation for meters. -->
     <string name="unit_meters">m</string>
     <!-- Tutorial: AR Mode -->
-    <string name="tut_ar_title">AR-projeksjon</string>
-    <string name="tut_ar_text">Projiserer designet ditt på en ekte vegg ved hjelp av telefonens dybdesensor og romlig sporing.</string>
-    <string name="tut_ar_step1_title">Trinn 1: Skann</string>
-    <string name="tut_ar_step1_text">Pek på veggen og beveg sakte side til side. Fargede flekker vises når motoren kartlegger overflaten. Vent til indikatorene dekker veggområdet.</string>
-    <string name="tut_ar_step2_title">Trinn 2: Trykk for å plassere</string>
-    <string name="tut_ar_step2_text">Bare trykk på skjermen. Appen fotograferer veggen, trekker ut sporingsfunksjoner og låser ankeret umiddelbart.</string>
-    <string name="tut_ar_step3_title">Trinn 3: Legg til kunstverket ditt</string>
-    <string name="tut_ar_step3_text">Trykk "Design" for å få tilgang til lagverktøyene dine. Bruk "Bilde" for å importere bilder, "Tegn" for å skissere, eller "Tekst" for å skrive.</string>
-    <string name="tut_ar_tip_title">Tips: Tekstur er viktig</string>
-    <string name="tut_ar_tip_text">Blanke hvite vegger, glatt betong og ensfargede overflater vil ikke spore. Sikt ankerpunktet mot graffiti, grov gips eller et annet tydelig merke.</string>
 
     <!-- Tutorial: Overlay Mode -->
-    <string name="tut_overlay_title">Live overlegg</string>
-    <string name="tut_overlay_text">Designet ditt flyter over den levende kameravisningen – ingen overflateskanning nødvendig.</string>
-    <string name="tut_overlay_step1_title">Trinn 1: Legg til kunstverket ditt</string>
-    <string name="tut_overlay_step1_text">Trykk "Design" for å få tilgang til lagverktøy. Bruk "Bilde" for å importere bilder, "Tegn" for å skissere, eller "Tekst" for å skrive.</string>
-    <string name="tut_overlay_step2_title">Trinn 2: Plasser den</string>
-    <string name="tut_overlay_step2_text">Klyp for å skalere, dra for å flytte. Overlegget forblir festet til skjermen din – gå tilbake for å se hvordan det passer til veggen.</string>
 
     <!-- Tutorial: Mockup Mode -->
-    <string name="tut_mockup_title">Fotomockup</string>
-    <string name="tut_mockup_text">Forhåndsvis design på et bilde før du noen gang tar opp en pensel.</string>
-    <string name="tut_mockup_step1_title">Trinn 1: Sett veggen</string>
-    <string name="tut_mockup_step1_text">Åpne "Design" og trykk på "Vegg" for å velge eller ta et bilde av overflaten din. Gjør dette først!</string>
-    <string name="tut_mockup_step2_title">Trinn 2: Legg til kunstverket ditt</string>
-    <string name="tut_mockup_step2_text">Bruk \'Bilde\', \'Tegn\' eller \'Tekst\' for å legge til lag på toppen av veggen. Klyp og dra til størrelse og plassering.</string>
 
     <!-- Tutorial: Trace Mode -->
-    <string name="tut_trace_title">Lysboksmodus</string>
-    <string name="tut_trace_text">Gjør skjermen om til en lysende lysboks for å spore designet ditt på papir.</string>
-    <string name="tut_trace_step1_title">Trinn 1: Åpne Design-menyen</string>
-    <string name="tut_trace_step1_text">Trykk på "Design" for å få tilgang til lagverktøy.</string>
-    <string name="tut_trace_step2_title">Trinn 2: Legg til innhold</string>
-    <string name="tut_trace_step2_text">Bruk "Bilde" for å importere bilder, "Tegn" for å skissere, eller "Tekst" for å skrive.</string>
-    <string name="tut_trace_step3_title">Trinn 3: Sporing</string>
-    <string name="tut_trace_step3_text">Legg papir over skjermen og spor. Trippeltrykk hvor som helst for å avslutte.</string>
 
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
     <string name="tut_create_anchor_title">Lag anker</string>

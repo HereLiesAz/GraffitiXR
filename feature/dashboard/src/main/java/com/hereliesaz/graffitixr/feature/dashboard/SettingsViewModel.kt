@@ -33,4 +33,8 @@ class SettingsViewModel @Inject constructor(
     fun markTutorialComplete(key: String) {
         viewModelScope.launch { settingsRepository.markTutorialComplete(key) }
     }
+
+    fun resetCompletedTutorials() {
+        viewModelScope.launch { settingsRepository.clearCompletedTutorials() }
+    }
 }

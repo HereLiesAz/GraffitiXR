@@ -568,42 +568,12 @@
 
     <string name="unit_meters">米</string>
 
-    <string name="tut_ar_title">擴增實境投影</string>
-    <string name="tut_ar_text">使用手機的深度感應器和空間追蹤將您的設計投影到真實的牆上。</string>
-    <string name="tut_ar_step1_title">第 1 步：掃描</string>
-    <string name="tut_ar_step1_text">指向牆壁並緩慢地左右移動。當引擎繪製表面時，會出現彩色斑點。等到碎片覆蓋牆壁區域。</string>
-    <string name="tut_ar_step2_title">第 2 步：點擊放置</string>
-    <string name="tut_ar_step2_text">只需點擊螢幕即可。該應用程式拍攝牆壁，提取追蹤特徵，並立即鎖定錨點。</string>
-    <string name="tut_ar_step3_title">第 3 步：新增您的作品</string>
-    <string name="tut_ar_step3_text">按“設計”存取圖層工具。使用“圖像”匯入照片，使用“繪圖”繪製草圖，或使用“文字”鍵入。</string>
-    <string name="tut_ar_tip_title">提示：紋理很重要</string>
-    <string name="tut_ar_tip_text">空白的白色牆壁、光滑的混凝土和單色表面不會跟踪。將錨點瞄準塗鴉、粗糙的灰泥或任何明顯的標記。</string>
 
 
-    <string name="tut_overlay_title">即時疊加</string>
-    <string name="tut_overlay_text">您的設計漂浮在即時攝影機視圖上 - 無需表面掃描。</string>
-    <string name="tut_overlay_step1_title">第 1 步：新增您的作品</string>
-    <string name="tut_overlay_step1_text">按“設計”存取圖層工具。使用“圖像”匯入照片，使用“繪圖”繪製草圖，或使用“文字”鍵入。</string>
-    <string name="tut_overlay_step2_title">第 2 步：定位</string>
-    <string name="tut_overlay_step2_text">捏合可縮放，拖曳可重新定位。覆蓋層固定在您的螢幕上 - 退一步看看它是否適合牆壁。</string>
 
 
-    <string name="tut_mockup_title">照片樣機</string>
-    <string name="tut_mockup_text">在拿起畫筆之前，在照片上預覽您的設計。</string>
-    <string name="tut_mockup_step1_title">第 1 步：設定牆壁</string>
-    <string name="tut_mockup_step1_text">打開“設計”並點擊“牆壁”以選擇表面或拍攝表面照片。先做這個吧！</string>
-    <string name="tut_mockup_step2_title">第 2 步：新增您的作品</string>
-    <string name="tut_mockup_step2_text">使用「圖像」、「繪圖」或「文字」在牆壁頂部新增圖層。捏合併拖曳以調整它們的大小和位置。</string>
 
 
-    <string name="tut_trace_title">燈箱模式</string>
-    <string name="tut_trace_text">將您的螢幕變成明亮的燈箱，以便將您的設計描繪到紙上。</string>
-    <string name="tut_trace_step1_title">第 1 步：開啟設計選單</string>
-    <string name="tut_trace_step1_text">點擊“設計”以存取圖層工具。</string>
-    <string name="tut_trace_step2_title">第 2 步：新增內容</string>
-    <string name="tut_trace_step2_text">使用“圖像”匯入照片，使用“繪圖”繪製草圖，或使用“文字”鍵入。</string>
-    <string name="tut_trace_step3_title">第三步：追蹤</string>
-    <string name="tut_trace_step3_text">將紙放在螢幕上並描畫。在任何位置點擊三次即可退出。</string>
 
 
     <string name="tut_create_anchor_title">建立錨點</string>

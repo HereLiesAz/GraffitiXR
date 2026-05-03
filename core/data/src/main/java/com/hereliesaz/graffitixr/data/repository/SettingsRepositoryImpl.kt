@@ -119,4 +119,10 @@ class SettingsRepositoryImpl @Inject constructor(
             preferences[COMPLETED_TUTORIALS] = current + key
         }
     }
+
+    override suspend fun clearCompletedTutorials() {
+        context.dataStore.edit { preferences ->
+            preferences[COMPLETED_TUTORIALS] = emptySet()
+        }
+    }
 }

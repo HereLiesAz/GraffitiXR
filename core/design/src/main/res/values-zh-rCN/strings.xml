@@ -586,42 +586,12 @@
 
     <string name="unit_meters">米</string>
 
-    <string name="tut_ar_title">AR 投影</string>
-    <string name="tut_ar_text">使用手机的深度传感器和空间追踪将您的设计投影到真实的墙壁上。</string>
-    <string name="tut_ar_step1_title">步骤 1：扫描</string>
-    <string name="tut_ar_step1_text">指向墙壁并缓慢地左右移动。引擎映射表面时会出现彩色的点。等到点覆盖墙壁区域。</string>
-    <string name="tut_ar_step2_title">步骤 2：点击放置</string>
-    <string name="tut_ar_step2_text">只需点按屏幕即可。应用程序拍摄墙壁，提取追踪特征，并立即锁定锚点。</string>
-    <string name="tut_ar_step3_title">步骤 3：添加您的艺术作品</string>
-    <string name="tut_ar_step3_text">按“设计”访问您的图层工具。使用“图像”导入照片，“绘画”进行素描，或“文本”进行输入。</string>
-    <string name="tut_ar_tip_title">提示：纹理很重要</string>
-    <string name="tut_ar_tip_text">空白的白墙、光滑的混凝土和单色表面无法被追踪。将您的锚点对准涂鸦、粗糙的灰泥或任何明显的标记。</string>
 
 
-    <string name="tut_overlay_title">实时覆盖</string>
-    <string name="tut_overlay_text">您的设计悬浮在实时摄像头视图上 — 无需进行表面扫描。</string>
-    <string name="tut_overlay_step1_title">步骤 1：添加您的艺术作品</string>
-    <string name="tut_overlay_step1_text">按“设计”访问图层工具。使用“图像”导入照片，“绘画”进行素描，或“文本”进行输入。</string>
-    <string name="tut_overlay_step2_title">步骤 2：定位它</string>
-    <string name="tut_overlay_step2_text">捏合以缩放，拖动以重新定位。覆盖层固定在您的屏幕上 — 退后一步看看它如何贴合墙壁。</string>
 
 
-    <string name="tut_mockup_title">照片效果图</string>
-    <string name="tut_mockup_text">在您拿起画笔之前，在照片上预览您的设计。</string>
-    <string name="tut_mockup_step1_title">步骤 1：设置墙壁</string>
-    <string name="tut_mockup_step1_text">打开“设计”并点击“墙壁”以选择或拍摄您的表面的照片。请先执行此操作！</string>
-    <string name="tut_mockup_step2_title">步骤 2：添加您的艺术作品</string>
-    <string name="tut_mockup_step2_text">使用“图像”、“绘画”或“文本”在墙壁顶部添加图层。捏合和拖动以调整其大小和位置。</string>
 
 
-    <string name="tut_trace_title">透写台模式</string>
-    <string name="tut_trace_text">将您的屏幕变成明亮的透写台，以便将您的设计描摹到纸上。</string>
-    <string name="tut_trace_step1_title">步骤 1：打开设计菜单</string>
-    <string name="tut_trace_step1_text">点击“设计”访问图层工具。</string>
-    <string name="tut_trace_step2_title">步骤 2：添加内容</string>
-    <string name="tut_trace_step2_text">使用“图像”导入照片，“绘画”进行素描，或“文本”进行输入。</string>
-    <string name="tut_trace_step3_title">步骤 3：描摹</string>
-    <string name="tut_trace_step3_text">将纸铺在屏幕上并开始描摹。在任意位置连按三次以退出。</string>
 
 
     <string name="tut_create_anchor_title">创建锚点</string>

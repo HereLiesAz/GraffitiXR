@@ -568,42 +568,12 @@
     <!-- Abbreviation for meters. -->
     <string name="unit_meters">m</string>
     <!-- Tutorial: AR Mode -->
-    <string name="tut_ar_title">Proyección AR</string>
-    <string name="tut_ar_text">Proyecta tu diseño en una pared real utilizando el sensor de profundidad del teléfono y el seguimiento espacial.</string>
-    <string name="tut_ar_step1_title">Paso 1: Escanear</string>
-    <string name="tut_ar_step1_text">Apunta a la pared y muévete lentamente de lado a lado. Aparecerán manchas de colores a medida que el motor mapea la superficie. Espera hasta que las manchas cubran el área de la pared.</string>
-    <string name="tut_ar_step2_title">Paso 2: Toca para Colocar</string>
-    <string name="tut_ar_step2_text">Solo toca la pantalla. La aplicación fotografía la pared, extrae características de seguimiento y bloquea el anclaje al instante.</string>
-    <string name="tut_ar_step3_title">Paso 3: Añade tu Obra</string>
-    <string name="tut_ar_step3_text">Presiona \'Diseño\' para acceder a las herramientas de capa. Usa \'Imagen\' para importar fotos, \'Dibujar\' para bocetar o \'Texto\' para escribir.</string>
-    <string name="tut_ar_tip_title">Consejo: La Textura Importa</string>
-    <string name="tut_ar_tip_text">Las paredes blancas y en blanco, el hormigón liso y las superficies de un solo color no se rastrearán. Apunta tu punto de anclaje a grafitis, yeso rugoso o cualquier marca distintiva.</string>
 
     <!-- Tutorial: Overlay Mode -->
-    <string name="tut_overlay_title">Superposición en Vivo</string>
-    <string name="tut_overlay_text">Tu diseño flota sobre la vista de la cámara en vivo — no se necesita escanear superficies.</string>
-    <string name="tut_overlay_step1_title">Paso 1: Añade tu Obra</string>
-    <string name="tut_overlay_step1_text">Presiona \'Diseño\' para acceder a herramientas de capa. Usa \'Imagen\' para importar fotos, \'Dibujar\' para bocetar o \'Texto\' para escribir.</string>
-    <string name="tut_overlay_step2_title">Paso 2: Posiciónalo</string>
-    <string name="tut_overlay_step2_text">Pellizca para escalar, arrastra para reubicar. La superposición permanece fija en tu pantalla — da un paso atrás para ver cómo se ajusta a la pared.</string>
 
     <!-- Tutorial: Mockup Mode -->
-    <string name="tut_mockup_title">Maqueta Fotográfica</string>
-    <string name="tut_mockup_text">Previsualiza tu diseño en una foto antes de siquiera agarrar un pincel.</string>
-    <string name="tut_mockup_step1_title">Paso 1: Establece la Pared</string>
-    <string name="tut_mockup_step1_text">Abre \'Diseño\' y toca \'Pared\' para elegir o tomar una foto de tu superficie. ¡Haz esto primero!</string>
-    <string name="tut_mockup_step2_title">Paso 2: Añade tu Obra</string>
-    <string name="tut_mockup_step2_text">Usa \'Imagen\', \'Dibujar\' o \'Texto\' para añadir capas sobre la pared. Pellizca y arrastra para dar tamaño y posicionarlas.</string>
 
     <!-- Tutorial: Trace Mode -->
-    <string name="tut_trace_title">Modo Mesa de Luz</string>
-    <string name="tut_trace_text">Convierte tu pantalla en una mesa de luz brillante para calcar tu diseño en papel.</string>
-    <string name="tut_trace_step1_title">Paso 1: Abre el Menú de Diseño</string>
-    <string name="tut_trace_step1_text">Toca \'Diseño\' para acceder a las herramientas de capa.</string>
-    <string name="tut_trace_step2_title">Paso 2: Añade Contenido</string>
-    <string name="tut_trace_step2_text">Usa \'Imagen\' para importar fotos, \'Dibujar\' para bocetar o \'Texto\' para escribir.</string>
-    <string name="tut_trace_step3_title">Paso 3: Calcando</string>
-    <string name="tut_trace_step3_text">Coloca papel sobre la pantalla y calca. Toca tres veces en cualquier lugar para salir.</string>
 
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
     <string name="tut_create_anchor_title">Crear Anclaje</string>

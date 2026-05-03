@@ -46,20 +46,13 @@ internal object RailIntegrityCheck {
             }
         }
 
-        // (4) tutorial anchors — we can only inspect anchors at the Compose
-        //     definition site, but the tutorial key itself is used as the anchor
-        //     for createSimpleTutorial. Verify every tutorial key is either
-        //     a rail-item ID, a mode firstRun key, or a layer-help key.
-        val firstRunKeys = setOf(
-            "mode.ar.firstRun", "mode.overlay.firstRun",
-            "mode.mockup.firstRun", "mode.trace.firstRun",
-        )
+        // (4) tutorial anchors — verify every tutorial key is either a
+        //     rail-item ID or a layer-help key.
         tutorials.keys.forEach { key ->
             val isRailId = key in railIds
-            val isFirstRun = key in firstRunKeys
             val isLayerHelp = key.endsWith(".help") && key.removeSuffix(".help") in railIds
-            if (!isRailId && !isFirstRun && !isLayerHelp) {
-                Log.w(TAG, "tutorial key '$key' has no matching rail item or mode")
+            if (!isRailId && !isLayerHelp) {
+                Log.w(TAG, "tutorial key '$key' has no matching rail item")
             }
         }
     }

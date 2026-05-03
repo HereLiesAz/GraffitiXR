@@ -568,42 +568,12 @@
 
     <string name="unit_meters">м</string>
 
-    <string name="tut_ar_title">AR-проекция</string>
-    <string name="tut_ar_text">Проецирует ваш дизайн на настоящую стену, используя датчик глубины телефона и пространственное отслеживание.</string>
-    <string name="tut_ar_step1_title">Шаг 1: Сканирование</string>
-    <string name="tut_ar_step1_text">Наведите курсор на стену и медленно двигайтесь из стороны в сторону. </string>
-    <string name="tut_ar_step2_title">Шаг 2: Нажмите, чтобы разместить</string>
-    <string name="tut_ar_step2_text">Просто коснитесь экрана. </string>
-    <string name="tut_ar_step3_title">Шаг 3: Добавьте свою работу</string>
-    <string name="tut_ar_step3_text">Нажмите «Дизайн», чтобы получить доступ к инструментам слоя. </string>
-    <string name="tut_ar_tip_title">Совет: текстура имеет значение</string>
-    <string name="tut_ar_tip_text">Пустые белые стены, гладкий бетон и однотонные поверхности не будут отслеживаться. </string>
 
 
-    <string name="tut_overlay_title">Живое наложение</string>
-    <string name="tut_overlay_text">Ваш дизайн плавает над изображением камеры в реальном времени — сканирование поверхности не требуется.</string>
-    <string name="tut_overlay_step1_title">Шаг 1: добавьте свою работу</string>
-    <string name="tut_overlay_step1_text">Нажмите «Дизайн», чтобы получить доступ к инструментам слоя. </string>
-    <string name="tut_overlay_step2_title">Шаг 2: Разместите его</string>
-    <string name="tut_overlay_step2_text">Сведите пальцы, чтобы масштабировать, перетащите, чтобы изменить положение. </string>
 
 
-    <string name="tut_mockup_title">Фото Мокап</string>
-    <string name="tut_mockup_text">Прежде чем взять в руки кисть, просмотрите свой дизайн на фотографии.</string>
-    <string name="tut_mockup_step1_title">Шаг 1: Установите стену</string>
-    <string name="tut_mockup_step1_text">Откройте «Дизайн» и нажмите «Стена», чтобы выбрать или сфотографировать поверхность. </string>
-    <string name="tut_mockup_step2_title">Шаг 2: Добавьте свою работу</string>
-    <string name="tut_mockup_step2_text">Используйте «Изображение», «Рисование» или «Текст», чтобы добавить слои поверх стены. </string>
 
 
-    <string name="tut_trace_title">Режим лайтбокса</string>
-    <string name="tut_trace_text">Превращает ваш экран в яркий лайтбокс для переноса вашего дизайна на бумагу.</string>
-    <string name="tut_trace_step1_title">Шаг 1. Откройте меню «Дизайн».</string>
-    <string name="tut_trace_step1_text">Нажмите «Дизайн», чтобы получить доступ к инструментам слоев.</string>
-    <string name="tut_trace_step2_title">Шаг 2: Добавьте контент</string>
-    <string name="tut_trace_step2_text">Используйте «Изображение» для импорта фотографий, «Рисование» для эскизов или «Текст» для ввода.</string>
-    <string name="tut_trace_step3_title">Шаг 3: Отслеживание</string>
-    <string name="tut_trace_step3_text">Положите бумагу на экран и обведите. </string>
 
 
     <string name="tut_create_anchor_title">Создать якорь</string>

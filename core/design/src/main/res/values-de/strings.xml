@@ -568,42 +568,12 @@
     <!-- Abbreviation for meters. -->
     <string name="unit_meters">m</string>
     <!-- Tutorial: AR Mode -->
-    <string name="tut_ar_title">AR-Projektion</string>
-    <string name="tut_ar_text">Projiziert Ihr Design mithilfe des Tiefensensors und des räumlichen Trackings des Telefons auf eine echte Wand.</string>
-    <string name="tut_ar_step1_title">Schritt 1: Scannen</string>
-    <string name="tut_ar_step1_text">Zielen Sie auf die Wand und bewegen Sie sich langsam von Seite zu Seite. Farbige Splats erscheinen, während die Engine die Oberfläche abbildet. Warten Sie, bis die Splats den Wandbereich abdecken.</string>
-    <string name="tut_ar_step2_title">Schritt 2: Zum Platzieren tippen</string>
-    <string name="tut_ar_step2_text">Tippen Sie einfach auf den Bildschirm. Die App fotografiert die Wand, extrahiert Tracking-Merkmale und arretiert den Anker sofort.</string>
-    <string name="tut_ar_step3_title">Schritt 3: Fügen Sie Ihr Kunstwerk hinzu</string>
-    <string name="tut_ar_step3_text">Drücken Sie auf \'Design\', um auf Ihre Ebenenwerkzeuge zuzugreifen. Verwenden Sie \'Bild\', um Fotos zu importieren, \'Zeichnen\', um zu skizzieren, oder \'Text\', um zu tippen.</string>
-    <string name="tut_ar_tip_title">Tipp: Auf die Textur kommt es an</string>
-    <string name="tut_ar_tip_text">Leere weiße Wände, glatter Beton und einfarbige Oberflächen werden nicht erfasst. Richten Sie Ihren Ankerpunkt auf Graffiti, rauen Putz oder eine beliebige andere deutliche Markierung.</string>
 
     <!-- Tutorial: Overlay Mode -->
-    <string name="tut_overlay_title">Live-Overlay</string>
-    <string name="tut_overlay_text">Ihr Design schwebt über der Live-Kameraansicht – kein Scannen der Oberfläche erforderlich.</string>
-    <string name="tut_overlay_step1_title">Schritt 1: Fügen Sie Ihr Kunstwerk hinzu</string>
-    <string name="tut_overlay_step1_text">Drücken Sie auf \'Design\', um auf Ebenenwerkzeuge zuzugreifen. Verwenden Sie \'Bild\', um Fotos zu importieren, \'Zeichnen\', um zu skizzieren, oder \'Text\', um zu tippen.</string>
-    <string name="tut_overlay_step2_title">Schritt 2: Positionieren Sie es</string>
-    <string name="tut_overlay_step2_text">Zusammendrücken zum Skalieren, ziehen zum Neupositionieren. Das Overlay bleibt fest auf Ihrem Bildschirm – treten Sie einen Schritt zurück, um zu sehen, wie es an die Wand passt.</string>
 
     <!-- Tutorial: Mockup Mode -->
-    <string name="tut_mockup_title">Foto-Mockup</string>
-    <string name="tut_mockup_text">Sehen Sie sich eine Vorschau Ihres Designs auf einem Foto an, bevor Sie jemals einen Pinsel in die Hand nehmen.</string>
-    <string name="tut_mockup_step1_title">Schritt 1: Legen Sie die Wand fest</string>
-    <string name="tut_mockup_step1_text">Öffnen Sie \'Design\' und tippen Sie auf \'Wand\', um ein Foto Ihrer Oberfläche auszuwählen oder aufzunehmen. Tun Sie dies zuerst!</string>
-    <string name="tut_mockup_step2_title">Schritt 2: Fügen Sie Ihr Kunstwerk hinzu</string>
-    <string name="tut_mockup_step2_text">Verwenden Sie \'Bild\', \'Zeichnen\' oder \'Text\', um Ebenen über der Wand hinzuzufügen. Drücken und ziehen Sie, um sie in der Größe anzupassen und zu positionieren.</string>
 
     <!-- Tutorial: Trace Mode -->
-    <string name="tut_trace_title">Leuchtkasten-Modus</string>
-    <string name="tut_trace_text">Verwandelt Ihren Bildschirm in einen hellen Leuchtkasten zum Übertragen Ihres Designs auf Papier.</string>
-    <string name="tut_trace_step1_title">Schritt 1: Öffnen Sie das Design-Menü</string>
-    <string name="tut_trace_step1_text">Tippen Sie auf \'Design\', um auf Ebenenwerkzeuge zuzugreifen.</string>
-    <string name="tut_trace_step2_title">Schritt 2: Inhalt hinzufügen</string>
-    <string name="tut_trace_step2_text">Verwenden Sie \'Bild\', um Fotos zu importieren, \'Zeichnen\', um zu skizzieren, oder \'Text\', um zu tippen.</string>
-    <string name="tut_trace_step3_title">Schritt 3: Pausen</string>
-    <string name="tut_trace_step3_text">Legen Sie Papier auf den Bildschirm und pausen Sie ab. Tippen Sie dreimal auf eine beliebige Stelle, um den Vorgang zu beenden.</string>
 
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
     <string name="tut_create_anchor_title">Anker erstellen</string>

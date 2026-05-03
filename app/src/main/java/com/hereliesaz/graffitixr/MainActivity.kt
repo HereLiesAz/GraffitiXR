@@ -71,15 +71,16 @@ import java.io.File
 import com.google.android.gms.common.GoogleApiAvailability
 import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.*
-import com.hereliesaz.aznavrail.tutorial.*
 import com.hereliesaz.aznavrail.HiddenMenuScope
-import com.hereliesaz.aznavrail.tutorial.LocalAzTutorialController
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
+import com.hereliesaz.graffitixr.onboarding.ModeOnboarding
+import com.hereliesaz.graffitixr.onboarding.ModeOnboardingOverlay
+import com.hereliesaz.graffitixr.onboarding.rememberModeOnboardings
 import com.hereliesaz.graffitixr.common.model.Tool
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
@@ -208,7 +209,6 @@ class MainActivity : ComponentActivity() {
                 val hostQr by arViewModel.hostQrPayload.collectAsState()
                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
                 val dashboardNavigation by dashboardViewModel.navigationTrigger.collectAsState()
-                val completedTutorials by settingsViewModel.completedTutorials.collectAsState()
                 val language by settingsViewModel.language.collectAsState()
 
                 LaunchedEffect(language) {
@@ -272,18 +272,6 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(arUiState.isAnchorEstablished) {
                     if (!arUiState.isAnchorEstablished && mainViewModel.uiState.value.isInPlaneRealignment) {
                         mainViewModel.endPlaneRealignment()
-                    }
-                }
-
-                LaunchedEffect(arUiState.isAnchorEstablished) {
-                    if (arUiState.isAnchorEstablished) {
-                        settingsViewModel.markTutorialComplete("tut_ar")
-                    }
-                }
-                LaunchedEffect(editorUiState.layers.size) {
-                    if (editorUiState.layers.isNotEmpty()) {
-                        settingsViewModel.markTutorialComplete("tut_design")
-                        settingsViewModel.markTutorialComplete("tut_${editorUiState.editorMode.name.lowercase()}")
                     }
                 }
 
@@ -379,8 +367,9 @@ class MainActivity : ComponentActivity() {
                     buildHelpItems(strings, editorUiState.layers)
                 }
 
-                val modeTutorials = remember(context) { getGraffitiTutorials(context) }
-                val tutorials = getTutorials(editorUiState.layers, strings) + modeTutorials
+                val tutorials = getTutorials(editorUiState.layers, strings)
+                val onboardings = rememberModeOnboardings()
+                var activeOnboarding by remember { mutableStateOf<ModeOnboarding?>(null) }
 
                 if (BuildConfig.DEBUG) {
                     RailIntegrityCheck.verify(
@@ -451,28 +440,25 @@ class MainActivity : ComponentActivity() {
                     onscreen {
                         if (isExporting) return@onscreen
 
-                        val tutorialController = LocalAzTutorialController.current
-                        LaunchedEffect(editorUiState.editorMode, showLibrary, completedTutorials) {
-                            if (showLibrary) return@LaunchedEffect
+                        LaunchedEffect(
+                            editorUiState.editorMode,
+                            showLibrary,
+                            showSettings,
+                            isExporting,
+                            mainUiState.isCapturingTarget
+                        ) {
+                            if (showLibrary || showSettings || isExporting || mainUiState.isCapturingTarget) return@LaunchedEffect
+                            if (editorUiState.layers.isNotEmpty()) return@LaunchedEffect
+                            activeOnboarding = onboardings[editorUiState.editorMode]
+                        }
 
-                            val noLayers = editorUiState.layers.isEmpty()
-                            val noAnchor = !arUiState.isAnchorEstablished
-                            if (!(noLayers && (editorUiState.editorMode != EditorMode.AR || noAnchor))) return@LaunchedEffect
-
-                            val tutorialId = when (editorUiState.editorMode) {
-                                EditorMode.AR      -> "mode.ar.firstRun"
-                                EditorMode.OVERLAY -> "mode.overlay.firstRun"
-                                EditorMode.MOCKUP  -> "mode.mockup.firstRun"
-                                EditorMode.TRACE   -> "mode.trace.firstRun"
-                                else               -> null
-                            } ?: return@LaunchedEffect
-
-                            val key = "tut_${editorUiState.editorMode.name.lowercase()}"
-                            if (key in completedTutorials) return@LaunchedEffect
-
-                            tutorialController.startTutorial(tutorialId)
-                            withFrameNanos { }
-                            settingsViewModel.markTutorialComplete(key)
+                        if (!showLibrary && !showSettings && !isExporting && !mainUiState.isCapturingTarget) {
+                            activeOnboarding?.let { ob ->
+                                ModeOnboardingOverlay(
+                                    onboarding = ob,
+                                    onDismiss = { activeOnboarding = null }
+                                )
+                            }
                         }
 
                         if (editorUiState.stencilHintVisible || editorUiState.isStencilGenerating) {
