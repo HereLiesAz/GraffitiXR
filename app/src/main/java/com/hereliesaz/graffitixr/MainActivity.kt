@@ -404,6 +404,7 @@ class MainActivity : ComponentActivity() {
                         noMenu = !isRailVisible
                     )
                     azAdvanced(
+                        helpEnabled = true,
                         helpList = allHelpItems,
                         tutorials = tutorials
                     )
@@ -456,21 +457,22 @@ class MainActivity : ComponentActivity() {
 
                             val noLayers = editorUiState.layers.isEmpty()
                             val noAnchor = !arUiState.isAnchorEstablished
+                            if (!(noLayers && (editorUiState.editorMode != EditorMode.AR || noAnchor))) return@LaunchedEffect
 
-                            if (noLayers && (editorUiState.editorMode != EditorMode.AR || noAnchor)) {
-                                val tutorialId = when (editorUiState.editorMode) {
-                                    EditorMode.AR      -> "mode.ar.firstRun"
-                                    EditorMode.OVERLAY -> "mode.overlay.firstRun"
-                                    EditorMode.MOCKUP  -> "mode.mockup.firstRun"
-                                    EditorMode.TRACE   -> "mode.trace.firstRun"
-                                    else               -> null
-                                }
-                                val key = "tut_${editorUiState.editorMode.name.lowercase()}"
-                                if (tutorialId != null && key !in completedTutorials) {
-                                    tutorialController.startTutorial(tutorialId)
-                                    settingsViewModel.markTutorialComplete(key)
-                                }
-                            }
+                            val tutorialId = when (editorUiState.editorMode) {
+                                EditorMode.AR      -> "mode.ar.firstRun"
+                                EditorMode.OVERLAY -> "mode.overlay.firstRun"
+                                EditorMode.MOCKUP  -> "mode.mockup.firstRun"
+                                EditorMode.TRACE   -> "mode.trace.firstRun"
+                                else               -> null
+                            } ?: return@LaunchedEffect
+
+                            val key = "tut_${editorUiState.editorMode.name.lowercase()}"
+                            if (key in completedTutorials) return@LaunchedEffect
+
+                            tutorialController.startTutorial(tutorialId)
+                            withFrameNanos { }
+                            settingsViewModel.markTutorialComplete(key)
                         }
 
                         if (editorUiState.stencilHintVisible || editorUiState.isStencilGenerating) {
@@ -889,6 +891,7 @@ class MainActivity : ComponentActivity() {
                                     onMuralMethodChanged = { arViewModel.setMuralMethod(it) },
                                     onCheckForUpdates = { dashboardViewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
                                     onInstallUpdate = { dashboardViewModel.installUpdate(this@MainActivity) },
+                                    onResetTutorials = { settingsViewModel.resetCompletedTutorials() },
                                     onClose = { showSettings = false },
                                     strings = strings
                                 )

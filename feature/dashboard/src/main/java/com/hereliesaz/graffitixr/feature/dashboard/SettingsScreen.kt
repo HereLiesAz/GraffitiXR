@@ -86,6 +86,7 @@ fun SettingsScreen(
     onMuralMethodChanged: (MuralMethod) -> Unit,
     onCheckForUpdates: () -> Unit,
     onInstallUpdate: () -> Unit,
+    onResetTutorials: () -> Unit,
     onClose: () -> Unit,
     strings: AppStrings
 ) {
@@ -249,6 +250,11 @@ fun SettingsScreen(
                                 label = strings.settings.units,
                                 value = if (isImperialUnits) strings.settings.imperial else strings.settings.metric,
                                 modifier = Modifier.clickable { onImperialUnitsChanged(!isImperialUnits) }
+                            )
+                            SettingsItem(
+                                label = strings.settings.resetTutorials,
+                                value = strings.settings.resetTutorialsValue,
+                                modifier = Modifier.clickable { onResetTutorials() }
                             )
                             SettingRow(label = strings.settings.canvasBg) {
                                 listOf(
