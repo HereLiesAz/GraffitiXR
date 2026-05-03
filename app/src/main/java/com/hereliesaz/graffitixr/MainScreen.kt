@@ -195,6 +195,8 @@ fun MainScreen(
                                 r.isCapturingTarget = mainUiState.isCapturingTarget
                                 r.isInPlaneRealignment = mainUiState.isInPlaneRealignment
                                 r.hideVisualization = isExporting
+                                r.visitedSectorsMask = arUiState.visitedSectorsMask
+                                r.scanPhase = arUiState.scanPhase
                             }
                         },
                         modifier = Modifier.fillMaxSize()

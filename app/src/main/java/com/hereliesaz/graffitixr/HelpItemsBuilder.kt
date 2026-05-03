@@ -7,34 +7,28 @@ import com.hereliesaz.graffitixr.design.theme.AppStrings
  * Builds the helpList map consumed by AzNavRail's azAdvanced(helpList = ...)
  * parameter. Single source of truth for help-overlay text.
  *
+ * Per the AzNavRail v8.10 guide (HelpOverlay filter rule): a help card is
+ * shown for an item when it has a `helpList` entry, an `info` string, or a
+ * tutorial. To scope help to "items on the main rail" vs "items in the open
+ * nested rail", this map is restricted to:
+ *   - Top-level rail items the user can see on the main rail
+ *   - Per-layer popup items (visible only when that layer's nested rail is open)
+ * Host sub-items (e.g. mode.ar, design.addImg) are intentionally omitted —
+ * they're inline expansions of host accordions, not items the user views as
+ * "on the main rail".
+ *
  * Keys must match rail-item IDs registered in ConfigureRailItems.
- * Layer-derived keys use the layerId() helper.
  */
 internal fun buildHelpItems(strings: AppStrings, layers: List<Layer>): Map<String, Any> {
     val base = mutableMapOf<String, Any>(
+        // Top-level main rail items — what's visible on the rail itself.
         "mode.host" to strings.help.modeHost,
-        "mode.ar" to strings.help.ar,
-        "mode.overlay" to strings.help.overlay,
-        "mode.mockup" to strings.help.mockup,
-        "mode.trace" to strings.help.trace,
         "target.host" to strings.help.targetHost,
-        "target.scanModeToggle" to strings.help.scanModeToggle,
-        "target.create" to strings.help.create,
         "design.host" to strings.help.designHost,
-        "design.addImg" to strings.help.addImg,
-        "design.addDraw" to strings.help.addDraw,
-        "design.addText" to strings.help.addText,
-        "design.wall" to strings.help.wall,
         "project.host.main" to strings.help.projectHost,
-        "project.new" to strings.help.newProject,
-        "project.save" to strings.help.saveProject,
-        "project.load" to strings.help.loadProject,
-        "project.export" to strings.help.exportImage,
-        "project.settings" to strings.help.appSettings,
         "tool.light" to strings.help.flashlight,
         "tool.lockTrace" to strings.help.lockTrace,
         "tool.helpMain" to strings.help.helpMain,
-        "wearable.main" to strings.nav.wearableInfo,
     )
 
     layers.forEach { layer ->

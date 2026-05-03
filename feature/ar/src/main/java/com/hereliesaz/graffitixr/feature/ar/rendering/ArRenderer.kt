@@ -13,6 +13,7 @@ import com.google.ar.core.exceptions.NotYetAvailableException
 import com.google.ar.core.exceptions.SessionPausedException
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.MuralMethod
+import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
 import com.hereliesaz.graffitixr.feature.ar.DisplayRotationHelper
 import com.hereliesaz.graffitixr.feature.ar.anchor.AnchorOrchestrator
@@ -56,6 +57,7 @@ class ArRenderer(
     private val overlayRenderer = OverlayRenderer(context)
     private val pointCloudRenderer = PointCloudRenderer()
     private val planeRenderer = PlaneRenderer()
+    private val scanFogRenderer = ScanFogRenderer()
     private val anchorOrchestrator = AnchorOrchestrator()
 
     @Volatile var scanMode: ArScanMode = ArScanMode.MURAL
@@ -69,6 +71,10 @@ class ArRenderer(
         }
     /** When true the SLAM/cloud visualization is suppressed — processing continues but nothing is drawn. */
     @Volatile var hideVisualization: Boolean = false
+    /** 36-bit mask of visited 10° yaw sectors. Pushed from `ArUiState.visitedSectorsMask`. */
+    @Volatile var visitedSectorsMask: Long = 0L
+    /** Current scan phase. Fog is rendered only when AMBIENT and not yet anchored. */
+    @Volatile var scanPhase: ScanPhase = ScanPhase.AMBIENT
     var stereoProvider: com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider? = null
 
     @Volatile private var isFlashlightRequested: Boolean = false
@@ -175,6 +181,7 @@ class ArRenderer(
         overlayRenderer.createOnGlThread()
         pointCloudRenderer.createOnGlThread(context)
         planeRenderer.createOnGlThread(context)
+        scanFogRenderer.createOnGlThread()
         isSurfaceCreated = true
 
         sessionLock.withLock {
@@ -304,6 +311,18 @@ class ArRenderer(
 
             val yawRad = kotlin.math.atan2(-viewMatrix[2].toDouble(), -viewMatrix[10].toDouble())
             val yawDeg = Math.toDegrees(yawRad).toFloat()
+
+            // Hot-pink "fog of war" over the camera feed for unvisited yaw sectors.
+            // Only during AMBIENT scan in MURAL mode, before the anchor is locked.
+            if (!hideVisualization &&
+                !anchorEstablished &&
+                scanMode == ArScanMode.MURAL &&
+                scanPhase == ScanPhase.AMBIENT
+            ) {
+                scanFogRenderer.updateMask(visitedSectorsMask)
+                val halfFovH = kotlin.math.atan(1.0 / projMatrix[0].toDouble()).toFloat()
+                scanFogRenderer.draw(yawRad.toFloat(), halfFovH)
+            }
 
             slamManager.setArCoreTrackingState(isTracking)
 

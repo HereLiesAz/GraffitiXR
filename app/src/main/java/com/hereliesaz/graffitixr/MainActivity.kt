@@ -367,7 +367,14 @@ class MainActivity : ComponentActivity() {
                     buildHelpItems(strings, editorUiState.layers)
                 }
 
-                val tutorials = getTutorials(editorUiState.layers, strings)
+                // Scope tutorials to the same keys present in `allHelpItems` so the
+                // HelpOverlay's filter (info OR helpList OR tutorial) doesn't
+                // surface cards for items the user isn't looking at — e.g.
+                // host sub-items that are inline expansions, not "rail" items.
+                val rawTutorials = getTutorials(editorUiState.layers, strings)
+                val tutorials = remember(rawTutorials, allHelpItems) {
+                    rawTutorials.filterKeys { it in allHelpItems }
+                }
                 val onboardings = rememberModeOnboardings()
                 var activeOnboarding by remember { mutableStateOf<ModeOnboarding?>(null) }
 
