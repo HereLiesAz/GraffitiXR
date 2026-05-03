@@ -7,21 +7,17 @@ import com.hereliesaz.graffitixr.design.theme.AppStrings
  * Builds the helpList map consumed by AzNavRail's azAdvanced(helpList = ...)
  * parameter. Single source of truth for help-overlay text.
  *
- * Per the AzNavRail v8.10 guide (HelpOverlay filter rule): a help card is
- * shown for an item when it has a `helpList` entry, an `info` string, or a
- * tutorial. To scope help to "items on the main rail" vs "items in the open
- * nested rail", this map is restricted to:
- *   - Top-level rail items the user can see on the main rail
- *   - Per-layer popup items (visible only when that layer's nested rail is open)
- * Host sub-items (e.g. mode.ar, design.addImg) are intentionally omitted —
- * they're inline expansions of host accordions, not items the user views as
- * "on the main rail".
+ * Per the AzNavRail v8.11 HelpOverlay scoping rule: when a nested rail is
+ * open, only its `nestedRailItems` are shown; otherwise all main-rail items
+ * (top-level + host sub-items) are shown. So this map can safely contain:
+ *   - All main-rail items (top-level + host sub-items) — surfaced on main Help
+ *   - Per-layer popup items — surfaced only when that layer's nested rail is open
  *
  * Keys must match rail-item IDs registered in ConfigureRailItems.
  */
 internal fun buildHelpItems(strings: AppStrings, layers: List<Layer>): Map<String, Any> {
     val base = mutableMapOf<String, Any>(
-        // Top-level main rail items — what's visible on the rail itself.
+        // Top-level main rail items
         "mode.host" to strings.help.modeHost,
         "target.host" to strings.help.targetHost,
         "design.host" to strings.help.designHost,
@@ -29,6 +25,23 @@ internal fun buildHelpItems(strings: AppStrings, layers: List<Layer>): Map<Strin
         "tool.light" to strings.help.flashlight,
         "tool.lockTrace" to strings.help.lockTrace,
         "tool.helpMain" to strings.help.helpMain,
+        // Host sub-items (visible inline when the host accordion is expanded)
+        "mode.ar" to strings.help.ar,
+        "mode.overlay" to strings.help.overlay,
+        "mode.mockup" to strings.help.mockup,
+        "mode.trace" to strings.help.trace,
+        "target.scanModeToggle" to strings.help.scanModeToggle,
+        "target.create" to strings.help.create,
+        "design.addImg" to strings.help.addImg,
+        "design.addDraw" to strings.help.addDraw,
+        "design.addText" to strings.help.addText,
+        "design.wall" to strings.help.wall,
+        "project.new" to strings.help.newProject,
+        "project.save" to strings.help.saveProject,
+        "project.load" to strings.help.loadProject,
+        "project.export" to strings.help.exportImage,
+        "project.settings" to strings.help.appSettings,
+        "wearable.main" to strings.nav.wearableInfo,
     )
 
     layers.forEach { layer ->

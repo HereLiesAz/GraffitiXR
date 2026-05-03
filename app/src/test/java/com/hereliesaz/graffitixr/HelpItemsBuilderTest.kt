@@ -16,31 +16,21 @@ class HelpItemsBuilderTest {
     }
 
     @Test
-    fun `result contains top-level main rail keys only`() {
+    fun `result contains every static main-rail key`() {
         val map = buildHelpItems(strings(), emptyList())
-        // Per the AzNavRail v8.10 HelpOverlay scope: only top-level rail items
-        // get help cards. Host sub-items (mode.ar, design.addImg, project.new,
-        // etc.) are inline expansions, not rail items, so they are intentionally
-        // absent from the helpList.
+        // Per AzNavRail v8.11 HelpOverlay scoping: main Help shows every
+        // main-rail item with a helpList entry, popup Help shows only the
+        // open nested rail's items. Both top-level rail items and host
+        // sub-items belong here.
         listOf(
-            "mode.host",
-            "target.host",
-            "design.host",
-            "project.host.main",
-            "tool.light",
-            "tool.lockTrace",
-            "tool.helpMain",
-        ).forEach { id ->
-            assertTrue("expected key '$id' in helpItems", id in map)
-        }
-        listOf(
-            "mode.ar", "mode.overlay", "mode.mockup", "mode.trace",
-            "target.scanModeToggle", "target.create",
-            "design.addImg", "design.addDraw", "design.addText", "design.wall",
-            "project.new", "project.save", "project.load", "project.export", "project.settings",
+            "mode.host", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace",
+            "target.host", "target.scanModeToggle", "target.create",
+            "design.host", "design.addImg", "design.addDraw", "design.addText", "design.wall",
+            "project.host.main", "project.new", "project.save", "project.load", "project.export", "project.settings",
+            "tool.light", "tool.lockTrace", "tool.helpMain",
             "wearable.main",
         ).forEach { id ->
-            assertFalse("did not expect host sub-item '$id' in helpItems", id in map)
+            assertTrue("expected key '$id' in helpItems", id in map)
         }
     }
 
