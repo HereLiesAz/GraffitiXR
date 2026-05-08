@@ -484,13 +484,33 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
 jobject buildFingerprintObject(JNIEnv* env, const MobileGS::FingerprintData& fd) {
     if (fd.descriptors.empty()) return nullptr;
 
+    // Helper: clear any pending JNI exception and bail to nullptr on lookup
+    // failure. Without this, GetMethodID returning null and then NewObject
+    // being called with that null mid aborts the process with
+    // "JNI DETECTED ERROR IN APPLICATION: mid == null". That can happen
+    // when R8 strips a constructor it doesn't see called from Kotlin/Java.
+    auto bail = [&](const char* what) -> jobject {
+        if (env->ExceptionCheck()) {
+            env->ExceptionDescribe();
+            env->ExceptionClear();
+        }
+        __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI",
+            "buildFingerprintObject: lookup failed: %s — returning nullptr", what);
+        return nullptr;
+    };
+
     jclass listClass = env->FindClass("java/util/ArrayList");
+    if (!listClass) return bail("ArrayList class");
     jmethodID listCtor = env->GetMethodID(listClass, "<init>", "(I)V");
+    if (!listCtor) return bail("ArrayList(int) ctor");
     jmethodID addMethod = env->GetMethodID(listClass, "add", "(Ljava/lang/Object;)Z");
+    if (!addMethod) return bail("ArrayList.add");
 
     // Keypoints: List<org.opencv.core.KeyPoint>
     jclass kpClass = env->FindClass("org/opencv/core/KeyPoint");
+    if (!kpClass) return bail("KeyPoint class");
     jmethodID kpCtor = env->GetMethodID(kpClass, "<init>", "(FFFFFII)V");
+    if (!kpCtor) return bail("KeyPoint ctor");
     jobject kpList = env->NewObject(listClass, listCtor, (jint)fd.keypoints.size());
     for (const auto& kp : fd.keypoints) {
         jobject jkp = env->NewObject(kpClass, kpCtor, kp.pt.x, kp.pt.y, kp.size, kp.angle, kp.response, (jint)kp.octave, (jint)kp.class_id);
@@ -500,7 +520,9 @@ jobject buildFingerprintObject(JNIEnv* env, const MobileGS::FingerprintData& fd)
 
     // Points3D: List<Float>
     jclass floatClass = env->FindClass("java/lang/Float");
+    if (!floatClass) return bail("Float class");
     jmethodID floatCtor = env->GetMethodID(floatClass, "<init>", "(F)V");
+    if (!floatCtor) return bail("Float(f) ctor");
     jobject ptsList = env->NewObject(listClass, listCtor, (jint)fd.points3d.size());
     for (float f : fd.points3d) {
         jobject jf = env->NewObject(floatClass, floatCtor, f);
@@ -514,7 +536,9 @@ jobject buildFingerprintObject(JNIEnv* env, const MobileGS::FingerprintData& fd)
     env->SetByteArrayRegion(descArray, 0, descSize, (const jbyte*)fd.descriptors.data);
 
     jclass fpClass = env->FindClass("com/hereliesaz/graffitixr/common/model/Fingerprint");
+    if (!fpClass) return bail("Fingerprint class");
     jmethodID fpCtor = env->GetMethodID(fpClass, "<init>", "(Ljava/util/List;Ljava/util/List;[BIII)V");
+    if (!fpCtor) return bail("Fingerprint(List,List,[B,I,I,I) ctor — likely R8-stripped; add a -keep rule for com.hereliesaz.graffitixr.common.model.Fingerprint");
 
     jobject fpObj = env->NewObject(fpClass, fpCtor, kpList, ptsList, descArray, fd.descriptors.rows, fd.descriptors.cols, fd.descriptors.type());
 
