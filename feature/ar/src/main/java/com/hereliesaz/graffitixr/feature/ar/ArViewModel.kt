@@ -173,6 +173,14 @@ class ArViewModel @Inject constructor(
     // ── Glasses session lifecycle ─────────────────────────────────────────────
 
     fun startGlassesSession() {
+        // The Meta wearables SDK (mwdat-camera) requires API 29+. The library
+        // is overridden in the manifest so the app can install on API 26+, but
+        // we must avoid invoking it on those devices at runtime.
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) {
+            _glassesSessionState.value =
+                GlassesSessionState.Fallback("Glasses require Android 10 or newer")
+            return
+        }
         val provider = wearableManager.listProviders().firstOrNull { it.name.contains("Meta") }
             ?: run {
                 _glassesSessionState.value = GlassesSessionState.Fallback("no Meta provider")
@@ -324,6 +332,23 @@ class ArViewModel @Inject constructor(
             slamManager.loadLowLightEnhancer(appContext.assets)
         }
         viewModelScope.launch {
+            // Resolve ARCore availability up front. With com.google.ar.core
+            // marked optional in the manifest, Play does not filter for ARCore
+            // devices, so we may be running on hardware that ARCore does not
+            // support. The result drives mode-chooser visibility and the
+            // first-launch "AR unavailable" onboarding step.
+            val result = ArAvailabilityChecker.check(appContext)
+            val supported = result == ArAvailabilityChecker.Result.Supported ||
+                result == ArAvailabilityChecker.Result.NeedsInstallOrUpdate
+            _uiState.update {
+                it.copy(
+                    isArCoreAvailable = supported,
+                    isArCoreAvailabilityResolved = true,
+                )
+            }
+            Timber.i("ArCore availability resolved: $result (supported=$supported)")
+        }
+        viewModelScope.launch {
             projectRepository.currentProject.collect { project ->
                 if (project != null) {
                     loadedProjectId = project.id
@@ -384,6 +409,14 @@ class ArViewModel @Inject constructor(
     }
 
     fun setArMode(enabled: Boolean, context: Context) {
+        if (enabled && !_uiState.value.isArCoreAvailable) {
+            // ARCore is not supported on this device. Refuse to enter AR mode
+            // rather than crashing inside Session(context). The mode chooser
+            // already hides AR for unsupported devices; this is defense in
+            // depth in case it's reached via deep link, restored state, etc.
+            Timber.w("setArMode(true) ignored: ARCore unavailable on this device")
+            return
+        }
         isInArMode = enabled
         updateSessionStateLocked(context)
     }

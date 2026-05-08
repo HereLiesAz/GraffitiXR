@@ -51,7 +51,7 @@ android {
 
     defaultConfig {
         applicationId = "com.hereliesaz.graffitixr"
-        minSdk = 29
+        minSdk = 26
         targetSdk = 37
         versionCode = currentVersionCode
         versionName = currentVersionName

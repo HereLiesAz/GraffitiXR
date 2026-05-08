@@ -608,6 +608,12 @@
         <item>Press \'Design\' to access layer tools. Use \'Image\' to import photos, \'Draw\' to sketch, or \'Text\' to type.</item>
         <item>Pinch to scale, drag to reposition. The overlay stays fixed to your screen — step back to see how it fits the wall.</item>
     </string-array>
+    <!-- Shown once on first launch on devices where ARCore is not supported. -->
+    <string-array name="onboarding_ar_unavailable">
+        <item>This device doesn\'t support ARCore, so the AR Projection mode isn\'t available.</item>
+        <item>You can still use Trace, Mockup, and Live Overlay — every mode except AR works without ARCore.</item>
+        <item>Tap to dismiss.</item>
+    </string-array>
     <string-array name="onboarding_mockup">
         <item>Photo Mockup — preview your design on a photo before you ever pick up a brush.</item>
         <item>Open \'Design\' and tap \'Wall\' to choose or take a photo of your surface. Do this first!</item>

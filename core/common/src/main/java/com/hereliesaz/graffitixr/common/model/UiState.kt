@@ -115,6 +115,12 @@ data class ArUiState(
     // False while unverified or when ARCore is missing / not supported.
     val isArCoreAvailable: Boolean = true,
 
+    // False until ArAvailabilityChecker.check() returns a final (non-UNKNOWN)
+    // result. UI gates that hide AR mode for unsupported devices must wait for
+    // this to be true before reacting, otherwise AR mode would briefly hide on
+    // every cold start before the check resolves.
+    val isArCoreAvailabilityResolved: Boolean = false,
+
     // Mirrors the runtime camera permission state so AR overlays can react without
     // threading the raw permission flag all the way into every composable.
     val hasCameraPermission: Boolean = false,

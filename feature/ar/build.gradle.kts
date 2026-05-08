@@ -10,7 +10,7 @@ android {
     namespace = "com.hereliesaz.graffitixr.feature.ar"
     compileSdk = 37
     defaultConfig {
-        minSdk = 29
+        minSdk = 26
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions {

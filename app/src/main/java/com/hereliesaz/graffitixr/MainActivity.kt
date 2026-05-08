@@ -78,6 +78,7 @@ import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
+import com.hereliesaz.graffitixr.onboarding.ArUnavailableOverlay
 import com.hereliesaz.graffitixr.onboarding.ModeOnboarding
 import com.hereliesaz.graffitixr.onboarding.ModeOnboardingOverlay
 import com.hereliesaz.graffitixr.onboarding.rememberModeOnboardings
@@ -319,6 +320,19 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // If a project (or restored state) puts the user in AR mode on a
+                // device where ARCore is unsupported, route them to OVERLAY —
+                // the closest non-AR experience, since both render artwork on
+                // top of the live camera feed.
+                LaunchedEffect(arUiState.isArCoreAvailabilityResolved, arUiState.isArCoreAvailable, editorUiState.editorMode) {
+                    if (arUiState.isArCoreAvailabilityResolved &&
+                        !arUiState.isArCoreAvailable &&
+                        editorUiState.editorMode == EditorMode.AR
+                    ) {
+                        editorViewModel.setEditorMode(EditorMode.OVERLAY)
+                    }
+                }
+
                 LaunchedEffect(Unit) {
                     arViewModel.unfreezeRequested.collect {
                         editorViewModel.toggleImageLock()
@@ -466,6 +480,31 @@ class MainActivity : ComponentActivity() {
                                     onDismiss = { activeOnboarding = null }
                                 )
                             }
+                        }
+
+                        // First-launch explainer for devices where ARCore is
+                        // unavailable. Modal-gated identically to the per-mode
+                        // onboarding above, and dismissed-once via the same
+                        // completedTutorials DataStore set.
+                        val completedTutorials by mainViewModel.completedTutorials.collectAsState()
+                        val arExplainerKey = "ar_unavailable_explainer"
+                        var arExplainerDismissedThisSession by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+                        val arUnavailableLines = remember {
+                            context.resources.getStringArray(DesignR.array.onboarding_ar_unavailable).toList()
+                        }
+                        if (!showLibrary && !showSettings && !isExporting && !mainUiState.isCapturingTarget &&
+                            arUiState.isArCoreAvailabilityResolved &&
+                            !arUiState.isArCoreAvailable &&
+                            arExplainerKey !in completedTutorials &&
+                            !arExplainerDismissedThisSession
+                        ) {
+                            ArUnavailableOverlay(
+                                lines = arUnavailableLines,
+                                onDismiss = {
+                                    arExplainerDismissedThisSession = true
+                                    mainViewModel.markTutorialCompletePersistent(arExplainerKey)
+                                }
+                            )
                         }
 
                         if (editorUiState.stencilHintVisible || editorUiState.isStencilGenerating) {
@@ -1014,11 +1053,18 @@ class MainActivity : ComponentActivity() {
 
         if (!showLibrary) {
             val isArMode = editorUiState.editorMode == EditorMode.AR
+            // Hide AR mode entirely on devices where ARCore is not supported.
+            // Wait until the availability check has resolved before deciding,
+            // otherwise the entry would briefly appear and disappear on cold
+            // start. Until resolved, default to showing it.
+            val showArModeEntry = !arUiState.isArCoreAvailabilityResolved || arUiState.isArCoreAvailable
 
             azRailHostItem(id = "mode.host", text = navStrings.modes, color = navItemColor)
-            azRailSubItem(id = "mode.ar", hostId = "mode.host", text = navStrings.arMode, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE)
+            if (showArModeEntry) {
+                azRailSubItem(id = "mode.ar", hostId = "mode.host", text = navStrings.arMode, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE)
+            }
 
-            if (isArMode) {
+            if (isArMode && showArModeEntry) {
                 val scanModeText = when (arUiState.arScanMode) {
                     ArScanMode.CLOUD_POINTS -> navStrings.canvas
                     ArScanMode.MURAL -> navStrings.mural

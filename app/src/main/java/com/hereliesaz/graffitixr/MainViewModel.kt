@@ -10,13 +10,16 @@ import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -41,11 +44,19 @@ class MainViewModel @Inject constructor(
     private val projectRepository: ProjectRepository,
     private val slamManager: SlamManager,
     private val projectManager: ProjectManager,
+    private val settingsRepository: SettingsRepository,
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+
+    val completedTutorials: StateFlow<Set<String>> = settingsRepository.completedTutorials
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    fun markTutorialCompletePersistent(key: String) {
+        viewModelScope.launch { settingsRepository.markTutorialComplete(key) }
+    }
 
     fun setTouchLocked(locked: Boolean) {
         _uiState.update { it.copy(isTouchLocked = locked) }

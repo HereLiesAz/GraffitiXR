@@ -2,10 +2,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!--
+        The Meta wearables (mwdat-*) libraries declare minSdk 29, but the
+        wearables flow is optional and gated at runtime (see WearableManager
+        and ArViewModel.startGlassesSession). Override the merger so Android
+        8.0+ devices can install the app; on SDK < 29 the wearables init path
+        short-circuits to GlassesSessionState.Fallback.
+    -->
+    <uses-sdk tools:overrideLibrary="com.meta.wearable.dat.camera,com.meta.wearable.dat.mockdevice,com.meta.wearable.dat.core" />
+
     <!-- AR and Hardware Permissions -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera" />
-    <uses-feature android:name="android.hardware.camera.ar" android:required="true" />
+    <uses-feature android:name="android.hardware.camera" android:required="true" />
+    <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
     <uses-feature android:glEsVersion="0x00030000" android:required="false" />
 
     <!-- Storage and Location Permissions -->
@@ -28,6 +37,19 @@
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
 
+    <!--
+        Permissions above (BLUETOOTH*, ACCESS_*_LOCATION, ACCESS_WIFI_STATE, etc.)
+        would otherwise imply required hardware features and filter the Play Store
+        listing. Mark them optional explicitly: the wearables / location flows are
+        not core to the app, and core camera is the only required hardware.
+    -->
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+    <uses-feature android:name="android.hardware.wifi" android:required="false" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.location.network" android:required="false" />
+
     <application
         android:name=".GraffitiApplication"
         android:allowBackup="true"
@@ -41,9 +63,16 @@
         android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="31">
 
+        <!--
+            ARCore is optional: the app supports a non-AR experience (TRACE,
+            MOCKUP, OVERLAY, STENCIL modes) on devices without ARCore. AR mode
+            is gated at runtime via ArCoreApk.checkAvailability(). With value
+            "optional" Google Play does not filter the listing to ARCore-eligible
+            devices and does not auto-install the ARCore APK.
+        -->
         <meta-data
             android:name="com.google.ar.core"
-            android:value="required" />
+            android:value="optional" />
 
         <!--
              android:configChanges prevents the Activity from being destroyed

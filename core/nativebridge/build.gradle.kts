@@ -7,7 +7,7 @@ android {
     namespace = "com.hereliesaz.graffitixr.nativebridge"
     compileSdk = 37
     defaultConfig {
-        minSdk = 29
+        minSdk = 26
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // Build only for ARM architectures (skip x86/x86_64 emulator builds)
