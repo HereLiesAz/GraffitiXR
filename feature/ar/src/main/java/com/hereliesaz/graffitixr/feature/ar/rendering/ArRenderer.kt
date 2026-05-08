@@ -37,7 +37,11 @@ class ArRenderer(
     private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int) -> Unit,
     private val onTrackingUpdated: (Boolean, Int, Int, Boolean, Float, Float, Triple<Float, Float, Float>?, Boolean, Boolean, Float, Float, Float) -> Unit,
     private val onLightUpdated: (Float) -> Unit,
-    private val onDiag: (String) -> Unit = {}
+    private val onDiag: (String) -> Unit = {},
+    // Fired once on the GL thread immediately after the primary anchor is
+    // created. The ViewModel uses this to flip ArUiState.isAnchorEstablished,
+    // which in turn unlocks the Design rail and advances scanPhase to COMPLETE.
+    private val onAnchorEstablished: () -> Unit = {}
 ) : GLSurfaceView.Renderer {
 
     private val backgroundScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -260,7 +264,8 @@ class ArRenderer(
                     setPrimaryAnchor(anchor)
                     anchorEstablished = true
                     hideVisualization = true
-                    
+                    onAnchorEstablished()
+
                     Timber.d("Anchor established on GL thread via consensus orchestrator.")
                 } catch (e: Exception) {
                     Timber.e(e, "Failed to establish anchor on GL thread")

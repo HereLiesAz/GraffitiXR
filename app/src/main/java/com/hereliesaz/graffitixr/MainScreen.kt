@@ -171,6 +171,9 @@ fun MainScreen(
                                 },
                                 onDiag = { text ->
                                     arViewModel.appendDiag(text)
+                                },
+                                onAnchorEstablished = {
+                                    arViewModel.onPrimaryAnchorEstablished()
                                 }
                             )
                             renderer.hideVisualization = isExporting

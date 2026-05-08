@@ -937,6 +937,17 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(lightLevel = level) }
     }
 
+    /**
+     * Called from ArRenderer (on the GL thread) the first time the primary
+     * anchor is created for this session. Flipping isAnchorEstablished is
+     * what unlocks the Design rail (canEdit) and advances scanPhase to
+     * COMPLETE in the next tracking-update tick. _uiState is a
+     * MutableStateFlow so update() is safe from any thread.
+     */
+    fun onPrimaryAnchorEstablished() {
+        _uiState.update { it.copy(isAnchorEstablished = true) }
+    }
+
     fun appendDiag(text: String) {
         _uiState.update { state ->
             val existing = state.diagLog?.lines() ?: emptyList()
