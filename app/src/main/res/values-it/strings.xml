@@ -510,7 +510,6 @@
     <!-- Lock/Freeze help text. -->
     <string name="help_lock_trace">Blocca/Congela: Previeni modifiche accidentali. Istruzioni: Nella modalità Ricalco disabilita lo schermo. In altre modalità, blocca le trasformazioni dei livelli.</string>
     <!-- Interactive \'Help\' help text. -->
-    <string name="help_help_main">Aiuto Interattivo: Spiega le funzioni dei pulsanti. Istruzioni: Tocca per attivare (Ciano). Mentre è attivo, tocca qualsiasi pulsante per vedere il suo testo di aiuto.</string>
     <!-- Individual Layer help text. -->
     <string name="help_layer">Livello \'%1$s\': Elemento attivo del murale. Istruzioni: Tocca per selezionare. Trascina il pulsante su/giù per riordinare. Trasforma sullo schermo con i gesti.</string>
 
@@ -558,7 +557,6 @@
     <!-- Sketch Outline help. -->
     <string name="help_line">Contorno Schizzo: Filtro line art. Istruzioni: Tocca per convertire la foto in un contorno trasparente in bianco e nero.</string>
     <!-- Layer Help toggle help. -->
-    <string name="help_help_layer">Aiuto Livello: Attiva/disattiva le info per questi strumenti di livello specifici. Istruzioni: Tocca per attivare. Poi tocca qualsiasi icona strumento per vedere cosa fa.</string>
 
     <!-- Unit labels -->
     <!-- Abbreviation for feet. -->

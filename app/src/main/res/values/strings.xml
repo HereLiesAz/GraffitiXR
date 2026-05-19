@@ -513,7 +513,6 @@
     <!-- Lock/Freeze help text. -->
     <string name="help_lock_trace">Lock/Freeze: Prevent accidental changes. Instructions: In Trace mode, disables screen. In other modes, locks layer transforms.</string>
     <!-- Interactive 'Help' help text. -->
-    <string name="help_help_main">Interactive Help: Explains button functions. Instructions: Tap to activate (Cyan). While active, tap any button to see its help text.</string>
     <!-- Individual Layer help text. -->
     <string name="help_layer">Layer \'%1$s\': Active mural element. Instructions: Tap to select. Drag button up/down to reorder. Transform on screen with gestures.</string>
 
@@ -561,7 +560,6 @@
     <!-- Sketch Outline help. -->
     <string name="help_line">Sketch Outline: Line art filter. Instructions: Tap to convert the photo into a black-and-white transparent outline.</string>
     <!-- Layer Help toggle help. -->
-    <string name="help_help_layer">Layer Help: Toggle info for these specific layer tools. Instructions: Tap to activate. Then tap any tool icon to see what it does.</string>
 
     <!-- Unit labels -->
     <!-- Abbreviation for feet. -->

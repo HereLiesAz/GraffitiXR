@@ -510,7 +510,6 @@
 
     <string name="help_lock_trace">鎖定/凍結：防止意外變更。說明： 在追蹤模式下，停用螢幕。在其他模式下，鎖定圖層變換。</string>
 
-    <string name="help_help_main">互動式幫助：解釋按鈕功能。說明：點選即可啟動（青色）。處於活動狀態時，點擊任一按鈕即可查看其說明文字。</string>
 
     <string name="help_layer">圖層「%1$s」：活動壁畫元素。說明：點選選擇。向上/向下拖曳按鈕以重新排序。透過手勢在螢幕上變換。</string>
 
@@ -558,7 +557,6 @@
 
     <string name="help_line">草圖輪廓：線條藝術濾鏡。使用說明：點選可將照片轉換為黑白透明輪廓。</string>
 
-    <string name="help_help_layer">圖層幫助：切換這些特定圖層工具的資訊。說明：點選即可啟動。然後點擊任意工具圖示以查看其功能。</string>
 
 
 

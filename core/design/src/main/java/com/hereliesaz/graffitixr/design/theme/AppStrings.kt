@@ -150,7 +150,6 @@ fun rememberAppStrings(): AppStrings {
             appSettings = R.string.help_settings,
             flashlight = R.string.help_light,
             lockTrace = R.string.help_lock_trace,
-            helpMain = R.string.help_help_main,
             layer = { name -> context.getString(R.string.help_layer, name) },
             editText = R.string.help_edit_text,
             size = R.string.help_size,
@@ -173,8 +172,7 @@ fun rememberAppStrings(): AppStrings {
             burn = R.string.help_burn,
             iso = R.string.help_iso,
             line = R.string.help_line,
-            cloudOffset = R.string.help_cloud_offset,
-            helpLayer = R.string.help_help_layer
+            cloudOffset = R.string.help_cloud_offset
         ),
         adj = AppStrings.Adjustments(
             detail = stringResource(R.string.adj_detail),
@@ -342,7 +340,6 @@ data class AppStrings(
         val appSettings: Int,
         val flashlight: Int,
         val lockTrace: Int,
-        val helpMain: Int,
         val layer: (String) -> String,
         val editText: Int,
         val size: Int,
@@ -365,8 +362,7 @@ data class AppStrings(
         val burn: Int,
         val iso: Int,
         val line: Int,
-        val cloudOffset: Int,
-        val helpLayer: Int
+        val cloudOffset: Int
     )
     data class Adjustments(
         val detail: String,

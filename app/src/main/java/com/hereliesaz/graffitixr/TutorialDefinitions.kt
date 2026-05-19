@@ -67,8 +67,6 @@ fun getTutorials(layers: List<Layer>, strings: AppStrings): Map<String, AzTutori
     val navLight = resolve(strings.nav.light)
     val helpFlashlight = resolve(strings.help.flashlight)
     val helpLockTrace = resolve(strings.help.lockTrace)
-    val navHelp = resolve(strings.nav.help)
-    val helpHelpMain = resolve(strings.help.helpMain)
 
     // Layer tool strings
     val navEdit = resolve(strings.nav.edit)
@@ -110,7 +108,6 @@ fun getTutorials(layers: List<Layer>, strings: AppStrings): Map<String, AzTutori
     val navIsolate = resolve(strings.nav.isolate)
     val helpIso = resolve(strings.help.iso)
     val helpLine = resolve(strings.help.line)
-    val helpHelpLayer = resolve(strings.help.helpLayer)
 
     // --- Mode Menu ---
     tutorials["mode.host"] = createSimpleTutorial("mode.host", navModes, helpModeHost)
@@ -187,8 +184,6 @@ fun getTutorials(layers: List<Layer>, strings: AppStrings): Map<String, AzTutori
         }
     }
 
-    tutorials["tool.helpMain"] = createSimpleTutorial("tool.helpMain", navHelp, helpHelpMain)
-
     // --- Layers ---
     layers.forEach { layer ->
         val layerNameHelp = strings.help.layer(layer.name)
@@ -246,7 +241,6 @@ fun getTutorials(layers: List<Layer>, strings: AppStrings): Map<String, AzTutori
         }
 
         tutorials[layerId(layer, "line")] = createSimpleTutorial(layerId(layer, "line"), navOutline, helpLine)
-        tutorials["${layerId(layer)}.help"] = createSimpleTutorial("${layerId(layer)}.help", navHelp, helpHelpLayer)
     }
 
     return tutorials

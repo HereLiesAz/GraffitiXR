@@ -27,7 +27,7 @@ class HelpItemsBuilderTest {
             "target.host", "target.scanModeToggle", "target.create",
             "design.host", "design.addImg", "design.addDraw", "design.addText", "design.wall",
             "project.host.main", "project.new", "project.save", "project.load", "project.export", "project.settings",
-            "tool.light", "tool.lockTrace", "tool.helpMain",
+            "tool.light", "tool.lockTrace",
             "wearable.main",
         ).forEach { id ->
             assertTrue("expected key '$id' in helpItems", id in map)
@@ -42,13 +42,12 @@ class HelpItemsBuilderTest {
             null, "editText", "size.brush", "size.text", "font", "color", "kern",
             "bold", "italic", "outline", "shadow", "stencil", "blend",
             "adj", "invert", "balance", "eraser", "blur", "liquify",
-            "dodge", "burn", "iso", "line", "help",
+            "dodge", "burn", "iso", "line",
         )
         layers.forEach { layer ->
             toolKeys.forEach { tool ->
                 val expected = when (tool) {
                     null -> layerId(layer)
-                    "help" -> "${layerId(layer)}.help"
                     else -> layerId(layer, tool)
                 }
                 assertTrue("expected '$expected' in map", expected in map)

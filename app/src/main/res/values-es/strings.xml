@@ -510,7 +510,6 @@
     <!-- Lock/Freeze help text. -->
     <string name="help_lock_trace">Bloquear/Congelar: Evita cambios accidentales. Instrucciones: En modo Calco, desactiva la pantalla. En otros modos, bloquea las transformaciones de capa.</string>
     <!-- Interactive \'Help\' help text. -->
-    <string name="help_help_main">Ayuda Interactiva: Explica funciones de los botones. Instrucciones: Toca para activar (Cian). Mientras esté activo, toca cualquier botón para ver su ayuda.</string>
     <!-- Individual Layer help text. -->
     <string name="help_layer">Capa \'%1$s\': Elemento activo del mural. Instrucciones: Toca para seleccionar. Arrastra botón arriba/abajo para reordenar. Transforma en pantalla con gestos.</string>
 
@@ -558,7 +557,6 @@
     <!-- Sketch Outline help. -->
     <string name="help_line">Boceto de Contorno: Filtro de arte de línea. Instrucciones: Toca para convertir foto en contorno transparente blanco y negro.</string>
     <!-- Layer Help toggle help. -->
-    <string name="help_help_layer">Ayuda de Capa: Alterna información para estas herramientas de capa específicas. Instrucciones: Toca para activar. Luego toca icono de cualquier herramienta para ver qué hace.</string>
 
     <!-- Unit labels -->
     <!-- Abbreviation for feet. -->

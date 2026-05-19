@@ -510,7 +510,6 @@
     <!-- Lock/Freeze help text. -->
     <string name="help_lock_trace">Sperren/Einfrieren: Verhindern Sie versehentliche Änderungen. Anweisungen: Im Pause-Modus wird der Bildschirm deaktiviert. In anderen Modi werden Ebenentransformationen gesperrt.</string>
     <!-- Interactive 'Help' help text. -->
-    <string name="help_help_main">Interaktive Hilfe: Erklärt Schaltflächenfunktionen. Anweisungen: Tippen Sie zum Aktivieren (Cyan). Tippen Sie bei aktiver Hilfe auf eine beliebige Schaltfläche, um ihren Hilfetext anzuzeigen.</string>
     <!-- Individual Layer help text. -->
     <string name="help_layer">Ebene \'%1$s\': Aktives Wandbildelement. Anweisungen: Tippen Sie zum Auswählen. Ziehen Sie die Schaltfläche nach oben/unten, um die Reihenfolge zu ändern. Transformieren Sie auf dem Bildschirm mit Gesten.</string>
 
@@ -558,7 +557,6 @@
     <!-- Sketch Outline help. -->
     <string name="help_line">Skizzenumriss: Strichzeichnungsfilter. Anweisungen: Tippen Sie, um das Foto in einen transparenten Schwarzweiß-Umriss zu konvertieren.</string>
     <!-- Layer Help toggle help. -->
-    <string name="help_help_layer">Ebenenhilfe: Informationen für diese spezifischen Ebenenwerkzeuge umschalten. Anweisungen: Tippen Sie zum Aktivieren. Tippen Sie dann auf ein beliebiges Werkzeugsymbol, um zu sehen, was es bewirkt.</string>
 
     <!-- Unit labels -->
     <!-- Abbreviation for feet. -->

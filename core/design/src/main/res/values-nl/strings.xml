@@ -510,7 +510,6 @@
 
     <string name="help_lock_trace">Vergrendelen/bevriezen: Voorkom onbedoelde wijzigingen. Instructies: Schakelt in de Trace-modus het scherm uit. In andere modi worden laagtransformaties vergrendeld.</string>
 
-    <string name="help_help_main">Interactieve Help: legt de knopfuncties uit. Instructies: Tik om te activeren (cyaan). Terwijl actief, tikt u op een willekeurige knop om de helptekst ervan te bekijken.</string>
 
     <string name="help_layer">Laag \'%1$s\': Actief muurschilderingelement. Instructies: Tik om te selecteren. Sleep de knop omhoog/omlaag om de volgorde te wijzigen. Transformeer op het scherm met gebaren.</string>
 
@@ -558,7 +557,6 @@
 
     <string name="help_line">Schetsoverzicht: lijntekeningenfilter. Instructies: Tik op om de foto om te zetten in een zwart-wit transparante omtrek.</string>
 
-    <string name="help_help_layer">Hulp voor lagen: schakel informatie voor deze specifieke laaggereedschappen in. Instructies: Tik om te activeren. Tik vervolgens op een gereedschapspictogram om te zien wat het doet.</string>
 
 
 

@@ -510,7 +510,6 @@
     <!-- Lock/Freeze help text. -->
     <string name="help_lock_trace">Lås/frys: Forhindr tilfeldige endringer. Instruksjoner: I sporingsmodus, deaktiverer skjermen. I andre moduser, låser laget transformeres.</string>
     <!-- Interactive 'Help' help text. -->
-    <string name="help_help_main">Interaktiv hjelp: Forklarer knappefunksjoner. Instruksjoner: Trykk for å aktivere (cyan). Mens du er aktiv, trykk på en hvilken som helst knapp for å se hjelpeteksten.</string>
     <!-- Individual Layer help text. -->
     <string name="help_layer">Lag \'%1$s\': Aktivt veggmalerielement. Instruksjoner: Trykk for å velge. Dra knappen opp/ned for å omorganisere. Transformer på skjermen med bevegelser.</string>
 
@@ -558,7 +557,6 @@
     <!-- Sketch Outline help. -->
     <string name="help_line">Sketch Outline: Line art-filter. Instruksjoner: Trykk for å konvertere bildet til en svart-hvitt gjennomsiktig kontur.</string>
     <!-- Layer Help toggle help. -->
-    <string name="help_help_layer">Laghjelp: Bytt informasjon for disse spesifikke lagverktøyene. Instruksjoner: Trykk for å aktivere. Trykk deretter på et verktøyikon for å se hva det gjør.</string>
 
     <!-- Unit labels -->
     <!-- Abbreviation for feet. -->

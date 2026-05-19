@@ -24,7 +24,6 @@ internal fun buildHelpItems(strings: AppStrings, layers: List<Layer>): Map<Strin
         "project.host.main" to strings.help.projectHost,
         "tool.light" to strings.help.flashlight,
         "tool.lockTrace" to strings.help.lockTrace,
-        "tool.helpMain" to strings.help.helpMain,
         // Host sub-items (visible inline when the host accordion is expanded)
         "mode.ar" to strings.help.ar,
         "mode.overlay" to strings.help.overlay,
@@ -68,7 +67,6 @@ internal fun buildHelpItems(strings: AppStrings, layers: List<Layer>): Map<Strin
         base[layerId(layer, "burn")] = strings.help.burn
         base[layerId(layer, "iso")] = strings.help.iso
         base[layerId(layer, "line")] = strings.help.line
-        base["${layerId(layer)}.help"] = strings.help.helpLayer
     }
 
     return base

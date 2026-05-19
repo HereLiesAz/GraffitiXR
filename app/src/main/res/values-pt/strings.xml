@@ -510,7 +510,6 @@
     <!-- Lock/Freeze help text. -->
     <string name="help_lock_trace">Bloquear/Congelar: Evite alterações acidentais. Instruções: No modo Traçar, desativa a tela. Em outros modos, bloqueia as transformações de camada.</string>
     <!-- Interactive 'Help' help text. -->
-    <string name="help_help_main">Ajuda Interativa: Explica as funções dos botões. Instruções: Toque para ativar (Ciano). Enquanto estiver ativo, toque em qualquer botão para ver seu texto de ajuda.</string>
     <!-- Individual Layer help text. -->
     <string name="help_layer">Camada \'%1$s\': Elemento de mural ativo. Instruções: Toque para selecionar. Arraste o botão para cima/para baixo para reordenar. Transforme na tela com gestos.</string>
 
@@ -558,7 +557,6 @@
     <!-- Sketch Outline help. -->
     <string name="help_line">Contorno do Esboço: Filtro de arte de linha. Instruções: Toque para converter a foto em um contorno transparente em preto e branco.</string>
     <!-- Layer Help toggle help. -->
-    <string name="help_help_layer">Ajuda da Camada: Alterne as informações para essas ferramentas de camada específicas. Instruções: Toque para ativar. Em seguida, toque em qualquer ícone de ferramenta para ver o que ele faz.</string>
 
     <!-- Unit labels -->
     <!-- Abbreviation for feet. -->

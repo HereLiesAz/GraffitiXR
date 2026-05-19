@@ -510,7 +510,6 @@
 
     <string name="help_lock_trace">Zárolás/Fagyasztás: Véletlen változtatások megelőzése. Utasítások: Rajzolás módban letiltja a képernyőt. Más módokban zárolja a réteg transzformációit.</string>
 
-    <string name="help_help_main">Interaktív Súgó: Elmagyarázza a gombok funkcióit. Utasítások: Koppints az aktiváláshoz (Cián). Amíg aktív, koppints bármelyik gombra a súgószöveg megtekintéséhez.</string>
 
     <string name="help_layer">\'%1$s\' Réteg: Aktív falfestmény elem. Utasítások: Koppints a kiválasztáshoz. Húzd a gombot fel/le az átrendezéshez. Alakítsd át a képernyőn gesztusokkal.</string>
 
@@ -558,7 +557,6 @@
 
     <string name="help_line">Vázlat Körvonal: Vonalrajz szűrő. Utasítások: Koppints a fotó fekete-fehér átlátszó körvonallá alakításához.</string>
 
-    <string name="help_help_layer">Réteg Súgó: Kapcsold be az információkat ezekhez a speciális rétegeszközökhöz. Utasítások: Koppints az aktiváláshoz. Ezután koppints bármelyik eszköz ikonra, hogy megtudd, mit csinál.</string>
 
 
 

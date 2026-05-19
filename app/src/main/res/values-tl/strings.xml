@@ -510,7 +510,6 @@
 
     <string name="help_lock_trace">I-lock/I-freeze: Pigilan ang mga hindi sinasadyang pagbabago. Mga Tagubilin: Sa Trace mode, hindi pinapagana ang screen. Sa ibang mga mode, nagbabago ang layer ng mga lock.</string>
 
-    <string name="help_help_main">Interactive Help: Nagpapaliwanag ng mga function ng button. Mga Tagubilin: I-tap para i-activate (Cyan). Habang aktibo, i-tap ang anumang button para makita ang text ng tulong nito.</string>
 
     <string name="help_layer">Layer \'%1$s\': Aktibong elemento ng mural. Mga Tagubilin: I-tap para pumili. I-drag ang button pataas/pababa para muling ayusin. Magbago sa screen gamit ang mga galaw.</string>
 
@@ -558,7 +557,6 @@
 
     <string name="help_line">Sketch Outline: Line art filter. Mga Tagubilin: I-tap para i-convert ang larawan sa isang black-and-white na transparent na outline.</string>
 
-    <string name="help_help_layer">Tulong sa Layer: I-toggle ang impormasyon para sa mga partikular na tool sa layer na ito. Mga Tagubilin: I-tap para i-activate. Pagkatapos ay i-tap ang anumang tool icon upang makita kung ano ang ginagawa nito.</string>
 
 
 

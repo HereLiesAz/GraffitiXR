@@ -508,7 +508,6 @@
     <!-- Lock/Freeze help text. -->
     <string name="help_lock_trace">Verrouiller/Geler : Empêcher les modifications accidentelles. Instructions : En mode Table lumineuse, désactive l\'écran. Dans les autres modes, verrouille les transformations de calque.</string>
     <!-- Interactive 'Help' help text. -->
-    <string name="help_help_main">Aide Interactive : Explique les fonctions des boutons. Instructions : Appuyez pour l\'activer (Cyan). Pendant qu\'elle est active, appuyez sur n\'importe quel bouton pour voir son texte d\'aide.</string>
     <!-- Individual Layer help text. -->
     <string name="help_layer">Calque \'%1$s\' : Élément de fresque actif. Instructions : Appuyez pour sélectionner. Faites glisser le bouton vers le haut/bas pour réorganiser. Transformez à l\'écran avec des gestes.</string>
 
@@ -556,7 +555,6 @@
     <!-- Sketch Outline help. -->
     <string name="help_line">Contour de Croquis : Filtre dessin au trait. Instructions : Appuyez pour convertir la photo en contour transparent noir et blanc.</string>
     <!-- Layer Help toggle help. -->
-    <string name="help_help_layer">Aide Calque : Basculer les infos pour ces outils de calque spécifiques. Instructions : Appuyez pour activer. Puis appuyez sur l\'icône de n\'importe quel outil pour voir ce qu\'il fait.</string>
 
     <!-- Unit labels -->
     <!-- Abbreviation for feet. -->

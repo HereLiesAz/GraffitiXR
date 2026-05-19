@@ -510,7 +510,6 @@
 
     <string name="help_lock_trace">Lås/frys: Förhindra oavsiktliga ändringar. Instruktioner: Inaktiverar skärmen i spårningsläge. I andra lägen transformeras låslager.</string>
 
-    <string name="help_help_main">Interaktiv hjälp: Förklarar knappfunktioner. Instruktioner: Tryck för att aktivera (cyan). När du är aktiv trycker du på valfri knapp för att se hjälptexten.</string>
 
     <string name="help_layer">Lager \'%1$s\': Aktivt väggmålningselement. Instruktioner: Tryck för att välja. Dra knappen upp/ned för att ändra ordning. Förvandla på skärmen med gester.</string>
 
@@ -558,7 +557,6 @@
 
     <string name="help_line">Sketch Outline: Line art-filter. Instruktioner: Tryck för att konvertera fotot till en svart-vit transparent kontur.</string>
 
-    <string name="help_help_layer">Lagerhjälp: Växla information för dessa specifika lagerverktyg. Instruktioner: Tryck för att aktivera. Tryck sedan på valfri verktygsikon för att se vad den gör.</string>
 
 
 

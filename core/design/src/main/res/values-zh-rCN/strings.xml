@@ -528,7 +528,6 @@
 
     <string name="help_lock_trace">锁定/冻结：防止意外更改。说明：在透写模式下，禁用屏幕。在其他模式下，锁定图层变换。</string>
 
-    <string name="help_help_main">交互式帮助：解释按钮功能。说明：点击以激活（青色）。在活动状态下，点击任意按钮查看其帮助文本。</string>
 
     <string name="help_layer">图层“%1$s”：活动的壁画元素。说明：点击以选择。向上/向下拖动按钮以重新排序。通过手势在屏幕上进行变换。</string>
 
@@ -576,7 +575,6 @@
 
     <string name="help_line">草图轮廓：线条艺术滤镜。说明：点击将照片转换为黑白透明轮廓。</string>
 
-    <string name="help_help_layer">图层帮助：切换这些特定图层工具的说明。说明：点击以激活。然后点击任意工具图标查看其功能。</string>
 
 
 
