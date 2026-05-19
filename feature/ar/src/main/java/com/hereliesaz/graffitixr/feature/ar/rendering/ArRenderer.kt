@@ -71,7 +71,10 @@ class ArRenderer(
     @Volatile var anchorEstablished: Boolean = false
         set(value) {
             field = value
-            if (!value) anchorOrchestrator.clear()
+            if (!value) {
+                anchorOrchestrator.clear()
+                quadInitialFitApplied = false
+            }
         }
     /** When true the SLAM/cloud visualization is suppressed — processing continues but nothing is drawn. */
     @Volatile var hideVisualization: Boolean = false
@@ -93,6 +96,13 @@ class ArRenderer(
 
     @Volatile private var pendingOverlayBitmap: Bitmap? = null
     @Volatile private var overlayBitmapDirty = false
+
+    // Tracks whether the screen-fit quad extent has been applied for this anchor.
+    // Cleared when the anchor is reset; set after the first successful bitmap upload
+    // so subsequent re-composites don't snap the user's scale back to the initial fit.
+    @Volatile private var quadInitialFitApplied = false
+    @Volatile private var lastBitmapW: Int = 0
+    @Volatile private var lastBitmapH: Int = 0
 
     private var frameCount = 0
     private var diagFrameCount = 0
@@ -147,6 +157,10 @@ class ArRenderer(
     fun updateOverlayBitmap(bitmap: Bitmap?) {
         pendingOverlayBitmap = bitmap
         overlayBitmapDirty = true
+        if (bitmap != null) {
+            lastBitmapW = bitmap.width
+            lastBitmapH = bitmap.height
+        }
     }
 
     fun updateOverlayExtent(halfW: Float, halfH: Float) {
@@ -662,6 +676,48 @@ class ArRenderer(
                 overlayBitmapDirty = false
                 val bmp = pendingOverlayBitmap
                 if (bmp != null) overlayRenderer.updateTexture(bmp) else overlayRenderer.clearTexture()
+            }
+
+            // Constrain the textured quad's initial size so it lands within the
+            // visible screen frustum at the anchor's distance. Applied once per
+            // anchor session — the user can pinch/scale later without being
+            // snapped back to the fit.
+            if (!quadInitialFitApplied &&
+                anchorEstablished &&
+                overlayRenderer.hasTexture &&
+                lastBitmapW > 0 && lastBitmapH > 0
+            ) {
+                val camWorld = FloatArray(16)
+                android.opengl.Matrix.invertM(camWorld, 0, viewMatrix, 0)
+                val ddx = anchorMatrix[12] - camWorld[12]
+                val ddy = anchorMatrix[13] - camWorld[13]
+                val ddz = anchorMatrix[14] - camWorld[14]
+                val dist = kotlin.math.sqrt((ddx * ddx + ddy * ddy + ddz * ddz).toDouble())
+                    .toFloat().coerceAtLeast(0.5f)
+
+                // For a standard GL perspective matrix:
+                //   projMatrix[0] = 1 / (aspect * tan(fovx/2))
+                //   projMatrix[5] = 1 / tan(fovy/2)
+                // World half-extent at distance d that just spans the screen:
+                //   halfScreenW = d / projMatrix[0],   halfScreenH = d / projMatrix[5]
+                val margin = 0.9f
+                val halfScreenW = if (projMatrix[0] != 0f) dist / projMatrix[0] * margin else dist * margin
+                val halfScreenH = if (projMatrix[5] != 0f) dist / projMatrix[5] * margin else dist * margin
+
+                val bmpAspect = lastBitmapW.toFloat() / lastBitmapH.toFloat()
+                val halfWFromH = halfScreenH * bmpAspect
+                val halfW: Float
+                val halfH: Float
+                if (halfWFromH <= halfScreenW) {
+                    halfW = halfWFromH
+                    halfH = halfScreenH
+                } else {
+                    halfW = halfScreenW
+                    halfH = halfScreenW / bmpAspect
+                }
+
+                overlayRenderer.setExtent(halfW, halfH)
+                quadInitialFitApplied = true
             }
 
             val hasMeshData = if (scanMode == ArScanMode.MURAL && muralMethod == MuralMethod.SURFACE_MESH) {
