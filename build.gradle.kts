@@ -7,6 +7,7 @@ buildscript {
         "io.netty:netty-codec:4.1.133.Final",
         "io.netty:netty-codec-http2:4.1.133.Final",
         "io.netty:netty-handler:4.1.133.Final",
+        "io.netty:netty-handler-proxy:4.1.133.Final",
         "org.bitbucket.b_c:jose4j:0.9.6",
         "org.apache.commons:commons-lang3:3.20.0",
         "org.apache.httpcomponents:httpclient:4.5.14",

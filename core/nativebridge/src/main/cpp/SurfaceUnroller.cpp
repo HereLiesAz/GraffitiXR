@@ -97,7 +97,7 @@ std::vector<std::vector<float>> SurfaceUnroller::computeP(const std::vector<floa
 }
 
 std::vector<glm::vec2> SurfaceUnroller::computeKLmaxGradients(const std::vector<std::vector<float>>& P, const std::vector<glm::vec2>& Y) {
-    std::vector<float> Q(mCount * mCount, 0.0f);
+    std::vector<float> Q(static_cast<std::size_t>(mCount) * static_cast<std::size_t>(mCount), 0.0f);
     float sumQ = 0.0f;
     for (int i = 0; i < mCount; ++i) {
         for (int j = 0; j < mCount; ++j) {
