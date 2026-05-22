@@ -65,6 +65,7 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.core.content.FileProvider
 import java.io.File
@@ -149,6 +150,8 @@ import com.hereliesaz.graffitixr.design.theme.rememberNavStrings
 import timber.log.Timber
 import kotlin.math.abs
 
+private const val LIBRARY_ROUTE = "library"
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
@@ -159,7 +162,6 @@ class MainActivity : ComponentActivity() {
     private val arViewModel: ArViewModel by viewModels()
 
     var showSaveDialog by mutableStateOf(false)
-    var showLibrary by mutableStateOf(true)
     var showSettings by mutableStateOf(false)
     var showPosterDialog by mutableStateOf(false)
     var posterSourceLayerId by mutableStateOf<String?>(null)
@@ -192,6 +194,11 @@ class MainActivity : ComponentActivity() {
         setContent {
             GraffitiXRTheme {
                 val navController = rememberNavController()
+                val currentBackStackEntry by navController.currentBackStackEntryAsState()
+                val currentRoute = currentBackStackEntry?.destination?.route
+                // Treat the brief pre-first-composition window (currentRoute == null) as
+                // "library visible" so the editor doesn't flash before AzNavHost mounts.
+                val showLibrary = currentRoute == null || currentRoute == LIBRARY_ROUTE
 
                 val mainViewModel: MainViewModel = hiltViewModel()
                 val editorViewModel: EditorViewModel = hiltViewModel()
@@ -238,7 +245,9 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(dashboardNavigation) {
                     dashboardNavigation?.let { destination ->
                         when (destination) {
-                            "project_library" -> showLibrary = true
+                            "project_library" -> navController.navigate(LIBRARY_ROUTE) {
+                                launchSingleTop = true
+                            }
                             "settings" -> showSettings = true
                         }
                         dashboardViewModel.onNavigationConsumed()
@@ -276,7 +285,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                BackHandler(enabled = showLibrary && editorUiState.projectId != null) { showLibrary = false }
                 BackHandler(enabled = showSettings) { showSettings = false }
                 BackHandler(enabled = mainUiState.isInPlaneRealignment) {
                     mainViewModel.endPlaneRealignment()
@@ -324,12 +332,15 @@ class MainActivity : ComponentActivity() {
                 // device where ARCore is unsupported, route them to OVERLAY —
                 // the closest non-AR experience, since both render artwork on
                 // top of the live camera feed.
-                LaunchedEffect(arUiState.isArCoreAvailabilityResolved, arUiState.isArCoreAvailable, editorUiState.editorMode) {
+                LaunchedEffect(arUiState.isArCoreAvailabilityResolved, arUiState.isArCoreAvailable, currentRoute) {
                     if (arUiState.isArCoreAvailabilityResolved &&
                         !arUiState.isArCoreAvailable &&
-                        editorUiState.editorMode == EditorMode.AR
+                        currentRoute == EditorMode.AR.name
                     ) {
-                        editorViewModel.setEditorMode(EditorMode.OVERLAY)
+                        navController.navigate(EditorMode.OVERLAY.name) {
+                            popUpTo(EditorMode.AR.name) { inclusive = true }
+                            launchSingleTop = true
+                        }
                     }
                 }
 
@@ -401,7 +412,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                AzHostActivityLayout(navController = navController, initiallyExpanded = false) {
+                AzHostActivityLayout(navController = navController, currentDestination = currentRoute, initiallyExpanded = false) {
                     azTheme(
                         activeColor = Cyan,
                         defaultShape = AzButtonShape.RECTANGLE,
@@ -530,23 +541,40 @@ class MainActivity : ComponentActivity() {
                         var fullSize by remember { mutableStateOf(IntSize.Zero) }
 
                         Box(Modifier.fillMaxSize().onSizeChanged { fullSize = it }) {
-                            if (!showLibrary) {
-                                AzNavHost(startDestination = EditorMode.TRACE.name) {
-                                    composable(EditorMode.AR.name) {
-                                        EditorOverlay(editorViewModel, mainUiState, strings)
-                                    }
-                                    composable(EditorMode.OVERLAY.name) {
-                                        OverlayScreen(editorViewModel, showLibrary, arUiState)
-                                        EditorOverlay(editorViewModel, mainUiState, strings)
-                                    }
-                                    composable(EditorMode.MOCKUP.name) {
-                                        MockupScreen(editorViewModel, showLibrary, arUiState)
-                                        EditorOverlay(editorViewModel, mainUiState, strings)
-                                    }
-                                    composable(EditorMode.TRACE.name) {
-                                        TraceScreen(editorViewModel, showLibrary, arUiState)
-                                        EditorOverlay(editorViewModel, mainUiState, strings)
-                                    }
+                            AzNavHost(startDestination = LIBRARY_ROUTE) {
+                                composable(LIBRARY_ROUTE) {
+                                    val dashboardState by dashboardViewModel.uiState.collectAsState()
+                                    LaunchedEffect(Unit) { dashboardViewModel.loadAvailableProjects() }
+                                    ProjectLibraryScreen(
+                                        projects = dashboardState.availableProjects,
+                                        onLoadProject = { project ->
+                                            dashboardViewModel.openProject(project)
+                                            navController.navigate(EditorMode.TRACE.name) {
+                                                popUpTo(LIBRARY_ROUTE) { inclusive = true }
+                                                launchSingleTop = true
+                                            }
+                                        },
+                                        onDeleteProject = { dashboardViewModel.deleteProject(it) },
+                                        onNewProject = { dashboardViewModel.onNewProjectTriggered() },
+                                        onImportProject = { uri -> dashboardViewModel.importProject(uri) },
+                                        onClose = { /* no-op: ProjectLibraryScreen no longer exposes a close affordance */ },
+                                        strings = strings
+                                    )
+                                }
+                                composable(EditorMode.AR.name) {
+                                    EditorOverlay(editorViewModel, mainUiState, strings)
+                                }
+                                composable(EditorMode.OVERLAY.name) {
+                                    OverlayScreen(editorViewModel, showLibrary, arUiState)
+                                    EditorOverlay(editorViewModel, mainUiState, strings)
+                                }
+                                composable(EditorMode.MOCKUP.name) {
+                                    MockupScreen(editorViewModel, showLibrary, arUiState)
+                                    EditorOverlay(editorViewModel, mainUiState, strings)
+                                }
+                                composable(EditorMode.TRACE.name) {
+                                    TraceScreen(editorViewModel, showLibrary, arUiState)
+                                    EditorOverlay(editorViewModel, mainUiState, strings)
                                 }
                             }
 
@@ -815,7 +843,10 @@ class MainActivity : ComponentActivity() {
                                     onDismissRequest = { dashboardViewModel.dismissNewProjectDialog() },
                                     onSaveRequest = { name ->
                                         dashboardViewModel.onCreateProject(name, editorUiState.isRightHanded)
-                                        showLibrary = false
+                                        navController.navigate(EditorMode.TRACE.name) {
+                                            popUpTo(LIBRARY_ROUTE) { inclusive = true }
+                                            launchSingleTop = true
+                                        }
                                     },
                                     strings = strings
                                 )
@@ -877,27 +908,6 @@ class MainActivity : ComponentActivity() {
                                     confirmButton = {
                                         AzButton(text = "Got it", onClick = { showDesignInstructionsDialog = false }, shape = AzButtonShape.RECTANGLE)
                                     }
-                                )
-                            }
-
-                            if (showLibrary) {
-                                val dashboardState by dashboardViewModel.uiState.collectAsState()
-                                LaunchedEffect(Unit) { dashboardViewModel.loadAvailableProjects() }
-                                ProjectLibraryScreen(
-                                    projects = dashboardState.availableProjects,
-                                    onLoadProject = {
-                                        dashboardViewModel.openProject(it)
-                                        showLibrary = false
-                                    },
-                                    onDeleteProject = { dashboardViewModel.deleteProject(it) },
-                                    onNewProject = {
-                                        dashboardViewModel.onNewProjectTriggered()
-                                    },
-                                    onImportProject = { uri ->
-                                        dashboardViewModel.importProject(uri)
-                                    },
-                                    onClose = { showLibrary = false },
-                                    strings = strings
                                 )
                             }
 
@@ -1191,7 +1201,9 @@ class MainActivity : ComponentActivity() {
                 showSaveDialog = true
             }
             azRailSubItem(id = "project.load", hostId = "project.host.main", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {
-                this@MainActivity.showLibrary = true
+                navController.navigate(LIBRARY_ROUTE) {
+                    launchSingleTop = true
+                }
             }
             azRailSubItem(id = "project.export", hostId = "project.host.main", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE) {
                 if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
