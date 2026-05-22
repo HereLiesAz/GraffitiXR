@@ -303,6 +303,11 @@ class MainActivity : ComponentActivity() {
                         !showSettings &&
                         !isExporting
 
+                // AzNavRail caches `isExpanded` in rememberSaveable; forcing
+                // noMenu on the library screen re-initialises it to false so
+                // its outer fillMaxSize Box never attaches tapOutsideToCollapse.
+                val railMenuDisabled = !isRailVisible || showLibrary
+
                 var permissionRequestedAtLeastOnce by remember { mutableStateOf(hasCameraPermission) }
 
                 LaunchedEffect(Unit) {
@@ -422,7 +427,7 @@ class MainActivity : ComponentActivity() {
                     azConfig(
                         packButtons = true,
                         dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT,
-                        noMenu = !isRailVisible
+                        noMenu = railMenuDisabled
                     )
                     azAdvanced(
                         helpEnabled = true,
@@ -1791,16 +1796,16 @@ class MainActivity : ComponentActivity() {
                 }
             }
             azRailItem(id = "tool.lockTrace", text = lockText, color = navItemColor, onClick = lockAction)
+
+            azDivider()
+
+            azHelpRailItem(
+                id = "tool.helpMain",
+                text = navStrings.help,
+                color = navItemColor,
+                shape = AzButtonShape.RECTANGLE
+            )
         }
-
-        azDivider()
-
-        azHelpRailItem(
-            id = "tool.helpMain",
-            text = navStrings.help,
-            color = navItemColor,
-            shape = AzButtonShape.RECTANGLE
-        )
     }
 }
 
