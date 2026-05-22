@@ -292,7 +292,7 @@ fun MainScreen(
 
         val isGuest = arUiState.coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST
 
-        if (uiState.editorMode != EditorMode.STENCIL) {
+        if (uiState.editorMode != EditorMode.STENCIL && isCameraActive) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()

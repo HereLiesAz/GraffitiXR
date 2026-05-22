@@ -276,7 +276,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                BackHandler(enabled = showLibrary) { showLibrary = false }
+                BackHandler(enabled = showLibrary && editorUiState.projectId != null) { showLibrary = false }
                 BackHandler(enabled = showSettings) { showSettings = false }
                 BackHandler(enabled = mainUiState.isInPlaneRealignment) {
                     mainViewModel.endPlaneRealignment()
@@ -530,21 +530,23 @@ class MainActivity : ComponentActivity() {
                         var fullSize by remember { mutableStateOf(IntSize.Zero) }
 
                         Box(Modifier.fillMaxSize().onSizeChanged { fullSize = it }) {
-                            AzNavHost(startDestination = EditorMode.TRACE.name) {
-                                composable(EditorMode.AR.name) {
-                                    EditorOverlay(editorViewModel, mainUiState, strings)
-                                }
-                                composable(EditorMode.OVERLAY.name) {
-                                    OverlayScreen(editorViewModel, showLibrary, arUiState)
-                                    EditorOverlay(editorViewModel, mainUiState, strings)
-                                }
-                                composable(EditorMode.MOCKUP.name) {
-                                    MockupScreen(editorViewModel, showLibrary, arUiState)
-                                    EditorOverlay(editorViewModel, mainUiState, strings)
-                                }
-                                composable(EditorMode.TRACE.name) {
-                                    TraceScreen(editorViewModel, showLibrary, arUiState)
-                                    EditorOverlay(editorViewModel, mainUiState, strings)
+                            if (!showLibrary) {
+                                AzNavHost(startDestination = EditorMode.TRACE.name) {
+                                    composable(EditorMode.AR.name) {
+                                        EditorOverlay(editorViewModel, mainUiState, strings)
+                                    }
+                                    composable(EditorMode.OVERLAY.name) {
+                                        OverlayScreen(editorViewModel, showLibrary, arUiState)
+                                        EditorOverlay(editorViewModel, mainUiState, strings)
+                                    }
+                                    composable(EditorMode.MOCKUP.name) {
+                                        MockupScreen(editorViewModel, showLibrary, arUiState)
+                                        EditorOverlay(editorViewModel, mainUiState, strings)
+                                    }
+                                    composable(EditorMode.TRACE.name) {
+                                        TraceScreen(editorViewModel, showLibrary, arUiState)
+                                        EditorOverlay(editorViewModel, mainUiState, strings)
+                                    }
                                 }
                             }
 
