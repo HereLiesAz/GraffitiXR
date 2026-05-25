@@ -1516,9 +1516,16 @@ class EditorViewModel @Inject constructor(
             withContext(dispatchers.main) {
                 dispatch(EditorIntent.AddLayer(newLayer))
                 opEmitter.emit(Op.LayerAdd(newLayer))
+                // Signal the UI to immediately open this text layer's edit-text box.
+                _uiState.update { it.copy(autoEditTextLayerId = newLayer.id) }
                 saveProject()
             }
         }
+    }
+
+    /** Clear the one-shot auto-edit signal once the UI has opened the text editor. */
+    fun consumeAutoEditTextLayer() {
+        _uiState.update { it.copy(autoEditTextLayerId = null) }
     }
 
     private fun rerasterizeTextLayer(layerId: String, params: TextLayerParams) {
