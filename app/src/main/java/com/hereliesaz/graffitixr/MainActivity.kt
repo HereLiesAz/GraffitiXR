@@ -477,6 +477,12 @@ class MainActivity : ComponentActivity() {
                     onscreen {
                         if (isExporting) return@onscreen
 
+                        // Single source of truth for the auto-fired-overlay modal gate. The rule
+                        // is that auto overlays (onboarding, AR-unavailable explainer) must
+                        // early-return on EVERY modal, not just one — collapsing the repeated
+                        // boolean chains here prevents a future overlay from forgetting one.
+                        val anyModalActive = showLibrary || showSettings || isExporting || mainUiState.isCapturingTarget
+
                         LaunchedEffect(
                             editorUiState.editorMode,
                             showLibrary,
@@ -484,12 +490,12 @@ class MainActivity : ComponentActivity() {
                             isExporting,
                             mainUiState.isCapturingTarget
                         ) {
-                            if (showLibrary || showSettings || isExporting || mainUiState.isCapturingTarget) return@LaunchedEffect
+                            if (anyModalActive) return@LaunchedEffect
                             if (editorUiState.layers.isNotEmpty()) return@LaunchedEffect
                             activeOnboarding = onboardings[editorUiState.editorMode]
                         }
 
-                        if (!showLibrary && !showSettings && !isExporting && !mainUiState.isCapturingTarget) {
+                        if (!anyModalActive) {
                             activeOnboarding?.let { ob ->
                                 ModeOnboardingOverlay(
                                     onboarding = ob,
@@ -508,7 +514,7 @@ class MainActivity : ComponentActivity() {
                         val arUnavailableLines = remember {
                             context.resources.getStringArray(DesignR.array.onboarding_ar_unavailable).toList()
                         }
-                        if (!showLibrary && !showSettings && !isExporting && !mainUiState.isCapturingTarget &&
+                        if (!anyModalActive &&
                             arUiState.isArCoreAvailabilityResolved &&
                             !arUiState.isArCoreAvailable &&
                             arExplainerKey !in completedTutorials &&

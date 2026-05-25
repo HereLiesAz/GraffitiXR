@@ -211,7 +211,20 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun setEditorMode(mode: EditorMode) = _uiState.update { it.copy(editorMode = mode) }
+    fun setEditorMode(mode: EditorMode) = _uiState.update {
+        if (it.editorMode == mode) return@update it
+        // Mode is a view, not a container: layers (the document) persist and stay editable,
+        // but transient mode-specific overlay state — an in-flight brush stroke, a live
+        // segmentation preview — must not bleed into the next mode.
+        it.copy(
+            editorMode = mode,
+            liveStrokeLayerId = null,
+            liveStrokeBitmap = null,
+            liveStrokeVersion = 0,
+            isSegmenting = false,
+            segmentationPreview = null,
+        )
+    }
 
     private fun pushHistory() {
         val layersWithoutBitmaps = _uiState.value.layers.map { it.copy(bitmap = null) }
