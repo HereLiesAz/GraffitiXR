@@ -263,4 +263,39 @@ class EditorReducerTest {
         assertEquals(Offset(5f, 6f), a.offset)
         assertEquals(30f, a.rotationZ)
     }
+
+    @Test
+    fun `SetLayers replaces the list but leaves active id untouched`() {
+        val s = state(lyr("a"), lyr("b"), active = "a")
+        val out = reduce(s, EditorIntent.SetLayers(listOf(lyr("a"))))
+        assertEquals(listOf("a"), out.layers.map { it.id })
+        assertEquals("a", out.activeLayerId)
+    }
+
+    @Test
+    fun `BeginGesture flags the gesture and dismisses the panel`() {
+        val s = state(lyr("a")).copy(activePanel = EditorPanel.ADJUST)
+        val out = reduce(s, EditorIntent.BeginGesture)
+        assertTrue(out.gestureInProgress)
+        assertEquals(EditorPanel.NONE, out.activePanel)
+    }
+
+    @Test
+    fun `LoadedProject sets id and layers and ClearProject resets them`() {
+        val loaded = reduce(state(), EditorIntent.LoadedProject("p1", listOf(lyr("a"))))
+        assertEquals("p1", loaded.projectId)
+        assertEquals(listOf("a"), loaded.layers.map { it.id })
+        val cleared = reduce(loaded, EditorIntent.ClearProject)
+        assertNull(cleared.projectId)
+        assertTrue(cleared.layers.isEmpty())
+    }
+
+    @Test
+    fun `PasteLayerModifications copies aesthetic props and warp from the source`() {
+        val source = lyr("src").copy(opacity = 0.2f, warpMesh = listOf(1f, 2f))
+        val s = state(lyr("a"))
+        val out = reduce(s, EditorIntent.PasteLayerModifications("a", source))
+        assertEquals(0.2f, out.layers.first().opacity)
+        assertEquals(listOf(1f, 2f), out.layers.first().warpMesh)
+    }
 }

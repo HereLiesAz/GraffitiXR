@@ -116,6 +116,26 @@ internal object EditorReducer {
                 blendMode = intent.props.blendMode,
             )
         })
+
+        EditorIntent.ToggleColorPanel ->
+            state.copy(activePanel = if (state.activePanel == EditorPanel.COLOR) EditorPanel.NONE else EditorPanel.COLOR)
+        EditorIntent.BeginGesture -> state.copy(gestureInProgress = true, activePanel = EditorPanel.NONE)
+        is EditorIntent.SetLayers -> state.copy(layers = intent.layers)
+        is EditorIntent.PasteLayerModifications -> state.copy(layers = LayerListOps.mapLayer(state.layers, intent.id) {
+            it.copy(
+                opacity = intent.source.opacity,
+                brightness = intent.source.brightness,
+                contrast = intent.source.contrast,
+                saturation = intent.source.saturation,
+                colorBalanceR = intent.source.colorBalanceR,
+                colorBalanceG = intent.source.colorBalanceG,
+                colorBalanceB = intent.source.colorBalanceB,
+                blendMode = intent.source.blendMode,
+                warpMesh = intent.source.warpMesh,
+            )
+        })
+        is EditorIntent.LoadedProject -> state.copy(projectId = intent.projectId, layers = intent.layers, activeTool = Tool.NONE)
+        EditorIntent.ClearProject -> state.copy(projectId = null, layers = emptyList(), backgroundBitmap = null, activeTool = Tool.NONE)
     }
 
     /**

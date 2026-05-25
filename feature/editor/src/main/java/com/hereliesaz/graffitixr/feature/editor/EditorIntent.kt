@@ -90,4 +90,15 @@ internal sealed interface EditorIntent {
     data class RemoveLayerById(val id: String) : EditorIntent
     data class SetLayerTransformById(val id: String, val scale: Float, val offset: Offset, val rx: Float, val ry: Float, val rz: Float) : EditorIntent
     data class SetLayerProps(val id: String, val props: LayerProps) : EditorIntent
+
+    // ── Panels / gestures / layer set / project lifecycle ─────────────────────
+    data object ToggleColorPanel : EditorIntent
+    /** A transform gesture begins: flags it and dismisses any open panel. */
+    data object BeginGesture : EditorIntent
+    /** Replaces just the layer list, leaving active id / tool untouched (undo restore, reload). */
+    data class SetLayers(val layers: List<Layer>) : EditorIntent
+    /** Copies a source layer's aesthetic modifications (incl. warp mesh) onto [id]. */
+    data class PasteLayerModifications(val id: String, val source: Layer) : EditorIntent
+    data class LoadedProject(val projectId: String, val layers: List<Layer>) : EditorIntent
+    data object ClearProject : EditorIntent
 }

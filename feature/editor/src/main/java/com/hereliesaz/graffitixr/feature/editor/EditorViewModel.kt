@@ -144,7 +144,7 @@ class EditorViewModel @Inject constructor(
                             }
                         }
 
-                        _uiState.update { it.copy(projectId = project.id, layers = layers, activeTool = Tool.NONE) }
+                        dispatch(EditorIntent.LoadedProject(project.id, layers))
 
                         val layersToLoad = layers.filter { it.bitmap == null && it.uri != null }
                         if (layersToLoad.isNotEmpty()) {
@@ -163,7 +163,7 @@ class EditorViewModel @Inject constructor(
                                     }
                                 }
                                 withContext(dispatchers.main) {
-                                    _uiState.update { it.copy(layers = loadedLayers) }
+                                    dispatch(EditorIntent.SetLayers(loadedLayers))
                                 }
                             }
                         }
@@ -190,13 +190,13 @@ class EditorViewModel @Inject constructor(
                             viewModelScope.launch(dispatchers.io) {
                                 val bitmap = ImageUtils.loadBitmapAsync(context, uri)
                                 withContext(dispatchers.main) {
-                                    _uiState.update { it.copy(backgroundBitmap = bitmap) }
+                                    dispatch(EditorIntent.SetBackgroundBitmap(bitmap))
                                 }
                             }
                         }
                     }
                 } else {
-                    _uiState.update { it.copy(projectId = null, layers = emptyList(), backgroundBitmap = null, activeTool = Tool.NONE) }
+                    dispatch(EditorIntent.ClearProject)
                     slamManager.clearMap()
                     layerStore.clear()
                     history.clear()
@@ -235,7 +235,7 @@ class EditorViewModel @Inject constructor(
             is EditCommand.PropertyChange -> {
                 val currentBitmaps = _uiState.value.layers.associate { it.id to it.bitmap }
                 val restoredLayers = command.oldLayers.map { it.copy(bitmap = currentBitmaps[it.id]) }
-                _uiState.update { it.copy(layers = restoredLayers) }
+                dispatch(EditorIntent.SetLayers(restoredLayers))
                 saveProject()
             }
         }
@@ -258,7 +258,7 @@ class EditorViewModel @Inject constructor(
             is EditCommand.PropertyChange -> {
                 val currentBitmaps = _uiState.value.layers.associate { it.id to it.bitmap }
                 val restoredLayers = command.oldLayers.map { it.copy(bitmap = currentBitmaps[it.id]) }
-                _uiState.update { it.copy(layers = restoredLayers) }
+                dispatch(EditorIntent.SetLayers(restoredLayers))
                 saveProject()
             }
         }
@@ -855,7 +855,7 @@ class EditorViewModel @Inject constructor(
         saveProject()
     }
     override fun onAdjustClicked() = dispatch(EditorIntent.ToggleAdjustPanel)
-    fun onBalanceClicked() { _uiState.update { it.copy(activePanel = if (it.activePanel == EditorPanel.COLOR) EditorPanel.NONE else EditorPanel.COLOR) } }
+    fun onBalanceClicked() = dispatch(EditorIntent.ToggleColorPanel)
     override fun onDismissPanel() = dispatch(EditorIntent.DismissPanel)
 
     fun onTransformGesture(pan: Offset, zoom: Float, rotationDelta: Float) {
@@ -871,7 +871,7 @@ class EditorViewModel @Inject constructor(
 
     override fun onGestureEnd() {
         saveProject()
-        _uiState.update { it.copy(gestureInProgress = false) }
+        dispatch(EditorIntent.SetGestureInProgress(false))
         // Emit LayerTransform for the active layer. The editor stores transform as
         // scale/offset/rotationX/Y/Z rather than a Matrix, so we encode them in the
         // first 6 slots of a 16-float list (slots 6-15 are zeros).
@@ -888,7 +888,7 @@ class EditorViewModel @Inject constructor(
     }
     override fun onGestureStart() { 
         pushHistory()
-        _uiState.update { it.copy(gestureInProgress = true, activePanel = EditorPanel.NONE) } 
+        dispatch(EditorIntent.BeginGesture) 
     }
     override fun toggleImageLock() {
         pushHistory()
@@ -942,7 +942,7 @@ class EditorViewModel @Inject constructor(
     override fun pasteLayerModifications(id: String) {
         val source = copiedLayerState ?: return
         pushHistory()
-        _uiState.update { state -> state.copy(layers = state.layers.map { if (it.id == id) it.copy(opacity = source.opacity, brightness = source.brightness, contrast = source.contrast, saturation = source.saturation, colorBalanceR = source.colorBalanceR, colorBalanceG = source.colorBalanceG, colorBalanceB = source.colorBalanceB, blendMode = source.blendMode, warpMesh = source.warpMesh) else it }) }
+        dispatch(EditorIntent.PasteLayerModifications(id, source))
         saveProject()
     }
 
@@ -1451,7 +1451,7 @@ class EditorViewModel @Inject constructor(
     }
 
     fun setLayers(layers: List<Layer>) {
-        _uiState.update { it.copy(layers = layers) }
+        dispatch(EditorIntent.SetLayers(layers))
         saveProject()
     }
 
