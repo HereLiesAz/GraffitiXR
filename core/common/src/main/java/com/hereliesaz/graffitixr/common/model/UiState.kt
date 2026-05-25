@@ -145,7 +145,13 @@ data class ArUiState(
     val visibleSplatConfidenceAvg: Float = 0f,
     val globalSplatConfidenceAvg: Float = 0f,
     val fpsAr: Float = 0f,
-    val rawSensorReadings: String? = null
+    val rawSensorReadings: String? = null,
+
+    // Flipped to true after ARCore has failed to acquire a TRACKING state for
+    // ~10 s after AR mode entry. Drives the "AR can't initialize" escape
+    // overlay, which gives the user a guaranteed exit even when the VIO/depth
+    // pipelines are stuck and the main thread is starved.
+    val trackingFailed: Boolean = false
 )
 
 enum class CoopRole { NONE, HOST, GUEST }

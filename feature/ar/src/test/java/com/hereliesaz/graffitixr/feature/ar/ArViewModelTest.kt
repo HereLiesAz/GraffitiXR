@@ -177,6 +177,18 @@ class ArViewModelTest {
     }
 
     @Test
+    fun `onCaptureConsumed recycles the displaced capture bitmap`() = runTest {
+        val mockBitmap = mockk<Bitmap>(relaxed = true)
+        every { mockBitmap.isRecycled } returns false
+        viewModel.setTempCapture(mockBitmap)
+
+        viewModel.onCaptureConsumed()
+
+        verify { mockBitmap.recycle() }
+        assertNull(viewModel.uiState.value.tempCaptureBitmap)
+    }
+
+    @Test
     fun `setUnwarpPoints updates state`() = runTest {
         val points = listOf(Offset(0f, 0f), Offset(100f, 0f), Offset(100f, 100f), Offset(0f, 100f))
 

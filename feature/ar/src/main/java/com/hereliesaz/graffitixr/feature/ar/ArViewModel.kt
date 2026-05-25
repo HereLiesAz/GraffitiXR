@@ -24,6 +24,7 @@ import com.hereliesaz.graffitixr.common.sensor.Vec3
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.common.util.eraseColorBlob
+import com.hereliesaz.graffitixr.common.util.safeRecycle
 import com.hereliesaz.graffitixr.common.wearable.ConnectionState
 import com.hereliesaz.graffitixr.common.wearable.WearableManager
 import com.hereliesaz.graffitixr.feature.ar.coop.calibration.Mat4
@@ -95,6 +96,9 @@ class ArViewModel @Inject constructor(
     @Volatile var phoneToGlassesXform: Mat4? = null
         private set
 
+    // Guards the calibration point lists, mutated from the connection-state collector,
+    // the tap-submit coroutine, and the main thread (recalibrate / endGlassesSession).
+    private val calibrationLock = Any()
     private val calibrationSrcPoints = mutableListOf<Vec3>()
     private val calibrationDstPoints = mutableListOf<Vec3>()
     // ─────────────────────────────────────────────────────────────────────────
@@ -194,8 +198,10 @@ class ArViewModel @Inject constructor(
                 when (state) {
                     is ConnectionState.Connected -> {
                         _glassesSessionState.value = GlassesSessionState.CalibrationPrompt(progress = 0f)
-                        calibrationSrcPoints.clear()
-                        calibrationDstPoints.clear()
+                        synchronized(calibrationLock) {
+                            calibrationSrcPoints.clear()
+                            calibrationDstPoints.clear()
+                        }
                     }
                     is ConnectionState.Disconnected,
                     is ConnectionState.Error -> {
@@ -217,8 +223,10 @@ class ArViewModel @Inject constructor(
         wearableManager.deactivate()
         slamManager.stopSensorCollection()
         phoneToGlassesXform = null
-        calibrationSrcPoints.clear()
-        calibrationDstPoints.clear()
+        synchronized(calibrationLock) {
+            calibrationSrcPoints.clear()
+            calibrationDstPoints.clear()
+        }
         _glassesSessionState.value = GlassesSessionState.Idle
     }
 
@@ -226,34 +234,49 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch {
             val phonePoint = arCoreHitTestToWorld(screenPoint) ?: return@launch
             val glassesPoint = glassesWorldHitForTimestamp(System.nanoTime()) ?: return@launch
-            calibrationSrcPoints.add(phonePoint)
-            calibrationDstPoints.add(glassesPoint)
-            val progress = (calibrationSrcPoints.size / 20f).coerceAtMost(1f)
+            val (progress, shouldFinalize) = synchronized(calibrationLock) {
+                calibrationSrcPoints.add(phonePoint)
+                calibrationDstPoints.add(glassesPoint)
+                val count = calibrationSrcPoints.size
+                (count / 20f).coerceAtMost(1f) to (count >= 20)
+            }
             _glassesSessionState.value = GlassesSessionState.CalibrationPrompt(progress)
-            if (calibrationSrcPoints.size >= 20) finalizeCalibration()
+            if (shouldFinalize) finalizeCalibration()
         }
     }
 
     fun recalibrate() {
-        calibrationSrcPoints.clear()
-        calibrationDstPoints.clear()
+        synchronized(calibrationLock) {
+            calibrationSrcPoints.clear()
+            calibrationDstPoints.clear()
+        }
         _glassesSessionState.value = GlassesSessionState.CalibrationPrompt(progress = 0f)
     }
 
     fun applyPhoneToGlasses(point: Vec3): Vec3 = phoneToGlassesXform?.apply(point) ?: point
 
-    private fun finalizeCalibration() {
-        val xform = Procrustes.solve(calibrationSrcPoints, calibrationDstPoints) ?: run {
-            Timber.w("ArViewModel.finalizeCalibration: Procrustes failed; resetting calibration")
+    private fun resetCalibrationPoints() {
+        synchronized(calibrationLock) {
             calibrationSrcPoints.clear()
             calibrationDstPoints.clear()
+        }
+    }
+
+    private fun finalizeCalibration() {
+        // Snapshot under the lock so a concurrent clear (disconnect / recalibrate)
+        // can't mutate the lists while Procrustes is solving.
+        val (src, dst) = synchronized(calibrationLock) {
+            calibrationSrcPoints.toList() to calibrationDstPoints.toList()
+        }
+        val xform = Procrustes.solve(src, dst) ?: run {
+            Timber.w("ArViewModel.finalizeCalibration: Procrustes failed; resetting calibration")
+            resetCalibrationPoints()
             _glassesSessionState.value = GlassesSessionState.CalibrationPrompt(progress = 0f)
             return
         }
         if (kotlin.math.abs(xform.approximateScale() - 1f) > 0.05f) {
             Timber.w("ArViewModel.finalizeCalibration: scale mismatch ${xform.approximateScale()}; resetting")
-            calibrationSrcPoints.clear()
-            calibrationDstPoints.clear()
+            resetCalibrationPoints()
             _glassesSessionState.value = GlassesSessionState.CalibrationPrompt(progress = 0f)
             return
         }
@@ -305,10 +328,17 @@ class ArViewModel @Inject constructor(
     val isCameraInUseByAr = _isCameraInUseByAr.asStateFlow()
 
     private var isActivityResumed = false
-    private var isInArMode = false
+    @Volatile private var isInArMode = false
     private var isSessionResumed = false
-    private var isDestroying = false
+    @Volatile private var isDestroying = false
     private val sessionMutex = Mutex()
+
+    // Timestamps used to flip `trackingFailed` when ARCore never reaches a
+    // TRACKING state within the grace window after entering AR mode. Reset on
+    // every AR-mode entry; updated each time setTrackingState reports tracking.
+    @Volatile private var arEntryTimestampMs: Long = 0L
+    @Volatile private var lastTrackingTimestampMs: Long = 0L
+    private val trackingFailureGraceMs: Long = 10_000L
 
     private val isSaving = AtomicBoolean(false)
     private val lastSavedSplatCount = AtomicInteger(0)
@@ -418,7 +448,36 @@ class ArViewModel @Inject constructor(
             return
         }
         isInArMode = enabled
+        if (enabled) {
+            val now = System.currentTimeMillis()
+            arEntryTimestampMs = now
+            lastTrackingTimestampMs = now
+            if (_uiState.value.trackingFailed) {
+                _uiState.update { it.copy(trackingFailed = false) }
+            }
+        }
         updateSessionStateLocked(context)
+    }
+
+    /**
+     * Hard-exit AR mode: flips the in-AR / destroying flags synchronously so
+     * the GL render loop stops doing work on the next tick, then schedules a
+     * full session close on a background dispatcher. Safe to call from the UI
+     * thread — does not block on the session mutex. Use this instead of
+     * setArMode(false) when the user is leaving AR (back press, mode switch,
+     * tracking-failed overlay), because a paused-but-not-closed session leaves
+     * the camera attached on some devices and produces the "AppOps Operation
+     * not started: op=CAMERA" symptom on the next entry.
+     */
+    fun exitArMode() {
+        isInArMode = false
+        isDestroying = true
+        if (_uiState.value.trackingFailed) {
+            _uiState.update { it.copy(trackingFailed = false) }
+        }
+        viewModelScope.launch {
+            performFullCleanupLocked()
+        }
     }
 
     private fun updateSessionStateLocked(context: Context? = null) {
@@ -452,33 +511,23 @@ class ArViewModel @Inject constructor(
 
             s.configure(config)
 
-            // Task: Engage dual lens depth mapping if device is capable.
-            // MANDATORY: We force REQUIRE_AND_USE if the device supports it.
-            val stereoFilter = CameraConfigFilter(s).apply {
+            // Pick the default monocular 30 FPS back-camera config — the path
+            // ARCore's VIO and ML depth pipelines are tuned for. Forcing
+            // hardware stereo (StereoCameraUsage.REQUIRE_AND_USE) reliably
+            // wedged VIO in kNotTracking on several supported phones and
+            // produced a per-frame "no depth measurements" loop that saturated
+            // the main thread and ANR'd the app. Stereo depth, if ever
+            // re-enabled, must be opt-in and use PREFER_AND_USE so ARCore can
+            // downgrade.
+            val configFilter = CameraConfigFilter(s).apply {
                 facingDirection = CameraConfig.FacingDirection.BACK
-                setStereoCameraUsage(EnumSet.of(CameraConfig.StereoCameraUsage.REQUIRE_AND_USE))
+                targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
             }
-            
-            val stereoConfigs = s.getSupportedCameraConfigs(stereoFilter)
-            if (stereoConfigs.isNotEmpty()) {
-                // MANDATORY HW STEREO: Use the first available stereo config
-                val mandatoryStereo = stereoConfigs[0]
-                s.cameraConfig = mandatoryStereo
-                _uiState.update { it.copy(isDualLensActive = true, isHardwareStereoActive = true) }
-                Timber.i("MANDATORY: Hardware dual-lens depth enabled. Camera ID: ${mandatoryStereo.cameraId}")
-            } else {
-                // Fallback to highest quality mono config only if NO stereo is found
-                val fallbackFilter = CameraConfigFilter(s).apply {
-                    facingDirection = CameraConfig.FacingDirection.BACK
-                    targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
-                }
-                val fallbackConfigs = s.getSupportedCameraConfigs(fallbackFilter)
-                if (fallbackConfigs.isNotEmpty()) {
-                    s.cameraConfig = fallbackConfigs[0]
-                }
-                _uiState.update { it.copy(isHardwareStereoActive = false) }
-                Timber.w("Hardware stereo NOT available on this device. Using mono fallback.")
+            val cameraConfigs = s.getSupportedCameraConfigs(configFilter)
+            if (cameraConfigs.isNotEmpty()) {
+                s.cameraConfig = cameraConfigs[0]
             }
+            _uiState.update { it.copy(isDualLensActive = false, isHardwareStereoActive = false) }
 
             session = s
             _isCameraInUseByAr.value = true
@@ -533,6 +582,29 @@ class ArViewModel @Inject constructor(
             isSessionResumed = false
             _isCameraInUseByAr.value = false
             isDestroying = false
+            recycleCaptureBitmaps()
+        }
+    }
+
+    /**
+     * Recycles the large capture bitmaps and drops the native depth buffer held in
+     * [ArUiState]. Called when a capture is consumed and on AR-mode teardown — points
+     * where the capture overlay is no longer on screen, so recycling cannot race live
+     * Compose drawing. [safeRecycle] is idempotent, so the rotation-0 aliasing
+     * (where `tempCaptureBitmap === targetRawBitmap`) is harmless.
+     */
+    private fun recycleCaptureBitmaps() {
+        val s = _uiState.value
+        s.tempCaptureBitmap.safeRecycle()
+        s.annotatedCaptureBitmap.safeRecycle()
+        s.targetRawBitmap.safeRecycle()
+        _uiState.update {
+            it.copy(
+                tempCaptureBitmap = null,
+                annotatedCaptureBitmap = null,
+                targetRawBitmap = null,
+                targetDepthBuffer = null
+            )
         }
     }
 
@@ -649,10 +721,18 @@ class ArViewModel @Inject constructor(
     }
 
     fun attachSessionToRenderer(r: ArRenderer?) {
-        renderer = r
-        renderer?.stereoProvider = stereoProvider
-        renderer?.attachSession(session)
-        loadCloudPointsIfExists()
+        r?.stereoProvider = stereoProvider
+        // Take the session mutex before reading `session` and attaching it: otherwise
+        // exitArMode()/performFullCleanupLocked() can null and close the session
+        // between the read here and attachSession(), handing the renderer a session
+        // that is being torn down (TOCTOU).
+        viewModelScope.launch {
+            sessionMutex.withLock {
+                renderer = r
+                r?.attachSession(session)
+                loadCloudPointsIfExists()
+            }
+        }
     }
 
     fun setTrackingState(
@@ -670,6 +750,13 @@ class ArViewModel @Inject constructor(
         globConf: Float = 0f
     ) {
         val progress = if (isTracking) slamManager.getPaintingProgress() else _uiState.value.paintingProgress
+
+        val nowMs = System.currentTimeMillis()
+        if (isTracking) lastTrackingTimestampMs = nowMs
+        val trackingFailed = isInArMode &&
+                !isTracking &&
+                arEntryTimestampMs > 0L &&
+                (nowMs - lastTrackingTimestampMs) > trackingFailureGraceMs
 
         val sector = (((cameraYaw % 360f) + 360f) % 360f / 10f).toInt().coerceIn(0, 35)
         visitedSectors[sector] = true
@@ -714,7 +801,8 @@ class ArViewModel @Inject constructor(
                 isHardwareStereoActive = isHardwareStereo,
                 currentCenterDepth = centerDepth,
                 visibleSplatConfidenceAvg = visConf,
-                globalSplatConfidenceAvg = globConf
+                globalSplatConfidenceAvg = globConf,
+                trackingFailed = trackingFailed
             )
         }
     }
@@ -885,7 +973,7 @@ class ArViewModel @Inject constructor(
 
 
     fun onCaptureConsumed() {
-        _uiState.update { it.copy(tempCaptureBitmap = null, annotatedCaptureBitmap = null) }
+        recycleCaptureBitmaps()
         slamManager.setMappingPaused(false)
     }
 

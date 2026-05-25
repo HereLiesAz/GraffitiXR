@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.opengl.GLES30
 import android.opengl.GLUtils
 import android.opengl.Matrix
+import com.hereliesaz.graffitixr.common.util.GlReleasable
 import com.hereliesaz.graffitixr.design.rendering.ShaderUtil
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -15,7 +16,7 @@ import java.nio.IntBuffer
  * Renders the editor layer composite as a warped grid mesh locked to the AR anchor.
  * Supports both flat-quad and dense-mesh (Twindo-style) rendering.
  */
-class OverlayRenderer(private val context: Context) {
+class OverlayRenderer(private val context: Context) : GlReleasable {
 
     private var program = 0
     private var positionHandle = 0
@@ -94,6 +95,22 @@ class OverlayRenderer(private val context: Context) {
         GLES30.glGenBuffers(1, borderBuf, 0)
         borderVboId = borderBuf[0]
         buildBorderQuad()
+    }
+
+    /**
+     * Deletes every GL object this renderer owns. Idempotent — safe to call when
+     * nothing has been created yet, and safe to call more than once. Must run on
+     * the GL thread.
+     */
+    override fun release() {
+        if (program != 0) { GLES30.glDeleteProgram(program); program = 0 }
+        if (borderProgram != 0) { GLES30.glDeleteProgram(borderProgram); borderProgram = 0 }
+        if (textureIds[0] != 0) { GLES30.glDeleteTextures(1, textureIds, 0); textureIds[0] = 0 }
+        val bufs = intArrayOf(vboId, iboId, borderVboId).filter { it != 0 }.toIntArray()
+        if (bufs.isNotEmpty()) GLES30.glDeleteBuffers(bufs.size, bufs, 0)
+        vboId = 0; iboId = 0; borderVboId = 0
+        vertexBuffer = null
+        hasTexture = false
     }
 
     fun clearTexture() {

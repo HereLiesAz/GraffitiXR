@@ -8,13 +8,14 @@ import com.google.ar.core.Plane
 import com.google.ar.core.Pose
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
+import com.hereliesaz.graffitixr.common.util.GlReleasable
 import com.hereliesaz.graffitixr.design.rendering.ShaderUtil
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.abs
 import kotlin.math.sqrt
 
-class PlaneRenderer {
+class PlaneRenderer : GlReleasable {
     private var planeProgram = 0
 
     private var planeModelUniform = 0
@@ -124,6 +125,14 @@ class PlaneRenderer {
         GLES20.glDrawArrays(GLES20.GL_LINE_LOOP, 0, count)
 
         GLES20.glDisableVertexAttribArray(posAttr)
+    }
+
+    /**
+     * Deletes the plane shader program. The vertex buffer is a plain direct buffer
+     * (no GL buffer object) and is reclaimed by GC. Idempotent; must run on the GL thread.
+     */
+    override fun release() {
+        if (planeProgram != 0) { GLES20.glDeleteProgram(planeProgram); planeProgram = 0 }
     }
 
     enum class PlaneMatchResult {

@@ -202,6 +202,18 @@ fun MainScreen(
                                 r.scanPhase = arUiState.scanPhase
                             }
                         },
+                        onRelease = { view ->
+                            // The AR view is leaving composition (mode switch / teardown).
+                            // Free GL objects on the GL thread while the context is still
+                            // alive, then run non-GL teardown (cancels the renderer's
+                            // coroutine scope and detaches the session).
+                            rendererRef.value?.let { r ->
+                                r.isDestroying = true
+                                view.queueEvent { r.releaseGlResources() }
+                                r.destroy()
+                            }
+                            rendererRef.value = null
+                        },
                         modifier = Modifier.fillMaxSize()
                     )
                 }

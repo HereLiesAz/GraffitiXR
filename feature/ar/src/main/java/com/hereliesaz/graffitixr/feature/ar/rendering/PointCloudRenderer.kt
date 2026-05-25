@@ -4,6 +4,7 @@ import android.content.Context
 import android.opengl.GLES20
 import android.opengl.Matrix
 import com.google.ar.core.PointCloud
+import com.hereliesaz.graffitixr.common.util.GlReleasable
 import com.hereliesaz.graffitixr.design.rendering.ShaderUtil
 import timber.log.Timber
 import java.io.File
@@ -13,7 +14,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.HashMap
 
-class PointCloudRenderer {
+class PointCloudRenderer : GlReleasable {
     private val TAG = "PointCloudRenderer"
 
     private var program: Int = 0
@@ -158,6 +159,16 @@ class PointCloudRenderer {
     fun clear() {
         accumulatedPointCount = 0
         pointIdMap.clear()
+    }
+
+    /**
+     * Deletes the shader program and VBO this renderer owns and resets accumulation.
+     * Idempotent; must run on the GL thread.
+     */
+    override fun release() {
+        if (program != 0) { GLES20.glDeleteProgram(program); program = 0 }
+        if (vboId != 0) { GLES20.glDeleteBuffers(1, intArrayOf(vboId), 0); vboId = 0 }
+        clear()
     }
 
     fun saveToFile(path: String) {
