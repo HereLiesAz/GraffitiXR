@@ -87,6 +87,9 @@ class EditorViewModel @Inject constructor(
 
     // Per-layer base-bitmap and stroke caches (thread-safe; see LayerStore).
     private val layerStore = LayerStore()
+
+    // Stroke-compositing pipeline (base + strokes -> rendered bitmap; see DrawingEngine).
+    private val drawingEngine = DrawingEngine(slamManager)
     private var pendingSaveJob: kotlinx.coroutines.Job? = null
 
     private var copiedLayerState: Layer? = null
@@ -280,32 +283,7 @@ class EditorViewModel @Inject constructor(
         val strokes = layerStore.strokes(layerId)
 
         viewModelScope.launch(dispatchers.default) {
-            var currentBitmap = base.copy(Bitmap.Config.ARGB_8888, true)
-
-            for (stroke in strokes) {
-                if (stroke.tool == Tool.LIQUIFY) {
-                    slamManager.prepareLiquify(currentBitmap)
-                    val mapped = ImageProcessor.mapScreenToBitmap(
-                        stroke.path, stroke.canvasSize.width, stroke.canvasSize.height, currentBitmap.width, currentBitmap.height,
-                        stroke.layerScale, stroke.layerOffset, stroke.layerRotationZ
-                    )
-                    // We need a flat array for JNI
-                    val flatArr = FloatArray(mapped.size * 2)
-                    mapped.forEachIndexed { i, pt -> flatArr[i*2] = pt.x; flatArr[i*2+1] = pt.y }
-                    slamManager.applyLiquify(flatArr, stroke.brushSize, 0.5f)
-                    val baked = currentBitmap.copy(Bitmap.Config.ARGB_8888, true)
-                    slamManager.bakeLiquify(baked)
-                    currentBitmap = baked
-                } else {
-                    val mapped = com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor.mapScreenToBitmap(
-                        stroke.path, stroke.canvasSize.width, stroke.canvasSize.height, currentBitmap.width, currentBitmap.height,
-                        stroke.layerScale, stroke.layerOffset, stroke.layerRotationZ
-                    )
-                    currentBitmap = com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor.applyToolToBitmap(
-                        currentBitmap, mapped, stroke.tool, stroke.brushSize, stroke.brushColor, stroke.intensity, true, stroke.feathering
-                    )
-                }
-            }
+            val currentBitmap = drawingEngine.composite(base, strokes)
 
             withContext(dispatchers.main) {
                 _uiState.update { state ->
@@ -324,16 +302,7 @@ class EditorViewModel @Inject constructor(
         updateHistoryCounts()
 
         viewModelScope.launch(dispatchers.default) {
-            val mappedStroke = com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor.mapScreenToBitmap(
-                command.path,
-                command.canvasSize.width, command.canvasSize.height,
-                activeBitmap.width, activeBitmap.height,
-                command.layerScale, command.layerOffset, command.layerRotationZ
-            )
-
-            val newBitmap = com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor.applyToolToBitmap(
-                activeBitmap, mappedStroke, command.tool, command.brushSize, command.brushColor, command.intensity, false, command.feathering
-            )
+            val newBitmap = drawingEngine.applySingleStroke(activeBitmap, command)
 
             withContext(dispatchers.main) {
                 _uiState.update { state ->
