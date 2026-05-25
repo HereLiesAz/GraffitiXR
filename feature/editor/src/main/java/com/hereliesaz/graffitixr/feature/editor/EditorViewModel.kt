@@ -85,13 +85,8 @@ class EditorViewModel @Inject constructor(
 
     private val history = EditHistory()
 
-    // ConcurrentHashMap: these maps are read/written from the project-collect coroutine
-    // (io), stroke handlers, and the main thread. Plain mutableMapOf threw
-    // ConcurrentModificationException when a project change cleared them mid-write.
-    // (Per-layer stroke-list mutation is still single-path; deeper confinement is a
-    // follow-up.) Non-null keys/values only, so the no-null contract is satisfied.
-    private val baseBitmaps = java.util.concurrent.ConcurrentHashMap<String, Bitmap>()
-    private val layerStrokes = java.util.concurrent.ConcurrentHashMap<String, MutableList<StrokeCommand>>()
+    // Per-layer base-bitmap and stroke caches (thread-safe; see LayerStore).
+    private val layerStore = LayerStore()
     private var pendingSaveJob: kotlinx.coroutines.Job? = null
 
     private var copiedLayerState: Layer? = null
@@ -156,8 +151,8 @@ class EditorViewModel @Inject constructor(
                                     if (layer.bitmap == null && layerUri != null) {
                                         val loadedBmp = ImageUtils.loadBitmapAsync(context, layerUri)
                                         if (loadedBmp != null) {
-                                            baseBitmaps[layer.id] = loadedBmp.copy(Bitmap.Config.ARGB_8888, false)
-                                            layerStrokes[layer.id] = mutableListOf()
+                                            layerStore.putBase(layer.id, loadedBmp.copy(Bitmap.Config.ARGB_8888, false))
+                                            layerStore.initStrokes(layer.id)
                                         }
                                         layer.copy(bitmap = loadedBmp)
                                     } else {
@@ -200,8 +195,7 @@ class EditorViewModel @Inject constructor(
                 } else {
                     _uiState.update { it.copy(projectId = null, layers = emptyList(), backgroundBitmap = null, activeTool = Tool.NONE) }
                     slamManager.clearMap()
-                    baseBitmaps.clear()
-                    layerStrokes.clear()
+                    layerStore.clear()
                     history.clear()
                 }
             }
@@ -245,8 +239,7 @@ class EditorViewModel @Inject constructor(
 
         when (command) {
             is EditCommand.Draw -> {
-                val strokes = layerStrokes[command.layerId] ?: return
-                if (strokes.isNotEmpty()) strokes.removeAt(strokes.lastIndex)
+                if (!layerStore.removeLastStroke(command.layerId)) return
                 rebuildLayerBitmap(command.layerId)
             }
             is EditCommand.PropertyChange -> {
@@ -269,9 +262,7 @@ class EditorViewModel @Inject constructor(
 
         when (command) {
             is EditCommand.Draw -> {
-                val strokes = layerStrokes[command.layerId] ?: mutableListOf()
-                strokes.add(command.command)
-                layerStrokes[command.layerId] = strokes
+                layerStore.addStroke(command.layerId, command.command)
                 rebuildLayerBitmap(command.layerId)
             }
             is EditCommand.PropertyChange -> {
@@ -285,8 +276,8 @@ class EditorViewModel @Inject constructor(
     }
 
     private fun rebuildLayerBitmap(layerId: String) {
-        val base = baseBitmaps[layerId] ?: return
-        val strokes = layerStrokes[layerId] ?: emptyList()
+        val base = layerStore.base(layerId) ?: return
+        val strokes = layerStore.strokes(layerId)
 
         viewModelScope.launch(dispatchers.default) {
             var currentBitmap = base.copy(Bitmap.Config.ARGB_8888, true)
@@ -327,9 +318,7 @@ class EditorViewModel @Inject constructor(
     }
 
     fun processNewStroke(layerId: String, activeBitmap: Bitmap, command: StrokeCommand, layer: Layer) {
-        val currentStrokes = layerStrokes[layerId] ?: mutableListOf()
-        currentStrokes.add(command)
-        layerStrokes[layerId] = currentStrokes
+        layerStore.addStroke(layerId, command)
 
         history.pushDraw(layerId, command)
         updateHistoryCounts()
@@ -404,8 +393,8 @@ class EditorViewModel @Inject constructor(
                     scale = initialScale
                 )
 
-                baseBitmaps[newLayer.id] = bitmap.copy(Bitmap.Config.ARGB_8888, false)
-                layerStrokes[newLayer.id] = mutableListOf()
+                layerStore.putBase(newLayer.id, bitmap.copy(Bitmap.Config.ARGB_8888, false))
+                layerStore.initStrokes(newLayer.id)
 
                 withContext(dispatchers.main) {
                     _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE, activePanel = EditorPanel.NONE) }
@@ -443,8 +432,8 @@ class EditorViewModel @Inject constructor(
                     uri = localUri
                 )
 
-                baseBitmaps[newLayer.id] = blankBitmap.copy(Bitmap.Config.ARGB_8888, false)
-                layerStrokes[newLayer.id] = mutableListOf()
+                layerStore.putBase(newLayer.id, blankBitmap.copy(Bitmap.Config.ARGB_8888, false))
+                layerStore.initStrokes(newLayer.id)
 
                 _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE, activePanel = EditorPanel.NONE) }
                 opEmitter.emit(Op.LayerAdd(newLayer))
@@ -614,8 +603,7 @@ class EditorViewModel @Inject constructor(
             val updated = state.layers.filter { it.id != id }
             state.copy(layers = updated, activeLayerId = if (state.activeLayerId == id) updated.firstOrNull()?.id else state.activeLayerId, activeTool = Tool.NONE)
         }
-        baseBitmaps.remove(id)
-        layerStrokes.remove(id)
+        layerStore.remove(id)
         opEmitter.emit(Op.LayerRemove(id))
         saveProject()
     }
@@ -876,8 +864,8 @@ class EditorViewModel @Inject constructor(
                     val updatedLayers = state.layers.map {
                         if (it.id == id) {
                             bitmap?.let { bmp ->
-                                baseBitmaps[id] = bmp.copy(Bitmap.Config.ARGB_8888, false)
-                                layerStrokes[id] = mutableListOf()
+                                layerStore.putBase(id, bmp.copy(Bitmap.Config.ARGB_8888, false))
+                                layerStore.initStrokes(id)
                             }
                             it.copy(uri = uri, bitmap = bitmap)
                         } else it
@@ -1053,8 +1041,8 @@ class EditorViewModel @Inject constructor(
             )
 
             newBitmap?.let { bmp ->
-                baseBitmaps[duplicated.id] = bmp.copy(Bitmap.Config.ARGB_8888, false)
-                layerStrokes[duplicated.id] = mutableListOf()
+                layerStore.putBase(duplicated.id, bmp.copy(Bitmap.Config.ARGB_8888, false))
+                layerStore.initStrokes(duplicated.id)
             }
 
             withContext(dispatchers.main) {
@@ -1298,9 +1286,7 @@ class EditorViewModel @Inject constructor(
             )
 
             // Add stroke to history
-            val currentStrokes = layerStrokes[layerId] ?: mutableListOf()
-            currentStrokes.add(command)
-            layerStrokes[layerId] = currentStrokes
+            layerStore.addStroke(layerId, command)
             history.pushDraw(layerId, command)
             updateHistoryCounts()
 
@@ -1329,9 +1315,7 @@ class EditorViewModel @Inject constructor(
             )
 
             // Add stroke to history for undo/redo replay.
-            val currentStrokes = layerStrokes[layerId] ?: mutableListOf()
-            currentStrokes.add(command)
-            layerStrokes[layerId] = currentStrokes
+            layerStore.addStroke(layerId, command)
             history.pushDraw(layerId, command)
             updateHistoryCounts()
 
@@ -1474,9 +1458,9 @@ class EditorViewModel @Inject constructor(
             )
 
             withContext(dispatchers.main) {
-                _uiState.value.layers.forEach { baseBitmaps.remove(it.id); layerStrokes.remove(it.id) }
-                baseBitmaps[flatLayer.id] = composite.copy(Bitmap.Config.ARGB_8888, false)
-                layerStrokes[flatLayer.id] = mutableListOf()
+                _uiState.value.layers.forEach { layerStore.remove(it.id) }
+                layerStore.putBase(flatLayer.id, composite.copy(Bitmap.Config.ARGB_8888, false))
+                layerStore.initStrokes(flatLayer.id)
                 _uiState.update { it.copy(layers = listOf(flatLayer), activeLayerId = flatLayer.id, activeTool = Tool.NONE) }
                 saveProject()
             }
@@ -1541,8 +1525,8 @@ class EditorViewModel @Inject constructor(
                 isVisible = true,
                 textParams = defaultParams
             )
-            baseBitmaps[newLayer.id] = bitmap.copy(Bitmap.Config.ARGB_8888, false)
-            layerStrokes[newLayer.id] = mutableListOf()
+            layerStore.putBase(newLayer.id, bitmap.copy(Bitmap.Config.ARGB_8888, false))
+            layerStore.initStrokes(newLayer.id)
 
             withContext(dispatchers.main) {
                 _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE, activePanel = EditorPanel.NONE) }
@@ -1571,7 +1555,7 @@ class EditorViewModel @Inject constructor(
                 } catch (_: Exception) {}
             }
 
-            baseBitmaps[layerId] = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+            layerStore.putBase(layerId, bitmap.copy(Bitmap.Config.ARGB_8888, false))
 
             withContext(dispatchers.main) {
                 _uiState.update { state ->
@@ -1715,8 +1699,8 @@ class EditorViewModel @Inject constructor(
 
                     withContext(dispatchers.main) {
                         for (layer in newLayers) {
-                            baseBitmaps[layer.id] = layer.bitmap!!.copy(Bitmap.Config.ARGB_8888, false)
-                            layerStrokes[layer.id] = mutableListOf()
+                            layerStore.putBase(layer.id, layer.bitmap!!.copy(Bitmap.Config.ARGB_8888, false))
+                            layerStore.initStrokes(layer.id)
                         }
 
                         // Set canvas background to match the color of the first generated layer (the Base)
