@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.editor
 
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.graffitixr.common.model.EditorMode
+import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.Tool
 
 /**
@@ -37,6 +38,14 @@ internal sealed interface EditorIntent {
     data class RenameLayer(val id: String, val name: String) : EditorIntent
     data class ToggleVisibility(val id: String) : EditorIntent
     data class ActivateLayer(val id: String) : EditorIntent
+
+    /** Appends [layer], makes it active, and clears the tool. [resetActivePanel] mirrors the
+     *  two call patterns: adds dismiss the panel, duplicate leaves it as-is. */
+    data class AddLayer(val layer: Layer, val resetActivePanel: Boolean = true) : EditorIntent
+    /** Removes [id]; if it was active, activates the first remaining layer. Clears the tool. */
+    data class RemoveLayer(val id: String) : EditorIntent
+    /** Replaces the whole layer set (e.g. flatten) with [layers], activating [activeId]. */
+    data class ReplaceLayers(val layers: List<Layer>, val activeId: String?) : EditorIntent
 
     // ── Tool / panel / mode / gesture ─────────────────────────────────────────
     data class SetActiveTool(val tool: Tool) : EditorIntent

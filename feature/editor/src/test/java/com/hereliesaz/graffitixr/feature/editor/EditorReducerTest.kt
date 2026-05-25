@@ -128,4 +128,50 @@ class EditorReducerTest {
         val s = state(lyr("a")).copy(editorMode = EditorMode.MOCKUP, isSegmenting = true)
         assertSame(s, reduce(s, EditorIntent.SetEditorMode(EditorMode.MOCKUP)))
     }
+
+    @Test
+    fun `AddLayer appends, activates, clears the tool, and resets the panel by default`() {
+        val s = state(lyr("a"), active = "a").copy(activeTool = Tool.LIQUIFY, activePanel = EditorPanel.ADJUST)
+        val out = reduce(s, EditorIntent.AddLayer(lyr("b")))
+        assertEquals(listOf("a", "b"), out.layers.map { it.id })
+        assertEquals("b", out.activeLayerId)
+        assertEquals(Tool.NONE, out.activeTool)
+        assertEquals(EditorPanel.NONE, out.activePanel)
+    }
+
+    @Test
+    fun `AddLayer with resetActivePanel false leaves the panel open`() {
+        val s = state(lyr("a")).copy(activePanel = EditorPanel.ADJUST)
+        assertEquals(EditorPanel.ADJUST, reduce(s, EditorIntent.AddLayer(lyr("b"), resetActivePanel = false)).activePanel)
+    }
+
+    @Test
+    fun `RemoveLayer reactivates the first remaining layer when the active one is removed`() {
+        val s = state(lyr("a"), lyr("b"), active = "a")
+        val out = reduce(s, EditorIntent.RemoveLayer("a"))
+        assertEquals(listOf("b"), out.layers.map { it.id })
+        assertEquals("b", out.activeLayerId)
+    }
+
+    @Test
+    fun `RemoveLayer keeps the active id when a non-active layer is removed`() {
+        val s = state(lyr("a"), lyr("b"), active = "b")
+        assertEquals("b", reduce(s, EditorIntent.RemoveLayer("a")).activeLayerId)
+    }
+
+    @Test
+    fun `RemoveLayer of the only layer clears the active id`() {
+        val s = state(lyr("a"), active = "a")
+        val out = reduce(s, EditorIntent.RemoveLayer("a"))
+        assertTrue(out.layers.isEmpty())
+        assertNull(out.activeLayerId)
+    }
+
+    @Test
+    fun `ReplaceLayers swaps the whole set and activates the given id`() {
+        val s = state(lyr("a"), lyr("b"), lyr("c"), active = "b")
+        val out = reduce(s, EditorIntent.ReplaceLayers(listOf(lyr("flat")), "flat"))
+        assertEquals(listOf("flat"), out.layers.map { it.id })
+        assertEquals("flat", out.activeLayerId)
+    }
 }

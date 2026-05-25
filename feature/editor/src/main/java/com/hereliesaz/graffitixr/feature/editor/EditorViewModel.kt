@@ -353,7 +353,7 @@ class EditorViewModel @Inject constructor(
                 layerStore.initStrokes(newLayer.id)
 
                 withContext(dispatchers.main) {
-                    _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE, activePanel = EditorPanel.NONE) }
+                    dispatch(EditorIntent.AddLayer(newLayer))
                     opEmitter.emit(Op.LayerAdd(newLayer))
                     saveProject()
                 }
@@ -391,7 +391,7 @@ class EditorViewModel @Inject constructor(
                 layerStore.putBase(newLayer.id, blankBitmap.copy(Bitmap.Config.ARGB_8888, false))
                 layerStore.initStrokes(newLayer.id)
 
-                _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE, activePanel = EditorPanel.NONE) }
+                dispatch(EditorIntent.AddLayer(newLayer))
                 opEmitter.emit(Op.LayerAdd(newLayer))
                 saveProject()
             }
@@ -553,10 +553,7 @@ class EditorViewModel @Inject constructor(
 
     override fun onLayerRemoved(id: String) {
         pushHistory()
-        _uiState.update { state ->
-            val updated = state.layers.filter { it.id != id }
-            state.copy(layers = updated, activeLayerId = if (state.activeLayerId == id) updated.firstOrNull()?.id else state.activeLayerId, activeTool = Tool.NONE)
-        }
+        dispatch(EditorIntent.RemoveLayer(id))
         layerStore.remove(id)
         opEmitter.emit(Op.LayerRemove(id))
         saveProject()
@@ -990,7 +987,7 @@ class EditorViewModel @Inject constructor(
             }
 
             withContext(dispatchers.main) {
-                _uiState.update { it.copy(layers = it.layers + duplicated, activeLayerId = duplicated.id, activeTool = Tool.NONE) }
+                dispatch(EditorIntent.AddLayer(duplicated, resetActivePanel = false))
                 saveProject()
             }
         }
@@ -1420,7 +1417,7 @@ class EditorViewModel @Inject constructor(
                 _uiState.value.layers.forEach { layerStore.remove(it.id) }
                 layerStore.putBase(flatLayer.id, composite.copy(Bitmap.Config.ARGB_8888, false))
                 layerStore.initStrokes(flatLayer.id)
-                _uiState.update { it.copy(layers = listOf(flatLayer), activeLayerId = flatLayer.id, activeTool = Tool.NONE) }
+                dispatch(EditorIntent.ReplaceLayers(listOf(flatLayer), flatLayer.id))
                 saveProject()
             }
         }
@@ -1488,7 +1485,7 @@ class EditorViewModel @Inject constructor(
             layerStore.initStrokes(newLayer.id)
 
             withContext(dispatchers.main) {
-                _uiState.update { it.copy(layers = it.layers + newLayer, activeLayerId = newLayer.id, activeTool = Tool.NONE, activePanel = EditorPanel.NONE) }
+                dispatch(EditorIntent.AddLayer(newLayer))
                 opEmitter.emit(Op.LayerAdd(newLayer))
                 saveProject()
             }

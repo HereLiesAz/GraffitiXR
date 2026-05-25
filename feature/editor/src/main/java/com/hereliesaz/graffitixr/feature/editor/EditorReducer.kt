@@ -50,6 +50,21 @@ internal object EditorReducer {
         is EditorIntent.RenameLayer -> state.copy(layers = LayerListOps.rename(state.layers, intent.id, intent.name))
         is EditorIntent.ToggleVisibility -> state.copy(layers = LayerListOps.toggleVisibility(state.layers, intent.id))
         is EditorIntent.ActivateLayer -> state.copy(activeLayerId = intent.id, activeTool = Tool.NONE)
+        is EditorIntent.AddLayer -> state.copy(
+            layers = state.layers + intent.layer,
+            activeLayerId = intent.layer.id,
+            activeTool = Tool.NONE,
+            activePanel = if (intent.resetActivePanel) EditorPanel.NONE else state.activePanel,
+        )
+        is EditorIntent.RemoveLayer -> {
+            val remaining = state.layers.filter { it.id != intent.id }
+            state.copy(
+                layers = remaining,
+                activeLayerId = if (state.activeLayerId == intent.id) remaining.firstOrNull()?.id else state.activeLayerId,
+                activeTool = Tool.NONE,
+            )
+        }
+        is EditorIntent.ReplaceLayers -> state.copy(layers = intent.layers, activeLayerId = intent.activeId, activeTool = Tool.NONE)
 
         is EditorIntent.SetActiveTool -> state.copy(activeTool = intent.tool, activePanel = EditorPanel.NONE)
         EditorIntent.ToggleAdjustPanel ->
