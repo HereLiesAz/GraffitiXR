@@ -110,6 +110,20 @@ class ArViewModel @Inject constructor(
     private var session: Session? = null
     private var renderer: ArRenderer? = null
 
+    // Single tracked collector of collaborationManager.state. startHosting/joinFromQr previously
+    // each launched their own forever-collect, so host→leave→host stacked collectors; this lets
+    // each entry cancel the prior one and leaveSession stop it.
+    private var coopStateJob: kotlinx.coroutines.Job? = null
+
+    private fun observeCoopState() {
+        coopStateJob?.cancel()
+        coopStateJob = viewModelScope.launch {
+            collaborationManager.state.collect { newState ->
+                _uiState.update { it.copy(coopSessionState = newState) }
+            }
+        }
+    }
+
     fun startHosting() {
         viewModelScope.launch {
             try {
@@ -135,10 +149,8 @@ class ArViewModel @Inject constructor(
                 }
                 return@launch
             }
-            // Observe collaborationManager.state and propagate.
-            collaborationManager.state.collect { newState ->
-                _uiState.update { it.copy(coopSessionState = newState) }
-            }
+            // Observe collaborationManager.state and propagate (single tracked collector).
+            observeCoopState()
         }
     }
 
@@ -155,9 +167,7 @@ class ArViewModel @Inject constructor(
                     onOp = { op -> spectatorOpHandler?.invoke(op) },
                 )
                 _uiState.update { it.copy(coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) }
-                collaborationManager.state.collect { newState ->
-                    _uiState.update { it.copy(coopSessionState = newState) }
-                }
+                observeCoopState()
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.Ended(com.hereliesaz.graffitixr.common.model.CoopSessionState.EndReason.NetworkLost))
@@ -168,6 +178,8 @@ class ArViewModel @Inject constructor(
 
     fun leaveSession() {
         viewModelScope.launch {
+            coopStateJob?.cancel()
+            coopStateJob = null
             collaborationManager.leaveSession()
             _uiState.update { it.copy(coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.NONE, coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.Idle) }
             _hostQrPayload.value = null
@@ -237,7 +249,7 @@ class ArViewModel @Inject constructor(
     fun submitCalibrationTap(screenPoint: PointF) {
         viewModelScope.launch {
             val phonePoint = arCoreHitTestToWorld(screenPoint) ?: return@launch
-            val glassesPoint = glassesWorldHitForTimestamp(System.nanoTime()) ?: return@launch
+            val glassesPoint = glassesWorldHitForTimestamp(System.nanoTime(), screenPoint) ?: return@launch
             val (progress, shouldFinalize) = synchronized(calibrationLock) {
                 calibrationSrcPoints.add(phonePoint)
                 calibrationDstPoints.add(glassesPoint)
@@ -310,21 +322,15 @@ class ArViewModel @Inject constructor(
     /**
      * Glasses-frame point for the moment of [timestampNs]. Without a real
      * glasses-side feature-extraction pipeline (camera→world projection in
-     * the glasses' own SLAM frame), this returns the same point ARCore would
-     * return for the most recent screen-center hit, so calibration produces
-     * an identity-ish transform. When glasses-side world lookup is wired,
-     * replace this with a real lookup.
+     * the glasses' own SLAM frame), this hit-tests the SAME [screenPoint] as the
+     * phone tap so the src/dst point pairs actually correspond. When glasses-side
+     * world lookup is wired, replace this with a real lookup keyed on [timestampNs].
      */
-    private fun glassesWorldHitForTimestamp(timestampNs: Long): Vec3? {
-        // Stand-in: reuse phone-world point from last screen-center hit.
-        return arCoreHitTestToWorld(PointF(centerScreenX(), centerScreenY()))
+    private fun glassesWorldHitForTimestamp(timestampNs: Long, screenPoint: PointF): Vec3? {
+        // Stand-in: hit-test the same screen point as the phone tap. Using screen-center for
+        // every dst made the dst cloud degenerate and Procrustes produced a bogus rotation.
+        return arCoreHitTestToWorld(screenPoint)
     }
-
-    private fun centerScreenX(): Float =
-        appContext.resources.displayMetrics.widthPixels.toFloat() * 0.5f
-
-    private fun centerScreenY(): Float =
-        appContext.resources.displayMetrics.heightPixels.toFloat() * 0.5f
 
     // ─────────────────────────────────────────────────────────────────────────
 

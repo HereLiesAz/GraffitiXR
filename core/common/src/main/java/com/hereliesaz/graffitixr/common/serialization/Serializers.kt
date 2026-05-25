@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.common.serialization
 
 import android.net.Uri
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.BlendMode
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -26,7 +27,10 @@ object OffsetSerializer : KSerializer<Offset> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("Offset", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: Offset) {
-        encoder.encodeString("${value.x},${value.y}")
+        // Reading .x/.y on Offset.Unspecified throws in Compose, and NaN/Infinity components
+        // would only round-trip to garbage; persist Zero so a save can never crash on them.
+        val safe = if (value.isSpecified && value.x.isFinite() && value.y.isFinite()) value else Offset.Zero
+        encoder.encodeString("${safe.x},${safe.y}")
     }
 
     override fun deserialize(decoder: Decoder): Offset {

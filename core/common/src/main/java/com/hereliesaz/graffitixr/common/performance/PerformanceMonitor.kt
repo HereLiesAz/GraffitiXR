@@ -30,6 +30,9 @@ object PerformanceMonitor {
             val frameDuration = (now - lastFrameTime) / 1_000_000f
             _frameTimeMs.value = frameDuration
         }
+        // Start the FPS window on the first frame; otherwise lastFpsUpdateTime == 0 vs a large
+        // since-boot `now` makes the first comparison true immediately and reports a bogus fps=1.
+        if (lastFpsUpdateTime == 0L) lastFpsUpdateTime = now
         lastFrameTime = now
 
         frameCount++

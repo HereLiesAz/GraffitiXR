@@ -205,7 +205,9 @@ class StencilProcessor @Inject constructor() {
         }
         val baseLayer = StencilLayer(baseType, pixelsToBitmap(basePixels, w, h), "Base - ${baseType.label}")
 
-        if (subjectCount == 0) return listOf(baseLayer)
+        // K-means below uses K=2 and throws if given fewer samples than K; an almost-empty mask
+        // (0 or 1 subject pixels) falls back to base-only rather than crashing.
+        if (subjectCount < 2) return listOf(baseLayer)
 
         // ── Step 2: Extract Contrast Detail via K-means (K=2) ─────────────────────
         val srcMat = Mat()

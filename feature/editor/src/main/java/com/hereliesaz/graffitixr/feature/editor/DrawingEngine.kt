@@ -21,8 +21,13 @@ internal class DrawingEngine(private val slamManager: SlamManager) {
     suspend fun composite(base: Bitmap, strokes: List<StrokeCommand>): Bitmap {
         var current = base.copy(Bitmap.Config.ARGB_8888, true)
         for (stroke in strokes) {
-            current = if (stroke.tool == Tool.LIQUIFY) applyLiquify(current, stroke)
+            val next = if (stroke.tool == Tool.LIQUIFY) applyLiquify(current, stroke)
             else applyTool(current, stroke, replaceExisting = true)
+            // Recycle the superseded intermediate so a long stroke history doesn't churn many
+            // full-resolution bitmaps into an OOM. Never recycle `base` (the caller owns it) or
+            // a tool that mutated `current` in place and returned it.
+            if (next !== current && current !== base) current.recycle()
+            current = next
         }
         return current
     }

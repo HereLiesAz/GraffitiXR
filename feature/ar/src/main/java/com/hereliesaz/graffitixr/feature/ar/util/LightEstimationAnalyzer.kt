@@ -15,46 +15,50 @@ class LightEstimationAnalyzer(private val listener: (Float) -> Unit) : ImageAnal
     private val frameIntervalMs = 200L
 
     override fun analyze(image: ImageProxy) {
-        val currentTimestamp = image.imageInfo.timestamp
-        if (lastAnalyzedTimestamp != 0L && (currentTimestamp - lastAnalyzedTimestamp < frameIntervalMs * 1_000_000)) {
-            image.close()
-            return
-        }
+        try {
+            val currentTimestamp = image.imageInfo.timestamp
+            if (lastAnalyzedTimestamp != 0L && (currentTimestamp - lastAnalyzedTimestamp < frameIntervalMs * 1_000_000)) {
+                return
+            }
 
-        lastAnalyzedTimestamp = currentTimestamp
+            lastAnalyzedTimestamp = currentTimestamp
 
-        val plane = image.planes[0]
-        val buffer = plane.buffer
-        val pixelStride = plane.pixelStride
-        val rowStride = plane.rowStride
-        val width = image.width
-        val height = image.height
+            val plane = image.planes[0]
+            val buffer = plane.buffer
+            val pixelStride = plane.pixelStride
+            val rowStride = plane.rowStride
+            val width = image.width
+            val height = image.height
 
-        var sum = 0L
-        var count = 0
+            var sum = 0L
+            var count = 0
 
-        // Iterate through rows
-        // We skip pixels for performance (every 20th pixel)
-        val skip = 20
+            // Iterate through rows
+            // We skip pixels for performance (every 20th pixel)
+            val skip = 20
 
-        for (row in 0 until height step skip) {
-            val rowStart = row * rowStride
-            for (col in 0 until width step skip) {
-                // Calculate index for the pixel
-                val index = rowStart + (col * pixelStride)
+            for (row in 0 until height step skip) {
+                val rowStart = row * rowStride
+                for (col in 0 until width step skip) {
+                    // Calculate index for the pixel
+                    val index = rowStart + (col * pixelStride)
 
-                // Ensure we don't go out of bounds (though strides should prevent this)
-                if (index < buffer.limit()) {
-                    sum += (buffer.get(index).toInt() and 0xFF)
-                    count++
+                    // Ensure we don't go out of bounds (though strides should prevent this)
+                    if (index < buffer.limit()) {
+                        sum += (buffer.get(index).toInt() and 0xFF)
+                        count++
+                    }
                 }
             }
+
+            val average = if (count > 0) sum.toDouble() / count else 0.0
+            val normalizedLuma = (average / 255.0).toFloat()
+
+            listener(normalizedLuma)
+        } finally {
+            // Always close, even if listener/sampling throws — a skipped close starves the
+            // ImageReader of buffers and silently stalls the analyzer.
+            image.close()
         }
-
-        val average = if (count > 0) sum.toDouble() / count else 0.0
-        val normalizedLuma = (average / 255.0).toFloat()
-
-        listener(normalizedLuma)
-        image.close()
     }
 }

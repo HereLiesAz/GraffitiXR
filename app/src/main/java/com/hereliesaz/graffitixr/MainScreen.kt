@@ -430,8 +430,10 @@ internal fun compositeLayersForAr(layers: List<Layer>): AndroidBitmap {
 
     var minX = Float.MAX_VALUE
     var minY = Float.MAX_VALUE
-    var maxX = Float.MIN_VALUE
-    var maxY = Float.MIN_VALUE
+    // -Float.MAX_VALUE, not Float.MIN_VALUE (the smallest *positive* float): a layer panned into
+    // negative screen coordinates would otherwise never update max, undersizing the composite.
+    var maxX = -Float.MAX_VALUE
+    var maxY = -Float.MAX_VALUE
 
     for (layer in layers) {
         val bmp = layer.bitmap ?: continue

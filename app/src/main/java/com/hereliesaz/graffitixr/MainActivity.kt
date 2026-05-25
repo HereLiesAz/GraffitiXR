@@ -2463,17 +2463,17 @@ private fun RelocStatusBadge(
     if (relocState == RelocState.IDLE) return
 
     val infiniteTransition = rememberInfiniteTransition(label = "reloc_pulse")
-    val pulseAlpha by if (relocState == RelocState.SEARCHING) {
-        infiniteTransition.animateFloat(
-            initialValue = 0.4f, targetValue = 1f, label = "pulse",
-            animationSpec = infiniteRepeatable(
-                animation = tween(700, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse
-            )
+    // Always call animateFloat (never inside an if/else) and select the value, so the set of
+    // composable/remember slots stays stable when relocState flips SEARCHING↔TRACKING — the
+    // conditional hook call could otherwise corrupt the slot table.
+    val animatedAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f, targetValue = 1f, label = "pulse",
+        animationSpec = infiniteRepeatable(
+            animation = tween(700, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
         )
-    } else {
-        remember { mutableStateOf(1f) }
-    }
+    )
+    val pulseAlpha = if (relocState == RelocState.SEARCHING) animatedAlpha else 1f
 
     val dotColor = if (relocState == RelocState.TRACKING) Color(0xFF66BB6A) else Color(0xFFFFCA28)
     val label = when (relocState) {

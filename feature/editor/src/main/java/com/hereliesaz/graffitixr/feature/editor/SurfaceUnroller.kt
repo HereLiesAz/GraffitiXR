@@ -193,8 +193,10 @@ class SurfaceUnroller(
     }
 
     private fun normalize(Y: Array<FloatArray>): List<Offset> {
+        // -Float.MAX_VALUE, not Float.MIN_VALUE (which is the smallest *positive* float, so a
+        // fully-negative coordinate set would never update max and squash the normalization).
         var minX = Float.MAX_VALUE; var minY = Float.MAX_VALUE
-        var maxX = Float.MIN_VALUE; var maxY = Float.MIN_VALUE
+        var maxX = -Float.MAX_VALUE; var maxY = -Float.MAX_VALUE
         for (y in Y) {
             if (y[0] < minX) minX = y[0]; if (y[0] > maxX) maxX = y[0]
             if (y[1] < minY) minY = y[1]; if (y[1] > maxY) maxY = y[1]
@@ -202,7 +204,10 @@ class SurfaceUnroller(
         val rangeX = maxX - minX
         val rangeY = maxY - minY
         return Y.map { y ->
-            Offset((y[0] - minX) / rangeX, (y[1] - minY) / rangeY)
+            // Guard degenerate (collapsed) point sets: a zero range would divide to NaN.
+            val nx = if (rangeX > 1e-6f) (y[0] - minX) / rangeX else 0.5f
+            val ny = if (rangeY > 1e-6f) (y[1] - minY) / rangeY else 0.5f
+            Offset(nx, ny)
         }
     }
 }

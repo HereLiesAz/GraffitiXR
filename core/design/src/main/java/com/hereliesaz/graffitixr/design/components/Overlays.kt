@@ -39,7 +39,11 @@ fun TouchLockOverlay(isLocked: Boolean, onUnlockRequested: () -> Unit) {
                     var tapCount = 0
                     var lastTapTime = 0L
                     while (true) {
-                        val change = awaitPointerEvent(PointerEventPass.Main).changes.firstOrNull()
+                        // Await once per iteration: counting the up-event from one awaitPointerEvent
+                        // and consuming a *different* event from a second await dropped/under-counted
+                        // taps, so the 4-tap unlock often never fired.
+                        val event = awaitPointerEvent(PointerEventPass.Main)
+                        val change = event.changes.firstOrNull()
                         if (change != null && change.changedToUp()) {
                             val now = System.currentTimeMillis()
                             if (now - lastTapTime < 500) tapCount++ else tapCount = 1
@@ -49,7 +53,7 @@ fun TouchLockOverlay(isLocked: Boolean, onUnlockRequested: () -> Unit) {
                                 tapCount = 0
                             }
                         }
-                        awaitPointerEvent(PointerEventPass.Main).changes.forEach { it.consume() }
+                        event.changes.forEach { it.consume() }
                     }
                 }
             }

@@ -173,12 +173,12 @@ class DashboardViewModel @Inject constructor(
                 .findAll(json)
                 .map { it.groupValues[1] }
                 .toList()
-            val assetNames = Regex("\"name\"\\s*:\\s*\"([^\"]+\\.apk)\"")
-                .findAll(json)
-                .map { it.groupValues[1] }
-                .toList()
-
-            val assets = assetNames.zip(assetUrls).map { (name, url) -> GitHubAsset(name, url) }
+            // Keep only APK assets and derive each name from its own URL. The previous code
+            // zipped apk *names* against *all* download URLs positionally, so any non-apk asset
+            // ahead of the apk shifted the mapping and produced the wrong download URL.
+            val assets = assetUrls
+                .filter { it.endsWith(".apk", ignoreCase = true) }
+                .map { url -> GitHubAsset(url.substringAfterLast('/'), url) }
             GitHubRelease(tagName, assets)
         } catch (e: Exception) { null }
     }

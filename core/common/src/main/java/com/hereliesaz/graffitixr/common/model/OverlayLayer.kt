@@ -43,14 +43,19 @@ data class OverlayLayer(
     val brightness: Float = 0f,
     val contrast: Float = 1.0f,
     val saturation: Float = 1.0f,
-    val colorBalanceR: Float = 0f,
-    val colorBalanceG: Float = 0f,
-    val colorBalanceB: Float = 0f,
+    // Neutral colour-balance multiplier is 1.0 (matches Layer/LegacyVisuals). The old 0f default
+    // meant a save missing these keys decoded to 0 and rendered every channel black on load.
+    val colorBalanceR: Float = 1.0f,
+    val colorBalanceG: Float = 1.0f,
+    val colorBalanceB: Float = 1.0f,
     val isImageLocked: Boolean = false,
     val isVisible: Boolean = true,
     val warpMesh: List<Float>? = null,
     val isSketch: Boolean = false,
     val textParams: TextLayerParams? = null,
     val isLinked: Boolean = false,
-    val isInverted: Boolean = false
+    val isInverted: Boolean = false,
+    // Persisted so stencil metadata survives save/load (LayerMappers used to drop these).
+    val stencilType: StencilLayerType? = null,
+    val stencilSourceId: String? = null
 )

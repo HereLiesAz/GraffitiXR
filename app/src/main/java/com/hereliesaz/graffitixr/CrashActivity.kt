@@ -18,7 +18,9 @@ class CrashActivity : Activity() {
             .appendQueryParameter("body", "```\n$sanitizedTrace\n```")
             .build()
 
-        startActivity(Intent(Intent.ACTION_VIEW, uri))
+        // This IS the crash-recovery screen; if no browser can handle the issue URL,
+        // startActivity would throw ActivityNotFoundException and re-crash. Swallow it.
+        runCatching { startActivity(Intent(Intent.ACTION_VIEW, uri)) }
         finish()
     }
 

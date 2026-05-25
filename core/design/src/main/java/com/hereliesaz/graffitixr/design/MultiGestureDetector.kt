@@ -105,7 +105,12 @@ class MultiGestureDetector(private val listener: OnMultiGestureListener) {
                 ptrID1 = INVALID_POINTER_ID
             }
             MotionEvent.ACTION_POINTER_UP -> {
-                ptrID2 = INVALID_POINTER_ID
+                // Clear whichever pointer actually lifted, not always ptrID2 — otherwise lifting
+                // the first finger strands ptrID1 on a dead pointer and drops subsequent moves.
+                when (event.getPointerId(event.actionIndex)) {
+                    ptrID1 -> ptrID1 = INVALID_POINTER_ID
+                    ptrID2 -> ptrID2 = INVALID_POINTER_ID
+                }
             }
         }
         return true

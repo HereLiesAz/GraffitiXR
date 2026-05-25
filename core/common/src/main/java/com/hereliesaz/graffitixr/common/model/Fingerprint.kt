@@ -22,6 +22,7 @@ data class Fingerprint(
         if (javaClass != other?.javaClass) return false
         other as Fingerprint
         if (keypoints != other.keypoints) return false
+        if (points3d != other.points3d) return false
         if (!descriptorsData.contentEquals(other.descriptorsData)) return false
         if (descriptorsRows != other.descriptorsRows) return false
         if (descriptorsCols != other.descriptorsCols) return false
@@ -31,6 +32,7 @@ data class Fingerprint(
 
     override fun hashCode(): Int {
         var result = keypoints.hashCode()
+        result = 31 * result + points3d.hashCode()
         result = 31 * result + descriptorsData.contentHashCode()
         result = 31 * result + descriptorsRows
         result = 31 * result + descriptorsCols
