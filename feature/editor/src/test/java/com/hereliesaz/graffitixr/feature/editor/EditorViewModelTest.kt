@@ -15,6 +15,7 @@ import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.common.coop.OpEmitter
+import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.feature.editor.stencil.StencilProcessor
 import com.hereliesaz.graffitixr.feature.editor.stencil.StencilPrintEngine
@@ -64,6 +65,11 @@ class EditorViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
+        // The OpenCV-backed singletons (ImageProcessor, SketchProcessor, StencilProcessor, …) call
+        // NativeLibLoader.loadAll() in their init blocks; on a host JVM that throws (the .so is
+        // Android-arm only). No-op it so those objects can initialise and have their methods mocked.
+        mockkObject(NativeLibLoader)
+        every { NativeLibLoader.loadAll() } returns Unit
         // Emit a test project so projectId is non-null, enabling onAddLayer to work
         val testProject = GraffitiProject(id = "test-project")
         currentProjectFlow.value = testProject
@@ -136,6 +142,7 @@ class EditorViewModelTest {
         unmockkObject(com.hereliesaz.graffitixr.common.util.ImageUtils)
         unmockkObject(TextRasterizer)
         unmockkObject(GoogleFontCache)
+        unmockkObject(NativeLibLoader)
     }
 
     @Test
