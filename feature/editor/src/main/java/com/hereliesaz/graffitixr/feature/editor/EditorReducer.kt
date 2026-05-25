@@ -1,0 +1,84 @@
+package com.hereliesaz.graffitixr.feature.editor
+
+import com.hereliesaz.graffitixr.common.model.EditorMode
+import com.hereliesaz.graffitixr.common.model.EditorPanel
+import com.hereliesaz.graffitixr.common.model.EditorUiState
+import com.hereliesaz.graffitixr.common.model.Layer
+import com.hereliesaz.graffitixr.common.model.RotationAxis
+import com.hereliesaz.graffitixr.common.model.Tool
+
+/**
+ * The pure state-transition function for the editor — the heart of its MVI design. Given the
+ * current [EditorUiState] and an [EditorIntent], it returns the next state with no dependency on
+ * Android, Compose, OpenCV, IO, or coroutines, which makes every transition unit-testable without
+ * a single mock.
+ *
+ * Side effects that an intent also triggers (undo-history snapshot, persistence, co-op op
+ * emission, OpenCV rasterization) live in EditorViewModel around the dispatch — keeping them out
+ * of here is precisely what lets this be pure.
+ */
+internal object EditorReducer {
+
+    fun reduce(state: EditorUiState, intent: EditorIntent): EditorUiState = when (intent) {
+        is EditorIntent.SetOpacity -> state.mapActive { it.copy(opacity = intent.value) }
+        is EditorIntent.SetBrightness -> state.mapActive { it.copy(brightness = intent.value) }
+        is EditorIntent.SetContrast -> state.mapActive { it.copy(contrast = intent.value) }
+        is EditorIntent.SetSaturation -> state.mapActive { it.copy(saturation = intent.value) }
+        is EditorIntent.SetColorBalanceR -> state.mapActive { it.copy(colorBalanceR = intent.value) }
+        is EditorIntent.SetColorBalanceG -> state.mapActive { it.copy(colorBalanceG = intent.value) }
+        is EditorIntent.SetColorBalanceB -> state.mapActive { it.copy(colorBalanceB = intent.value) }
+        is EditorIntent.SetScale -> state.mapActive { it.copy(scale = intent.value) }
+        is EditorIntent.AddOffset -> state.mapActive { it.copy(offset = it.offset + intent.delta) }
+        is EditorIntent.SetRotationX -> state.mapActive { it.copy(rotationX = intent.value) }.copy(activeRotationAxis = RotationAxis.X)
+        is EditorIntent.SetRotationY -> state.mapActive { it.copy(rotationY = intent.value) }.copy(activeRotationAxis = RotationAxis.Y)
+        is EditorIntent.SetRotationZ -> state.mapActive { it.copy(rotationZ = intent.value) }.copy(activeRotationAxis = RotationAxis.Z)
+        is EditorIntent.SetLayerTransform -> state.mapActive {
+            it.copy(scale = intent.scale, offset = intent.offset, rotationX = intent.rx, rotationY = intent.ry, rotationZ = intent.rz)
+        }
+        EditorIntent.ToggleInvert -> state.mapActive { it.copy(isInverted = !it.isInverted) }
+        EditorIntent.ToggleImageLock -> state.mapActive { it.copy(isImageLocked = !it.isImageLocked) }
+        EditorIntent.CycleRotationAxis -> {
+            val next = when (state.activeRotationAxis) {
+                RotationAxis.X -> RotationAxis.Y
+                RotationAxis.Y -> RotationAxis.Z
+                RotationAxis.Z -> RotationAxis.X
+            }
+            state.copy(activeRotationAxis = next, showRotationAxisFeedback = true)
+        }
+
+        is EditorIntent.ReorderLayers -> state.copy(layers = LayerListOps.reorder(state.layers, intent.order))
+        is EditorIntent.RenameLayer -> state.copy(layers = LayerListOps.rename(state.layers, intent.id, intent.name))
+        is EditorIntent.ToggleVisibility -> state.copy(layers = LayerListOps.toggleVisibility(state.layers, intent.id))
+        is EditorIntent.ActivateLayer -> state.copy(activeLayerId = intent.id, activeTool = Tool.NONE)
+
+        is EditorIntent.SetActiveTool -> state.copy(activeTool = intent.tool, activePanel = EditorPanel.NONE)
+        EditorIntent.ToggleAdjustPanel ->
+            state.copy(activePanel = if (state.activePanel == EditorPanel.ADJUST) EditorPanel.NONE else EditorPanel.ADJUST)
+        EditorIntent.DismissPanel -> state.copy(activePanel = EditorPanel.NONE)
+        is EditorIntent.SetGestureInProgress -> state.copy(gestureInProgress = intent.inProgress)
+        is EditorIntent.SetEditorMode -> reduceEditorMode(state, intent.mode)
+    }
+
+    /**
+     * Mode is a view, not a container: layers (the document) persist and stay editable, but
+     * transient mode-specific overlay state — an in-flight brush stroke, a live segmentation
+     * preview — must not bleed into the next mode.
+     */
+    private fun reduceEditorMode(state: EditorUiState, mode: EditorMode): EditorUiState {
+        if (state.editorMode == mode) return state
+        return state.copy(
+            editorMode = mode,
+            liveStrokeLayerId = null,
+            liveStrokeBitmap = null,
+            liveStrokeVersion = 0,
+            isSegmenting = false,
+            segmentationPreview = null,
+        )
+    }
+
+    /** Applies [transform] to the active layer (no-op when there is no active layer). */
+    private fun EditorUiState.mapActive(transform: (Layer) -> Layer): EditorUiState {
+        val id = activeLayerId ?: return this
+        return copy(layers = LayerListOps.mapLayer(layers, id, transform))
+    }
+}

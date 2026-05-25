@@ -205,20 +205,7 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun setEditorMode(mode: EditorMode) = _uiState.update {
-        if (it.editorMode == mode) return@update it
-        // Mode is a view, not a container: layers (the document) persist and stay editable,
-        // but transient mode-specific overlay state — an in-flight brush stroke, a live
-        // segmentation preview — must not bleed into the next mode.
-        it.copy(
-            editorMode = mode,
-            liveStrokeLayerId = null,
-            liveStrokeBitmap = null,
-            liveStrokeVersion = 0,
-            isSegmenting = false,
-            segmentationPreview = null,
-        )
-    }
+    fun setEditorMode(mode: EditorMode) = dispatch(EditorIntent.SetEditorMode(mode))
 
     private fun pushHistory() {
         history.pushProperty(_uiState.value.layers.map { it.copy(bitmap = null) })
@@ -560,11 +547,9 @@ class EditorViewModel @Inject constructor(
 
     fun toggleHandedness() = _uiState.update { it.copy(isRightHanded = !it.isRightHanded) }
     fun toggleDiagOverlay() = _uiState.update { it.copy(showDiagOverlay = !it.showDiagOverlay) }
-    fun setActiveTool(tool: Tool) = _uiState.update { 
-        it.copy(activeTool = tool, activePanel = EditorPanel.NONE) 
-    }
+    fun setActiveTool(tool: Tool) = dispatch(EditorIntent.SetActiveTool(tool))
 
-    override fun onLayerActivated(id: String) = _uiState.update { it.copy(activeLayerId = id, activeTool = Tool.NONE) }
+    override fun onLayerActivated(id: String) = dispatch(EditorIntent.ActivateLayer(id))
 
     override fun onLayerRemoved(id: String) {
         pushHistory()
@@ -579,7 +564,7 @@ class EditorViewModel @Inject constructor(
 
     override fun onLayerReordered(newOrder: List<String>) {
         pushHistory()
-        _uiState.update { state -> state.copy(layers = LayerListOps.reorder(state.layers, newOrder)) }
+        dispatch(EditorIntent.ReorderLayers(newOrder))
         opEmitter.emit(Op.LayerReorder(newOrder))
         saveProject()
     }
@@ -872,9 +857,9 @@ class EditorViewModel @Inject constructor(
         }
         saveProject()
     }
-    override fun onAdjustClicked() { _uiState.update { it.copy(activePanel = if (it.activePanel == EditorPanel.ADJUST) EditorPanel.NONE else EditorPanel.ADJUST) } }
+    override fun onAdjustClicked() = dispatch(EditorIntent.ToggleAdjustPanel)
     fun onBalanceClicked() { _uiState.update { it.copy(activePanel = if (it.activePanel == EditorPanel.COLOR) EditorPanel.NONE else EditorPanel.COLOR) } }
-    override fun onDismissPanel() { _uiState.update { it.copy(activePanel = EditorPanel.NONE) } }
+    override fun onDismissPanel() = dispatch(EditorIntent.DismissPanel)
 
     fun onTransformGesture(pan: Offset, zoom: Float, rotationDelta: Float) {
         val activeId = _uiState.value.activeLayerId ?: return
@@ -910,53 +895,43 @@ class EditorViewModel @Inject constructor(
     }
     override fun toggleImageLock() {
         pushHistory()
-        updateActiveLayer { it.copy(isImageLocked = !it.isImageLocked) }
+        dispatch(EditorIntent.ToggleImageLock)
         saveProject()
-        _uiState.value.activeLayerId?.let { id ->
-            _uiState.value.layers.find { it.id == id }?.let { opEmitter.emit(Op.LayerPropsChange(id, it.toLayerProps())) }
-        }
+        emitActiveLayerProps()
     }
     override fun onToggleInvert() {
         pushHistory()
-        updateActiveLayer { it.copy(isInverted = !it.isInverted) }
+        dispatch(EditorIntent.ToggleInvert)
         saveProject()
-        _uiState.value.activeLayerId?.let { id ->
-            _uiState.value.layers.find { it.id == id }?.let { opEmitter.emit(Op.LayerPropsChange(id, it.toLayerProps())) }
-        }
+        emitActiveLayerProps()
     }
-    override fun onOpacityChanged(v: Float) = updateActiveLayer { it.copy(opacity = v) }
-    override fun onBrightnessChanged(v: Float) = updateActiveLayer { it.copy(brightness = v) }
-    override fun onContrastChanged(v: Float) = updateActiveLayer { it.copy(contrast = v) }
-    override fun onSaturationChanged(v: Float) = updateActiveLayer { it.copy(saturation = v) }
-    override fun onColorBalanceRChanged(v: Float) = updateActiveLayer { it.copy(colorBalanceR = v) }
-    override fun onColorBalanceGChanged(v: Float) = updateActiveLayer { it.copy(colorBalanceG = v) }
-    override fun onColorBalanceBChanged(v: Float) = updateActiveLayer { it.copy(colorBalanceB = v) }
-    override fun onScaleChanged(s: Float) = updateActiveLayer { it.copy(scale = s) }
-    override fun onOffsetChanged(o: Offset) = updateActiveLayer { it.copy(offset = it.offset + o) }
+    override fun onOpacityChanged(v: Float) = dispatch(EditorIntent.SetOpacity(v))
+    override fun onBrightnessChanged(v: Float) = dispatch(EditorIntent.SetBrightness(v))
+    override fun onContrastChanged(v: Float) = dispatch(EditorIntent.SetContrast(v))
+    override fun onSaturationChanged(v: Float) = dispatch(EditorIntent.SetSaturation(v))
+    override fun onColorBalanceRChanged(v: Float) = dispatch(EditorIntent.SetColorBalanceR(v))
+    override fun onColorBalanceGChanged(v: Float) = dispatch(EditorIntent.SetColorBalanceG(v))
+    override fun onColorBalanceBChanged(v: Float) = dispatch(EditorIntent.SetColorBalanceB(v))
+    override fun onScaleChanged(s: Float) = dispatch(EditorIntent.SetScale(s))
+    override fun onOffsetChanged(o: Offset) = dispatch(EditorIntent.AddOffset(o))
 
-    override fun onRotationXChanged(d: Float) { updateActiveLayer { it.copy(rotationX = d) }; _uiState.update { it.copy(activeRotationAxis = RotationAxis.X) } }
-    override fun onRotationYChanged(d: Float) { updateActiveLayer { it.copy(rotationY = d) }; _uiState.update { it.copy(activeRotationAxis = RotationAxis.Y) } }
-    override fun onRotationZChanged(d: Float) { updateActiveLayer { it.copy(rotationZ = d) }; _uiState.update { it.copy(activeRotationAxis = RotationAxis.Z) } }
+    override fun onRotationXChanged(d: Float) = dispatch(EditorIntent.SetRotationX(d))
+    override fun onRotationYChanged(d: Float) = dispatch(EditorIntent.SetRotationY(d))
+    override fun onRotationZChanged(d: Float) = dispatch(EditorIntent.SetRotationZ(d))
 
-    override fun onCycleRotationAxis() {
-        val next = when (_uiState.value.activeRotationAxis) { RotationAxis.X -> RotationAxis.Y; RotationAxis.Y -> RotationAxis.Z; RotationAxis.Z -> RotationAxis.X }
-        _uiState.update { it.copy(activeRotationAxis = next, showRotationAxisFeedback = true) }
-    }
+    override fun onCycleRotationAxis() = dispatch(EditorIntent.CycleRotationAxis)
 
-    override fun onAdjustmentStart() { pushHistory(); _uiState.update { it.copy(gestureInProgress = true) } }
+    override fun onAdjustmentStart() { pushHistory(); dispatch(EditorIntent.SetGestureInProgress(true)) }
 
     override fun onAdjustmentEnd() {
-        _uiState.update { it.copy(gestureInProgress = false) }
+        dispatch(EditorIntent.SetGestureInProgress(false))
         saveProject()
         // Emit LayerPropsChange for the active layer after adjustment is committed.
-        val state = _uiState.value
-        val activeId = state.activeLayerId ?: return
-        val layer = state.layers.find { it.id == activeId } ?: return
-        opEmitter.emit(Op.LayerPropsChange(activeId, layer.toLayerProps()))
+        emitActiveLayerProps()
     }
 
     override fun setLayerTransform(scale: Float, offset: Offset, rx: Float, ry: Float, rz: Float) {
-        updateActiveLayer { it.copy(scale = scale, offset = offset, rotationX = rx, rotationY = ry, rotationZ = rz) }
+        dispatch(EditorIntent.SetLayerTransform(scale, offset, rx, ry, rz))
         saveProject()
     }
 
@@ -1023,7 +998,7 @@ class EditorViewModel @Inject constructor(
 
     override fun onLayerRenamed(id: String, name: String) {
         pushHistory()
-        _uiState.update { state -> state.copy(layers = LayerListOps.rename(state.layers, id, name)) }
+        dispatch(EditorIntent.RenameLayer(id, name))
         saveProject()
     }
 
@@ -1046,6 +1021,21 @@ class EditorViewModel @Inject constructor(
             val id = state.activeLayerId ?: return@update state
             state.copy(layers = LayerListOps.mapLayer(state.layers, id, transform))
         }
+    }
+
+    /**
+     * MVI dispatch: apply a state-only [EditorIntent] through the pure [EditorReducer]. Side
+     * effects (history, persistence, co-op op emission) are orchestrated by the caller around
+     * this call — the reducer itself stays pure.
+     */
+    private fun dispatch(intent: EditorIntent) {
+        _uiState.update { EditorReducer.reduce(it, intent) }
+    }
+
+    /** Emits a co-op LayerPropsChange for the active layer, if any. */
+    private fun emitActiveLayerProps() {
+        val id = _uiState.value.activeLayerId ?: return
+        _uiState.value.layers.find { it.id == id }?.let { opEmitter.emit(Op.LayerPropsChange(id, it.toLayerProps())) }
     }
 
     /** Returns the IDs of all layers in the same link-group as [layerId].
@@ -1458,7 +1448,7 @@ class EditorViewModel @Inject constructor(
 
     override fun onToggleVisibility(layerId: String) {
         pushHistory()
-        _uiState.update { state -> state.copy(layers = LayerListOps.toggleVisibility(state.layers, layerId)) }
+        dispatch(EditorIntent.ToggleVisibility(layerId))
         saveProject()
         _uiState.value.layers.find { it.id == layerId }?.let { opEmitter.emit(Op.LayerPropsChange(layerId, it.toLayerProps())) }
     }
