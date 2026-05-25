@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.common.util
 
 import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
+import timber.log.Timber
 import org.opencv.android.Utils
 import org.opencv.core.CvType
 import org.opencv.core.Mat
@@ -89,7 +90,7 @@ object ImageProcessor {
 
             resultBitmap
         } catch (e: Exception) {
-            e.printStackTrace()
+            Timber.e(e, "ImageProcessor: processing failed")
             null
         }
     }
@@ -146,7 +147,7 @@ object ImageProcessor {
 
             outputBitmap
         } catch (e: Exception) {
-            e.printStackTrace()
+            Timber.e(e, "ImageProcessor: processing failed")
             null
         }
     }

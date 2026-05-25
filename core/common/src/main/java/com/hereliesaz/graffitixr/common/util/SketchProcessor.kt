@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.common.util
 
 import android.graphics.Bitmap
 import org.opencv.android.Utils
+import timber.log.Timber
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
@@ -127,7 +128,7 @@ object SketchProcessor {
             resultBitmap.setPixels(argbPixels, 0, w, 0, 0, w, h)
             resultBitmap
         } catch (e: Exception) {
-            e.printStackTrace()
+            Timber.e(e, "SketchProcessor: sketch conversion failed")
             null
         }
     }

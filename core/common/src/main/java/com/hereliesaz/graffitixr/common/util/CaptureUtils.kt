@@ -12,6 +12,7 @@ import android.provider.MediaStore
 import android.util.Log
 import android.view.PixelCopy
 import android.view.Window
+import timber.log.Timber
 
 /**
  * Captures the current window content as a Bitmap.
@@ -77,7 +78,7 @@ fun saveBitmapToGallery(context: Context, bitmap: Bitmap): Boolean {
             }
         } ?: false
     } catch (e: Exception) {
-        e.printStackTrace()
+        Timber.e(e, "CaptureUtils: failed to save bitmap")
         false
     }
 }

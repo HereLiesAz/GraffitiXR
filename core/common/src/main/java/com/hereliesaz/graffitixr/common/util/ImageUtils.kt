@@ -8,6 +8,7 @@ import android.graphics.Matrix
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import timber.log.Timber
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -54,7 +55,7 @@ object ImageUtils {
                     MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                Timber.e(e, "ImageUtils: loadBitmapAsync failed")
                 null
             }
         }
@@ -90,7 +91,7 @@ object ImageUtils {
                     Pair(options.outWidth, options.outHeight)
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                Timber.e(e, "ImageUtils: getBitmapDimensions failed")
                 Pair(0, 0)
             }
         }
@@ -114,7 +115,7 @@ object ImageUtils {
                 BitmapFactory.decodeStream(it)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Timber.e(e, "ImageUtils: loadBitmapSync failed")
             null
         }
     }

@@ -12,7 +12,13 @@ buildscript {
         "org.apache.commons:commons-lang3:3.20.0",
         "org.apache.httpcomponents:httpclient:4.5.14",
         "com.google.guava:guava:33.4.0-jre",
-        "com.google.android.gms:play-services-basement:18.10.0"
+        "com.google.android.gms:play-services-basement:18.10.0",
+        // Bouncy Castle: 1.79 (transitive, via the build + app classpaths) is vulnerable to
+        // a covert timing channel (HIGH), LDAP injection, and a risky-crypto-algo issue in
+        // bcpkix — all first patched in 1.84. The bcprov/bcpkix/bcutil versions must match.
+        "org.bouncycastle:bcprov-jdk18on:1.84",
+        "org.bouncycastle:bcpkix-jdk18on:1.84",
+        "org.bouncycastle:bcutil-jdk18on:1.84"
     )
 
     val protobufModules = listOf(
