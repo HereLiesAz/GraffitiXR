@@ -622,10 +622,7 @@ class EditorViewModel @Inject constructor(
 
     override fun onLayerReordered(newOrder: List<String>) {
         pushHistory()
-        _uiState.update { state ->
-            val map = state.layers.associateBy { it.id }
-            state.copy(layers = newOrder.mapNotNull { map[it] })
-        }
+        _uiState.update { state -> state.copy(layers = LayerListOps.reorder(state.layers, newOrder)) }
         opEmitter.emit(Op.LayerReorder(newOrder))
         saveProject()
     }
@@ -1069,7 +1066,7 @@ class EditorViewModel @Inject constructor(
 
     override fun onLayerRenamed(id: String, name: String) {
         pushHistory()
-        _uiState.update { state -> state.copy(layers = state.layers.map { if (it.id == id) it.copy(name = name) else it }) }
+        _uiState.update { state -> state.copy(layers = LayerListOps.rename(state.layers, id, name)) }
         saveProject()
     }
 
@@ -1088,7 +1085,10 @@ class EditorViewModel @Inject constructor(
     )
 
     private fun updateActiveLayer(transform: (Layer) -> Layer) {
-        _uiState.update { state -> val id = state.activeLayerId ?: return@update state; state.copy(layers = state.layers.map { if (it.id == id) transform(it) else it }) }
+        _uiState.update { state ->
+            val id = state.activeLayerId ?: return@update state
+            state.copy(layers = LayerListOps.mapLayer(state.layers, id, transform))
+        }
     }
 
     /** Returns the IDs of all layers in the same link-group as [layerId].
@@ -1505,12 +1505,7 @@ class EditorViewModel @Inject constructor(
 
     override fun onToggleVisibility(layerId: String) {
         pushHistory()
-        _uiState.update { state ->
-            val updatedLayers = state.layers.map {
-                if (it.id == layerId) it.copy(isVisible = !it.isVisible) else it
-            }
-            state.copy(layers = updatedLayers)
-        }
+        _uiState.update { state -> state.copy(layers = LayerListOps.toggleVisibility(state.layers, layerId)) }
         saveProject()
         _uiState.value.layers.find { it.id == layerId }?.let { opEmitter.emit(Op.LayerPropsChange(layerId, it.toLayerProps())) }
     }
