@@ -95,6 +95,27 @@ internal object EditorReducer {
         is EditorIntent.SetActiveColor -> state.copy(activeColor = intent.color, showColorPicker = false)
         is EditorIntent.SetLayerWarp -> state.copy(layers = LayerListOps.mapLayer(state.layers, intent.layerId) { it.copy(warpMesh = intent.mesh) })
         is EditorIntent.RenderTextLayer -> state.copy(layers = LayerListOps.mapLayer(state.layers, intent.layerId) { it.copy(bitmap = intent.bitmap, textParams = intent.params) })
+
+        is EditorIntent.AppendLayer -> state.copy(layers = state.layers + intent.layer)
+        is EditorIntent.RemoveLayerById -> state.copy(layers = state.layers.filterNot { it.id == intent.id })
+        is EditorIntent.SetLayerTransformById -> state.copy(layers = LayerListOps.mapLayer(state.layers, intent.id) {
+            it.copy(scale = intent.scale, offset = intent.offset, rotationX = intent.rx, rotationY = intent.ry, rotationZ = intent.rz)
+        })
+        is EditorIntent.SetLayerProps -> state.copy(layers = LayerListOps.mapLayer(state.layers, intent.id) {
+            it.copy(
+                isVisible = intent.props.isVisible,
+                opacity = intent.props.opacity,
+                brightness = intent.props.brightness,
+                contrast = intent.props.contrast,
+                saturation = intent.props.saturation,
+                colorBalanceR = intent.props.colorBalanceR,
+                colorBalanceG = intent.props.colorBalanceG,
+                colorBalanceB = intent.props.colorBalanceB,
+                isImageLocked = intent.props.isImageLocked,
+                isInverted = intent.props.isInverted,
+                blendMode = intent.props.blendMode,
+            )
+        })
     }
 
     /**

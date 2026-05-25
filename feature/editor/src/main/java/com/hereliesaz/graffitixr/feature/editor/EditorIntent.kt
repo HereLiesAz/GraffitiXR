@@ -5,6 +5,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.Layer
+import com.hereliesaz.graffitixr.common.model.LayerProps
 import com.hereliesaz.graffitixr.common.model.TextLayerParams
 import com.hereliesaz.graffitixr.common.model.Tool
 
@@ -83,4 +84,10 @@ internal sealed interface EditorIntent {
     data class SetLayerWarp(val layerId: String, val mesh: List<Float>) : EditorIntent
     /** Applies a freshly-rasterized text bitmap and its params to [layerId]. */
     data class RenderTextLayer(val layerId: String, val bitmap: Bitmap, val params: TextLayerParams) : EditorIntent
+
+    // ── Spectator / remote-op application (by id; no active-layer side effects) ────
+    data class AppendLayer(val layer: Layer) : EditorIntent
+    data class RemoveLayerById(val id: String) : EditorIntent
+    data class SetLayerTransformById(val id: String, val scale: Float, val offset: Offset, val rx: Float, val ry: Float, val rz: Float) : EditorIntent
+    data class SetLayerProps(val id: String, val props: LayerProps) : EditorIntent
 }

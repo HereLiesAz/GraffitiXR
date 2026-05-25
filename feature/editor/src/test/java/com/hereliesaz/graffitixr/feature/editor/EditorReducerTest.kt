@@ -226,4 +226,41 @@ class EditorReducerTest {
         assertEquals(listOf(1f, 2f, 3f), out.layers.first { it.id == "a" }.warpMesh)
         assertTrue(out.layers.first { it.id == "b" }.warpMesh.isEmpty())
     }
+
+    @Test
+    fun `AppendLayer adds without touching the active layer (spectator path)`() {
+        val s = state(lyr("a"), active = "a")
+        val out = reduce(s, EditorIntent.AppendLayer(lyr("b")))
+        assertEquals(listOf("a", "b"), out.layers.map { it.id })
+        assertEquals("a", out.activeLayerId) // unchanged, unlike AddLayer
+    }
+
+    @Test
+    fun `RemoveLayerById drops the layer without reactivating (spectator path)`() {
+        val s = state(lyr("a"), lyr("b"), active = "a")
+        val out = reduce(s, EditorIntent.RemoveLayerById("a"))
+        assertEquals(listOf("b"), out.layers.map { it.id })
+        assertEquals("a", out.activeLayerId) // unchanged, unlike RemoveLayer
+    }
+
+    @Test
+    fun `SetLayerProps copies all props onto the target layer`() {
+        val s = state(lyr("a"), lyr("b"))
+        val props = com.hereliesaz.graffitixr.common.model.LayerProps(opacity = 0.4f, isVisible = false)
+        val out = reduce(s, EditorIntent.SetLayerProps("a", props))
+        val a = out.layers.first { it.id == "a" }
+        assertEquals(0.4f, a.opacity)
+        assertFalse(a.isVisible)
+        assertEquals(1.0f, out.layers.first { it.id == "b" }.opacity)
+    }
+
+    @Test
+    fun `SetLayerTransformById sets transform on the target layer`() {
+        val s = state(lyr("a"))
+        val out = reduce(s, EditorIntent.SetLayerTransformById("a", scale = 2f, offset = Offset(5f, 6f), rx = 10f, ry = 20f, rz = 30f))
+        val a = out.layers.first()
+        assertEquals(2f, a.scale)
+        assertEquals(Offset(5f, 6f), a.offset)
+        assertEquals(30f, a.rotationZ)
+    }
 }

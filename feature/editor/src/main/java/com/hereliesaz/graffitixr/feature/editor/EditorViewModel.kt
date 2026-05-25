@@ -1707,58 +1707,22 @@ class EditorViewModel @Inject constructor(
     /** Applies a remote Op received from the host, without echoing it back through opEmitter. */
     fun applySpectatorOp(op: Op) {
         when (op) {
-            is Op.LayerAdd -> _uiState.update { it.copy(layers = it.layers + op.layer) }
-            is Op.LayerRemove -> _uiState.update { state ->
-                state.copy(layers = state.layers.filterNot { it.id == op.layerId })
-            }
-            is Op.LayerReorder -> _uiState.update { state ->
-                val byId = state.layers.associateBy { it.id }
-                state.copy(layers = op.newOrder.mapNotNull { byId[it] })
-            }
+            is Op.LayerAdd -> dispatch(EditorIntent.AppendLayer(op.layer))
+            is Op.LayerRemove -> dispatch(EditorIntent.RemoveLayerById(op.layerId))
+            is Op.LayerReorder -> dispatch(EditorIntent.ReorderLayers(op.newOrder))
             is Op.LayerTransform -> {
                 // The host encodes transform as [scale, offsetX, offsetY, rotX, rotY, rotZ, 0...0].
                 // Apply the first 6 slots back to the matching layer.
                 if (op.matrix.size >= 6) {
-                    val scale = op.matrix[0]
-                    val offsetX = op.matrix[1]
-                    val offsetY = op.matrix[2]
-                    val rx = op.matrix[3]
-                    val ry = op.matrix[4]
-                    val rz = op.matrix[5]
-                    _uiState.update { state ->
-                        state.copy(layers = state.layers.map {
-                            if (it.id == op.layerId)
-                                it.copy(
-                                    scale = scale,
-                                    offset = androidx.compose.ui.geometry.Offset(offsetX, offsetY),
-                                    rotationX = rx,
-                                    rotationY = ry,
-                                    rotationZ = rz
-                                )
-                            else it
-                        })
-                    }
+                    dispatch(EditorIntent.SetLayerTransformById(
+                        op.layerId,
+                        scale = op.matrix[0],
+                        offset = androidx.compose.ui.geometry.Offset(op.matrix[1], op.matrix[2]),
+                        rx = op.matrix[3], ry = op.matrix[4], rz = op.matrix[5],
+                    ))
                 }
             }
-            is Op.LayerPropsChange -> _uiState.update { state ->
-                state.copy(layers = state.layers.map {
-                    if (it.id == op.layerId)
-                        it.copy(
-                            isVisible = op.props.isVisible,
-                            opacity = op.props.opacity,
-                            brightness = op.props.brightness,
-                            contrast = op.props.contrast,
-                            saturation = op.props.saturation,
-                            colorBalanceR = op.props.colorBalanceR,
-                            colorBalanceG = op.props.colorBalanceG,
-                            colorBalanceB = op.props.colorBalanceB,
-                            isImageLocked = op.props.isImageLocked,
-                            isInverted = op.props.isInverted,
-                            blendMode = op.props.blendMode
-                        )
-                    else it
-                })
-            }
+            is Op.LayerPropsChange -> dispatch(EditorIntent.SetLayerProps(op.layerId, op.props))
             is Op.StrokeComplete -> {
                 // TODO: Wire StrokeComplete application — see Task 17.
                 // The editor stores strokes as rendered bitmaps rather than a List<BrushStroke>,
