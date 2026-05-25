@@ -59,7 +59,8 @@ internal class GuestSession(
      */
     private suspend fun connectLoop(isReconnect: Boolean): Boolean {
         return try {
-            val s = Socket(host, port)
+            val s = Socket()
+            s.connect(java.net.InetSocketAddress(host, port), 5000)
             socket = s
             val input = s.getInputStream()
             val output = s.getOutputStream()
