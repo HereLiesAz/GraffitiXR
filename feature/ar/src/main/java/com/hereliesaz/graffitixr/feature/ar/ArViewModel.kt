@@ -24,7 +24,6 @@ import com.hereliesaz.graffitixr.common.sensor.Vec3
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.common.util.eraseColorBlob
-import com.hereliesaz.graffitixr.common.util.safeRecycle
 import com.hereliesaz.graffitixr.common.wearable.ConnectionState
 import com.hereliesaz.graffitixr.common.wearable.WearableManager
 import com.hereliesaz.graffitixr.feature.ar.coop.calibration.Mat4
@@ -597,22 +596,19 @@ class ArViewModel @Inject constructor(
             isSessionResumed = false
             _isCameraInUseByAr.value = false
             isDestroying = false
-            recycleCaptureBitmaps()
+            clearCaptureBitmaps()
         }
     }
 
     /**
-     * Recycles the large capture bitmaps and drops the native depth buffer held in
-     * [ArUiState]. Called when a capture is consumed and on AR-mode teardown — points
-     * where the capture overlay is no longer on screen, so recycling cannot race live
-     * Compose drawing. [safeRecycle] is idempotent, so the rotation-0 aliasing
-     * (where `tempCaptureBitmap === targetRawBitmap`) is harmless.
+     * Drops the large capture bitmaps and the native depth buffer held in [ArUiState], letting
+     * GC reclaim them. We deliberately do NOT call recycle(): on AR-mode teardown a background
+     * fingerprint/save coroutine (onConfirmTargetCreation, setArtworkFingerprintFromComposite)
+     * may still hold these same bitmap instances, and recycling them out from under it would
+     * cause a "trying to use a recycled bitmap" crash. Nulling the references is deterministic
+     * and safe; the platform reclaims the memory once no coroutine references them.
      */
-    private fun recycleCaptureBitmaps() {
-        val s = _uiState.value
-        s.tempCaptureBitmap.safeRecycle()
-        s.annotatedCaptureBitmap.safeRecycle()
-        s.targetRawBitmap.safeRecycle()
+    private fun clearCaptureBitmaps() {
         _uiState.update {
             it.copy(
                 tempCaptureBitmap = null,
@@ -736,18 +732,15 @@ class ArViewModel @Inject constructor(
     }
 
     fun attachSessionToRenderer(r: ArRenderer?) {
-        r?.stereoProvider = stereoProvider
-        // Take the session mutex before reading `session` and attaching it: otherwise
-        // exitArMode()/performFullCleanupLocked() can null and close the session
-        // between the read here and attachSession(), handing the renderer a session
-        // that is being torn down (TOCTOU).
-        viewModelScope.launch {
-            sessionMutex.withLock {
-                renderer = r
-                r?.attachSession(session)
-                loadCloudPointsIfExists()
-            }
-        }
+        // Synchronous on purpose. ArRenderer.attachSession() already guards the session read with
+        // its own ReentrantLock and null-checks, and onDrawFrame swallows a torn-down session, so
+        // the read-then-attach is safe. Dispatching this onto a coroutine (to "fix" a benign
+        // TOCTOU) instead created a worse race: it could run AFTER performFullCleanupLocked nulled
+        // `renderer`, resurrecting a reference to an already-destroyed renderer.
+        renderer = r
+        renderer?.stereoProvider = stereoProvider
+        renderer?.attachSession(session)
+        loadCloudPointsIfExists()
     }
 
     fun setTrackingState(
@@ -988,7 +981,7 @@ class ArViewModel @Inject constructor(
 
 
     fun onCaptureConsumed() {
-        recycleCaptureBitmaps()
+        clearCaptureBitmaps()
         slamManager.setMappingPaused(false)
     }
 

@@ -311,6 +311,9 @@ class EditorViewModel @Inject constructor(
                 java.io.FileOutputStream(file).use { out ->
                     bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Normal: a newer stroke superseded this debounced save. Not a failure.
+                throw e
             } catch (e: Exception) {
                 // A swallowed failure here means the user's edits are silently lost.
                 android.util.Log.e("EditorViewModel", "Failed to save layer bitmap to $path", e)

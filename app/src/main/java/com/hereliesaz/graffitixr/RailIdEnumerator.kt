@@ -4,14 +4,21 @@ import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.Layer
 
 /**
- * Returns every rail-item ID that ConfigureRailItems will register for the
- * given mode and layer list. Pure function; no Compose. Used by tests
- * (TutorialAnchorTest) and the debug-only RailIntegrityCheck.
+ * Returns the rail-item IDs that ConfigureRailItems registers for the given mode and layer list.
+ * Pure function; no Compose. Used by tests (RailIdUniquenessTest) and the debug-only
+ * RailIntegrityCheck.
  *
  * Conditional registration in ConfigureRailItems is mirrored here:
  *   - target.host / target.create only registered in AR mode
  *   - design.wall only registered in MOCKUP mode
- *   - scan_mode_cycle / coop.main only in AR mode
+ *   - target.scanModeToggle / coop.main / coop.join only in AR mode
+ *
+ * CAVEAT: the per-layer block below emits the UNION of every layer-menu suffix, whereas
+ * ConfigureRailItems registers a different suffix subset per layer type (text vs sketch vs
+ * image). So this faithfully covers the static/global IDs (where the real "project.host"
+ * duplicate crash lived) but does NOT model the per-layer-type branching. A duplicate that
+ * exists only inside one layer-type branch would not be caught here. Modeling those branches
+ * is a follow-up.
  */
 internal fun enumerateRailItemIds(layers: List<Layer>, mode: EditorMode): Set<String> =
     enumerateRailItemIdRegistrations(layers, mode).toSet()
@@ -34,7 +41,7 @@ internal fun enumerateRailItemIdRegistrations(layers: List<Layer>, mode: EditorM
         "wearable.main",
     )
     if (mode == EditorMode.AR) {
-        ids += listOf("target.scanModeToggle", "coop.main")
+        ids += listOf("target.scanModeToggle", "coop.main", "coop.join")
     }
 
     // Target menu (AR only)
