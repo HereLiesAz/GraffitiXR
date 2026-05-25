@@ -401,7 +401,7 @@ class EditorViewModel @Inject constructor(
     fun setBackgroundImage(uri: Uri) {
         val projectId = _uiState.value.projectId ?: return
         viewModelScope.launch(dispatchers.io) {
-            _uiState.update { it.copy(isLoading = true) }
+            dispatch(EditorIntent.SetLoading(true))
             val bitmap = ImageUtils.loadBitmapAsync(context, uri)
             if (bitmap != null) {
                 val filename = "bg_${UUID.randomUUID()}.png"
@@ -414,11 +414,11 @@ class EditorViewModel @Inject constructor(
                 }
 
                 withContext(dispatchers.main) {
-                    _uiState.update { it.copy(backgroundBitmap = bitmap, isLoading = false) }
+                    dispatch(EditorIntent.SetBackgroundBitmap(bitmap)); dispatch(EditorIntent.SetLoading(false))
                 }
             } else {
                 withContext(dispatchers.main) {
-                    _uiState.update { it.copy(isLoading = false) }
+                    dispatch(EditorIntent.SetLoading(false))
                 }
             }
         }
@@ -507,7 +507,7 @@ class EditorViewModel @Inject constructor(
 
     fun exportImage(backgroundBitmap: Bitmap? = null) {
         viewModelScope.launch(dispatchers.default) {
-            _uiState.update { it.copy(isLoading = true) }
+            dispatch(EditorIntent.SetLoading(true))
             try {
                 val metrics = context.resources.displayMetrics
                 val bgBmp = backgroundBitmap ?: if (_uiState.value.editorMode == EditorMode.MOCKUP) _uiState.value.backgroundBitmap else null
@@ -529,7 +529,7 @@ class EditorViewModel @Inject constructor(
                 val success = saveBitmapToGallery(context, compositeBitmap)
 
                 withContext(dispatchers.main) {
-                    _uiState.update { it.copy(isLoading = false) }
+                    dispatch(EditorIntent.SetLoading(false))
                     if (success) {
                         Toast.makeText(context, "Image saved to gallery", Toast.LENGTH_LONG).show()
                     } else {
@@ -538,7 +538,7 @@ class EditorViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 withContext(dispatchers.main) {
-                    _uiState.update { it.copy(isLoading = false) }
+                    dispatch(EditorIntent.SetLoading(false))
                     Toast.makeText(context, "Export error: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             }
@@ -574,7 +574,7 @@ class EditorViewModel @Inject constructor(
         val uri = layer.uri ?: return
 
         pushHistory()
-        _uiState.update { it.copy(isLoading = true) }
+        dispatch(EditorIntent.SetLoading(true))
 
         viewModelScope.launch(dispatchers.default) {
             val bitmap = ImageUtils.loadBitmapAsync(context, uri)
@@ -587,19 +587,19 @@ class EditorViewModel @Inject constructor(
                     segmentationSourceBitmap = bitmap
                     segmentationTargetLayerId = layerId
                     withContext(dispatchers.main) {
-                        _uiState.update { it.copy(isSegmenting = true, segmentationInfluence = 0.5f) }
+                        dispatch(EditorIntent.BeginSegmentation)
                     }
                 }
             }
             withContext(dispatchers.main) {
-                _uiState.update { it.copy(isLoading = false) }
+                dispatch(EditorIntent.SetLoading(false))
             }
         }
     }
 
     fun setSegmentationInfluence(value: Float) {
         val clamped = value.coerceIn(0f, 1f)
-        _uiState.update { it.copy(segmentationInfluence = clamped) }
+        dispatch(EditorIntent.SetSegmentationInfluence(clamped))
 
         val confidence = rawSegmentationConfidence ?: return
         val source = segmentationSourceBitmap ?: return
@@ -634,7 +634,7 @@ class EditorViewModel @Inject constructor(
                     }
                 } else {
                     // Update live preview for stencil generation
-                    _uiState.update { it.copy(segmentationPreview = finalPreview) }
+                    dispatch(EditorIntent.SetSegmentationPreview(finalPreview))
                 }
             }
         }
@@ -652,17 +652,17 @@ class EditorViewModel @Inject constructor(
         segmentationTargetLayerId = null
         pendingStencilSourceLayerId = null
         pendingStencilProjectId = null
-        _uiState.update { it.copy(isSegmenting = false, segmentationPreview = null) }
+        dispatch(EditorIntent.EndSegmentation)
 
         if (stencilSourceLayerId != null && stencilProjectId != null) {
-            _uiState.update { it.copy(isLoading = true) }
+            dispatch(EditorIntent.SetLoading(true))
             viewModelScope.launch(dispatchers.default) {
                 val isolated = if (confidence != null && source != null)
                     subjectIsolator.applyConfidenceThreshold(source, confidence, influence, 0.1f)
                 else source ?: return@launch
                 runStencilPipeline(isolated, stencilSourceLayerId, stencilProjectId, influence)
                 withContext(dispatchers.main) {
-                    _uiState.update { it.copy(isLoading = false) }
+                    dispatch(EditorIntent.SetLoading(false))
                 }
             }
         }
@@ -674,7 +674,7 @@ class EditorViewModel @Inject constructor(
         segmentationTargetLayerId = null
         pendingStencilSourceLayerId = null
         pendingStencilProjectId = null
-        _uiState.update { it.copy(isSegmenting = false, segmentationPreview = null) }
+        dispatch(EditorIntent.EndSegmentation)
     }
 
     fun dismissSegmentationSlider() {
@@ -689,7 +689,7 @@ class EditorViewModel @Inject constructor(
         val uri = layer.uri ?: return
 
         pushHistory()
-        _uiState.update { it.copy(isLoading = true) }
+        dispatch(EditorIntent.SetLoading(true))
 
         viewModelScope.launch(dispatchers.default) {
             val bitmap = ImageUtils.loadBitmapAsync(context, uri)
@@ -743,7 +743,7 @@ class EditorViewModel @Inject constructor(
                 }
             }
             withContext(dispatchers.main) {
-                _uiState.update { it.copy(isLoading = false) }
+                dispatch(EditorIntent.SetLoading(false))
             }
         }
     }
@@ -760,7 +760,7 @@ class EditorViewModel @Inject constructor(
         val uri = layer.uri ?: return
 
         pushHistory()
-        _uiState.update { it.copy(isLoading = true) }
+        dispatch(EditorIntent.SetLoading(true))
 
         viewModelScope.launch(dispatchers.default) {
             val bitmap = ImageUtils.loadBitmapAsync(context, uri)
@@ -802,7 +802,7 @@ class EditorViewModel @Inject constructor(
                 return@launch
             }
             withContext(dispatchers.main) {
-                _uiState.update { it.copy(isLoading = false) }
+                dispatch(EditorIntent.SetLoading(false))
             }
         }
     }
@@ -1575,7 +1575,7 @@ class EditorViewModel @Inject constructor(
     }
 
     fun updateStencilButtonPosition(position: Offset) {
-        _uiState.update { it.copy(stencilButtonPosition = position) }
+        dispatch(EditorIntent.SetStencilButtonPosition(position))
     }
 
     override fun onGenerateStencil(layerId: String) {
@@ -1584,7 +1584,7 @@ class EditorViewModel @Inject constructor(
         val projectId = state.projectId ?: return
 
         pushHistory()
-        _uiState.update { it.copy(isStencilGenerating = true) }
+        dispatch(EditorIntent.SetStencilGenerating(true))
 
         viewModelScope.launch(dispatchers.default) {
             // 1. Identify linked group
@@ -1684,14 +1684,14 @@ class EditorViewModel @Inject constructor(
                         }
                         viewModelScope.launch {
                             kotlinx.coroutines.delay(3000)
-                            _uiState.update { it.copy(stencilHintVisible = false) }
+                            dispatch(EditorIntent.SetStencilHintVisible(false))
                         }
                         saveProject()
                     }
                 }
                 is StencilProgress.Error -> {
                     withContext(dispatchers.main) {
-                        _uiState.update { it.copy(isStencilGenerating = false) }
+                        dispatch(EditorIntent.SetStencilGenerating(false))
                         Toast.makeText(context, "Stencil failed: ${progress.message}", Toast.LENGTH_LONG).show()
                     }
                 }
@@ -1806,7 +1806,7 @@ class EditorViewModel @Inject constructor(
 
         if (stencilLayers.isEmpty()) return
 
-        _uiState.update { it.copy(isLoading = true) }
+        dispatch(EditorIntent.SetLoading(true))
         viewModelScope.launch(dispatchers.io) {
             val result = stencilPrintEngine.generatePdf(
                 context,
@@ -1816,7 +1816,7 @@ class EditorViewModel @Inject constructor(
             )
             
             withContext(dispatchers.main) {
-                _uiState.update { it.copy(isLoading = false) }
+                dispatch(EditorIntent.SetLoading(false))
                 result.fold(
                     onSuccess = { uri ->
                         // Share intent triggered via Activity/UI state or broadcast

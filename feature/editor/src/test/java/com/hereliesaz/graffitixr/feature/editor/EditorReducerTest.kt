@@ -174,4 +174,27 @@ class EditorReducerTest {
         assertEquals(listOf("flat"), out.layers.map { it.id })
         assertEquals("flat", out.activeLayerId)
     }
+
+    @Test
+    fun `SetLoading toggles the loading flag`() {
+        assertTrue(reduce(state(lyr("a")), EditorIntent.SetLoading(true)).isLoading)
+        assertFalse(reduce(state(lyr("a")).copy(isLoading = true), EditorIntent.SetLoading(false)).isLoading)
+    }
+
+    @Test
+    fun `BeginSegmentation sets the flag and default influence and EndSegmentation clears state`() {
+        val begun = reduce(state(lyr("a")), EditorIntent.BeginSegmentation)
+        assertTrue(begun.isSegmenting)
+        assertEquals(0.5f, begun.segmentationInfluence)
+        val ended = reduce(begun.copy(segmentationPreview = null), EditorIntent.EndSegmentation)
+        assertFalse(ended.isSegmenting)
+        assertNull(ended.segmentationPreview)
+    }
+
+    @Test
+    fun `stencil flag intents update their fields`() {
+        val s = state(lyr("a"))
+        assertTrue(reduce(s, EditorIntent.SetStencilGenerating(true)).isStencilGenerating)
+        assertFalse(reduce(s.copy(stencilHintVisible = true), EditorIntent.SetStencilHintVisible(false)).stencilHintVisible)
+    }
 }

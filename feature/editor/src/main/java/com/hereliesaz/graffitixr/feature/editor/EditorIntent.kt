@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.feature.editor
 
+import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.Layer
@@ -53,4 +54,15 @@ internal sealed interface EditorIntent {
     data object DismissPanel : EditorIntent
     data class SetEditorMode(val mode: EditorMode) : EditorIntent
     data class SetGestureInProgress(val inProgress: Boolean) : EditorIntent
+
+    // ── Effect-result / transient flags (dispatched by the VM around async work) ───
+    data class SetLoading(val loading: Boolean) : EditorIntent
+    data class SetBackgroundBitmap(val bitmap: Bitmap?) : EditorIntent
+    data object BeginSegmentation : EditorIntent
+    data object EndSegmentation : EditorIntent
+    data class SetSegmentationInfluence(val value: Float) : EditorIntent
+    data class SetSegmentationPreview(val preview: Bitmap?) : EditorIntent
+    data class SetStencilGenerating(val generating: Boolean) : EditorIntent
+    data class SetStencilHintVisible(val visible: Boolean) : EditorIntent
+    data class SetStencilButtonPosition(val position: Offset) : EditorIntent
 }

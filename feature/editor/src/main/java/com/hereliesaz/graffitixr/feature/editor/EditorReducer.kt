@@ -72,6 +72,16 @@ internal object EditorReducer {
         EditorIntent.DismissPanel -> state.copy(activePanel = EditorPanel.NONE)
         is EditorIntent.SetGestureInProgress -> state.copy(gestureInProgress = intent.inProgress)
         is EditorIntent.SetEditorMode -> reduceEditorMode(state, intent.mode)
+
+        is EditorIntent.SetLoading -> state.copy(isLoading = intent.loading)
+        is EditorIntent.SetBackgroundBitmap -> state.copy(backgroundBitmap = intent.bitmap)
+        EditorIntent.BeginSegmentation -> state.copy(isSegmenting = true, segmentationInfluence = 0.5f)
+        EditorIntent.EndSegmentation -> state.copy(isSegmenting = false, segmentationPreview = null)
+        is EditorIntent.SetSegmentationInfluence -> state.copy(segmentationInfluence = intent.value)
+        is EditorIntent.SetSegmentationPreview -> state.copy(segmentationPreview = intent.preview)
+        is EditorIntent.SetStencilGenerating -> state.copy(isStencilGenerating = intent.generating)
+        is EditorIntent.SetStencilHintVisible -> state.copy(stencilHintVisible = intent.visible)
+        is EditorIntent.SetStencilButtonPosition -> state.copy(stencilButtonPosition = intent.position)
     }
 
     /**
