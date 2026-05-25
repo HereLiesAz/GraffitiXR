@@ -123,7 +123,7 @@ class EditorViewModel @Inject constructor(
     init {
         viewModelScope.launch(dispatchers.main) {
             settingsRepository.backgroundColor.collect { argb ->
-                _uiState.update { it.copy(canvasBackground = Color(argb.toLong() and 0xFFFFFFFFL)) }
+                dispatch(EditorIntent.SetCanvasBackground(Color(argb.toLong() and 0xFFFFFFFFL)))
             }
         }
 
@@ -545,8 +545,8 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun toggleHandedness() = _uiState.update { it.copy(isRightHanded = !it.isRightHanded) }
-    fun toggleDiagOverlay() = _uiState.update { it.copy(showDiagOverlay = !it.showDiagOverlay) }
+    fun toggleHandedness() = dispatch(EditorIntent.ToggleHandedness)
+    fun toggleDiagOverlay() = dispatch(EditorIntent.ToggleDiagOverlay)
     fun setActiveTool(tool: Tool) = dispatch(EditorIntent.SetActiveTool(tool))
 
     override fun onLayerActivated(id: String) = dispatch(EditorIntent.ActivateLayer(id))
@@ -749,7 +749,7 @@ class EditorViewModel @Inject constructor(
     }
 
     override fun onSketchThicknessChanged(thickness: Int) {
-        _uiState.update { it.copy(sketchThickness = thickness.coerceIn(1, 20)) }
+        dispatch(EditorIntent.SetSketchThickness(thickness))
     }
 
     override fun onApplyCannyEdgeClicked() {
@@ -933,7 +933,7 @@ class EditorViewModel @Inject constructor(
     }
 
     override fun onLayerWarpChanged(layerId: String, mesh: List<Float>) {
-        _uiState.update { state -> state.copy(layers = state.layers.map { if (it.id == layerId) it.copy(warpMesh = mesh) else it }) }
+        dispatch(EditorIntent.SetLayerWarp(layerId, mesh))
         saveProject()
     }
 
@@ -1055,7 +1055,7 @@ class EditorViewModel @Inject constructor(
         _uiState.update { state -> state.copy(layers = state.layers.map { if (it.id in groupIds) transform(it) else it }) }
     }
 
-    override fun onFeedbackShown() { _uiState.update { it.copy(showRotationAxisFeedback = false) } }
+    override fun onFeedbackShown() = dispatch(EditorIntent.FeedbackShown)
     override fun onDoubleTapHintDismissed() {}
     override fun onOnboardingComplete(mode: Any) {}
 
@@ -1353,19 +1353,19 @@ class EditorViewModel @Inject constructor(
         }
 
     override fun onColorClicked() {
-        _uiState.update { it.copy(showColorPicker = true) }
+        dispatch(EditorIntent.ShowColorPicker)
     }
 
     override fun setBrushSize(size: Float) {
-        _uiState.update { it.copy(brushSize = size.coerceIn(1f, 200f)) }
+        dispatch(EditorIntent.SetBrushSize(size))
     }
 
     fun setBrushFeathering(amount: Float) {
-        _uiState.update { it.copy(brushFeathering = amount.coerceIn(0f, 1f)) }
+        dispatch(EditorIntent.SetBrushFeathering(amount))
     }
 
     override fun setActiveColor(color: Color) {
-        _uiState.update { it.copy(activeColor = color, showColorPicker = false) }
+        dispatch(EditorIntent.SetActiveColor(color))
     }
 
     override fun adjustColorLightness(delta: Float) {
@@ -1390,7 +1390,7 @@ class EditorViewModel @Inject constructor(
     }
 
     override fun onColorPickerDismissed() {
-        _uiState.update { it.copy(showColorPicker = false) }
+        dispatch(EditorIntent.DismissColorPicker)
     }
 
     override fun onFlattenAllLayers() {
@@ -1514,11 +1514,7 @@ class EditorViewModel @Inject constructor(
             layerStore.putBase(layerId, bitmap.copy(Bitmap.Config.ARGB_8888, false))
 
             withContext(dispatchers.main) {
-                _uiState.update { state ->
-                    state.copy(layers = state.layers.map {
-                        if (it.id == layerId) it.copy(bitmap = bitmap, textParams = params) else it
-                    })
-                }
+                dispatch(EditorIntent.RenderTextLayer(layerId, bitmap, params))
             }
         }
     }

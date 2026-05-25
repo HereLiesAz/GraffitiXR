@@ -2,8 +2,10 @@ package com.hereliesaz.graffitixr.feature.editor
 
 import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.Layer
+import com.hereliesaz.graffitixr.common.model.TextLayerParams
 import com.hereliesaz.graffitixr.common.model.Tool
 
 /**
@@ -65,4 +67,20 @@ internal sealed interface EditorIntent {
     data class SetStencilGenerating(val generating: Boolean) : EditorIntent
     data class SetStencilHintVisible(val visible: Boolean) : EditorIntent
     data class SetStencilButtonPosition(val position: Offset) : EditorIntent
+
+    // ── Settings / tool / brush / color ───────────────────────────────────────
+    data class SetCanvasBackground(val color: Color) : EditorIntent
+    data object ToggleHandedness : EditorIntent
+    data object ToggleDiagOverlay : EditorIntent
+    data object FeedbackShown : EditorIntent
+    data class SetSketchThickness(val value: Int) : EditorIntent
+    data class SetBrushSize(val value: Float) : EditorIntent
+    data class SetBrushFeathering(val value: Float) : EditorIntent
+    data object ShowColorPicker : EditorIntent
+    data object DismissColorPicker : EditorIntent
+    /** Sets the active brush color and closes the color picker. */
+    data class SetActiveColor(val color: Color) : EditorIntent
+    data class SetLayerWarp(val layerId: String, val mesh: List<Float>) : EditorIntent
+    /** Applies a freshly-rasterized text bitmap and its params to [layerId]. */
+    data class RenderTextLayer(val layerId: String, val bitmap: Bitmap, val params: TextLayerParams) : EditorIntent
 }

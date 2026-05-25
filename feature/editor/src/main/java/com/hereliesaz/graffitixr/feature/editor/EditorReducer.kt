@@ -82,6 +82,19 @@ internal object EditorReducer {
         is EditorIntent.SetStencilGenerating -> state.copy(isStencilGenerating = intent.generating)
         is EditorIntent.SetStencilHintVisible -> state.copy(stencilHintVisible = intent.visible)
         is EditorIntent.SetStencilButtonPosition -> state.copy(stencilButtonPosition = intent.position)
+
+        is EditorIntent.SetCanvasBackground -> state.copy(canvasBackground = intent.color)
+        EditorIntent.ToggleHandedness -> state.copy(isRightHanded = !state.isRightHanded)
+        EditorIntent.ToggleDiagOverlay -> state.copy(showDiagOverlay = !state.showDiagOverlay)
+        EditorIntent.FeedbackShown -> state.copy(showRotationAxisFeedback = false)
+        is EditorIntent.SetSketchThickness -> state.copy(sketchThickness = intent.value.coerceIn(1, 20))
+        is EditorIntent.SetBrushSize -> state.copy(brushSize = intent.value.coerceIn(1f, 200f))
+        is EditorIntent.SetBrushFeathering -> state.copy(brushFeathering = intent.value.coerceIn(0f, 1f))
+        EditorIntent.ShowColorPicker -> state.copy(showColorPicker = true)
+        EditorIntent.DismissColorPicker -> state.copy(showColorPicker = false)
+        is EditorIntent.SetActiveColor -> state.copy(activeColor = intent.color, showColorPicker = false)
+        is EditorIntent.SetLayerWarp -> state.copy(layers = LayerListOps.mapLayer(state.layers, intent.layerId) { it.copy(warpMesh = intent.mesh) })
+        is EditorIntent.RenderTextLayer -> state.copy(layers = LayerListOps.mapLayer(state.layers, intent.layerId) { it.copy(bitmap = intent.bitmap, textParams = intent.params) })
     }
 
     /**

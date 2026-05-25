@@ -197,4 +197,33 @@ class EditorReducerTest {
         assertTrue(reduce(s, EditorIntent.SetStencilGenerating(true)).isStencilGenerating)
         assertFalse(reduce(s.copy(stencilHintVisible = true), EditorIntent.SetStencilHintVisible(false)).stencilHintVisible)
     }
+
+    @Test
+    fun `SetBrushSize and SetSketchThickness coerce into range`() {
+        assertEquals(200f, reduce(state(lyr("a")), EditorIntent.SetBrushSize(9999f)).brushSize)
+        assertEquals(1f, reduce(state(lyr("a")), EditorIntent.SetBrushSize(-5f)).brushSize)
+        assertEquals(20, reduce(state(lyr("a")), EditorIntent.SetSketchThickness(99)).sketchThickness)
+    }
+
+    @Test
+    fun `SetActiveColor sets the color and closes the picker`() {
+        val s = state(lyr("a")).copy(showColorPicker = true)
+        val out = reduce(s, EditorIntent.SetActiveColor(androidx.compose.ui.graphics.Color.Red))
+        assertEquals(androidx.compose.ui.graphics.Color.Red, out.activeColor)
+        assertFalse(out.showColorPicker)
+    }
+
+    @Test
+    fun `ToggleHandedness flips the handedness flag`() {
+        val s = state(lyr("a")).copy(isRightHanded = true)
+        assertFalse(reduce(s, EditorIntent.ToggleHandedness).isRightHanded)
+    }
+
+    @Test
+    fun `SetLayerWarp sets the mesh on the target layer only`() {
+        val s = state(lyr("a"), lyr("b"))
+        val out = reduce(s, EditorIntent.SetLayerWarp("a", listOf(1f, 2f, 3f)))
+        assertEquals(listOf(1f, 2f, 3f), out.layers.first { it.id == "a" }.warpMesh)
+        assertTrue(out.layers.first { it.id == "b" }.warpMesh.isEmpty())
+    }
 }
