@@ -7,6 +7,7 @@ import com.hereliesaz.graffitixr.core.collaboration.session.HostSession
 import com.hereliesaz.graffitixr.core.collaboration.wire.QrPayload
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,6 +27,9 @@ class CollaborationManager @Inject constructor() {
     @Volatile private var hostSession: HostSession? = null
     @Volatile private var guestSession: GuestSession? = null
     @Volatile private var lastQrPayload: QrPayload? = null
+    // The session-state collector never completes; track it so each new session cancels the
+    // previous collector (otherwise one leaks per host/join cycle and stale ones race _state).
+    @Volatile private var observeJob: Job? = null
 
     /** Begin hosting. Returns the QR payload to display. */
     suspend fun startHosting(
@@ -61,8 +65,11 @@ class CollaborationManager @Inject constructor() {
     }
 
     suspend fun stopHosting() {
+        observeJob?.cancel()
+        observeJob = null
         hostSession?.close(CoopSessionState.EndReason.UserLeft)
         hostSession = null
+        _state.value = CoopSessionState.Idle
     }
 
     suspend fun joinFromQr(
@@ -88,6 +95,10 @@ class CollaborationManager @Inject constructor() {
     }
 
     suspend fun leaveSession() {
+        // Cancel the collector first so the sessions' terminal Ended emission can't race past
+        // the Idle we set below (the auditor's nondeterministic Ended-vs-Idle finish).
+        observeJob?.cancel()
+        observeJob = null
         guestSession?.close(CoopSessionState.EndReason.UserLeft)
         guestSession = null
         hostSession?.close(CoopSessionState.EndReason.UserLeft)
@@ -101,7 +112,8 @@ class CollaborationManager @Inject constructor() {
     }
 
     private fun observe(stateFlow: StateFlow<CoopSessionState>) {
-        scope.launch {
+        observeJob?.cancel()
+        observeJob = scope.launch {
             stateFlow.collect { _state.value = it }
         }
     }

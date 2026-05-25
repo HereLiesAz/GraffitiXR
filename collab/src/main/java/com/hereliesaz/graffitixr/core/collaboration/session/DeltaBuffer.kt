@@ -17,9 +17,13 @@ internal class DeltaBuffer(
     private val ring = ArrayDeque<Entry>()
     private var totalBytes: Long = 0
 
+    // append() runs on the host's outbound loop while trimUpTo() runs on its inbound loop;
+    // both are independent coroutines on Dispatchers.IO, so all access to ring/totalBytes
+    // is synchronized to avoid lost updates and ConcurrentModificationException.
     /** Append. Returns false when capped (caller should treat as a fatal reconnect failure). */
+    @Synchronized
     fun append(seq: Long, op: Op, sizeBytes: Int): Boolean {
-        if (sizeBytes > maxBytes) return false
+        if (sizeBytes < 0 || sizeBytes > maxBytes) return false
         if (ring.size >= maxOps || totalBytes + sizeBytes > maxBytes) return false
         ring.addLast(Entry(seq, op, sizeBytes))
         totalBytes += sizeBytes
@@ -27,6 +31,7 @@ internal class DeltaBuffer(
     }
 
     /** Discard all entries with seq <= upTo. */
+    @Synchronized
     fun trimUpTo(upTo: Long) {
         while (ring.isNotEmpty() && ring.first().seq <= upTo) {
             val removed = ring.removeFirst()
@@ -34,13 +39,18 @@ internal class DeltaBuffer(
         }
     }
 
+    @Synchronized
     fun opsAfter(lastSeq: Long): List<Pair<Long, Op>> =
         ring.filter { it.seq > lastSeq }.map { it.seq to it.op }
 
+    @Synchronized
     fun isEmpty(): Boolean = ring.isEmpty()
+    @Synchronized
     fun size(): Int = ring.size
+    @Synchronized
     fun bytes(): Long = totalBytes
 
+    @Synchronized
     fun clear() {
         ring.clear()
         totalBytes = 0

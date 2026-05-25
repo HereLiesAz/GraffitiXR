@@ -10,6 +10,9 @@ internal abstract class Session {
         MutableStateFlow(CoopSessionState.Idle)
     val state: StateFlow<CoopSessionState> get() = _state
 
+    // Read/written from multiple I/O coroutines (inbound/outbound/heartbeat loops); volatile
+    // so a phase transition (e.g. into Reconnecting/Ended) is visible across threads.
+    @Volatile
     protected var phase: Phase = Phase.Handshake
 
     abstract suspend fun close(reason: CoopSessionState.EndReason)
