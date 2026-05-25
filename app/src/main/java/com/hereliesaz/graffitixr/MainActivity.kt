@@ -945,7 +945,7 @@ class MainActivity : ComponentActivity() {
                                     muralMethod = arUiState.muralMethod,
                                     onMuralMethodChanged = { arViewModel.setMuralMethod(it) },
                                     onCheckForUpdates = { dashboardViewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
-                                    onInstallUpdate = { dashboardViewModel.installUpdate(this@MainActivity) },
+                                    onOpenUpdatePage = { dashboardViewModel.openUpdatePage(this@MainActivity) },
                                     onResetTutorials = { settingsViewModel.resetCompletedTutorials() },
                                     onClose = { showSettings = false },
                                     strings = strings

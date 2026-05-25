@@ -1,8 +1,8 @@
 // FILE: feature/dashboard/src/main/java/com/hereliesaz/graffitixr/feature/dashboard/DashboardViewModel.kt
 package com.hereliesaz.graffitixr.feature.dashboard
 
-import android.app.DownloadManager
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -111,12 +111,11 @@ class DashboardViewModel @Inject constructor(
 
                 val latestTag = latestRelease.tagName.removePrefix("v")
                 if (isNewerVersion(latestTag, currentVersion)) {
-                    val apkAsset = latestRelease.assets.firstOrNull { it.name.endsWith(".apk") }
                     _uiState.update {
                         it.copy(
                             isCheckingForUpdate = false,
                             updateStatusMessage = "New version $latestTag available",
-                            pendingUpdateApkUrl = apkAsset?.browserDownloadUrl
+                            updateUrl = latestRelease.htmlUrl
                         )
                     }
                 } else {
@@ -129,21 +128,17 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    fun installUpdate(context: Context) {
-        val apkUrl = _uiState.value.pendingUpdateApkUrl ?: return
-        val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-        val request = DownloadManager.Request(Uri.parse(apkUrl)).apply {
-            setTitle("GraffitiXR Update")
-            setDescription("Downloading latest experimental build...")
-            setDestinationInExternalFilesDir(context, null, "update.apk")
-            setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+    fun openUpdatePage(context: Context) {
+        val url = _uiState.value.updateUrl ?: "https://github.com/hereliesaz/GraffitiXR/releases"
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            _uiState.update { it.copy(updateStatusMessage = "Opening browser...") }
+        } catch (e: Exception) {
+            android.util.Log.e("DashboardViewModel", "Failed to open update URL", e)
         }
-        val downloadId = downloadManager.enqueue(request)
-
-        context.getSharedPreferences("secure_prefs", Context.MODE_PRIVATE)
-            .edit().putLong("update_download_id", downloadId).apply()
-
-        _uiState.update { it.copy(updateStatusMessage = "Downloading update... Check notifications.") }
     }
 
     private suspend fun fetchLatestRelease(): GitHubRelease? {
@@ -169,17 +164,8 @@ class DashboardViewModel @Inject constructor(
     private fun parseRelease(json: String): GitHubRelease? {
         return try {
             val tagName = Regex("\"tag_name\"\\s*:\\s*\"([^\"]+)\"").find(json)?.groupValues?.get(1) ?: return null
-            val assetUrls = Regex("\"browser_download_url\"\\s*:\\s*\"([^\"]+)\"")
-                .findAll(json)
-                .map { it.groupValues[1] }
-                .toList()
-            // Keep only APK assets and derive each name from its own URL. The previous code
-            // zipped apk *names* against *all* download URLs positionally, so any non-apk asset
-            // ahead of the apk shifted the mapping and produced the wrong download URL.
-            val assets = assetUrls
-                .filter { it.endsWith(".apk", ignoreCase = true) }
-                .map { url -> GitHubAsset(url.substringAfterLast('/'), url) }
-            GitHubRelease(tagName, assets)
+            val htmlUrl = Regex("\"html_url\"\\s*:\\s*\"([^\"]+)\"").find(json)?.groupValues?.get(1) ?: "https://github.com/hereliesaz/GraffitiXR/releases"
+            GitHubRelease(tagName, htmlUrl)
         } catch (e: Exception) { null }
     }
 
@@ -195,6 +181,5 @@ class DashboardViewModel @Inject constructor(
         return false
     }
 
-    private data class GitHubRelease(val tagName: String, val assets: List<GitHubAsset>)
-    private data class GitHubAsset(val name: String, val browserDownloadUrl: String)
+    private data class GitHubRelease(val tagName: String, val htmlUrl: String)
 }

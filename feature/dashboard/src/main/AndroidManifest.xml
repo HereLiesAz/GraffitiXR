@@ -1,21 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Required to launch the package installer for the in-app self-update. -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-
     <application>
-        <!--
-            exported="true" is required because the intent is sent by the
-            system's DownloadManager, which is an external application.
-        -->
-        <receiver
-            android:name=".ApkInstallReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
-            </intent-filter>
-        </receiver>
+        <!-- No direct APK installation; user is pointed to GitHub releases. -->
     </application>
 
 </manifest>
