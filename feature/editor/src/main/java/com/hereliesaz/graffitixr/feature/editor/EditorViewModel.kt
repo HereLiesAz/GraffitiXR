@@ -90,7 +90,10 @@ class EditorViewModel @Inject constructor(
 
     // Stroke-compositing pipeline (base + strokes -> rendered bitmap; see DrawingEngine).
     private val drawingEngine = DrawingEngine(slamManager)
-    private var pendingSaveJob: kotlinx.coroutines.Job? = null
+    // Debounced disk saves, keyed by layer id. A single shared job would let a save
+    // scheduled for layer B cancel a still-pending save for layer A, silently dropping
+    // A's strokes; per-layer jobs cancel only the same layer's superseded save.
+    private val pendingSaveJobs = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Job>()
 
     private var copiedLayerState: Layer? = null
     private var anchorHalfExtentMeters: Pair<Float, Float>? = null
@@ -303,8 +306,9 @@ class EditorViewModel @Inject constructor(
 
     private fun scheduleDiskSave(layerId: String, bitmap: Bitmap, uri: Uri?) {
         val path = uri?.path ?: return
-        pendingSaveJob?.cancel()
-        pendingSaveJob = viewModelScope.launch(dispatchers.io) {
+        // Cancel only this layer's previous pending save, never another layer's.
+        pendingSaveJobs.remove(layerId)?.cancel()
+        val job = viewModelScope.launch(dispatchers.io) {
             kotlinx.coroutines.delay(1500)
             try {
                 val file = java.io.File(path)
@@ -320,8 +324,12 @@ class EditorViewModel @Inject constructor(
                 withContext(dispatchers.main) {
                     Toast.makeText(context, "Couldn't save your changes — storage may be full", Toast.LENGTH_LONG).show()
                 }
+            } finally {
+                // Don't leak completed jobs in the map.
+                pendingSaveJobs.remove(layerId, coroutineContext[kotlinx.coroutines.Job])
             }
         }
+        pendingSaveJobs[layerId] = job
     }
 
     override fun onAddLayer(uri: Uri) {
@@ -649,6 +657,7 @@ class EditorViewModel @Inject constructor(
         val confidence = rawSegmentationConfidence
         val source = segmentationSourceBitmap
         val influence = _uiState.value.segmentationInfluence
+        val targetLayerId = segmentationTargetLayerId
 
         rawSegmentationConfidence = null
         segmentationSourceBitmap = null
@@ -667,6 +676,23 @@ class EditorViewModel @Inject constructor(
                 withContext(dispatchers.main) {
                     dispatch(EditorIntent.SetLoading(false))
                 }
+            }
+        } else if (targetLayerId != null && confidence != null && source != null) {
+            // Background-removal path: setSegmentationInfluence only updated the in-memory
+            // Layer.bitmap (which is @Transient and never serialized). Recompute the adjusted
+            // isolation deterministically and overwrite the layer's file so the slider
+            // adjustment survives a reload instead of reverting to the default threshold.
+            dispatch(EditorIntent.SetLoading(true))
+            viewModelScope.launch(dispatchers.default) {
+                val adjusted = subjectIsolator.applyConfidenceThreshold(source, confidence, influence, 0.1f)
+                val state = _uiState.value
+                val projectId = state.projectId
+                val filename = state.layers.find { it.id == targetLayerId }?.uri?.path?.substringAfterLast('/')
+                if (projectId != null && filename != null) {
+                    val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(adjusted))
+                    withContext(dispatchers.main) { updateLayerUri(targetLayerId, "file://$path".toUri()) }
+                }
+                withContext(dispatchers.main) { dispatch(EditorIntent.SetLoading(false)) }
             }
         }
     }
@@ -1733,16 +1759,15 @@ class EditorViewModel @Inject constructor(
                 // Left as a stub until a spectator-side rasterization path is implemented.
                 android.util.Log.d("EditorViewModel", "applySpectatorOp: StrokeComplete stub for layer ${op.layerId}")
             }
-            is Op.TextContentChange -> _uiState.update { state ->
-                state.copy(layers = state.layers.map {
-                    if (it.id == op.layerId) {
-                        val updatedParams = it.textParams?.copy(text = op.text)
-                        if (updatedParams != null) {
-                            rerasterizeTextLayer(it.id, updatedParams)
-                            it // rerasterize updates state asynchronously; return unchanged for now
-                        } else it
-                    } else it
-                })
+            is Op.TextContentChange -> {
+                // rerasterizeTextLayer launches its own coroutine and updates state itself,
+                // so it must NOT run inside _uiState.update { } — that lambda can re-run under
+                // CAS contention and would launch duplicate rasterizations racing the same file.
+                val updatedParams = _uiState.value.layers
+                    .find { it.id == op.layerId }?.textParams?.copy(text = op.text)
+                if (updatedParams != null) {
+                    rerasterizeTextLayer(op.layerId, updatedParams)
+                }
             }
         }
     }

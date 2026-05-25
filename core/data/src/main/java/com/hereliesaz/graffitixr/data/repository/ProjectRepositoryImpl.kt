@@ -10,7 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
@@ -25,20 +26,27 @@ class ProjectRepositoryImpl @Inject constructor(
     private val _currentProject = MutableStateFlow<GraffitiProject?>(null)
     override val currentProject: StateFlow<GraffitiProject?> = _currentProject.asStateFlow()
 
-    override val projects: Flow<List<GraffitiProject>> = flow {
-        emit(getProjects())
+    // Backing state for the project list so observers see creates/deletes/imports,
+    // as the ProjectRepository contract promises. A plain cold flow emitted once.
+    private val _projects = MutableStateFlow<List<GraffitiProject>>(emptyList())
+    override val projects: Flow<List<GraffitiProject>> = _projects.onStart { refreshProjects() }
+
+    private suspend fun refreshProjects() {
+        _projects.value = getProjects()
     }
 
     override suspend fun createProject(name: String): GraffitiProject {
         val newProject = GraffitiProject(name = name)
         projectManager.saveProject(context, newProject)
         _currentProject.value = newProject
+        refreshProjects()
         return newProject
     }
 
     override suspend fun createProject(project: GraffitiProject) {
         projectManager.saveProject(context, project)
         _currentProject.value = project
+        refreshProjects()
     }
 
     override suspend fun getProject(id: String): GraffitiProject? {
@@ -67,12 +75,15 @@ class ProjectRepositoryImpl @Inject constructor(
         if (_currentProject.value?.id == project.id) {
             _currentProject.value = project
         }
+        refreshProjects()
     }
 
     override suspend fun updateProject(transform: (GraffitiProject) -> GraffitiProject) {
-        val current = _currentProject.value ?: return
-        val updated = transform(current)
-        updateProject(updated)
+        // Apply the transform atomically against the live state so two concurrent
+        // callers can't both read the same base and clobber each other's mutation.
+        val updated = _currentProject.updateAndGet { current -> current?.let(transform) } ?: return
+        projectManager.saveProject(context, updated)
+        refreshProjects()
     }
 
     override suspend fun deleteProject(id: String) {
@@ -80,13 +91,23 @@ class ProjectRepositoryImpl @Inject constructor(
         if (_currentProject.value?.id == id) {
             _currentProject.value = null
         }
+        refreshProjects()
     }
 
     override suspend fun saveArtifact(projectId: String, filename: String, data: ByteArray): String = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/$projectId")
         if (!root.exists()) root.mkdirs()
         val file = File(root, filename)
-        file.writeBytes(data)
+        // Atomic write: a half-written map.bin / fingerprint can crash native loaders.
+        val tmp = File(root, "$filename.tmp")
+        tmp.writeBytes(data)
+        if (!tmp.renameTo(file)) {
+            file.delete()
+            if (!tmp.renameTo(file)) {
+                file.writeBytes(data)
+                tmp.delete()
+            }
+        }
         file.absolutePath
     }
 
@@ -104,6 +125,7 @@ class ProjectRepositoryImpl @Inject constructor(
         val project = projectManager.importProjectFromUri(context, uri)
             ?: return Result.failure(Exception("Failed to import project from $uri"))
         _currentProject.value = project
+        refreshProjects()
         return Result.success(project)
     }
 }

@@ -4,6 +4,8 @@ import android.app.DownloadManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import android.widget.Toast
 
 class ApkInstallReceiver : BroadcastReceiver() {
@@ -27,6 +29,22 @@ class ApkInstallReceiver : BroadcastReceiver() {
         if (uri != null) {
             // Confirming reality before torching the bridge.
             prefs.edit().remove("update_download_id").apply()
+
+            // Installing an APK needs REQUEST_INSTALL_PACKAGES *and* the user having granted
+            // "install unknown apps" for us. Without this gate the ACTION_VIEW below silently
+            // fails and the self-update dead-ends at a Toast.
+            if (!context.packageManager.canRequestPackageInstalls()) {
+                Toast.makeText(context, "Allow installing unknown apps to finish updating.", Toast.LENGTH_LONG).show()
+                try {
+                    context.startActivity(
+                        Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Open Settings → Install unknown apps to update.", Toast.LENGTH_LONG).show()
+                }
+                return
+            }
 
             val installIntent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, "application/vnd.android.package-archive")

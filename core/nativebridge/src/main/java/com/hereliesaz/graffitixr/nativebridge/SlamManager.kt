@@ -31,12 +31,19 @@ class SlamManager @Inject constructor(
         NativeLibLoader.loadAll()
     }
 
-    private var isInitialized = false
+    // Guards native init/destroy. ensureInitialized() and destroy() are called from the
+    // GL thread, the sensor (Default) scope, and the UI thread; without this lock two
+    // threads could both pass the !isInitialized check and double-call nativeInitialize(),
+    // or init could race a concurrent destroy() (use-after-free in native code).
+    private val initLock = Any()
+    @Volatile private var isInitialized = false
 
     fun ensureInitialized() {
-        if (!isInitialized) {
-            nativeInitialize()
-            isInitialized = true
+        synchronized(initLock) {
+            if (!isInitialized) {
+                nativeInitialize()
+                isInitialized = true
+            }
         }
     }
 
@@ -283,9 +290,11 @@ class SlamManager @Inject constructor(
 
     fun destroy() {
         stopSensorCollection()
-        if (isInitialized) {
-            nativeDestroy()
-            isInitialized = false
+        synchronized(initLock) {
+            if (isInitialized) {
+                nativeDestroy()
+                isInitialized = false
+            }
         }
     }
 
