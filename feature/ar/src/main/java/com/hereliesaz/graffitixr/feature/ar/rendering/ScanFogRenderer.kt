@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar.rendering
 
 import android.opengl.GLES30
 import android.util.Log
+import com.hereliesaz.graffitixr.common.util.GlReleasable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -15,7 +16,7 @@ import java.nio.FloatBuffer
  * Single fullscreen quad, no geometry, no depth interaction. Mask is updated
  * per frame from the SLAM-derived sector mask in [com.hereliesaz.graffitixr.feature.ar.ArViewModel].
  */
-class ScanFogRenderer {
+class ScanFogRenderer : GlReleasable {
     private var program = 0
     private var aPosition = 0
     private var uYaw = 0
@@ -116,6 +117,14 @@ class ScanFogRenderer {
         GLES30.glDisable(GLES30.GL_BLEND)
         GLES30.glDepthMask(true)
         GLES30.glEnable(GLES30.GL_DEPTH_TEST)
+    }
+
+    /**
+     * Deletes the fog shader program and mask texture. Idempotent; must run on the GL thread.
+     */
+    override fun release() {
+        if (program != 0) { GLES30.glDeleteProgram(program); program = 0 }
+        if (maskTextureId != 0) { GLES30.glDeleteTextures(1, intArrayOf(maskTextureId), 0); maskTextureId = 0 }
     }
 
     private fun compile(type: Int, src: String): Int {

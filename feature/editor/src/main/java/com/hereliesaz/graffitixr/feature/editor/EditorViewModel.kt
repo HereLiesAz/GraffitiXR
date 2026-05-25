@@ -87,8 +87,13 @@ class EditorViewModel @Inject constructor(
     private val redoStack = ArrayDeque<EditCommand>()
     private val maxStackSize = 20
 
-    private val baseBitmaps = mutableMapOf<String, Bitmap>()
-    private val layerStrokes = mutableMapOf<String, MutableList<StrokeCommand>>()
+    // ConcurrentHashMap: these maps are read/written from the project-collect coroutine
+    // (io), stroke handlers, and the main thread. Plain mutableMapOf threw
+    // ConcurrentModificationException when a project change cleared them mid-write.
+    // (Per-layer stroke-list mutation is still single-path; deeper confinement is a
+    // follow-up.) Non-null keys/values only, so the no-null contract is satisfied.
+    private val baseBitmaps = java.util.concurrent.ConcurrentHashMap<String, Bitmap>()
+    private val layerStrokes = java.util.concurrent.ConcurrentHashMap<String, MutableList<StrokeCommand>>()
     private var pendingSaveJob: kotlinx.coroutines.Job? = null
 
     private var copiedLayerState: Layer? = null
@@ -358,7 +363,11 @@ class EditorViewModel @Inject constructor(
                     bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                // A swallowed failure here means the user's edits are silently lost.
+                android.util.Log.e("EditorViewModel", "Failed to save layer bitmap to $path", e)
+                withContext(dispatchers.main) {
+                    Toast.makeText(context, "Couldn't save your changes — storage may be full", Toast.LENGTH_LONG).show()
+                }
             }
         }
     }

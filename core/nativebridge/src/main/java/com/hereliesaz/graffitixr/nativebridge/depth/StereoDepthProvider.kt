@@ -27,16 +27,21 @@ class StereoDepthProvider @Inject constructor(
     private var prevHeight: Int = 0
 
     val isDualLensActive: Boolean
-        get() = stereoLeft != null && stereoRight != null
+        get() = synchronized(this) { stereoLeft != null && stereoRight != null }
 
     /**
      * Processes incoming stereo frames by mapping them into native memory space.
+     *
+     * Synchronized because frames may arrive from more than one producer thread
+     * (camera analysis / GL); without it the persistent direct buffers and their
+     * size bookkeeping can be torn or null-unwrapped mid-allocation.
      *
      * @param left The left camera frame data.
      * @param right The right camera frame data.
      * @param width Frame width.
      * @param height Frame height.
      */
+    @Synchronized
     fun processStereoFrames(left: ByteArray, right: ByteArray, width: Int, height: Int, timestamp: Long) {
         if (left.isEmpty() || right.isEmpty()) return
         val requiredSize = left.size
@@ -47,19 +52,13 @@ class StereoDepthProvider @Inject constructor(
             currentAllocationSize = requiredSize
         }
 
-        directLeftBuffer?.let {
-            it.clear()
-            it.put(left)
-            it.rewind()
-        }
+        val leftBuf = directLeftBuffer ?: return
+        val rightBuf = directRightBuffer ?: return
 
-        directRightBuffer?.let {
-            it.clear()
-            it.put(right)
-            it.rewind()
-        }
+        leftBuf.clear(); leftBuf.put(left); leftBuf.rewind()
+        rightBuf.clear(); rightBuf.put(right); rightBuf.rewind()
 
-        slamManager.feedStereoData(directLeftBuffer!!, directRightBuffer!!, width, height, timestamp)
+        slamManager.feedStereoData(leftBuf, rightBuf, width, height, timestamp)
     }
 
     /**
@@ -70,46 +69,54 @@ class StereoDepthProvider @Inject constructor(
      * @param width  Frame width.
      * @param height Frame height.
      */
+    @Synchronized
     fun submitFrame(yPlane: ByteBuffer, width: Int, height: Int, timestamp: Long) {
         val snapshot = yPlane.duplicate()  // independent position, shared backing data
         val frameSize = snapshot.remaining()
 
         if (stereoFrameSize != frameSize || stereoLeft == null) {
+            val prev = ByteBuffer.allocateDirect(frameSize)
             stereoLeft = ByteBuffer.allocateDirect(frameSize)
             stereoRight = ByteBuffer.allocateDirect(frameSize)
-            prevFrameBuffer = ByteBuffer.allocateDirect(frameSize)
+            prevFrameBuffer = prev
             stereoFrameSize = frameSize
-            prevFrameBuffer!!.put(snapshot)
-            prevFrameBuffer!!.rewind()
+            prev.put(snapshot)
+            prev.rewind()
             prevWidth = width
             prevHeight = height
             return
         }
 
+        // After the allocation guard above these are always non-null on this thread
+        // (state is mutated only under this lock), so capture locals and drop the !!.
+        val prev = prevFrameBuffer ?: return
+        val left = stereoLeft ?: return
+        val right = stereoRight ?: return
+
         if (prevWidth != width || prevHeight != height) {
-            prevFrameBuffer!!.clear()
-            prevFrameBuffer!!.put(snapshot)
-            prevFrameBuffer!!.rewind()
+            prev.clear()
+            prev.put(snapshot)
+            prev.rewind()
             prevWidth = width
             prevHeight = height
             return
         }
 
         // Left = previous frame, Right = current frame
-        stereoLeft!!.clear()
-        prevFrameBuffer!!.rewind()
-        stereoLeft!!.put(prevFrameBuffer!!)
-        stereoLeft!!.rewind()
+        left.clear()
+        prev.rewind()
+        left.put(prev)
+        left.rewind()
 
-        stereoRight!!.clear()
-        stereoRight!!.put(snapshot)
-        stereoRight!!.rewind()
+        right.clear()
+        right.put(snapshot)
+        right.rewind()
 
         // Advance previous frame to current
-        prevFrameBuffer!!.clear()
-        prevFrameBuffer!!.put(stereoRight!!.duplicate().also { it.rewind() })
-        prevFrameBuffer!!.rewind()
+        prev.clear()
+        prev.put(right.duplicate().also { it.rewind() })
+        prev.rewind()
 
-        slamManager.feedStereoData(stereoLeft!!, stereoRight!!, width, height, timestamp)
+        slamManager.feedStereoData(left, right, width, height, timestamp)
     }
 }

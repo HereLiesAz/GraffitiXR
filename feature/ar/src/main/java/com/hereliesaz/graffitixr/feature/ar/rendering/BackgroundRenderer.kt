@@ -6,11 +6,12 @@ import android.opengl.GLES30
 import android.util.Log
 import com.google.ar.core.Coordinates2d
 import com.google.ar.core.Frame
+import com.hereliesaz.graffitixr.common.util.GlReleasable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 
-class BackgroundRenderer {
+class BackgroundRenderer : GlReleasable {
     private lateinit var quadVertices: FloatBuffer
     private lateinit var quadTexCoord: FloatBuffer
     private lateinit var quadTexCoordTransformed: FloatBuffer
@@ -127,6 +128,15 @@ class BackgroundRenderer {
 
         GLES30.glDepthMask(true)
         GLES30.glEnable(GLES30.GL_DEPTH_TEST)
+    }
+
+    /**
+     * Deletes the camera-background shader program and the external-OES texture.
+     * Idempotent; must run on the GL thread.
+     */
+    override fun release() {
+        if (backgroundProgram != 0) { GLES30.glDeleteProgram(backgroundProgram); backgroundProgram = 0 }
+        if (textureId > 0) { GLES30.glDeleteTextures(1, intArrayOf(textureId), 0); textureId = -1 }
     }
 
     private fun loadShader(type: Int, shaderCode: String): Int {

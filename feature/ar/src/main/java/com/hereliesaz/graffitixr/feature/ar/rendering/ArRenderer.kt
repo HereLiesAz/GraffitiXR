@@ -41,8 +41,28 @@ class ArRenderer(
     // Fired once on the GL thread immediately after the primary anchor is
     // created. The ViewModel uses this to flip ArUiState.isAnchorEstablished,
     // which in turn unlocks the Design rail and advances scanPhase to COMPLETE.
-    private val onAnchorEstablished: () -> Unit = {}
+    private val onAnchorEstablished: () -> Unit = {},
+    // Fired from the GL thread when ARCore has been stuck not-tracking for a
+    // sustained run of frames (true) or recovers (false). MainScreen uses this
+    // to drop the GLSurfaceView render mode to WHEN_DIRTY so the saturated
+    // main thread can serve input again.
+    private val onTrackingLoopStuck: (Boolean) -> Unit = {}
 ) : GLSurfaceView.Renderer {
+
+    /**
+     * When true the render loop early-returns on the next tick instead of
+     * driving ARCore. Set by ArViewModel.exitArMode() so that mode-exit is
+     * effectively instantaneous from the user's perspective even if the
+     * session cleanup coroutine hasn't completed yet.
+     */
+    @Volatile var isDestroying: Boolean = false
+
+    // Consecutive frames the ARCore camera has reported a non-TRACKING state.
+    // When this crosses STUCK_THRESHOLD we fire onTrackingLoopStuck(true) so
+    // the host can downgrade GL render mode. We fire (false) on recovery.
+    private var consecutiveNotTrackingFrames = 0
+    private var trackingLoopStuckReported = false
+    private val stuckThresholdFrames = 30
 
     private val backgroundScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val sessionLock = ReentrantLock()
@@ -215,6 +235,9 @@ class ArRenderer(
 
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
+        // Mode-exit was requested: stop driving ARCore so teardown is effectively
+        // instantaneous and we never touch a session that is being closed.
+        if (isDestroying) return
         frameCount++
 
         sessionLock.withLock {
@@ -823,10 +846,33 @@ class ArRenderer(
         slamManager.updateAnchorTransform(anchorMat)
     }
 
+    /**
+     * Deletes all GL objects owned by the sub-renderers. MUST be invoked on the GL
+     * thread (e.g. via `GLSurfaceView.queueEvent`) while the EGL context is still
+     * alive — never directly from [destroy], which runs off the GL thread.
+     */
+    fun releaseGlResources() {
+        backgroundRenderer.release()
+        overlayRenderer.release()
+        pointCloudRenderer.release()
+        planeRenderer.release()
+        scanFogRenderer.release()
+    }
+
+    /**
+     * Non-GL teardown: stops the render loop, cancels the background coroutine
+     * scope (previously never cancelled — a coroutine leak), detaches the session,
+     * and drops retained references. Safe to call from any thread. GL objects are
+     * freed separately via [releaseGlResources] on the GL thread.
+     */
     fun destroy() {
+        isDestroying = true
         backgroundScope.cancel("Renderer detached and destroyed.")
         sessionLock.withLock {
             session = null
         }
+        anchorOrchestrator.clear()
+        pendingOverlayBitmap = null
+        latestFrame.set(null)
     }
 }
