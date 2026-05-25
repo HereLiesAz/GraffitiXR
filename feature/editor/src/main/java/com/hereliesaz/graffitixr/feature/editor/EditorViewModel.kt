@@ -83,9 +83,7 @@ class EditorViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState = _uiState.asStateFlow()
 
-    private val undoStack = ArrayDeque<EditCommand>()
-    private val redoStack = ArrayDeque<EditCommand>()
-    private val maxStackSize = 20
+    private val history = EditHistory()
 
     // ConcurrentHashMap: these maps are read/written from the project-collect coroutine
     // (io), stroke handlers, and the main thread. Plain mutableMapOf threw
@@ -204,8 +202,7 @@ class EditorViewModel @Inject constructor(
                     slamManager.clearMap()
                     baseBitmaps.clear()
                     layerStrokes.clear()
-                    undoStack.clear()
-                    redoStack.clear()
+                    history.clear()
                 }
             }
         }
@@ -227,36 +224,32 @@ class EditorViewModel @Inject constructor(
     }
 
     private fun pushHistory() {
-        val layersWithoutBitmaps = _uiState.value.layers.map { it.copy(bitmap = null) }
-        if (undoStack.isNotEmpty()) {
-            val last = undoStack.last()
-            if (last is EditCommand.PropertyChange && last.oldLayers == layersWithoutBitmaps) return
-        }
-        undoStack.addLast(EditCommand.PropertyChange(layersWithoutBitmaps))
-        if (undoStack.size > maxStackSize) undoStack.removeFirst()
-        redoStack.clear()
+        history.pushProperty(_uiState.value.layers.map { it.copy(bitmap = null) })
         updateHistoryCounts()
     }
 
     private fun updateHistoryCounts() {
-        _uiState.update { it.copy(undoCount = undoStack.size, redoCount = redoStack.size) }
+        _uiState.update { it.copy(undoCount = history.undoCount, redoCount = history.redoCount) }
     }
 
-    override fun onUndoClicked() {
-        if (undoStack.isEmpty()) return
-        val command = undoStack.removeLast()
+    /** The current layer set, stripped of bitmaps — what we record so an undo can be reverted. */
+    private fun currentLayerSnapshot(): List<Layer> = _uiState.value.layers.map { it.copy(bitmap = null) }
 
-        when(command) {
+    override fun onUndoClicked() {
+        val command = history.popUndo { undone ->
+            when (undone) {
+                is EditCommand.Draw -> undone
+                is EditCommand.PropertyChange -> EditCommand.PropertyChange(currentLayerSnapshot())
+            }
+        } ?: return
+
+        when (command) {
             is EditCommand.Draw -> {
-                redoStack.addLast(command)
                 val strokes = layerStrokes[command.layerId] ?: return
                 if (strokes.isNotEmpty()) strokes.removeAt(strokes.lastIndex)
                 rebuildLayerBitmap(command.layerId)
             }
             is EditCommand.PropertyChange -> {
-                val currentProps = _uiState.value.layers.map { it.copy(bitmap = null) }
-                redoStack.addLast(EditCommand.PropertyChange(currentProps))
-
                 val currentBitmaps = _uiState.value.layers.associate { it.id to it.bitmap }
                 val restoredLayers = command.oldLayers.map { it.copy(bitmap = currentBitmaps[it.id]) }
                 _uiState.update { it.copy(layers = restoredLayers) }
@@ -267,21 +260,21 @@ class EditorViewModel @Inject constructor(
     }
 
     override fun onRedoClicked() {
-        if (redoStack.isEmpty()) return
-        val command = redoStack.removeLast()
+        val command = history.popRedo { redone ->
+            when (redone) {
+                is EditCommand.Draw -> redone
+                is EditCommand.PropertyChange -> EditCommand.PropertyChange(currentLayerSnapshot())
+            }
+        } ?: return
 
-        when(command) {
+        when (command) {
             is EditCommand.Draw -> {
-                undoStack.addLast(command)
                 val strokes = layerStrokes[command.layerId] ?: mutableListOf()
                 strokes.add(command.command)
                 layerStrokes[command.layerId] = strokes
                 rebuildLayerBitmap(command.layerId)
             }
             is EditCommand.PropertyChange -> {
-                val currentProps = _uiState.value.layers.map { it.copy(bitmap = null) }
-                undoStack.addLast(EditCommand.PropertyChange(currentProps))
-
                 val currentBitmaps = _uiState.value.layers.associate { it.id to it.bitmap }
                 val restoredLayers = command.oldLayers.map { it.copy(bitmap = currentBitmaps[it.id]) }
                 _uiState.update { it.copy(layers = restoredLayers) }
@@ -338,9 +331,7 @@ class EditorViewModel @Inject constructor(
         currentStrokes.add(command)
         layerStrokes[layerId] = currentStrokes
 
-        undoStack.addLast(EditCommand.Draw(layerId, command))
-        if (undoStack.size > maxStackSize) undoStack.removeFirst()
-        redoStack.clear()
+        history.pushDraw(layerId, command)
         updateHistoryCounts()
 
         viewModelScope.launch(dispatchers.default) {
@@ -1310,9 +1301,7 @@ class EditorViewModel @Inject constructor(
             val currentStrokes = layerStrokes[layerId] ?: mutableListOf()
             currentStrokes.add(command)
             layerStrokes[layerId] = currentStrokes
-            undoStack.addLast(EditCommand.Draw(layerId, command))
-            if (undoStack.size > maxStackSize) undoStack.removeFirst()
-            redoStack.clear()
+            history.pushDraw(layerId, command)
             updateHistoryCounts()
 
             _uiState.update { s ->
@@ -1343,9 +1332,7 @@ class EditorViewModel @Inject constructor(
             val currentStrokes = layerStrokes[layerId] ?: mutableListOf()
             currentStrokes.add(command)
             layerStrokes[layerId] = currentStrokes
-            undoStack.addLast(EditCommand.Draw(layerId, command))
-            if (undoStack.size > maxStackSize) undoStack.removeFirst()
-            redoStack.clear()
+            history.pushDraw(layerId, command)
             updateHistoryCounts()
 
             // Commit: working bitmap becomes the displayed layer bitmap.
