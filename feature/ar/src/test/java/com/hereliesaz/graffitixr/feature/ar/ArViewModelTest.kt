@@ -177,14 +177,16 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `onCaptureConsumed recycles the displaced capture bitmap`() = runTest {
+    fun `onCaptureConsumed clears the capture bitmap without recycling it`() = runTest {
+        // Deliberately does NOT recycle: a background fingerprint/save coroutine may still hold
+        // the same instance. The reference is dropped (GC reclaims); recycle() must not be called.
         val mockBitmap = mockk<Bitmap>(relaxed = true)
         every { mockBitmap.isRecycled } returns false
         viewModel.setTempCapture(mockBitmap)
 
         viewModel.onCaptureConsumed()
 
-        verify { mockBitmap.recycle() }
+        verify(exactly = 0) { mockBitmap.recycle() }
         assertNull(viewModel.uiState.value.tempCaptureBitmap)
     }
 

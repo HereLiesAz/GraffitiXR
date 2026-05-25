@@ -31,7 +31,10 @@ class LayerTransformState(
 fun rememberLayerTransformState(
     activeLayer: OverlayLayer?
 ): LayerTransformState {
-    val state = remember {
+    // Key on the layer id: switching active layer forces a fresh state instance, so a switch
+    // that happens mid-gesture (isGesturing == true) can't carry the previous layer's transform
+    // onto the new one (the LaunchedEffect below skips the sync while gesturing).
+    val state = remember(activeLayer?.id) {
         LayerTransformState(
             initialScale = activeLayer?.scale ?: 1f,
             initialOffset = activeLayer?.offset ?: Offset.Zero,

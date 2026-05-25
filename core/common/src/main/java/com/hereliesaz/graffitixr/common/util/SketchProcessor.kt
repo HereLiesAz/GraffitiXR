@@ -3,6 +3,7 @@ package com.hereliesaz.graffitixr.common.util
 
 import android.graphics.Bitmap
 import org.opencv.android.Utils
+import timber.log.Timber
 import org.opencv.core.Core
 import org.opencv.core.CvType
 import org.opencv.core.Mat
@@ -35,25 +36,26 @@ object SketchProcessor {
      *                  or null if processing fails.
      */
     fun sketchEffect(bitmap: Bitmap, thickness: Int = 5, penColor: Int = android.graphics.Color.WHITE): Bitmap? {
+        val mats = mutableListOf<Mat>()
         return try {
             val clampedThickness = thickness.coerceAtLeast(1)
 
             // Step 1: Load bitmap into an OpenCV Mat and convert RGBA → grayscale
-            val src = Mat()
+            val src = Mat().also { mats.add(it) }
             Utils.bitmapToMat(bitmap, src)
 
-            val gray = Mat()
+            val gray = Mat().also { mats.add(it) }
             Imgproc.cvtColor(src, gray, Imgproc.COLOR_RGBA2GRAY)
             src.release()
 
             // Step 2: Invert grayscale (creates a "negative" layer)
-            val inverted = Mat()
+            val inverted = Mat().also { mats.add(it) }
             Core.bitwise_not(gray, inverted)
 
             // Step 3: Gaussian blur the inverted image
             // MUCH thicker lines: scale the thickness factor for larger kernels
             val kernelSide = (clampedThickness * 8 + 1).toDouble()
-            val blurred = Mat()
+            val blurred = Mat().also { mats.add(it) }
             Imgproc.GaussianBlur(inverted, blurred, Size(kernelSide, kernelSide), 0.0)
             inverted.release()
 
@@ -68,41 +70,41 @@ object SketchProcessor {
             //   result      = min(result_f, 255) → CV_8U
 
             // 255 - blurred via bitwise_not (equivalent for CV_8U, no scalar-first overload available)
-            val denominator8u = Mat()
+            val denominator8u = Mat().also { mats.add(it) }
             Core.bitwise_not(blurred, denominator8u)
             blurred.release()
 
             // Clamp denominator to [1, 255] so we never divide by zero
-            val denominatorClamped = Mat()
+            val denominatorClamped = Mat().also { mats.add(it) }
             Core.max(denominator8u, Scalar(1.0), denominatorClamped)
             denominator8u.release()
 
             // Promote both operands to float for the division
-            val grayFloat = Mat()
+            val grayFloat = Mat().also { mats.add(it) }
             gray.convertTo(grayFloat, CvType.CV_32F)
             gray.release()
 
-            val denomFloat = Mat()
+            val denomFloat = Mat().also { mats.add(it) }
             denominatorClamped.convertTo(denomFloat, CvType.CV_32F)
             denominatorClamped.release()
 
             // numerator = grayFloat * 255
-            val numeratorFloat = Mat()
+            val numeratorFloat = Mat().also { mats.add(it) }
             Core.multiply(grayFloat, Scalar(255.0), numeratorFloat)
             grayFloat.release()
 
             // divide element-wise
-            val dodgeFloat = Mat()
+            val dodgeFloat = Mat().also { mats.add(it) }
             Core.divide(numeratorFloat, denomFloat, dodgeFloat)
             numeratorFloat.release()
             denomFloat.release()
 
             // Clamp to [0, 255] and convert back to CV_8U
-            val dodgeClamped = Mat()
+            val dodgeClamped = Mat().also { mats.add(it) }
             Core.min(dodgeFloat, Scalar(255.0), dodgeClamped)
             dodgeFloat.release()
 
-            val sketchGray = Mat()
+            val sketchGray = Mat().also { mats.add(it) }
             dodgeClamped.convertTo(sketchGray, CvType.CV_8U)
             dodgeClamped.release()
 
@@ -127,8 +129,12 @@ object SketchProcessor {
             resultBitmap.setPixels(argbPixels, 0, w, 0, 0, w, h)
             resultBitmap
         } catch (e: Exception) {
-            e.printStackTrace()
+            Timber.e(e, "SketchProcessor: sketch conversion failed")
             null
+        } finally {
+            // Release any Mats still live if an OpenCV op threw mid-pipeline. The eager releases
+            // on the happy path remain; Mat.release() is idempotent, so double-release is safe.
+            mats.forEach { it.release() }
         }
     }
 }

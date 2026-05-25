@@ -67,7 +67,7 @@ fun EditorUi(
                         layers = uiState.layers,
                         activeLayerId = uiState.activeLayerId,
                         onSelectLayer = actions::onLayerActivated,
-                        onToggleVisibility = { /* Toggle logic */ },
+                        onToggleVisibility = actions::onToggleVisibility,
                         onClose = { actions.onDismissPanel() },
                         strings = strings
                     )

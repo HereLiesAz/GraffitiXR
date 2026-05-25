@@ -6,6 +6,8 @@ import com.hereliesaz.graffitixr.core.collaboration.wire.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.Socket
@@ -18,6 +20,10 @@ internal class GuestSession(
     private val localDeviceName: String,
     private val onBulkReceived: suspend (fingerprint: ByteArray, project: ByteArray) -> Unit,
     private val onOp: suspend (Op) -> Unit,
+    // How long (and how often) to retry reconnecting before giving up. Injectable so tests can
+    // use a short, deterministic window instead of waiting the full production 30s.
+    private val reconnectWindowMs: Long = 30_000L,
+    private val reconnectIntervalMs: Long = 2_000L,
 ) : Session() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -25,13 +31,36 @@ internal class GuestSession(
     @Volatile private var lastAppliedSeq: Long = 0L
     private var socket: Socket? = null
 
-    suspend fun connect() {
-        scope.launch { connectLoop(isReconnect = false) }
+    // Serializes writes to the host: the inbound loop (PONG) and the periodic DELTA_ACK loop
+    // both write to the same OutputStream, so without this lock their frames interleave.
+    private val writeMutex = Mutex()
+
+    private suspend fun writeFrame(output: OutputStream, type: FrameType, payload: ByteArray) {
+        writeMutex.withLock {
+            Frame.write(output, type, payload)
+            output.flush()
+        }
     }
 
-    private suspend fun connectLoop(isReconnect: Boolean) {
-        try {
-            val s = Socket(host, port)
+    suspend fun connect() {
+        scope.launch {
+            // connectLoop never throws; it returns false on a transient failure. On the very
+            // first attempt there is nothing to reconnect to, so a failure ends the session.
+            if (!connectLoop(isReconnect = false) && phase != Phase.Ended) {
+                close(CoopSessionState.EndReason.NetworkLost)
+            }
+        }
+    }
+
+    /**
+     * Attempts one connect+handshake. Returns true once the live phase has started, false on a
+     * transient failure (so the reconnect loop can retry). Terminal handshake rejections close
+     * the session themselves and return false; callers must check [phase] before re-closing.
+     */
+    private suspend fun connectLoop(isReconnect: Boolean): Boolean {
+        return try {
+            val s = Socket()
+            s.connect(java.net.InetSocketAddress(host, port), 5000)
             socket = s
             val input = s.getInputStream()
             val output = s.getOutputStream()
@@ -62,6 +91,7 @@ internal class GuestSession(
                     _state.value = CoopSessionState.Connected(peerName = "host")
                     phase = Phase.Live
                     livePhase(input, output)
+                    true
                 }
                 FrameType.HELLO_REJECTED -> {
                     val rej = OpCodec.decode<HelloRejectedPayload>(response.payload)
@@ -71,15 +101,16 @@ internal class GuestSession(
                         HelloRejectedPayload.RejectReason.AlreadyHosting -> CoopSessionState.EndReason.HostClosed
                     }
                     close(reason)
+                    false
                 }
-                else -> close(CoopSessionState.EndReason.ProtocolError)
+                else -> {
+                    close(CoopSessionState.EndReason.ProtocolError)
+                    false
+                }
             }
         } catch (e: Exception) {
-            if (isReconnect) {
-                close(CoopSessionState.EndReason.NetworkLost)
-            } else {
-                close(CoopSessionState.EndReason.NetworkLost)
-            }
+            // Transient: let the caller decide whether to retry (reconnect) or end the session.
+            false
         }
     }
 
@@ -101,13 +132,18 @@ internal class GuestSession(
     }
 
     private fun receiveChunked(input: InputStream, expectedType: FrameType, totalBytes: Int): ByteArray {
+        // totalBytes is peer-declared: reject negative/absurd sizes before allocating
+        // (NegativeArraySize / OOM), and never copy past the declared end even if a chunk
+        // overshoots (ArrayIndexOutOfBounds).
+        require(totalBytes in 0..MAX_BULK_BYTES) { "invalid bulk size $totalBytes" }
         val buffer = ByteArray(totalBytes)
         var offset = 0
         while (offset < totalBytes) {
             val frame = Frame.read(input) ?: error("EOF mid-bulk")
             require(frame.type == expectedType) { "expected $expectedType, got ${frame.type}" }
-            System.arraycopy(frame.payload, 0, buffer, offset, frame.payload.size)
-            offset += frame.payload.size
+            val len = minOf(frame.payload.size, totalBytes - offset)
+            System.arraycopy(frame.payload, 0, buffer, offset, len)
+            offset += len
         }
         return buffer
     }
@@ -132,8 +168,11 @@ internal class GuestSession(
                     }
                     FrameType.PING -> {
                         val ping = OpCodec.decode<PingPayload>(frame.payload)
-                        Frame.write(output, FrameType.PONG, OpCodec.encode(ping))
-                        output.flush()
+                        try {
+                            writeFrame(output, FrameType.PONG, OpCodec.encode(ping))
+                        } catch (e: Exception) {
+                            attemptReconnect(); return@launch
+                        }
                     }
                     FrameType.BYE -> {
                         val bye = OpCodec.decode<ByePayload>(frame.payload)
@@ -144,39 +183,47 @@ internal class GuestSession(
             }
         }
         scope.launch {
-            // Periodic DELTA_ACK.
+            // Periodic DELTA_ACK. Terminate on write failure so a stale ack loop from a prior
+            // connection doesn't linger and double up after a reconnect.
             while (scope.isActive) {
                 delay(1_000)
                 try {
-                    Frame.write(output, FrameType.DELTA_ACK, OpCodec.encode(DeltaAckPayload(lastAppliedSeq)))
-                    output.flush()
-                } catch (_: Exception) { /* let inbound loop handle */ }
+                    writeFrame(output, FrameType.DELTA_ACK, OpCodec.encode(DeltaAckPayload(lastAppliedSeq)))
+                } catch (_: Exception) {
+                    return@launch
+                }
             }
         }
     }
 
     private suspend fun attemptReconnect() {
+        if (phase == Phase.Ended) return
         phase = Phase.Reconnecting
         _state.value = CoopSessionState.Reconnecting
-        socket?.close()
+        try { socket?.close() } catch (_: Exception) {}
         socket = null
-        val deadline = System.currentTimeMillis() + 30_000L
-        while (System.currentTimeMillis() < deadline) {
-            delay(2_000)
-            try {
-                connectLoop(isReconnect = true)
-                return // succeeded, connectLoop transitioned state
-            } catch (_: Exception) {
-                // try again
-            }
+        val deadline = System.currentTimeMillis() + reconnectWindowMs
+        while (System.currentTimeMillis() < deadline && phase != Phase.Ended) {
+            delay(reconnectIntervalMs)
+            // connectLoop returns true only once the live phase is running again. (It no longer
+            // throws, so the previous single-shot try/return bug — which gave up after one
+            // attempt — is gone.)
+            if (connectLoop(isReconnect = true)) return
+            // A terminal rejection during reconnect already closed the session.
+            if (phase == Phase.Ended) return
         }
-        close(CoopSessionState.EndReason.NetworkLost)
+        if (phase != Phase.Ended) close(CoopSessionState.EndReason.NetworkLost)
     }
 
     override suspend fun close(reason: CoopSessionState.EndReason) {
         phase = Phase.Ended
         _state.value = CoopSessionState.Ended(reason)
-        socket?.close()
+        try { socket?.close() } catch (_: Exception) {}
         scope.cancel()
+    }
+
+    private companion object {
+        // Generous cap on a full project bulk transfer; rejects malformed/hostile declared sizes.
+        const val MAX_BULK_BYTES = 256 * 1024 * 1024
     }
 }

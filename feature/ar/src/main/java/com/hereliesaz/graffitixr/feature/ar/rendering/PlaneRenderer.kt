@@ -24,7 +24,7 @@ class PlaneRenderer : GlReleasable {
     private var planeColorUniform = 0
     private var isOutlineUniform = 0
 
-    private val vertexBuffer = ByteBuffer.allocateDirect(1000 * 4) // Reusable buffer (Float = 4 bytes)
+    private var vertexBuffer = ByteBuffer.allocateDirect(1000 * 4) // Reusable buffer (Float = 4 bytes), grown on demand
         .order(ByteOrder.nativeOrder())
         .asFloatBuffer()
 
@@ -97,6 +97,13 @@ class PlaneRenderer : GlReleasable {
 
     private fun drawPlane(plane: Plane, viewMatrix: FloatArray, projectionMatrix: FloatArray) {
         val polygon = plane.polygon
+        if (polygon.remaining() > vertexBuffer.capacity()) {
+            // Large/merged plane polygons exceed the initial 500-vertex buffer; grow to fit
+            // instead of throwing BufferOverflowException out of the GL frame.
+            vertexBuffer = ByteBuffer.allocateDirect(polygon.remaining() * 4)
+                .order(ByteOrder.nativeOrder())
+                .asFloatBuffer()
+        }
         vertexBuffer.clear()
         vertexBuffer.put(polygon)
         vertexBuffer.flip()

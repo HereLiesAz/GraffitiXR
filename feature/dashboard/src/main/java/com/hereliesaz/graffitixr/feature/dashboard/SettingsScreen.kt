@@ -85,7 +85,7 @@ fun SettingsScreen(
     muralMethod: MuralMethod,
     onMuralMethodChanged: (MuralMethod) -> Unit,
     onCheckForUpdates: () -> Unit,
-    onInstallUpdate: () -> Unit,
+    onOpenUpdatePage: () -> Unit,
     onResetTutorials: () -> Unit,
     onClose: () -> Unit,
     strings: AppStrings
@@ -303,9 +303,9 @@ fun SettingsScreen(
                                         .weight(1f)
                                         .clickable(
                                             enabled = isUpdateAvailable,
-                                            onClick = onInstallUpdate,
+                                            onClick = onOpenUpdatePage,
                                             role = Role.Button,
-                                            onClickLabel = strings.settings.installUpdate
+                                            onClickLabel = strings.settings.getUpdate
                                         )
                                 ) {
                                     Text(text = strings.settings.checkUpdates, fontWeight = FontWeight.Medium)

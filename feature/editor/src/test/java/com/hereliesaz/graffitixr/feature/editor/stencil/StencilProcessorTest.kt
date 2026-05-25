@@ -8,9 +8,11 @@ import android.graphics.Paint
 import com.hereliesaz.graffitixr.common.model.StencilLayer
 import com.hereliesaz.graffitixr.common.model.StencilLayerType
 import com.hereliesaz.graffitixr.common.model.TonalPolarity
+import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkConstructor
+import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.spyk
 import io.mockk.unmockkAll
@@ -125,6 +127,11 @@ class StencilProcessorTest {
         mockkStatic(org.opencv.imgproc.Imgproc::class)
         mockkStatic(org.opencv.core.Core::class)
         mockkConstructor(org.opencv.core.Mat::class)
+
+        // StencilProcessor's init block calls NativeLibLoader.loadAll(), which throws on a host
+        // JVM (the .so is Android-arm only). No-op it so the processor can be constructed.
+        mockkObject(NativeLibLoader)
+        every { NativeLibLoader.loadAll() } returns Unit
 
         // Build the processor under test as a spy so we can mock private methods
         processor = spyk(StencilProcessor(), recordPrivateCalls = true)

@@ -100,11 +100,16 @@ class AnchorOrchestrator {
         // Simple linear interpolation of quaternions (normalized) for n-way blend
         // Note: For higher precision, use actual SO(3) averaging.
         val avgQuat = FloatArray(4)
+        // Use a fixed reference (the first quaternion) for the hemisphere check. Seeding the
+        // accumulator at {0,0,0,0} made the first dot product 0, so the flip was meaningless and
+        // near-antipodal quats could cancel toward zero — forcing the identity fallback below and
+        // silently discarding the blended orientation.
+        val ref = quats.firstOrNull() ?: floatArrayOf(0f, 0f, 0f, 1f)
         for (i in 0 until quats.size) {
             val q = quats[i]
             val w = weights[i] / weightSum
-            // Ensure quaternions are in the same hemisphere to avoid cancellation
-            val dot = q[0] * avgQuat[0] + q[1] * avgQuat[1] + q[2] * avgQuat[2] + q[3] * avgQuat[3]
+            // Ensure quaternions are in the same hemisphere as the reference to avoid cancellation
+            val dot = q[0] * ref[0] + q[1] * ref[1] + q[2] * ref[2] + q[3] * ref[3]
             val sign = if (dot >= 0) 1.0f else -1.0f
             
             avgQuat[0] += q[0] * w * sign

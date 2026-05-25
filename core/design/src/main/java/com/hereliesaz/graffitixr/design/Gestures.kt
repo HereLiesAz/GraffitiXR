@@ -3,7 +3,6 @@ package com.hereliesaz.graffitixr.design
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
-import androidx.compose.foundation.gestures.calculateCentroidSize
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateRotation
 import androidx.compose.foundation.gestures.calculateZoom
@@ -11,7 +10,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.positionChanged
-import kotlin.math.PI
 import kotlin.math.abs
 
 suspend fun PointerInputScope.detectSmartOverlayGestures(
@@ -43,7 +41,6 @@ suspend fun PointerInputScope.detectSmartOverlayGestures(
             val isChanged = pointerInputChanges.any { it.positionChanged() }
             if (!isChanged) continue
 
-            val centroidSize = event.calculateCentroidSize(useCurrent = false)
             val zoomChange = event.calculateZoom()
             val rotationChange = event.calculateRotation()
             val panChange = event.calculatePan()
@@ -53,11 +50,12 @@ suspend fun PointerInputScope.detectSmartOverlayGestures(
                 rotation += rotationChange
                 pan += panChange
 
-                val centroidSizeChange = abs(centroidSize - event.calculateCentroidSize(useCurrent = true))
-                val rotationChangeDegrees = abs(rotation * 180f / PI.toFloat())
+                // calculateRotation() already returns degrees; the old `rotation * 180/PI`
+                // treated the accumulated degrees as radians and tripped the slop ~57x too early.
+                val rotationDegrees = abs(rotation)
                 val panAmount = pan.getDistance()
 
-                if (zoom > 1.1f || zoom < 0.9f || rotationChangeDegrees > 10.0 || panAmount > touchSlop) {
+                if (zoom > 1.1f || zoom < 0.9f || rotationDegrees > 10.0 || panAmount > touchSlop) {
                     pastTouchSlop = true
                 }
             }

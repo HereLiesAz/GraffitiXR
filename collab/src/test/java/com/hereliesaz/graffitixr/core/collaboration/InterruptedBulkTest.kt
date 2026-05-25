@@ -37,6 +37,10 @@ class InterruptedBulkTest {
             localDeviceName = "guest",
             onBulkReceived = { _, _ -> },
             onOp = { },
+            // Short, deterministic reconnect window so the test doesn't wait the production 30s
+            // (which raced the old 35s timeout under parallel-module load).
+            reconnectWindowMs = 1_000L,
+            reconnectIntervalMs = 200L,
         )
         guest.connect()
 
@@ -46,10 +50,8 @@ class InterruptedBulkTest {
         // Force-close the host.
         host.close(CoopSessionState.EndReason.NetworkLost)
 
-        // Guest should transition to Ended within a reasonable timeout.
-        // Note: GuestSession's reconnect logic will retry for up to 30s before
-        // giving up, so we allow up to 35s.
-        val state = withTimeout(35_000) {
+        // Guest should transition to Ended once the (here-shortened ~1s) reconnect window lapses.
+        val state = withTimeout(10_000) {
             guest.state.first { it is CoopSessionState.Ended }
         }
         assertTrue("expected Ended state, got $state", state is CoopSessionState.Ended)

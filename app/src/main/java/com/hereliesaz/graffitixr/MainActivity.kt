@@ -477,6 +477,12 @@ class MainActivity : ComponentActivity() {
                     onscreen {
                         if (isExporting) return@onscreen
 
+                        // Single source of truth for the auto-fired-overlay modal gate. The rule
+                        // is that auto overlays (onboarding, AR-unavailable explainer) must
+                        // early-return on EVERY modal, not just one — collapsing the repeated
+                        // boolean chains here prevents a future overlay from forgetting one.
+                        val anyModalActive = showLibrary || showSettings || isExporting || mainUiState.isCapturingTarget
+
                         LaunchedEffect(
                             editorUiState.editorMode,
                             showLibrary,
@@ -484,12 +490,12 @@ class MainActivity : ComponentActivity() {
                             isExporting,
                             mainUiState.isCapturingTarget
                         ) {
-                            if (showLibrary || showSettings || isExporting || mainUiState.isCapturingTarget) return@LaunchedEffect
+                            if (anyModalActive) return@LaunchedEffect
                             if (editorUiState.layers.isNotEmpty()) return@LaunchedEffect
                             activeOnboarding = onboardings[editorUiState.editorMode]
                         }
 
-                        if (!showLibrary && !showSettings && !isExporting && !mainUiState.isCapturingTarget) {
+                        if (!anyModalActive) {
                             activeOnboarding?.let { ob ->
                                 ModeOnboardingOverlay(
                                     onboarding = ob,
@@ -508,7 +514,7 @@ class MainActivity : ComponentActivity() {
                         val arUnavailableLines = remember {
                             context.resources.getStringArray(DesignR.array.onboarding_ar_unavailable).toList()
                         }
-                        if (!showLibrary && !showSettings && !isExporting && !mainUiState.isCapturingTarget &&
+                        if (!anyModalActive &&
                             arUiState.isArCoreAvailabilityResolved &&
                             !arUiState.isArCoreAvailable &&
                             arExplainerKey !in completedTutorials &&
@@ -939,7 +945,7 @@ class MainActivity : ComponentActivity() {
                                     muralMethod = arUiState.muralMethod,
                                     onMuralMethodChanged = { arViewModel.setMuralMethod(it) },
                                     onCheckForUpdates = { dashboardViewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
-                                    onInstallUpdate = { dashboardViewModel.installUpdate(this@MainActivity) },
+                                    onOpenUpdatePage = { dashboardViewModel.openUpdatePage(this@MainActivity) },
                                     onResetTutorials = { settingsViewModel.resetCompletedTutorials() },
                                     onClose = { showSettings = false },
                                     strings = strings
@@ -2457,17 +2463,17 @@ private fun RelocStatusBadge(
     if (relocState == RelocState.IDLE) return
 
     val infiniteTransition = rememberInfiniteTransition(label = "reloc_pulse")
-    val pulseAlpha by if (relocState == RelocState.SEARCHING) {
-        infiniteTransition.animateFloat(
-            initialValue = 0.4f, targetValue = 1f, label = "pulse",
-            animationSpec = infiniteRepeatable(
-                animation = tween(700, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse
-            )
+    // Always call animateFloat (never inside an if/else) and select the value, so the set of
+    // composable/remember slots stays stable when relocState flips SEARCHING↔TRACKING — the
+    // conditional hook call could otherwise corrupt the slot table.
+    val animatedAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f, targetValue = 1f, label = "pulse",
+        animationSpec = infiniteRepeatable(
+            animation = tween(700, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
         )
-    } else {
-        remember { mutableStateOf(1f) }
-    }
+    )
+    val pulseAlpha = if (relocState == RelocState.SEARCHING) animatedAlpha else 1f
 
     val dotColor = if (relocState == RelocState.TRACKING) Color(0xFF66BB6A) else Color(0xFFFFCA28)
     val label = when (relocState) {

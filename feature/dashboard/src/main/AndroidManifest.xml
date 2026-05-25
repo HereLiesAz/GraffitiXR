@@ -2,17 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application>
-        <!--
-            exported="true" is required because the intent is sent by the
-            system's DownloadManager, which is an external application.
-        -->
-        <receiver
-            android:name=".ApkInstallReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
-            </intent-filter>
-        </receiver>
+        <!-- No direct APK installation; user is pointed to GitHub releases. -->
     </application>
 
 </manifest>

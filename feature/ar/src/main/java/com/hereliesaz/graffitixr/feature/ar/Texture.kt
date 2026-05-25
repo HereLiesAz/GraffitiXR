@@ -6,8 +6,6 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Log
 import java.io.BufferedInputStream
-import java.io.IOException
-import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -21,19 +19,22 @@ class Texture {
         @JvmStatic
         fun loadTextureFromUri(context: Context, uri: Uri): Texture? {
             return try {
-                val inputStream = context.contentResolver.openInputStream(uri)
-                val bufferedStream = BufferedInputStream(inputStream)
-                val bitMap = BitmapFactory.decodeStream(bufferedStream)
-                val data = IntArray(bitMap.width * bitMap.height)
-                bitMap.getPixels(
-                    data, 0, bitMap.width, 0, 0,
-                    bitMap.width, bitMap.height
-                )
-                loadTextureFromIntBuffer(
-                    data, bitMap.width,
-                    bitMap.height
-                )
-            } catch (e: IOException) {
+                context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    val bufferedStream = BufferedInputStream(inputStream)
+                    // decodeStream returns null (it does NOT throw) on a corrupt/unsupported
+                    // stream; without this guard bitMap.width below NPEs and escapes the catch.
+                    val bitMap = BitmapFactory.decodeStream(bufferedStream) ?: return@use null
+                    val data = IntArray(bitMap.width * bitMap.height)
+                    bitMap.getPixels(
+                        data, 0, bitMap.width, 0, 0,
+                        bitMap.width, bitMap.height
+                    )
+                    loadTextureFromIntBuffer(
+                        data, bitMap.width,
+                        bitMap.height
+                    )
+                }
+            } catch (e: Exception) {
                 Log.e("Texture", "Failed to load texture from URI: $uri", e)
                 null
             }
@@ -44,23 +45,21 @@ class Texture {
             fileName: String,
             assets: AssetManager
         ): Texture? {
-            val inputStream: InputStream
             return try {
-                inputStream = assets.open(fileName, AssetManager.ACCESS_BUFFER)
-                val bufferedStream = BufferedInputStream(
-                    inputStream
-                )
-                val bitMap = BitmapFactory.decodeStream(bufferedStream)
-                val data = IntArray(bitMap.width * bitMap.height)
-                bitMap.getPixels(
-                    data, 0, bitMap.width, 0, 0,
-                    bitMap.width, bitMap.height
-                )
-                loadTextureFromIntBuffer(
-                    data, bitMap.width,
-                    bitMap.height
-                )
-            } catch (e: IOException) {
+                assets.open(fileName, AssetManager.ACCESS_BUFFER).use { inputStream ->
+                    val bufferedStream = BufferedInputStream(inputStream)
+                    val bitMap = BitmapFactory.decodeStream(bufferedStream) ?: return@use null
+                    val data = IntArray(bitMap.width * bitMap.height)
+                    bitMap.getPixels(
+                        data, 0, bitMap.width, 0, 0,
+                        bitMap.width, bitMap.height
+                    )
+                    loadTextureFromIntBuffer(
+                        data, bitMap.width,
+                        bitMap.height
+                    )
+                }
+            } catch (e: Exception) {
                 Log.e("Texture", "Failed to load texture '$fileName' from APK")
                 Log.d("Texture", e.message.toString())
                 null

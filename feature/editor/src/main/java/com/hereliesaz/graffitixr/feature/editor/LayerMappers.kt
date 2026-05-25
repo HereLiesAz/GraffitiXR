@@ -29,7 +29,9 @@ fun Layer.toOverlayLayer(): OverlayLayer {
         isSketch = isSketch,
         textParams = textParams,
         isLinked = isLinked,
-        isInverted = isInverted
+        isInverted = isInverted,
+        stencilType = stencilType,
+        stencilSourceId = stencilSourceId
     )
 }
 
@@ -57,7 +59,9 @@ fun OverlayLayer.toLayer(): Layer {
         isSketch = isSketch,
         textParams = textParams,
         isLinked = isLinked,
-        isInverted = isInverted
+        isInverted = isInverted,
+        stencilType = stencilType,
+        stencilSourceId = stencilSourceId
     )
 }
 

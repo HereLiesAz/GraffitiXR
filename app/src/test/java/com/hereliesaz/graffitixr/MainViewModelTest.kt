@@ -4,9 +4,12 @@ import android.content.Context
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
+import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -25,12 +28,14 @@ class MainViewModelTest {
     private val projectRepository: ProjectRepository = mockk(relaxed = true)
     private val slamManager: SlamManager = mockk(relaxed = true)
     private val projectManager: ProjectManager = mockk(relaxed = true)
+    private val settingsRepository: SettingsRepository = mockk(relaxed = true)
     private val context: Context = mockk(relaxed = true)
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        viewModel = MainViewModel(projectRepository, slamManager, projectManager, context)
+        every { settingsRepository.completedTutorials } returns flowOf(emptySet<String>())
+        viewModel = MainViewModel(projectRepository, slamManager, projectManager, settingsRepository, context)
     }
 
     @After

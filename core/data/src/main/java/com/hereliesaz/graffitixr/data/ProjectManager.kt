@@ -116,7 +116,25 @@ class ProjectManager @Inject constructor(
         )
 
         val jsonString = json.encodeToString(updatedGraffitiProject)
-        File(root, "project.json").writeText(jsonString)
+        atomicWriteText(File(root, "project.json"), jsonString)
+    }
+
+    /**
+     * Writes [text] to [target] atomically: stream into a sibling temp file then rename
+     * over the target, so a crash/kill/IO-error mid-write can never leave a truncated
+     * project.json that would fail to parse and silently drop the project on next load.
+     */
+    private fun atomicWriteText(target: File, text: String) {
+        val tmp = File(target.parentFile, "${target.name}.tmp")
+        tmp.writeText(text)
+        if (!tmp.renameTo(target)) {
+            // Some filesystems won't rename onto an existing file; replace explicitly.
+            target.delete()
+            if (!tmp.renameTo(target)) {
+                target.writeText(text)
+                tmp.delete()
+            }
+        }
     }
 
     suspend fun loadProject(context: Context, projectId: String): LoadedProject? = withContext(Dispatchers.IO) {

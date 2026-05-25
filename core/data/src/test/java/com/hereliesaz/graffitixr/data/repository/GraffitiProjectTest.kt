@@ -6,6 +6,8 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -55,5 +57,14 @@ class GraffitiProjectTest {
         assertEquals("Test Project", project.name)
         assertEquals(true, project.layers[0].isImageLocked)
         assertEquals(listOf(0f, 1f, 2f, 3f), project.layers[0].warpMesh)
+
+        // Actually exercise serialization — the test name promised a round-trip but only ever
+        // checked the constructed object's fields, so a serialization regression went uncaught.
+        val decoded = json.decodeFromString<GraffitiProject>(json.encodeToString(project))
+        assertEquals("test-id", decoded.id)
+        assertEquals("Test Project", decoded.name)
+        assertEquals(true, decoded.layers[0].isImageLocked)
+        assertEquals(listOf(0f, 1f, 2f, 3f), decoded.layers[0].warpMesh)
+        assertEquals("/path/to/fingerprint", decoded.targetFingerprintPath)
     }
 }

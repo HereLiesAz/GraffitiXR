@@ -21,21 +21,31 @@ class DualAnalyzer(
     private var lastLightUpdate = -lightIntervalMs
 
     override fun analyze(image: ImageProxy) {
-        val now = clock()
+        try {
+            val now = clock()
 
-        // 1. SLAM Tracking (Every Frame - primarily for Stereo Depth fallback)
-        if (onSlamFrame != null && image.planes.isNotEmpty()) {
-            val yBuffer = image.planes[0].buffer
-            onSlamFrame.invoke(yBuffer, image.width, image.height, image.imageInfo.timestamp)
+            // 1. SLAM Tracking (Every Frame - primarily for Stereo Depth fallback)
+            if (onSlamFrame != null && image.planes.isNotEmpty()) {
+                val yBuffer = image.planes[0].buffer
+                // The plane buffer is backed by the ImageProxy and is recycled the moment
+                // image.close() runs below. Copy it out so a consumer that reads the frame
+                // asynchronously can never touch freed native memory (use-after-free).
+                val copy = ByteBuffer.allocateDirect(yBuffer.remaining())
+                copy.put(yBuffer)
+                copy.rewind()
+                onSlamFrame.invoke(copy, image.width, image.height, image.imageInfo.timestamp)
+            }
+
+            // 2. Light Estimation
+            if (now - lastLightUpdate >= lightIntervalMs) {
+                lastLightUpdate = now
+                estimateLight(image)
+            }
+        } finally {
+            // Always close: a throw in onSlamFrame/estimateLight must not starve the
+            // ImageReader of buffers (which would silently stall the analyzer).
+            image.close()
         }
-
-        // 2. Light Estimation
-        if (now - lastLightUpdate >= lightIntervalMs) {
-            lastLightUpdate = now
-            estimateLight(image)
-        }
-
-        image.close()
     }
 
     private fun estimateLight(image: ImageProxy) {

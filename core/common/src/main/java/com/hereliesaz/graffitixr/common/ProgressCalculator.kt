@@ -13,19 +13,27 @@ fun calculateProgress(paths: List<Path>, bitmap: Bitmap): Int {
     val height = bitmap.height
     if (width == 0 || height == 0) return 0
 
-    val canvas = Canvas(bitmap)
-    val paint = Paint().apply {
-        color = Color.Red.toArgb()
-        strokeWidth = 5f
-        style = Paint.Style.STROKE
+    // Draw onto a throwaway transparent bitmap: never mutate the caller's bitmap, and count
+    // only the stroke pixels. (Drawing onto `bitmap` and counting all non-zero pixels both
+    // corrupted the caller's image and counted the entire opaque image as "progress".)
+    val scratch = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    return try {
+        val canvas = Canvas(scratch)
+        val paint = Paint().apply {
+            color = Color.Red.toArgb()
+            strokeWidth = 5f
+            style = Paint.Style.STROKE
+        }
+
+        paths.forEach { path ->
+            canvas.drawPath(path.asAndroidPath(), paint)
+        }
+
+        val pixels = IntArray(width * height)
+        scratch.getPixels(pixels, 0, width, 0, 0, width, height)
+
+        pixels.count { it != 0 }
+    } finally {
+        scratch.recycle()
     }
-
-    paths.forEach { path ->
-        canvas.drawPath(path.asAndroidPath(), paint)
-    }
-
-    val pixels = IntArray(width * height)
-    bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-
-    return pixels.count { it != 0 }
 }

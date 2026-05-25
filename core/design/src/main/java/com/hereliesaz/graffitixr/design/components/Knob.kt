@@ -76,6 +76,13 @@ fun Knob(
     val haptic = LocalHapticFeedback.current
     val updatedValue by rememberUpdatedState(value)
     val updatedOnValueChange by rememberUpdatedState(onValueChange)
+    // The pointerInput blocks are keyed on Unit (created once), so wrap the rest of the captured
+    // state in rememberUpdatedState too — otherwise a recomposition with a different range/default
+    // would keep using the values from first composition (wrong sensitivity / reset target).
+    val updatedOnStart by rememberUpdatedState(onValueChangeStart)
+    val updatedOnFinished by rememberUpdatedState(onValueChangeFinished)
+    val updatedDefault by rememberUpdatedState(defaultValue)
+    val updatedRange by rememberUpdatedState(valueRange)
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -101,26 +108,30 @@ fun Knob(
                 detectTapGestures(
                     onDoubleTap = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        updatedOnValueChange(defaultValue)
+                        // Bracket the reset with start/finished so consumers that wrap a value
+                        // change in an undo transaction record the double-tap reset too.
+                        updatedOnStart?.invoke()
+                        updatedOnValueChange(updatedDefault)
+                        updatedOnFinished?.invoke()
                     }
                 )
             }
             .pointerInput(Unit) {
                 detectDragGestures(
-                    onDragStart = { onValueChangeStart?.invoke() },
-                    onDragEnd = { onValueChangeFinished?.invoke() },
-                    onDragCancel = { onValueChangeFinished?.invoke() }
+                    onDragStart = { updatedOnStart?.invoke() },
+                    onDragEnd = { updatedOnFinished?.invoke() },
+                    onDragCancel = { updatedOnFinished?.invoke() }
                 ) { change, dragAmount ->
                     change.consume()
                     // Sensitivity: full range in 300dp drag
                     val sensitivityPx = with(density) { 300.dp.toPx() }
-                    val sensitivity = (valueRange.endInclusive - valueRange.start) / sensitivityPx
+                    val sensitivity = (updatedRange.endInclusive - updatedRange.start) / sensitivityPx
 
-                    val newValue = (updatedValue - dragAmount.y * sensitivity).coerceIn(valueRange.start, valueRange.endInclusive)
+                    val newValue = (updatedValue - dragAmount.y * sensitivity).coerceIn(updatedRange.start, updatedRange.endInclusive)
 
                     // Haptic feedback when crossing default value
-                    if ((updatedValue < defaultValue && newValue >= defaultValue) ||
-                        (updatedValue > defaultValue && newValue <= defaultValue)) {
+                    if ((updatedValue < updatedDefault && newValue >= updatedDefault) ||
+                        (updatedValue > updatedDefault && newValue <= updatedDefault)) {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     }
 

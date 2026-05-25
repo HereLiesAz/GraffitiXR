@@ -440,7 +440,7 @@
     <string name="settings_version_label">Version</string>
     <string name="settings_updates_section">Updates</string>
     <string name="settings_check_updates_label">Check for experimental updates</string>
-    <string name="settings_install_update_label">Install Update</string>
+    <string name="settings_install_update_label">Get Update</string>
     <string name="settings_permissions_section">Permissions</string>
     <string name="settings_camera_access">Camera Access</string>
     <string name="settings_photo_access">Photo Library Access</string>

@@ -14,6 +14,8 @@ import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
+import com.hereliesaz.graffitixr.common.coop.OpEmitter
+import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.feature.editor.stencil.StencilProcessor
 import com.hereliesaz.graffitixr.feature.editor.stencil.StencilPrintEngine
@@ -57,11 +59,17 @@ class EditorViewModelTest {
     private val projectManager: ProjectManager = mockk(relaxed = true)
     private val exportManager: com.hereliesaz.graffitixr.feature.editor.export.ExportManager = mockk(relaxed = true)
     private val slamManager: SlamManager = mockk(relaxed = true)
+    private val opEmitter: OpEmitter = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
+        // The OpenCV-backed singletons (ImageProcessor, SketchProcessor, StencilProcessor, …) call
+        // NativeLibLoader.loadAll() in their init blocks; on a host JVM that throws (the .so is
+        // Android-arm only). No-op it so those objects can initialise and have their methods mocked.
+        mockkObject(NativeLibLoader)
+        every { NativeLibLoader.loadAll() } returns Unit
         // Emit a test project so projectId is non-null, enabling onAddLayer to work
         val testProject = GraffitiProject(id = "test-project")
         currentProjectFlow.value = testProject
@@ -120,7 +128,7 @@ class EditorViewModelTest {
         viewModel = EditorViewModel(
             projectRepository, settingsRepository, projectManager, exportManager, context,
             subjectIsolator, stencilProcessor, stencilPrintEngine, slamManager,
-            testDispatcherProvider
+            testDispatcherProvider, opEmitter
         )
     }
 
@@ -134,6 +142,7 @@ class EditorViewModelTest {
         unmockkObject(com.hereliesaz.graffitixr.common.util.ImageUtils)
         unmockkObject(TextRasterizer)
         unmockkObject(GoogleFontCache)
+        unmockkObject(NativeLibLoader)
     }
 
     @Test
@@ -456,5 +465,99 @@ class EditorViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals(layerCountBefore, viewModel.uiState.value.layers.size)
+    }
+
+    // ==================== Layer-state characterization (refactor safety net) ====================
+    // These pin the observable behavior of the layer-management operations a future LayerManager
+    // extraction must preserve. They seed state via setLayers() and avoid OpenCV, so they run in
+    // plain JVM. If an extraction changes behavior, these go red. advanceUntilIdle() runs FIRST so
+    // the init currentProject-collect (which seeds layers from the empty test project) settles
+    // before setLayers() seeds the real fixture.
+
+    private fun lyr(id: String, name: String = id) = Layer(id = id, name = name)
+
+    @Test
+    fun `characterize onLayerReordered reorders layers by the given id order`() = runTest {
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.setLayers(listOf(lyr("a"), lyr("b"), lyr("c")))
+        viewModel.onLayerReordered(listOf("c", "a", "b"))
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(listOf("c", "a", "b"), viewModel.uiState.value.layers.map { it.id })
+    }
+
+    @Test
+    fun `characterize onLayerRenamed renames only the target layer`() = runTest {
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.setLayers(listOf(lyr("a", "Alpha"), lyr("b", "Beta")))
+        viewModel.onLayerRenamed("a", "Renamed")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val layers = viewModel.uiState.value.layers
+        assertEquals("Renamed", layers.first { it.id == "a" }.name)
+        assertEquals("Beta", layers.first { it.id == "b" }.name)
+    }
+
+    @Test
+    fun `characterize onToggleVisibility flips only the target layer`() = runTest {
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.setLayers(listOf(lyr("a"), lyr("b")))
+        viewModel.onToggleVisibility("a")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val layers = viewModel.uiState.value.layers
+        assertFalse(layers.first { it.id == "a" }.isVisible)
+        assertTrue(layers.first { it.id == "b" }.isVisible)
+    }
+
+    @Test
+    fun `characterize onOpacityChanged updates only the active layer`() = runTest {
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.setLayers(listOf(lyr("a"), lyr("b")))
+        viewModel.onLayerActivated("a")
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.onOpacityChanged(0.25f)
+        testDispatcher.scheduler.advanceUntilIdle()
+        val layers = viewModel.uiState.value.layers
+        assertEquals(0.25f, layers.first { it.id == "a" }.opacity)
+        assertEquals(1.0f, layers.first { it.id == "b" }.opacity)
+    }
+
+    @Test
+    fun `characterize onCycleBlendMode changes the active layer blend mode`() = runTest {
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.setLayers(listOf(lyr("a")))
+        viewModel.onLayerActivated("a")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val before = viewModel.uiState.value.layers.first().blendMode
+        viewModel.onCycleBlendMode()
+        testDispatcher.scheduler.advanceUntilIdle()
+        val after = viewModel.uiState.value.layers.first().blendMode
+        assertTrue("blend mode should advance", before != after)
+    }
+
+    @Test
+    fun `characterize onLayerDuplicated appends a copy and activates it`() = runTest {
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.setLayers(listOf(lyr("a", "Alpha")))
+        viewModel.onLayerActivated("a")
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.onLayerDuplicated("a")
+        testDispatcher.scheduler.advanceUntilIdle()
+        val layers = viewModel.uiState.value.layers
+        assertEquals(2, layers.size)
+        val dup = layers.first { it.name == "Alpha Copy" }
+        assertEquals(dup.id, viewModel.uiState.value.activeLayerId)
+    }
+
+    @Test
+    fun `characterize setEditorMode preserves layers but clears transient overlay state`() = runTest {
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.setLayers(listOf(lyr("a"), lyr("b")))
+        viewModel.setEditorMode(EditorMode.MOCKUP)
+        testDispatcher.scheduler.advanceUntilIdle()
+        val st = viewModel.uiState.value
+        assertEquals(EditorMode.MOCKUP, st.editorMode)
+        assertEquals(listOf("a", "b"), st.layers.map { it.id })
+        assertNull(st.segmentationPreview)
+        assertNull(st.liveStrokeBitmap)
+        assertFalse(st.isSegmenting)
     }
 }
