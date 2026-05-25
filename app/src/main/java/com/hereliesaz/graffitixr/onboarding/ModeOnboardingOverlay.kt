@@ -27,9 +27,21 @@ import kotlin.random.Random
 fun ModeOnboardingOverlay(
     onboarding: ModeOnboarding,
     onDismiss: () -> Unit,
+) = ModeOnboardingOverlay(stepKey = onboarding.mode, lines = onboarding.lines, onDismiss = onDismiss)
+
+/**
+ * Generic tap-to-advance onboarding overlay over arbitrary [lines]. [stepKey] resets the
+ * step counter when it changes (so a new rail-item context starts from line 0) and seeds
+ * the popup zone. Used both for per-mode onboarding and for rail-tap tutorial text.
+ */
+@Composable
+fun ModeOnboardingOverlay(
+    stepKey: Any,
+    lines: List<String>,
+    onDismiss: () -> Unit,
 ) {
-    var step by rememberSaveable(onboarding.mode) { mutableStateOf(0) }
-    val line = onboarding.lines.getOrNull(step)
+    var step by rememberSaveable(stepKey) { mutableStateOf(0) }
+    val line = lines.getOrNull(step)
     if (line == null) {
         onDismiss()
         return
@@ -38,23 +50,26 @@ fun ModeOnboardingOverlay(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(onboarding.mode) {
+            .pointerInput(stepKey) {
                 detectTapGestures {
                     val next = step + 1
-                    if (next >= onboarding.lines.size) onDismiss() else step = next
+                    if (next >= lines.size) onDismiss() else step = next
                 }
             }
     ) {
-        // Pick one of nine in-bounds zones based on a (mode, step) seed so the
+        // Pick one of nine in-bounds zones based on a (key, step) seed so the
         // text moves between popups but never the same zone twice in a row.
-        val zone = remember(onboarding.mode, step) {
-            zoneForSeed(onboarding.mode.ordinal * 1000 + step, prevStep = step - 1, prevMode = onboarding.mode.ordinal)
+        val seed = stepKey.hashCode()
+        val zone = remember(stepKey, step) {
+            zoneForSeed(seed * 1000 + step, prevStep = step - 1, prevMode = seed)
         }
 
         Box(
             modifier = Modifier
                 .align(zone)
-                .padding(horizontal = 32.dp, vertical = 48.dp)
+                // Reserve the bottom strip so a bottom-zone line never lands behind the editor's
+                // undo / redo / magic-wand FABs. Top stays at 48dp; bottom clears the FAB row.
+                .padding(start = 32.dp, end = 32.dp, top = 48.dp, bottom = 140.dp)
                 .widthIn(max = maxWidth * 0.75f)
         ) {
             // Drop-shadow halo so plain text reads on any background.

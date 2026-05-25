@@ -36,7 +36,11 @@ data class MainUiState(
     val isInPlaneRealignment: Boolean = false,
     // True when the current capture was initiated via the tap-to-target path (Phase 4).
     val captureOriginatedFromTap: Boolean = false,
-    val tutorialCompleted: Map<String, Boolean> = emptyMap()
+    val tutorialCompleted: Map<String, Boolean> = emptyMap(),
+    // When true, interacting with a rail item surfaces that item's existing tutorial text.
+    val tutorialModeActive: Boolean = false,
+    // The rail-item id whose tutorial text is currently being shown (null = none).
+    val currentTutorialId: String? = null
 )
 
 @HiltViewModel
@@ -56,6 +60,38 @@ class MainViewModel @Inject constructor(
 
     fun markTutorialCompletePersistent(key: String) {
         viewModelScope.launch { settingsRepository.markTutorialComplete(key) }
+    }
+
+    /** Toggle the tutorial walkthrough mode. Tapping rail items only shows text while this is on. */
+    fun toggleTutorialMode() {
+        _uiState.update { it.copy(tutorialModeActive = !it.tutorialModeActive, currentTutorialId = null) }
+    }
+
+    /**
+     * Called on every rail interaction. Surfaces that item's existing tutorial text, gated by
+     * [shouldShowTutorial]. We don't author new text here — [id] is looked up against the existing
+     * onboarding/help strings at the call site.
+     */
+    fun onRailTap(id: String) {
+        if (shouldShowTutorial(id)) {
+            _uiState.update { it.copy(currentTutorialId = id) }
+        }
+    }
+
+    /** Dismiss the currently shown tutorial text and remember it as seen so it won't nag again. */
+    fun dismissCurrentTutorial() {
+        _uiState.value.currentTutorialId?.let { markTutorialCompletePersistent(it) }
+        _uiState.update { it.copy(currentTutorialId = null) }
+    }
+
+    /**
+     * The single policy gate for the whole tap→tutorial flow. Currently: only while tutorial mode
+     * is on, and only the first time each item is tapped (until-seen). To show on *every* tap
+     * instead, change the body to `return true`.
+     */
+    private fun shouldShowTutorial(id: String): Boolean {
+        val st = _uiState.value
+        return st.tutorialModeActive && id !in completedTutorials.value
     }
 
     fun setTouchLocked(locked: Boolean) {

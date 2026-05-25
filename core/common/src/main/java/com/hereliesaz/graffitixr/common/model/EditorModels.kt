@@ -156,4 +156,7 @@ data class EditorUiState(
     val isStencilGenerating: Boolean = false,
     val stencilButtonPosition: Offset = Offset.Zero,
     val stencilHintVisible: Boolean = false,
+    // One-shot: set to a freshly-created text layer's id so the UI can immediately open its
+    // edit-text box. Cleared once consumed.
+    val autoEditTextLayerId: String? = null,
 )
