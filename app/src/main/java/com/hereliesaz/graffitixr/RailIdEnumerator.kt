@@ -13,25 +13,37 @@ import com.hereliesaz.graffitixr.common.model.Layer
  *   - design.wall only registered in MOCKUP mode
  *   - scan_mode_cycle / coop.main only in AR mode
  */
-internal fun enumerateRailItemIds(layers: List<Layer>, mode: EditorMode): Set<String> {
-    val ids = mutableSetOf<String>()
+internal fun enumerateRailItemIds(layers: List<Layer>, mode: EditorMode): Set<String> =
+    enumerateRailItemIdRegistrations(layers, mode).toSet()
+
+/**
+ * Same registrations as [enumerateRailItemIds] but in registration order and WITH
+ * duplicates preserved.
+ *
+ * AzNavRail throws IllegalArgumentException at runtime the moment an ID is registered
+ * twice — a duplicate "project.host" once took the whole app down on launch. The Set form
+ * above hides such collisions; this list form lets a unit test (RailIdUniquenessTest) catch
+ * them at build time instead of in users' hands.
+ */
+internal fun enumerateRailItemIdRegistrations(layers: List<Layer>, mode: EditorMode): List<String> {
+    val ids = mutableListOf<String>()
 
     // Mode menu
-    ids += setOf(
+    ids += listOf(
         "mode.host", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace",
         "wearable.main",
     )
     if (mode == EditorMode.AR) {
-        ids += setOf("target.scanModeToggle", "coop.main")
+        ids += listOf("target.scanModeToggle", "coop.main")
     }
 
     // Target menu (AR only)
     if (mode == EditorMode.AR) {
-        ids += setOf("target.host", "target.create")
+        ids += listOf("target.host", "target.create")
     }
 
     // Design menu
-    ids += setOf(
+    ids += listOf(
         "design.host", "design.addImg", "design.addDraw", "design.addText",
     )
     if (mode == EditorMode.MOCKUP) {
@@ -39,17 +51,17 @@ internal fun enumerateRailItemIds(layers: List<Layer>, mode: EditorMode): Set<St
     }
 
     // Project menu
-    ids += setOf(
+    ids += listOf(
         "project.host.main", "project.new", "project.save", "project.load",
         "project.export", "project.settings",
     )
 
     // Global tools
-    ids += setOf("tool.light", "tool.lockTrace", "tool.helpMain")
+    ids += listOf("tool.light", "tool.lockTrace", "tool.helpMain")
 
     // Per-layer
     layers.forEach { layer ->
-        ids += setOf(
+        ids += listOf(
             layerId(layer),
             layerId(layer, "editText"),
             layerId(layer, "size.brush"),

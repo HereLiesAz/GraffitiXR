@@ -14,6 +14,7 @@ import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
+import com.hereliesaz.graffitixr.common.coop.OpEmitter
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.feature.editor.stencil.StencilProcessor
 import com.hereliesaz.graffitixr.feature.editor.stencil.StencilPrintEngine
@@ -57,6 +58,7 @@ class EditorViewModelTest {
     private val projectManager: ProjectManager = mockk(relaxed = true)
     private val exportManager: com.hereliesaz.graffitixr.feature.editor.export.ExportManager = mockk(relaxed = true)
     private val slamManager: SlamManager = mockk(relaxed = true)
+    private val opEmitter: OpEmitter = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
@@ -120,7 +122,7 @@ class EditorViewModelTest {
         viewModel = EditorViewModel(
             projectRepository, settingsRepository, projectManager, exportManager, context,
             subjectIsolator, stencilProcessor, stencilPrintEngine, slamManager,
-            testDispatcherProvider
+            testDispatcherProvider, opEmitter
         )
     }
 
