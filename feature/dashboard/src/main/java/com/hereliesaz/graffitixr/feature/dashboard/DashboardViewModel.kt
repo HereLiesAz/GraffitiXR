@@ -38,7 +38,14 @@ class DashboardViewModel @Inject constructor(
     }
 
     fun openProject(project: GraffitiProject) {
-        viewModelScope.launch { repository.loadProject(project.id) }
+        viewModelScope.launch {
+            repository.loadProject(project.id).onFailure { e ->
+                // Previously the Result was discarded, so a missing/corrupt project failed
+                // silently. Log it and refresh the list so a deleted project stops lingering.
+                android.util.Log.e("DashboardViewModel", "Failed to open project ${project.id}", e)
+                loadAvailableProjects()
+            }
+        }
     }
 
     fun onNewProjectTriggered() {

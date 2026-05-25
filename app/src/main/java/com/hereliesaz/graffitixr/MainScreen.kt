@@ -39,7 +39,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
+import com.hereliesaz.graffitixr.common.model.FeedbackEvent
 import com.hereliesaz.graffitixr.common.model.Tool
+import android.widget.Toast
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.CameraPreview
 import com.hereliesaz.graffitixr.feature.ar.FreezePreviewScreen
@@ -76,6 +78,19 @@ fun MainScreen(
 
     val bgColor = if (uiState.editorMode == EditorMode.AR || uiState.editorMode == EditorMode.OVERLAY) Transparent else uiState.canvasBackground
     Box(modifier = Modifier.fillMaxSize().background(bgColor)) {
+
+        // Surface one-off AR failures (camera unavailable, session-init failure) as a toast
+        // so the user isn't left on a silent frozen preview.
+        LaunchedEffect(Unit) {
+            arViewModel.feedback.collect { event ->
+                val message = when (event) {
+                    is FeedbackEvent.Error -> event.message
+                    is FeedbackEvent.Toast -> event.message
+                    else -> null
+                }
+                if (message != null) Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            }
+        }
 
         DisposableEffect(lifecycleOwner) {
             if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {

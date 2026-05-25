@@ -477,6 +477,7 @@ class EditorViewModel @Inject constructor(
 
     fun saveProject(name: String? = null) {
         viewModelScope.launch(dispatchers.io) {
+            try {
             val currentProject = projectRepository.currentProject.value
             val updatedLayers = _uiState.value.layers.map { it.toOverlayLayer() }
 
@@ -510,6 +511,13 @@ class EditorViewModel @Inject constructor(
 
             if (name != null) {
                 exportProjectInternal(manifestToSave)
+            }
+            } catch (e: Exception) {
+                // Don't let a failed save die silently — the user believes their work is safe.
+                android.util.Log.e("EditorViewModel", "Failed to save project", e)
+                withContext(dispatchers.main) {
+                    Toast.makeText(context, "Couldn't save the project — storage may be full", Toast.LENGTH_LONG).show()
+                }
             }
         }
     }

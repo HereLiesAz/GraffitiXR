@@ -78,6 +78,11 @@ class ArViewModel @Inject constructor(
     private val _unfreezeRequested = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val unfreezeRequested: SharedFlow<Unit> = _unfreezeRequested.asSharedFlow()
 
+    // One-off, user-facing feedback (e.g. "camera unavailable") so AR failures surface
+    // instead of leaving a silent black screen. Collected by the screen and shown as a toast.
+    private val _feedback = MutableSharedFlow<com.hereliesaz.graffitixr.common.model.FeedbackEvent>(extraBufferCapacity = 4)
+    val feedback: SharedFlow<com.hereliesaz.graffitixr.common.model.FeedbackEvent> = _feedback.asSharedFlow()
+
     private val _hostQrPayload = MutableStateFlow<String?>(null)
     val hostQrPayload: StateFlow<String?> = _hostQrPayload
 
@@ -536,6 +541,11 @@ class ArViewModel @Inject constructor(
             renderer?.attachSession(s)
         } catch (e: Exception) {
             Timber.e(e, "Failed to create ARCore session")
+            // Surface the failure instead of leaving the user on a frozen black AR screen.
+            _isCameraInUseByAr.value = false
+            _feedback.tryEmit(
+                com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error("Couldn't start AR — your camera may be in use by another app", e)
+            )
         }
     }
 
@@ -551,6 +561,11 @@ class ArViewModel @Inject constructor(
             startAutoSave()
         } catch (e: CameraNotAvailableException) {
             Timber.e(e, "Camera not available for ARCore")
+            // Permission revoked at runtime, or the camera is held elsewhere. Tell the user
+            // rather than leaving a frozen preview.
+            _feedback.tryEmit(
+                com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error("Camera unavailable — check the camera permission, then re-enter AR", e)
+            )
         } catch (e: Exception) {
             Timber.e(e, "Failed to resume ARCore session")
         }
