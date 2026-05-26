@@ -418,6 +418,11 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
+                // Window-space bounds of each rail item, reported by AzNavRail's
+                // onItemGloballyPositioned. Drives the tutorial pointer that aims at the item the
+                // current walkthrough step is asking the user to interact with.
+                val railItemBounds = remember { androidx.compose.runtime.mutableStateMapOf<String, androidx.compose.ui.geometry.Rect>() }
+
                 AzHostActivityLayout(navController = navController, currentDestination = currentRoute, initiallyExpanded = false) {
                     azTheme(
                         activeColor = Cyan,
@@ -433,7 +438,14 @@ class MainActivity : ComponentActivity() {
                     azAdvanced(
                         helpEnabled = true,
                         helpList = allHelpItems,
-                        tutorials = tutorials
+                        tutorials = tutorials,
+                        // Single, reliable advancement signal: AzNavRail reports every rail
+                        // interaction (tap, toggle, cycler, nested-rail open, reloc drag) here, so
+                        // the do-it-to-advance walkthrough advances when the user performs the
+                        // targeted action. Replaces the scattered per-item onRailTap calls.
+                        onInteraction = { id, _ -> mainViewModel.onRailInteraction(id) },
+                        // Window-space bounds per item, so the walkthrough can point at its target.
+                        onItemGloballyPositioned = { id, rect -> railItemBounds[id] = rect }
                     )
 
                     if (isRailVisible) {
@@ -484,7 +496,17 @@ class MainActivity : ComponentActivity() {
                         // early-return on EVERY modal, not just one — collapsing the repeated
                         // boolean chains here prevents a future overlay from forgetting one.
                         val anyModalActive = showLibrary || showSettings || isExporting || mainUiState.isCapturingTarget
-                        val railTutorialLines = rememberRailTutorialLines(strings)
+
+                        // The ordered do-it-to-advance walkthrough for the current mode/layers.
+                        // Derived from the rail enumeration + help/text maps so it always matches
+                        // what's actually on the rail; remembered, so it only changes on mode/layer
+                        // changes and the effect below doesn't re-fire every recomposition.
+                        val tutorialSeq = rememberTutorialSequence(strings, editorUiState.layers, editorUiState.editorMode)
+                        LaunchedEffect(tutorialSeq, mainUiState.tutorialModeActive) {
+                            if (mainUiState.tutorialModeActive) {
+                                mainViewModel.setTutorialSequence(tutorialSeq)
+                            }
+                        }
 
                         // Auto-open the edit-text box the instant a new text layer is created.
                         // The new layer's rail item must compose first (with its hidden menu
@@ -503,39 +525,34 @@ class MainActivity : ComponentActivity() {
                             showLibrary,
                             showSettings,
                             isExporting,
-                            mainUiState.isCapturingTarget
+                            mainUiState.isCapturingTarget,
+                            mainUiState.tutorialModeActive
                         ) {
                             if (anyModalActive) return@LaunchedEffect
-                            if (mainUiState.tutorialModeActive) {
-                                // Tutorial mode: *switching* mode surfaces that mode's onboarding text.
-                                // (Keyed on editorMode only, so merely toggling tutorial mode while
-                                // already in a mode doesn't blast the onboarding over the rail.)
-                                mainViewModel.onRailTap("mode." + editorUiState.editorMode.name.lowercase())
-                                return@LaunchedEffect
-                            }
+                            // Tutorial mode drives its own walkthrough overlay (below); don't also
+                            // auto-fire the first-run onboarding underneath it.
+                            if (mainUiState.tutorialModeActive) return@LaunchedEffect
                             // First-run behaviour: auto-onboard a brand-new (empty) project per mode.
                             if (editorUiState.layers.isNotEmpty()) return@LaunchedEffect
                             activeOnboarding = onboardings[editorUiState.editorMode]
                         }
 
                         if (!anyModalActive) {
-                            val tutId = mainUiState.currentTutorialId
-                            if (tutId != null) {
-                                // Tap-driven tutorial: show the existing text linked to this rail id.
-                                val lines = railTutorialLines(tutId)
-                                if (lines.isNotEmpty()) {
-                                    ModeOnboardingOverlay(
-                                        positionKey = tutId,
-                                        step = mainUiState.currentTutorialStep,
-                                        lines = lines,
-                                        onAdvance = { mainViewModel.advanceTutorial() },
-                                        onDismiss = { mainViewModel.dismissCurrentTutorial() }
-                                    )
-                                } else {
-                                    // No text mapped for this id — clear it without nagging.
-                                    LaunchedEffect(tutId) { mainViewModel.dismissCurrentTutorial() }
-                                }
-                            } else {
+                            val currentStep = mainUiState.tutorialSteps.getOrNull(mainUiState.tutorialStepIndex)
+                            if (mainUiState.tutorialModeActive && currentStep != null) {
+                                // Do-it-to-advance walkthrough: show the current step's instruction.
+                                // It advances when the user performs the targeted interaction
+                                // (onInteraction -> onRailInteraction); the screen tap / idle timer
+                                // here advance via advanceTutorialIdle so a stuck user isn't trapped.
+                                ModeOnboardingOverlay(
+                                    positionKey = currentStep.targetId,
+                                    step = mainUiState.tutorialLineIndex,
+                                    lines = currentStep.lines,
+                                    onAdvance = { mainViewModel.advanceTutorialIdle() },
+                                    onDismiss = { mainViewModel.dismissCurrentTutorial() },
+                                    targetBounds = railItemBounds[currentStep.targetId]
+                                )
+                            } else if (!mainUiState.tutorialModeActive) {
                                 activeOnboarding?.let { ob ->
                                     ModeOnboardingOverlay(
                                         onboarding = ob,
@@ -1124,7 +1141,7 @@ class MainActivity : ComponentActivity() {
             // start. Until resolved, default to showing it.
             val showArModeEntry = !arUiState.isArCoreAvailabilityResolved || arUiState.isArCoreAvailable
 
-            azRailHostItem(id = "mode.host", text = navStrings.modes, color = navItemColor, onClick = { mainViewModel.onRailTap("mode.host") })
+            azRailHostItem(id = "mode.host", text = navStrings.modes, color = navItemColor)
             if (showArModeEntry) {
                 azRailSubItem(id = "mode.ar", hostId = "mode.host", text = navStrings.arMode, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE)
             }
@@ -1200,7 +1217,6 @@ class MainActivity : ComponentActivity() {
                 color = navItemColor,
                 shape = AzButtonShape.RECTANGLE
             ) {
-                mainViewModel.onRailTap("wearable.main")
                 when (arViewModel.glassesSessionState.value) {
                     com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.Idle ->
                         arViewModel.startGlassesSession()
@@ -1212,10 +1228,9 @@ class MainActivity : ComponentActivity() {
             azDivider()
 
             if (isArMode) {
-                azRailHostItem(id = "target.host", text = navStrings.grid, color = navItemColor, onClick = { mainViewModel.onRailTap("target.host") })
+                azRailHostItem(id = "target.host", text = navStrings.grid, color = navItemColor)
 
                 azRailSubItem(id = "target.create", hostId = "target.host", text = navStrings.create, color = navItemColor, shape = AzButtonShape.NONE) {
-                    mainViewModel.onRailTap("target.create")
                     if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
                 }
 
@@ -1228,23 +1243,19 @@ class MainActivity : ComponentActivity() {
             else true
 
             if (canEdit && arUiState.coopRole != CoopRole.GUEST) {
-                azRailHostItem(id = "design.host", text = navStrings.design, color = navItemColor, onClick = { mainViewModel.onRailTap("design.host") })
+                azRailHostItem(id = "design.host", text = navStrings.design, color = navItemColor)
                 azRailSubItem(id = "design.addImg", hostId = "design.host", text = navStrings.image, color = navItemColor, shape = AzButtonShape.NONE) {
-                    mainViewModel.onRailTap("design.addImg")
                     overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
                 azRailSubItem(id = "design.addDraw", hostId = "design.host", text = navStrings.draw, color = navItemColor, shape = AzButtonShape.NONE) {
-                    mainViewModel.onRailTap("design.addDraw")
                     editorViewModel.onAddBlankLayer()
                 }
                 azRailSubItem(id = "design.addText", hostId = "design.host", text = navStrings.text, color = navItemColor, shape = AzButtonShape.NONE) {
-                    mainViewModel.onRailTap("design.addText")
                     editorViewModel.onAddTextLayer()
                 }
 
                 if (editorUiState.editorMode == EditorMode.MOCKUP) {
                     azRailSubItem(id = "design.wall", hostId = "design.host", text = navStrings.wall, color = navItemColor, shape = AzButtonShape.NONE) {
-                        mainViewModel.onRailTap("design.wall")
                         showWallSourceDialog = true
                     }
                 }
@@ -1252,23 +1263,19 @@ class MainActivity : ComponentActivity() {
                 azDivider()
             }
 
-            azRailHostItem(id = "project.host.main", text = navStrings.project, color = navItemColor, onClick = { mainViewModel.onRailTap("project.host.main") })
+            azRailHostItem(id = "project.host.main", text = navStrings.project, color = navItemColor)
             azRailSubItem(id = "project.new", hostId = "project.host.main", text = navStrings.new, color = navItemColor, shape = AzButtonShape.NONE) {
-                mainViewModel.onRailTap("project.new")
                 dashboardViewModel.onNewProjectTriggered()
             }
             azRailSubItem(id = "project.save", hostId = "project.host.main", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE) {
-                mainViewModel.onRailTap("project.save")
                 showSaveDialog = true
             }
             azRailSubItem(id = "project.load", hostId = "project.host.main", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {
-                mainViewModel.onRailTap("project.load")
                 navController.navigate(LIBRARY_ROUTE) {
                     launchSingleTop = true
                 }
             }
             azRailSubItem(id = "project.export", hostId = "project.host.main", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE) {
-                mainViewModel.onRailTap("project.export")
                 if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
                     arViewModel.requestExport { bgBitmap ->
                         editorViewModel.exportImage(bgBitmap)
@@ -1278,7 +1285,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
             azRailSubItem(id = "project.settings", hostId = "project.host.main", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE) {
-                mainViewModel.onRailTap("project.settings")
                 showSettings = true
             }
 
@@ -1307,7 +1313,6 @@ class MainActivity : ComponentActivity() {
                         forceHiddenMenuOpen = forceOpenHiddenMenu,
                         onHiddenMenuDismiss = { layerMenusOpen[layer.id] = false },
                         onClick = {
-                            mainViewModel.onRailTap(layerId(layer))
                             editorViewModel.onLayerActivated(layer.id)
                             editorViewModel.setActiveTool(Tool.NONE)
                         },
@@ -1853,7 +1858,7 @@ class MainActivity : ComponentActivity() {
             azDivider()
 
             if (editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY) {
-                azRailItem(id = "tool.light", text = navStrings.light, color = navItemColor, onClick = { mainViewModel.onRailTap("tool.light"); arViewModel.toggleFlashlight() })
+                azRailItem(id = "tool.light", text = navStrings.light, color = navItemColor, onClick = { arViewModel.toggleFlashlight() })
             }
 
             val lockText = if (editorUiState.editorMode == EditorMode.TRACE) strings.editor.lock else strings.editor.freeze
@@ -1869,7 +1874,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
-            azRailItem(id = "tool.lockTrace", text = lockText, color = navItemColor, onClick = { mainViewModel.onRailTap("tool.lockTrace"); lockAction() })
+            azRailItem(id = "tool.lockTrace", text = lockText, color = navItemColor, onClick = { lockAction() })
 
             azDivider()
 

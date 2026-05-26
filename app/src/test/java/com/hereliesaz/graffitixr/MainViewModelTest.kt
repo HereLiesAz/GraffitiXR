@@ -75,71 +75,153 @@ class MainViewModelTest {
         assertEquals(CaptureStep.REVIEW, viewModel.uiState.value.captureStep)
     }
 
+    // --- Do-it-to-advance walkthrough ---------------------------------------------------------
+
+    /** A small sequence: a single-line step, then a two-line step, then another single-line step. */
+    private fun sampleSequence() = listOf(
+        TutorialStep("mode.host", listOf("pick a mode")),
+        TutorialStep("design.host", listOf("design line 1", "design line 2")),
+        TutorialStep("project.host.main", listOf("manage your project")),
+    )
+
     @Test
-    fun `onRailTap does nothing while tutorial mode is off`() = runTest {
-        viewModel.onRailTap("mode.host")
-        assertEquals(null, viewModel.uiState.value.currentTutorialId)
+    fun `setTutorialSequence is ignored while tutorial mode is off`() = runTest {
+        viewModel.setTutorialSequence(sampleSequence())
+        assertEquals(emptyList<TutorialStep>(), viewModel.uiState.value.tutorialSteps)
     }
 
     @Test
-    fun `onRailTap starts tutorial when none is showing`() = runTest {
-        viewModel.toggleTutorialMode()
+    fun `onRailInteraction does nothing while tutorial mode is off`() = runTest {
+        // Even with a sequence installed, no advancement happens unless the mode is on.
+        viewModel.onRailInteraction("mode.host")
+        assertEquals(0, viewModel.uiState.value.tutorialStepIndex)
+    }
 
-        viewModel.onRailTap("mode.host")
+    @Test
+    fun `matching interaction advances to the next step`() = runTest {
+        viewModel.toggleTutorialMode()
+        viewModel.setTutorialSequence(sampleSequence())
+
+        viewModel.onRailInteraction("mode.host")
 
         val state = viewModel.uiState.value
-        assertEquals("mode.host", state.currentTutorialId)
-        assertEquals(0, state.currentTutorialStep)
+        assertEquals(1, state.tutorialStepIndex)
+        assertEquals(0, state.tutorialLineIndex)
     }
 
     @Test
-    fun `onRailTap advances current tutorial when one is showing`() = runTest {
+    fun `matching interaction walks lines before moving to the next step`() = runTest {
         viewModel.toggleTutorialMode()
-        viewModel.onRailTap("mode.host")
+        viewModel.setTutorialSequence(sampleSequence())
+        viewModel.onRailInteraction("mode.host") // -> step 1 (design.host), line 0
 
-        // A second rail tap advances the showing card rather than replacing it.
-        viewModel.onRailTap("design.host")
+        // design.host has two lines: first matching interaction bumps the line, not the step.
+        viewModel.onRailInteraction("design.host")
+        var state = viewModel.uiState.value
+        assertEquals(1, state.tutorialStepIndex)
+        assertEquals(1, state.tutorialLineIndex)
+
+        // Second one exhausts the lines and moves to the final step.
+        viewModel.onRailInteraction("design.host")
+        state = viewModel.uiState.value
+        assertEquals(2, state.tutorialStepIndex)
+        assertEquals(0, state.tutorialLineIndex)
+    }
+
+    @Test
+    fun `non-matching interaction is ignored`() = runTest {
+        viewModel.toggleTutorialMode()
+        viewModel.setTutorialSequence(sampleSequence())
+
+        viewModel.onRailInteraction("project.host.main") // not the current target (mode.host)
 
         val state = viewModel.uiState.value
-        assertEquals("mode.host", state.currentTutorialId)
-        assertEquals(1, state.currentTutorialStep)
+        assertEquals(0, state.tutorialStepIndex)
+        assertEquals(0, state.tutorialLineIndex)
     }
 
     @Test
-    fun `advanceTutorial increments the step`() = runTest {
+    fun `advanceTutorialIdle advances without an id match`() = runTest {
         viewModel.toggleTutorialMode()
-        viewModel.onRailTap("mode.host")
+        viewModel.setTutorialSequence(sampleSequence())
 
-        viewModel.advanceTutorial()
-        viewModel.advanceTutorial()
+        viewModel.advanceTutorialIdle()
 
-        assertEquals(2, viewModel.uiState.value.currentTutorialStep)
+        assertEquals(1, viewModel.uiState.value.tutorialStepIndex)
     }
 
     @Test
-    fun `dismissCurrentTutorial clears id and resets step`() = runTest {
+    fun `advancing past the last step clears the sequence but keeps the mode on`() = runTest {
         viewModel.toggleTutorialMode()
-        viewModel.onRailTap("mode.host")
-        viewModel.advanceTutorial()
+        viewModel.setTutorialSequence(sampleSequence())
+
+        // mode.host -> design(line0) -> design(line1) -> project -> (end)
+        repeat(5) { viewModel.advanceTutorialIdle() }
+
+        val state = viewModel.uiState.value
+        assertEquals(emptyList<TutorialStep>(), state.tutorialSteps)
+        assertEquals(0, state.tutorialStepIndex)
+        assertEquals(0, state.tutorialLineIndex)
+        assertEquals(true, state.tutorialModeActive)
+    }
+
+    @Test
+    fun `setTutorialSequence preserves position when the current target still exists`() = runTest {
+        viewModel.toggleTutorialMode()
+        viewModel.setTutorialSequence(sampleSequence())
+        viewModel.onRailInteraction("mode.host") // now on design.host (index 1)
+
+        // A mode/layer change rebuilds the sequence; design.host is still present at a new index.
+        viewModel.setTutorialSequence(
+            listOf(
+                TutorialStep("project.host.main", listOf("manage your project")),
+                TutorialStep("design.host", listOf("design line 1", "design line 2")),
+            )
+        )
+
+        val state = viewModel.uiState.value
+        assertEquals("design.host", state.tutorialSteps[state.tutorialStepIndex].targetId)
+        assertEquals(1, state.tutorialStepIndex)
+    }
+
+    @Test
+    fun `setTutorialSequence restarts at step 0 when the current target is gone`() = runTest {
+        viewModel.toggleTutorialMode()
+        viewModel.setTutorialSequence(sampleSequence())
+        viewModel.onRailInteraction("mode.host") // on design.host
+
+        // New sequence no longer contains design.host -> restart for predictability.
+        viewModel.setTutorialSequence(
+            listOf(TutorialStep("project.host.main", listOf("manage your project")))
+        )
+
+        val state = viewModel.uiState.value
+        assertEquals(0, state.tutorialStepIndex)
+        assertEquals(0, state.tutorialLineIndex)
+    }
+
+    @Test
+    fun `dismissCurrentTutorial clears the sequence`() = runTest {
+        viewModel.toggleTutorialMode()
+        viewModel.setTutorialSequence(sampleSequence())
 
         viewModel.dismissCurrentTutorial()
 
-        val state = viewModel.uiState.value
-        assertEquals(null, state.currentTutorialId)
-        assertEquals(0, state.currentTutorialStep)
+        assertEquals(emptyList<TutorialStep>(), viewModel.uiState.value.tutorialSteps)
     }
 
     @Test
-    fun `toggleTutorialMode off resets tutorial state`() = runTest {
+    fun `toggleTutorialMode off resets walkthrough state`() = runTest {
         viewModel.toggleTutorialMode()
-        viewModel.onRailTap("mode.host")
-        viewModel.advanceTutorial()
+        viewModel.setTutorialSequence(sampleSequence())
+        viewModel.onRailInteraction("mode.host")
 
         viewModel.toggleTutorialMode()
 
         val state = viewModel.uiState.value
         assertEquals(false, state.tutorialModeActive)
-        assertEquals(null, state.currentTutorialId)
-        assertEquals(0, state.currentTutorialStep)
+        assertEquals(emptyList<TutorialStep>(), state.tutorialSteps)
+        assertEquals(0, state.tutorialStepIndex)
+        assertEquals(0, state.tutorialLineIndex)
     }
 }
