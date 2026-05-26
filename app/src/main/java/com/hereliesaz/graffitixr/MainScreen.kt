@@ -118,7 +118,12 @@ fun MainScreen(
                     DisposableEffect(uiState.editorMode) {
                         arViewModel.setArMode(true, context)
                         onDispose {
-                            arViewModel.setArMode(false, context)
+                            // Fully close the session (not just pause) when leaving AR — e.g. into
+                            // the library to load a project, then back via Trace. A paused-but-open
+                            // session gets resumed on re-entry instead of rebuilt, which on many
+                            // devices comes back as a black/uninitialised camera. exitArMode() tears
+                            // it down so the next AR entry creates a fresh session.
+                            arViewModel.exitArMode()
                         }
                     }
 

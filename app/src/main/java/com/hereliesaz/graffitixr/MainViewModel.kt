@@ -93,21 +93,19 @@ class MainViewModel @Inject constructor(
         _uiState.update { it.copy(currentTutorialStep = it.currentTutorialStep + 1) }
     }
 
-    /** Dismiss the currently shown tutorial text and remember it as seen so it won't nag again. */
+    /** Dismiss the currently shown tutorial text. In tutorial mode it re-surfaces on the next tap. */
     fun dismissCurrentTutorial() {
-        _uiState.value.currentTutorialId?.let { markTutorialCompletePersistent(it) }
         _uiState.update { it.copy(currentTutorialId = null, currentTutorialStep = 0) }
     }
 
     /**
-     * The single policy gate for the whole tap→tutorial flow. Currently: only while tutorial mode
-     * is on, and only the first time each item is tapped (until-seen). To show on *every* tap
-     * instead, change the body to `return true`.
+     * The single policy gate for the whole tap→tutorial flow: tutorials surface only while tutorial
+     * mode is on. We intentionally do *not* suppress already-seen items — tutorial mode is an
+     * explicit, user-toggled walkthrough, so every rail tap should surface (and every subsequent tap
+     * advance) its text for as long as the mode stays on. Until-seen suppression here was why the
+     * rail stopped advancing the tutorial once each item had been viewed once.
      */
-    private fun shouldShowTutorial(id: String): Boolean {
-        val st = _uiState.value
-        return st.tutorialModeActive && id !in completedTutorials.value
-    }
+    private fun shouldShowTutorial(id: String): Boolean = _uiState.value.tutorialModeActive
 
     fun setTouchLocked(locked: Boolean) {
         _uiState.update { it.copy(isTouchLocked = locked) }
