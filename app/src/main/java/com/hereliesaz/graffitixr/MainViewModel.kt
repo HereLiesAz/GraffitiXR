@@ -40,7 +40,10 @@ data class MainUiState(
     // When true, interacting with a rail item surfaces that item's existing tutorial text.
     val tutorialModeActive: Boolean = false,
     // The rail-item id whose tutorial text is currently being shown (null = none).
-    val currentTutorialId: String? = null
+    val currentTutorialId: String? = null,
+    // The line index within the current tutorial. Advanced by any tap (rail or screen)
+    // or by the per-step timer; the overlay dismisses once it runs past the last line.
+    val currentTutorialStep: Int = 0
 )
 
 @HiltViewModel
@@ -64,24 +67,36 @@ class MainViewModel @Inject constructor(
 
     /** Toggle the tutorial walkthrough mode. Tapping rail items only shows text while this is on. */
     fun toggleTutorialMode() {
-        _uiState.update { it.copy(tutorialModeActive = !it.tutorialModeActive, currentTutorialId = null) }
+        _uiState.update {
+            it.copy(tutorialModeActive = !it.tutorialModeActive, currentTutorialId = null, currentTutorialStep = 0)
+        }
     }
 
     /**
-     * Called on every rail interaction. Surfaces that item's existing tutorial text, gated by
-     * [shouldShowTutorial]. We don't author new text here — [id] is looked up against the existing
-     * onboarding/help strings at the call site.
+     * Called on every rail interaction. While tutorial mode is on, any rail tap *advances* the
+     * card that's already showing (so tapping the rail never blocks the walkthrough); if nothing
+     * is showing yet it starts that item's tutorial, gated by [shouldShowTutorial]. The rail item's
+     * own action still runs at the call site, so interaction is never blocked. We don't author new
+     * text here — [id] is looked up against the existing onboarding/help strings at the call site.
      */
     fun onRailTap(id: String) {
-        if (shouldShowTutorial(id)) {
-            _uiState.update { it.copy(currentTutorialId = id) }
+        if (!_uiState.value.tutorialModeActive) return
+        if (_uiState.value.currentTutorialId != null) {
+            advanceTutorial()
+        } else if (shouldShowTutorial(id)) {
+            _uiState.update { it.copy(currentTutorialId = id, currentTutorialStep = 0) }
         }
+    }
+
+    /** Move to the next line of the current tutorial. The overlay dismisses once step runs past the end. */
+    fun advanceTutorial() {
+        _uiState.update { it.copy(currentTutorialStep = it.currentTutorialStep + 1) }
     }
 
     /** Dismiss the currently shown tutorial text and remember it as seen so it won't nag again. */
     fun dismissCurrentTutorial() {
         _uiState.value.currentTutorialId?.let { markTutorialCompletePersistent(it) }
-        _uiState.update { it.copy(currentTutorialId = null) }
+        _uiState.update { it.copy(currentTutorialId = null, currentTutorialStep = 0) }
     }
 
     /**
