@@ -1,8 +1,11 @@
 package com.hereliesaz.graffitixr
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import com.hereliesaz.graffitixr.common.model.EditorMode
+import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.design.theme.AppStrings
 import com.hereliesaz.graffitixr.design.R as DesignR
 
@@ -94,5 +97,40 @@ fun rememberRailTutorialLines(strings: AppStrings): (String) -> List<String> {
             id.startsWith("layer.") -> layerLine
             else -> emptyList()
         }
+    }
+}
+
+/**
+ * Builds the ordered do-it-to-advance walkthrough for the given [mode] and [layers].
+ *
+ * The sequence is derived from the same two sources of truth the rest of the app already uses, so
+ * it can never drift from what is actually on the rail:
+ *   - [enumerateRailItemIdRegistrations] gives the rail-item ids in registration order, already
+ *     mode-adaptive (AR-only `target.*`, MOCKUP-only `design.wall`) and per-layer.
+ *   - [buildHelpItems] is the canonical set of ids that carry help text; intersecting against it
+ *     drops items that aren't real walkthrough targets (e.g. `tool.helpMain`, `coop.*`, the
+ *     per-layer `.help` placeholder).
+ *   - [rememberRailTutorialLines] supplies each step's instruction lines; ids with no text are
+ *     skipped (e.g. `wearable.main`).
+ *
+ * Result is remembered on (layers, mode) so the returned list is structurally stable across
+ * recompositions — important because it keys the LaunchedEffect that feeds it to the view model.
+ */
+@Composable
+fun rememberTutorialSequence(
+    strings: AppStrings,
+    layers: List<Layer>,
+    mode: EditorMode,
+): List<TutorialStep> {
+    val lineFor = rememberRailTutorialLines(strings)
+    return remember(layers, mode) {
+        val helpKeys = buildHelpItems(strings, layers).keys
+        val seen = LinkedHashSet<String>()
+        enumerateRailItemIdRegistrations(layers, mode)
+            .filter { it in helpKeys && seen.add(it) }
+            .mapNotNull { id ->
+                val lines = lineFor(id)
+                if (lines.isEmpty()) null else TutorialStep(id, lines)
+            }
     }
 }
