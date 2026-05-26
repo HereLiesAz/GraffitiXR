@@ -41,8 +41,9 @@ data class MainUiState(
     val tutorialModeActive: Boolean = false,
     // The rail-item id whose tutorial text is currently being shown (null = none).
     val currentTutorialId: String? = null,
-    // The line index within the current tutorial. Advanced by any tap (rail or screen)
-    // or by the per-step timer; the overlay dismisses once it runs past the last line.
+    // The line index within the current tutorial. Advanced by screen taps and the per-step timer;
+    // a rail tap instead switches to that item's tutorial (resetting to line 0). The overlay
+    // dismisses once the step runs past the last line.
     val currentTutorialStep: Int = 0
 )
 
@@ -73,19 +74,16 @@ class MainViewModel @Inject constructor(
     }
 
     /**
-     * Called on every rail interaction. While tutorial mode is on, any rail tap *advances* the
-     * card that's already showing (so tapping the rail never blocks the walkthrough); if nothing
-     * is showing yet it starts that item's tutorial, gated by [shouldShowTutorial]. The rail item's
-     * own action still runs at the call site, so interaction is never blocked. We don't author new
-     * text here — [id] is looked up against the existing onboarding/help strings at the call site.
+     * Called on every rail interaction. While tutorial mode is on, tapping a rail item surfaces
+     * *that item's* tutorial text from the top, switching context if another card is already
+     * showing. Advancing within an item is driven by screen taps and the per-step timer, not by
+     * rail taps. The rail item's own action still runs at the call site, so interaction is never
+     * blocked. We don't author new text here — [id] is looked up against the existing
+     * onboarding/help strings at the call site.
      */
     fun onRailTap(id: String) {
-        if (!_uiState.value.tutorialModeActive) return
-        if (_uiState.value.currentTutorialId != null) {
-            advanceTutorial()
-        } else if (shouldShowTutorial(id)) {
-            _uiState.update { it.copy(currentTutorialId = id, currentTutorialStep = 0) }
-        }
+        if (!shouldShowTutorial(id)) return
+        _uiState.update { it.copy(currentTutorialId = id, currentTutorialStep = 0) }
     }
 
     /** Move to the next line of the current tutorial. The overlay dismisses once step runs past the end. */
@@ -93,21 +91,19 @@ class MainViewModel @Inject constructor(
         _uiState.update { it.copy(currentTutorialStep = it.currentTutorialStep + 1) }
     }
 
-    /** Dismiss the currently shown tutorial text and remember it as seen so it won't nag again. */
+    /** Dismiss the currently shown tutorial text. In tutorial mode it re-surfaces on the next tap. */
     fun dismissCurrentTutorial() {
-        _uiState.value.currentTutorialId?.let { markTutorialCompletePersistent(it) }
         _uiState.update { it.copy(currentTutorialId = null, currentTutorialStep = 0) }
     }
 
     /**
-     * The single policy gate for the whole tap→tutorial flow. Currently: only while tutorial mode
-     * is on, and only the first time each item is tapped (until-seen). To show on *every* tap
-     * instead, change the body to `return true`.
+     * The single policy gate for the whole tap→tutorial flow: tutorials surface only while tutorial
+     * mode is on. We intentionally do *not* suppress already-seen items — tutorial mode is an
+     * explicit, user-toggled walkthrough, so every rail tap should surface (and every subsequent tap
+     * advance) its text for as long as the mode stays on. Until-seen suppression here was why the
+     * rail stopped advancing the tutorial once each item had been viewed once.
      */
-    private fun shouldShowTutorial(id: String): Boolean {
-        val st = _uiState.value
-        return st.tutorialModeActive && id !in completedTutorials.value
-    }
+    private fun shouldShowTutorial(id: String): Boolean = _uiState.value.tutorialModeActive
 
     fun setTouchLocked(locked: Boolean) {
         _uiState.update { it.copy(isTouchLocked = locked) }
