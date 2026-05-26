@@ -1,6 +1,5 @@
 package com.hereliesaz.graffitixr.onboarding
 
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,58 +8,95 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.fastAny
 import kotlin.random.Random
+import kotlinx.coroutines.delay
 
 @Composable
 fun ModeOnboardingOverlay(
     onboarding: ModeOnboarding,
     onDismiss: () -> Unit,
-) = ModeOnboardingOverlay(stepKey = onboarding.mode, lines = onboarding.lines, onDismiss = onDismiss)
+) {
+    // First-run per-mode onboarding manages its own step locally (no rail-tap driving).
+    var step by rememberSaveable(onboarding.mode) { mutableStateOf(0) }
+    ModeOnboardingOverlay(
+        positionKey = onboarding.mode,
+        step = step,
+        lines = onboarding.lines,
+        onAdvance = { step++ },
+        onDismiss = onDismiss,
+    )
+}
 
 /**
- * Generic tap-to-advance onboarding overlay over arbitrary [lines]. [stepKey] resets the
- * step counter when it changes (so a new rail-item context starts from line 0) and seeds
- * the popup zone. Used both for per-mode onboarding and for rail-tap tutorial text.
+ * Generic onboarding overlay over arbitrary [lines]. The current [step] is controlled by the
+ * caller so any tap source — the non-consuming screen observer below, the per-step timer, or an
+ * external rail tap — can drive advancement through the same [onAdvance]. [positionKey] seeds the
+ * popup zone and resets the tap observer when the context changes.
+ *
+ * The overlay never consumes pointer events, so taps fall through to the canvas/editor underneath
+ * and the walkthrough never blocks interaction.
  */
 @Composable
 fun ModeOnboardingOverlay(
-    stepKey: Any,
+    positionKey: Any,
+    step: Int,
     lines: List<String>,
+    onAdvance: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var step by rememberSaveable(stepKey) { mutableStateOf(0) }
     val line = lines.getOrNull(step)
     if (line == null) {
         onDismiss()
         return
     }
 
+    // Keep advance current without restarting the pointer loop on every step.
+    val advance by rememberUpdatedState(onAdvance)
+
+    // Per-step timer: longer lines linger longer. Restarts whenever the step (from any
+    // source) or context changes; firing past the last line trips the dismiss guard above.
+    LaunchedEffect(positionKey, step) {
+        delay(stepDurationMs(line))
+        advance()
+    }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(stepKey) {
-                detectTapGestures {
-                    val next = step + 1
-                    if (next >= lines.size) onDismiss() else step = next
+            .pointerInput(positionKey) {
+                awaitPointerEventScope {
+                    while (true) {
+                        // Observe in the Initial pass and never consume, so the tap still
+                        // reaches whatever is underneath while also advancing the step.
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.changes.fastAny { it.changedToDownIgnoreConsumed() }) {
+                            advance()
+                        }
+                    }
                 }
             }
     ) {
         // Pick one of nine in-bounds zones based on a (key, step) seed so the
         // text moves between popups but never the same zone twice in a row.
-        val seed = stepKey.hashCode()
-        val zone = remember(stepKey, step) {
+        val seed = positionKey.hashCode()
+        val zone = remember(positionKey, step) {
             zoneForSeed(seed * 1000 + step, prevStep = step - 1, prevMode = seed)
         }
 
@@ -89,6 +125,9 @@ fun ModeOnboardingOverlay(
         }
     }
 }
+
+private fun stepDurationMs(line: String): Long =
+    (3000L + 50L * line.length).coerceIn(3000L, 10000L)
 
 private val zones: List<Alignment> = listOf(
     Alignment.TopStart, Alignment.TopCenter, Alignment.TopEnd,

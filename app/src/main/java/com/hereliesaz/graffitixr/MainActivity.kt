@@ -525,8 +525,10 @@ class MainActivity : ComponentActivity() {
                                 val lines = railTutorialLines(tutId)
                                 if (lines.isNotEmpty()) {
                                     ModeOnboardingOverlay(
-                                        stepKey = tutId,
+                                        positionKey = tutId,
+                                        step = mainUiState.currentTutorialStep,
                                         lines = lines,
+                                        onAdvance = { mainViewModel.advanceTutorial() },
                                         onDismiss = { mainViewModel.dismissCurrentTutorial() }
                                     )
                                 } else {

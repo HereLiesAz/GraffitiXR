@@ -74,4 +74,72 @@ class MainViewModelTest {
         viewModel.setCaptureStep(CaptureStep.REVIEW)
         assertEquals(CaptureStep.REVIEW, viewModel.uiState.value.captureStep)
     }
+
+    @Test
+    fun `onRailTap does nothing while tutorial mode is off`() = runTest {
+        viewModel.onRailTap("mode.host")
+        assertEquals(null, viewModel.uiState.value.currentTutorialId)
+    }
+
+    @Test
+    fun `onRailTap starts tutorial when none is showing`() = runTest {
+        viewModel.toggleTutorialMode()
+
+        viewModel.onRailTap("mode.host")
+
+        val state = viewModel.uiState.value
+        assertEquals("mode.host", state.currentTutorialId)
+        assertEquals(0, state.currentTutorialStep)
+    }
+
+    @Test
+    fun `onRailTap advances current tutorial when one is showing`() = runTest {
+        viewModel.toggleTutorialMode()
+        viewModel.onRailTap("mode.host")
+
+        // A second rail tap advances the showing card rather than replacing it.
+        viewModel.onRailTap("design.host")
+
+        val state = viewModel.uiState.value
+        assertEquals("mode.host", state.currentTutorialId)
+        assertEquals(1, state.currentTutorialStep)
+    }
+
+    @Test
+    fun `advanceTutorial increments the step`() = runTest {
+        viewModel.toggleTutorialMode()
+        viewModel.onRailTap("mode.host")
+
+        viewModel.advanceTutorial()
+        viewModel.advanceTutorial()
+
+        assertEquals(2, viewModel.uiState.value.currentTutorialStep)
+    }
+
+    @Test
+    fun `dismissCurrentTutorial clears id and resets step`() = runTest {
+        viewModel.toggleTutorialMode()
+        viewModel.onRailTap("mode.host")
+        viewModel.advanceTutorial()
+
+        viewModel.dismissCurrentTutorial()
+
+        val state = viewModel.uiState.value
+        assertEquals(null, state.currentTutorialId)
+        assertEquals(0, state.currentTutorialStep)
+    }
+
+    @Test
+    fun `toggleTutorialMode off resets tutorial state`() = runTest {
+        viewModel.toggleTutorialMode()
+        viewModel.onRailTap("mode.host")
+        viewModel.advanceTutorial()
+
+        viewModel.toggleTutorialMode()
+
+        val state = viewModel.uiState.value
+        assertEquals(false, state.tutorialModeActive)
+        assertEquals(null, state.currentTutorialId)
+        assertEquals(0, state.currentTutorialStep)
+    }
 }
