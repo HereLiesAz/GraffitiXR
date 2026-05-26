@@ -62,8 +62,13 @@ fun ModeOnboardingOverlay(
     onDismiss: () -> Unit,
 ) {
     val line = lines.getOrNull(step)
+    LaunchedEffect(line) {
+        if (line == null) {
+            onDismiss()
+        }
+    }
+
     if (line == null) {
-        onDismiss()
         return
     }
 
