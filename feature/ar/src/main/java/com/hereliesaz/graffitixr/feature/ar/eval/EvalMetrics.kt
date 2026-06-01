@@ -34,6 +34,25 @@ object EvalMetrics {
         return PoseError(translationMm, if (rotationDeg.isNaN()) 0f else rotationDeg)
     }
 
+    /** Mean distance of each point from the centroid, in millimeters. */
+    fun jitterMm(translations: List<FloatArray>): Float {
+        if (translations.size < 2) return 0f
+        val n = translations.size
+        val cx = translations.sumOf { it[0].toDouble() } / n
+        val cy = translations.sumOf { it[1].toDouble() } / n
+        val cz = translations.sumOf { it[2].toDouble() } / n
+        val meanDist = translations.sumOf {
+            val dx = it[0] - cx; val dy = it[1] - cy; val dz = it[2] - cz
+            sqrt(dx * dx + dy * dy + dz * dz)
+        } / n
+        return (meanDist * 1000.0).toFloat()
+    }
+
+    fun availability(usable: Int, total: Int): Float = if (total <= 0) 0f else usable.toFloat() / total
+
+    /** Milliseconds from an induced tracking loss to the first re-lock; null if never relocked. */
+    fun recoveryMs(lossMs: Long, relockMs: Long?): Long? = relockMs?.let { it - lossMs }
+
     // Extract the upper-left 3x3 rotation, row-major, normalizing out scale.
     private fun rotationOnly(m: FloatArray): FloatArray {
         fun colLen(c: Int) = sqrt(m[c*4]*m[c*4] + m[c*4+1]*m[c*4+1] + m[c*4+2]*m[c*4+2]).let { if (it == 0f) 1f else it }
