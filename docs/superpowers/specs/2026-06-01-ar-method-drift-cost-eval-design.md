@@ -29,11 +29,22 @@ method set.
 
 ## Goals
 
-- Produce **comparable, per-mechanism** effectiveness and cost numbers on a **mono** and a
-  **dual-lens** device.
+- Produce **comparable, per-mechanism** effectiveness and cost numbers on both device classes: a
+  **dual-lens** device (mandatory whenever the device has two back cameras) and a **monocular** device
+  (mandatory fallback when it doesn't). Both classes must be supported and pushed to their best
+  achievable accuracy.
 - Two acquisition paths: a **live dev telemetry overlay** (real walls) and a **deterministic bench
   harness** (repeatable A/B).
-- Emit a **decision artifact**: benefit÷cost + unique-failure-mode table recommending keep/drop.
+- Emit a **decision artifact** ranking mechanisms by *effectiveness first* and flagging redundancy.
+
+## Guiding principle: accuracy is paramount
+
+There is no LiDAR on these devices, so drift accuracy is hard-won and is the product's whole value —
+a subpar, drifting overlay is useless. Therefore **cost (battery/compute) never outranks
+effectiveness.** The harness measures cost so we can understand it and optimize, **not** to justify
+trading away accuracy. A mechanism may be dropped from the later fusion only if it is **redundant** —
+it adds no unique failure-mode coverage the survivors already provide — never merely because it is
+expensive. Every retained device class (mono and dual-lens) is driven to its best available option.
 
 ## Non-goals
 
@@ -102,12 +113,14 @@ yields clean diffs on **deterministic input** — hence the bench harness below.
      frame-time/CPU/battery, an **induce-tracking-loss** button, and **start/stop recording**.
 
 5. **Decision artifact**
-   - A generated summary (markdown/JSON) ranking each mechanism by **(anti-drift benefit ÷ cost)** and
-     flagging **unique failure-mode coverage** (a cheap-but-redundant mechanism loses to a
-     pricier-but-uniquely-covering one). Output feeds Sub-project B.
-   - Prior hypotheses to confirm with data: **M4 (Cloud-offset) likely drops** (effectively a stub
-     that falls back to the voxel renderer); **M3 (Surface-mesh) likely conditional** (only earns its
-     cost when depth shows the wall is non-flat).
+   - A generated summary (markdown/JSON) that ranks each mechanism by **effectiveness first**
+     (pose error / jitter / recovery / availability) and reports cost **alongside**, not as a divisor.
+     The keep/drop recommendation per mechanism applies the guiding principle: drop **only** a
+     mechanism that is **redundant** (no unique failure-mode coverage); keep an accurate,
+     uniquely-covering mechanism regardless of cost. Output feeds Sub-project B.
+   - **No pre-pruning:** all four mechanisms are measured. Hypotheses (e.g. M4/Cloud-offset may be a
+     stub that just falls back to the voxel renderer; M3/Surface-mesh may only matter on non-flat
+     walls) are things the data must confirm or refute — never a reason to skip measuring a mechanism.
 
 ## Testing
 
