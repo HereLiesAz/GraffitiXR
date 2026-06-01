@@ -83,6 +83,9 @@ class ArRenderer(
     private val planeRenderer = PlaneRenderer()
     private val scanFogRenderer = ScanFogRenderer()
     private val anchorOrchestrator = AnchorOrchestrator()
+    private val poseFusion = com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion()
+    // A/B switch for the Sub-project A harness: when false, reproduce the old pre/post-anchor toggle.
+    @Volatile var fusionEnabled: Boolean = true
 
     @Volatile var scanMode: ArScanMode = ArScanMode.MURAL
     @Volatile var muralMethod: MuralMethod = MuralMethod.VOXEL_HASH
@@ -394,14 +397,25 @@ class ArRenderer(
             slamManager.setArScanMode(currentScanMode.ordinal)
             slamManager.setMuralMethod(muralMethod.ordinal)
             
-            // --- Democratic Consensus Transformation ---
-            val anchorMatrix = FloatArray(16)
+            // --- Democratic Consensus Transformation + smoothed reloc fusion ---
+            // Backbone: ARCore consensus once anchored, else the native cached pose (as before).
+            val backbone = FloatArray(16)
             if (anchorEstablished) {
-                anchorOrchestrator.getConsensusMatrix(anchorMatrix)
+                anchorOrchestrator.getConsensusMatrix(backbone)
             } else {
-                val rawAnchor = slamManager.getAnchorTransform()
-                System.arraycopy(rawAnchor, 0, anchorMatrix, 0, 16)
+                System.arraycopy(slamManager.getAnchorTransform(), 0, backbone, 0, 16)
             }
+            // Fuse in the corrected mark-PnP snap (smoothed) when anchored; the flag lets the eval
+            // harness A/B fusion vs the old toggle. Off → exact previous behavior.
+            val anchorMatrix: FloatArray = if (fusionEnabled && anchorEstablished) {
+                poseFusion.currentAnchor(
+                    backbone = backbone,
+                    vCurrent = viewMatrix,
+                    reloc = slamManager.getRelocResult(),
+                    fpAnchor = slamManager.getFingerprintAnchor(),
+                    confGlobal = slamManager.getGlobalConfidenceAvg(),
+                )
+            } else backbone
 
             // Throttle UI and distance updates to 15Hz to match SLAM processing frequency and reduce state churn.
             if (frameCount % 4 == 0) {
