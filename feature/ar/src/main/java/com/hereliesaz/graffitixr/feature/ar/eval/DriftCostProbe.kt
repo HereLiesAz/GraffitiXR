@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.ar.eval
 
 import android.content.Context
 import android.os.BatteryManager
+import com.hereliesaz.graffitixr.common.model.EvalLiveMetrics
 import java.io.File
 
 /**
@@ -21,6 +22,8 @@ class DriftCostProbe(
     private var lossMs: Long? = null
     private var relockMs: Long? = null
     private var logFile: File? = null
+
+    @Volatile var lastMetrics = EvalLiveMetrics()
 
     private val batteryManager by lazy {
         context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
@@ -85,6 +88,12 @@ class DriftCostProbe(
             nativeHeapKb = android.os.Debug.getNativeHeapAllocatedSize() / 1024L,
         )
         file.appendText(EvalSampleLog.toCsvRow(sample) + "\n")
+
+        lastMetrics = EvalLiveMetrics(
+            errMm = sample.errMm, errDeg = sample.errDeg, jitterMm = sample.jitterMm,
+            availability = sample.availability, recoveryMs = recoveryMs(),
+            stageMs = sample.stageMs, batteryMa = sample.batteryMa,
+        )
     }
 
     private fun sampleBatteryMa(): Float {

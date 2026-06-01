@@ -190,6 +190,43 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(showCoopNotFoundDialog = false) }
     }
 
+    // Eval (Sub-project A) — dev-only.
+    private val evalProbe by lazy {
+        com.hereliesaz.graffitixr.feature.ar.eval.DriftCostProbe(
+            context = appContext,
+            deviceClass = if (_uiState.value.isHardwareStereoActive) "dual" else "mono",
+            nowMs = { android.os.SystemClock.elapsedRealtime() },
+        )
+    }
+    private val evalRecorder by lazy {
+        com.hereliesaz.graffitixr.feature.ar.eval.ArRecordingController(appContext)
+    }
+
+    fun evalStartLog() {
+        evalProbe.start()
+        renderer?.driftCostProbe = evalProbe
+    }
+
+    fun evalStopLog() {
+        renderer?.driftCostProbe = null
+        evalProbe.stop()
+    }
+
+    /** Simulate a tracking loss: mark it for recovery timing and briefly pause mapping. */
+    fun evalInduceLoss() {
+        evalProbe.markTrackingLoss()
+        slamManager.setMappingPaused(true)
+        viewModelScope.launch { kotlinx.coroutines.delay(500); slamManager.setMappingPaused(false) }
+    }
+
+    fun evalStartRecording() {
+        session?.let { evalRecorder.startRecording(it, "eval_${android.os.SystemClock.elapsedRealtime()}") }
+    }
+
+    fun evalStopRecording() {
+        session?.let { evalRecorder.stopRecording(it) }
+    }
+
     // ── Glasses session lifecycle ─────────────────────────────────────────────
 
     fun startGlassesSession() {
@@ -816,7 +853,8 @@ class ArViewModel @Inject constructor(
                 currentCenterDepth = centerDepth,
                 visibleSplatConfidenceAvg = visConf,
                 globalSplatConfidenceAvg = globConf,
-                trackingFailed = trackingFailed
+                trackingFailed = trackingFailed,
+                evalLiveMetrics = evalProbe.lastMetrics
             )
         }
     }
