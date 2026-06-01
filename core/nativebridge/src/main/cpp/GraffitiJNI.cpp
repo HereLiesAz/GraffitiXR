@@ -704,6 +704,22 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetStageEnabled(JN
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocResult(JNIEnv* env, jobject, jfloatArray out) {
+    if (!gSlamEngine) return;
+    float buf[19];
+    gSlamEngine->getRelocResult(buf);
+    env->SetFloatArrayRegion(out, 0, 19, buf);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintAnchor(JNIEnv* env, jobject, jfloatArray out) {
+    if (!gSlamEngine) return;
+    float buf[16];
+    gSlamEngine->getFingerprintAnchor(buf);
+    env->SetFloatArrayRegion(out, 0, 16, buf);
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPersistentMesh(JNIEnv* env, jobject, jfloatArray vertices, jfloatArray weights) {
     if (!gSlamEngine) return;
     std::vector<float> v, w;

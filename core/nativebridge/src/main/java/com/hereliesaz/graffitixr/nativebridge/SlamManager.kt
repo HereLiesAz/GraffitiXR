@@ -211,6 +211,12 @@ class SlamManager @Inject constructor(
     /** Eval: toggle a native stage for A/B cost attribution. Stage 0 is non-gateable (reloc backbone). */
     fun setStageEnabled(stage: Int, enabled: Boolean) = nativeSetStageEnabled(stage, enabled)
 
+    /** Pose fusion (B): [0..15]=pnpMat, [16]=inlierCount, [17]=matchCount, [18]=seq. */
+    fun getRelocResult(): FloatArray { val o = FloatArray(19); nativeGetRelocResult(o); return o }
+
+    /** Pose fusion (B): the anchor model matrix captured in the fingerprint world frame. */
+    fun getFingerprintAnchor(): FloatArray { val o = FloatArray(16); nativeGetFingerprintAnchor(o); return o }
+
     fun getPersistentMesh(vertices: FloatArray, weights: FloatArray) = nativeGetPersistentMesh(vertices, weights)
     fun unrollMesh(vertices: FloatArray): FloatArray = nativeUnrollMesh(vertices)
 
@@ -367,6 +373,8 @@ class SlamManager @Inject constructor(
     private external fun nativeSetMuralMethod(method: Int)
     private external fun nativeGetStageTimings(out: FloatArray)
     private external fun nativeSetStageEnabled(stage: Int, enabled: Boolean)
+    private external fun nativeGetRelocResult(out: FloatArray)
+    private external fun nativeGetFingerprintAnchor(out: FloatArray)
     private external fun nativeGetPersistentMesh(vertices: FloatArray, weights: FloatArray)
     private external fun nativeUnrollMesh(vertices: FloatArray): FloatArray
     private external fun nativeExportFingerprint(): ByteArray?
