@@ -200,6 +200,17 @@ class SlamManager @Inject constructor(
     fun setArScanMode(mode: Int) = nativeSetArScanMode(mode)
     fun setMuralMethod(method: Int) = nativeSetMuralMethod(method)
 
+    /** Eval (Sub-project A): average ms/stage since last call, then resets native accumulators.
+     *  Indexes: 0=voxelUpdate,1=voxelKeyframe,2=surfaceMesh,3=draw,4=pnpReloc. */
+    fun getStageTimings(): FloatArray {
+        val out = FloatArray(5)
+        nativeGetStageTimings(out)
+        return out
+    }
+
+    /** Eval: toggle a native stage for A/B cost attribution. Stage 0 is non-gateable (reloc backbone). */
+    fun setStageEnabled(stage: Int, enabled: Boolean) = nativeSetStageEnabled(stage, enabled)
+
     fun getPersistentMesh(vertices: FloatArray, weights: FloatArray) = nativeGetPersistentMesh(vertices, weights)
     fun unrollMesh(vertices: FloatArray): FloatArray = nativeUnrollMesh(vertices)
 
@@ -354,6 +365,8 @@ class SlamManager @Inject constructor(
     private external fun nativeGetPaintingProgress(): Float
     private external fun nativeSetArScanMode(mode: Int)
     private external fun nativeSetMuralMethod(method: Int)
+    private external fun nativeGetStageTimings(out: FloatArray)
+    private external fun nativeSetStageEnabled(stage: Int, enabled: Boolean)
     private external fun nativeGetPersistentMesh(vertices: FloatArray, weights: FloatArray)
     private external fun nativeUnrollMesh(vertices: FloatArray): FloatArray
     private external fun nativeExportFingerprint(): ByteArray?
