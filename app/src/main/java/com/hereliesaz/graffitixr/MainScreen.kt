@@ -171,12 +171,12 @@ fun MainScreen(
                             val renderer = ArRenderer(
                                 context = ctx,
                                 slamManager = slamManager,
-                                onTargetCaptured = { bmp, cw, ch, depth, dw, dh, stride, intr, viewMat, rot ->
+                                onTargetCaptured = { bmp, cw, ch, depth, dw, dh, stride, intr, viewMat, rot, tapDist ->
                                     arViewModel.onTargetCaptured(
                                         bmp, depth,
                                         cw, ch,
                                         dw, dh, stride,
-                                        intr, viewMat, rot
+                                        intr, viewMat, rot, tapDist
                                     )
                                 },
                                 onTrackingUpdated = { isTracking, splatCount, immutableSplatCount, isDepthSupported, yaw, distanceMeters, relDir, isDualLens, isHardwareStereo, centerDepth, visConf, globConf ->

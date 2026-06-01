@@ -18,6 +18,10 @@ data class EvalLiveMetrics(
     val batteryMa: Float = 0f,
 )
 
+/** A tapped wall mark: normalized screen coords (0..1) plus the camera→point range in meters
+ *  (-1 when depth was unavailable/out of range at that pixel). */
+data class TapMark(val nx: Float, val ny: Float, val distanceMeters: Float)
+
 data class ArUiState(
     val isScanning: Boolean = false,
     val splatCount: Int = 0,
@@ -88,9 +92,9 @@ data class ArUiState(
     // Phase 3 — True once the renderer has confirmed ARCore Depth API is available on this device.
     val isDepthApiSupported: Boolean = false,
 
-    // Phase 4 — Tap-to-target: list of normalized screen coords (0..1) where the user has tapped
-    // their painted reference marks. Displayed as cyan circles on the live camera view.
-    val tapHighlightKeypoints: List<Pair<Float, Float>> = emptyList(),
+    // Phase 4 — Tap-to-target: marks the user tapped on their painted reference, each with the
+    // camera→point distance measured at that pixel. Rendered as a chip on the live camera view.
+    val tapMarks: List<TapMark> = emptyList(),
 
     // Phase 5 — When true, OverlayRenderer draws an orange line-loop around the anchor quad boundary.
     val showAnchorBoundary: Boolean = false,

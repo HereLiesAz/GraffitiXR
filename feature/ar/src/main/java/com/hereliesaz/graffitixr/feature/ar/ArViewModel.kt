@@ -896,7 +896,8 @@ class ArViewModel @Inject constructor(
         depthBufStride: Int,
         intrinsics: FloatArray?,
         viewMatrix: FloatArray,
-        displayRotation: Int
+        displayRotation: Int,
+        tapDistanceMeters: Float
     ) {
         val tapPos = pendingTapPosition
         val extent = computePhysicalExtent(depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics, depthBufStride)
@@ -920,7 +921,7 @@ class ArViewModel @Inject constructor(
 
             _uiState.update {
                 it.copy(
-                    tapHighlightKeypoints = it.tapHighlightKeypoints + tapPos,
+                    tapMarks = it.tapMarks + com.hereliesaz.graffitixr.common.model.TapMark(tapPos.first, tapPos.second, tapDistanceMeters),
                     targetRawBitmap = bitmap,
                     targetDisplayRotation = displayRotation,
                     targetDepthBuffer = depthBuffer,
@@ -982,11 +983,14 @@ class ArViewModel @Inject constructor(
 
     fun onScreenTap(nx: Float, ny: Float) {
         pendingTapPosition = nx to ny
+        // Hand the tap to the renderer so it can measure the camera→point distance at that pixel
+        // (and add a fusion support anchor) on the GL thread during capture.
+        renderer?.pendingCaptureTap = floatArrayOf(nx, ny)
         requestCapture()
     }
 
     fun clearTapHighlights() {
-        _uiState.update { it.copy(tapHighlightKeypoints = emptyList()) }
+        _uiState.update { it.copy(tapMarks = emptyList()) }
         pendingTapPosition = null
     }
 
