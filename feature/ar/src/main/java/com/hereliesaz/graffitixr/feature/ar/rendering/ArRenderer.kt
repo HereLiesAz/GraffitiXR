@@ -86,6 +86,14 @@ class ArRenderer(
 
     @Volatile var scanMode: ArScanMode = ArScanMode.MURAL
     @Volatile var muralMethod: MuralMethod = MuralMethod.VOXEL_HASH
+
+    // Eval (Sub-project A): null unless dev/eval mode is on. Set from ArViewModel.
+    @Volatile var driftCostProbe: com.hereliesaz.graffitixr.feature.ar.eval.DriftCostProbe? = null
+    // Scratch holder for the mark-PnP "truth" pose read from the native anchor transform.
+    private val truthPoseScratch = FloatArray(16)
+    // Visible-confidence threshold above which mark-PnP is treated as truth for eval.
+    private val markVisibleConf = 0.5f
+
     @Volatile var showAnchorBoundary: Boolean = false
     @Volatile var showBorderForConfirmation: Boolean = false
     @Volatile var anchorEstablished: Boolean = false
@@ -397,6 +405,24 @@ class ArRenderer(
 
             // Throttle UI and distance updates to 15Hz to match SLAM processing frequency and reduce state churn.
             if (frameCount % 4 == 0) {
+                driftCostProbe?.let { probe ->
+                    val stageMs = slamManager.getStageTimings()
+                    // Truth = mark-PnP pose when a confident match exists; getVisibleConfidenceAvg()
+                    // gates "marks visible". Reuse the native anchor transform as the PnP-refined pose.
+                    val marksVisible = slamManager.getVisibleConfidenceAvg() > markVisibleConf
+                    val truth = if (marksVisible) {
+                        System.arraycopy(slamManager.getAnchorTransform(), 0, truthPoseScratch, 0, 16)
+                        truthPoseScratch
+                    } else null
+                    probe.onTick(
+                        candidatePose = anchorMatrix,
+                        truthPose = truth,
+                        isTracking = anchorEstablished,
+                        stageMs = stageMs,
+                        cpuPct = -1f, // CPU% sampled by overlay; -1 here keeps the GL thread cheap
+                    )
+                }
+
                 backgroundScope.launch {
                     val (count, immutableCount) = if (currentScanMode == ArScanMode.CLOUD_POINTS) {
                         pointCloudRenderer.accumulatedPointCount to 0
