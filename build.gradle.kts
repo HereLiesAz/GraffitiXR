@@ -28,9 +28,18 @@ buildscript {
         "com.google.protobuf:protobuf-kotlin-lite"
     )
 
+    // Protobuf is intentionally pinned to TWO different versions: the buildscript classpath needs
+    // 3.25.5 for AGP 9.0.1, while the application runtime needs the 4.x line for security fixes.
+    // These are named (not inline literals) so the split is explicit in one place and a future edit
+    // can't silently collide them. See the resolutionStrategy blocks below and in allprojects.
+    val protobufBuildscriptVersion = "3.25.5"
+    val protobufRuntimeVersion = "4.28.2"
+
     // Store in extra properties so allprojects can access it
     extra["commonForcedDependencies"] = commonForcedDependencies
     extra["protobufModules"] = protobufModules
+    extra["protobufBuildscriptVersion"] = protobufBuildscriptVersion
+    extra["protobufRuntimeVersion"] = protobufRuntimeVersion
 
     repositories {
         google()
@@ -44,7 +53,7 @@ buildscript {
             // Force common dependencies
             commonForcedDependencies.forEach { force(it) }
             // AGP 9.0.1 requires Protobuf 3.25.5 in the buildscript classpath
-            protobufModules.forEach { force("$it:3.25.5") }
+            protobufModules.forEach { force("$it:$protobufBuildscriptVersion") }
         }
     }
 }
@@ -74,13 +83,20 @@ allprojects {
     val commonForcedDependencies = rootProject.extra["commonForcedDependencies"] as List<String>
     @Suppress("UNCHECKED_CAST")
     val protobufModules = rootProject.extra["protobufModules"] as List<String>
+    val protobufRuntimeVersion = rootProject.extra["protobufRuntimeVersion"] as String
+
+    // Security invariant: the app runtime must stay on the 4.x protobuf line (the buildscript's
+    // 3.25.x is for AGP only). Fail fast if a future edit drops it back to 3.x.
+    check(protobufRuntimeVersion.startsWith("4.")) {
+        "Application runtime protobuf must remain on the 4.x line (was $protobufRuntimeVersion)"
+    }
 
     configurations.all {
         resolutionStrategy {
             // Force common dependencies
             commonForcedDependencies.forEach { force(it) }
-            // Force Protobuf 4.28.2 for application runtime security
-            protobufModules.forEach { force("$it:4.28.2") }
+            // Force Protobuf 4.x for application runtime security
+            protobufModules.forEach { force("$it:$protobufRuntimeVersion") }
         }
     }
 }

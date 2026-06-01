@@ -34,6 +34,12 @@ class PointCloudRenderer : GlReleasable {
     private val localBuffer = FloatArray(maxPoints * 4)
     private val pointIdMap = HashMap<Int, Int>()
 
+    // Reusable GL upload buffers (GL thread only). [update] runs every frame while scanning, so
+    // allocating a fresh direct buffer each call churned the GC and caused scan-time jank; allocate
+    // the max-size buffer once and re-fill the used prefix instead.
+    private val uploadByteBuffer = ByteBuffer.allocateDirect(maxPoints * 4 * 4).order(ByteOrder.nativeOrder())
+    private val uploadFloatBuffer = uploadByteBuffer.asFloatBuffer()
+
     fun createOnGlThread(context: Context) {
         val vertexShaderCode = """
             uniform mat4 u_MvpMatrix;
@@ -115,12 +121,12 @@ class PointCloudRenderer : GlReleasable {
         if (hasUpdates) {
             GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
 
-            val byteBuffer = ByteBuffer.allocateDirect(accumulatedPointCount * 4 * 4).order(ByteOrder.nativeOrder())
-            val floatBuffer = byteBuffer.asFloatBuffer()
-            floatBuffer.put(localBuffer, 0, accumulatedPointCount * 4)
-            floatBuffer.position(0)
+            val byteCount = accumulatedPointCount * 4 * 4
+            uploadFloatBuffer.clear()
+            uploadFloatBuffer.put(localBuffer, 0, accumulatedPointCount * 4)
+            uploadByteBuffer.position(0)
 
-            GLES20.glBufferSubData(GLES20.GL_ARRAY_BUFFER, 0, accumulatedPointCount * 4 * 4, byteBuffer)
+            GLES20.glBufferSubData(GLES20.GL_ARRAY_BUFFER, 0, byteCount, uploadByteBuffer)
             GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
         }
     }

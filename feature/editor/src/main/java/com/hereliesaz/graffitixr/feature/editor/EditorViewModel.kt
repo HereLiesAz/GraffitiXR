@@ -208,7 +208,17 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun setEditorMode(mode: EditorMode) = dispatch(EditorIntent.SetEditorMode(mode))
+    fun setEditorMode(mode: EditorMode) {
+        // A mode switch is a view change, not a container change — but any interaction in flight
+        // (a stroke not yet lifted, a segmentation not yet confirmed) must not survive it, or its
+        // callbacks would commit to the previous view's layer. Mirror the reducer's no-op guard.
+        if (_uiState.value.editorMode != mode) {
+            clearTransientStrokeState()
+            pendingStencilSourceLayerId = null
+            pendingStencilProjectId = null
+        }
+        dispatch(EditorIntent.SetEditorMode(mode))
+    }
 
     private fun pushHistory() {
         history.pushProperty(_uiState.value.layers.map { it.copy(bitmap = null) })
@@ -1172,6 +1182,10 @@ class EditorViewModel @Inject constructor(
         // original bitmap so each drag frame shows the full accumulated warp.
         if (_uiState.value.activeTool == Tool.LIQUIFY) {
             val layerId = strokeLayerId ?: return
+            // Capture the original bitmap once: onStrokeEnd may null the field while the warp job
+            // below is still queued on the default dispatcher, and a fast tool switch can enter this
+            // branch before onStrokeStart populated it. Bailing here is preferable to an NPE.
+            val original = liquifyOriginalBitmap ?: return
             val points = strokeCollectedPoints.toList()
             val canvasW = strokeCanvasW
             val canvasH = strokeCanvasH
@@ -1184,20 +1198,20 @@ class EditorViewModel @Inject constructor(
             if (points.size >= 2) {
                 val p1 = points[points.size - 2]
                 val p2 = points.last()
-                
+
                 // We need to map these screen points to the bitmap space
                 val mapped = ImageProcessor.mapScreenToBitmap(
-                    listOf(p1, p2), canvasW, canvasH, liquifyOriginalBitmap!!.width, liquifyOriginalBitmap!!.height,
+                    listOf(p1, p2), canvasW, canvasH, original.width, original.height,
                     capturedScale, capturedOffset, capturedRotZ
                 )
-                
+
                 val strokeArr = floatArrayOf(mapped[0].x, mapped[0].y, mapped[1].x, mapped[1].y)
                 slamManager.applyLiquify(strokeArr, brushSize, 0.5f)
             }
 
             liquifyJob?.cancel()
             liquifyJob = viewModelScope.launch(dispatchers.default) {
-                val warpBitmap = liquifyOriginalBitmap!!.copy(Bitmap.Config.ARGB_8888, true)
+                val warpBitmap = original.copy(Bitmap.Config.ARGB_8888, true)
                 slamManager.bakeLiquify(warpBitmap)
 
                 if (isActive) {
@@ -1250,7 +1264,9 @@ class EditorViewModel @Inject constructor(
             val bitmap = layer.bitmap ?: return
             
             val finalBitmap = if (state.activeTool == Tool.LIQUIFY) {
-                val baked = liquifyOriginalBitmap!!.copy(Bitmap.Config.ARGB_8888, true)
+                // Fall back to the committed layer bitmap if the original was already cleared
+                // (e.g. a second onStrokeEnd, or a start that never populated it) rather than NPE.
+                val baked = (liquifyOriginalBitmap ?: bitmap).copy(Bitmap.Config.ARGB_8888, true)
                 slamManager.bakeLiquify(baked)
                 baked
             } else {
@@ -1329,7 +1345,16 @@ class EditorViewModel @Inject constructor(
             opEmitter.emit(Op.StrokeComplete(layerId, brushStroke))
         }
 
-        // Clear stroke working state.
+        clearTransientStrokeState()
+    }
+
+    /**
+     * Resets the imperative, in-flight stroke/liquify scratch state. These live as ViewModel fields
+     * (not in [EditorUiState]), so the pure reducer can't clear them — any caller that abandons an
+     * in-progress stroke (stroke end, mode switch, project load) must invoke this so a later
+     * onStrokePoint/onStrokeEnd can't commit to a stale layer or bitmap.
+     */
+    private fun clearTransientStrokeState() {
         strokeWorkingBitmap = null
         strokeWorkingCanvas = null
         strokePaint = null
@@ -1337,7 +1362,6 @@ class EditorViewModel @Inject constructor(
         strokeCollectedPoints = mutableListOf()
         strokeLayerId = null
 
-        // Clean up Liquify live-preview state.
         liquifyJob?.cancel()
         liquifyJob = null
         liquifyOriginalBitmap = null

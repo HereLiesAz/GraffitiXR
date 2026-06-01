@@ -495,7 +495,9 @@ class MainActivity : ComponentActivity() {
                         // is that auto overlays (onboarding, AR-unavailable explainer) must
                         // early-return on EVERY modal, not just one — collapsing the repeated
                         // boolean chains here prevents a future overlay from forgetting one.
-                        val anyModalActive = showLibrary || showSettings || isExporting || mainUiState.isCapturingTarget
+                        val anyModalActive = showLibrary || showSettings || isExporting ||
+                            mainUiState.isCapturingTarget || showSaveDialog ||
+                            dashboardUiState.showNewProjectDialog
 
                         // The ordered do-it-to-advance walkthrough for the current mode/layers.
                         // Derived from the rail enumeration + help/text maps so it always matches
@@ -817,7 +819,10 @@ class MainActivity : ComponentActivity() {
                                 screenSize = fullSize
                             )
 
-                            if (arUiState.showCoopNotFoundDialog) {
+                            // Auto-fired by AR state, so it must yield to any user-driven modal
+                            // rather than stack on top of it. Stays true in state and re-renders
+                            // once the higher-priority modal dismisses.
+                            if (arUiState.showCoopNotFoundDialog && !anyModalActive) {
                                 CoopNotFoundDialog(
                                     onDismiss = { arViewModel.dismissCoopNotFoundDialog() },
                                     onHost = { arViewModel.startHosting() },

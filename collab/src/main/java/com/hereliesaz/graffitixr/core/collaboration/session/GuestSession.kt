@@ -60,8 +60,11 @@ internal class GuestSession(
     private suspend fun connectLoop(isReconnect: Boolean): Boolean {
         return try {
             val s = Socket()
-            s.connect(java.net.InetSocketAddress(host, port), 5000)
+            // Publish the socket to the field before connecting so a connect() failure (timeout /
+            // refused / unreachable) still has its descriptor closed by the catch below — otherwise
+            // the local would leak one FD per failed attempt across the reconnect loop.
             socket = s
+            s.connect(java.net.InetSocketAddress(host, port), 5000)
             val input = s.getInputStream()
             val output = s.getOutputStream()
 
@@ -110,6 +113,10 @@ internal class GuestSession(
             }
         } catch (e: Exception) {
             // Transient: let the caller decide whether to retry (reconnect) or end the session.
+            // Close the half-open socket now so a failed attempt doesn't leak an FD — the reconnect
+            // loop reassigns the field on the next try and would otherwise orphan this one.
+            try { socket?.close() } catch (_: Exception) {}
+            socket = null
             false
         }
     }
