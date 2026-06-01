@@ -34,7 +34,8 @@ import kotlin.concurrent.withLock
 class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
-    private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int) -> Unit,
+    // Last arg is the camera→point distance (meters) at the tapped pixel, or -1f when unavailable.
+    private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int, Float) -> Unit,
     private val onTrackingUpdated: (Boolean, Int, Int, Boolean, Float, Float, Triple<Float, Float, Float>?, Boolean, Boolean, Float, Float, Float) -> Unit,
     private val onLightUpdated: (Float) -> Unit,
     private val onDiag: (String) -> Unit = {},
@@ -145,6 +146,10 @@ class ArRenderer(
     private var lastPoseZ = 0f
 
     @Volatile var captureRequested: Boolean = false
+    // Normalized (0..1) screen tap to measure distance for on the next capture; consumed on the GL thread.
+    @Volatile var pendingCaptureTap: FloatArray? = null
+    @Volatile private var surfaceWidth: Int = 0
+    @Volatile private var surfaceHeight: Int = 0
     @Volatile var isCapturingTarget: Boolean = false
     @Volatile var isInPlaneRealignment: Boolean = false
     @Volatile var pendingAnchorEstablishment: Boolean = false
@@ -240,6 +245,8 @@ class ArRenderer(
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES30.glViewport(0, 0, width, height)
+        surfaceWidth = width
+        surfaceHeight = height
         displayRotationHelper.onSurfaceChanged(width, height)
         slamManager.setViewportSize(width, height)
     }
@@ -529,12 +536,40 @@ class ArRenderer(
                             intrinsics.principalPoint[0], intrinsics.principalPoint[1]
                         )
 
+                        // Camera→point distance at the tapped pixel (Sub-project C). Map the tap from
+                        // view pixels to the depth image via ARCore's rotation/crop-aware transform,
+                        // then read the depth buffer. A confident tap also becomes a fusion support
+                        // anchor (done here on the GL thread, where frame + activeSession are valid).
+                        var tapDistanceMeters = -1f
+                        val tap = pendingCaptureTap
+                        pendingCaptureTap = null
+                        val capturedDepth = depthBuffer
+                        if (tap != null && capturedDepth != null && depthWidth > 0 && surfaceWidth > 0) {
+                            try {
+                                val viewPx = floatArrayOf(tap[0] * surfaceWidth, tap[1] * surfaceHeight)
+                                val imgNorm = FloatArray(2)
+                                frame.transformCoordinates2d(
+                                    com.google.ar.core.Coordinates2d.VIEW, viewPx,
+                                    com.google.ar.core.Coordinates2d.IMAGE_NORMALIZED, imgNorm
+                                )
+                                tapDistanceMeters = com.hereliesaz.graffitixr.feature.ar.eval.DepthLookup
+                                    .depthMetersAt(capturedDepth, depthStride, depthWidth, depthHeight, imgNorm[0], imgNorm[1])
+                                if (tapDistanceMeters > 0f && anchorEstablished) {
+                                    frame.hitTest(viewPx[0], viewPx[1]).firstOrNull()?.let {
+                                        anchorOrchestrator.addSupportAnchor(activeSession, it.hitPose)
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Timber.w(e, "Tap depth/support-anchor lookup failed")
+                            }
+                        }
+
                         onTargetCaptured(
                             bitmap, image.width, image.height,
                             depthBuffer,
                             depthWidth, depthHeight, depthStride,
                             intrArr, mappingViewMatrix.copyOf(),
-                            rotationNeeded
+                            rotationNeeded, tapDistanceMeters
                         )
                     }
                 } catch (e: Exception) {

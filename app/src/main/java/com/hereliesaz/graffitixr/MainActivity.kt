@@ -831,6 +831,29 @@ class MainActivity : ComponentActivity() {
                                 screenSize = fullSize
                             )
 
+                            // Tap-to-distance (Sub-project C): live center reticle + a distance chip
+                            // pinned at each tapped wall mark. Only when depth is available in AR mode.
+                            if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && arUiState.isDepthApiSupported) {
+                                androidx.compose.material3.Text(
+                                    text = com.hereliesaz.graffitixr.feature.ar.eval.DistanceFormat.format(
+                                        arUiState.currentCenterDepth, arUiState.isImperialUnits
+                                    ),
+                                    color = androidx.compose.ui.graphics.Color.Cyan,
+                                    modifier = Modifier.align(Alignment.Center)
+                                )
+                                arUiState.tapMarks.forEach { mark ->
+                                    androidx.compose.material3.Text(
+                                        text = com.hereliesaz.graffitixr.feature.ar.eval.DistanceFormat.format(
+                                            mark.distanceMeters, arUiState.isImperialUnits
+                                        ),
+                                        color = androidx.compose.ui.graphics.Color.Yellow,
+                                        modifier = Modifier.align(
+                                            androidx.compose.ui.BiasAlignment(mark.nx * 2f - 1f, mark.ny * 2f - 1f)
+                                        )
+                                    )
+                                }
+                            }
+
                             // Auto-fired by AR state, so it must yield to any user-driven modal
                             // rather than stack on top of it. Stays true in state and re-renders
                             // once the higher-priority modal dismisses.

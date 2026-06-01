@@ -252,18 +252,19 @@ class ArViewModelTest {
             depthBufW = 100, depthBufH = 100, depthBufStride = 200,
             intrinsics = null,
             viewMatrix = FloatArray(16),
-            displayRotation = 0
+            displayRotation = 0,
+            tapDistanceMeters = -1f
         )
 
         assertFalse(viewModel.uiState.value.isCaptureRequested)
-        assertEquals(1, viewModel.uiState.value.tapHighlightKeypoints.size)
+        assertEquals(1, viewModel.uiState.value.tapMarks.size)
     }
 
     @Test
     fun `clearTapHighlights clears keypoints and bitmaps`() = runTest {
         viewModel.clearTapHighlights()
         val state = viewModel.uiState.value
-        assertTrue(state.tapHighlightKeypoints.isEmpty())
+        assertTrue(state.tapMarks.isEmpty())
         assertNull(state.annotatedCaptureBitmap)
         assertNull(state.tempCaptureBitmap)
     }
@@ -323,7 +324,7 @@ class ArViewModelTest {
             bitmap = rawBmp, depthBuffer = null,
             colorW = 100, colorH = 100,
             depthBufW = 0, depthBufH = 0, depthBufStride = 0,
-            intrinsics = null, viewMatrix = FloatArray(16), displayRotation = 0
+            intrinsics = null, viewMatrix = FloatArray(16), displayRotation = 0, tapDistanceMeters = -1f
         )
         // withContext(Dispatchers.Default) runs on a real thread pool; give it time to finish,
         // then advance testDispatcher to process the resulting state-update continuation.
@@ -407,7 +408,7 @@ class ArViewModelTest {
             bitmap = rawBmp, depthBuffer = null,
             colorW = 100, colorH = 100,
             depthBufW = 0, depthBufH = 0, depthBufStride = 0,
-            intrinsics = null, viewMatrix = FloatArray(16), displayRotation = 0
+            intrinsics = null, viewMatrix = FloatArray(16), displayRotation = 0, tapDistanceMeters = -1f
         )
 
         val state = viewModel.uiState.value
