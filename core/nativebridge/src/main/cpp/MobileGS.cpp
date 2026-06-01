@@ -326,18 +326,23 @@ void MobileGS::relocThreadFunc() {
                     cv::Mat R;
                     cv:: Rodrigues(rvec, R);
 
-                    // Construct 4x4 matrix from PnP result (Camera-to-World in Fingerprint Space)
+                    // PnP gives T_camera_from_fingerprintWorld (a view matrix). DO NOT write it to
+                    // mAnchorMatrix (a world-space MODEL matrix) — that caused overlay teleport.
+                    // Publish the raw result; Kotlin composes inverse(V_current)*pnp*fpAnchor with the
+                    // FRESH view matrix (see PoseFusion).
                     glm::mat4 pnpMat = glm::mat4(1.0f);
                     for(int i=0; i<3; ++i) {
                         for(int j=0; j<3; ++j) pnpMat[j][i] = (float)R.at<double>(i,j);
                         pnpMat[3][i] = (float)tvec.at<double>(i);
                     }
-
-                    // [TELEOLOGICAL CORRECTION] Snap the global anchor to match the physical fingerprint
-                    std::lock_guard<std::mutex> lock(mMutex);
-                    // This is a simplified version of the correction logic
-                    memcpy(mAnchorMatrix, glm::value_ptr(pnpMat), 16 * sizeof(float));
-                    LOGI("Relocalization: Snap-Back successful with %zu inliers", inliers.size());
+                    {
+                        std::lock_guard<std::mutex> lock(mMutex);
+                        memcpy(mPnpCamFromFpWorld, glm::value_ptr(pnpMat), 16 * sizeof(float));
+                    }
+                    mPnpInlierCount.store((int)inliers.size(), std::memory_order_relaxed);
+                    mPnpMatchCount.store((int)imgPts.size(), std::memory_order_relaxed);
+                    mPnpResultSeq.fetch_add(1, std::memory_order_relaxed);
+                    LOGI("Relocalization: PnP match published (%zu/%zu inliers)", inliers.size(), imgPts.size());
                 }
             }
         }
@@ -600,6 +605,7 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
         std::lock_guard<std::mutex> lock(mMutex);
         mWallDescriptors  = fd.descriptors.clone();
         mWallKeypoints3D  = std::move(pts3d);
+        memcpy(mFingerprintAnchorMatrix, mAnchorMatrix, 16 * sizeof(float));
     }
 
     return fd;
@@ -620,4 +626,16 @@ void MobileGS::setStageEnabled(int stage, bool enabled) {
     // timing-only and always run — their cost is read from the timers, never toggled. Reject 0/3/4
     // so setStageEnabled(3/4,false) isn't a confusing silent no-op.
     if (stage == 1 || stage == 2) mStageEnabled[stage].store(enabled, std::memory_order_relaxed);
+}
+
+void MobileGS::getRelocResult(float* out19) const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    memcpy(out19, mPnpCamFromFpWorld, 16 * sizeof(float));
+    out19[16] = (float) mPnpInlierCount.load(std::memory_order_relaxed);
+    out19[17] = (float) mPnpMatchCount.load(std::memory_order_relaxed);
+    out19[18] = (float) mPnpResultSeq.load(std::memory_order_relaxed);
+}
+void MobileGS::getFingerprintAnchor(float* out16) const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    memcpy(out16, mFingerprintAnchorMatrix, 16 * sizeof(float));
 }

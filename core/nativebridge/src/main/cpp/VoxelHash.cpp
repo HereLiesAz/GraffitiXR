@@ -259,8 +259,15 @@ void VoxelHash::getAnchorCandidates(std::vector<Splat>& out, float threshold, in
     }
 }
 
-float VoxelHash::getVisibleConfidenceAvg() const { return 0.5f; }
-float VoxelHash::getGlobalConfidenceAvg() const { return 0.5f; }
+float VoxelHash::getGlobalConfidenceAvg() const {
+    if (mSplatData.empty()) return 0.0f;
+    double sum = 0.0;
+    for (const auto& s : mSplatData) sum += s.confidence;
+    return static_cast<float>(sum / mSplatData.size());
+}
+// "Visible" frustum culling is not yet available at this layer; approximate with the global mean.
+// TODO(B-followup): pass the current view/proj matrix to cull to the visible frustum.
+float VoxelHash::getVisibleConfidenceAvg() const { return getGlobalConfidenceAvg(); }
 void VoxelHash::addKeyframe(const VoxelFrame& kf) {
     std::lock_guard<std::mutex> lock(mMutex);
     if (mRecentFrames.size() > 5) mRecentFrames.erase(mRecentFrames.begin());

@@ -38,6 +38,8 @@ public:
     void restoreWallFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
     void scheduleRelocCheck(const cv::Mat& colorFrame);
     void getAnchorTransform(float* outMat16) const;
+    void getRelocResult(float* out19) const;       // [0..15]=pnpMat,16=inliers,17=matches,18=seq
+    void getFingerprintAnchor(float* out16) const;
     void setArtworkFingerprint(const cv::Mat& composite, const uint8_t* depthData, int depthW, int depthH, int depthStride, const float* intrinsics4, const float* viewMat16);
 
     struct FingerprintData {
@@ -136,6 +138,13 @@ private:
     SurfaceMesh mSurfaceMesh;
 
     float mAnchorMatrix[16];
+
+    // --- Pose fusion (Sub-project B): reloc result published for Kotlin to compose correctly ---
+    float mPnpCamFromFpWorld[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    std::atomic<int> mPnpInlierCount{0};
+    std::atomic<int> mPnpMatchCount{0};
+    std::atomic<long> mPnpResultSeq{0};
+    float mFingerprintAnchorMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     uint64_t mFrameCounter = 0;
     float mLightLevel = 1.0f;
     float mLastAngularVelocity[3] = {0,0,0};
