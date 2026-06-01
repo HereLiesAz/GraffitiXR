@@ -615,5 +615,9 @@ void MobileGS::getStageTimingsAndReset(float* out) {
 }
 
 void MobileGS::setStageEnabled(int stage, bool enabled) {
-    if (stage > 0 && stage < kStageCount) mStageEnabled[stage].store(enabled, std::memory_order_relaxed);
+    // Only stages 1 (voxelKeyframe) and 2 (surfaceMesh) are gateable for A/B cost attribution.
+    // Stage 0 (voxelUpdate) is the relocalization backbone; stages 3 (draw) and 4 (pnpReloc) are
+    // timing-only and always run — their cost is read from the timers, never toggled. Reject 0/3/4
+    // so setStageEnabled(3/4,false) isn't a confusing silent no-op.
+    if (stage == 1 || stage == 2) mStageEnabled[stage].store(enabled, std::memory_order_relaxed);
 }

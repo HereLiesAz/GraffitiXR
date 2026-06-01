@@ -202,12 +202,18 @@ class ArViewModel @Inject constructor(
         com.hereliesaz.graffitixr.feature.ar.eval.ArRecordingController(appContext)
     }
 
+    // True only while a dev eval session is logging. Gates the live-metrics publish so the lazy
+    // evalProbe (and its BatteryManager) is never instantiated in release / normal use.
+    @Volatile private var evalLogging = false
+
     fun evalStartLog() {
         evalProbe.start()
         renderer?.driftCostProbe = evalProbe
+        evalLogging = true
     }
 
     fun evalStopLog() {
+        evalLogging = false
         renderer?.driftCostProbe = null
         evalProbe.stop()
     }
@@ -854,7 +860,7 @@ class ArViewModel @Inject constructor(
                 visibleSplatConfidenceAvg = visConf,
                 globalSplatConfidenceAvg = globConf,
                 trackingFailed = trackingFailed,
-                evalLiveMetrics = evalProbe.lastMetrics
+                evalLiveMetrics = if (evalLogging) evalProbe.lastMetrics else state.evalLiveMetrics
             )
         }
     }
