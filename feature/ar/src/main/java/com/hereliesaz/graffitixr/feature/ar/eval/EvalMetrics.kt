@@ -34,18 +34,18 @@ object EvalMetrics {
         return PoseError(translationMm, if (rotationDeg.isNaN()) 0f else rotationDeg)
     }
 
-    /** Mean distance of each point from the centroid, in millimeters. */
+    /** RMS deviation of the points from their centroid (total positional stddev), in millimeters. */
     fun jitterMm(translations: List<FloatArray>): Float {
         if (translations.size < 2) return 0f
         val n = translations.size
         val cx = translations.sumOf { it[0].toDouble() } / n
         val cy = translations.sumOf { it[1].toDouble() } / n
         val cz = translations.sumOf { it[2].toDouble() } / n
-        val meanDist = translations.sumOf {
+        val meanSq = translations.sumOf {
             val dx = it[0] - cx; val dy = it[1] - cy; val dz = it[2] - cz
-            sqrt(dx * dx + dy * dy + dz * dz)
+            dx * dx + dy * dy + dz * dz
         } / n
-        return (meanDist * 1000.0).toFloat()
+        return (sqrt(meanSq) * 1000.0).toFloat()
     }
 
     fun availability(usable: Int, total: Int): Float = if (total <= 0) 0f else usable.toFloat() / total

@@ -43,6 +43,14 @@ class EvalMetricsTest {
     }
 
     @Test
+    fun `jitter is RMS deviation, not mean distance`() {
+        // Points at z = 0, 0, 0.03 -> centroid z = 0.01. Distances from centroid: 10, 10, 20 mm.
+        // RMS = sqrt((100+100+400)/3) = sqrt(200) = 14.14 mm (mean distance would be 13.33 mm).
+        val pts = listOf(floatArrayOf(0f, 0f, 0f), floatArrayOf(0f, 0f, 0f), floatArrayOf(0f, 0f, 0.03f))
+        assertEquals(14.142f, EvalMetrics.jitterMm(pts), 0.05f)
+    }
+
+    @Test
     fun `availability is usable over total`() {
         assertEquals(0.75f, EvalMetrics.availability(usable = 3, total = 4), 1e-4f)
         assertEquals(0f, EvalMetrics.availability(usable = 0, total = 0), 1e-4f) // guard /0
