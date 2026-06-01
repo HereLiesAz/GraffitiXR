@@ -106,6 +106,16 @@ class CollaborationManager @Inject constructor() {
         _state.value = CoopSessionState.Idle
     }
 
+    /**
+     * Fire-and-forget [leaveSession] for lifecycle owners (e.g. ViewModel.onCleared) whose own
+     * coroutine scope is already cancelled at teardown time and therefore cannot run the suspend
+     * variant. Runs on this singleton's [scope], which outlives the caller, so the host server
+     * socket / guest connection is actually released instead of leaking until process death.
+     */
+    fun leaveSessionAsync() {
+        scope.launch { leaveSession() }
+    }
+
     /** Called by OpEmitterImpl on every editor mutation. */
     internal fun enqueueHostOp(op: Op) {
         hostSession?.enqueueOp(op)

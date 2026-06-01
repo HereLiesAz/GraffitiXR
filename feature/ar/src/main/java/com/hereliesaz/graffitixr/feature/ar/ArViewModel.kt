@@ -1110,7 +1110,13 @@ class ArViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        leaveSession()
+        // viewModelScope is already cancelled by the time onCleared runs, so leaveSession()'s
+        // viewModelScope.launch would never execute and the collaboration session would leak.
+        // Cancel the local collector synchronously and tear the session down on the manager's
+        // own (surviving) scope instead.
+        coopStateJob?.cancel()
+        coopStateJob = null
+        collaborationManager.leaveSessionAsync()
         destroyArSession()
     }
 }

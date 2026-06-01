@@ -49,12 +49,15 @@ class CrashReporter(private val context: Context) : Thread.UncaughtExceptionHand
     }
 
     private fun collectLogcat(): String {
+        var process: Process? = null
         return try {
-            val process = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-t", "1000", "--pid=${android.os.Process.myPid()}"))
-            val reader = InputStreamReader(process.inputStream)
-            reader.readText()
+            process = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-t", "1000", "--pid=${android.os.Process.myPid()}"))
+            InputStreamReader(process.inputStream).use { it.readText() }
         } catch (e: Exception) {
             "Failed to collect Logcat: ${e.message}"
+        } finally {
+            // Release the subprocess's pipes/FDs; readText() above already drained stdout.
+            process?.destroy()
         }
     }
 

@@ -54,7 +54,8 @@ class CrashUploadWorker(private val context: Context) {
             if (response.isSuccessful) {
                 true
             } else {
-                Log.e("CrashUploadWorker", "GitHub API Error: ${response.code()} ${response.errorBody()?.string()}")
+                val errorText = response.errorBody()?.use { it.string() }
+                Log.e("CrashUploadWorker", "GitHub API Error: ${response.code()} $errorText")
                 false
             }
         } catch (e: Exception) {
