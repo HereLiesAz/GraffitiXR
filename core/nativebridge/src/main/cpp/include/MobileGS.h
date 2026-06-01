@@ -8,6 +8,7 @@
 #include <string>
 #include <thread>
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <GLES3/gl3.h>
 
@@ -53,6 +54,9 @@ public:
     void setArScanMode(int mode);
     void setMuralMethod(int method);
     void setViewportSize(int width, int height);
+    // Eval: fill out[kStageCount] with average ms/stage since last reset, then reset accumulators.
+    void getStageTimingsAndReset(float* out);
+    void setStageEnabled(int stage, bool enabled);
     void setRelocEnabled(bool enabled);
     void setVoxelSize(float size);
     void setMappingPaused(bool paused) { mMappingPaused = paused; }
@@ -150,6 +154,16 @@ private:
     bool mSplatsVisible{false};
     int mScanMode = 0; // 0=CLOUD, 1=MURAL
     int mMuralMethod = 0; // 0=VOXEL_HASH, 1=SURFACE_MESH
+
+    // --- Evaluation instrumentation (Sub-project A) ---
+    // Accumulated wall-time per stage and a sample count, for averaging. Indexes match the Kotlin
+    // stage contract: 0=voxelUpdate,1=voxelKeyframe,2=surfaceMesh,3=draw,4=pnpReloc.
+    static constexpr int kStageCount = 5;
+    std::atomic<double> mStageAccumMs[kStageCount] = {};
+    std::atomic<uint64_t> mStageSamples[kStageCount] = {};
+    // Per-stage A/B enable flags (default on). When off, the stage's work is skipped so cost diffs
+    // are clean. Stage 0 (voxelUpdate) is the relocalization backbone and is NOT gateable.
+    std::atomic<bool> mStageEnabled[kStageCount] = { true, true, true, true, true };
 
     std::thread             mRelocThread;
     std::mutex              mRelocMutex;

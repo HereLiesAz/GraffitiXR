@@ -7,6 +7,17 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import java.nio.ByteBuffer
 
+/** Live eval metrics snapshot rendered by the dev overlay (Sub-project A). */
+data class EvalLiveMetrics(
+    val errMm: Float = -1f,
+    val errDeg: Float = -1f,
+    val jitterMm: Float = 0f,
+    val availability: Float = 0f,
+    val recoveryMs: Long? = null,
+    val stageMs: FloatArray = FloatArray(5),
+    val batteryMa: Float = 0f,
+)
+
 data class ArUiState(
     val isScanning: Boolean = false,
     val splatCount: Int = 0,
@@ -151,7 +162,9 @@ data class ArUiState(
     // ~10 s after AR mode entry. Drives the "AR can't initialize" escape
     // overlay, which gives the user a guaranteed exit even when the VIO/depth
     // pipelines are stuck and the main thread is starved.
-    val trackingFailed: Boolean = false
+    val trackingFailed: Boolean = false,
+
+    val evalLiveMetrics: EvalLiveMetrics = EvalLiveMetrics(),
 )
 
 enum class CoopRole { NONE, HOST, GUEST }

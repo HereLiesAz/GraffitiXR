@@ -21,6 +21,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -802,6 +803,17 @@ class MainActivity : ComponentActivity() {
 
                             if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings) {
                                 AnchorLockFlash(isAnchorEstablished = arUiState.isAnchorEstablished, strings = strings)
+                            }
+
+                            if (EVAL_OVERLAY_ENABLED && editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && !mainUiState.isCapturingTarget) {
+                                EvalOverlay(
+                                    metrics = arUiState.evalLiveMetrics,
+                                    onStartRecord = { arViewModel.evalStartRecording() },
+                                    onStopRecord = { arViewModel.evalStopRecording() },
+                                    onStartLog = { arViewModel.evalStartLog() },
+                                    onStopLog = { arViewModel.evalStopLog() },
+                                    onInduceLoss = { arViewModel.evalInduceLoss() },
+                                )
                             }
 
                             SyncingBadge(
@@ -2384,6 +2396,39 @@ private fun DiagnosticOverlay(
                     fontFamily = FontFamily.Monospace
                 )
             }
+        }
+    }
+}
+
+// Eval overlay only renders in debug builds; production users never see it.
+private val EVAL_OVERLAY_ENABLED = com.hereliesaz.graffitixr.BuildConfig.DEBUG
+
+@Composable
+private fun EvalOverlay(
+    metrics: com.hereliesaz.graffitixr.common.model.EvalLiveMetrics,
+    onStartRecord: () -> Unit,
+    onStopRecord: () -> Unit,
+    onStartLog: () -> Unit,
+    onStopLog: () -> Unit,
+    onInduceLoss: () -> Unit,
+) {
+    androidx.compose.foundation.layout.Column(
+        androidx.compose.ui.Modifier
+            .background(androidx.compose.ui.graphics.Color(0xAA000000))
+            .padding(8.dp)
+    ) {
+        DiagnosticRow("Err", if (metrics.errMm >= 0) "%.0fmm / %.1f°".format(metrics.errMm, metrics.errDeg) else "no marks", androidx.compose.ui.graphics.Color.Cyan)
+        DiagnosticRow("Jitter", "%.1fmm".format(metrics.jitterMm), androidx.compose.ui.graphics.Color.White)
+        DiagnosticRow("Avail", "%.0f%%".format(metrics.availability * 100), androidx.compose.ui.graphics.Color.White)
+        DiagnosticRow("Recovery", metrics.recoveryMs?.let { "${it}ms" } ?: "—", androidx.compose.ui.graphics.Color.White)
+        DiagnosticRow("Stage ms", metrics.stageMs.joinToString(" ") { "%.1f".format(it) }, androidx.compose.ui.graphics.Color.Yellow)
+        DiagnosticRow("Batt", "%.0fmA".format(metrics.batteryMa), androidx.compose.ui.graphics.Color.White)
+        androidx.compose.foundation.layout.Row {
+            androidx.compose.material3.TextButton(onClick = onStartLog) { androidx.compose.material3.Text("Log▶") }
+            androidx.compose.material3.TextButton(onClick = onStopLog) { androidx.compose.material3.Text("Log■") }
+            androidx.compose.material3.TextButton(onClick = onInduceLoss) { androidx.compose.material3.Text("Loss") }
+            androidx.compose.material3.TextButton(onClick = onStartRecord) { androidx.compose.material3.Text("Rec▶") }
+            androidx.compose.material3.TextButton(onClick = onStopRecord) { androidx.compose.material3.Text("Rec■") }
         }
     }
 }

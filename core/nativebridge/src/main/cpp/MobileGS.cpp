@@ -16,6 +16,28 @@
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "MobileGS", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "MobileGS", __VA_ARGS__)
 
+namespace {
+// C++17-compatible atomic double add via CAS loop.
+inline void atomicAddDouble(std::atomic<double>* a, double v) {
+    double old = a->load(std::memory_order_relaxed);
+    while (!a->compare_exchange_weak(old, old + v, std::memory_order_relaxed, std::memory_order_relaxed)) {}
+}
+
+struct StageTimer {
+    std::atomic<double>* accum;
+    std::atomic<uint64_t>* count;
+    std::chrono::steady_clock::time_point start;
+    StageTimer(std::atomic<double>* a, std::atomic<uint64_t>* c)
+        : accum(a), count(c), start(std::chrono::steady_clock::now()) {}
+    ~StageTimer() {
+        double ms = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - start).count();
+        atomicAddDouble(accum, ms);
+        count->fetch_add(1, std::memory_order_relaxed);
+    }
+};
+}
+
 std::string gLastSplatTrace = "";
 
 extern JavaVM* gJvm;
@@ -92,12 +114,12 @@ void MobileGS::draw() {
     glm::mat4 mvp = P * V;
 
     if (mSplatsVisible) {
+        StageTimer _t(&mStageAccumMs[3], &mStageSamples[3]);
         if (mMuralMethod == 0) { // VOXEL_HASH
             mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight);
         } else if (mMuralMethod == 1) { // SURFACE_MESH
             mSurfaceMesh.draw(mvp);
         } else if (mMuralMethod == 2) { // CLOUD_OFFSET
-            // Use VoxelHash renderer as fallback for Point Cloud Offset visualization
             mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight);
         }
     }
@@ -123,13 +145,15 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
     else colorRGB = color;
 
     // Universal Ingestion: Build the Voxel Map in ALL modes to enable Snap-Back relocalization.
-    mVoxelHash.update(depth, colorRGB, viewMat, projMat, mVoxelSize, confidence);
+    { StageTimer _t(&mStageAccumMs[0], &mStageSamples[0]);
+      mVoxelHash.update(depth, colorRGB, viewMat, projMat, mVoxelSize, confidence); }
 
     if (mScanMode == 0) return; // Canvas mode only needs the voxel map for background recovery.
 
     mFrameCounter++;
     if (mMuralMethod == 0) { // VOXEL_HASH
-        if (mFrameCounter % 30 == 0) { // Throttled keyframes
+        if (mStageEnabled[1].load(std::memory_order_relaxed) && mFrameCounter % 30 == 0) {
+            StageTimer _t(&mStageAccumMs[1], &mStageSamples[1]);
             VoxelFrame kf;
             kf.depth = depth.clone(); kf.color = colorRGB.clone();
             memcpy(kf.viewMatrix, viewMat, 16 * sizeof(float));
@@ -137,7 +161,10 @@ void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, con
             mVoxelHash.addKeyframe(kf);
         }
     } else if (mMuralMethod == 1) { // SURFACE_MESH
-        mSurfaceMesh.update(depth, colorRGB, viewMat, projMat, mAnchorMatrix, mLightLevel);
+        if (mStageEnabled[2].load(std::memory_order_relaxed)) {
+            StageTimer _t(&mStageAccumMs[2], &mStageSamples[2]);
+            mSurfaceMesh.update(depth, colorRGB, viewMat, projMat, mAnchorMatrix, mLightLevel);
+        }
     } else if (mMuralMethod == 2) { // CLOUD_OFFSET
         // Cloud Offset mode leverages the mVoxelHash map updated above.
     }
@@ -293,6 +320,7 @@ void MobileGS::relocThreadFunc() {
             std::vector<int> inliers;
             // Physical intrinsics from Mapping camera
             cv::Mat intr = (cv::Mat_<double>(3,3) << 1000.0, 0, 960.0, 0, 1000.0, 540.0);
+            StageTimer _pnpTimer(&mStageAccumMs[4], &mStageSamples[4]);
             if (cv::solvePnPRansac(objPts, imgPts, intr, cv::Mat(), rvec, tvec, false, 100, 8.0, 0.99, inliers)) {
                 if (inliers.size() >= 12) {
                     cv::Mat R;
@@ -577,3 +605,19 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
     return fd;
 }
 void MobileGS::sortThreadFunc() {}
+
+void MobileGS::getStageTimingsAndReset(float* out) {
+    for (int i = 0; i < kStageCount; ++i) {
+        uint64_t n = mStageSamples[i].exchange(0, std::memory_order_relaxed);
+        double acc = mStageAccumMs[i].exchange(0.0, std::memory_order_relaxed);
+        out[i] = (n > 0) ? static_cast<float>(acc / static_cast<double>(n)) : 0.0f;
+    }
+}
+
+void MobileGS::setStageEnabled(int stage, bool enabled) {
+    // Only stages 1 (voxelKeyframe) and 2 (surfaceMesh) are gateable for A/B cost attribution.
+    // Stage 0 (voxelUpdate) is the relocalization backbone; stages 3 (draw) and 4 (pnpReloc) are
+    // timing-only and always run — their cost is read from the timers, never toggled. Reject 0/3/4
+    // so setStageEnabled(3/4,false) isn't a confusing silent no-op.
+    if (stage == 1 || stage == 2) mStageEnabled[stage].store(enabled, std::memory_order_relaxed);
+}
