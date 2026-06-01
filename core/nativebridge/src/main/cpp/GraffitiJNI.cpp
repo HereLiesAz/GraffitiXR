@@ -691,6 +691,19 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMuralMethod(JNI
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetStageTimings(JNIEnv* env, jobject, jfloatArray out) {
+    if (!gSlamEngine) return;
+    float buf[5] = {0,0,0,0,0};
+    gSlamEngine->getStageTimingsAndReset(buf);
+    env->SetFloatArrayRegion(out, 0, 5, buf);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetStageEnabled(JNIEnv* env, jobject, jint stage, jboolean enabled) {
+    if (gSlamEngine) gSlamEngine->setStageEnabled((int) stage, enabled == JNI_TRUE);
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPersistentMesh(JNIEnv* env, jobject, jfloatArray vertices, jfloatArray weights) {
     if (!gSlamEngine) return;
     std::vector<float> v, w;
