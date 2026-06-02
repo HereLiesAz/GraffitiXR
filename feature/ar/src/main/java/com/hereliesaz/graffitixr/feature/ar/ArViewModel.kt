@@ -585,6 +585,23 @@ class ArViewModel @Inject constructor(
             }
             _uiState.update { it.copy(isDualLensActive = false, isHardwareStereoActive = false) }
 
+            // Dual-lens mandate probe: ask ARCore whether this device exposes ANY hardware-stereo
+            // camera config. This is read-only (does NOT change the selected config) — it answers the
+            // "why only one lens?" question with device ground truth. If count > 0 we can enable
+            // stereo (via PREFER_AND_USE) on this device; if 0, ARCore cannot pair the lenses here and
+            // hardware stereo is impossible without abandoning ARCore tracking. Grep logcat for "dual-lens probe".
+            try {
+                val stereoFilter = CameraConfigFilter(s).apply {
+                    facingDirection = CameraConfig.FacingDirection.BACK
+                    stereoCameraUsage = java.util.EnumSet.of(CameraConfig.StereoCameraUsage.REQUIRE_AND_USE)
+                }
+                val stereoConfigs = s.getSupportedCameraConfigs(stereoFilter)
+                Timber.i("dual-lens probe: ${stereoConfigs.size} hardware-stereo camera config(s) on this device")
+                stereoConfigs.forEach { Timber.i("dual-lens probe: stereo cameraId=${it.cameraId} imageSize=${it.imageSize}") }
+            } catch (e: Exception) {
+                Timber.w(e, "dual-lens probe failed")
+            }
+
             session = s
             _isCameraInUseByAr.value = true
             
