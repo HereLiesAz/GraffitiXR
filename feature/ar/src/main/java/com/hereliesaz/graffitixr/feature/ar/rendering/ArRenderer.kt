@@ -82,7 +82,6 @@ class ArRenderer(
     private val overlayRenderer = OverlayRenderer(context)
     private val pointCloudRenderer = PointCloudRenderer()
     private val planeRenderer = PlaneRenderer()
-    private val scanFogRenderer = ScanFogRenderer()
     private val anchorOrchestrator = AnchorOrchestrator()
     private val poseFusion = com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion()
     // A/B switch for the Sub-project A harness: when false, reproduce the old pre/post-anchor toggle.
@@ -237,7 +236,6 @@ class ArRenderer(
         overlayRenderer.createOnGlThread()
         pointCloudRenderer.createOnGlThread(context)
         planeRenderer.createOnGlThread(context)
-        scanFogRenderer.createOnGlThread()
         isSurfaceCreated = true
 
         sessionLock.withLock {
@@ -276,7 +274,11 @@ class ArRenderer(
             }
 
             latestFrame.set(frame)
-            backgroundRenderer.draw(frame)
+            // During the AMBIENT scan, the camera background renders as a newspaper halftone with full
+            // colour bleeding in (like ink) as each yaw sector is mapped — the world-mapping indicator.
+            val scanActive = !anchorEstablished && scanMode == ArScanMode.MURAL && scanPhase == ScanPhase.AMBIENT
+            if (scanActive) backgroundRenderer.updateScanMask(visitedSectorsMask)
+            backgroundRenderer.draw(frame, scanActive)
 
             if (pendingAnchorEstablishment) {
                 pendingAnchorEstablishment = false
@@ -391,17 +393,8 @@ class ArRenderer(
             val yawRad = kotlin.math.atan2(-viewMatrix[2].toDouble(), -viewMatrix[10].toDouble())
             val yawDeg = Math.toDegrees(yawRad).toFloat()
 
-            // Hot-pink "fog of war" over the camera feed for unvisited yaw sectors.
-            // Only during AMBIENT scan in MURAL mode, before the anchor is locked.
-            if (!hideVisualization &&
-                !anchorEstablished &&
-                scanMode == ArScanMode.MURAL &&
-                scanPhase == ScanPhase.AMBIENT
-            ) {
-                scanFogRenderer.updateMask(visitedSectorsMask)
-                val halfFovH = kotlin.math.atan(1.0 / projMatrix[0].toDouble()).toFloat()
-                scanFogRenderer.draw(yawRad.toFloat(), halfFovH)
-            }
+            // (The world-mapping indicator is now the camera-background "ink develop" reveal, applied
+            // in BackgroundRenderer.draw(frame, scanActive) above — no separate overlay here.)
 
             slamManager.setArCoreTrackingState(isTracking)
 
@@ -776,17 +769,9 @@ class ArRenderer(
                 } catch (e: Exception) { /* Non-fatal */ }
             }
 
-            if (!hideVisualization) {
-                val showDiagnostics = !anchorEstablished
-                if (showDiagnostics) {
-                    if (currentScanMode == ArScanMode.CLOUD_POINTS) {
-                        planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose)
-                        pointCloudRenderer.draw(viewMatrix, projMatrix)
-                    } else {
-                        slamManager.draw()
-                    }
-                }
-            }
+            // During scanning we no longer draw the splat cloud / point cloud / plane grid — the
+            // newspaper-halftone "ink develop" reveal on the camera background is the mapping indicator.
+            // (Mapping/localization still runs; this only suppressed the busy 3D overlays.)
 
             if (overlayBitmapDirty) {
                 overlayBitmapDirty = false
@@ -949,7 +934,6 @@ class ArRenderer(
         overlayRenderer.release()
         pointCloudRenderer.release()
         planeRenderer.release()
-        scanFogRenderer.release()
     }
 
     /**
