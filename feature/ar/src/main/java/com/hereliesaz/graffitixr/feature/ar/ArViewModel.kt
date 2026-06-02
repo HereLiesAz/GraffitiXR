@@ -560,9 +560,20 @@ class ArViewModel @Inject constructor(
             config.focusMode = Config.FocusMode.AUTO
             config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
             
-            if (s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
+            // ROOT-CAUSE TEST (VIO never tracked): ARCore's Depth API (DepthMode.AUTOMATIC) runs an ML
+            // depth/perception graph that was erroring continuously on this device
+            // (feature_track_ml_depth_provider, mediapipe normal_detector RET_CHECK) while VIO sat in
+            // kNotTracking for the ENTIRE session. Disable the Depth API to isolate whether that
+            // pipeline is starving/wedging tracking. While disabled, depth-only features (surface mesh,
+            // tap distance) go dark — that's the trade for the test. Flip back to re-enable.
+            val disableDepthForVioTest = true
+            if (!disableDepthForVioTest && s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                 config.depthMode = Config.DepthMode.AUTOMATIC
                 _uiState.update { it.copy(isDepthApiSupported = true) }
+            } else {
+                config.depthMode = Config.DepthMode.DISABLED
+                _uiState.update { it.copy(isDepthApiSupported = false) }
+                Timber.i("VIO test: ARCore Depth API DISABLED to isolate the kNotTracking failure")
             }
 
             s.configure(config)
