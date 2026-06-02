@@ -455,11 +455,21 @@ internal fun compositeLayersForAr(layers: List<Layer>): AndroidBitmap {
         if (bottom > maxY) maxY = bottom
     }
 
-    val width = (maxX - minX).coerceAtLeast(1f).toInt()
-    val height = (maxY - minY).coerceAtLeast(1f).toInt()
+    val rawWidth = (maxX - minX).coerceAtLeast(1f)
+    val rawHeight = (maxY - minY).coerceAtLeast(1f)
+
+    // Cap the composite size: a zoomed-in (large layer.scale) or far-panned layer can otherwise
+    // request a multi-hundred-MB ARGB_8888 bitmap and OOM. Downscale proportionally past the cap so
+    // the result still fits as an overlay texture; downscale == 1 leaves the common case untouched.
+    val maxDim = 4096f
+    val downscale = minOf(1f, maxDim / rawWidth, maxDim / rawHeight)
+    val width = (rawWidth * downscale).toInt().coerceAtLeast(1)
+    val height = (rawHeight * downscale).toInt().coerceAtLeast(1)
 
     val result = createBitmap(width, height, AndroidBitmap.Config.ARGB_8888)
     val canvas = Canvas(result)
+    // Layer matrices are built in raw composite coordinates; this maps them into the capped bitmap.
+    canvas.scale(downscale, downscale)
     val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     for (layer in layers) {

@@ -18,22 +18,45 @@ class ArRecordingController(private val context: Context) {
 
     fun recordingsDir(): File = File(context.filesDir, "eval/recordings").apply { mkdirs() }
 
-    /** Start recording the live session to an MP4 dataset. Returns the target file. */
-    fun startRecording(session: Session, name: String): File {
-        val file = File(recordingsDir(), "$name.mp4")
-        val config = RecordingConfig(session).setMp4DatasetUri(Uri.fromFile(file))
-        session.startRecording(config)
-        Timber.i("eval: recording -> ${file.absolutePath}")
-        return file
+    /**
+     * Start recording the live session to an MP4 dataset. Returns the target file, or null if
+     * recording could not be started. ARCore throws AR_ERROR_ILLEGAL_STATE if recording is started
+     * after the session has resumed (it must be configured at resume time) or if a recording is
+     * already active — this is a dev-only bench control, so a failure must never crash the app.
+     */
+    fun startRecording(session: Session, name: String): File? {
+        if (session.recordingStatus == RecordingStatus.OK) {
+            Timber.w("eval: recording already in progress; ignoring start")
+            return null
+        }
+        return try {
+            val file = File(recordingsDir(), "$name.mp4")
+            val config = RecordingConfig(session).setMp4DatasetUri(Uri.fromFile(file))
+            session.startRecording(config)
+            Timber.i("eval: recording -> ${file.absolutePath}")
+            file
+        } catch (e: Exception) {
+            // Most commonly AR_ERROR_ILLEGAL_STATE: recording must be configured before session.resume().
+            Timber.w(e, "eval: startRecording failed (recording must be set up at session resume)")
+            null
+        }
     }
 
     fun stopRecording(session: Session) {
-        if (session.recordingStatus == RecordingStatus.OK) session.stopRecording()
+        try {
+            if (session.recordingStatus == RecordingStatus.OK) session.stopRecording()
+        } catch (e: Exception) {
+            Timber.w(e, "eval: stopRecording failed")
+        }
     }
 
     /** Set a recorded dataset for playback. Session must be paused; caller resumes after. */
-    fun startPlayback(session: Session, file: File) {
+    fun startPlayback(session: Session, file: File): Boolean = try {
         session.setPlaybackDatasetUri(Uri.fromFile(file))
+        true
+    } catch (e: Exception) {
+        Timber.w(e, "eval: startPlayback failed (set the dataset while the session is paused)")
+        false
     }
 
     fun isPlaying(session: Session): Boolean = session.playbackStatus == PlaybackStatus.OK
