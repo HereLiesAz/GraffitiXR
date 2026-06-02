@@ -38,23 +38,34 @@ overlay only when relocalization has no view to match.
   immediately (no smoothing); only smooth *subsequent* in-session corrections (extends `PoseFusion`:
   add a `coldSnap` path that bypasses the SLERP on the first lock).
 
-### 2. Two relocalization references, fused (Teleological SLAM)
-PnP matches the live frame against the union of:
-- **(a) Mark fingerprint** — `mWallKeypoints3D` from the artist's marks. **Metric** via the
-  dual-lens→triangulation→ML depth ladder (see the metric-depth spec). Dominant early; **fades** as
-  paint covers the marks.
-- **(b) Artwork fingerprint** — `mArtworkKeypoints3D`: features of the **target image**, with 3D taken
-  from the **anchor-plane geometry** (each artwork-image feature lies on the known wall plane at the
-  anchor pose → metric, *no depth needed*). **Grows** as the painting comes to resemble the target.
+### 2. Teleological SLAM — a self-growing fingerprint validated by the target
+Relocalization always matches **real observed features** (marks + paint) against the fingerprint — it
+never depends on the painting "looking like" the target. The target overlay is the **gatekeeper that
+decides which new real features earn a place in the fingerprint**, so the map stays dense as the original
+marks get painted over:
 
-Both contribute correspondences to a single PnP; the artwork set is **weighted up as painting progress
-rises**. Implement the stubs: `setArtworkFingerprint` (build (b) from the registered target), and the
-per-frame teleological match (`runPnPMatch`).
+- The registered **target overlay is the "base understanding"** — what each wall location is supposed to
+  become, via the current anchor pose + wall plane.
+- Each (throttled) frame, run feature detection on the **clean camera image** — the raw wall + paint,
+  **not** the composited view with the overlay drawn into it (else we'd fingerprint our own overlay).
+- For **new** features not already in the fingerprint: project the feature into target space (current
+  pose + anchor plane) and test whether the target has corresponding content there **and** the live
+  local patch **roughly matches** the target at that spot (a tolerance check — patch correlation /
+  descriptor agreement).
+- **Pass → promote** the feature into the fingerprint as a new anchor, with metric 3D from the anchor
+  plane (or the depth ladder). **Fail** (hand, shadow, mistake, off-target paint) → reject.
+- Result: the fingerprint **continuously grows from the artist's own validated painting**; original marks
+  fade under paint but verified paint-marks replace them → more PnP correspondences → "the further along,
+  the tighter it sticks."
 
-### 3. Painting progress (powers the weighting + "tighter as you go")
-- `progress` = fraction of artwork features currently detectable/matchable on the wall (compare live
-  frame, registered via the current pose, to the artwork fingerprint). Write `mPaintingProgress` (it's
-  currently always 0). Drives: artwork-vs-marks weighting, relocalization confidence, and the UI.
+This is what implements the empty stubs: `tryUpdateFingerprint` (the per-frame detect→validate→promote
+loop), `setArtworkFingerprint` (register the target as the validator + its plane geometry), and
+`runPnPMatch` (per-frame PnP against the grown fingerprint).
+
+### 3. Painting progress (powers confidence + "tighter as you go")
+- `progress` = fraction of the target area now backed by **confirmed (promoted) marks** — a natural
+  byproduct of §2. Write `mPaintingProgress` (currently always 0). Drives relocalization confidence and
+  the UI; more confirmed anchors also *mechanically* tightens the lock (more correspondences).
 
 ### 4. Partial-view & flat-wall robustness
 - **Partials are first-class:** PnP needs only the visible subset. Keep the fingerprint **densely
@@ -98,9 +109,11 @@ from anchor geometry regardless.
 ## Sequencing
 1. **Continuous PnP + cold-snap** (drive pose by reloc; hard snap on first lock).
 2. **Partial/planar robustness** (IPPE + flip resolution + adaptive thresholds).
-3. **Teleological artwork reference** (implement `setArtworkFingerprint` + fused match + `mPaintingProgress`).
-4. **Continuous/multi-scale fingerprint** (`tryUpdateFingerprint`).
-5. **Metric marks** wired from the depth ladder (triangulation core done; stereo priority done).
+3. **Teleological self-growing fingerprint** — the detect→validate-against-target→promote loop
+   (`tryUpdateFingerprint` + `setArtworkFingerprint` + `mPaintingProgress`), running on the clean camera
+   image, so the map survives the marks being painted over. (This *is* the continuous/multi-scale
+   fingerprint update — same loop also augments scale over distance.)
+4. **Metric marks** wired from the depth ladder (triangulation core done; stereo priority done).
 
 All of it rides on VIO at least initializing a session (the in-flight depth-disable experiment); the
 **snap itself is PnP**, so it survives weak mono tracking.
