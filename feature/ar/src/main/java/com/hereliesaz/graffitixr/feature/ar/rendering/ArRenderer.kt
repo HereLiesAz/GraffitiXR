@@ -297,28 +297,45 @@ class ArRenderer(
                     fallbackMatrix[13] += -fallbackMatrix[9] * 2.0f
                     fallbackMatrix[14] += -fallbackMatrix[10] * 2.0f
 
-                    if (hits.isEmpty()) {
-                        anchorModelMatrix = fallbackMatrix
-                    } else {
-                        val pose = hits[0].hitPose
-                        pose.toMatrix(anchorModelMatrix, 0)
+                    // Prefer a real surface (a wall/plane) over the nearest hit. hits[0] is the closest
+                    // result, which is usually a stray feature point in front of the wall — anchoring to
+                    // it puts the overlay between the camera and the marks. Pick the first Plane hit
+                    // inside its polygon; else a depth/feature point; else the nearest hit.
+                    var chosen: com.google.ar.core.HitResult? = null
+                    for (h in hits) {
+                        val t = h.trackable
+                        if (t is com.google.ar.core.Plane && t.isPoseInPolygon(h.hitPose)) { chosen = h; break }
+                        if (chosen == null && (t is com.google.ar.core.DepthPoint || t is com.google.ar.core.Point)) chosen = h
+                    }
+                    if (chosen == null) chosen = hits.firstOrNull()
+
+                    var anchor: com.google.ar.core.Anchor? = null
+                    if (chosen != null) {
+                        val pose = chosen.hitPose
                         val camPose = camera.pose
                         val dx = pose.tx() - camPose.tx()
                         val dy = pose.ty() - camPose.ty()
                         val dz = pose.tz() - camPose.tz()
-                        val dist = Math.sqrt((dx*dx + dy*dy + dz*dz).toDouble())
-                        if (dist < 0.1 || dist > 10.0) {
-                            anchorModelMatrix = fallbackMatrix
+                        val dist = Math.sqrt((dx * dx + dy * dy + dz * dz).toDouble())
+                        if (dist in 0.1..10.0) {
+                            pose.toMatrix(anchorModelMatrix, 0) // full surface pose (position + normal)
+                            // Anchor to the hit's trackable so ARCore keeps it pinned to the wall as the
+                            // artist moves, instead of a free world point at a guessed depth.
+                            anchor = chosen.createAnchor()
                         }
                     }
-
-                    val anchor = activeSession.createAnchor(com.google.ar.core.Pose(
-                        floatArrayOf(anchorModelMatrix[12], anchorModelMatrix[13], anchorModelMatrix[14]),
-                        floatArrayOf(0f, 0f, 0f, 1f)
-                    ))
+                    if (anchor == null) {
+                        anchorModelMatrix = fallbackMatrix
+                        anchor = activeSession.createAnchor(
+                            com.google.ar.core.Pose(
+                                floatArrayOf(anchorModelMatrix[12], anchorModelMatrix[13], anchorModelMatrix[14]),
+                                floatArrayOf(0f, 0f, 0f, 1f)
+                            )
+                        )
+                    }
 
                     slamManager.updateAnchorTransform(anchorModelMatrix)
-                    setPrimaryAnchor(anchor)
+                    setPrimaryAnchor(anchor!!) // non-null: the fallback branch always creates one
                     anchorEstablished = true
                     hideVisualization = true
                     onAnchorEstablished()

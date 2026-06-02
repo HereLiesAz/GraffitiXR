@@ -559,6 +559,9 @@ class ArViewModel @Inject constructor(
             val config = Config(s)
             config.focusMode = Config.FocusMode.AUTO
             config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+            // Detect walls so the overlay can anchor to the real surface at its true distance. Without
+            // this, hit-tests only return sparse feature points and the overlay lands short of the wall.
+            config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
             
             // ROOT-CAUSE TEST (VIO never tracked): ARCore's Depth API (DepthMode.AUTOMATIC) runs an ML
             // depth/perception graph that was erroring continuously on this device
