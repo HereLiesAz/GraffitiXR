@@ -813,6 +813,7 @@ class MainActivity : ComponentActivity() {
                                     onStartLog = { arViewModel.evalStartLog() },
                                     onStopLog = { arViewModel.evalStopLog() },
                                     onInduceLoss = { arViewModel.evalInduceLoss() },
+                                    onToggleFusion = { arViewModel.evalSetFusionEnabled(it) },
                                 )
                             }
 
@@ -2434,7 +2435,10 @@ private fun EvalOverlay(
     onStartLog: () -> Unit,
     onStopLog: () -> Unit,
     onInduceLoss: () -> Unit,
+    onToggleFusion: (Boolean) -> Unit,
 ) {
+    // Local UI state for the A/B switch; defaults to true to match ArRenderer.fusionEnabled.
+    val fusionOn = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
     androidx.compose.foundation.layout.Column(
         androidx.compose.ui.Modifier
             .background(androidx.compose.ui.graphics.Color(0xAA000000))
@@ -2452,6 +2456,12 @@ private fun EvalOverlay(
             androidx.compose.material3.TextButton(onClick = onInduceLoss) { androidx.compose.material3.Text("Loss") }
             androidx.compose.material3.TextButton(onClick = onStartRecord) { androidx.compose.material3.Text("Rec▶") }
             androidx.compose.material3.TextButton(onClick = onStopRecord) { androidx.compose.material3.Text("Rec■") }
+            androidx.compose.material3.TextButton(onClick = {
+                fusionOn.value = !fusionOn.value
+                onToggleFusion(fusionOn.value)
+            }) {
+                androidx.compose.material3.Text(if (fusionOn.value) "Fusion ON" else "Fusion OFF")
+            }
         }
     }
 }

@@ -233,6 +233,9 @@ class ArViewModel @Inject constructor(
         session?.let { evalRecorder.stopRecording(it) }
     }
 
+    /** A/B switch for the pose fusion (Sub-project B): on = corrected snap-back fusion, off = old toggle. */
+    fun evalSetFusionEnabled(on: Boolean) { renderer?.fusionEnabled = on }
+
     // ── Glasses session lifecycle ─────────────────────────────────────────────
 
     fun startGlassesSession() {
