@@ -150,6 +150,8 @@ class ArRenderer(
     @Volatile var pendingCaptureTap: FloatArray? = null
     @Volatile private var surfaceWidth: Int = 0
     @Volatile private var surfaceHeight: Int = 0
+    // EMA-smoothed center depth (meters) for the live reticle; raw per-pixel ARCore depth is too noisy.
+    @Volatile private var smoothedCenterDepth: Float = -1f
     @Volatile var isCapturingTarget: Boolean = false
     @Volatile var isInPlaneRealignment: Boolean = false
     @Volatile var pendingAnchorEstablishment: Boolean = false
@@ -454,21 +456,20 @@ class ArRenderer(
                     val visConf = slamManager.getVisibleConfidenceAvg()
                     val globConf = slamManager.getGlobalConfidenceAvg()
 
-                    var centerDepth = -1f
+                    // Keep last smoothed value across invalid/dropped frames so the readout is stable.
+                    var centerDepth = smoothedCenterDepth
                     try {
                         frame.acquireDepthImage16Bits().use { depthImage ->
                             val plane = depthImage.planes[0]
-                            val cx = depthImage.width / 2
-                            val cy = depthImage.height / 2
-                            val stride = plane.rowStride
-                            val offset = cy * stride + cx * 2
-                            if (offset + 2 <= plane.buffer.limit()) {
-                                val raw = plane.buffer.getShort(offset).toInt() and 0xFFFF
-                                val depthMm = raw and 0x1FFF
-                                // Filter out invalid range jumps (like the ghost 7.94m reading)
-                                if (depthMm > 0 && depthMm < 7900) {
-                                    centerDepth = depthMm / 1000f
-                                }
+                            // Median of a 7x7 patch (radius 3) rejects per-pixel noise/holes; the
+                            // single-pixel read made the live distance flicker wildly.
+                            val raw = com.hereliesaz.graffitixr.feature.ar.eval.DepthLookup.depthMetersAtPatch(
+                                plane.buffer, plane.rowStride, depthImage.width, depthImage.height, 0.5f, 0.5f, radius = 3
+                            )
+                            if (raw > 0f) {
+                                smoothedCenterDepth = if (smoothedCenterDepth <= 0f) raw
+                                    else 0.2f * raw + 0.8f * smoothedCenterDepth
+                                centerDepth = smoothedCenterDepth
                             }
                         }
                     } catch (e: Exception) { /* ignore */ }
@@ -553,7 +554,7 @@ class ArRenderer(
                                     com.google.ar.core.Coordinates2d.IMAGE_NORMALIZED, imgNorm
                                 )
                                 tapDistanceMeters = com.hereliesaz.graffitixr.feature.ar.eval.DepthLookup
-                                    .depthMetersAt(capturedDepth, depthStride, depthWidth, depthHeight, imgNorm[0], imgNorm[1])
+                                    .depthMetersAtPatch(capturedDepth, depthStride, depthWidth, depthHeight, imgNorm[0], imgNorm[1], radius = 3)
                                 if (tapDistanceMeters > 0f && anchorEstablished) {
                                     frame.hitTest(viewPx[0], viewPx[1]).firstOrNull()?.let {
                                         anchorOrchestrator.addSupportAnchor(activeSession, it.hitPose)

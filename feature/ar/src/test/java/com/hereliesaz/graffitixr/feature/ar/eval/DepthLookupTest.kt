@@ -23,4 +23,21 @@ class DepthLookupTest {
         assertEquals(-1f, DepthLookup.depthMetersAt(b, 4, 2, 2, 0f, 0f), 1e-3f)
         assertEquals(-1f, DepthLookup.depthMetersAt(b, 4, 2, 2, 0.99f, 0f), 1e-3f)
     }
+
+    @Test fun `patch median rejects an outlier center pixel`() {
+        // 3x3, stride = 6 bytes/row. Center (1,1) is a 7000mm spike; its 8 neighbors are all 1000mm.
+        // Single-pixel read at center returns 7.0; patch median (radius 1) returns 1.0.
+        val b = buf(
+            1000, 1000, 1000,
+            1000, 7000, 1000,
+            1000, 1000, 1000,
+        )
+        assertEquals(7.0f, DepthLookup.depthMetersAt(b, 6, 3, 3, 0.5f, 0.5f), 1e-3f)
+        assertEquals(1.0f, DepthLookup.depthMetersAtPatch(b, 6, 3, 3, 0.5f, 0.5f, radius = 1), 1e-3f)
+    }
+
+    @Test fun `patch ignores holes and returns -1 when all invalid`() {
+        val b = buf(0, 0, 0, 0) // all holes
+        assertEquals(-1f, DepthLookup.depthMetersAtPatch(b, 4, 2, 2, 0.5f, 0.5f, radius = 1), 1e-3f)
+    }
 }
