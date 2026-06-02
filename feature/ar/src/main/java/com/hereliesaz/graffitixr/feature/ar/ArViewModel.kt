@@ -567,40 +567,37 @@ class ArViewModel @Inject constructor(
 
             s.configure(config)
 
-            // Pick the default monocular 30 FPS back-camera config — the path
-            // ARCore's VIO and ML depth pipelines are tuned for. Forcing
-            // hardware stereo (StereoCameraUsage.REQUIRE_AND_USE) reliably
-            // wedged VIO in kNotTracking on several supported phones and
-            // produced a per-frame "no depth measurements" loop that saturated
-            // the main thread and ANR'd the app. Stereo depth, if ever
-            // re-enabled, must be opt-in and use PREFER_AND_USE so ARCore can
-            // downgrade.
-            val configFilter = CameraConfigFilter(s).apply {
-                facingDirection = CameraConfig.FacingDirection.BACK
-                targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
-            }
-            val cameraConfigs = s.getSupportedCameraConfigs(configFilter)
-            if (cameraConfigs.isNotEmpty()) {
-                s.cameraConfig = cameraConfigs[0]
-            }
-            _uiState.update { it.copy(isDualLensActive = false, isHardwareStereoActive = false) }
-
-            // Dual-lens mandate probe: ask ARCore whether this device exposes ANY hardware-stereo
-            // camera config. This is read-only (does NOT change the selected config) — it answers the
-            // "why only one lens?" question with device ground truth. If count > 0 we can enable
-            // stereo (via PREFER_AND_USE) on this device; if 0, ARCore cannot pair the lenses here and
-            // hardware stereo is impossible without abandoning ARCore tracking. Grep logcat for "dual-lens probe".
-            try {
-                val stereoFilter = CameraConfigFilter(s).apply {
+            // Dual-lens mandate: use a hardware-stereo camera config whenever ARCore offers one on
+            // this device; fall back to the mono 30 FPS back config otherwise. We only select a
+            // stereo config that ARCore explicitly lists as supported, so devices that don't expose
+            // one (e.g. Pixel 5) stay exactly on the old mono path — no change, no risk. Where stereo
+            // IS selected the device gets true two-lens depth; watch for the historical caveat that
+            // some phones' VIO destabilized under forced stereo (grep logcat "dual-lens").
+            val stereoConfigs = try {
+                s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
                     facingDirection = CameraConfig.FacingDirection.BACK
                     stereoCameraUsage = java.util.EnumSet.of(CameraConfig.StereoCameraUsage.REQUIRE_AND_USE)
-                }
-                val stereoConfigs = s.getSupportedCameraConfigs(stereoFilter)
-                Timber.i("dual-lens probe: ${stereoConfigs.size} hardware-stereo camera config(s) on this device")
-                stereoConfigs.forEach { Timber.i("dual-lens probe: stereo cameraId=${it.cameraId} imageSize=${it.imageSize}") }
+                })
             } catch (e: Exception) {
-                Timber.w(e, "dual-lens probe failed")
+                Timber.w(e, "dual-lens: stereo config query failed")
+                emptyList()
             }
+
+            val stereoActive: Boolean
+            if (stereoConfigs.isNotEmpty()) {
+                s.cameraConfig = stereoConfigs[0]
+                stereoActive = true
+                Timber.i("dual-lens: HARDWARE STEREO selected — cameraId=${stereoConfigs[0].cameraId} imageSize=${stereoConfigs[0].imageSize} (${stereoConfigs.size} stereo config(s))")
+            } else {
+                val monoConfigs = s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
+                    facingDirection = CameraConfig.FacingDirection.BACK
+                    targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
+                })
+                if (monoConfigs.isNotEmpty()) s.cameraConfig = monoConfigs[0]
+                stereoActive = false
+                Timber.i("dual-lens: no hardware-stereo config on this device — using mono")
+            }
+            _uiState.update { it.copy(isDualLensActive = stereoActive, isHardwareStereoActive = stereoActive) }
 
             session = s
             _isCameraInUseByAr.value = true
