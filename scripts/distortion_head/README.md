@@ -33,7 +33,15 @@ python3 scripts/distortion_head/model.py                 # head shapes / param c
 python3 scripts/distortion_head/train.py --steps 50 --batch 8 --epochs 1 --workers 0
 ```
 
-## Real training
+## Kaggle (GPU, recommended)
+
+`train_kaggle.ipynb` is a self-contained notebook (inlines the backbone/dataset/model/train/
+export — no repo clone needed). On Kaggle: enable **GPU** + **Internet**, optionally attach an
+image dataset (auto-discovered under `/kaggle/input`; e.g. *Describable Textures Dataset*), then
+**Run All**. Artifacts land in `/kaggle/working`: `head_best.pth`, `head_last.pth`,
+`distortion_head.onnx`. Regenerate the notebook from source with `python3 _build_kaggle_notebook.py`.
+
+## Real training (local)
 
 Point `--images` at a corpus of a few thousand wall/texture/mural photos (domain is not
 critical — the backbone is frozen and the runtime target is unseen at train time):
