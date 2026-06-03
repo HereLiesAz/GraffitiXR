@@ -1393,27 +1393,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // ADJUST — in-mode tweaks for the finished design (the few last-minute, in-place touchups).
-            // Lives under Modes and only while in a mode; design content editing stays in the Design screen.
-            if (!isDesignMode) {
-                azRailSubItem(
-                    id = "sub.modes.adjust",
-                    hostId = "host.modes",
-                    text = navStrings.adjust,
-                    content = Icons.Default.Tune,
-                    color = navItemColor
-                ) {
-                    if (editorUiState.editorMode == EditorMode.MOCKUP) {
-                        azRailItem(id = "adjust.wall", text = navStrings.wall, content = Icons.Default.Wallpaper, color = navItemColor) {
-                            showWallSourceDialog = true
-                        }
-                    }
-                    azRailItem(id = "adjust.dim", text = "Dim", content = Icons.Default.Opacity, color = navItemColor) {
-                        editorViewModel.updateAllLayers { it.copy(opacity = (it.opacity - 0.1f).coerceIn(0f, 1f)) }
-                    }
-                    azRailItem(id = "adjust.reset", text = "Reset", content = Icons.Default.Refresh, color = navItemColor) {
-                        editorViewModel.updateAllLayers { it.copy(scale = 1f, offset = Offset.Zero, rotationX = 0f, rotationY = 0f, rotationZ = 0f) }
-                    }
+            // Adjust for Modes is NOT a rail item — it's off-rail adjustment knobs (opacity, saturation,
+            // …) on the mode screen, like the design adjustment knobs. Keeping the rail minimal so Modes
+            // don't overwhelm. Mockup still needs to pick its surface image (not a design-content tool):
+            if (editorUiState.editorMode == EditorMode.MOCKUP) {
+                azRailSubItem(id = "mode.mockup.wall", hostId = "host.modes", text = navStrings.wall, content = Icons.Default.Wallpaper, color = navItemColor) {
+                    showWallSourceDialog = true
                 }
             }
 
