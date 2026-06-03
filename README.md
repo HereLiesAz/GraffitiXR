@@ -20,7 +20,7 @@ And then, there's a decent suite of pertinent design tools, with support for mul
 *   **Persistent Voxel Memory:** C++17 native engine using a zero-allocation fixed-size spatial hash table for O(1) discovery speed.
 *   **Opaque Surfel Pipeline:** High-performance rendering with hardware Z-buffering, replacing expensive alpha blending.
 *   **Stochastic Integration:** Optimized depth integration (2048 random pixels per frame) to reduce CPU overhead by 90%.
-*   **Mandatory Dual-Lens:** Automatically leverages hardware stereo depth for rock-solid tracking stability.
+*   **Dual-Lens Aware:** Auto-selects hardware stereo depth on devices that expose it; falls back to single-camera tracking with motion-based (VIO-baseline) depth elsewhere.
 *   **AI Glasses Support:** Integrated support for **Meta Ray-Bans** and **Xreal Air/Ultra** via a provider-based abstraction layer.
 *   **Co-op Mode:** Robust peer-to-peer AR synchronization for collaborative painting.
 *   **AzNavRail UI:** Thumb-driven, one-handed navigation designed for artists holding a spray can.

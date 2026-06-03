@@ -563,21 +563,21 @@ class ArViewModel @Inject constructor(
             // this, hit-tests only return sparse feature points and the overlay lands short of the wall.
             config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
             
-            // ROOT-CAUSE TEST (VIO never tracked): ARCore's Depth API (DepthMode.AUTOMATIC) runs an ML
-            // depth/perception graph that was erroring continuously on this device
-            // (feature_track_ml_depth_provider, mediapipe normal_detector RET_CHECK) while VIO sat in
-            // kNotTracking for the ENTIRE session. Disable the Depth API to isolate whether that
-            // pipeline is starving/wedging tracking. While disabled, depth-only features (surface mesh,
-            // tap distance) go dark — that's the trade for the test. Flip back to re-enable.
-            val disableDepthForVioTest = true
-            if (!disableDepthForVioTest && s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
+            // ARCore's ML Depth API (DepthMode.AUTOMATIC) ran a perception graph that errored
+            // continuously and starved VIO into permanent kNotTracking on this hardware (confirmed via
+            // logcat: feature_track_ml_depth_provider + mediapipe normal_detector RET_CHECK). It stays
+            // OFF. Metric depth comes from VIO-baseline triangulation (and hardware stereo where the
+            // device offers it); the wall anchor uses plane detection. Re-enabling requires first
+            // solving the VIO starvation.
+            val useArCoreDepthApi = false
+            if (useArCoreDepthApi && s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                 config.depthMode = Config.DepthMode.AUTOMATIC
                 _uiState.update { it.copy(isDepthApiSupported = true) }
             } else {
                 config.depthMode = Config.DepthMode.DISABLED
                 _uiState.update { it.copy(isDepthApiSupported = false) }
-                Timber.i("VIO test: ARCore Depth API DISABLED to isolate the kNotTracking failure")
             }
+            renderer?.depthApiEnabled = useArCoreDepthApi
 
             s.configure(config)
 
