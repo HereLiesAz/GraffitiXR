@@ -86,6 +86,18 @@ class SlamManager @Inject constructor(
         nativeRestoreWallFingerprint(descriptorsData, rows, cols, type, points3d)
     }
 
+    /**
+     * Ingest a fingerprint built from triangulated metric marks (no depth source). Also fixes the
+     * fingerprint anchor pose (column-major 4x4) and the camera intrinsics (fx,fy,cx,cy) the reloc
+     * PnP should use. points3d are in keyframe-0's CV camera frame (see [MetricMarks]).
+     */
+    fun restoreWallFingerprintMetric(
+        descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,
+        points3d: FloatArray, anchorMatrix: FloatArray, intrinsics: FloatArray,
+    ) {
+        nativeRestoreWallFingerprintMetric(descriptorsData, rows, cols, type, points3d, anchorMatrix, intrinsics)
+    }
+
     fun setArtworkFingerprint(
         bitmap: Bitmap,
         depthBuffer: ByteBuffer,
@@ -388,6 +400,10 @@ class SlamManager @Inject constructor(
     ): Fingerprint?
     private external fun nativeRestoreWallFingerprint(
         descriptorsData: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray
+    )
+    private external fun nativeRestoreWallFingerprintMetric(
+        descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,
+        points3d: FloatArray, anchorMatrix: FloatArray, intrinsics: FloatArray
     )
     private external fun nativeSetArtworkFingerprint(
         bitmap: Bitmap, depthBuffer: ByteBuffer,

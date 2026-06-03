@@ -481,6 +481,29 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
     }
 }
 
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerprintMetric(
+        JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type,
+        jfloatArray ptsArray, jfloatArray anchorArray, jfloatArray intrArray) {
+    if (!gSlamEngine) return;
+    jbyte* descData = env->GetByteArrayElements(descArray, nullptr);
+    cv::Mat descriptors(rows, cols, type, descData);
+    jsize ptsLen = env->GetArrayLength(ptsArray);
+    jfloat* ptsData = env->GetFloatArrayElements(ptsArray, nullptr);
+    std::vector<cv::Point3f> points3d;
+    points3d.reserve(ptsLen / 3);
+    for (int i = 0; i + 2 < ptsLen; i += 3) {
+        points3d.push_back(cv::Point3f(ptsData[i], ptsData[i+1], ptsData[i+2]));
+    }
+    jfloat* anchor = env->GetFloatArrayElements(anchorArray, nullptr);
+    jfloat* intr = env->GetFloatArrayElements(intrArray, nullptr);
+    gSlamEngine->restoreWallFingerprintMetric(descriptors, points3d, anchor, intr);
+    env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
+    env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
+    env->ReleaseFloatArrayElements(anchorArray, anchor, JNI_ABORT);
+    env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
+}
+
 jobject buildFingerprintObject(JNIEnv* env, const MobileGS::FingerprintData& fd) {
     if (fd.descriptors.empty()) return nullptr;
 

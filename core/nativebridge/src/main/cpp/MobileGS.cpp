@@ -435,6 +435,14 @@ bool MobileGS::importModel3D(const std::string& p) { return false; }
 void MobileGS::setViewportSize(int w, int h) { mScreenWidth = w; mScreenHeight = h; }
 void MobileGS::setRelocEnabled(bool e) { mRelocEnabled = e; }
 void MobileGS::restoreWallFingerprint(const cv::Mat& d, const std::vector<cv::Point3f>& p) { mWallDescriptors = d.clone(); mWallKeypoints3D = p; }
+void MobileGS::restoreWallFingerprintMetric(const cv::Mat& d, const std::vector<cv::Point3f>& p,
+                                            const float* anchorMatrix16, const float* intrinsics4) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mWallDescriptors = d.clone();
+    mWallKeypoints3D = p;
+    if (anchorMatrix16) memcpy(mFingerprintAnchorMatrix, anchorMatrix16, 16 * sizeof(float));
+    if (intrinsics4)    memcpy(mFingerprintIntrinsics, intrinsics4, 4 * sizeof(float));
+}
 
 std::vector<uint8_t> MobileGS::exportFingerprint() {
     std::lock_guard<std::mutex> lock(mMutex);
