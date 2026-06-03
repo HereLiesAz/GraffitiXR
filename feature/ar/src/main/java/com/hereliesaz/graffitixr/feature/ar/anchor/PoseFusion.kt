@@ -20,10 +20,12 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
  */
 class PoseFusion {
     private var lastSeq = 0f
-    private var smoothed: FloatArray? = null
-    // True until the first confident relocalization after a (re)start or tracking loss. The first
-    // confident snap is applied HARD (no smoothing) so a cold relock — out of a pocket, screen back on —
-    // is instantaneous; subsequent in-session corrections are smoothed to avoid jitter.
+    // Persistent world-frame drift correction D such that fused = D ∘ backbone. Held between snaps and
+    // re-applied every frame so the overlay stays locked to the PnP-corrected world location even on
+    // frames with no new snap. Null until the first trusted relocalization.
+    private var correction: FloatArray? = null
+    // True until the first HARD relock after a (re)start or tracking loss, so a cold relock — out of a
+    // pocket, screen back on — snaps instantly instead of easing in.
     private var coldStart = true
 
     /** Re-arm the cold (hard) snap — call on session resume / tracking loss so the next relock is instant. */
@@ -96,16 +98,19 @@ class PoseFusion {
         val isNew = seq > 0f && seq != lastSeq
 
         if (isNew && inlierRatio >= MIN_INLIER_RATIO) {
-            lastSeq = seq
             val corrected = composeCorrected(vCurrent, reloc.copyOf(16), fpAnchor)
             // World-frame drift correction such that D ∘ backbone == corrected at snap time.
             val newD = PoseMath.multiply(corrected, PoseMath.rigidInverse(backbone))
 
+            // Cold = first lock after (re)start/tracking-loss, no prior correction, or a fix that
+            // diverges far from where we currently draw (the pocket case). A confident cold fix snaps
+            // hard for instant relock; everything else eases in by inlier-ratio-scaled alpha.
             val applied = correction?.let { PoseMath.multiply(it, backbone) }
-            val cold = applied == null || diverged(applied, corrected)
+            val cold = coldStart || applied == null || diverged(applied, corrected)
             val highConf = inlierRatio >= COLD_SNAP_INLIER_RATIO && inliers >= COLD_SNAP_MIN_INLIERS
 
             correction = if (cold && highConf) {
+                coldStart = false
                 newD // instant relock
             } else {
                 val effConf = (CONF_FLOOR + (1f - CONF_FLOOR) * confGlobal.coerceIn(0f, 1f))
@@ -114,13 +119,7 @@ class PoseFusion {
             }
         }
         lastSeq = seq
-        val pnpMat = reloc.copyOf(16)
-        val corrected = composeCorrected(vCurrent, pnpMat, fpAnchor)
-        // Cold relock snaps hard (instant); warm corrections ease in by inlier-ratio-scaled alpha.
-        val alpha = if (coldStart) 1f else (BASE_ALPHA * inlierRatio).coerceIn(0f, 1f)
-        coldStart = false
-        val out = blend(base, corrected, alpha)
-        smoothed = out
-        return out
+        // fused = D ∘ backbone, re-applied every frame (identity drift until the first trusted snap).
+        return PoseMath.multiply(correction ?: identity(), backbone)
     }
 }
