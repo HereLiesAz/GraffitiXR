@@ -3,7 +3,6 @@ package com.hereliesaz.graffitixr
 
 import android.content.Context
 import android.graphics.Bitmap
-import com.hereliesaz.graffitixr.common.util.ImageUtils
 import android.widget.Toast
 import java.nio.ByteBuffer
 import androidx.lifecycle.ViewModel
@@ -279,25 +278,8 @@ class MainViewModel @Inject constructor(
                 return@launch
             }
 
-            // Teleological base: register the design composited over the captured wall as the "base
-            // understanding" the clean camera frame is validated against (drives painting-progress and
-            // the staged self-grow). Built from the same capture frame/depth/intrinsics as the wall
-            // fingerprint, so the artwork 3D coordinates align. No overlay yet => gatekeeper stays inert.
-            currentProject.overlayImageUri?.let { overlayUri ->
-                val design = ImageUtils.loadBitmapSync(context, overlayUri)
-                if (design != null) {
-                    val composite = sensorBmp.copy(Bitmap.Config.ARGB_8888, true)
-                    android.graphics.Canvas(composite).drawBitmap(
-                        design,
-                        null,
-                        android.graphics.Rect(0, 0, composite.width, composite.height),
-                        android.graphics.Paint().apply { alpha = 180; isFilterBitmap = true }
-                    )
-                    slamManager.setArtworkFingerprint(
-                        composite, safeDepth, depthW, depthH, depthStride, safeIntr, safeView
-                    )
-                }
-            }
+            // (Teleological artwork base is registered from the live design composite via
+            // ArViewModel.updatePaintingGuide — the design-only overlay, not blended with wall texture.)
 
             projectManager.saveProject(
                 context = context,
@@ -367,21 +349,8 @@ class MainViewModel @Inject constructor(
                 }
                 return@launch
             }
-            // Teleological base (depth-off path): register the design composited over the captured wall.
-            // No depth buffer here => descriptors-only base, which is enough to drive painting-progress.
-            currentProject.overlayImageUri?.let { overlayUri ->
-                val design = ImageUtils.loadBitmapSync(context, overlayUri)
-                if (design != null) {
-                    val composite = bitmap.copy(Bitmap.Config.ARGB_8888, true)
-                    android.graphics.Canvas(composite).drawBitmap(
-                        design,
-                        null,
-                        android.graphics.Rect(0, 0, composite.width, composite.height),
-                        android.graphics.Paint().apply { alpha = 180; isFilterBitmap = true }
-                    )
-                    slamManager.setArtworkFingerprint(composite, null, 0, 0, 0, intr, view)
-                }
-            }
+            // (Teleological artwork base is registered from the live design composite via
+            // ArViewModel.updatePaintingGuide — see the depth path above.)
 
             projectManager.saveProject(
                 context = context,

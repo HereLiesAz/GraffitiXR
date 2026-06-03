@@ -896,8 +896,25 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    private val artworkRegInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
+
     fun updatePaintingGuide(bitmap: Bitmap) {
-        // Future: feed to PnP engine if needed
+        // The design composite (design layers only — NO wall texture) is the teleological "base
+        // understanding": the registered overlay the clean wall frame is validated against. Re-register
+        // it as the artwork base whenever the design changes so painting-progress (and the staged
+        // self-grow) track the current design. Descriptors-only here (no capture depth); the
+        // 3D-dependent promotion step is staged. compareAndSet drops overlapping registrations — the
+        // next stable design state registers once the in-flight one finishes.
+        if (!artworkRegInFlight.compareAndSet(false, true)) return
+        val intr = _uiState.value.targetIntrinsics ?: FloatArray(4)
+        val view = _uiState.value.targetCaptureViewMatrix ?: FloatArray(16)
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                slamManager.setArtworkFingerprint(bitmap, null, 0, 0, 0, intr, view)
+            } finally {
+                artworkRegInFlight.set(false)
+            }
+        }
     }
 
     fun onFreezeRequested(bitmap: Bitmap) {
