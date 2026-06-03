@@ -8,6 +8,36 @@ painting-progress signal).
 
 ---
 
+## 0. Architecture context — A + B + D
+
+Three chosen, composing components for learned, viewpoint-aware, *self-growing* relocalization.
+(Path **C**, a from-scratch registration net, was explicitly rejected — reuse proven components.)
+
+- **A — LightGlue matcher.** Replace brute-force `knnMatch` + Lowe ratio with SuperPoint +
+  **LightGlue** (pretrained, ONNX): attention-based correspondences with per-match confidence,
+  robust to viewpoint. The *precise* geometry (`findHomography`/IPPE on its matches) comes from here.
+- **B — distortion head (this doc).** A cheap, always-on head emitting the planar distortion,
+  matchability, and **coverage**. With A present it is *not* the primary geometry source; its unique
+  value is (i) **coverage → painting progress**, (ii) a fast pre-gate, and (iii) a **viewpoint
+  prior** to pre-rectify the patch so LightGlue survives extreme tilt. A and B overlap on
+  *matchability* — B's is the cheap filter, A's is the precise one.
+- **D — self-growing fingerprint (`TELEOLOGICAL_SLAM.md`).** Each *verified* relock contributes a
+  new viewpoint to a multi-view fingerprint bank; the teleological reference validates and promotes
+  new painted marks. B + A are what produce and gate the verified data D grows from.
+
+**Division of labor:** head (B) gates + viewpoint prior + progress → LightGlue (A) precise
+correspondences → `findHomography`/IPPE geometry → PnP verifies → verified triple feeds D.
+
+**Dependency order:** B (offline train/validate) → A (LightGlue + ONNX Runtime) → D (needs B on
+device emitting verified triples + the reference validator).
+
+**Runtime:** A is the forcing function for **ONNX Runtime** — cv::dnn cannot import LightGlue's
+attention ops. When A lands, migrate all NN inference (SuperPoint + enhancer + this head) to ORT
+together; OpenCV keeps the classical CV (ORB fallback, PnP, homography, warp). Standard opset-12
+exports load in both runtimes, so B trains runtime-agnostic today.
+
+---
+
 ## 1. Why
 
 The current relocalizer (`MobileGS::relocThreadFunc`) is viewpoint-blind:
@@ -26,9 +56,10 @@ current view is *exactly* a homography `H`. The distortion head learns to estima
 confidence and a coverage fraction) from SuperPoint features, giving the system an explicit,
 numeric perception of the viewpoint — which it can then *act on*.
 
-> **Decision (recorded):** Path **A** — keep the already-validated SuperPoint, **freeze it**, and
-> bolt on a small trainable head. Additive; cannot regress the current matcher; trains in hours on
-> one GPU.
+> **Decision (recorded):** keep the already-validated SuperPoint, **freeze it**, and bolt on a
+> small trainable head — additive, cannot regress the current matcher, trains in hours on one GPU.
+> This head is component **B** of three chosen for learned relocalization; see §0 for how it composes
+> with the LightGlue matcher (**A**) and the self-growing fingerprint (**D**).
 
 ---
 
