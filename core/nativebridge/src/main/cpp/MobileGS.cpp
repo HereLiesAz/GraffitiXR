@@ -664,7 +664,6 @@ namespace mobilegs {
 
 bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) { return mSuperPoint.load(onnxBytes); }
 bool MobileGS::loadLowLightEnhancer(const std::vector<uchar>& onnxBytes) { return mEnhancer.load(onnxBytes); }
-<<<<<<< HEAD
 // Teleological SLAM, stage 1: store the TARGET artwork as the validator reference. Its features +
 // metric 3D describe "what the wall should become"; tryUpdateFingerprint (stage 2) uses them to decide
 // which new real paint-marks to promote into the live fingerprint as the original marks get covered.
