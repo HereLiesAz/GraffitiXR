@@ -131,7 +131,7 @@ class ArViewModel @Inject constructor(
                 val projectBytes = projectManager.serializeCurrentProject()
                 val qrString = collaborationManager.startHosting(
                     projectId = projectManager.currentProjectId(),
-                    layerCount = 0, // TODO Task 17: wire to real layer count
+                    layerCount = projectRepository.currentProject.value?.layers?.size ?: 0,
                     fingerprintBytes = fingerprint,
                     projectBytes = projectBytes,
                     localDeviceName = android.os.Build.MODEL,

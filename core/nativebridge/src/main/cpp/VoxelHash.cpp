@@ -265,14 +265,45 @@ float VoxelHash::getGlobalConfidenceAvg() const {
     for (const auto& s : mSplatData) sum += s.confidence;
     return static_cast<float>(sum / mSplatData.size());
 }
-// "Visible" frustum culling is not yet available at this layer; approximate with the global mean.
 // TODO(B-followup): pass the current view/proj matrix to cull to the visible frustum.
-float VoxelHash::getVisibleConfidenceAvg() const { return getGlobalConfidenceAvg(); }
+float VoxelHash::getVisibleConfidenceAvg(const glm::mat4& mvp) const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (mSplatData.empty()) return 0.0f;
+    double sum = 0.0;
+    int count = 0;
+    for (const auto& s : mSplatData) {
+        glm::vec4 p = mvp * glm::vec4(s.x, s.y, s.z, 1.0f);
+        if (p.w > 0) {
+            float ndcX = p.x / p.w;
+            float ndcY = p.y / p.w;
+            if (ndcX >= -1.1f && ndcX <= 1.1f && ndcY >= -1.1f && ndcY <= 1.1f) {
+                sum += s.confidence;
+                count++;
+            }
+        }
+    }
+    return (count > 0) ? static_cast<float>(sum / count) : 0.0f;
+}
 void VoxelHash::addKeyframe(const VoxelFrame& kf) {
     std::lock_guard<std::mutex> lock(mMutex);
     if (mRecentFrames.size() > 5) mRecentFrames.erase(mRecentFrames.begin());
     mRecentFrames.push_back(kf);
 }
-void VoxelHash::prune(float threshold) {}
+void VoxelHash::prune(float threshold) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    auto it = std::remove_if(mSplatData.begin(), mSplatData.end(), [threshold](const Splat& s) {
+        return s.confidence < threshold;
+    });
+    if (it != mSplatData.end()) {
+        mSplatData.erase(it, mSplatData.end());
+        // Must rebuild the spatial hash indices because they refer to the vector positions
+        for (int i = 0; i < HASH_SIZE; ++i) mSpatialHash[i] = -1;
+        for (size_t i = 0; i < mSplatData.size(); ++i) {
+            uint32_t hash = getVoxelHash(mSplatData[i].x, mSplatData[i].y, mSplatData[i].z, mLastVoxelSize);
+            mSpatialHash[hash] = static_cast<int32_t>(i);
+        }
+        mDataDirty = true;
+    }
+}
 void VoxelHash::optimize(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat) {}
 void VoxelHash::sort(const glm::vec3& camPos) {}

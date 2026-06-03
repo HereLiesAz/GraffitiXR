@@ -250,6 +250,13 @@ fun MainScreen(
                 }
 
                 EditorMode.MOCKUP, EditorMode.TRACE -> {}
+                EditorMode.DESIGN -> {
+                    DesignScreen(
+                        uiState = uiState,
+                        editorViewModel = editorViewModel,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
                 else -> {}
             }
         }

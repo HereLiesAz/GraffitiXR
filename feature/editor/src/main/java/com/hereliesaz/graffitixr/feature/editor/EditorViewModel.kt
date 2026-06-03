@@ -1059,6 +1059,12 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    fun updateAllLayers(transform: (Layer) -> Layer) {
+        _uiState.update { state ->
+            state.copy(layers = state.layers.map(transform))
+        }
+    }
+
     /**
      * MVI dispatch: apply a state-only [EditorIntent] through the pure [EditorReducer]. Side
      * effects (history, persistence, co-op op emission) are orchestrated by the caller around
@@ -1334,15 +1340,22 @@ class EditorViewModel @Inject constructor(
         // Emit StrokeComplete for non-Liquify strokes only (Liquify bakes into the bitmap
         // and doesn't map cleanly to a BrushStroke replay; leave Liquify sync as a TODO).
         if (state.activeTool != Tool.LIQUIFY) {
-            val pointsFlat = points.flatMap { listOf(it.x, it.y) }
-            val brushStroke = BrushStroke(
-                points = pointsFlat,
-                colorArgb = state.activeColor.toArgb().toLong() and 0xFFFFFFFFL,
-                brushSize = state.brushSize,
-                brushFeathering = state.brushFeathering,
-                blendModeOrdinal = state.activeTool.ordinal // NOTE: Tool ordinal != BlendMode ordinal; spectator applies by re-rasterizing
-            )
-            opEmitter.emit(Op.StrokeComplete(layerId, brushStroke))
+            val bitmap = layer.bitmap
+            if (bitmap != null) {
+                val mappedPoints = ImageProcessor.mapScreenToBitmap(
+                    points, canvasW, canvasH, bitmap.width, bitmap.height,
+                    capturedScale, capturedOffset, capturedRotationZ
+                )
+                val pointsFlat = mappedPoints.flatMap { listOf(it.x, it.y) }
+                val brushStroke = BrushStroke(
+                    points = pointsFlat,
+                    colorArgb = state.activeColor.toArgb().toLong() and 0xFFFFFFFFL,
+                    brushSize = state.brushSize,
+                    brushFeathering = state.brushFeathering,
+                    blendModeOrdinal = state.activeTool.ordinal
+                )
+                opEmitter.emit(Op.StrokeComplete(layerId, brushStroke))
+            }
         }
 
         clearTransientStrokeState()
@@ -1784,11 +1797,38 @@ class EditorViewModel @Inject constructor(
             }
             is Op.LayerPropsChange -> dispatch(EditorIntent.SetLayerProps(op.layerId, op.props))
             is Op.StrokeComplete -> {
-                // TODO: Wire StrokeComplete application — see Task 17.
-                // The editor stores strokes as rendered bitmaps rather than a List<BrushStroke>,
-                // so replaying a remote stroke requires re-rasterizing into the layer bitmap.
-                // Left as a stub until a spectator-side rasterization path is implemented.
-                android.util.Log.d("EditorViewModel", "applySpectatorOp: StrokeComplete stub for layer ${op.layerId}")
+                val layerId = op.layerId
+                val stroke = op.stroke
+                val layer = _uiState.value.layers.find { it.id == layerId } ?: return
+                
+                viewModelScope.launch(dispatchers.default) {
+                    val points = mutableListOf<Offset>()
+                    for (i in 0 until stroke.points.size step 2) {
+                        points.add(Offset(stroke.points[i], stroke.points[i+1]))
+                    }
+                    
+                    val tool = Tool.entries.getOrNull(stroke.blendModeOrdinal) ?: Tool.BRUSH
+                    val bitmap = layer.bitmap ?: return@launch
+                    
+                    // The points are already in BITMAP space (mapped by the host).
+                    // To bypass mapping in DrawingEngine, we set canvasSize to bitmap size
+                    // and identity transform.
+                    val command = StrokeCommand(
+                        path = points,
+                        canvasSize = IntSize(bitmap.width, bitmap.height),
+                        tool = tool,
+                        brushSize = stroke.brushSize,
+                        brushColor = stroke.colorArgb.toInt(),
+                        intensity = 0.5f,
+                        feathering = stroke.brushFeathering,
+                        layerScale = 1f,
+                        layerOffset = Offset.Zero,
+                        layerRotationZ = 0f
+                    )
+                    
+                    layerStore.addStroke(layerId, command)
+                    rebuildLayerBitmap(layerId)
+                }
             }
             is Op.TextContentChange -> {
                 // rerasterizeTextLayer launches its own coroutine and updates state itself,

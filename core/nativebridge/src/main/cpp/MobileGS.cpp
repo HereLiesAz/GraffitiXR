@@ -250,7 +250,10 @@ void MobileGS::getAnchorTransform(float* outMat16) const {
 }
 
 void MobileGS::getConfidenceAvgs(float& outVisible, float& outGlobal) const {
-    outVisible = mVoxelHash.getVisibleConfidenceAvg();
+    std::lock_guard<std::mutex> lock(mMutex);
+    glm::mat4 view = glm::make_mat4(mViewMatrix);
+    glm::mat4 proj = glm::make_mat4(mProjMatrix);
+    outVisible = mVoxelHash.getVisibleConfidenceAvg(proj * view);
     outGlobal = mVoxelHash.getGlobalConfidenceAvg();
 }
 
@@ -303,9 +306,19 @@ void MobileGS::relocThreadFunc() {
             if (sp && !mSuperPoint.detect(g, kps, descs)) sp = false;
             if (!sp) mFeatureDetector->detectAndCompute(g, cv::noArray(), kps, descs);
             if (descs.empty()) return;
+
+            cv::Mat wallDescs;
+            std::vector<cv::Point3f> wallKps3d;
+            {
+                std::lock_guard<std::mutex> lock(mMutex);
+                wallDescs = mWallDescriptors.clone();
+                wallKps3d = mWallKeypoints3D;
+            }
+            if (wallDescs.empty()) return;
+
             cv::Ptr<cv::DescriptorMatcher>& matcher = (descs.type() == CV_32F) ? mL2Matcher : mMatcher;
             std::vector<std::vector<cv::DMatch>> matches;
-            matcher->knnMatch(descs, mWallDescriptors, matches, 2);
+            matcher->knnMatch(descs, wallDescs, matches, 2);
             for (auto& match : matches) {
                 if (match.size() < 2) continue;
                 if (match[0].distance < 0.75f * match[1].distance) {
@@ -316,7 +329,7 @@ void MobileGS::relocThreadFunc() {
                         p = outp[0];
                     }
                     outImg.push_back(p);
-                    outObj.push_back(mWallKeypoints3D[match[0].trainIdx]);
+                    outObj.push_back(wallKps3d[match[0].trainIdx]);
                 }
             }
         };
@@ -565,7 +578,11 @@ void MobileGS::loadModel(const std::string& p) {
 bool MobileGS::importModel3D(const std::string& p) { return false; }
 void MobileGS::setViewportSize(int w, int h) { mScreenWidth = w; mScreenHeight = h; }
 void MobileGS::setRelocEnabled(bool e) { mRelocEnabled = e; }
-void MobileGS::restoreWallFingerprint(const cv::Mat& d, const std::vector<cv::Point3f>& p) { mWallDescriptors = d.clone(); mWallKeypoints3D = p; }
+void MobileGS::restoreWallFingerprint(const cv::Mat& d, const std::vector<cv::Point3f>& p) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mWallDescriptors = d.clone();
+    mWallKeypoints3D = p;
+}
 void MobileGS::restoreWallFingerprintMetric(const cv::Mat& d, const std::vector<cv::Point3f>& p,
                                             const float* anchorMatrix16, const float* intrinsics4) {
     std::lock_guard<std::mutex> lock(mMutex);

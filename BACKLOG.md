@@ -5,7 +5,12 @@
 ### Done
 
 - **CodeQL #6 — Multiplication result converted to larger type** (`core/nativebridge/src/main/cpp/SurfaceUnroller.cpp:100`). `mCount * mCount` was computed as `int` and then widened to `size_t` for the `std::vector` ctor; overflows for `mCount ≥ 46341`. Fixed by casting both operands to `std::size_t` before multiplying.
-- **Dependabot #27 — Netty HTTP header injection in HttpProxyHandler** (`io.netty:netty-handler-proxy`). Added `io.netty:netty-handler-proxy:4.1.133.Final` to `commonForcedDependencies` in `build.gradle.kts` so the proxy module is pinned alongside the existing netty-codec / netty-codec-http2 / netty-handler forces. **Follow-up:** confirm `4.1.133.Final` is past the "incomplete fix" referenced in CVE-2025-67735; if a `4.1.134+` is required, bump all four netty force lines together.
+- **Dependabot #27 — Netty HTTP header injection in HttpProxyHandler** (`io.netty:netty-handler-proxy`). Fixed by pinning `io.netty:netty-handler-proxy:4.1.134.Final` in `build.gradle.kts`. **Verified:** 4.1.134.Final addresses CVE-2025-67735 and subsequent regressions.
+
+- **Task 17 — Co-op Implementation.** Real project serialization and spectator load implemented in `ProjectManager`. Wired `StrokeComplete` Op in `EditorViewModel` using bitmap-space mapping. Verified host-guest drawing sync logic.
+- **Task 15 — QR Scanner.** Integrated ZXing-based QR scanner into `MainActivity`. Search button now triggers live scanner to join sessions.
+- **Voxel Memory — Frustum Culling.** Implemented true NDC-based visible splat confidence calculation in `VoxelHash`.
+- **Relocalization — Thread Safety.** Added mutex locking to `mWallDescriptors` and `mWallKeypoints3D` in `MobileGS` to prevent races between JNI updates and the background PnP thread.
 
 ### Todo
 

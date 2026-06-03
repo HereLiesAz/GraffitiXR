@@ -9,11 +9,14 @@ import androidx.compose.ui.graphics.BlendMode as ComposeBlendMode
 import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.common.model.BlendMode as ModelBlendMode
 import com.hereliesaz.graffitixr.common.util.ImageUtils
+import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -21,6 +24,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import javax.inject.Inject
+import javax.inject.Provider
 import javax.inject.Singleton
 
 interface UriProvider {
@@ -36,7 +40,8 @@ class DefaultUriProvider @Inject constructor() : UriProvider {
 @Singleton
 class ProjectManager @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val uriProvider: UriProvider
+    private val uriProvider: UriProvider,
+    private val projectRepositoryProvider: Provider<ProjectRepository>
 ) {
 
     private val json = Json {
@@ -328,27 +333,75 @@ class ProjectManager @Inject constructor(
         else                        -> ModelBlendMode.SrcOver
     }
 
-    // --- Co-op stubs (Task 14 — real implementation in Task 17) ---
+    // --- Co-op implementation (Task 17) ---
 
     /**
      * Returns the ID of the currently open project, or "unknown" if none is loaded.
-     * TODO Task 17: thread through ProjectRepository.currentProject.value?.id
      */
-    fun currentProjectId(): String = "unknown"
+    fun currentProjectId(): String = projectRepositoryProvider.get().currentProject.value?.id ?: "unknown"
 
     /**
      * Serialises the current project to bytes for bulk-transfer to a guest device.
-     * TODO Task 17: implement real project serialisation.
      */
-    fun serializeCurrentProject(): ByteArray = ByteArray(0)
+    fun serializeCurrentProject(): ByteArray {
+        val project = projectRepositoryProvider.get().currentProject.value ?: return ByteArray(0)
+        val sourceFolder = File(context.filesDir, "projects/${project.id}")
+        if (!sourceFolder.exists()) return ByteArray(0)
+
+        return ByteArrayOutputStream().use { baos ->
+            ZipOutputStream(baos).use { zos ->
+                zipFolder(sourceFolder, "", zos)
+            }
+            baos.toByteArray()
+        }
+    }
 
     /**
      * Loads a project received as raw bytes from a host device (spectator/guest path).
-     * TODO Task 17: implement real deserialisation and project load.
      */
-    fun loadAsSpectator(@Suppress("UNUSED_PARAMETER") bytes: ByteArray) { /* no-op stub */ }
+    fun loadAsSpectator(bytes: ByteArray) {
+        if (bytes.isEmpty()) return
+        
+        runBlocking {
+            try {
+                ZipInputStream(bytes.inputStream()).use { zis ->
+                    var projectData: GraffitiProject? = null
+                    val extractedFiles = mutableMapOf<String, ByteArray>()
 
-    // --- End co-op stubs ---
+                    var entry = zis.nextEntry
+                    while (entry != null) {
+                        val name = entry.name
+                        if (!entry.isDirectory && name.isNotEmpty()) {
+                            val fileBytes = zis.readBytes()
+                            if (name == "project.json") {
+                                projectData = json.decodeFromString<GraffitiProject>(fileBytes.decodeToString())
+                            }
+                            extractedFiles[name] = fileBytes
+                        }
+                        zis.closeEntry()
+                        entry = zis.nextEntry
+                    }
+
+                    val project = projectData ?: return@use
+                    val destDir = File(context.filesDir, "projects/${project.id}").also { it.mkdirs() }
+
+                    for ((name, fileBytes) in extractedFiles) {
+                        val dest = File(destDir, name)
+                        dest.parentFile?.mkdirs()
+                        dest.writeBytes(fileBytes)
+                    }
+
+                    withContext(Dispatchers.Main) {
+                        projectRepositoryProvider.get().createProject(project)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ProjectManager", "loadAsSpectator failed", e)
+            }
+        }
+    }
+
+    // --- End co-op implementation ---
 
     private fun zipFolder(folder: File, parentFolder: String, zos: ZipOutputStream) {
         for (file in folder.listFiles() ?: emptyArray()) {
