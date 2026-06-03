@@ -86,6 +86,9 @@ class ArRenderer(
     private val poseFusion = com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion()
     // A/B switch for the Sub-project A harness: when false, reproduce the old pre/post-anchor toggle.
     @Volatile var fusionEnabled: Boolean = true
+    // Whether the ARCore Depth API is actually enabled this session. Off by default — it starves VIO
+    // on this hardware; metric depth comes from triangulation/stereo instead. Set from ArViewModel.
+    @Volatile var depthApiEnabled: Boolean = false
 
     @Volatile var scanMode: ArScanMode = ArScanMode.MURAL
     @Volatile var muralMethod: MuralMethod = MuralMethod.VOXEL_HASH
@@ -388,7 +391,7 @@ class ArRenderer(
             }
 
             val isTracking = camera.trackingState == TrackingState.TRACKING
-            val depthSupported = activeSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
+            val depthSupported = depthApiEnabled && activeSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
 
             val yawRad = kotlin.math.atan2(-viewMatrix[2].toDouble(), -viewMatrix[10].toDouble())
             val yawDeg = Math.toDegrees(yawRad).toFloat()
@@ -468,7 +471,7 @@ class ArRenderer(
 
                     // Keep last smoothed value across invalid/dropped frames so the readout is stable.
                     var centerDepth = smoothedCenterDepth
-                    try {
+                    if (depthApiEnabled) try {
                         frame.acquireDepthImage16Bits().use { depthImage ->
                             val plane = depthImage.planes[0]
                             // Median of a 7x7 patch (radius 3) rejects per-pixel noise/holes; the
@@ -525,7 +528,7 @@ class ArRenderer(
                         var depthHeight = 0
                         var depthStride = 0
 
-                        if (activeSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
+                        if (depthApiEnabled) {
                             try {
                                 frame.acquireDepthImage16Bits().use { depthImage ->
                                     val plane = depthImage.planes[0]
