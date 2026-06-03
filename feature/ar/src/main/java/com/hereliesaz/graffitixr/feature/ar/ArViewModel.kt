@@ -1025,6 +1025,18 @@ class ArViewModel @Inject constructor(
             }
             canvas.drawCircle(nx * copy.width, ny * copy.height, radius * copy.width, paint)
             _uiState.update { it.copy(annotatedCaptureBitmap = copy) }
+            // Reflect the erase in the keypoint overlay: re-detect within the updated mask so dots in
+            // erased regions disappear. Debounced so a drag (many erase calls) recomputes once it pauses.
+            scheduleKeypointRecompute()
+        }
+    }
+
+    private var keypointRecomputeJob: kotlinx.coroutines.Job? = null
+    private fun scheduleKeypointRecompute() {
+        keypointRecomputeJob?.cancel()
+        keypointRecomputeJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(250)
+            computeTargetKeypoints()
         }
     }
 
