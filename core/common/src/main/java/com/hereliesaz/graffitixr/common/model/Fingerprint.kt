@@ -15,7 +15,10 @@ data class Fingerprint(
     val descriptorsData: ByteArray,
     val descriptorsRows: Int,
     val descriptorsCols: Int,
-    val descriptorsType: Int
+    val descriptorsType: Int,
+    // Canonical 256x256 raw-gray patch of the marks (row-major) for the distortion head. Empty when
+    // the head isn't in use. Defaulted so older saved projects deserialize unchanged.
+    val patchData: ByteArray = ByteArray(0),
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -27,6 +30,7 @@ data class Fingerprint(
         if (descriptorsRows != other.descriptorsRows) return false
         if (descriptorsCols != other.descriptorsCols) return false
         if (descriptorsType != other.descriptorsType) return false
+        if (!patchData.contentEquals(other.patchData)) return false
         return true
     }
 
@@ -37,6 +41,7 @@ data class Fingerprint(
         result = 31 * result + descriptorsRows
         result = 31 * result + descriptorsCols
         result = 31 * result + descriptorsType
+        result = 31 * result + patchData.contentHashCode()
         return result
     }
 }
