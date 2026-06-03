@@ -119,7 +119,10 @@ private:
 
     void relocThreadFunc();
     void runPnPMatch(const cv::Mat& frame);
-    void tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, const float* viewMat, const float* projMat);
+    // Teleological self-grow (gatekeeper stage): measure how much of the registered artwork base is now
+    // corroborated by real wall content in the clean camera frame -> mPaintingProgress. Read-only on the
+    // reloc fingerprint; the promotion step (adding validated new marks) is staged separately.
+    void tryUpdateFingerprint(const cv::Mat& grayClean);
     void interpolateAnchorStep();
     // Plane-guided rectification: homography (current-image <-> fingerprint-image) from the wall plane
     // and the VIO baseline between the current and fingerprint-capture views, plus the viewing
