@@ -236,6 +236,9 @@ class ArViewModel @Inject constructor(
     /** A/B switch for the pose fusion (Sub-project B): on = corrected snap-back fusion, off = old toggle. */
     fun evalSetFusionEnabled(on: Boolean) { renderer?.fusionEnabled = on }
 
+    /** A/B switch for teleological self-grow (default OFF): promote validated new marks into the fingerprint. */
+    fun evalSetSelfGrowEnabled(on: Boolean) { slamManager.setSelfGrowEnabled(on) }
+
     // ── Glasses session lifecycle ─────────────────────────────────────────────
 
     fun startGlassesSession() {

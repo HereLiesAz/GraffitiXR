@@ -48,6 +48,8 @@ public:
     // Detect the same features generateFingerprint would (SuperPoint/ORB-1000, masked) and return their
     // 2D positions in image pixels — for a truthful "what anchors the fingerprint" curation overlay.
     void getFingerprintKeypoints(const cv::Mat& image, const cv::Mat& mask, std::vector<cv::Point2f>& out);
+    // Teleological self-grow (default OFF — mutates the live reloc fingerprint, so opt-in only).
+    void setSelfGrowEnabled(bool e) { mSelfGrowEnabled.store(e, std::memory_order_relaxed); }
 
     struct FingerprintData {
         std::vector<cv::KeyPoint> keypoints;
@@ -166,6 +168,10 @@ private:
     // restored without a capture view (rectification is then skipped — plain matching still runs).
     float mFingerprintViewMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     bool mHasFingerprintView = false;
+    // Teleological self-grow: opt-in flag + the last reloc seq we grew from (only grow on a fresh,
+    // confident relock so promoted marks are placed with a current pose, never a stale one).
+    std::atomic<bool> mSelfGrowEnabled{false};
+    long mLastGrowSeq = 0;
     // VIO view snapshot captured alongside the reloc frame, so the rectifying warp matches that frame.
     float mRelocViewMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     uint64_t mFrameCounter = 0;

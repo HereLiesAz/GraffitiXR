@@ -174,6 +174,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetRelocEnabled(JN
 }
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetSelfGrowEnabled(JNIEnv* env, jobject thiz, jboolean enabled) {
+    if (gSlamEngine) gSlamEngine->setSelfGrowEnabled(enabled);
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetVoxelSize(JNIEnv* env, jobject thiz, jfloat size) {
     if (gSlamEngine) gSlamEngine->setVoxelSize(size);
 }

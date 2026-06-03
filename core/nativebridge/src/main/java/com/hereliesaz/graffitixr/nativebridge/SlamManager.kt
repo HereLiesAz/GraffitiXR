@@ -118,6 +118,8 @@ class SlamManager @Inject constructor(
     fun pruneByConfidence(threshold: Float) = nativePruneByConfidence(threshold)
 
     fun setRelocEnabled(enabled: Boolean) = nativeSetRelocEnabled(enabled)
+    /** Teleological self-grow (default OFF): promote validated new marks into the live fingerprint. */
+    fun setSelfGrowEnabled(enabled: Boolean) = nativeSetSelfGrowEnabled(enabled)
     fun setVoxelSize(size: Float) = nativeSetVoxelSize(size)
     fun setMappingPaused(paused: Boolean) = nativeSetMappingPaused(paused)
 
@@ -426,6 +428,7 @@ class SlamManager @Inject constructor(
         intrinsics: FloatArray, viewMatrix: FloatArray
     )
     private external fun nativeSetRelocEnabled(enabled: Boolean)
+    private external fun nativeSetSelfGrowEnabled(enabled: Boolean)
     private external fun nativeSetVoxelSize(size: Float)
     private external fun nativeSetMappingPaused(paused: Boolean)
     private external fun nativeFeedPointCloud(points: FloatArray)
