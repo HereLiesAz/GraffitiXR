@@ -344,12 +344,25 @@ class SlamManager @Inject constructor(
         return list
     }
 
+    /**
+     * The REAL fingerprint feature positions (image pixels) the same detector used by
+     * generateFingerprint would produce on [bitmap], restricted to [mask] when given — for a truthful
+     * curation overlay. Unlike getKeypoints (plain ORB-500), this matches what actually anchors.
+     */
+    fun getFingerprintKeypoints(bitmap: Bitmap, mask: Bitmap?): List<android.util.Pair<Float, Float>> {
+        val raw = nativeGetFingerprintKeypoints(bitmap, mask) ?: return emptyList()
+        val list = ArrayList<android.util.Pair<Float, Float>>(raw.size / 2)
+        for (i in 0 until raw.size / 2) list.add(android.util.Pair(raw[i * 2], raw[i * 2 + 1]))
+        return list
+    }
+
     fun updateLightLevel(level: Float) {
         nativeUpdateLightLevel(level)
     }
 
     // Native methods
     private external fun nativeGetKeypoints(bitmap: Bitmap): FloatArray?
+    private external fun nativeGetFingerprintKeypoints(bitmap: Bitmap, mask: Bitmap?): FloatArray?
     private external fun nativeInitialize()
 
     private external fun nativeInitGl()

@@ -641,6 +641,27 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
 }
 
 JNIEXPORT jfloatArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintKeypoints(
+        JNIEnv* env, jobject thiz, jobject bitmap, jobject mask) {
+    if (!gSlamEngine) return nullptr;
+    cv::Mat image; bitmapToMat(env, bitmap, image);
+    if (image.empty()) return nullptr;
+    cv::Mat maskMat;
+    if (mask) bitmapToMat(env, mask, maskMat);
+    std::vector<cv::Point2f> pts;
+    {
+        std::lock_guard<std::mutex> lock(gSlamEngine->getMutex());
+        gSlamEngine->getFingerprintKeypoints(image, maskMat, pts);
+    }
+    jfloatArray result = env->NewFloatArray((jsize)(pts.size() * 2));
+    if (!result) return nullptr;
+    jfloat* ptr = env->GetFloatArrayElements(result, nullptr);
+    for (size_t i = 0; i < pts.size(); ++i) { ptr[i * 2] = pts[i].x; ptr[i * 2 + 1] = pts[i].y; }
+    env->ReleaseFloatArrayElements(result, ptr, 0);
+    return result;
+}
+
+JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetKeypoints(
         JNIEnv* env, jobject thiz, jobject bitmap) {
     if (!gSlamEngine) return nullptr;
