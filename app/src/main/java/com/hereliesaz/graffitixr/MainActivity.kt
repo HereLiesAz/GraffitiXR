@@ -1251,6 +1251,7 @@ class MainActivity : ComponentActivity() {
                         val forceOpenHiddenMenu = layerMenusOpen[layer.id] ?: false
                         azRailRelocItem(
                             id = "layer.${layer.id}",
+                            hostId = "sub.design.layers",
                             text = layer.name,
                             color = when {
                                 editorUiState.activeLayerId == layer.id -> Cyan
