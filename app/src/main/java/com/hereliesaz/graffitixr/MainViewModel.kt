@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.data.ProjectManager
+import com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
@@ -231,18 +232,17 @@ class MainViewModel @Inject constructor(
         intrinsics: FloatArray? = null,
         viewMatrix: FloatArray? = null
     ) {
-        _uiState.update {
-            it.copy(
-                isCapturingTarget = false,
-                captureStep = CaptureStep.NONE,
-                isWaitingForTap = false,
-                captureOriginatedFromTap = false
-            )
+        if (bitmap == null || intrinsics == null || viewMatrix == null) { resetCaptureUi(); return }
+        val safeIntr = intrinsics
+        val safeView = viewMatrix
+
+        if (depthBuffer == null) {
+            // No depth source: build the wall fingerprint from two keyframes via triangulation.
+            handleMetricCapture(bitmap, safeIntr, safeView)
+            return
         }
-        bitmap ?: return
-        val safeDepth = depthBuffer ?: return
-        val safeIntr = intrinsics ?: return
-        val safeView = viewMatrix ?: return
+        resetCaptureUi()
+        val safeDepth = depthBuffer
 
         viewModelScope.launch(Dispatchers.IO) {
             val currentProject = projectRepository.currentProject.value ?: return@launch
@@ -292,7 +292,74 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    private fun resetCaptureUi() {
+        _uiState.update {
+            it.copy(
+                isCapturingTarget = false,
+                captureStep = CaptureStep.NONE,
+                isWaitingForTap = false,
+                captureOriginatedFromTap = false
+            )
+        }
+    }
+
+    private class MetricKf0(
+        val bitmap: Bitmap, val view: FloatArray, val intr: FloatArray, val anchor: FloatArray
+    )
+    private var pendingMetricKf0: MetricKf0? = null
+
+    override fun onCleared() {
+        super.onCleared()
+        pendingMetricKf0 = null
+    }
+
+    /**
+     * Depth-off target creation: capture two keyframes a side-step apart and triangulate. The first
+     * tap stores keyframe 0 and re-enters capture; the second tap supplies keyframe 1 and builds.
+     */
+    private fun handleMetricCapture(bitmap: Bitmap, intr: FloatArray, view: FloatArray) {
+        val kf0 = pendingMetricKf0
+        if (kf0 == null) {
+            pendingMetricKf0 = MetricKf0(bitmap, view.copyOf(), intr.copyOf(), slamManager.getAnchorTransform())
+            // Re-enter tap-capture so the next tap supplies the second view.
+            _uiState.update {
+                it.copy(isCapturingTarget = true, captureStep = CaptureStep.NONE,
+                    isWaitingForTap = true, captureOriginatedFromTap = true)
+            }
+            Toast.makeText(context,
+                "First view captured. Step ~20 cm to the side and tap your marks again.",
+                Toast.LENGTH_LONG).show()
+            return
+        }
+        pendingMetricKf0 = null
+        resetCaptureUi()
+        viewModelScope.launch(Dispatchers.IO) {
+            val currentProject = projectRepository.currentProject.value ?: return@launch
+            val fp = MetricFingerprintBuilder.build(
+                slamManager, kf0.bitmap, kf0.view, kf0.intr, bitmap, view, intr, kf0.anchor
+            )
+            if (fp == null) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context,
+                        "Not enough overlap between the two views. Try again with a smaller side-step.",
+                        Toast.LENGTH_LONG).show()
+                }
+                return@launch
+            }
+            projectManager.saveProject(
+                context = context,
+                projectData = currentProject.copy(fingerprint = fp),
+                targetImages = listOf(bitmap)
+            )
+            projectRepository.loadProject(currentProject.id)
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "Target Saved & Locked", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     fun onCancelCaptureClicked() {
+        pendingMetricKf0 = null
         _uiState.update {
             it.copy(
                 isCapturingTarget = false,

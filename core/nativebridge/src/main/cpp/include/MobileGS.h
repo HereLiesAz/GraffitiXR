@@ -36,6 +36,10 @@ public:
 
     void setArCoreTrackingState(bool isTracking);
     void restoreWallFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
+    // Ingest a fingerprint built from triangulated metric marks (no depth source): also fixes the
+    // fingerprint anchor pose and the intrinsics the reloc PnP should use.
+    void restoreWallFingerprintMetric(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d,
+                                      const float* anchorMatrix16, const float* intrinsics4);
     void scheduleRelocCheck(const cv::Mat& colorFrame);
     void getAnchorTransform(float* outMat16) const;
     void getRelocResult(float* out19) const;       // [0..15]=pnpMat,16=inliers,17=matches,18=seq
@@ -145,6 +149,8 @@ private:
     std::atomic<int> mPnpMatchCount{0};
     std::atomic<long> mPnpResultSeq{0};
     float mFingerprintAnchorMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    // fx,fy,cx,cy the wall fingerprint's 3D points were built with; {0,..} => unset (use a default).
+    float mFingerprintIntrinsics[4] = {0,0,0,0};
     uint64_t mFrameCounter = 0;
     float mLightLevel = 1.0f;
     float mLastAngularVelocity[3] = {0,0,0};
