@@ -70,22 +70,40 @@ class MetaGlassProvider @Inject constructor(
 
     init {
         scope.launch {
-            Wearables.registrationState.collect { state ->
-                val newState = when (state) {
-                    is RegistrationState.Registered -> ConnectionState.Connected
-                    is RegistrationState.Available -> ConnectionState.Disconnected
-                    is RegistrationState.Unavailable -> {
-                        if (state.error != null) ConnectionState.Error(state.error.toString())
-                        else ConnectionState.Disconnected
-                    }
-                    else -> ConnectionState.Connecting
-                }
-                _connectionState.value = newState
+            // This @Singleton can be constructed before MainActivity calls Wearables.initialize()
+            // (which is itself permission-gated), so touching Wearables.registrationState here can throw
+            // "Wearables not initialized" and crash the app on launch. Wait + retry instead of crashing;
+            // once collect() starts it runs for the session.
+            var attempt = 0
+            while (true) {
+                try {
+                    Wearables.registrationState.collect { state ->
+                        val newState = when (state) {
+                            is RegistrationState.Registered -> ConnectionState.Connected
+                            is RegistrationState.Available -> ConnectionState.Disconnected
+                            is RegistrationState.Unavailable -> {
+                                if (state.error != null) ConnectionState.Error(state.error.toString())
+                                else ConnectionState.Disconnected
+                            }
+                            else -> ConnectionState.Connecting
+                        }
+                        _connectionState.value = newState
 
-                if (newState is ConnectionState.Connected) {
-                    startCameraStream()
-                } else if (newState is ConnectionState.Disconnected || newState is ConnectionState.Error) {
-                    stopCameraStream()
+                        if (newState is ConnectionState.Connected) {
+                            startCameraStream()
+                        } else if (newState is ConnectionState.Disconnected || newState is ConnectionState.Error) {
+                            stopCameraStream()
+                        }
+                    }
+                    break // collect completed normally
+                } catch (e: Exception) {
+                    // Most commonly WearablesException("not initialized") — back off and retry until the
+                    // SDK is initialized. Give up after ~1 min so we don't poll forever if it never is.
+                    if (++attempt >= 30) {
+                        Log.w("MetaGlassProvider", "Wearables registrationState unavailable; giving up", e)
+                        break
+                    }
+                    kotlinx.coroutines.delay(2000)
                 }
             }
         }
