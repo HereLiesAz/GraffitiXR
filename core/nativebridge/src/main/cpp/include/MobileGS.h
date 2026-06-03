@@ -45,6 +45,9 @@ public:
     void getRelocResult(float* out19) const;       // [0..15]=pnpMat,16=inliers,17=matches,18=seq
     void getFingerprintAnchor(float* out16) const;
     void setArtworkFingerprint(const cv::Mat& composite, const uint8_t* depthData, int depthW, int depthH, int depthStride, const float* intrinsics4, const float* viewMat16);
+    // Detect the same features generateFingerprint would (SuperPoint/ORB-1000, masked) and return their
+    // 2D positions in image pixels — for a truthful "what anchors the fingerprint" curation overlay.
+    void getFingerprintKeypoints(const cv::Mat& image, const cv::Mat& mask, std::vector<cv::Point2f>& out);
 
     struct FingerprintData {
         std::vector<cv::KeyPoint> keypoints;
