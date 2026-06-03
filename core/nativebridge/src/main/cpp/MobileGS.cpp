@@ -267,11 +267,13 @@ void MobileGS::relocThreadFunc() {
     JniThreadAttacher attacher;
     while (mRelocRunning) {
         cv::Mat frame;
+        float relocView[16];
         {
             std::unique_lock<std::mutex> lock(mRelocMutex);
             mRelocCv.wait(lock, [this] { return mRelocRequested || !mRelocRunning; });
             if (!mRelocRunning) break;
             frame = mRelocColorFrame.clone();
+            memcpy(relocView, mRelocViewMatrix, 16 * sizeof(float));
             mRelocRequested = false;
         }
 
@@ -286,32 +288,60 @@ void MobileGS::relocThreadFunc() {
         cv::Mat gray;
         cv::cvtColor(workFrame, gray, cv::COLOR_RGB2GRAY);
 
-        std::vector<cv::KeyPoint> kps;
-        cv::Mat descs;
-        // Use SuperPoint if loaded and wall fingerprint type matches (float) or is absent
-        bool useSuperPoint = mSuperPoint.isLoaded() &&
+        // SuperPoint usable when loaded and the wall fingerprint is float-typed (or empty).
+        const bool spOk = mSuperPoint.isLoaded() &&
             (mWallDescriptors.empty() || mWallDescriptors.type() == CV_32F);
-        if (useSuperPoint && !mSuperPoint.detect(gray, kps, descs)) {
-            useSuperPoint = false;
-        }
-        if (!useSuperPoint) {
-            mFeatureDetector->detectAndCompute(gray, cv::noArray(), kps, descs);
-        }
 
-        if (descs.empty()) continue;
-
-        cv::Ptr<cv::DescriptorMatcher>& activeMatcher =
-            (descs.type() == CV_32F) ? mL2Matcher : mMatcher;
-        std::vector<std::vector<cv::DMatch>> matches;
-        activeMatcher->knnMatch(descs, mWallDescriptors, matches, 2);
+        // Detect + Lowe-ratio match a gray image against the wall fingerprint. When Hback is non-empty
+        // the matched keypoints are mapped through it (rectified frame -> current image) before being
+        // stored, so the returned 2D points are ALWAYS in the current camera image — exactly what the
+        // PnP below expects.
+        auto buildCorr = [&](const cv::Mat& g, const cv::Mat& Hback,
+                             std::vector<cv::Point2f>& outImg, std::vector<cv::Point3f>& outObj) {
+            std::vector<cv::KeyPoint> kps; cv::Mat descs;
+            bool sp = spOk;
+            if (sp && !mSuperPoint.detect(g, kps, descs)) sp = false;
+            if (!sp) mFeatureDetector->detectAndCompute(g, cv::noArray(), kps, descs);
+            if (descs.empty()) return;
+            cv::Ptr<cv::DescriptorMatcher>& matcher = (descs.type() == CV_32F) ? mL2Matcher : mMatcher;
+            std::vector<std::vector<cv::DMatch>> matches;
+            matcher->knnMatch(descs, mWallDescriptors, matches, 2);
+            for (auto& match : matches) {
+                if (match.size() < 2) continue;
+                if (match[0].distance < 0.75f * match[1].distance) {
+                    cv::Point2f p = kps[match[0].queryIdx].pt;
+                    if (!Hback.empty()) {
+                        std::vector<cv::Point2f> in{p}, outp;
+                        cv::perspectiveTransform(in, outp, Hback);
+                        p = outp[0];
+                    }
+                    outImg.push_back(p);
+                    outObj.push_back(mWallKeypoints3D[match[0].trainIdx]);
+                }
+            }
+        };
 
         std::vector<cv::Point2f> imgPts;
         std::vector<cv::Point3f> objPts;
-        for (auto& match : matches) {
-            if (match.size() < 2) continue;
-            if (match[0].distance < 0.75f * match[1].distance) {
-                imgPts.push_back(kps[match[0].queryIdx].pt);
-                objPts.push_back(mWallKeypoints3D[match[0].trainIdx]);
+        buildCorr(gray, cv::Mat(), imgPts, objPts);
+
+        // Plane-guided rectification (perspective-robust matching). The marks lie on a known plane and
+        // VIO gives a pose, so the oblique-vs-frontal distortion is a homography we can pre-cancel:
+        // warp the live frame into the fingerprint's frontal frame and re-match there, recovering
+        // oblique/partial relocks that raw descriptor matching loses. Strictly never-worse — only adopt
+        // the rectified correspondences when they out-number the plain ones.
+        if (mHasFingerprintView && mIsArCoreTracking && mWallKeypoints3D.size() >= 12) {
+            cv::Mat Hcur_fp, Hfp_cur; double obliqDeg = 0.0;
+            if (computeRectifyHomography(relocView, Hcur_fp, Hfp_cur, obliqDeg) && obliqDeg > 25.0) {
+                cv::Mat grayRect;
+                cv::warpPerspective(gray, grayRect, Hfp_cur, gray.size());
+                std::vector<cv::Point2f> rImg; std::vector<cv::Point3f> rObj;
+                buildCorr(grayRect, Hcur_fp, rImg, rObj);
+                if (rImg.size() > imgPts.size()) {
+                    LOGI("Reloc: rectified match (obliquity %.0f deg) %zu corr beats plain %zu",
+                         obliqDeg, rImg.size(), imgPts.size());
+                    imgPts.swap(rImg); objPts.swap(rObj);
+                }
             }
         }
 
@@ -386,6 +416,67 @@ void MobileGS::relocThreadFunc() {
     }
 }
 void MobileGS::runPnPMatch(const cv::Mat& frame) {}
+
+bool MobileGS::computeRectifyHomography(const float* viewCur16, cv::Mat& Hcur_fp,
+                                        cv::Mat& Hfp_cur, double& obliquityDeg) {
+    glm::mat4 viewCur = glm::make_mat4(viewCur16);
+    glm::mat4 viewFp;
+    double fx, fy, cx, cy;
+    std::vector<cv::Point3f> pts;
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        if (!mHasFingerprintView) return false;
+        viewFp = glm::make_mat4(mFingerprintViewMatrix);
+        fx = mFingerprintIntrinsics[0]; fy = mFingerprintIntrinsics[1];
+        cx = mFingerprintIntrinsics[2]; cy = mFingerprintIntrinsics[3];
+        pts = mWallKeypoints3D;
+    }
+    if (pts.size() < 12 || fx <= 0.0 || fy <= 0.0) return false;
+
+    // Fit a plane to the fingerprint-frame 3D marks: centroid + normal (smallest-variance PCA axis).
+    cv::Mat data((int)pts.size(), 3, CV_32F);
+    for (int i = 0; i < (int)pts.size(); ++i) {
+        data.at<float>(i,0) = pts[i].x; data.at<float>(i,1) = pts[i].y; data.at<float>(i,2) = pts[i].z;
+    }
+    cv::PCA pca(data, cv::Mat(), cv::PCA::DATA_AS_ROW);
+    cv::Vec3d n(pca.eigenvectors.at<float>(2,0), pca.eigenvectors.at<float>(2,1), pca.eigenvectors.at<float>(2,2));
+    cv::Vec3d c(pca.mean.at<float>(0,0), pca.mean.at<float>(0,1), pca.mean.at<float>(0,2));
+    double nn = cv::norm(n); if (nn < 1e-6) return false; n /= nn;
+    double d = n.dot(c);
+    if (d < 0) { n = -n; d = -d; }              // plane n·X = d with d > 0 (in front of the fp camera)
+    if (d < 1e-3) return false;
+
+    // Relative pose fp-camera -> current-camera (both share the VIO world while tracking):
+    //   X_cur = R X_fp + t,  T = view_cur * inverse(view_fp).  glm is column-major: T[col][row].
+    glm::mat4 T = viewCur * glm::inverse(viewFp);
+    cv::Matx33d Rgl(T[0][0], T[1][0], T[2][0],
+                    T[0][1], T[1][1], T[2][1],
+                    T[0][2], T[1][2], T[2][2]);
+    cv::Vec3d tgl(T[3][0], T[3][1], T[3][2]);
+
+    // ARCore view matrices are OpenGL convention (camera looks down -z, +y up); the fingerprint 3D
+    // points are OpenCV convention (+z forward, +y down). Convert the pose with C = diag(1,-1,-1)
+    // (its own inverse): R_cv = C R_gl C, t_cv = C t_gl. Without this the homography is meaningless.
+    const cv::Matx33d C(1,0,0, 0,-1,0, 0,0,-1);
+    cv::Matx33d R = C * Rgl * C;
+    cv::Vec3d t = C * tgl;
+
+    // Obliquity = angle between the plane normal in the CURRENT camera frame and the optical (+z) axis.
+    cv::Vec3d nCur = R * n;
+    double cosA = std::abs(nCur[2]) / (cv::norm(nCur) + 1e-9);
+    obliquityDeg = std::acos(std::min(1.0, cosA)) * 180.0 / CV_PI;
+
+    // Plane-induced homography current-image <- fingerprint-image:  H = K (R - t nᵀ / d) K⁻¹.
+    cv::Matx33d K(fx, 0, cx, 0, fy, cy, 0, 0, 1);
+    cv::Matx33d M = R - (1.0 / d) * (cv::Matx31d(t[0], t[1], t[2]) * cv::Matx13d(n[0], n[1], n[2]));
+    cv::Matx33d Hc = K * M * K.inv();
+    if (std::abs(Hc(2,2)) < 1e-9) return false;
+    Hc = (1.0 / Hc(2,2)) * Hc;
+    Hcur_fp = cv::Mat(Hc);
+    Hfp_cur = Hcur_fp.inv();
+    return true;
+}
+
 void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, const float* viewMat, const float* projMat) {}
 void MobileGS::interpolateAnchorStep() {}
 void MobileGS::setArCoreTrackingState(bool t) { mIsArCoreTracking = t; }
@@ -515,6 +606,9 @@ void MobileGS::scheduleRelocCheck(const cv::Mat& f) {
         std::lock_guard<std::mutex> lock(mRelocMutex);
         if (mRelocRequested) return;
         f.copyTo(mRelocColorFrame);
+        // Snapshot the latest VIO view alongside the frame so the rectifying warp matches it. A torn
+        // read vs. updateCamera is harmless here — the warp is approximate and PnP refines it.
+        memcpy(mRelocViewMatrix, mViewMatrix, 16 * sizeof(float));
         mRelocRequested = true;
     }
     mRelocCv.notify_one();
@@ -538,7 +632,7 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& c, const uint8_t* d, int w, 
 MobileGS::FingerprintData MobileGS::generateFingerprint(
         const cv::Mat& image, const cv::Mat& mask,
         const uint8_t* depthData, int depthW, int depthH, int depthStride,
-        const float* intr, const float* /*viewMat*/)
+        const float* intr, const float* viewMat)
 {
     if (image.empty()) return {};
 
@@ -664,6 +758,10 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
         mWallKeypoints3D  = std::move(pts3d);
         memcpy(mFingerprintAnchorMatrix, mAnchorMatrix, 16 * sizeof(float));
         memcpy(mFingerprintIntrinsics, intr, 4 * sizeof(float));
+        if (viewMat) {
+            memcpy(mFingerprintViewMatrix, viewMat, 16 * sizeof(float));
+            mHasFingerprintView = true; // enables plane-guided rectification at reloc time
+        }
     }
 
     return fd;

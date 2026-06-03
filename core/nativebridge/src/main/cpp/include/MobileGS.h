@@ -121,6 +121,10 @@ private:
     void runPnPMatch(const cv::Mat& frame);
     void tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, const float* viewMat, const float* projMat);
     void interpolateAnchorStep();
+    // Plane-guided rectification: homography (current-image <-> fingerprint-image) from the wall plane
+    // and the VIO baseline between the current and fingerprint-capture views, plus the viewing
+    // obliquity in degrees. False if no fingerprint view is stored or the geometry is degenerate.
+    bool computeRectifyHomography(const float* viewCur16, cv::Mat& Hcur_fp, cv::Mat& Hfp_cur, double& obliquityDeg);
 
     mutable std::mutex mMutex;
     bool mIsArCoreTracking = false;
@@ -151,6 +155,13 @@ private:
     float mFingerprintAnchorMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     // fx,fy,cx,cy the wall fingerprint's 3D points were built with; {0,..} => unset (use a default).
     float mFingerprintIntrinsics[4] = {0,0,0,0};
+    // VIO view matrix at fingerprint-capture time + flag; used to rectify oblique live views to the
+    // fingerprint's frontal frame before matching (perspective-robust matching). False for fingerprints
+    // restored without a capture view (rectification is then skipped — plain matching still runs).
+    float mFingerprintViewMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    bool mHasFingerprintView = false;
+    // VIO view snapshot captured alongside the reloc frame, so the rectifying warp matches that frame.
+    float mRelocViewMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     uint64_t mFrameCounter = 0;
     float mLightLevel = 1.0f;
     float mLastAngularVelocity[3] = {0,0,0};
