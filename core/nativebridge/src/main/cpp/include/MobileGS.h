@@ -67,6 +67,9 @@ public:
 
     bool loadSuperPoint(const std::vector<uchar>& onnxBytes);
     bool loadDistortionHead(const std::vector<uchar>& onnxBytes) { return mDistortionHead.load(onnxBytes); }
+    // Canonical fingerprint patch (the marks) the distortion head compares the live crop against.
+    // Stored as a raw 256x256 gray (NO CLAHE — the head's frozen SuperPoint was trained on raw gray).
+    void setWallPatch(const cv::Mat& img);
     bool loadLowLightEnhancer(const std::vector<uchar>& onnxBytes);
     void clearMap();
     void pruneByConfidence(float threshold);
@@ -181,6 +184,7 @@ private:
     // confident relock so promoted marks are placed with a current pose, never a stale one).
     std::atomic<bool> mSelfGrowEnabled{false};
     long mLastGrowSeq = 0;
+    cv::Mat mWallPatch; // raw 256x256 gray canonical patch for the distortion head (desc_fp source)
     // VIO view snapshot captured alongside the reloc frame, so the rectifying warp matches that frame.
     float mRelocViewMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     uint64_t mFrameCounter = 0;

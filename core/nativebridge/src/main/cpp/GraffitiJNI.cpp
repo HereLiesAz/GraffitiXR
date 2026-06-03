@@ -184,6 +184,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetWallKeypointCou
 }
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallPatch(JNIEnv* env, jobject thiz, jobject bitmap) {
+    if (!gSlamEngine || !bitmap) return;
+    cv::Mat img; bitmapToMat(env, bitmap, img);
+    gSlamEngine->setWallPatch(img);
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetVoxelSize(JNIEnv* env, jobject thiz, jfloat size) {
     if (gSlamEngine) gSlamEngine->setVoxelSize(size);
 }
