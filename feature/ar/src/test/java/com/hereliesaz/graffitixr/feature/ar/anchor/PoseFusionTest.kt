@@ -38,13 +38,37 @@ class PoseFusionTest {
         assertEquals(0f, out[12], 1e-3f)
     }
 
-    @Test fun `fusion moves toward correction on a confident new snap`() {
+    @Test fun `cold start snaps hard to the correction (instant relock)`() {
         val f = PoseFusion()
-        val backbone = trans(0f,0f,0f)
         val reloc = FloatArray(19).also {
             System.arraycopy(trans(10f,0f,0f), 0, it, 0, 16); it[16] = 90f; it[17] = 100f; it[18] = 1f
         }
-        val out = f.currentAnchor(backbone, identity(), reloc, fpAnchor = identity(), confGlobal = 1f)
-        assert(out[12] > 0f && out[12] < 10f) { "expected partial move, got ${out[12]}" }
+        val out = f.currentAnchor(trans(0f,0f,0f), identity(), reloc, fpAnchor = identity(), confGlobal = 1f)
+        assertEquals(10f, out[12], 1e-3f) // hard snap on the first confident lock
+    }
+
+    @Test fun `warm correction eases in (smoothed) after the cold snap`() {
+        val f = PoseFusion()
+        // First (cold) snap to 10.
+        f.currentAnchor(trans(0f,0f,0f), identity(),
+            FloatArray(19).also { System.arraycopy(trans(10f,0f,0f),0,it,0,16); it[16]=90f; it[17]=100f; it[18]=1f },
+            identity(), 1f)
+        // Second confident snap to a new target (20) is smoothed → lands between 10 and 20.
+        val out = f.currentAnchor(trans(0f,0f,0f), identity(),
+            FloatArray(19).also { System.arraycopy(trans(20f,0f,0f),0,it,0,16); it[16]=90f; it[17]=100f; it[18]=2f },
+            identity(), 1f)
+        assert(out[12] > 10f && out[12] < 20f) { "expected smoothed move between 10 and 20, got ${out[12]}" }
+    }
+
+    @Test fun `markRelocalizing re-arms the hard snap`() {
+        val f = PoseFusion()
+        f.currentAnchor(trans(0f,0f,0f), identity(),
+            FloatArray(19).also { System.arraycopy(trans(10f,0f,0f),0,it,0,16); it[16]=90f; it[17]=100f; it[18]=1f },
+            identity(), 1f)
+        f.markRelocalizing()
+        val out = f.currentAnchor(trans(0f,0f,0f), identity(),
+            FloatArray(19).also { System.arraycopy(trans(20f,0f,0f),0,it,0,16); it[16]=90f; it[17]=100f; it[18]=2f },
+            identity(), 1f)
+        assertEquals(20f, out[12], 1e-3f) // hard snap again after re-arm
     }
 }

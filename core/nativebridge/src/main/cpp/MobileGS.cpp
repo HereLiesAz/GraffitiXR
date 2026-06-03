@@ -315,14 +315,17 @@ void MobileGS::relocThreadFunc() {
             }
         }
 
-        if (imgPts.size() >= 15) {
+        // Lowered floors so a close-up PARTIAL view (only a corner of the marks visible) can still
+        // localize: PnP needs only a handful of correspondences. The inlier RATIO (published below) is
+        // the quality gate PoseFusion actually trusts, so being permissive here is safe.
+        if (imgPts.size() >= 8) {
             cv::Mat rvec, tvec;
             std::vector<int> inliers;
             // Physical intrinsics from Mapping camera
             cv::Mat intr = (cv::Mat_<double>(3,3) << 1000.0, 0, 960.0, 0, 1000.0, 540.0);
             StageTimer _pnpTimer(&mStageAccumMs[4], &mStageSamples[4]);
             if (cv::solvePnPRansac(objPts, imgPts, intr, cv::Mat(), rvec, tvec, false, 100, 8.0, 0.99, inliers)) {
-                if (inliers.size() >= 12) {
+                if (inliers.size() >= 6) {
                     cv::Mat R;
                     cv:: Rodrigues(rvec, R);
 
