@@ -894,7 +894,9 @@ class ArViewModel @Inject constructor(
                 visibleSplatConfidenceAvg = visConf,
                 globalSplatConfidenceAvg = globConf,
                 trackingFailed = trackingFailed,
-                evalLiveMetrics = if (evalLogging) evalProbe.lastMetrics else state.evalLiveMetrics
+                evalLiveMetrics = if (evalLogging)
+                    evalProbe.lastMetrics.copy(wallCount = slamManager.getWallKeypointCount())
+                else state.evalLiveMetrics
             )
         }
     }

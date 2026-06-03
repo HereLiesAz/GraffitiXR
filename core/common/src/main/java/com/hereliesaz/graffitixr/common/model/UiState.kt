@@ -16,6 +16,7 @@ data class EvalLiveMetrics(
     val recoveryMs: Long? = null,
     val stageMs: FloatArray = FloatArray(5),
     val batteryMa: Float = 0f,
+    val wallCount: Int = 0, // live wall-fingerprint point count (reloc health / self-grow watch)
 )
 
 /** A tapped wall mark: normalized screen coords (0..1) plus the camera→point range in meters

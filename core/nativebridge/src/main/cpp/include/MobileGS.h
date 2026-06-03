@@ -50,6 +50,8 @@ public:
     void getFingerprintKeypoints(const cv::Mat& image, const cv::Mat& mask, std::vector<cv::Point2f>& out);
     // Teleological self-grow (default OFF — mutates the live reloc fingerprint, so opt-in only).
     void setSelfGrowEnabled(bool e) { mSelfGrowEnabled.store(e, std::memory_order_relaxed); }
+    // Live wall-fingerprint size — diagnostic for relocalization health and watching self-grow.
+    int getWallKeypointCount() const { std::lock_guard<std::mutex> lock(mMutex); return (int)mWallKeypoints3D.size(); }
     // SuperPoint detect+describe for one image (gray + CLAHE applied inside, matching the reloc path) so
     // the depth-off triangulated fingerprint can be built from SuperPoint (CV_32F) instead of ORB. False
     // if the model isn't loaded or nothing was found.

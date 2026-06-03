@@ -127,6 +127,9 @@ class SlamManager @Inject constructor(
      * found. Caller unpacks (kept here as a raw array to avoid an OpenCV dependency in this module).
      */
     fun detectSuperPoint(bitmap: Bitmap): FloatArray? = nativeDetectSuperPoint(bitmap)
+
+    /** Live wall-fingerprint point count — diagnostic for reloc health / watching self-grow. */
+    fun getWallKeypointCount(): Int = nativeGetWallKeypointCount()
     fun setVoxelSize(size: Float) = nativeSetVoxelSize(size)
     fun setMappingPaused(paused: Boolean) = nativeSetMappingPaused(paused)
 
@@ -437,6 +440,7 @@ class SlamManager @Inject constructor(
     private external fun nativeSetRelocEnabled(enabled: Boolean)
     private external fun nativeSetSelfGrowEnabled(enabled: Boolean)
     private external fun nativeDetectSuperPoint(bitmap: Bitmap): FloatArray?
+    private external fun nativeGetWallKeypointCount(): Int
     private external fun nativeSetVoxelSize(size: Float)
     private external fun nativeSetMappingPaused(paused: Boolean)
     private external fun nativeFeedPointCloud(points: FloatArray)

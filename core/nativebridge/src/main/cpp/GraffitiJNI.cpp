@@ -178,6 +178,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetSelfGrowEnabled
     if (gSlamEngine) gSlamEngine->setSelfGrowEnabled(enabled);
 }
 
+JNIEXPORT jint JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetWallKeypointCount(JNIEnv* env, jobject thiz) {
+    return gSlamEngine ? gSlamEngine->getWallKeypointCount() : 0;
+}
+
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetVoxelSize(JNIEnv* env, jobject thiz, jfloat size) {
     if (gSlamEngine) gSlamEngine->setVoxelSize(size);
