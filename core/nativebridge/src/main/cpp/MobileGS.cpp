@@ -332,7 +332,7 @@ void MobileGS::relocThreadFunc() {
             cv::Mat intr = (cv::Mat_<double>(3,3) << fx, 0, cx, 0, fy, cy, 0, 0, 1);
             StageTimer _pnpTimer(&mStageAccumMs[4], &mStageSamples[4]);
             if (cv::solvePnPRansac(objPts, imgPts, intr, cv::Mat(), rvec, tvec, false, 100, 8.0, 0.99, inliers)) {
-                if (inliers.size() >= 12) {
+                if (inliers.size() >= 6) {
                     // Refine on the RANSAC inliers. The marks lie on the wall plane, so resolve the
                     // planar two-fold (flip) ambiguity with IPPE and keep whichever pose reprojects
                     // best — but only adopt it if it strictly beats the RANSAC pose, so a non-coplanar
