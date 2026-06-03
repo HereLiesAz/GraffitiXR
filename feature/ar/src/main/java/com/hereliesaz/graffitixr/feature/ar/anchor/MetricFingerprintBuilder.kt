@@ -116,11 +116,18 @@ object MetricFingerprintBuilder {
     /** ORB detect + ratio-tested BF-Hamming match. descriptors[i] is frame-0's descriptor for corrs[i]. */
     private fun detectAndMatch(gray0: Mat, gray1: Mat, ratio: Float): Matched? {
         val orb = ORB.create(1500)
+        // Illumination-normalize identically to the native reloc path (CLAHE 2.0 / 8x8) so this
+        // triangulated fingerprint's descriptors match the live frame's under light/color changes.
+        // CLAHE doesn't move pixels, so keypoint positions (used for triangulation) are unaffected.
+        val clahe = Imgproc.createCLAHE(2.0, org.opencv.core.Size(8.0, 8.0))
+        val n0 = Mat(); val n1 = Mat()
+        clahe.apply(gray0, n0); clahe.apply(gray1, n1)
         val kp0 = MatOfKeyPoint(); val kp1 = MatOfKeyPoint()
         val d0 = Mat(); val d1 = Mat()
         try {
-            orb.detectAndCompute(gray0, Mat(), kp0, d0)
-            orb.detectAndCompute(gray1, Mat(), kp1, d1)
+            orb.detectAndCompute(n0, Mat(), kp0, d0)
+            orb.detectAndCompute(n1, Mat(), kp1, d1)
+            n0.release(); n1.release()
             if (d0.empty() || d1.empty()) return null
 
             val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
