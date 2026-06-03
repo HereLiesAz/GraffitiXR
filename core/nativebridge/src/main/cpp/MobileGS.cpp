@@ -380,6 +380,31 @@ void MobileGS::relocThreadFunc() {
             }
         }
 
+        // Distortion head (optional, docs/DISTORTION_HEAD.md): when the model + canonical patch are
+        // present, compare the live view (cropped around the coarse match centroid) against the
+        // fingerprint patch -> matchability (relock confidence) + coverage (= painting-progress). The
+        // corners/H -> IPPE prior is a later increment; here we consume the cheap signals. Inert unless
+        // the distortion_head.onnx asset is bundled. Uses RAW gray (the head's SuperPoint expects it).
+        if (mDistortionHead.isLoaded() && !mWallPatch.empty() && !imgPts.empty()) {
+            float cxs = 0, cys = 0;
+            for (const auto& p : imgPts) { cxs += p.x; cys += p.y; }
+            cxs /= (float)imgPts.size(); cys /= (float)imgPts.size();
+            cv::Mat headGray;
+            cv::cvtColor(workFrame, headGray, cv::COLOR_RGB2GRAY);
+            int side = std::min(headGray.cols, headGray.rows);
+            int x0 = std::max(0, std::min((int)cxs - side / 2, headGray.cols - side));
+            int y0 = std::max(0, std::min((int)cys - side / 2, headGray.rows - side));
+            cv::Mat crop = headGray(cv::Rect(x0, y0, side, side)).clone();
+            cv::Mat patch; { std::lock_guard<std::mutex> lock(mMutex); patch = mWallPatch.clone(); }
+            std::array<float, 13> dist{};
+            if (mDistortionHead.run(crop, patch, dist)) {
+                const float matchability = dist[11], coverage = dist[12];
+                if (matchability > 0.5f) mPaintingProgress.store(coverage, std::memory_order_relaxed);
+                LOGI("DistortionHead: match %.2f coverage %.2f tilt %.0f log2scale %.2f",
+                     matchability, coverage, dist[8], dist[9]);
+            }
+        }
+
         // Lowered floors so a close-up PARTIAL view (only a corner of the marks visible) can still
         // localize: PnP needs only a handful of correspondences. The inlier RATIO (published below) is
         // the quality gate PoseFusion actually trusts, so being permissive here is safe.
@@ -549,7 +574,9 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean) {
             validQuery.push_back(m[0].queryIdx);
         }
     }
-    if (artDescs.rows > 0)
+    // The distortion head's coverage is the principled progress signal; only fall back to this
+    // descriptor-corroboration ratio when the head isn't present.
+    if (artDescs.rows > 0 && !mDistortionHead.isLoaded())
         mPaintingProgress.store((float)matched / (float)artDescs.rows, std::memory_order_relaxed);
 
     // --- Teleological self-grow (opt-in) ---------------------------------------------------------
@@ -854,6 +881,18 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
     }
     LOGI("setArtworkFingerprint: stored %d validator features (%zu with 3D)",
          mArtworkDescriptors.rows, (size_t)mArtworkKeypoints3D.size());
+}
+
+void MobileGS::setWallPatch(const cv::Mat& img) {
+    if (img.empty()) return;
+    cv::Mat gray;
+    if (img.channels() == 4)      cv::cvtColor(img, gray, cv::COLOR_RGBA2GRAY);
+    else if (img.channels() == 3) cv::cvtColor(img, gray, cv::COLOR_RGB2GRAY);
+    else                          gray = img;
+    cv::Mat patch;
+    cv::resize(gray, patch, cv::Size(DistortionHead::kPatch, DistortionHead::kPatch));
+    std::lock_guard<std::mutex> lock(mMutex);
+    mWallPatch = patch.clone(); // raw gray, no CLAHE (the head's SuperPoint was trained on raw gray)
 }
 
 bool MobileGS::getSuperPointFeatures(const cv::Mat& image, std::vector<cv::KeyPoint>& kps, cv::Mat& descs) {

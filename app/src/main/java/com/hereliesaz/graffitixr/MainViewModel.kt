@@ -281,6 +281,9 @@ class MainViewModel @Inject constructor(
             // (Teleological artwork base is registered from the live design composite via
             // ArViewModel.updatePaintingGuide — the design-only overlay, not blended with wall texture.)
 
+            // Canonical patch (the captured marks) for the distortion head — inert unless its model is bundled.
+            slamManager.setWallPatch(sensorBmp)
+
             projectManager.saveProject(
                 context = context,
                 projectData = currentProject.copy(fingerprint = fp),
@@ -351,6 +354,9 @@ class MainViewModel @Inject constructor(
             }
             // (Teleological artwork base is registered from the live design composite via
             // ArViewModel.updatePaintingGuide — see the depth path above.)
+
+            // Canonical patch (keyframe of the marks) for the distortion head — inert unless model bundled.
+            slamManager.setWallPatch(bitmap)
 
             projectManager.saveProject(
                 context = context,

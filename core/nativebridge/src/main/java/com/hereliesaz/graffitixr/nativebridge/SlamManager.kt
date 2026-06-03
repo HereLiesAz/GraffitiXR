@@ -130,6 +130,9 @@ class SlamManager @Inject constructor(
 
     /** Live wall-fingerprint point count — diagnostic for reloc health / watching self-grow. */
     fun getWallKeypointCount(): Int = nativeGetWallKeypointCount()
+
+    /** Store the canonical fingerprint patch (the captured marks) for the distortion head. */
+    fun setWallPatch(bitmap: Bitmap) = nativeSetWallPatch(bitmap)
     fun setVoxelSize(size: Float) = nativeSetVoxelSize(size)
     fun setMappingPaused(paused: Boolean) = nativeSetMappingPaused(paused)
 
@@ -444,6 +447,7 @@ class SlamManager @Inject constructor(
     private external fun nativeSetSelfGrowEnabled(enabled: Boolean)
     private external fun nativeDetectSuperPoint(bitmap: Bitmap): FloatArray?
     private external fun nativeGetWallKeypointCount(): Int
+    private external fun nativeSetWallPatch(bitmap: Bitmap)
     private external fun nativeSetVoxelSize(size: Float)
     private external fun nativeSetMappingPaused(paused: Boolean)
     private external fun nativeFeedPointCloud(points: FloatArray)
