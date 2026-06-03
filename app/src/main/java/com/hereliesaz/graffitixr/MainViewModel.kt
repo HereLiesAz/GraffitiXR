@@ -281,12 +281,14 @@ class MainViewModel @Inject constructor(
             // (Teleological artwork base is registered from the live design composite via
             // ArViewModel.updatePaintingGuide — the design-only overlay, not blended with wall texture.)
 
-            // Canonical patch (the captured marks) for the distortion head — inert unless its model is bundled.
-            slamManager.setWallPatch(sensorBmp)
+            // Canonical patch (the captured marks) for the distortion head — fed live AND persisted on the
+            // fingerprint so the head survives reload. Inert unless its model is bundled.
+            val patch = grayPatchBytes(sensorBmp)
+            slamManager.setWallPatchBytes(patch, PATCH_SIZE)
 
             projectManager.saveProject(
                 context = context,
-                projectData = currentProject.copy(fingerprint = fp),
+                projectData = currentProject.copy(fingerprint = fp.copy(patchData = patch)),
                 targetImages = listOf(bitmap)
             )
 
@@ -296,6 +298,25 @@ class MainViewModel @Inject constructor(
                 Toast.makeText(context, "Target Saved & Locked", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    /**
+     * The canonical distortion-head patch as a raw [PATCH_SIZE]x[PATCH_SIZE] gray byte buffer (row-major
+     * luma). Computed in Kotlin so the exact bytes are both fed to native and persisted on the
+     * Fingerprint — keeping the capture-time and reload-time patch identical.
+     */
+    private fun grayPatchBytes(bitmap: Bitmap, size: Int = PATCH_SIZE): ByteArray {
+        val scaled = Bitmap.createScaledBitmap(bitmap, size, size, true)
+        val px = IntArray(size * size)
+        scaled.getPixels(px, 0, size, 0, 0, size, size)
+        if (scaled != bitmap) scaled.recycle()
+        val out = ByteArray(size * size)
+        for (i in px.indices) {
+            val p = px[i]
+            val r = (p ushr 16) and 0xFF; val g = (p ushr 8) and 0xFF; val b = p and 0xFF
+            out[i] = ((r * 299 + g * 587 + b * 114) / 1000).toByte() // BT.601 luma
+        }
+        return out
     }
 
     private fun resetCaptureUi() {
@@ -355,12 +376,13 @@ class MainViewModel @Inject constructor(
             // (Teleological artwork base is registered from the live design composite via
             // ArViewModel.updatePaintingGuide — see the depth path above.)
 
-            // Canonical patch (keyframe of the marks) for the distortion head — inert unless model bundled.
-            slamManager.setWallPatch(bitmap)
+            // Canonical patch (keyframe of the marks) for the distortion head — fed live AND persisted.
+            val patch = grayPatchBytes(bitmap)
+            slamManager.setWallPatchBytes(patch, PATCH_SIZE)
 
             projectManager.saveProject(
                 context = context,
-                projectData = currentProject.copy(fingerprint = fp),
+                projectData = currentProject.copy(fingerprint = fp.copy(patchData = patch)),
                 targetImages = listOf(bitmap)
             )
             projectRepository.loadProject(currentProject.id)
@@ -388,5 +410,9 @@ class MainViewModel @Inject constructor(
                 tutorialCompleted = currentState.tutorialCompleted + (tutorialId to true)
             )
         }
+    }
+
+    private companion object {
+        const val PATCH_SIZE = 256 // distortion-head canonical patch is 256x256 gray
     }
 }

@@ -133,6 +133,8 @@ class SlamManager @Inject constructor(
 
     /** Store the canonical fingerprint patch (the captured marks) for the distortion head. */
     fun setWallPatch(bitmap: Bitmap) = nativeSetWallPatch(bitmap)
+    /** Store the canonical patch from a raw [size]x[size] gray byte buffer (persisted on Fingerprint). */
+    fun setWallPatchBytes(data: ByteArray, size: Int) = nativeSetWallPatchBytes(data, size)
     fun setVoxelSize(size: Float) = nativeSetVoxelSize(size)
     fun setMappingPaused(paused: Boolean) = nativeSetMappingPaused(paused)
 
@@ -448,6 +450,7 @@ class SlamManager @Inject constructor(
     private external fun nativeDetectSuperPoint(bitmap: Bitmap): FloatArray?
     private external fun nativeGetWallKeypointCount(): Int
     private external fun nativeSetWallPatch(bitmap: Bitmap)
+    private external fun nativeSetWallPatchBytes(data: ByteArray, size: Int)
     private external fun nativeSetVoxelSize(size: Float)
     private external fun nativeSetMappingPaused(paused: Boolean)
     private external fun nativeFeedPointCloud(points: FloatArray)

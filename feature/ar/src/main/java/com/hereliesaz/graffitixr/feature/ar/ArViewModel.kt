@@ -752,6 +752,12 @@ class ArViewModel @Inject constructor(
                     fp.descriptorsType,
                     fp.points3d.toFloatArray()
                 )
+                // Restore the distortion-head canonical patch so the head works after reload, not only
+                // in the capture session. 256x256 raw gray (= sqrt(len)); inert if absent/head unloaded.
+                if (fp.patchData.isNotEmpty()) {
+                    val s = kotlin.math.sqrt(fp.patchData.size.toDouble()).toInt()
+                    if (s * s == fp.patchData.size) slamManager.setWallPatchBytes(fp.patchData, s)
+                }
             }
         }
     }

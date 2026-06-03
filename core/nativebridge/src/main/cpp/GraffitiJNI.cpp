@@ -191,6 +191,17 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallPatch(JNIEn
 }
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallPatchBytes(
+        JNIEnv* env, jobject thiz, jbyteArray data, jint size) {
+    if (!gSlamEngine || !data || size <= 0) return;
+    if (env->GetArrayLength(data) < size * size) return; // expect a size x size single-channel gray buffer
+    jbyte* p = env->GetByteArrayElements(data, nullptr);
+    cv::Mat gray(size, size, CV_8UC1, reinterpret_cast<uchar*>(p));
+    gSlamEngine->setWallPatch(gray); // clones internally; safe to release after
+    env->ReleaseByteArrayElements(data, p, JNI_ABORT);
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetVoxelSize(JNIEnv* env, jobject thiz, jfloat size) {
     if (gSlamEngine) gSlamEngine->setVoxelSize(size);
 }
