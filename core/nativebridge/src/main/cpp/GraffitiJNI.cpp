@@ -456,6 +456,24 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadSuperPoint(
     return ok ? JNI_TRUE : JNI_FALSE;
 }
 
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadDistortionHead(
+        JNIEnv* env, jobject thiz, jobject assetManager) {
+    if (!gSlamEngine) return JNI_FALSE;
+    AAssetManager* mgr = AAssetManager_fromJava(env, assetManager);
+    AAsset* asset = AAssetManager_open(mgr, "distortion_head.onnx", AASSET_MODE_BUFFER);
+    if (!asset) {
+        __android_log_print(ANDROID_LOG_WARN, "GraffitiJNI", "distortion_head.onnx not in assets — head disabled");
+        return JNI_FALSE; // optional model: absent => head stays inert
+    }
+    size_t size = (size_t)AAsset_getLength(asset);
+    std::vector<uchar> buf(size);
+    AAsset_read(asset, buf.data(), (off_t)size);
+    AAsset_close(asset);
+    bool ok = gSlamEngine->loadDistortionHead(buf);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadLowLightEnhancer(
         JNIEnv* env, jobject thiz, jobject assetManager) {

@@ -221,6 +221,8 @@ class SlamManager @Inject constructor(
     }
 
     fun loadSuperPoint(assetManager: AssetManager): Boolean = nativeLoadSuperPoint(assetManager)
+    /** Optional distortion head (docs/DISTORTION_HEAD.md). False (inert) if the asset isn't bundled. */
+    fun loadDistortionHead(assetManager: AssetManager): Boolean = nativeLoadDistortionHead(assetManager)
     fun loadLowLightEnhancer(assetManager: AssetManager) = nativeLoadLowLightEnhancer(assetManager)
 
     fun setArScanMode(mode: Int) = nativeSetArScanMode(mode)
@@ -403,6 +405,7 @@ class SlamManager @Inject constructor(
     private external fun nativeLoadModel(path: String)
     private external fun nativeImportModel3D(path: String): Boolean
     private external fun nativeLoadSuperPoint(assetManager: AssetManager): Boolean
+    private external fun nativeLoadDistortionHead(assetManager: AssetManager): Boolean
     private external fun nativeLoadLowLightEnhancer(assetManager: AssetManager)
     private external fun nativeUpdateAnchorTransform(transform: FloatArray)
     private external fun nativeUpdateDeviceMotion(angularVel: FloatArray, linearVel: FloatArray)
