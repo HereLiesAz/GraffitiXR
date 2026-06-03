@@ -338,23 +338,33 @@ void MobileGS::relocThreadFunc() {
         std::vector<cv::Point3f> objPts;
         buildCorr(gray, cv::Mat(), imgPts, objPts);
 
-        // Plane-guided rectification (perspective-robust matching). The marks lie on a known plane and
-        // VIO gives a pose, so the oblique-vs-frontal distortion is a homography we can pre-cancel:
-        // warp the live frame into the fingerprint's frontal frame and re-match there, recovering
-        // oblique/partial relocks that raw descriptor matching loses. Strictly never-worse — only adopt
-        // the rectified correspondences when they out-number the plain ones.
+        // Multi-scale matching (distance robustness). SuperPoint isn't scale-invariant, and the marks
+        // shrink in the frame from far away and grow up close, so also match the frame DOWN- and
+        // UP-scaled, mapping the matched points back to full-res with a scale homography (Hback). These
+        // passes share the plain pass's camera geometry, so they only add consistent correspondences
+        // across distance; PnP RANSAC discards any that don't fit. Covers both ORB and SuperPoint
+        // fingerprints, beyond ORB's own pyramid range.
+        for (float s : {0.5f, 2.0f}) {
+            cv::Mat scaled;
+            cv::resize(gray, scaled, cv::Size(), s, s, cv::INTER_LINEAR);
+            cv::Mat Hback = (cv::Mat_<double>(3,3) << 1.0/(double)s, 0, 0, 0, 1.0/(double)s, 0, 0, 0, 1);
+            buildCorr(scaled, Hback, imgPts, objPts);
+        }
+
+        // Plane-guided rectification (perspective robustness for oblique views). The marks lie on a
+        // known plane and VIO gives a pose, so the oblique-vs-frontal distortion is a homography we can
+        // pre-cancel: warp the live frame into the fingerprint's frontal frame, match, and ADD the
+        // correspondences mapped back to the current image (RANSAC filters any that don't fit).
         if (mHasFingerprintView && mIsArCoreTracking && mWallKeypoints3D.size() >= 12) {
             cv::Mat Hcur_fp, Hfp_cur; double obliqDeg = 0.0;
             if (computeRectifyHomography(relocView, Hcur_fp, Hfp_cur, obliqDeg) && obliqDeg > 25.0) {
                 cv::Mat grayRect;
                 cv::warpPerspective(gray, grayRect, Hfp_cur, gray.size());
-                std::vector<cv::Point2f> rImg; std::vector<cv::Point3f> rObj;
-                buildCorr(grayRect, Hcur_fp, rImg, rObj);
-                if (rImg.size() > imgPts.size()) {
-                    LOGI("Reloc: rectified match (obliquity %.0f deg) %zu corr beats plain %zu",
-                         obliqDeg, rImg.size(), imgPts.size());
-                    imgPts.swap(rImg); objPts.swap(rObj);
-                }
+                size_t before = imgPts.size();
+                buildCorr(grayRect, Hcur_fp, imgPts, objPts);
+                if (imgPts.size() > before)
+                    LOGI("Reloc: rectified (obliquity %.0f deg) added %zu corr (total %zu)",
+                         obliqDeg, imgPts.size() - before, imgPts.size());
             }
         }
 
