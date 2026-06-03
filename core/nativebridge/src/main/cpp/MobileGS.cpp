@@ -318,8 +318,15 @@ void MobileGS::relocThreadFunc() {
         if (imgPts.size() >= 15) {
             cv::Mat rvec, tvec;
             std::vector<int> inliers;
-            // Physical intrinsics from Mapping camera
-            cv::Mat intr = (cv::Mat_<double>(3,3) << 1000.0, 0, 960.0, 0, 1000.0, 540.0);
+            // Camera matrix: reuse the intrinsics the fingerprint's 3D points were built with (keeps
+            // the 2D<->3D correspondence consistent) when available, else a coarse default. The old
+            // hardcoded init supplied only 6 of the 9 entries, leaving the bottom row uninitialised.
+            double fx = 1000.0, fy = 1000.0, cx = 960.0, cy = 540.0;
+            if (mFingerprintIntrinsics[0] > 0.0f && mFingerprintIntrinsics[1] > 0.0f) {
+                fx = mFingerprintIntrinsics[0]; fy = mFingerprintIntrinsics[1];
+                cx = mFingerprintIntrinsics[2]; cy = mFingerprintIntrinsics[3];
+            }
+            cv::Mat intr = (cv::Mat_<double>(3,3) << fx, 0, cx, 0, fy, cy, 0, 0, 1);
             StageTimer _pnpTimer(&mStageAccumMs[4], &mStageSamples[4]);
             if (cv::solvePnPRansac(objPts, imgPts, intr, cv::Mat(), rvec, tvec, false, 100, 8.0, 0.99, inliers)) {
                 if (inliers.size() >= 12) {
@@ -461,7 +468,21 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
     }
     LOGI("Co-op: Received fingerprint with %u points. Relocalization triggered.", numPoints);
 }
-void MobileGS::scheduleRelocCheck(const cv::Mat& f) {}
+void MobileGS::scheduleRelocCheck(const cv::Mat& f) {
+    // Feed the latest camera frame to the background relocalization thread. Previously a no-op, which
+    // meant mRelocColorFrame was never populated and the reloc thread always saw an empty frame —
+    // live-camera PnP relocalization never ran. Throttles to the reloc thread's consume rate: while a
+    // request is still pending we skip, so we only copy a frame when the worker is ready for the next.
+    if (f.empty() || !mRelocEnabled) return;
+    if (mWallDescriptors.empty()) return; // nothing to match against yet
+    {
+        std::lock_guard<std::mutex> lock(mRelocMutex);
+        if (mRelocRequested) return;
+        f.copyTo(mRelocColorFrame);
+        mRelocRequested = true;
+    }
+    mRelocCv.notify_one();
+}
 
 extern MobileGS* gSlamEngine;
 namespace mobilegs {
@@ -606,6 +627,7 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
         mWallDescriptors  = fd.descriptors.clone();
         mWallKeypoints3D  = std::move(pts3d);
         memcpy(mFingerprintAnchorMatrix, mAnchorMatrix, 16 * sizeof(float));
+        memcpy(mFingerprintIntrinsics, intr, 4 * sizeof(float));
     }
 
     return fd;

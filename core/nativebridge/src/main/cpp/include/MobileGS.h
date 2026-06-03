@@ -145,6 +145,8 @@ private:
     std::atomic<int> mPnpMatchCount{0};
     std::atomic<long> mPnpResultSeq{0};
     float mFingerprintAnchorMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    // fx,fy,cx,cy the wall fingerprint's 3D points were built with; {0,..} => unset (use a default).
+    float mFingerprintIntrinsics[4] = {0,0,0,0};
     uint64_t mFrameCounter = 0;
     float mLightLevel = 1.0f;
     float mLastAngularVelocity[3] = {0,0,0};
