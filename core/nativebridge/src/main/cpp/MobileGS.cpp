@@ -330,6 +330,31 @@ void MobileGS::relocThreadFunc() {
             StageTimer _pnpTimer(&mStageAccumMs[4], &mStageSamples[4]);
             if (cv::solvePnPRansac(objPts, imgPts, intr, cv::Mat(), rvec, tvec, false, 100, 8.0, 0.99, inliers)) {
                 if (inliers.size() >= 12) {
+                    // Refine on the RANSAC inliers. The marks lie on the wall plane, so resolve the
+                    // planar two-fold (flip) ambiguity with IPPE and keep whichever pose reprojects
+                    // best — but only adopt it if it strictly beats the RANSAC pose, so a non-coplanar
+                    // inlier set can never make relocalization worse.
+                    {
+                        std::vector<cv::Point3f> inObj; std::vector<cv::Point2f> inImg;
+                        inObj.reserve(inliers.size()); inImg.reserve(inliers.size());
+                        for (int idx : inliers) { inObj.push_back(objPts[idx]); inImg.push_back(imgPts[idx]); }
+                        auto reproj = [&](const cv::Mat& rv, const cv::Mat& tv) {
+                            std::vector<cv::Point2f> pr;
+                            cv::projectPoints(inObj, rv, tv, intr, cv::Mat(), pr);
+                            double e = 0; for (size_t k = 0; k < pr.size(); ++k) e += cv::norm(pr[k] - inImg[k]);
+                            return e;
+                        };
+                        double bestErr = reproj(rvec, tvec);
+                        try {
+                            std::vector<cv::Mat> rvecs, tvecs;
+                            int n = cv::solvePnPGeneric(inObj, inImg, intr, cv::Mat(), rvecs, tvecs,
+                                                        false, cv::SOLVEPNP_IPPE);
+                            for (int s = 0; s < n; ++s) {
+                                double e = reproj(rvecs[s], tvecs[s]);
+                                if (e < bestErr) { bestErr = e; rvecs[s].copyTo(rvec); tvecs[s].copyTo(tvec); }
+                            }
+                        } catch (const cv::Exception&) { /* keep RANSAC pose */ }
+                    }
                     cv::Mat R;
                     cv:: Rodrigues(rvec, R);
 
