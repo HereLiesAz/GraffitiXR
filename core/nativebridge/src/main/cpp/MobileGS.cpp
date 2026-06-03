@@ -315,7 +315,10 @@ void MobileGS::relocThreadFunc() {
             }
         }
 
-        if (imgPts.size() >= 15) {
+        // Lowered floors so a close-up PARTIAL view (only a corner of the marks visible) can still
+        // localize: PnP needs only a handful of correspondences. The inlier RATIO (published below) is
+        // the quality gate PoseFusion actually trusts, so being permissive here is safe.
+        if (imgPts.size() >= 8) {
             cv::Mat rvec, tvec;
             std::vector<int> inliers;
             // Camera matrix: reuse the intrinsics the fingerprint's 3D points were built with (keeps

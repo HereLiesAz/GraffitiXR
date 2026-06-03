@@ -391,6 +391,9 @@ class ArRenderer(
             }
 
             val isTracking = camera.trackingState == TrackingState.TRACKING
+            // Re-arm the hard cold-snap whenever ARCore isn't tracking (pocket / screen-off / loss), so
+            // the next confident relocalization snaps the overlay back instantly rather than easing in.
+            if (!isTracking) poseFusion.markRelocalizing()
             val depthSupported = depthApiEnabled && activeSession.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
 
             val yawRad = kotlin.math.atan2(-viewMatrix[2].toDouble(), -viewMatrix[10].toDouble())
