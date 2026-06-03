@@ -120,6 +120,13 @@ class SlamManager @Inject constructor(
     fun setRelocEnabled(enabled: Boolean) = nativeSetRelocEnabled(enabled)
     /** Teleological self-grow (default OFF): promote validated new marks into the live fingerprint. */
     fun setSelfGrowEnabled(enabled: Boolean) = nativeSetSelfGrowEnabled(enabled)
+
+    /**
+     * SuperPoint detect+describe on [bitmap] (gray + CLAHE applied natively). Returns the packed array
+     * [n, dim, (u,v)*n, descriptors row-major (n*dim)], or null if the model isn't loaded / nothing
+     * found. Caller unpacks (kept here as a raw array to avoid an OpenCV dependency in this module).
+     */
+    fun detectSuperPoint(bitmap: Bitmap): FloatArray? = nativeDetectSuperPoint(bitmap)
     fun setVoxelSize(size: Float) = nativeSetVoxelSize(size)
     fun setMappingPaused(paused: Boolean) = nativeSetMappingPaused(paused)
 
@@ -429,6 +436,7 @@ class SlamManager @Inject constructor(
     )
     private external fun nativeSetRelocEnabled(enabled: Boolean)
     private external fun nativeSetSelfGrowEnabled(enabled: Boolean)
+    private external fun nativeDetectSuperPoint(bitmap: Bitmap): FloatArray?
     private external fun nativeSetVoxelSize(size: Float)
     private external fun nativeSetMappingPaused(paused: Boolean)
     private external fun nativeFeedPointCloud(points: FloatArray)

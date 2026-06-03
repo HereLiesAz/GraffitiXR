@@ -856,6 +856,17 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
          mArtworkDescriptors.rows, (size_t)mArtworkKeypoints3D.size());
 }
 
+bool MobileGS::getSuperPointFeatures(const cv::Mat& image, std::vector<cv::KeyPoint>& kps, cv::Mat& descs) {
+    if (!mSuperPoint.isLoaded() || image.empty()) return false;
+    cv::Mat gray;
+    if (image.channels() == 4)      cv::cvtColor(image, gray, cv::COLOR_RGBA2GRAY);
+    else if (image.channels() == 3) cv::cvtColor(image, gray, cv::COLOR_RGB2GRAY);
+    else                            gray = image;
+    normalizeForFeatures(gray); // CLAHE, identical to the reloc path so descriptors stay comparable
+    if (!mSuperPoint.detect(gray, kps, descs)) return false;
+    return !kps.empty() && !descs.empty();
+}
+
 void MobileGS::getFingerprintKeypoints(const cv::Mat& image, const cv::Mat& mask,
                                        std::vector<cv::Point2f>& out) {
     out.clear();

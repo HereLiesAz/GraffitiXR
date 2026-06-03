@@ -646,6 +646,32 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
 }
 
 JNIEXPORT jfloatArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDetectSuperPoint(
+        JNIEnv* env, jobject thiz, jobject bitmap) {
+    if (!gSlamEngine) return nullptr;
+    cv::Mat image; bitmapToMat(env, bitmap, image);
+    if (image.empty()) return nullptr;
+    std::vector<cv::KeyPoint> kps; cv::Mat descs;
+    {
+        std::lock_guard<std::mutex> lock(gSlamEngine->getMutex());
+        if (!gSlamEngine->getSuperPointFeatures(image, kps, descs)) return nullptr;
+    }
+    const int n = (int)kps.size();
+    const int d = descs.cols;
+    if (n <= 0 || d <= 0) return nullptr;
+    cv::Mat dc = descs.isContinuous() ? descs : descs.clone();
+    // Packed layout: [n, d, (u,v) * n, descriptors row-major (n*d)].
+    jfloatArray result = env->NewFloatArray(2 + 2 * n + n * d);
+    if (!result) return nullptr;
+    jfloat* ptr = env->GetFloatArrayElements(result, nullptr);
+    ptr[0] = (float)n; ptr[1] = (float)d;
+    for (int i = 0; i < n; ++i) { ptr[2 + 2*i] = kps[i].pt.x; ptr[2 + 2*i + 1] = kps[i].pt.y; }
+    std::memcpy(ptr + 2 + 2*n, dc.ptr<float>(0), (size_t)n * d * sizeof(float));
+    env->ReleaseFloatArrayElements(result, ptr, 0);
+    return result;
+}
+
+JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintKeypoints(
         JNIEnv* env, jobject thiz, jobject bitmap, jobject mask) {
     if (!gSlamEngine) return nullptr;

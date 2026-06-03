@@ -50,10 +50,20 @@ object MetricFingerprintBuilder {
         ratio: Float = 0.75f,
     ): Fingerprint? {
         val matched = detectAndMatch(kf0.gray, kf1.gray, ratio) ?: return null
+        return assemble(slam, matched, kf0.glView, kf1.glView,
+            floatArrayOf(kf0.fx, kf0.fy, kf0.cx, kf0.cy), anchorModel, minPoints)
+    }
+
+    /** Triangulate a Matched set into metric 3D, ingest it, and return the persistable Fingerprint. */
+    private fun assemble(
+        slam: SlamManager, matched: Matched,
+        glView0: FloatArray, glView1: FloatArray, intr0: FloatArray,
+        anchorModel: FloatArray, minPoints: Int,
+    ): Fingerprint? {
         try {
-            val cv0 = MetricMarks.glViewToCv(kf0.glView)
-            val cv1 = MetricMarks.glViewToCv(kf1.glView)
-            val tri = MetricMarks.triangulate(matched.corrs, cv0, cv1, kf0.fx, kf0.fy, kf0.cx, kf0.cy)
+            val cv0 = MetricMarks.glViewToCv(glView0)
+            val cv1 = MetricMarks.glViewToCv(glView1)
+            val tri = MetricMarks.triangulate(matched.corrs, cv0, cv1, intr0[0], intr0[1], intr0[2], intr0[3])
             if (tri.count < minPoints) return null
 
             // Keep the rows of frame-0's descriptors (and the frame-0 keypoints) whose match survived.
@@ -70,8 +80,7 @@ object MetricFingerprintBuilder {
             keptDesc.release()
 
             slam.restoreWallFingerprintMetric(
-                bytes, rows, cols, type, tri.pointsCam0, anchorModel,
-                floatArrayOf(kf0.fx, kf0.fy, kf0.cx, kf0.cy),
+                bytes, rows, cols, type, tri.pointsCam0, anchorModel, intr0,
             )
             return Fingerprint(keypoints, tri.pointsCam0.toList(), bytes, rows, cols, type)
         } finally {
@@ -91,6 +100,15 @@ object MetricFingerprintBuilder {
         anchorModel: FloatArray,
         minPoints: Int = 20,
     ): Fingerprint? {
+        // Prefer SuperPoint (learned, far more robust to viewpoint/illumination) so the depth-off
+        // fingerprint is CV_32F and the reloc thread runs its SuperPoint path. Falls back to ORB if the
+        // model isn't loaded or the SuperPoint match/triangulation is too weak — strictly never-worse.
+        val sp = matchSuperPoint(slam, bitmap0, bitmap1, 0.75f)
+        if (sp != null) {
+            val fp = assemble(slam, sp, glView0, glView1, intr0, anchorModel, minPoints)
+            if (fp != null) return fp
+        }
+
         val gray0 = toGray(bitmap0)
         val gray1 = toGray(bitmap1)
         try {
@@ -100,6 +118,47 @@ object MetricFingerprintBuilder {
         } finally {
             gray0.release(); gray1.release()
         }
+    }
+
+    /** SuperPoint detect (native, CLAHE'd) on both views + L2 ratio match → Matched (CV_32F descs). */
+    private fun matchSuperPoint(slam: SlamManager, bitmap0: Bitmap, bitmap1: Bitmap, ratio: Float): Matched? {
+        val sp0 = unpackSuperPoint(slam.detectSuperPoint(bitmap0)) ?: return null
+        val sp1 = unpackSuperPoint(slam.detectSuperPoint(bitmap1)) ?: return null
+        val (pos0, d0) = sp0
+        val (pos1, d1) = sp1
+        try {
+            val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE) // L2 for float descriptors
+            val knn = ArrayList<MatOfDMatch>()
+            matcher.knnMatch(d0, d1, knn, 2)
+            val corrs = ArrayList<MetricMarks.Corr>(knn.size)
+            val rows = ArrayList<Int>(knn.size)
+            for (mm in knn) {
+                val m = mm.toArray()
+                if (m.size < 2) continue
+                if (m[0].distance < ratio * m[1].distance) {
+                    val q = m[0].queryIdx; val t = m[0].trainIdx
+                    corrs.add(MetricMarks.Corr(pos0[2 * q], pos0[2 * q + 1], pos1[2 * t], pos1[2 * t + 1]))
+                    rows.add(q)
+                }
+            }
+            if (corrs.isEmpty()) return null
+            val desc = Mat(corrs.size, d0.cols(), d0.type())
+            for ((dst, src) in rows.withIndex()) d0.row(src).copyTo(desc.row(dst))
+            return Matched(corrs, desc)
+        } finally {
+            d0.release(); d1.release()
+        }
+    }
+
+    /** Unpack the native [n, dim, (u,v)*n, descriptors] array into (positions, CV_32F descriptor Mat). */
+    private fun unpackSuperPoint(raw: FloatArray?): Pair<FloatArray, Mat>? {
+        if (raw == null || raw.size < 2) return null
+        val n = raw[0].toInt(); val d = raw[1].toInt()
+        if (n <= 0 || d <= 0 || raw.size < 2 + 2 * n + n * d) return null
+        val pos = raw.copyOfRange(2, 2 + 2 * n)
+        val descs = Mat(n, d, org.opencv.core.CvType.CV_32F)
+        descs.put(0, 0, raw.copyOfRange(2 + 2 * n, 2 + 2 * n + n * d))
+        return Pair(pos, descs)
     }
 
     private fun toGray(bitmap: Bitmap): Mat {
