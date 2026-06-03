@@ -412,6 +412,10 @@ void MobileGS::relocThreadFunc() {
             }
         }
 
+        // Teleological gatekeeper: update painting-progress from how much of the artwork base the clean
+        // frame now corroborates. No-op until an artwork is registered; read-only on the reloc set.
+        tryUpdateFingerprint(gray);
+
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
 }
@@ -477,7 +481,40 @@ bool MobileGS::computeRectifyHomography(const float* viewCur16, cv::Mat& Hcur_fp
     return true;
 }
 
-void MobileGS::tryUpdateFingerprint(const cv::Mat& color, const cv::Mat& depth, const float* viewMat, const float* projMat) {}
+void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean) {
+    cv::Mat artDescs;
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        if (mArtworkDescriptors.empty()) return;
+        artDescs = mArtworkDescriptors;
+    }
+    if (grayClean.empty()) return;
+
+    // Detect on the CLEAN frame (the real wall incl. any new paint — overlays are GL-only, never in
+    // this CV frame) and match against the ARTWORK base: a clean feature corroborates the target only
+    // if it matches what the artwork expects. This is the validator for the upcoming self-grow.
+    std::vector<cv::KeyPoint> kps; cv::Mat descs;
+    bool sp = mSuperPoint.isLoaded() && (artDescs.type() == CV_32F);
+    if (sp && !mSuperPoint.detect(grayClean, kps, descs)) sp = false;
+    if (!sp) mFeatureDetector->detectAndCompute(grayClean, cv::noArray(), kps, descs);
+    if (descs.empty() || descs.type() != artDescs.type()) return;
+
+    cv::Ptr<cv::DescriptorMatcher>& matcher = (descs.type() == CV_32F) ? mL2Matcher : mMatcher;
+    std::vector<std::vector<cv::DMatch>> matches;
+    matcher->knnMatch(descs, artDescs, matches, 2);
+
+    std::vector<char> hit(artDescs.rows, 0);
+    int matched = 0;
+    for (auto& m : matches) {
+        if (m.size() < 2) continue;
+        if (m[0].distance < 0.75f * m[1].distance) {
+            int a = m[0].trainIdx;
+            if (a >= 0 && a < (int)hit.size() && !hit[a]) { hit[a] = 1; matched++; }
+        }
+    }
+    if (artDescs.rows > 0)
+        mPaintingProgress.store((float)matched / (float)artDescs.rows, std::memory_order_relaxed);
+}
 void MobileGS::interpolateAnchorStep() {}
 void MobileGS::setArCoreTrackingState(bool t) { mIsArCoreTracking = t; }
 
@@ -627,7 +664,58 @@ namespace mobilegs {
 
 bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) { return mSuperPoint.load(onnxBytes); }
 bool MobileGS::loadLowLightEnhancer(const std::vector<uchar>& onnxBytes) { return mEnhancer.load(onnxBytes); }
-void MobileGS::setArtworkFingerprint(const cv::Mat& c, const uint8_t* d, int w, int h, int s, const float* i, const float* v) {}
+void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* depthData,
+        int depthW, int depthH, int depthStride, const float* intr, const float* /*viewMat*/) {
+    if (composite.empty()) return;
+
+    cv::Mat gray;
+    if (composite.channels() == 4)      cv::cvtColor(composite, gray, cv::COLOR_RGBA2GRAY);
+    else if (composite.channels() == 3) cv::cvtColor(composite, gray, cv::COLOR_RGB2GRAY);
+    else                                gray = composite;
+
+    std::vector<cv::KeyPoint> kps; cv::Mat descs;
+    bool sp = mSuperPoint.isLoaded();
+    if (sp && !mSuperPoint.detect(gray, kps, descs)) sp = false;
+    if (!sp || kps.empty()) {
+        auto orb = cv::ORB::create(1000);
+        orb->detectAndCompute(gray, cv::noArray(), kps, descs);
+    }
+    if (kps.empty() || descs.empty()) { LOGE("setArtworkFingerprint: no keypoints"); return; }
+
+    // 3D for each artwork keypoint when a capture depth buffer is available (shares the wall
+    // fingerprint's capture frame, so these coordinates are reuseable for the future self-grow
+    // promotion). With the ML depth API off the buffer may be absent — descriptors alone still drive
+    // painting-progress; 3D-dependent promotion simply waits.
+    std::vector<cv::Point3f> pts3d;
+    cv::Mat keepDescs = descs;
+    if (depthData && depthW > 0 && depthH > 0 && depthStride > 0 && intr) {
+        float fx = intr[0], fy = intr[1], cx = intr[2], cy = intr[3];
+        float sx = (float)depthW / (float)composite.cols, sy = (float)depthH / (float)composite.rows;
+        std::vector<int> validIdx;
+        for (int k = 0; k < (int)kps.size(); ++k) {
+            int dx = std::max(0, std::min((int)std::round(kps[k].pt.x * sx), depthW - 1));
+            int dy = std::max(0, std::min((int)std::round(kps[k].pt.y * sy), depthH - 1));
+            const auto* row = reinterpret_cast<const uint16_t*>(depthData + (size_t)dy * depthStride);
+            float mm = (float)(row[dx] & 0x1FFF);
+            if (mm < 100.0f) continue;
+            float Z = mm / 1000.0f;
+            pts3d.emplace_back((kps[k].pt.x - cx) / fx * Z, (kps[k].pt.y - cy) / fy * Z, Z);
+            validIdx.push_back(k);
+        }
+        if (!validIdx.empty()) {
+            cv::Mat vd((int)validIdx.size(), descs.cols, descs.type());
+            for (int k = 0; k < (int)validIdx.size(); ++k) descs.row(validIdx[k]).copyTo(vd.row(k));
+            keepDescs = vd;   // keep descriptors aligned 1:1 with pts3d
+        }
+    }
+
+    std::lock_guard<std::mutex> lock(mMutex);
+    mArtworkDescriptors = keepDescs.clone();
+    mArtworkKeypoints3D = std::move(pts3d);
+    mPaintingProgress.store(0.0f, std::memory_order_relaxed);
+    LOGI("setArtworkFingerprint: artwork base set (%d descriptors, %zu with 3D)",
+         mArtworkDescriptors.rows, mArtworkKeypoints3D.size());
+}
 
 MobileGS::FingerprintData MobileGS::generateFingerprint(
         const cv::Mat& image, const cv::Mat& mask,
