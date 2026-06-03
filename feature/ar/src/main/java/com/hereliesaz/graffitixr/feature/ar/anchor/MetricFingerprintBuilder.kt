@@ -1,11 +1,16 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
+import android.graphics.Bitmap
+import com.hereliesaz.graffitixr.common.model.Fingerprint
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import org.opencv.android.Utils
+import org.opencv.core.KeyPoint
 import org.opencv.core.Mat
 import org.opencv.core.MatOfDMatch
 import org.opencv.core.MatOfKeyPoint
 import org.opencv.features2d.DescriptorMatcher
 import org.opencv.features2d.ORB
+import org.opencv.imgproc.Imgproc
 
 /**
  * Builds a wall fingerprint from two camera keyframes by triangulation — the depth-off path. Detects
@@ -30,8 +35,9 @@ object MetricFingerprintBuilder {
     )
 
     /**
-     * Detect, match, triangulate, and ingest. Returns the number of metric points committed (0 if the
-     * geometry was too weak — too few matches survived triangulation/reprojection filtering).
+     * Detect, match, triangulate, and ingest. Returns a persistable [Fingerprint] (descriptors +
+     * keyframe-0-frame 3D points), or null if the geometry was too weak — too few matches survived
+     * triangulation/reprojection filtering. The result is also committed to the live native engine.
      *
      * @param anchorModel the anchor's world pose (column-major 4x4) at keyframe-0's time.
      */
@@ -42,28 +48,67 @@ object MetricFingerprintBuilder {
         anchorModel: FloatArray,
         minPoints: Int = 20,
         ratio: Float = 0.75f,
-    ): Int {
-        val matched = detectAndMatch(kf0.gray, kf1.gray, ratio) ?: return 0
-        val cv0 = MetricMarks.glViewToCv(kf0.glView)
-        val cv1 = MetricMarks.glViewToCv(kf1.glView)
-        val tri = MetricMarks.triangulate(matched.corrs, cv0, cv1, kf0.fx, kf0.fy, kf0.cx, kf0.cy)
-        if (tri.count < minPoints) return 0
+    ): Fingerprint? {
+        val matched = detectAndMatch(kf0.gray, kf1.gray, ratio) ?: return null
+        try {
+            val cv0 = MetricMarks.glViewToCv(kf0.glView)
+            val cv1 = MetricMarks.glViewToCv(kf1.glView)
+            val tri = MetricMarks.triangulate(matched.corrs, cv0, cv1, kf0.fx, kf0.fy, kf0.cx, kf0.cy)
+            if (tri.count < minPoints) return null
 
-        // Keep only the rows of frame-0's descriptors whose match survived triangulation.
-        val keptDesc = Mat(tri.count, matched.descriptors.cols(), matched.descriptors.type())
-        for ((dst, src) in tri.kept.withIndex()) {
-            matched.descriptors.row(src).copyTo(keptDesc.row(dst))
+            // Keep the rows of frame-0's descriptors (and the frame-0 keypoints) whose match survived.
+            val keptDesc = Mat(tri.count, matched.descriptors.cols(), matched.descriptors.type())
+            val keypoints = ArrayList<KeyPoint>(tri.count)
+            for ((dst, src) in tri.kept.withIndex()) {
+                matched.descriptors.row(src).copyTo(keptDesc.row(dst))
+                val c = matched.corrs[src]
+                keypoints.add(KeyPoint(c.u0, c.v0, 7f))
+            }
+            val bytes = ByteArray(keptDesc.rows() * keptDesc.cols() * keptDesc.elemSize().toInt())
+            keptDesc.get(0, 0, bytes)
+            val rows = keptDesc.rows(); val cols = keptDesc.cols(); val type = keptDesc.type()
+            keptDesc.release()
+
+            slam.restoreWallFingerprintMetric(
+                bytes, rows, cols, type, tri.pointsCam0, anchorModel,
+                floatArrayOf(kf0.fx, kf0.fy, kf0.cx, kf0.cy),
+            )
+            return Fingerprint(keypoints, tri.pointsCam0.toList(), bytes, rows, cols, type)
+        } finally {
+            matched.descriptors.release()
         }
-        val bytes = ByteArray(keptDesc.rows() * keptDesc.cols() * keptDesc.elemSize().toInt())
-        keptDesc.get(0, 0, bytes)
+    }
 
-        slam.restoreWallFingerprintMetric(
-            bytes, keptDesc.rows(), keptDesc.cols(), keptDesc.type(),
-            tri.pointsCam0, anchorModel,
-            floatArrayOf(kf0.fx, kf0.fy, kf0.cx, kf0.cy),
-        )
-        keptDesc.release()
-        return tri.count
+    /**
+     * Bitmap convenience overload: converts each view to grayscale and builds. The two intrinsics
+     * (fx,fy,cx,cy) must describe the same pixel frame as the bitmaps; pass the two views' ARCore
+     * world→camera matrices and the anchor's world pose at keyframe-0's time.
+     */
+    fun build(
+        slam: SlamManager,
+        bitmap0: Bitmap, glView0: FloatArray, intr0: FloatArray,
+        bitmap1: Bitmap, glView1: FloatArray, intr1: FloatArray,
+        anchorModel: FloatArray,
+        minPoints: Int = 20,
+    ): Fingerprint? {
+        val gray0 = toGray(bitmap0)
+        val gray1 = toGray(bitmap1)
+        try {
+            val kf0 = Keyframe(gray0, glView0, intr0[0], intr0[1], intr0[2], intr0[3])
+            val kf1 = Keyframe(gray1, glView1, intr1[0], intr1[1], intr1[2], intr1[3])
+            return build(slam, kf0, kf1, anchorModel, minPoints)
+        } finally {
+            gray0.release(); gray1.release()
+        }
+    }
+
+    private fun toGray(bitmap: Bitmap): Mat {
+        val rgba = Mat()
+        Utils.bitmapToMat(bitmap, rgba)
+        val gray = Mat()
+        Imgproc.cvtColor(rgba, gray, Imgproc.COLOR_RGBA2GRAY)
+        rgba.release()
+        return gray
     }
 
     private class Matched(val corrs: List<MetricMarks.Corr>, val descriptors: Mat)
