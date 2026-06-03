@@ -690,6 +690,10 @@ class MainActivity : ComponentActivity() {
                                     TraceScreen(editorViewModel, showLibrary, arUiState)
                                     EditorOverlay(editorViewModel, mainUiState, strings)
                                 }
+                                composable(EditorMode.DESIGN.name) {
+                                    DesignScreen(editorUiState, editorViewModel)
+                                    EditorOverlay(editorViewModel, mainUiState, strings)
+                                }
                             }
 
                             if (mainUiState.isTouchLocked) {
