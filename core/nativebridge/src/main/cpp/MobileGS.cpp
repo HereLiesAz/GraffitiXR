@@ -17,6 +17,17 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "MobileGS", __VA_ARGS__)
 
 namespace {
+// Normalize illumination so feature matching survives light/color changes: CLAHE on the luma. MUST be
+// applied identically to BOTH fingerprint build and live reloc detection or descriptors stop matching.
+// thread_local so the reloc/map/UI threads each keep their own reusable instance.
+inline void normalizeForFeatures(cv::Mat& gray) {
+    if (gray.empty() || gray.type() != CV_8UC1) return;
+    static thread_local cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(2.0, cv::Size(8, 8));
+    cv::Mat tmp;
+    clahe->apply(gray, tmp);   // not in-place, and never aliases a caller's source bitmap
+    gray = tmp;
+}
+
 // C++17-compatible atomic double add via CAS loop.
 inline void atomicAddDouble(std::atomic<double>* a, double v) {
     double old = a->load(std::memory_order_relaxed);
@@ -290,6 +301,7 @@ void MobileGS::relocThreadFunc() {
         }
         cv::Mat gray;
         cv::cvtColor(workFrame, gray, cv::COLOR_RGB2GRAY);
+        normalizeForFeatures(gray); // illumination-normalize to match the (also-normalized) fingerprint
 
         // SuperPoint usable when loaded and the wall fingerprint is float-typed (or empty).
         const bool spOk = mSuperPoint.isLoaded() &&
@@ -708,6 +720,7 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
     if (composite.channels() == 4)      cv::cvtColor(composite, gray, cv::COLOR_RGBA2GRAY);
     else if (composite.channels() == 3) cv::cvtColor(composite, gray, cv::COLOR_RGB2GRAY);
     else                                gray = composite;
+    normalizeForFeatures(gray); // match the live frame's illumination normalization
 
     std::vector<cv::KeyPoint> kps;
     cv::Mat descs;
@@ -777,6 +790,7 @@ void MobileGS::getFingerprintKeypoints(const cv::Mat& image, const cv::Mat& mask
     if (workFrame.channels() == 4)      cv::cvtColor(workFrame, gray, cv::COLOR_RGBA2GRAY);
     else if (workFrame.channels() == 3) cv::cvtColor(workFrame, gray, cv::COLOR_RGB2GRAY);
     else                                gray = workFrame;
+    normalizeForFeatures(gray); // same normalization as generateFingerprint, so the overlay is truthful
 
     cv::Mat orbMask;
     if (!mask.empty()) {
@@ -818,6 +832,7 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
         cv::cvtColor(workFrame, gray, cv::COLOR_RGB2GRAY);
     else
         gray = workFrame;
+    normalizeForFeatures(gray); // illumination-normalize to match the live reloc frame
 
     cv::Mat orbMask;
     if (!mask.empty()) {
