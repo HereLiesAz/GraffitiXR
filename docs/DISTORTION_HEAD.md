@@ -21,7 +21,7 @@ Three chosen, composing components for learned, viewpoint-aware, *self-growing* 
   value is (i) **coverage → painting progress**, (ii) a fast pre-gate, and (iii) a **viewpoint
   prior** to pre-rectify the patch so LightGlue survives extreme tilt. A and B overlap on
   *matchability* — B's is the cheap filter, A's is the precise one.
-- **D — self-growing fingerprint (`TELEOLOGICAL_SLAM.md`).** Each *verified* relock contributes a
+- **D — self-growing fingerprint (`SELF_GROWING_FINGERPRINT.md`).** Each *verified* relock contributes a
   new viewpoint to a multi-view fingerprint bank; the teleological reference validates and promotes
   new painted marks. B + A are what produce and gate the verified data D grows from.
 
