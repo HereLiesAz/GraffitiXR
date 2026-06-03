@@ -1242,45 +1242,39 @@ class MainActivity : ComponentActivity() {
                 id = "host.design",
                 text = navStrings.design,
                 content = Icons.Default.Palette,
-                color = if (isDesignMode) Cyan else navItemColor
+                color = if (isDesignMode) Cyan else navItemColor,
+                onClick = {
+                    // From a Mode, tapping Design navigates to the dedicated Design screen. In Design it
+                    // just expands the design tools below (this onClick is a no-op there).
+                    if (!isDesignMode) navController.navigate(EditorMode.DESIGN.name) { launchSingleTop = true }
+                }
             )
 
-            if (!isDesignMode) {
+            // Design CONTENT tools live ONLY in the Design screen. Modes show the finished design with
+            // minimal in-place touchups (below) — never the add/layer/tool editors.
+            if (isDesignMode) {
+                // ADD SUB-FOLDER
                 azRailSubItem(
-                    id = "sub.design.enter",
+                    id = "sub.design.add",
                     hostId = "host.design",
-                    text = "Enter",
-                    content = Icons.Default.Login,
-                    route = EditorMode.DESIGN.name,
+                    text = "Add",
+                    content = Icons.Default.Add,
                     color = navItemColor
-                )
-            }
-
-            // ADD SUB-FOLDER
-            azRailSubItem(
-                id = "sub.design.add",
-                hostId = "host.design",
-                text = "Add",
-                content = Icons.Default.Add,
-                color = navItemColor
-            ) {
-                azRailItem(id = "design.addImg", text = navStrings.image, content = Icons.Default.Image, color = navItemColor) {
-                    overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                }
-                azRailItem(id = "design.addDraw", text = navStrings.draw, content = Icons.Default.Brush, color = navItemColor) {
-                    editorViewModel.onAddBlankLayer()
-                }
-                azRailItem(id = "design.addText", text = navStrings.text, content = Icons.Default.TextFields, color = navItemColor) {
-                    editorViewModel.onAddTextLayer()
-                }
-                if (editorUiState.editorMode == EditorMode.MOCKUP || isDesignMode) {
+                ) {
+                    azRailItem(id = "design.addImg", text = navStrings.image, content = Icons.Default.Image, color = navItemColor) {
+                        overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
+                    azRailItem(id = "design.addDraw", text = navStrings.draw, content = Icons.Default.Brush, color = navItemColor) {
+                        editorViewModel.onAddBlankLayer()
+                    }
+                    azRailItem(id = "design.addText", text = navStrings.text, content = Icons.Default.TextFields, color = navItemColor) {
+                        editorViewModel.onAddTextLayer()
+                    }
                     azRailItem(id = "design.wall", text = navStrings.wall, content = Icons.Default.Wallpaper, color = navItemColor) {
                         showWallSourceDialog = true
                     }
                 }
-            }
 
-            if (isDesignMode) {
                 // LAYERS SUB-FOLDER
                 azRailSubItem(
                     id = "sub.design.layers",
@@ -1375,22 +1369,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // 2. TOUCHUP FOLDER (MINIMAL TOOLS FOR STACK)
-            if (!isDesignMode) {
-                azRailHostItem(
-                    id = "host.touchup",
-                    text = "Touchup",
-                    content = Icons.Default.AutoFixHigh,
-                    color = navItemColor
-                )
-                azRailSubItem(id = "sub.touch.opacity", hostId = "host.touchup", text = "Dim", content = Icons.Default.Opacity, color = navItemColor) {
-                    editorViewModel.updateAllLayers { it.copy(opacity = (it.opacity - 0.1f).coerceIn(0f, 1f)) }
-                }
-                azRailSubItem(id = "sub.touch.reset", hostId = "host.touchup", text = "Reset", content = Icons.Default.Refresh, color = navItemColor) {
-                    editorViewModel.updateAllLayers { it.copy(scale = 1f, offset = Offset.Zero, rotationX = 0f, rotationY = 0f, rotationZ = 0f) }
-                }
-            }
-
             azDivider()
 
             // 3. MODES FOLDER
@@ -1412,6 +1390,30 @@ class MainActivity : ComponentActivity() {
             if (editorUiState.editorMode == EditorMode.AR) {
                 azRailSubItem(id = "target.create", hostId = "host.modes", text = navStrings.create, content = Icons.Default.AddAPhoto, color = navItemColor) {
                     if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
+                }
+            }
+
+            // ADJUST — in-mode tweaks for the finished design (the few last-minute, in-place touchups).
+            // Lives under Modes and only while in a mode; design content editing stays in the Design screen.
+            if (!isDesignMode) {
+                azRailSubItem(
+                    id = "sub.modes.adjust",
+                    hostId = "host.modes",
+                    text = navStrings.adjust,
+                    content = Icons.Default.Tune,
+                    color = navItemColor
+                ) {
+                    if (editorUiState.editorMode == EditorMode.MOCKUP) {
+                        azRailItem(id = "adjust.wall", text = navStrings.wall, content = Icons.Default.Wallpaper, color = navItemColor) {
+                            showWallSourceDialog = true
+                        }
+                    }
+                    azRailItem(id = "adjust.dim", text = "Dim", content = Icons.Default.Opacity, color = navItemColor) {
+                        editorViewModel.updateAllLayers { it.copy(opacity = (it.opacity - 0.1f).coerceIn(0f, 1f)) }
+                    }
+                    azRailItem(id = "adjust.reset", text = "Reset", content = Icons.Default.Refresh, color = navItemColor) {
+                        editorViewModel.updateAllLayers { it.copy(scale = 1f, offset = Offset.Zero, rotationX = 0f, rotationY = 0f, rotationZ = 0f) }
+                    }
                 }
             }
 
