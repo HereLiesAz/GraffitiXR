@@ -72,6 +72,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.core.content.FileProvider
 import java.io.File
+import com.meta.wearable.dat.core.Wearables
 import com.google.android.gms.common.GoogleApiAvailability
 import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.*
@@ -176,11 +177,35 @@ class MainActivity : ComponentActivity() {
     var showPosterDialog by mutableStateOf(false)
     var posterSourceLayerId by mutableStateOf<String?>(null)
     var hasCameraPermission by mutableStateOf(false)
+    var hasBluetoothPermission by mutableStateOf(false)
     var showWallSourceDialog by mutableStateOf(false)
     var isExporting by mutableStateOf(false)
 
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p ->
         hasCameraPermission = p[Manifest.permission.CAMERA] ?: false
+        hasBluetoothPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            p[Manifest.permission.BLUETOOTH_CONNECT] ?: false
+        } else {
+            true
+        }
+        if (hasBluetoothPermission) {
+            checkAndInitializeWearables()
+        }
+    }
+
+    private fun checkAndInitializeWearables() {
+        val bluetoothPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+        if (bluetoothPermission) {
+            try {
+                Wearables.initialize(this)
+            } catch (e: Exception) {
+                // Ignore initialization errors if already initialized or permissions still missing
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -190,8 +215,17 @@ class MainActivity : ComponentActivity() {
             this, Manifest.permission.CAMERA
         ) == PackageManager.PERMISSION_GRANTED
 
+        hasBluetoothPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(
+                this, Manifest.permission.BLUETOOTH_CONNECT
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+
         securityProviderManager.installAsync(this)
         slamManager.ensureInitialized()
+        checkAndInitializeWearables()
 
         lifecycleScope.launch {
             securityProviderManager.securityProviderState.collect { state ->
@@ -1183,9 +1217,12 @@ class MainActivity : ComponentActivity() {
     ) {
         val navStrings = strings.nav
         val requestPermissions = {
-            permissionLauncher.launch(
-                arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
-            )
+            val perms = mutableListOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                perms.add(Manifest.permission.BLUETOOTH_CONNECT)
+                perms.add(Manifest.permission.BLUETOOTH_SCAN)
+            }
+            permissionLauncher.launch(perms.toTypedArray())
         }
 
         if (editorUiState.editorMode == EditorMode.STENCIL) return

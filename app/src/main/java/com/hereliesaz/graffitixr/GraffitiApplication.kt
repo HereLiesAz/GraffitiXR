@@ -43,9 +43,6 @@ class GraffitiApplication : Application() {
             CrashUploadWorker(this@GraffitiApplication).checkAndUpload(BuildConfig.GH_TOKEN)
         }
 
-        // 1.5. Initialize Meta Wearables SDK
-        Wearables.initialize(this)
-
         // 2. Update Security Provider (Fix for SSLHandshakeException)
         // Using explicit listener implementation instead of lambda for clarity/compatibility if needed
         ProviderInstaller.installIfNeededAsync(this, object : ProviderInstaller.ProviderInstallListener {
