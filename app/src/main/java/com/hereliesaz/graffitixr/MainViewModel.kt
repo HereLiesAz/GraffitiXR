@@ -308,6 +308,11 @@ class MainViewModel @Inject constructor(
     )
     private var pendingMetricKf0: MetricKf0? = null
 
+    override fun onCleared() {
+        super.onCleared()
+        pendingMetricKf0 = null
+    }
+
     /**
      * Depth-off target creation: capture two keyframes a side-step apart and triangulate. The first
      * tap stores keyframe 0 and re-enters capture; the second tap supplies keyframe 1 and builds.
