@@ -1222,17 +1222,17 @@ class MainActivity : ComponentActivity() {
                 content = Icons.Default.Add,
                 color = navItemColor
             ) {
-                azRailItem(id = "design.addImg", content = Icons.Default.Image, color = navItemColor) {
+                azRailItem(id = "design.addImg", text = navStrings.image, content = Icons.Default.Image, color = navItemColor) {
                     overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
-                azRailItem(id = "design.addDraw", content = Icons.Default.Brush, color = navItemColor) {
+                azRailItem(id = "design.addDraw", text = navStrings.draw, content = Icons.Default.Brush, color = navItemColor) {
                     editorViewModel.onAddBlankLayer()
                 }
-                azRailItem(id = "design.addText", content = Icons.Default.TextFields, color = navItemColor) {
+                azRailItem(id = "design.addText", text = navStrings.text, content = Icons.Default.TextFields, color = navItemColor) {
                     editorViewModel.onAddTextLayer()
                 }
                 if (editorUiState.editorMode == EditorMode.MOCKUP || isDesignMode) {
-                    azRailItem(id = "design.wall", content = Icons.Default.Wallpaper, color = navItemColor) {
+                    azRailItem(id = "design.wall", text = navStrings.wall, content = Icons.Default.Wallpaper, color = navItemColor) {
                         showWallSourceDialog = true
                     }
                 }
@@ -1271,15 +1271,15 @@ class MainActivity : ComponentActivity() {
                             },
                             nestedContent = {
                                 if (layer.textParams != null) {
-                                    azRailItem(id = "layer.${layer.id}.edit", content = Icons.Default.Title, color = navItemColor) {
+                                    azRailItem(id = "layer.${layer.id}.edit", text = navStrings.edit, content = Icons.Default.Title, color = navItemColor) {
                                         editorViewModel.onLayerActivated(layer.id)
                                         layerMenusOpen[layer.id] = true
                                     }
                                 }
-                                azRailItem(id = "layer.${layer.id}.hide", content = if (layer.isVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility, color = navItemColor) {
+                                azRailItem(id = "layer.${layer.id}.hide", text = if (layer.isVisible) strings.editor.hideLayer else strings.editor.showLayer, content = if (layer.isVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility, color = navItemColor) {
                                     editorViewModel.onToggleVisibility(layer.id)
                                 }
-                                azRailItem(id = "layer.${layer.id}.del", content = Icons.Default.Delete, color = Color.Red) {
+                                azRailItem(id = "layer.${layer.id}.del", text = strings.editor.delete, content = Icons.Default.Delete, color = Color.Red) {
                                     editorViewModel.onLayerRemoved(layer.id)
                                 }
                             }
@@ -1296,16 +1296,16 @@ class MainActivity : ComponentActivity() {
                         content = Icons.Default.Construction,
                         color = if (activeTool != Tool.NONE) Cyan else navItemColor
                     ) {
-                        azRailItem(id = "tool.brush", content = Icons.Default.Brush, color = if (activeTool == Tool.BRUSH) Cyan else navItemColor) {
+                        azRailItem(id = "tool.brush", text = "Brush", content = Icons.Default.Brush, color = if (activeTool == Tool.BRUSH) Cyan else navItemColor) {
                             editorViewModel.setActiveTool(Tool.BRUSH)
                         }
-                        azRailItem(id = "tool.eraser", content = Icons.Default.AutoFixNormal, color = if (activeTool == Tool.ERASER) Cyan else navItemColor) {
+                        azRailItem(id = "tool.eraser", text = navStrings.eraser, content = Icons.Default.AutoFixNormal, color = if (activeTool == Tool.ERASER) Cyan else navItemColor) {
                             editorViewModel.setActiveTool(Tool.ERASER)
                         }
-                        azRailItem(id = "tool.blur", content = Icons.Default.BlurOn, color = if (activeTool == Tool.BLUR) Cyan else navItemColor) {
+                        azRailItem(id = "tool.blur", text = navStrings.blur, content = Icons.Default.BlurOn, color = if (activeTool == Tool.BLUR) Cyan else navItemColor) {
                             editorViewModel.setActiveTool(Tool.BLUR)
                         }
-                        azRailItem(id = "tool.liquify", content = Icons.Default.Waves, color = if (activeTool == Tool.LIQUIFY) Cyan else navItemColor) {
+                        azRailItem(id = "tool.liquify", text = navStrings.liquify, content = Icons.Default.Waves, color = if (activeTool == Tool.LIQUIFY) Cyan else navItemColor) {
                             editorViewModel.setActiveTool(Tool.LIQUIFY)
                         }
                     }
@@ -1317,16 +1317,16 @@ class MainActivity : ComponentActivity() {
                         content = Icons.Default.Tune,
                         color = navItemColor
                     ) {
-                        azRailItem(id = "adj.blend", content = Icons.Default.Opacity, color = navItemColor) {
+                        azRailItem(id = "adj.blend", text = navStrings.build, content = Icons.Default.Opacity, color = navItemColor) {
                             editorViewModel.onCycleBlendMode()
                         }
-                        azRailItem(id = "adj.invert", content = Icons.Default.InvertColors, color = if (activeLayer.isInverted) Cyan else navItemColor) {
+                        azRailItem(id = "adj.invert", text = navStrings.invert, content = Icons.Default.InvertColors, color = if (activeLayer.isInverted) Cyan else navItemColor) {
                             editorViewModel.onToggleInvert()
                         }
-                        azRailItem(id = "adj.filters", content = Icons.Default.Settings, color = navItemColor) {
+                        azRailItem(id = "adj.filters", text = navStrings.adjust, content = Icons.Default.Settings, color = navItemColor) {
                             editorViewModel.onAdjustClicked()
                         }
-                        azRailItem(id = "adj.balance", content = Icons.Default.Palette, color = navItemColor) {
+                        azRailItem(id = "adj.balance", text = navStrings.balance, content = Icons.Default.Palette, color = navItemColor) {
                             editorViewModel.onBalanceClicked()
                         }
                     }
@@ -1397,6 +1397,7 @@ class MainActivity : ComponentActivity() {
 
             azRailItem(
                 id = "item.help",
+                text = navStrings.help,
                 content = Icons.Default.Help,
                 color = if (tutorialModeActive) Cyan else navItemColor,
                 onClick = { mainViewModel.toggleTutorialMode() }
