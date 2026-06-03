@@ -418,6 +418,7 @@ class ArViewModel @Inject constructor(
         NativeLibLoader.loadAll()
         viewModelScope.launch(Dispatchers.IO) {
             slamManager.loadSuperPoint(appContext.assets)
+            slamManager.loadDistortionHead(appContext.assets) // optional; inert if asset absent
             slamManager.loadLowLightEnhancer(appContext.assets)
         }
         viewModelScope.launch {
