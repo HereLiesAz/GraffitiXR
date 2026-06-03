@@ -76,6 +76,7 @@ fun TargetCreationUi(
                 TargetRefinementScreen(
                     rawBitmap = uiState.tempCaptureBitmap,
                     maskBitmap = uiState.annotatedCaptureBitmap,
+                    keypoints = uiState.targetKeypoints,
                     strings = strings,
                     onNext = { mask ->
                         if (mask != null) {
@@ -336,6 +337,7 @@ private fun UnwarpOverlay(
 private fun TargetRefinementScreen(
     rawBitmap: Bitmap?,
     maskBitmap: Bitmap?,
+    keypoints: List<Offset>,
     strings: AppStrings,
     onNext: (Bitmap?) -> Unit,
     onRetake: () -> Unit,
@@ -382,6 +384,18 @@ private fun TargetRefinementScreen(
                 val imgH = bmpH * scale
                 val imgX = (boxW - imgW) / 2f
                 val imgY = (boxH - imgH) / 2f
+
+                // The actual fingerprint features (HotPink dots) overlaid where they sit on the capture,
+                // so the user sees exactly what anchors and can tap/drag to erase the spurious ones.
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    keypoints.forEach { kp ->
+                        drawCircle(
+                            color = HotPink,
+                            radius = 4f,
+                            center = Offset(imgX + kp.x * imgW, imgY + kp.y * imgH)
+                        )
+                    }
+                }
 
                 Box(
                     modifier = Modifier.fillMaxSize()

@@ -1077,6 +1077,28 @@ class ArViewModel @Inject constructor(
 
     fun setAnnotatedCapture(bitmap: Bitmap?) {
         _uiState.update { it.copy(annotatedCaptureBitmap = bitmap) }
+        computeTargetKeypoints()
+    }
+
+    /**
+     * Detect the REAL fingerprint features on the captured target (same detector as
+     * generateFingerprint, restricted to the current mask) and publish them normalized for the
+     * refinement overlay, so the user sees exactly what will anchor and can erase the spurious ones.
+     */
+    private fun computeTargetKeypoints() {
+        val raw = _uiState.value.tempCaptureBitmap
+        if (raw == null) {
+            _uiState.update { it.copy(targetKeypoints = emptyList()) }
+            return
+        }
+        val mask = _uiState.value.annotatedCaptureBitmap
+        val w = raw.width.toFloat().coerceAtLeast(1f)
+        val h = raw.height.toFloat().coerceAtLeast(1f)
+        viewModelScope.launch(Dispatchers.IO) {
+            val pts = slamManager.getFingerprintKeypoints(raw, mask)
+                .map { androidx.compose.ui.geometry.Offset(it.first / w, it.second / h) }
+            _uiState.update { it.copy(targetKeypoints = pts) }
+        }
     }
 
 
