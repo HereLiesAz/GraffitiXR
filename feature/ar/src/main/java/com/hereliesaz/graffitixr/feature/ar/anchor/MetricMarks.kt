@@ -82,4 +82,3 @@ object MetricMarks {
         m[2] * x + m[6] * y + m[10] * z + m[14],
     )
 }
-</content>

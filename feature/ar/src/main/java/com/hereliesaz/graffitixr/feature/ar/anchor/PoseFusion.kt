@@ -110,4 +110,3 @@ class PoseFusion {
         return correction?.let { PoseMath.multiply(it, backbone) } ?: backbone
     }
 }
-</content>

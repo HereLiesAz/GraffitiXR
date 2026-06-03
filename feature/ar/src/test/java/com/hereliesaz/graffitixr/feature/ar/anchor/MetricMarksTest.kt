@@ -70,4 +70,3 @@ class MetricMarksTest {
         assertTrue("kept the consistent correspondence", r.kept[0] == 0)
     }
 }
-</content>

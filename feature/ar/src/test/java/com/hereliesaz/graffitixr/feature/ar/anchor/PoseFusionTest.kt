@@ -96,4 +96,3 @@ class PoseFusionTest {
         assertTrue("expected smoothed move, got ${out[12]}", out[12] > 10f && out[12] < 10.05f)
     }
 }
-</content>
