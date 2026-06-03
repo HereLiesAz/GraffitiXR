@@ -100,12 +100,14 @@ class SlamManager @Inject constructor(
 
     fun setArtworkFingerprint(
         bitmap: Bitmap,
-        depthBuffer: ByteBuffer,
+        depthBuffer: ByteBuffer?,
         depthW: Int, depthH: Int, depthStride: Int,
         intrinsics: FloatArray,
         viewMatrix: FloatArray
     ) {
-        if (depthBuffer.isDirect) {
+        // Depth is optional: with the ML depth API off there is no capture depth buffer, so the artwork
+        // base registers descriptors-only (enough for painting-progress; 3D-dependent promotion waits).
+        if (depthBuffer == null || depthBuffer.isDirect) {
             nativeSetArtworkFingerprint(bitmap, depthBuffer, depthW, depthH, depthStride, intrinsics, viewMatrix)
         }
     }
@@ -406,7 +408,7 @@ class SlamManager @Inject constructor(
         points3d: FloatArray, anchorMatrix: FloatArray, intrinsics: FloatArray
     )
     private external fun nativeSetArtworkFingerprint(
-        bitmap: Bitmap, depthBuffer: ByteBuffer,
+        bitmap: Bitmap, depthBuffer: ByteBuffer?,
         depthW: Int, depthH: Int, depthStride: Int,
         intrinsics: FloatArray, viewMatrix: FloatArray
     )
