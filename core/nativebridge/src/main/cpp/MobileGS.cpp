@@ -539,16 +539,90 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean) {
     matcher->knnMatch(descs, artDescs, matches, 2);
 
     std::vector<char> hit(artDescs.rows, 0);
+    std::vector<int> validQuery;   // clean keypoints that corroborate the artwork (self-grow candidates)
     int matched = 0;
     for (auto& m : matches) {
         if (m.size() < 2) continue;
         if (m[0].distance < 0.75f * m[1].distance) {
             int a = m[0].trainIdx;
             if (a >= 0 && a < (int)hit.size() && !hit[a]) { hit[a] = 1; matched++; }
+            validQuery.push_back(m[0].queryIdx);
         }
     }
     if (artDescs.rows > 0)
         mPaintingProgress.store((float)matched / (float)artDescs.rows, std::memory_order_relaxed);
+
+    // --- Teleological self-grow (opt-in) ---------------------------------------------------------
+    // Promote validated NEW marks into the live reloc fingerprint so it self-grows from real painting
+    // that matches the target — surviving the original marks being painted over. Depth-free: each new
+    // feature is placed on the wall plane via the current relocalized pose. Guarded hard (fresh +
+    // confident relock, gatekeeper-validated, capped, deduped) and RANSAC in the reloc PnP is the
+    // backstop, but it still mutates the authoritative set, so it stays OFF unless explicitly enabled.
+    if (!mSelfGrowEnabled.load(std::memory_order_relaxed) || validQuery.empty()) return;
+
+    cv::Matx33d R; cv::Vec3d t; double fx, fy, cx, cy; int inliers; long seq;
+    std::vector<cv::Point3f> wall;
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        seq = mPnpResultSeq.load(std::memory_order_relaxed);
+        if (seq == mLastGrowSeq) return;          // no fresh relock this tick — pose would be stale
+        inliers = mPnpInlierCount.load(std::memory_order_relaxed);
+        const float* M = mPnpCamFromFpWorld;      // camera_from_fpWorld, column-major (OpenCV frame)
+        R = cv::Matx33d(M[0], M[4], M[8], M[1], M[5], M[9], M[2], M[6], M[10]);
+        t = cv::Vec3d(M[12], M[13], M[14]);
+        fx = mFingerprintIntrinsics[0]; fy = mFingerprintIntrinsics[1];
+        cx = mFingerprintIntrinsics[2]; cy = mFingerprintIntrinsics[3];
+        wall = mWallKeypoints3D;
+        if (inliers >= 20) mLastGrowSeq = seq;    // claim this relock (whether or not it yields points)
+    }
+    if (inliers < 20 || fx <= 0 || fy <= 0 || wall.size() < 12 || wall.size() > 5000) return;
+
+    // Wall plane (n·X = pdist, pdist>0) in the fingerprint frame, fit to the existing marks.
+    cv::Mat data((int)wall.size(), 3, CV_32F);
+    for (int i = 0; i < (int)wall.size(); ++i) {
+        data.at<float>(i,0) = wall[i].x; data.at<float>(i,1) = wall[i].y; data.at<float>(i,2) = wall[i].z;
+    }
+    cv::PCA pca(data, cv::Mat(), cv::PCA::DATA_AS_ROW);
+    cv::Vec3d n(pca.eigenvectors.at<float>(2,0), pca.eigenvectors.at<float>(2,1), pca.eigenvectors.at<float>(2,2));
+    cv::Vec3d cen(pca.mean.at<float>(0,0), pca.mean.at<float>(0,1), pca.mean.at<float>(0,2));
+    double nn = cv::norm(n); if (nn < 1e-6) return; n /= nn;
+    double pdist = n.dot(cen); if (pdist < 0) { n = -n; pdist = -pdist; } if (pdist < 1e-3) return;
+
+    // fp_from_cam = [R^T | -R^T t]: camera centre and per-pixel ray in the fingerprint frame.
+    cv::Matx33d Rt = R.t();
+    cv::Vec3d C = -(Rt * t);
+    double nDotC = n.dot(C);
+
+    std::vector<cv::Point3f> newPts; cv::Mat newDescs;
+    for (int q : validQuery) {
+        if (q < 0 || q >= (int)kps.size()) continue;
+        cv::Point2f p = kps[q].pt;
+        cv::Vec3d dir = Rt * cv::Vec3d((p.x - cx) / fx, (p.y - cy) / fy, 1.0);
+        double denom = n.dot(dir);
+        if (std::abs(denom) < 1e-6) continue;
+        double lambda = (pdist - nDotC) / denom;
+        if (lambda <= 0) continue;                // intersection behind the camera
+        cv::Vec3d X = C + lambda * dir;
+        cv::Point3f Xp((float)X[0], (float)X[1], (float)X[2]);
+        bool dup = false;
+        for (const auto& w : wall)
+            if (std::abs(w.x-Xp.x) < 0.01f && std::abs(w.y-Xp.y) < 0.01f && std::abs(w.z-Xp.z) < 0.01f) { dup = true; break; }
+        if (dup) continue;
+        newPts.push_back(Xp);
+        newDescs.push_back(descs.row(q));
+        if (newPts.size() >= 30) break;           // cap per relock
+    }
+    if (newPts.empty()) return;
+
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        if (mWallDescriptors.type() != newDescs.type() || mWallKeypoints3D.size() > 5000) return;
+        for (int i = 0; i < (int)newPts.size(); ++i) {
+            mWallKeypoints3D.push_back(newPts[i]);
+            mWallDescriptors.push_back(newDescs.row(i));
+        }
+    }
+    LOGI("Teleological self-grow: promoted %zu marks (wall now %zu)", newPts.size(), mWallKeypoints3D.size());
 }
 void MobileGS::interpolateAnchorStep() {}
 void MobileGS::setArCoreTrackingState(bool t) { mIsArCoreTracking = t; }
@@ -722,9 +796,16 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
     else                                gray = composite;
     normalizeForFeatures(gray); // match the live frame's illumination normalization
 
+    // Detect with the SAME descriptor type as the wall fingerprint so the gatekeeper match (clean-vs-
+    // artwork) and self-grow promotion are type-compatible: if the wall is ORB (CV_8U, the depth-off
+    // path) use ORB here too; otherwise SuperPoint. Without this, an ORB wall + SuperPoint artwork can't
+    // match and painting-progress/self-grow silently do nothing in the depth-off config.
+    bool wallIsOrb;
+    { std::lock_guard<std::mutex> lock(mMutex); wallIsOrb = !mWallDescriptors.empty() && mWallDescriptors.type() == CV_8U; }
+
     std::vector<cv::KeyPoint> kps;
     cv::Mat descs;
-    bool useSuperPoint = mSuperPoint.isLoaded();
+    bool useSuperPoint = mSuperPoint.isLoaded() && !wallIsOrb;
     if (useSuperPoint && !mSuperPoint.detect(gray, kps, descs)) useSuperPoint = false;
     if (!useSuperPoint || kps.empty()) {
         auto orb = cv::ORB::create(1500);

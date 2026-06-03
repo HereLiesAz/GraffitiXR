@@ -856,6 +856,7 @@ class MainActivity : ComponentActivity() {
                                     onStopLog = { arViewModel.evalStopLog() },
                                     onInduceLoss = { arViewModel.evalInduceLoss() },
                                     onToggleFusion = { arViewModel.evalSetFusionEnabled(it) },
+                                    onToggleSelfGrow = { arViewModel.evalSetSelfGrowEnabled(it) },
                                 )
                             }
 
@@ -1949,9 +1950,12 @@ private fun EvalOverlay(
     onStopLog: () -> Unit,
     onInduceLoss: () -> Unit,
     onToggleFusion: (Boolean) -> Unit,
+    onToggleSelfGrow: (Boolean) -> Unit,
 ) {
     // Local UI state for the A/B switch; defaults to true to match ArRenderer.fusionEnabled.
     val fusionOn = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
+    // Teleological self-grow defaults OFF to match the native default (mutates the reloc fingerprint).
+    val selfGrowOn = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     androidx.compose.foundation.layout.Column(
         androidx.compose.ui.Modifier
             .background(androidx.compose.ui.graphics.Color(0xAA000000))
@@ -1974,6 +1978,12 @@ private fun EvalOverlay(
                 onToggleFusion(fusionOn.value)
             }) {
                 androidx.compose.material3.Text(if (fusionOn.value) "Fusion ON" else "Fusion OFF")
+            }
+            androidx.compose.material3.TextButton(onClick = {
+                selfGrowOn.value = !selfGrowOn.value
+                onToggleSelfGrow(selfGrowOn.value)
+            }) {
+                androidx.compose.material3.Text(if (selfGrowOn.value) "Grow ON" else "Grow OFF")
             }
         }
     }
