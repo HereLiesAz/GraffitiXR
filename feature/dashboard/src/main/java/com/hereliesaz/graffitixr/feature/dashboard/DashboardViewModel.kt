@@ -52,6 +52,20 @@ class DashboardViewModel @Inject constructor(
         _uiState.update { it.copy(showNewProjectDialog = true) }
     }
 
+    /**
+     * Create a project AND load it, so the editor gets a non-null projectId immediately. Used when the
+     * user jumps straight into Design with no active project — otherwise every Add silently no-ops
+     * because the add handlers require a projectId.
+     */
+    fun createAndOpenProject(name: String = "Untitled", isRightHanded: Boolean = true) {
+        viewModelScope.launch {
+            val p = repository.createProject(name)
+            repository.updateProject(p.copy(isRightHanded = isRightHanded))
+            repository.loadProject(p.id)
+            loadAvailableProjects()
+        }
+    }
+
     fun onCreateProject(name: String, isRightHanded: Boolean) {
         viewModelScope.launch {
             val p = repository.createProject(name)

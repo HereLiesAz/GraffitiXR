@@ -1246,7 +1246,12 @@ class MainActivity : ComponentActivity() {
                 onClick = {
                     // From a Mode, tapping Design navigates to the dedicated Design screen. In Design it
                     // just expands the design tools below (this onClick is a no-op there).
-                    if (!isDesignMode) navController.navigate(EditorMode.DESIGN.name) { launchSingleTop = true }
+                    if (!isDesignMode) {
+                        // Design needs an active project or every Add silently no-ops — create+open one
+                        // if the user jumped straight into Design without loading a project.
+                        if (editorUiState.projectId == null) dashboardViewModel.createAndOpenProject()
+                        navController.navigate(EditorMode.DESIGN.name) { launchSingleTop = true }
+                    }
                 }
             )
 
@@ -1275,8 +1280,8 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // LAYERS SUB-FOLDER
-                azRailSubItem(
+                // LAYERS SUB-FOLDER — only when layers exist (an empty "Layers" folder is confusing)
+                if (editorUiState.layers.isNotEmpty()) azRailSubItem(
                     id = "sub.design.layers",
                     hostId = "host.design",
                     text = "Layers",
