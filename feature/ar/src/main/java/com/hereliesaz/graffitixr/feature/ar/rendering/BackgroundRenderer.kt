@@ -264,28 +264,10 @@ class BackgroundRenderer : GlReleasable {
             }
 
             void main() {
-                vec4 cam = texture(u_Texture, v_TexCoord);
-                if (u_ScanActive < 0.5) { FragColor = cam; return; }
-
-                float yawOffset = atan(v_NdcXy.x * tan(u_HalfFovHRad));
-                float yaw = u_CameraYawRad + yawOffset;
-                float u = fract(yaw / TWO_PI);
-                if (u < 0.0) u += 1.0;
-                float coverage = texture(u_MaskTex, vec2(u, 0.5)).r; // 0 unmapped .. 1 mapped
-
-                // Newspaper halftone of the camera luminance: darker -> larger ink dot.
-                float L = dot(cam.rgb, vec3(0.299, 0.587, 0.114));
-                vec2 cell = gl_FragCoord.xy / u_DotSizePx;
-                float dotd = length(fract(cell) - 0.5) * 2.0;
-                float dotR = sqrt(clamp(1.0 - L, 0.0, 1.0));
-                float inkDot = smoothstep(dotR + 0.08, dotR - 0.08, dotd);
-                vec3 bw = vec3(1.0 - inkDot); // paper-white with black halftone dots
-
-                // Full colour/tone bleeds in organically as coverage rises (spreads like ink).
-                float nf = vnoise(gl_FragCoord.xy / 90.0);
-                float reveal = smoothstep(nf - 0.12, nf + 0.12, coverage);
-
-                FragColor = vec4(mix(bw, cam.rgb, reveal), 1.0);
+                // Plain camera pass-through. The screen-space halftone->colour "develop" reveal was
+                // removed: it was a flat 2D effect (same failing as the pink fog). A real scan indicator
+                // must spread on the actual 3D surfaces being mapped, not across the whole frame.
+                FragColor = texture(u_Texture, v_TexCoord);
             }
         """.trimIndent()
     }
