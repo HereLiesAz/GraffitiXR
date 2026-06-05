@@ -31,7 +31,7 @@ internal fun buildHelpItems(strings: AppStrings, layers: List<Layer>): Map<Strin
         "design.addImg" to strings.help.addImg,
         "design.addDraw" to strings.help.addDraw,
         "design.addText" to strings.help.addText,
-        "design.wall" to strings.help.wall,
+        "mode.trace.freeze" to strings.help.lockTrace,
 
         // Tools menu
         "sub.design.tools" to strings.help.designHost, // Use design host help for tools parent

@@ -37,18 +37,15 @@ internal fun enumerateRailItemIdRegistrations(layers: List<Layer>, mode: EditorM
 
     // Modes menu
     ids += listOf(
-        "host.modes", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace"
+        "host.modes", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace", "mode.mockup.wall", "mode.trace.freeze"
     )
     if (mode == EditorMode.AR) {
         ids += "target.create"
     }
-    if (mode == EditorMode.MOCKUP) {
-        ids += "mode.mockup.wall"
-    }
 
     // Design menu
     ids += listOf(
-        "host.design", "design.addImg", "design.addDraw", "design.addText", "design.wall"
+        "host.design", "design.addImg", "design.addDraw", "design.addText"
     )
 
     // Project menu

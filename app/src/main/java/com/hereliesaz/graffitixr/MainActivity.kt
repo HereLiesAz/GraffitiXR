@@ -501,6 +501,7 @@ class MainActivity : ComponentActivity() {
                             showLibrary = showLibrary,
                             tutorialModeActive = mainUiState.tutorialModeActive,
                             coopState = coopState,
+                            isTouchLocked = mainUiState.isTouchLocked,
                             onShowJoinScanner = { showJoinScanner = true }
                         )
                     }
@@ -653,8 +654,35 @@ class MainActivity : ComponentActivity() {
                         }
 
                         var fullSize by remember { mutableStateOf(IntSize.Zero) }
+                        var lockTaps by remember { mutableIntStateOf(0) }
+                        
+                        LaunchedEffect(mainUiState.isTouchLocked) {
+                            if (mainUiState.isTouchLocked) lockTaps = 0
+                        }
 
-                        Box(Modifier.fillMaxSize().onSizeChanged { fullSize = it }) {
+                        Box(Modifier
+                            .fillMaxSize()
+                            .onSizeChanged { fullSize = it }
+                            .then(
+                                if (mainUiState.isTouchLocked) {
+                                    Modifier.pointerInput(Unit) {
+                                        awaitPointerEventScope {
+                                            while (true) {
+                                                val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
+                                                val isDown = event.changes.any { it.pressed && !it.previousPressed }
+                                                event.changes.forEach { it.consume() }
+                                                if (isDown) {
+                                                    lockTaps++
+                                                    if (lockTaps >= 4) {
+                                                        mainViewModel.setTouchLocked(false)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else Modifier
+                            )
+                        ) {
                             AzNavHost(startDestination = LIBRARY_ROUTE) {
                                 composable(LIBRARY_ROUTE) {
                                     val dashboardState by dashboardViewModel.uiState.collectAsState()
@@ -663,7 +691,7 @@ class MainActivity : ComponentActivity() {
                                         projects = dashboardState.availableProjects,
                                         onLoadProject = { project ->
                                             dashboardViewModel.openProject(project)
-                                            navController.navigate(EditorMode.TRACE.name) {
+                                            navController.navigate(EditorMode.DESIGN.name) {
                                                 popUpTo(LIBRARY_ROUTE) { inclusive = true }
                                                 launchSingleTop = true
                                             }
@@ -1008,7 +1036,7 @@ class MainActivity : ComponentActivity() {
                                     onDismissRequest = { dashboardViewModel.dismissNewProjectDialog() },
                                     onSaveRequest = { name ->
                                         dashboardViewModel.onCreateProject(name, editorUiState.isRightHanded)
-                                        navController.navigate(EditorMode.TRACE.name) {
+                                        navController.navigate(EditorMode.DESIGN.name) {
                                             popUpTo(LIBRARY_ROUTE) { inclusive = true }
                                             launchSingleTop = true
                                         }
@@ -1218,6 +1246,7 @@ class MainActivity : ComponentActivity() {
         showLibrary: Boolean,
         tutorialModeActive: Boolean = false,
         coopState: CoopSessionState = CoopSessionState.Idle,
+        isTouchLocked: Boolean,
         onShowJoinScanner: () -> Unit = {}
     ) {
         val navStrings = strings.nav
@@ -1255,32 +1284,17 @@ class MainActivity : ComponentActivity() {
                 }
             )
 
-            // Design CONTENT tools live ONLY in the Design screen. Modes show the finished design with
-            // minimal in-place touchups (below) — never the add/layer/tool editors.
             if (isDesignMode) {
-                // ADD SUB-FOLDER
-                azRailSubItem(
-                    id = "sub.design.add",
-                    hostId = "host.design",
-                    text = "Add",
-                    content = Icons.Default.Add,
-                    color = navItemColor
-                ) {
-                    azRailItem(id = "design.addImg", text = navStrings.image, content = DesignR.drawable.ic_ps_image, color = navItemColor) {
-                        overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }
-                    azRailItem(id = "design.addDraw", text = navStrings.draw, content = DesignR.drawable.ic_ps_pencil, color = navItemColor) {
-                        editorViewModel.onAddBlankLayer()
-                    }
-                    azRailItem(id = "design.addText", text = navStrings.text, content = DesignR.drawable.ic_ps_text, color = navItemColor) {
-                        editorViewModel.onAddTextLayer()
-                    }
-                    azRailItem(id = "design.wall", text = navStrings.wall, content = Icons.Default.Wallpaper, color = navItemColor) {
-                        showWallSourceDialog = true
-                    }
+                azRailSubItem(id = "design.addImg", hostId = "host.design", text = "Open", content = DesignR.drawable.ic_ps_image, color = navItemColor, shape = AzButtonShape.NONE) {
+                    overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
+                azRailSubItem(id = "design.addDraw", hostId = "host.design", text = "Sketch", content = DesignR.drawable.ic_ps_pencil, color = navItemColor, shape = AzButtonShape.NONE) {
+                    editorViewModel.onAddBlankLayer()
+                }
+                azRailSubItem(id = "design.addText", hostId = "host.design", text = "Text", content = DesignR.drawable.ic_ps_text, color = navItemColor, shape = AzButtonShape.NONE) {
+                    editorViewModel.onAddTextLayer()
                 }
 
-                // LAYERS SUB-FOLDER — only when layers exist (an empty "Layers" folder is confusing)
                 if (editorUiState.layers.isNotEmpty()) azRailSubItem(
                     id = "sub.design.layers",
                     hostId = "host.design",
@@ -1356,11 +1370,9 @@ class MainActivity : ComponentActivity() {
                                 content = DesignR.drawable.ic_ps_brush,
                                 color = if (paintActive) Cyan else navItemColor
                             )
-                            azRailSubItem(id = "tool.brush", hostId = "grp.paint", text = "Brush", content = DesignR.drawable.ic_ps_brush, color = if (activeTool == Tool.BRUSH) Cyan else navItemColor) {
-                                editorViewModel.setActiveTool(Tool.BRUSH)
+                            azRailSubItem(id = "tool.brush", hostId = "grp.paint", text = "Brush", content = DesignR.drawable.ic_ps_brush, color = if (activeTool == Tool.BRUSH) Cyan else navItemColor, shape = AzButtonShape.NONE) {                                editorViewModel.setActiveTool(Tool.BRUSH)
                             }
-                            azRailSubItem(id = "tool.eraser", hostId = "grp.paint", text = navStrings.eraser, content = DesignR.drawable.ic_ps_eraser, color = if (activeTool == Tool.ERASER) Cyan else navItemColor) {
-                                editorViewModel.setActiveTool(Tool.ERASER)
+                            azRailSubItem(id = "tool.eraser", hostId = "grp.paint", text = navStrings.eraser, content = DesignR.drawable.ic_ps_eraser, color = if (activeTool == Tool.ERASER) Cyan else navItemColor, shape = AzButtonShape.NONE) {                                editorViewModel.setActiveTool(Tool.ERASER)
                             }
 
                             // RETOUCH (host) → Blur, Liquify (sub-items)
@@ -1370,11 +1382,9 @@ class MainActivity : ComponentActivity() {
                                 content = DesignR.drawable.ic_ps_blur,
                                 color = if (retouchActive) Cyan else navItemColor
                             )
-                            azRailSubItem(id = "tool.blur", hostId = "grp.retouch", text = navStrings.blur, content = DesignR.drawable.ic_ps_blur, color = if (activeTool == Tool.BLUR) Cyan else navItemColor) {
-                                editorViewModel.setActiveTool(Tool.BLUR)
+                            azRailSubItem(id = "tool.blur", hostId = "grp.retouch", text = navStrings.blur, content = DesignR.drawable.ic_ps_blur, color = if (activeTool == Tool.BLUR) Cyan else navItemColor, shape = AzButtonShape.NONE) {                                editorViewModel.setActiveTool(Tool.BLUR)
                             }
-                            azRailSubItem(id = "tool.liquify", hostId = "grp.retouch", text = navStrings.liquify, content = DesignR.drawable.ic_ps_liquify, color = if (activeTool == Tool.LIQUIFY) Cyan else navItemColor) {
-                                editorViewModel.setActiveTool(Tool.LIQUIFY)
+                            azRailSubItem(id = "tool.liquify", hostId = "grp.retouch", text = navStrings.liquify, content = DesignR.drawable.ic_ps_liquify, color = if (activeTool == Tool.LIQUIFY) Cyan else navItemColor, shape = AzButtonShape.NONE) {                                editorViewModel.setActiveTool(Tool.LIQUIFY)
                             }
 
                             // COLOR (host) → Invert, Balance, Blend (sub-items)
@@ -1384,14 +1394,11 @@ class MainActivity : ComponentActivity() {
                                 content = Icons.Default.Palette,
                                 color = if (activeLayer.isInverted) Cyan else navItemColor
                             )
-                            azRailSubItem(id = "adj.invert", hostId = "grp.color", text = navStrings.invert, content = Icons.Default.InvertColors, color = if (activeLayer.isInverted) Cyan else navItemColor) {
-                                editorViewModel.onToggleInvert()
+                            azRailSubItem(id = "adj.invert", hostId = "grp.color", text = navStrings.invert, content = Icons.Default.InvertColors, color = if (activeLayer.isInverted) Cyan else navItemColor, shape = AzButtonShape.NONE) {                                editorViewModel.onToggleInvert()
                             }
-                            azRailSubItem(id = "adj.balance", hostId = "grp.color", text = navStrings.balance, content = Icons.Default.Palette, color = navItemColor) {
-                                editorViewModel.onBalanceClicked()
+                            azRailSubItem(id = "adj.balance", hostId = "grp.color", text = navStrings.balance, content = Icons.Default.Palette, color = navItemColor, shape = AzButtonShape.NONE) {                                editorViewModel.onBalanceClicked()
                             }
-                            azRailSubItem(id = "adj.blend", hostId = "grp.color", text = navStrings.build, content = Icons.Default.Opacity, color = navItemColor) {
-                                editorViewModel.onCycleBlendMode()
+                            azRailSubItem(id = "adj.blend", hostId = "grp.color", text = navStrings.build, content = Icons.Default.Opacity, color = navItemColor, shape = AzButtonShape.NONE) {                                editorViewModel.onCycleBlendMode()
                             }
 
                             // UNGROUPED TOOL — Filter sits directly in the nested rail
@@ -1415,24 +1422,24 @@ class MainActivity : ComponentActivity() {
 
             val showArModeEntry = !arUiState.isArCoreAvailabilityResolved || arUiState.isArCoreAvailable
             if (showArModeEntry) {
-                azRailSubItem(id = "mode.ar", hostId = "host.modes", text = navStrings.arMode, content = Icons.Default.ViewInAr, route = EditorMode.AR.name, color = navItemColor)
+                azRailSubItem(id = "mode.ar", hostId = "host.modes", text = navStrings.arMode, content = Icons.Default.ViewInAr, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE)            }
+            azRailSubItem(id = "mode.overlay", hostId = "host.modes", text = navStrings.overlay, content = Icons.Default.Layers, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE)
+            
+            azRailSubItem(id = "mode.mockup", hostId = "host.modes", text = navStrings.mockup, content = Icons.Default.CameraAlt, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE) {
+                azRailItem(id = "mode.mockup.wall", text = navStrings.wall, content = Icons.Default.Wallpaper, color = navItemColor, shape = AzButtonShape.NONE) {
+                    showWallSourceDialog = true
+                }
             }
-            azRailSubItem(id = "mode.overlay", hostId = "host.modes", text = navStrings.overlay, content = Icons.Default.Layers, route = EditorMode.OVERLAY.name, color = navItemColor)
-            azRailSubItem(id = "mode.mockup", hostId = "host.modes", text = navStrings.mockup, content = Icons.Default.CameraAlt, route = EditorMode.MOCKUP.name, color = navItemColor)
-            azRailSubItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, content = Icons.Default.LightMode, route = EditorMode.TRACE.name, color = navItemColor)
-
-            if (editorUiState.editorMode == EditorMode.AR) {
-                azRailSubItem(id = "target.create", hostId = "host.modes", text = navStrings.create, content = Icons.Default.AddAPhoto, color = navItemColor) {
-                    if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
+            
+            azRailSubItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, content = Icons.Default.LightMode, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE) {
+                azRailItem(id = "mode.trace.freeze", text = "Freeze", content = Icons.Default.Lock, color = navItemColor, shape = AzButtonShape.NONE) {
+                    mainViewModel.setTouchLocked(!isTouchLocked)
                 }
             }
 
-            // Adjust for Modes is NOT a rail item — it's off-rail adjustment knobs (opacity, saturation,
-            // …) on the mode screen, like the design adjustment knobs. Keeping the rail minimal so Modes
-            // don't overwhelm. Mockup still needs to pick its surface image (not a design-content tool):
-            if (editorUiState.editorMode == EditorMode.MOCKUP) {
-                azRailSubItem(id = "mode.mockup.wall", hostId = "host.modes", text = navStrings.wall, content = Icons.Default.Wallpaper, color = navItemColor) {
-                    showWallSourceDialog = true
+            if (editorUiState.editorMode == EditorMode.AR) {
+                azRailSubItem(id = "target.create", hostId = "host.modes", text = navStrings.create, content = Icons.Default.AddAPhoto, color = navItemColor, shape = AzButtonShape.NONE) {
+                    if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
                 }
             }
 
@@ -1443,17 +1450,13 @@ class MainActivity : ComponentActivity() {
                 content = Icons.Default.Folder,
                 color = navItemColor
             )
-            azRailSubItem(id = "proj.new", hostId = "host.project", text = navStrings.new, content = Icons.Default.CreateNewFolder, color = navItemColor) {
-                dashboardViewModel.onNewProjectTriggered()
+            azRailSubItem(id = "proj.new", hostId = "host.project", text = navStrings.new, content = Icons.Default.CreateNewFolder, color = navItemColor, shape = AzButtonShape.NONE) {                dashboardViewModel.onNewProjectTriggered()
             }
-            azRailSubItem(id = "proj.save", hostId = "host.project", text = navStrings.save, content = Icons.Default.Save, color = navItemColor) {
-                showSaveDialog = true
+            azRailSubItem(id = "proj.save", hostId = "host.project", text = navStrings.save, content = Icons.Default.Save, color = navItemColor, shape = AzButtonShape.NONE) {                showSaveDialog = true
             }
-            azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, content = Icons.Default.FolderOpen, color = navItemColor) {
-                navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
+            azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, content = Icons.Default.FolderOpen, color = navItemColor, shape = AzButtonShape.NONE) {                navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
             }
-            azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, content = Icons.Default.Settings, color = navItemColor) {
-                showSettings = true
+            azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, content = Icons.Default.Settings, color = navItemColor, shape = AzButtonShape.NONE) {                showSettings = true
             }
 
             azDivider()
