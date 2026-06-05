@@ -881,7 +881,9 @@ class MainActivity : ComponentActivity() {
                                 AnchorLockFlash(isAnchorEstablished = arUiState.isAnchorEstablished, strings = strings)
                             }
 
-                            if (EVAL_OVERLAY_ENABLED && editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && !mainUiState.isCapturingTarget) {
+                            // Dev/eval overlay: debug builds only, and off unless the user opts in
+                            // via the Diagnostic Overlay setting (hidden by default).
+                            if (EVAL_OVERLAY_ENABLED && editorUiState.showDiagOverlay && editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && !mainUiState.isCapturingTarget) {
                                 EvalOverlay(
                                     metrics = arUiState.evalLiveMetrics,
                                     onStartRecord = { arViewModel.evalStartRecording() },
@@ -1871,7 +1873,14 @@ class MainActivity : ComponentActivity() {
 
             val showArModeEntry = !arUiState.isArCoreAvailabilityResolved || arUiState.isArCoreAvailable
             if (showArModeEntry) {
-                azRailSubItem(id = "mode.ar", hostId = "host.modes", text = navStrings.arMode, content = Icons.Default.ViewInAr, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE)            }
+                azRailSubItem(id = "mode.ar", hostId = "host.modes", text = navStrings.arMode, content = Icons.Default.ViewInAr, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE)
+            }
+            // Target capture sits directly under AR; only shown while in AR mode.
+            if (editorUiState.editorMode == EditorMode.AR) {
+                azRailSubItem(id = "target.create", hostId = "host.modes", text = navStrings.grid, content = Icons.Default.AddAPhoto, color = navItemColor, shape = AzButtonShape.NONE) {
+                    if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
+                }
+            }
             azRailSubItem(id = "mode.overlay", hostId = "host.modes", text = navStrings.overlay, content = Icons.Default.Layers, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE)
             
             azRailSubItem(id = "mode.mockup", hostId = "host.modes", text = navStrings.mockup, content = Icons.Default.CameraAlt, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE) {
@@ -1883,12 +1892,6 @@ class MainActivity : ComponentActivity() {
             azRailSubItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, content = Icons.Default.LightMode, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE) {
                 azRailItem(id = "mode.trace.freeze", text = "Freeze", content = Icons.Default.Lock, color = navItemColor, shape = AzButtonShape.NONE) {
                     mainViewModel.setTouchLocked(!isTouchLocked)
-                }
-            }
-
-            if (editorUiState.editorMode == EditorMode.AR) {
-                azRailSubItem(id = "target.create", hostId = "host.modes", text = navStrings.create, content = Icons.Default.AddAPhoto, color = navItemColor, shape = AzButtonShape.NONE) {
-                    if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
                 }
             }
 
