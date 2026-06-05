@@ -42,7 +42,9 @@ data class AdjustmentsState(
     val redoCount: Int = 0,
     val isRightHanded: Boolean = true,
     val isCapturingTarget: Boolean = false,
-    val activeLayer: OverlayLayer? = null
+    val activeLayer: OverlayLayer? = null,
+    // Undo/redo belongs to the Design screen only; Modes show the finished design (no history controls).
+    val showUndoRedo: Boolean = true
 )
 
 /**
@@ -66,7 +68,6 @@ fun AdjustmentsPanel(
     onColorBalanceBChange: (Float) -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
-    onMagicAlign: () -> Unit,
     onAdjustmentStart: () -> Unit,
     onAdjustmentEnd: () -> Unit,
     strings: AppStrings,
@@ -171,7 +172,7 @@ fun AdjustmentsPanel(
             }
         }
 
-        if (canShowActionRow) {
+        if (canShowActionRow && state.showUndoRedo) {
             UndoRedoRow(
                 canUndo = true, // Logic handled by ViewModel, but we can pass state if needed
                 canRedo = true, // Logic handled by ViewModel
@@ -179,7 +180,6 @@ fun AdjustmentsPanel(
                 redoCount = state.redoCount,
                 onUndo = onUndo,
                 onRedo = onRedo,
-                onMagicClicked = onMagicAlign,
                 strings = strings,
                 modifier = Modifier.fillMaxWidth()
             )

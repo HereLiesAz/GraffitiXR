@@ -31,7 +31,6 @@ fun UndoRedoRow(
     redoCount: Int,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
-    onMagicClicked: () -> Unit,
     strings: AppStrings,
     modifier: Modifier = Modifier
 ) {
@@ -65,17 +64,6 @@ fun UndoRedoRow(
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(start = 4.dp)
                 )
-            }
-        }
-
-        // Aligned with the second knob (Green/Brightness) - Magic Wand
-        Surface(
-            shape = CircleShape,
-            color = HotPink,
-            shadowElevation = 4.dp
-        ) {
-            IconButton(onClick = onMagicClicked) {
-                Icon(Icons.Filled.AutoFixHigh, contentDescription = strings.adj.magicAlign, tint = Color.White)
             }
         }
 
