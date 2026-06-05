@@ -1,0 +1,8 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24"
+    android:tint="?android:attr/colorControlNormal">
+    <!-- Photoshop-style blur: a teardrop with a soft (half-tone) edge. -->
+    <path android:fillColor="@android:color/white"
+        android:pathData="M12,2.5c0,0 6.5,7 6.5,11.5c0,3.6 -2.9,6.5 -6.5,6.5s-6.5,-2.9 -6.5,-6.5C5.5,9.5 12,2.5 12,2.5zM12,18.5c2.5,0 4.5,-2 4.5,-4.5h-9C7.5,16.5 9.5,18.5 12,18.5z"/>
+</vector>
