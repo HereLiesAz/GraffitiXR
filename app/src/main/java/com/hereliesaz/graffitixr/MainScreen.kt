@@ -250,13 +250,10 @@ fun MainScreen(
                 }
 
                 EditorMode.MOCKUP, EditorMode.TRACE -> {}
-                EditorMode.DESIGN -> {
-                    DesignScreen(
-                        uiState = uiState,
-                        editorViewModel = editorViewModel,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
+                // DESIGN needs no camera preview here; the canvas (layers, gestures, drawing) is
+                // drawn full-screen by the shared background rendering below, so it fills the
+                // screen behind the rail as a background component.
+                EditorMode.DESIGN -> {}
                 else -> {}
             }
         }
