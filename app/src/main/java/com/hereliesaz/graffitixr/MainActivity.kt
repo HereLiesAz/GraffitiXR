@@ -881,7 +881,9 @@ class MainActivity : ComponentActivity() {
                                 AnchorLockFlash(isAnchorEstablished = arUiState.isAnchorEstablished, strings = strings)
                             }
 
-                            if (EVAL_OVERLAY_ENABLED && editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && !mainUiState.isCapturingTarget) {
+                            // Dev/eval overlay: debug builds only, and off unless the user opts in
+                            // via the Diagnostic Overlay setting (hidden by default).
+                            if (EVAL_OVERLAY_ENABLED && editorUiState.showDiagOverlay && editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && !mainUiState.isCapturingTarget) {
                                 EvalOverlay(
                                     metrics = arUiState.evalLiveMetrics,
                                     onStartRecord = { arViewModel.evalStartRecording() },
