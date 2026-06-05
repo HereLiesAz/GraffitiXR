@@ -1321,7 +1321,11 @@ class MainActivity : ComponentActivity() {
                             editorViewModel.setActiveTool(Tool.NONE)
                         },
                         onRelocate = { _: Int, _: Int, new: List<String> ->
-                            editorViewModel.onLayerReordered(new.map { it.removePrefix("layer.") }.reversed())
+                            editorViewModel.onLayerReordered(
+                                new.filter { it.startsWith("layer.") }
+                                   .map { it.removePrefix("layer.") }
+                                   .reversed()
+                            )
                         },
                         nestedContent = {
                             if (layer.textParams != null) {
