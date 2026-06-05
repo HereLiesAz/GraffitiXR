@@ -1328,66 +1328,78 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // EDITING TOOLS — grouped by type into per-type nested rails (Paint / Retouch / Color /
-                // Filter) so each nested rail holds same-type tools. Same hostId pattern; main rail untouched.
+                // EDITING TOOLS — one nested-rail parent under Design (the documented relocItem
+                // "Nested Rail Parent") whose nestedContent is a nested rail of TYPE HOST ITEMS
+                // (Paint / Retouch / Color, each expanding to its tools as sub-items) plus UNGROUPED
+                // tools (Filter). azRailSubItem/azRailItem are leaves (trailing lambda = onClick); only
+                // azRailHostItem can hold sub-items, and only relocItem/azNestedRail carry nestedContent —
+                // so this is the only API-correct way to nest type-hosts under Design without adding a
+                // main-rail item. Main rail (host.design/modes/project) is untouched.
                 if (activeLayer != null) {
-                    azRailSubItem(
-                        id = "sub.design.paint",
+                    val paintActive = activeTool == Tool.BRUSH || activeTool == Tool.ERASER
+                    val retouchActive = activeTool == Tool.BLUR || activeTool == Tool.LIQUIFY
+                    val anyToolActive = paintActive || retouchActive || activeLayer.isInverted
+                    azRailRelocItem(
+                        id = "sub.design.tools",
                         hostId = "host.design",
-                        text = "Paint",
+                        text = "Tools",
                         content = DesignR.drawable.ic_ps_brush,
-                        color = if (activeTool == Tool.BRUSH || activeTool == Tool.ERASER) Cyan else navItemColor
-                    ) {
-                        azRailItem(id = "tool.brush", text = "Brush", content = DesignR.drawable.ic_ps_brush, color = if (activeTool == Tool.BRUSH) Cyan else navItemColor) {
-                            editorViewModel.setActiveTool(Tool.BRUSH)
-                        }
-                        azRailItem(id = "tool.eraser", text = navStrings.eraser, content = DesignR.drawable.ic_ps_eraser, color = if (activeTool == Tool.ERASER) Cyan else navItemColor) {
-                            editorViewModel.setActiveTool(Tool.ERASER)
-                        }
-                    }
+                        color = if (anyToolActive) Cyan else navItemColor,
+                        nestedRailAlignment = AzNestedRailAlignment.VERTICAL,
+                        keepNestedRailOpen = true,
+                        onClick = { /* parent only opens the nested rail */ },
+                        nestedContent = {
+                            // PAINT (host) → Brush, Eraser (sub-items)
+                            azRailHostItem(
+                                id = "grp.paint",
+                                text = "Paint",
+                                content = DesignR.drawable.ic_ps_brush,
+                                color = if (paintActive) Cyan else navItemColor
+                            )
+                            azRailSubItem(id = "tool.brush", hostId = "grp.paint", text = "Brush", content = DesignR.drawable.ic_ps_brush, color = if (activeTool == Tool.BRUSH) Cyan else navItemColor) {
+                                editorViewModel.setActiveTool(Tool.BRUSH)
+                            }
+                            azRailSubItem(id = "tool.eraser", hostId = "grp.paint", text = navStrings.eraser, content = DesignR.drawable.ic_ps_eraser, color = if (activeTool == Tool.ERASER) Cyan else navItemColor) {
+                                editorViewModel.setActiveTool(Tool.ERASER)
+                            }
 
-                    azRailSubItem(
-                        id = "sub.design.retouch",
-                        hostId = "host.design",
-                        text = "Retouch",
-                        content = DesignR.drawable.ic_ps_blur,
-                        color = if (activeTool == Tool.BLUR || activeTool == Tool.LIQUIFY) Cyan else navItemColor
-                    ) {
-                        azRailItem(id = "tool.blur", text = navStrings.blur, content = DesignR.drawable.ic_ps_blur, color = if (activeTool == Tool.BLUR) Cyan else navItemColor) {
-                            editorViewModel.setActiveTool(Tool.BLUR)
-                        }
-                        azRailItem(id = "tool.liquify", text = navStrings.liquify, content = DesignR.drawable.ic_ps_liquify, color = if (activeTool == Tool.LIQUIFY) Cyan else navItemColor) {
-                            editorViewModel.setActiveTool(Tool.LIQUIFY)
-                        }
-                    }
+                            // RETOUCH (host) → Blur, Liquify (sub-items)
+                            azRailHostItem(
+                                id = "grp.retouch",
+                                text = "Retouch",
+                                content = DesignR.drawable.ic_ps_blur,
+                                color = if (retouchActive) Cyan else navItemColor
+                            )
+                            azRailSubItem(id = "tool.blur", hostId = "grp.retouch", text = navStrings.blur, content = DesignR.drawable.ic_ps_blur, color = if (activeTool == Tool.BLUR) Cyan else navItemColor) {
+                                editorViewModel.setActiveTool(Tool.BLUR)
+                            }
+                            azRailSubItem(id = "tool.liquify", hostId = "grp.retouch", text = navStrings.liquify, content = DesignR.drawable.ic_ps_liquify, color = if (activeTool == Tool.LIQUIFY) Cyan else navItemColor) {
+                                editorViewModel.setActiveTool(Tool.LIQUIFY)
+                            }
 
-                    azRailSubItem(
-                        id = "sub.design.color",
-                        hostId = "host.design",
-                        text = "Color",
-                        content = Icons.Default.Palette,
-                        color = if (activeLayer.isInverted) Cyan else navItemColor
-                    ) {
-                        azRailItem(id = "adj.invert", text = navStrings.invert, content = Icons.Default.InvertColors, color = if (activeLayer.isInverted) Cyan else navItemColor) {
-                            editorViewModel.onToggleInvert()
-                        }
-                        azRailItem(id = "adj.balance", text = navStrings.balance, content = Icons.Default.Palette, color = navItemColor) {
-                            editorViewModel.onBalanceClicked()
-                        }
-                        azRailItem(id = "adj.blend", text = navStrings.build, content = Icons.Default.Opacity, color = navItemColor) {
-                            editorViewModel.onCycleBlendMode()
-                        }
-                    }
+                            // COLOR (host) → Invert, Balance, Blend (sub-items)
+                            azRailHostItem(
+                                id = "grp.color",
+                                text = "Color",
+                                content = Icons.Default.Palette,
+                                color = if (activeLayer.isInverted) Cyan else navItemColor
+                            )
+                            azRailSubItem(id = "adj.invert", hostId = "grp.color", text = navStrings.invert, content = Icons.Default.InvertColors, color = if (activeLayer.isInverted) Cyan else navItemColor) {
+                                editorViewModel.onToggleInvert()
+                            }
+                            azRailSubItem(id = "adj.balance", hostId = "grp.color", text = navStrings.balance, content = Icons.Default.Palette, color = navItemColor) {
+                                editorViewModel.onBalanceClicked()
+                            }
+                            azRailSubItem(id = "adj.blend", hostId = "grp.color", text = navStrings.build, content = Icons.Default.Opacity, color = navItemColor) {
+                                editorViewModel.onCycleBlendMode()
+                            }
 
-                    azRailSubItem(
-                        id = "sub.design.filter",
-                        hostId = "host.design",
-                        text = "Filter",
-                        content = Icons.Default.Tune,
-                        color = navItemColor
-                    ) {
-                        editorViewModel.onAdjustClicked()
-                    }
+                            // UNGROUPED TOOL — Filter sits directly in the nested rail
+                            azRailItem(id = "tool.filter", text = "Filter", content = Icons.Default.Tune, color = navItemColor) {
+                                editorViewModel.onAdjustClicked()
+                            }
+                        }
+                    )
                 }
             }
 
