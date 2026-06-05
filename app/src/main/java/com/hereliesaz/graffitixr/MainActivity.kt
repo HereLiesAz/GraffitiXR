@@ -1295,51 +1295,49 @@ class MainActivity : ComponentActivity() {
                     editorViewModel.onAddTextLayer()
                 }
 
-                if (editorUiState.layers.isNotEmpty()) azRailSubItem(
-                    id = "sub.design.layers",
-                    hostId = "host.design",
-                    text = "Layers",
-                    content = DesignR.drawable.ic_ps_layers,
-                    color = if (activeLayer != null) Cyan else navItemColor
-                ) {
-                    editorUiState.layers.reversed().forEach { layer ->
-                        val forceOpenHiddenMenu = layerMenusOpen[layer.id] ?: false
-                        azRailRelocItem(
-                            id = "layer.${layer.id}",
-                            hostId = "sub.design.layers",
-                            text = layer.name,
-                            color = when {
-                                editorUiState.activeLayerId == layer.id -> Cyan
-                                layer.isLinked -> NeonGreen
-                                else -> HotPink
-                            },
-                            nestedRailAlignment = AzNestedRailAlignment.VERTICAL,
-                            keepNestedRailOpen = true,
-                            forceHiddenMenuOpen = forceOpenHiddenMenu,
-                            onHiddenMenuDismiss = { layerMenusOpen[layer.id] = false },
-                            onClick = {
-                                editorViewModel.onLayerActivated(layer.id)
-                                editorViewModel.setActiveTool(Tool.NONE)
-                            },
-                            onRelocate = { _: Int, _: Int, new: List<String> ->
-                                editorViewModel.onLayerReordered(new.map { it.removePrefix("layer.") }.reversed())
-                            },
-                            nestedContent = {
-                                if (layer.textParams != null) {
-                                    azRailItem(id = "layer.${layer.id}.edit", text = navStrings.edit, content = Icons.Default.Title, color = navItemColor) {
-                                        editorViewModel.onLayerActivated(layer.id)
-                                        layerMenusOpen[layer.id] = true
-                                    }
-                                }
-                                azRailItem(id = "layer.${layer.id}.hide", text = if (layer.isVisible) strings.editor.hideLayer else strings.editor.showLayer, content = if (layer.isVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility, color = navItemColor) {
-                                    editorViewModel.onToggleVisibility(layer.id)
-                                }
-                                azRailItem(id = "layer.${layer.id}.del", text = strings.editor.delete, content = Icons.Default.Delete, color = Color.Red) {
-                                    editorViewModel.onLayerRemoved(layer.id)
+                // LAYERS — emitted directly under the Design host, exactly as in the working
+                // pre-refactor rail. They are NOT wrapped in an azRailSubItem: a sub-item's
+                // trailing lambda is its onClick, so any items created there never compose —
+                // which is why new layers stopped appearing. Each layer is a relocItem
+                // (drag to reorder) whose nested rail holds its edit/hide/delete actions.
+                editorUiState.layers.reversed().forEach { layer ->
+                    val forceOpenHiddenMenu = layerMenusOpen[layer.id] ?: false
+                    azRailRelocItem(
+                        id = "layer.${layer.id}",
+                        hostId = "host.design",
+                        text = layer.name,
+                        color = when {
+                            editorUiState.activeLayerId == layer.id -> Cyan
+                            layer.isLinked -> NeonGreen
+                            else -> HotPink
+                        },
+                        shape = AzButtonShape.NONE,
+                        nestedRailAlignment = AzNestedRailAlignment.VERTICAL,
+                        keepNestedRailOpen = true,
+                        forceHiddenMenuOpen = forceOpenHiddenMenu,
+                        onHiddenMenuDismiss = { layerMenusOpen[layer.id] = false },
+                        onClick = {
+                            editorViewModel.onLayerActivated(layer.id)
+                            editorViewModel.setActiveTool(Tool.NONE)
+                        },
+                        onRelocate = { _: Int, _: Int, new: List<String> ->
+                            editorViewModel.onLayerReordered(new.map { it.removePrefix("layer.") }.reversed())
+                        },
+                        nestedContent = {
+                            if (layer.textParams != null) {
+                                azRailItem(id = "layer.${layer.id}.edit", text = navStrings.edit, content = Icons.Default.Title, color = navItemColor, shape = AzButtonShape.NONE) {
+                                    editorViewModel.onLayerActivated(layer.id)
+                                    layerMenusOpen[layer.id] = true
                                 }
                             }
-                        )
-                    }
+                            azRailItem(id = "layer.${layer.id}.hide", text = if (layer.isVisible) strings.editor.hideLayer else strings.editor.showLayer, content = if (layer.isVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility, color = navItemColor, shape = AzButtonShape.NONE) {
+                                editorViewModel.onToggleVisibility(layer.id)
+                            }
+                            azRailItem(id = "layer.${layer.id}.del", text = strings.editor.delete, content = Icons.Default.Delete, color = Color.Red, shape = AzButtonShape.NONE) {
+                                editorViewModel.onLayerRemoved(layer.id)
+                            }
+                        }
+                    )
                 }
 
                 // EDITING TOOLS — one nested-rail parent under Design (the documented relocItem
@@ -1359,6 +1357,7 @@ class MainActivity : ComponentActivity() {
                         text = "Tools",
                         content = DesignR.drawable.ic_ps_brush,
                         color = if (anyToolActive) Cyan else navItemColor,
+                        shape = AzButtonShape.NONE,
                         nestedRailAlignment = AzNestedRailAlignment.VERTICAL,
                         keepNestedRailOpen = true,
                         onClick = { /* parent only opens the nested rail */ },
@@ -1402,7 +1401,7 @@ class MainActivity : ComponentActivity() {
                             }
 
                             // UNGROUPED TOOL — Filter sits directly in the nested rail
-                            azRailItem(id = "tool.filter", text = "Filter", content = Icons.Default.Tune, color = navItemColor) {
+                            azRailItem(id = "tool.filter", text = "Filter", content = Icons.Default.Tune, color = navItemColor, shape = AzButtonShape.NONE) {
                                 editorViewModel.onAdjustClicked()
                             }
                         }
