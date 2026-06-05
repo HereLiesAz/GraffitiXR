@@ -1328,14 +1328,15 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // TOOLS SUB-FOLDER
+                // EDITING TOOLS — grouped by type into per-type nested rails (Paint / Retouch / Color /
+                // Filter) so each nested rail holds same-type tools. Same hostId pattern; main rail untouched.
                 if (activeLayer != null) {
                     azRailSubItem(
-                        id = "sub.design.tools",
+                        id = "sub.design.paint",
                         hostId = "host.design",
-                        text = "Tools",
-                        content = Icons.Default.Construction,
-                        color = if (activeTool != Tool.NONE) Cyan else navItemColor
+                        text = "Paint",
+                        content = DesignR.drawable.ic_ps_brush,
+                        color = if (activeTool == Tool.BRUSH || activeTool == Tool.ERASER) Cyan else navItemColor
                     ) {
                         azRailItem(id = "tool.brush", text = "Brush", content = DesignR.drawable.ic_ps_brush, color = if (activeTool == Tool.BRUSH) Cyan else navItemColor) {
                             editorViewModel.setActiveTool(Tool.BRUSH)
@@ -1343,6 +1344,15 @@ class MainActivity : ComponentActivity() {
                         azRailItem(id = "tool.eraser", text = navStrings.eraser, content = DesignR.drawable.ic_ps_eraser, color = if (activeTool == Tool.ERASER) Cyan else navItemColor) {
                             editorViewModel.setActiveTool(Tool.ERASER)
                         }
+                    }
+
+                    azRailSubItem(
+                        id = "sub.design.retouch",
+                        hostId = "host.design",
+                        text = "Retouch",
+                        content = DesignR.drawable.ic_ps_blur,
+                        color = if (activeTool == Tool.BLUR || activeTool == Tool.LIQUIFY) Cyan else navItemColor
+                    ) {
                         azRailItem(id = "tool.blur", text = navStrings.blur, content = DesignR.drawable.ic_ps_blur, color = if (activeTool == Tool.BLUR) Cyan else navItemColor) {
                             editorViewModel.setActiveTool(Tool.BLUR)
                         }
@@ -1352,24 +1362,31 @@ class MainActivity : ComponentActivity() {
                     }
 
                     azRailSubItem(
-                        id = "sub.design.adjust",
+                        id = "sub.design.color",
                         hostId = "host.design",
-                        text = "Adjust",
-                        content = Icons.Default.Tune,
-                        color = navItemColor
+                        text = "Color",
+                        content = Icons.Default.Palette,
+                        color = if (activeLayer.isInverted) Cyan else navItemColor
                     ) {
-                        azRailItem(id = "adj.blend", text = navStrings.build, content = Icons.Default.Opacity, color = navItemColor) {
-                            editorViewModel.onCycleBlendMode()
-                        }
                         azRailItem(id = "adj.invert", text = navStrings.invert, content = Icons.Default.InvertColors, color = if (activeLayer.isInverted) Cyan else navItemColor) {
                             editorViewModel.onToggleInvert()
-                        }
-                        azRailItem(id = "adj.filters", text = navStrings.adjust, content = Icons.Default.Settings, color = navItemColor) {
-                            editorViewModel.onAdjustClicked()
                         }
                         azRailItem(id = "adj.balance", text = navStrings.balance, content = Icons.Default.Palette, color = navItemColor) {
                             editorViewModel.onBalanceClicked()
                         }
+                        azRailItem(id = "adj.blend", text = navStrings.build, content = Icons.Default.Opacity, color = navItemColor) {
+                            editorViewModel.onCycleBlendMode()
+                        }
+                    }
+
+                    azRailSubItem(
+                        id = "sub.design.filter",
+                        hostId = "host.design",
+                        text = "Filter",
+                        content = Icons.Default.Tune,
+                        color = navItemColor
+                    ) {
+                        editorViewModel.onAdjustClicked()
                     }
                 }
             }
