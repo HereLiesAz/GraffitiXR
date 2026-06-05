@@ -719,7 +719,9 @@ class MainActivity : ComponentActivity() {
                                     EditorOverlay(editorViewModel, mainUiState, strings)
                                 }
                                 composable(EditorMode.DESIGN.name) {
-                                    DesignScreen(editorUiState, editorViewModel)
+                                    // The design canvas is a background component (AzNavRail
+                                    // `background` layer, rendered full-screen behind the rail by
+                                    // MainScreen). Onscreen content here is only the editing overlay.
                                     EditorOverlay(editorViewModel, mainUiState, strings)
                                 }
                             }
