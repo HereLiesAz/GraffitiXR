@@ -1266,13 +1266,13 @@ class MainActivity : ComponentActivity() {
                     content = Icons.Default.Add,
                     color = navItemColor
                 ) {
-                    azRailItem(id = "design.addImg", text = navStrings.image, content = Icons.Default.Image, color = navItemColor) {
+                    azRailItem(id = "design.addImg", text = navStrings.image, content = DesignR.drawable.ic_ps_image, color = navItemColor) {
                         overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }
-                    azRailItem(id = "design.addDraw", text = navStrings.draw, content = Icons.Default.Brush, color = navItemColor) {
+                    azRailItem(id = "design.addDraw", text = navStrings.draw, content = DesignR.drawable.ic_ps_pencil, color = navItemColor) {
                         editorViewModel.onAddBlankLayer()
                     }
-                    azRailItem(id = "design.addText", text = navStrings.text, content = Icons.Default.TextFields, color = navItemColor) {
+                    azRailItem(id = "design.addText", text = navStrings.text, content = DesignR.drawable.ic_ps_text, color = navItemColor) {
                         editorViewModel.onAddTextLayer()
                     }
                     azRailItem(id = "design.wall", text = navStrings.wall, content = Icons.Default.Wallpaper, color = navItemColor) {
@@ -1285,7 +1285,7 @@ class MainActivity : ComponentActivity() {
                     id = "sub.design.layers",
                     hostId = "host.design",
                     text = "Layers",
-                    content = Icons.Default.Layers,
+                    content = DesignR.drawable.ic_ps_layers,
                     color = if (activeLayer != null) Cyan else navItemColor
                 ) {
                     editorUiState.layers.reversed().forEach { layer ->
@@ -1337,16 +1337,16 @@ class MainActivity : ComponentActivity() {
                         content = Icons.Default.Construction,
                         color = if (activeTool != Tool.NONE) Cyan else navItemColor
                     ) {
-                        azRailItem(id = "tool.brush", text = "Brush", content = Icons.Default.Brush, color = if (activeTool == Tool.BRUSH) Cyan else navItemColor) {
+                        azRailItem(id = "tool.brush", text = "Brush", content = DesignR.drawable.ic_ps_brush, color = if (activeTool == Tool.BRUSH) Cyan else navItemColor) {
                             editorViewModel.setActiveTool(Tool.BRUSH)
                         }
-                        azRailItem(id = "tool.eraser", text = navStrings.eraser, content = Icons.Default.AutoFixNormal, color = if (activeTool == Tool.ERASER) Cyan else navItemColor) {
+                        azRailItem(id = "tool.eraser", text = navStrings.eraser, content = DesignR.drawable.ic_ps_eraser, color = if (activeTool == Tool.ERASER) Cyan else navItemColor) {
                             editorViewModel.setActiveTool(Tool.ERASER)
                         }
-                        azRailItem(id = "tool.blur", text = navStrings.blur, content = Icons.Default.BlurOn, color = if (activeTool == Tool.BLUR) Cyan else navItemColor) {
+                        azRailItem(id = "tool.blur", text = navStrings.blur, content = DesignR.drawable.ic_ps_blur, color = if (activeTool == Tool.BLUR) Cyan else navItemColor) {
                             editorViewModel.setActiveTool(Tool.BLUR)
                         }
-                        azRailItem(id = "tool.liquify", text = navStrings.liquify, content = Icons.Default.Waves, color = if (activeTool == Tool.LIQUIFY) Cyan else navItemColor) {
+                        azRailItem(id = "tool.liquify", text = navStrings.liquify, content = DesignR.drawable.ic_ps_liquify, color = if (activeTool == Tool.LIQUIFY) Cyan else navItemColor) {
                             editorViewModel.setActiveTool(Tool.LIQUIFY)
                         }
                     }

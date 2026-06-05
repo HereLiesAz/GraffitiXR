@@ -1,0 +1,8 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24"
+    android:tint="?android:attr/colorControlNormal">
+    <!-- Photoshop-style "place image": framed photo with sun + mountains. -->
+    <path android:fillColor="@android:color/white"
+        android:pathData="M21,3H3C2.4,3 2,3.4 2,4v16c0,0.6 0.4,1 1,1h18c0.6,0 1,-0.4 1,-1V4C22,3.4 21.6,3 21,3zM20,19H4l4.5,-5.5l2.5,3l3.5,-4.5L20,19zM8,9.5C8,10.3 7.3,11 6.5,11S5,10.3 5,9.5S5.7,8 6.5,8S8,8.7 8,9.5z"/>
+</vector>

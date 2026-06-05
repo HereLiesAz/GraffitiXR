@@ -1,0 +1,12 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24"
+    android:tint="?android:attr/colorControlNormal">
+    <!-- Photoshop-style layers: stacked sheets. -->
+    <path android:fillColor="@android:color/white"
+        android:pathData="M12,2L2,8l10,6l10,-6L12,2zM12,4.3L18.1,8L12,11.7L5.9,8L12,4.3z"/>
+    <path android:fillColor="@android:color/white"
+        android:pathData="M4.2,11.4L2,12.7l10,6l10,-6l-2.2,-1.3L12,15.1L4.2,11.4z"/>
+    <path android:fillColor="@android:color/white"
+        android:pathData="M4.2,15.4L2,16.7l10,6l10,-6l-2.2,-1.3L12,19.1L4.2,15.4z"/>
+</vector>
