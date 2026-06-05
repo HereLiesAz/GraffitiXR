@@ -1401,7 +1401,7 @@ class MainActivity : ComponentActivity() {
                             }
 
                             // UNGROUPED TOOL — Filter sits directly in the nested rail
-                            azRailItem(id = "tool.filter", text = "Filter", content = Icons.Default.Tune, color = navItemColor, shape = AzButtonShape.NONE) {
+                            azRailItem(id = "tool.filter", text = navStrings.filter, content = Icons.Default.Tune, color = navItemColor, shape = AzButtonShape.NONE) {
                                 editorViewModel.onAdjustClicked()
                             }
                         }
