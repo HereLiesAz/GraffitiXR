@@ -146,7 +146,7 @@ private:
     bool computeRectifyHomography(const float* viewCur16, cv::Mat& Hcur_fp, cv::Mat& Hfp_cur, double& obliquityDeg);
 
     mutable std::mutex mMutex;
-    bool mIsArCoreTracking = false;
+    std::atomic<bool> mIsArCoreTracking{false};
 
     cv::Ptr<cv::ORB> mFeatureDetector;
     cv::Ptr<cv::DescriptorMatcher> mMatcher;    // BruteForce-Hamming for ORB (CV_8U)

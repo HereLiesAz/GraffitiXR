@@ -292,7 +292,16 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
         // No conversion on GL thread; pass raw YUV to map thread
         gLastColorFrame = yuv.clone();
     } else if (uvPixelStride == 2) {
-        cv::Mat uvInterleaved(height / 2, width, CV_8UC1, vData, uvStride);
+        jlong vCap = env->GetDirectBufferCapacity(vBuffer);
+        cv::Mat uvInterleaved = cv::Mat::zeros(height / 2, width, CV_8UC1);
+        size_t limit = (vCap > 0) ? (size_t)vCap : (size_t)((height / 2 - 1) * uvStride + width);
+        for (int r = 0; r < height / 2; ++r) {
+            size_t rowStart = r * uvStride;
+            size_t rowLen = std::min((size_t)width, (size_t)(limit > rowStart ? limit - rowStart : 0));
+            if (rowLen > 0) {
+                std::memcpy(uvInterleaved.ptr(r), vData + rowStart, rowLen);
+            }
+        }
         uvInterleaved.copyTo(yuv(cv::Rect(0, height, width, height / 2)));
         // No conversion on GL thread; pass raw YUV to map thread
         gLastColorFrame = yuv.clone();

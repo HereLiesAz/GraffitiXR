@@ -560,10 +560,30 @@ class ArRenderer(
                             }
                         }
 
-                        val intrArr = floatArrayOf(
-                            intrinsics.focalLength[0], intrinsics.focalLength[1],
-                            intrinsics.principalPoint[0], intrinsics.principalPoint[1]
-                        )
+                        var fx = intrinsics.focalLength[0]
+                        var fy = intrinsics.focalLength[1]
+                        var cx = intrinsics.principalPoint[0]
+                        var cy = intrinsics.principalPoint[1]
+                        val dims = intrinsics.imageDimensions
+                        val rawW = dims[0].toFloat()
+                        val rawH = dims[1].toFloat()
+
+                        when (rotationNeeded) {
+                            90 -> {
+                                val t_fx = fx; fx = fy; fy = t_fx
+                                val t_cx = cx; cx = rawH - cy; cy = t_cx
+                            }
+                            180 -> {
+                                cx = rawW - cx
+                                cy = rawH - cy
+                            }
+                            270 -> {
+                                val t_fx = fx; fx = fy; fy = t_fx
+                                val t_cx = cx; cx = cy; cy = rawW - t_cx
+                            }
+                        }
+
+                        val intrArr = floatArrayOf(fx, fy, cx, cy)
 
                         // Camera→point distance at the tapped pixel (Sub-project C). Map the tap from
                         // view pixels to the depth image via ARCore's rotation/crop-aware transform,

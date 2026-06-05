@@ -291,7 +291,21 @@ void MobileGS::relocThreadFunc() {
             mRelocRequested = false;
         }
 
-        if (frame.empty() || mWallDescriptors.empty() || mWallKeypoints3D.empty() || !mRelocEnabled) continue;
+        cv::Mat wallDescs;
+        std::vector<cv::Point3f> wallKps3d;
+        cv::Mat wallPatch;
+        float fpIntrinsics[4];
+        bool hasFpView = false;
+        {
+            std::lock_guard<std::mutex> lock(mMutex);
+            wallDescs = mWallDescriptors.clone();
+            wallKps3d = mWallKeypoints3D;
+            wallPatch = mWallPatch.clone();
+            memcpy(fpIntrinsics, mFingerprintIntrinsics, 4 * sizeof(float));
+            hasFpView = mHasFingerprintView;
+        }
+
+        if (frame.empty() || wallDescs.empty() || wallKps3d.empty() || !mRelocEnabled) continue;
 
         // Optionally enhance the RGB frame under low light before grayscale conversion
         cv::Mat workFrame = frame;
@@ -305,7 +319,7 @@ void MobileGS::relocThreadFunc() {
 
         // SuperPoint usable when loaded and the wall fingerprint is float-typed (or empty).
         const bool spOk = mSuperPoint.isLoaded() &&
-            (mWallDescriptors.empty() || mWallDescriptors.type() == CV_32F);
+            (wallDescs.empty() || wallDescs.type() == CV_32F);
 
         // Detect + Lowe-ratio match a gray image against the wall fingerprint. When Hback is non-empty
         // the matched keypoints are mapped through it (rectified frame -> current image) before being
@@ -317,16 +331,8 @@ void MobileGS::relocThreadFunc() {
             bool sp = spOk;
             if (sp && !mSuperPoint.detect(g, kps, descs)) sp = false;
             if (!sp) mFeatureDetector->detectAndCompute(g, cv::noArray(), kps, descs);
-            if (descs.empty()) return;
-
-            cv::Mat wallDescs;
-            std::vector<cv::Point3f> wallKps3d;
-            {
-                std::lock_guard<std::mutex> lock(mMutex);
-                wallDescs = mWallDescriptors.clone();
-                wallKps3d = mWallKeypoints3D;
-            }
-            if (wallDescs.empty()) return;
+            if (descs.empty() || wallDescs.empty()) return;
+            if (descs.type() != wallDescs.type()) return;
 
             cv::Ptr<cv::DescriptorMatcher>& matcher = (descs.type() == CV_32F) ? mL2Matcher : mMatcher;
             std::vector<std::vector<cv::DMatch>> matches;
@@ -367,7 +373,7 @@ void MobileGS::relocThreadFunc() {
         // known plane and VIO gives a pose, so the oblique-vs-frontal distortion is a homography we can
         // pre-cancel: warp the live frame into the fingerprint's frontal frame, match, and ADD the
         // correspondences mapped back to the current image (RANSAC filters any that don't fit).
-        if (mHasFingerprintView && mIsArCoreTracking && mWallKeypoints3D.size() >= 12) {
+        if (hasFpView && mIsArCoreTracking.load(std::memory_order_relaxed) && wallKps3d.size() >= 12) {
             cv::Mat Hcur_fp, Hfp_cur; double obliqDeg = 0.0;
             if (computeRectifyHomography(relocView, Hcur_fp, Hfp_cur, obliqDeg) && obliqDeg > 25.0) {
                 cv::Mat grayRect;
@@ -385,7 +391,7 @@ void MobileGS::relocThreadFunc() {
         // fingerprint patch -> matchability (relock confidence) + coverage (= painting-progress). The
         // corners/H -> IPPE prior is a later increment; here we consume the cheap signals. Inert unless
         // the distortion_head.onnx asset is bundled. Uses RAW gray (the head's SuperPoint expects it).
-        if (mDistortionHead.isLoaded() && !mWallPatch.empty() && !imgPts.empty()) {
+        if (mDistortionHead.isLoaded() && !wallPatch.empty() && !imgPts.empty()) {
             float cxs = 0, cys = 0;
             for (const auto& p : imgPts) { cxs += p.x; cys += p.y; }
             cxs /= (float)imgPts.size(); cys /= (float)imgPts.size();
@@ -395,14 +401,24 @@ void MobileGS::relocThreadFunc() {
             int x0 = std::max(0, std::min((int)cxs - side / 2, headGray.cols - side));
             int y0 = std::max(0, std::min((int)cys - side / 2, headGray.rows - side));
             cv::Mat crop = headGray(cv::Rect(x0, y0, side, side)).clone();
-            cv::Mat patch; { std::lock_guard<std::mutex> lock(mMutex); patch = mWallPatch.clone(); }
             std::array<float, 13> dist{};
-            if (mDistortionHead.run(crop, patch, dist)) {
+            if (mDistortionHead.run(crop, wallPatch, dist)) {
                 const float matchability = dist[11], coverage = dist[12];
-                if (matchability > 0.5f) mPaintingProgress.store(coverage, std::memory_order_relaxed);
+                if (matchability > 0.5f) {
+                    mPaintingProgress.store(coverage, std::memory_order_relaxed);
+                } else {
+                    float p = mPaintingProgress.load(std::memory_order_relaxed);
+                    mPaintingProgress.store(p * 0.9f, std::memory_order_relaxed);
+                }
                 LOGI("DistortionHead: match %.2f coverage %.2f tilt %.0f log2scale %.2f",
                      matchability, coverage, dist[8], dist[9]);
+            } else {
+                float p = mPaintingProgress.load(std::memory_order_relaxed);
+                mPaintingProgress.store(p * 0.9f, std::memory_order_relaxed);
             }
+        } else if (mDistortionHead.isLoaded()) {
+            float p = mPaintingProgress.load(std::memory_order_relaxed);
+            mPaintingProgress.store(p * 0.9f, std::memory_order_relaxed);
         }
 
         // Lowered floors so a close-up PARTIAL view (only a corner of the marks visible) can still
@@ -415,9 +431,9 @@ void MobileGS::relocThreadFunc() {
             // the 2D<->3D correspondence consistent) when available, else a coarse default. The old
             // hardcoded init supplied only 6 of the 9 entries, leaving the bottom row uninitialised.
             double fx = 1000.0, fy = 1000.0, cx = 960.0, cy = 540.0;
-            if (mFingerprintIntrinsics[0] > 0.0f && mFingerprintIntrinsics[1] > 0.0f) {
-                fx = mFingerprintIntrinsics[0]; fy = mFingerprintIntrinsics[1];
-                cx = mFingerprintIntrinsics[2]; cy = mFingerprintIntrinsics[3];
+            if (fpIntrinsics[0] > 0.0f && fpIntrinsics[1] > 0.0f) {
+                fx = fpIntrinsics[0]; fy = fpIntrinsics[1];
+                cx = fpIntrinsics[2]; cy = fpIntrinsics[3];
             }
             cv::Mat intr = (cv::Mat_<double>(3,3) << fx, 0, cx, 0, fy, cy, 0, 0, 1);
             StageTimer _pnpTimer(&mStageAccumMs[4], &mStageSamples[4]);
@@ -643,7 +659,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean) {
 
     {
         std::lock_guard<std::mutex> lock(mMutex);
-        if (mWallDescriptors.type() != newDescs.type() || mWallKeypoints3D.size() > 5000) return;
+        if (mWallDescriptors.type() != newDescs.type() || mWallDescriptors.cols != newDescs.cols || mWallKeypoints3D.size() > 5000) return;
         for (int i = 0; i < (int)newPts.size(); ++i) {
             mWallKeypoints3D.push_back(newPts[i]);
             mWallDescriptors.push_back(newDescs.row(i));
@@ -652,7 +668,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean) {
     LOGI("Teleological self-grow: promoted %zu marks (wall now %zu)", newPts.size(), mWallKeypoints3D.size());
 }
 void MobileGS::interpolateAnchorStep() {}
-void MobileGS::setArCoreTrackingState(bool t) { mIsArCoreTracking = t; }
+void MobileGS::setArCoreTrackingState(bool t) { mIsArCoreTracking.store(t, std::memory_order_relaxed); }
 
 void MobileGS::optimizeThreadFunc() {
     setpriority(PRIO_PROCESS, 0, 19);

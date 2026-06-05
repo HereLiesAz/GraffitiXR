@@ -17,30 +17,45 @@ import com.hereliesaz.graffitixr.design.theme.AppStrings
  */
 internal fun buildHelpItems(strings: AppStrings, layers: List<Layer>): Map<String, Any> {
     val base = mutableMapOf<String, Any>(
-        // Top-level main rail items
-        "mode.host" to strings.help.modeHost,
-        "target.host" to strings.help.targetHost,
-        "design.host" to strings.help.designHost,
-        "project.host.main" to strings.help.projectHost,
-        "tool.light" to strings.help.flashlight,
-        "tool.lockTrace" to strings.help.lockTrace,
-        // Host sub-items (visible inline when the host accordion is expanded)
+        // Modes menu
+        "host.modes" to strings.help.modeHost,
         "mode.ar" to strings.help.ar,
         "mode.overlay" to strings.help.overlay,
         "mode.mockup" to strings.help.mockup,
         "mode.trace" to strings.help.trace,
-        "target.scanModeToggle" to strings.help.scanModeToggle,
         "target.create" to strings.help.create,
+        "mode.mockup.wall" to strings.help.wall,
+
+        // Design menu
+        "host.design" to strings.help.designHost,
         "design.addImg" to strings.help.addImg,
         "design.addDraw" to strings.help.addDraw,
         "design.addText" to strings.help.addText,
         "design.wall" to strings.help.wall,
-        "project.new" to strings.help.newProject,
-        "project.save" to strings.help.saveProject,
-        "project.load" to strings.help.loadProject,
-        "project.export" to strings.help.exportImage,
-        "project.settings" to strings.help.appSettings,
-        "wearable.main" to strings.nav.wearableInfo,
+
+        // Tools menu
+        "sub.design.tools" to strings.help.designHost, // Use design host help for tools parent
+        "grp.paint" to strings.help.addDraw,
+        "tool.brush" to strings.help.size,
+        "tool.eraser" to strings.help.eraser,
+        "grp.retouch" to strings.help.blur,
+        "tool.blur" to strings.help.blur,
+        "tool.liquify" to strings.help.liquify,
+        "grp.color" to strings.help.adj,
+        "adj.invert" to strings.help.invert,
+        "adj.balance" to strings.help.balance,
+        "adj.blend" to strings.help.blend,
+        "tool.filter" to strings.help.adj,
+
+        // Project menu
+        "host.project" to strings.help.projectHost,
+        "proj.new" to strings.help.newProject,
+        "proj.save" to strings.help.saveProject,
+        "proj.load" to strings.help.loadProject,
+        "proj.settings" to strings.help.appSettings,
+
+        // Global
+        "item.help" to strings.nav.help
     )
 
     layers.forEach { layer ->

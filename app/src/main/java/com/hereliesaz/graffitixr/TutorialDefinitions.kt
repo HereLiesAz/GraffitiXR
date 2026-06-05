@@ -110,15 +110,12 @@ fun getTutorials(layers: List<Layer>, strings: AppStrings): Map<String, AzTutori
     val helpLine = resolve(strings.help.line)
 
     // --- Mode Menu ---
-    tutorials["mode.host"] = createSimpleTutorial("mode.host", navModes, helpModeHost)
+    tutorials["host.modes"] = createSimpleTutorial("host.modes", navModes, helpModeHost)
     tutorials["mode.ar"] = createSimpleTutorial("mode.ar", navArMode, helpAr)
     tutorials["mode.overlay"] = createSimpleTutorial("mode.overlay", navOverlay, helpOverlay)
     tutorials["mode.mockup"] = createSimpleTutorial("mode.mockup", navMockup, helpMockup)
     tutorials["mode.trace"] = createSimpleTutorial("mode.trace", navTrace, helpTrace)
-
-    // --- Target Menu ---
-    tutorials["target.host"] = createSimpleTutorial("target.host", navGrid, helpTargetHost)
-    tutorials["target.scanModeToggle"] = createSimpleTutorial("target.scanModeToggle", "$navCanvas / $navMural", helpScanModeToggle)
+    tutorials["mode.mockup.wall"] = createSimpleTutorial("mode.mockup.wall", navWall, helpWall)
 
     tutorials["target.create"] = azTutorial {
         scene(id = "create_intro", content = { Box(Modifier.fillMaxSize()) }) {
@@ -142,7 +139,7 @@ fun getTutorials(layers: List<Layer>, strings: AppStrings): Map<String, AzTutori
     }
 
     // --- Design Menu ---
-    tutorials["design.host"] = createSimpleTutorial("design.host", navDesign, helpDesignHost)
+    tutorials["host.design"] = createSimpleTutorial("host.design", navDesign, helpDesignHost)
 
     tutorials["design.addImg"] = azTutorial {
         scene(id = "add_img_intro", content = { Box(Modifier.fillMaxSize()) }) {
@@ -163,26 +160,30 @@ fun getTutorials(layers: List<Layer>, strings: AppStrings): Map<String, AzTutori
     tutorials["design.addText"] = createSimpleTutorial("design.addText", resolve(strings.nav.text), resolve(strings.help.addText))
     tutorials["design.wall"] = createSimpleTutorial("design.wall", navWall, helpWall)
 
+    // --- Tools Menu ---
+    tutorials["sub.design.tools"] = createSimpleTutorial("sub.design.tools", "Tools", helpDesignHost)
+    tutorials["grp.paint"] = createSimpleTutorial("grp.paint", "Paint", resolve(strings.help.addDraw))
+    tutorials["tool.brush"] = createSimpleTutorial("tool.brush", "Brush", helpSize)
+    tutorials["tool.eraser"] = createSimpleTutorial("tool.eraser", navEraser, helpEraser)
+    tutorials["grp.retouch"] = createSimpleTutorial("grp.retouch", "Retouch", helpBlur)
+    tutorials["tool.blur"] = createSimpleTutorial("tool.blur", navBlur, helpBlur)
+    tutorials["tool.liquify"] = createSimpleTutorial("tool.liquify", navLiquify, helpLiquify)
+    tutorials["grp.color"] = createSimpleTutorial("grp.color", "Color", helpAdj)
+    tutorials["adj.invert"] = createSimpleTutorial("adj.invert", navInvert, helpInvert)
+    tutorials["adj.balance"] = createSimpleTutorial("adj.balance", navBalance, helpBalance)
+    tutorials["adj.blend"] = createSimpleTutorial("adj.blend", navBuild, helpBlend)
+    tutorials["tool.filter"] = createSimpleTutorial("tool.filter", "Filter", helpAdj)
+
+
     // --- Project Menu ---
-    tutorials["project.host.main"] = createSimpleTutorial("project.host.main", navProject, helpProjectHost)
-    tutorials["project.new"] = createSimpleTutorial("project.new", navNew, helpNewProject)
-    tutorials["project.save"] = createSimpleTutorial("project.save", navSave, helpSaveProject)
-    tutorials["project.load"] = createSimpleTutorial("project.load", navLoad, helpLoadProject)
-    tutorials["project.export"] = createSimpleTutorial("project.export", navExport, helpExportImage)
-    tutorials["project.settings"] = createSimpleTutorial("project.settings", navSettings, helpAppSettings)
+    tutorials["host.project"] = createSimpleTutorial("host.project", navProject, helpProjectHost)
+    tutorials["proj.new"] = createSimpleTutorial("proj.new", navNew, helpNewProject)
+    tutorials["proj.save"] = createSimpleTutorial("proj.save", navSave, helpSaveProject)
+    tutorials["proj.load"] = createSimpleTutorial("proj.load", navLoad, helpLoadProject)
+    tutorials["proj.settings"] = createSimpleTutorial("proj.settings", navSettings, helpAppSettings)
 
     // --- Global Tools ---
-    tutorials["tool.light"] = createSimpleTutorial("tool.light", navLight, helpFlashlight)
-
-    tutorials["tool.lockTrace"] = azTutorial {
-        scene(id = "lock_trace_intro", content = { Box(Modifier.fillMaxSize()) }) {
-            card(
-                title = strings.editor.lock + " / " + strings.editor.freeze,
-                text = helpLockTrace,
-                highlight = AzHighlight.Item("tool.lockTrace")
-            )
-        }
-    }
+    tutorials["item.help"] = createSimpleTutorial("item.help", resolve(strings.nav.help), resolve(strings.nav.help))
 
     // --- Layers ---
     layers.forEach { layer ->

@@ -37,8 +37,15 @@ bool DistortionHead::run(const cv::Mat& grayCur, const cv::Mat& grayFp, std::arr
         mNet.setInput(blobCur, "image_cur");
         mNet.setInput(blobFp, "image_fp");
         cv::Mat o = mNet.forward("distortion");
-        if ((int)o.total() < 13) { LOGE("DistortionHead: bad output size %d", (int)o.total()); return false; }
-        const float* p = o.ptr<float>(0);
+        if (o.empty() || !o.isContinuous() || (int)o.total() < 13) {
+            LOGE("DistortionHead: bad output size or continuity. total=%d", (int)o.total());
+            return false;
+        }
+        if (o.dims > 0 && o.size[o.dims - 1] < 13 && (int)o.total() != 13) {
+            LOGE("DistortionHead: unexpected layout (inner dim = %d)", o.size[o.dims - 1]);
+            return false;
+        }
+        const float* p = reinterpret_cast<const float*>(o.data);
         for (int i = 0; i < 13; ++i) out[i] = p[i];
         return true;
     } catch (const cv::Exception& e) {

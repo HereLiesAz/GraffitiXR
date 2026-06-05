@@ -37,7 +37,8 @@ class ProjectManagerTest {
         every { Uri.fromFile(any()) } returns mockk(relaxed = true)
 
         uriProvider = mockk(relaxed = true)
-        manager = ProjectManager(mockContext, uriProvider)
+        val projectRepositoryProvider = mockk<javax.inject.Provider<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>>(relaxed = true)
+        manager = ProjectManager(mockContext, uriProvider, projectRepositoryProvider)
     }
 
     @After

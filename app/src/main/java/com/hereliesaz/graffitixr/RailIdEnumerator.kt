@@ -35,64 +35,48 @@ internal fun enumerateRailItemIds(layers: List<Layer>, mode: EditorMode): Set<St
 internal fun enumerateRailItemIdRegistrations(layers: List<Layer>, mode: EditorMode): List<String> {
     val ids = mutableListOf<String>()
 
-    // Mode menu
+    // Modes menu
     ids += listOf(
-        "mode.host", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace",
-        "wearable.main",
+        "host.modes", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace"
     )
     if (mode == EditorMode.AR) {
-        ids += listOf("target.scanModeToggle", "coop.main", "coop.join")
+        ids += "target.create"
     }
-
-    // Target menu (AR only)
-    if (mode == EditorMode.AR) {
-        ids += listOf("target.host", "target.create")
+    if (mode == EditorMode.MOCKUP) {
+        ids += "mode.mockup.wall"
     }
 
     // Design menu
     ids += listOf(
-        "design.host", "design.addImg", "design.addDraw", "design.addText",
+        "host.design", "design.addImg", "design.addDraw", "design.addText", "design.wall"
     )
-    if (mode == EditorMode.MOCKUP) {
-        ids += "design.wall"
-    }
 
     // Project menu
     ids += listOf(
-        "project.host.main", "project.new", "project.save", "project.load",
-        "project.export", "project.settings",
+        "host.project", "proj.new", "proj.save", "proj.load", "proj.settings"
     )
 
     // Global tools
-    ids += listOf("tool.light", "tool.lockTrace", "tool.helpMain")
+    ids += "item.help"
+
+    // Sub-design tools
+    if (layers.isNotEmpty()) {
+        ids += listOf(
+            "sub.design.tools",
+            "grp.paint", "tool.brush", "tool.eraser",
+            "grp.retouch", "tool.blur", "tool.liquify",
+            "grp.color", "adj.invert", "adj.balance", "adj.blend",
+            "tool.filter"
+        )
+    }
 
     // Per-layer
     layers.forEach { layer ->
         ids += listOf(
-            layerId(layer),
-            layerId(layer, "editText"),
-            layerId(layer, "size.brush"),
-            layerId(layer, "size.text"),
-            layerId(layer, "font"),
-            layerId(layer, "color"),
-            layerId(layer, "kern"),
-            layerId(layer, "bold"),
-            layerId(layer, "italic"),
-            layerId(layer, "outline"),
-            layerId(layer, "shadow"),
-            layerId(layer, "stencil"),
-            layerId(layer, "blend"),
-            layerId(layer, "adj"),
-            layerId(layer, "invert"),
-            layerId(layer, "balance"),
-            layerId(layer, "eraser"),
-            layerId(layer, "blur"),
-            layerId(layer, "liquify"),
-            layerId(layer, "dodge"),
-            layerId(layer, "burn"),
-            layerId(layer, "iso"),
-            layerId(layer, "line"),
-            "${layerId(layer)}.help",
+            "layer.${layer.id}",
+            "layer.${layer.id}.edit",
+            "layer.${layer.id}.hide",
+            "layer.${layer.id}.del"
         )
     }
 

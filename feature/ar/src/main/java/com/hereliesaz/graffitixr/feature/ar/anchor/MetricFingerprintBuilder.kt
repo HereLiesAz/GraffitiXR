@@ -74,9 +74,19 @@ object MetricFingerprintBuilder {
                 val c = matched.corrs[src]
                 keypoints.add(KeyPoint(c.u0, c.v0, 7f))
             }
-            val bytes = ByteArray(keptDesc.rows() * keptDesc.cols() * keptDesc.elemSize().toInt())
-            keptDesc.get(0, 0, bytes)
-            val rows = keptDesc.rows(); val cols = keptDesc.cols(); val type = keptDesc.type()
+            val type = keptDesc.type()
+            val rows = keptDesc.rows(); val cols = keptDesc.cols()
+            val bytes: ByteArray
+            if (type == org.opencv.core.CvType.CV_32F) {
+                val floats = FloatArray(rows * cols)
+                keptDesc.get(0, 0, floats)
+                val buffer = java.nio.ByteBuffer.allocate(floats.size * 4).order(java.nio.ByteOrder.nativeOrder())
+                buffer.asFloatBuffer().put(floats)
+                bytes = buffer.array()
+            } else {
+                bytes = ByteArray(rows * cols * keptDesc.elemSize().toInt())
+                keptDesc.get(0, 0, bytes)
+            }
             keptDesc.release()
 
             slam.restoreWallFingerprintMetric(
