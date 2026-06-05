@@ -23,6 +23,8 @@ class PlaneRenderer : GlReleasable {
     private var gridControlUniform = 0
     private var planeColorUniform = 0
     private var isOutlineUniform = 0
+    private var developUniform = 0
+    private var firstDrawNs = -1L // for the ink-spread develop ramp
 
     private var vertexBuffer = ByteBuffer.allocateDirect(1000 * 4) // Reusable buffer (Float = 4 bytes), grown on demand
         .order(ByteOrder.nativeOrder())
@@ -37,20 +39,36 @@ class PlaneRenderer : GlReleasable {
             uniform mat4 u_PlaneModel;
             uniform mat4 u_PlaneModelViewProjection;
             attribute vec2 a_PositionXZ;
+            varying vec2 v_PosXZ;
             void main() {
+                v_PosXZ = a_PositionXZ; // plane-local metres — anchored to the surface
                 gl_Position = u_PlaneModelViewProjection * vec4(a_PositionXZ.x, 0.0, a_PositionXZ.y, 1.0);
             }
         """.trimIndent()
 
+        // Ink-develop fill: the colour is "soaked" into the actual surface as a value-noise texture in
+        // plane-local space, so it stays put on the wall/floor as the camera moves (unlike the old
+        // screen-space reveal). It spreads in as u_Develop rises. Hue still carries the match meaning.
         val fragmentShaderCode = """
             precision mediump float;
             uniform vec4 u_Color;
             uniform int u_IsOutline;
+            uniform float u_Develop;
+            varying vec2 v_PosXZ;
+            float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+            float vnoise(vec2 p) {
+                vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+                float a = hash(i), b = hash(i + vec2(1.0, 0.0));
+                float c = hash(i + vec2(0.0, 1.0)), d = hash(i + vec2(1.0, 1.0));
+                return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+            }
             void main() {
                 if (u_IsOutline == 1) {
-                    gl_FragColor = vec4(u_Color.rgb, 1.0);
+                    gl_FragColor = vec4(u_Color.rgb, 0.9);
                 } else {
-                    gl_FragColor = u_Color;
+                    float n = vnoise(v_PosXZ * 18.0);
+                    float ink = smoothstep(n - 0.18, n + 0.18, u_Develop);
+                    gl_FragColor = vec4(u_Color.rgb, ink * 0.5);
                 }
             }
         """.trimIndent()
@@ -68,6 +86,7 @@ class PlaneRenderer : GlReleasable {
         gridControlUniform = GLES20.glGetUniformLocation(planeProgram, "u_gridControl")
         planeColorUniform = GLES20.glGetUniformLocation(planeProgram, "u_Color")
         isOutlineUniform = GLES20.glGetUniformLocation(planeProgram, "u_IsOutline")
+        developUniform = GLES20.glGetUniformLocation(planeProgram, "u_Develop")
     }
 
     fun drawPlanes(session: Session, viewMatrix: FloatArray, projectionMatrix: FloatArray, cameraPose: Pose) {
@@ -79,6 +98,12 @@ class PlaneRenderer : GlReleasable {
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
 
         GLES20.glUniform1f(gridControlUniform, 1.0f)
+
+        // Ink-spread progress: ramp 0->1 over ~1.5 s from the first drawn frame, so the colour visibly
+        // soaks into the surfaces as the scan gets going (then holds).
+        if (firstDrawNs < 0L) firstDrawNs = System.nanoTime()
+        val develop = ((System.nanoTime() - firstDrawNs) / 1_500_000_000.0f).coerceIn(0f, 1f)
+        GLES20.glUniform1f(developUniform, develop)
 
         for (plane in planes) {
             if (plane.trackingState != TrackingState.TRACKING || plane.subsumedBy != null) {

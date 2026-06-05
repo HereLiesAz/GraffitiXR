@@ -283,6 +283,18 @@ class ArRenderer(
             if (scanActive) backgroundRenderer.updateScanMask(visitedSectorsMask)
             backgroundRenderer.draw(frame, scanActive)
 
+            // Scan/world-mapping indicator: ink develops on ARCore's detected planes (real 3D surfaces
+            // that track with the world), so it reads as colour soaking into the wall/floor — not a flat
+            // screen overlay. Only while scanning and tracking.
+            if (scanActive && !hideVisualization) {
+                val cam = frame.camera
+                if (cam.trackingState == com.google.ar.core.TrackingState.TRACKING) {
+                    val pv = FloatArray(16); cam.getProjectionMatrix(pv, 0, 0.1f, 100.0f)
+                    val vv = FloatArray(16); cam.getViewMatrix(vv, 0)
+                    planeRenderer.drawPlanes(activeSession, vv, pv, cam.pose)
+                }
+            }
+
             if (pendingAnchorEstablishment) {
                 pendingAnchorEstablishment = false
                 try {
