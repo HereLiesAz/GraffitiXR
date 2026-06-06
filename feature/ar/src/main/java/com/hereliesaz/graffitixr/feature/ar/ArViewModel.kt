@@ -450,7 +450,7 @@ class ArViewModel @Inject constructor(
         }
         viewModelScope.launch {
             settingsRepository.arScanMode.collect { mode ->
-                _uiState.update { it.copy(arScanMode = mode) }
+                _uiState.update { it.copy(arScanMode = mode.coerceToCapability()) }
             }
         }
         viewModelScope.launch {
@@ -470,8 +470,16 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    // Whether this device can run MURAL scanning (gated on ARCore Depth API support, the app's
+    // existing capability premise). Defaults true until a session reports otherwise.
+    @Volatile private var deviceCanDoMural: Boolean = true
+
+    // MURAL requires depth; on devices that can't do it, fall back to Canvas (CLOUD_POINTS).
+    private fun ArScanMode.coerceToCapability(): ArScanMode =
+        if (!deviceCanDoMural && this == ArScanMode.MURAL) ArScanMode.CLOUD_POINTS else this
+
     fun setArScanMode(mode: ArScanMode) {
-        _uiState.update { it.copy(arScanMode = mode) }
+        _uiState.update { it.copy(arScanMode = mode.coerceToCapability()) }
     }
 
     fun setMuralMethod(method: MuralMethod) {
@@ -574,13 +582,18 @@ class ArViewModel @Inject constructor(
             // device offers it); the wall anchor uses plane detection. Re-enabling requires first
             // solving the VIO starvation.
             val useArCoreDepthApi = false
-            if (useArCoreDepthApi && s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
+            // Device capability for MURAL: whether ARCore supports the Depth API here. Independent of
+            // useArCoreDepthApi (which stays off for VIO reasons) — this is the device's true support.
+            deviceCanDoMural = s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
+            if (useArCoreDepthApi && deviceCanDoMural) {
                 config.depthMode = Config.DepthMode.AUTOMATIC
                 _uiState.update { it.copy(isDepthApiSupported = true) }
             } else {
                 config.depthMode = Config.DepthMode.DISABLED
                 _uiState.update { it.copy(isDepthApiSupported = false) }
             }
+            // Auto-fall-back to Canvas if this device can't do MURAL.
+            _uiState.update { it.copy(arScanMode = it.arScanMode.coerceToCapability()) }
             renderer?.depthApiEnabled = useArCoreDepthApi
 
             s.configure(config)
