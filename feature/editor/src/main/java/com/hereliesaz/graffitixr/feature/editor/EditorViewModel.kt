@@ -149,6 +149,11 @@ class EditorViewModel @Inject constructor(
 
                         dispatch(EditorIntent.LoadedProject(project.id, layers))
 
+                        val loadedModeAdjustments = project.modeAdjustments.mapNotNull { (key, value) ->
+                            runCatching { EditorMode.valueOf(key) }.getOrNull()?.let { it to value }
+                        }.toMap()
+                        dispatch(EditorIntent.SetAllModeAdjustments(loadedModeAdjustments))
+
                         val layersToLoad = layers.filter { it.bitmap == null && it.uri != null }
                         if (layersToLoad.isNotEmpty()) {
                             viewModelScope.launch(dispatchers.io) {
@@ -455,13 +460,15 @@ class EditorViewModel @Inject constructor(
             try {
             val currentProject = projectRepository.currentProject.value
             val updatedLayers = _uiState.value.layers.map { it.toOverlayLayer() }
+            val modeAdjustments = _uiState.value.modeAdjustments.mapKeys { it.key.name }
 
             val projectToSave = if (currentProject == null) {
-                GraffitiProject(name = name ?: "New Project", layers = updatedLayers)
+                GraffitiProject(name = name ?: "New Project", layers = updatedLayers, modeAdjustments = modeAdjustments)
             } else {
                 currentProject.copy(
                     name = name ?: currentProject.name,
                     layers = updatedLayers,
+                    modeAdjustments = modeAdjustments,
                     lastModified = System.currentTimeMillis()
                 )
             }
@@ -911,6 +918,29 @@ class EditorViewModel @Inject constructor(
             val rz = if (axis == RotationAxis.Z) layer.rotationZ + rotationDelta else layer.rotationZ
             layer.copy(scale = layer.scale * zoom, offset = layer.offset + pan, rotationX = rx, rotationY = ry, rotationZ = rz)
         }
+    }
+
+    // ── Per-mode whole-design adjustments ─────────────────────────────────────
+    /** Enter "edit the whole design as a unit for this mode" — transform gestures now drive the
+     *  mode adjustment rather than the active layer. */
+    fun onModeLayerSelected(mode: EditorMode) {
+        dispatch(EditorIntent.SetActiveTool(Tool.NONE))
+        dispatch(EditorIntent.SetEditingModeLayer(true))
+    }
+    fun onModeLayerDeselected() = dispatch(EditorIntent.SetEditingModeLayer(false))
+
+    fun onModeTransformGesture(mode: EditorMode, pan: Offset, zoom: Float, rotationDelta: Float) {
+        dispatch(EditorIntent.ApplyModeTransformGesture(mode, pan, zoom, rotationDelta))
+    }
+
+    fun onModeAdjustmentChanged(mode: EditorMode, adjustment: ModeAdjustment) {
+        dispatch(EditorIntent.SetModeAdjustment(mode, adjustment))
+        saveProject()
+    }
+
+    fun onModeLayerReset(mode: EditorMode) {
+        dispatch(EditorIntent.SetModeAdjustment(mode, ModeAdjustment()))
+        saveProject()
     }
 
     override fun onGestureEnd() {

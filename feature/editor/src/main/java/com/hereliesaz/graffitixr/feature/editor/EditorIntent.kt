@@ -5,6 +5,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.Layer
+import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.common.model.LayerProps
 import com.hereliesaz.graffitixr.common.model.TextLayerParams
 import com.hereliesaz.graffitixr.common.model.Tool
@@ -56,6 +57,12 @@ internal sealed interface EditorIntent {
     data object ToggleAdjustPanel : EditorIntent
     data object DismissPanel : EditorIntent
     data class SetEditorMode(val mode: EditorMode) : EditorIntent
+
+    // ── Per-mode whole-design adjustments ─────────────────────────────────────
+    data class SetEditingModeLayer(val editing: Boolean) : EditorIntent
+    data class SetModeAdjustment(val mode: EditorMode, val adjustment: ModeAdjustment) : EditorIntent
+    data class SetAllModeAdjustments(val adjustments: Map<EditorMode, ModeAdjustment>) : EditorIntent
+    data class ApplyModeTransformGesture(val mode: EditorMode, val pan: Offset, val zoom: Float, val rotation: Float) : EditorIntent
     data class SetGestureInProgress(val inProgress: Boolean) : EditorIntent
 
     // ── Effect-result / transient flags (dispatched by the VM around async work) ───

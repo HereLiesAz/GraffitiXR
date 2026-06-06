@@ -117,6 +117,28 @@ enum class RotationAxis {
 }
 
 /**
+ * Whole-design adjustment applied per [EditorMode]. Lets the user position and tone the entire
+ * mural as a single unit for one mode (e.g. line it up on a wall in MOCKUP) without altering the
+ * underlying Design layers. Identity = no change. Persisted per mode; Design edits stay global.
+ */
+@Serializable
+data class ModeAdjustment(
+    val offsetX: Float = 0f,
+    val offsetY: Float = 0f,
+    val scale: Float = 1f,
+    val rotation: Float = 0f,
+    val brightness: Float = 0f,
+    val contrast: Float = 1f,
+    val saturation: Float = 1f,
+    val opacity: Float = 1f,
+    val isInverted: Boolean = false,
+) {
+    val isIdentity: Boolean
+        get() = offsetX == 0f && offsetY == 0f && scale == 1f && rotation == 0f &&
+            brightness == 0f && contrast == 1f && saturation == 1f && opacity == 1f && !isInverted
+}
+
+/**
  * The global state for the Editor UI, including AR and Gesture feedback flags.
  */
 data class EditorUiState(
@@ -160,4 +182,10 @@ data class EditorUiState(
     // One-shot: set to a freshly-created text layer's id so the UI can immediately open its
     // edit-text box. Cleared once consumed.
     val autoEditTextLayerId: String? = null,
+    // Per-mode whole-design adjustments (transform + tone). Applied to the composited design in
+    // that mode only; Design-mode layer edits stay global across all modes.
+    val modeAdjustments: Map<EditorMode, ModeAdjustment> = emptyMap(),
+    // True while the user is editing the whole design as a unit (via a mode's "Layer" item), so
+    // transform gestures drive the mode adjustment instead of the active layer.
+    val editingModeLayer: Boolean = false,
 )
