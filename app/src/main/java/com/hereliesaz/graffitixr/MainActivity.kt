@@ -772,17 +772,8 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            val showDepthWarning = editorUiState.editorMode == EditorMode.AR
-                                    && arUiState.arScanMode == ArScanMode.MURAL
-                                    && !arUiState.isDepthApiSupported
-                                    && arUiState.splatCount == 0
-                            if (showDepthWarning && !showLibrary && !showSettings) {
-                                DepthApiUnsupportedBanner(
-                                    modifier = Modifier
-                                        .align(Alignment.TopCenter)
-                                        .padding(top = 16.dp)
-                                )
-                            }
+                            // Depth-unsupported devices auto-fall-back to Canvas (handled in
+                            // ArViewModel), so the old "switch to Canvas in Settings" banner is gone.
 
                             if (editorUiState.editorMode == EditorMode.AR
                                 && !arUiState.isArCoreAvailable
@@ -2018,21 +2009,6 @@ private fun WallSourceDialog(
             AzButton(text = stringResource(DesignR.string.choose_from_gallery), onClick = onGallery, shape = AzButtonShape.RECTANGLE)
         }
     )
-}
-
-@Composable
-private fun DepthApiUnsupportedBanner(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .background(Color(0xEECC4400), RoundedCornerShape(12.dp))
-            .padding(horizontal = 20.dp, vertical = 10.dp)
-    ) {
-        Text(
-            text = stringResource(DesignR.string.depth_unsupported),
-            color = HotPink,
-            textAlign = TextAlign.Center
-        )
-    }
 }
 
 @Composable

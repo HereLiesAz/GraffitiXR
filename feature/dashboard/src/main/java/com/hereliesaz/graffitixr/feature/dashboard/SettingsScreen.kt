@@ -218,7 +218,7 @@ fun SettingsScreen(
                             val modes = ArScanMode.entries
                             val nextMode = modes[(arScanMode.ordinal + 1) % modes.size]
                             val scanModeValue = when (arScanMode) {
-                                ArScanMode.CLOUD_POINTS -> strings.settings.pointCloud
+                                ArScanMode.CLOUD_POINTS -> strings.nav.canvas
                                 ArScanMode.MURAL -> strings.nav.mural
                             }
                             SettingsItem(
