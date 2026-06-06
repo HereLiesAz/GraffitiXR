@@ -1283,16 +1283,15 @@ class MainActivity : ComponentActivity() {
             id = "$modeId.layer",
             hostId = modeId,
             text = "Layer",
-            content = Icons.Default.Layers,
             color = if (active) Cyan else navItemColor,
             shape = AzButtonShape.NONE,
             onClick = { editorViewModel.onModeLayerSelected(mode) }
         )
-        azRailSubItem(id = "$modeId.layer.adjust", hostId = "$modeId.layer", text = navStrings.adjust, content = Icons.Default.Tune, color = navItemColor, shape = AzButtonShape.NONE) {
+        azRailSubItem(id = "$modeId.layer.adjust", hostId = "$modeId.layer", text = navStrings.adjust, color = navItemColor, shape = AzButtonShape.NONE) {
             editorViewModel.onModeLayerSelected(mode)
             onOpenModeAdjust(mode)
         }
-        azRailSubItem(id = "$modeId.layer.reset", hostId = "$modeId.layer", text = "Reset", content = Icons.Default.Refresh, color = navItemColor, shape = AzButtonShape.NONE) {
+        azRailSubItem(id = "$modeId.layer.reset", hostId = "$modeId.layer", text = "Reset", color = navItemColor, shape = AzButtonShape.NONE) {
             editorViewModel.onModeLayerReset(mode)
         }
     }
@@ -1338,7 +1337,6 @@ class MainActivity : ComponentActivity() {
             azRailHostItem(
                 id = "host.design",
                 text = navStrings.design,
-                content = Icons.Default.Palette,
                 color = if (isDesignMode) Cyan else navItemColor,
                 onClick = {
                     // From a Mode, tapping Design navigates to the dedicated Design screen. In Design it
@@ -1353,13 +1351,13 @@ class MainActivity : ComponentActivity() {
             )
 
             if (isDesignMode) {
-                azRailSubItem(id = "design.addImg", hostId = "host.design", text = "Open", content = DesignR.drawable.ic_ps_image, color = navItemColor, shape = AzButtonShape.NONE) {
+                azRailSubItem(id = "design.addImg", hostId = "host.design", text = "Open", color = navItemColor, shape = AzButtonShape.NONE) {
                     overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
-                azRailSubItem(id = "design.addDraw", hostId = "host.design", text = "Sketch", content = DesignR.drawable.ic_ps_pencil, color = navItemColor, shape = AzButtonShape.NONE) {
+                azRailSubItem(id = "design.addDraw", hostId = "host.design", text = "Sketch", color = navItemColor, shape = AzButtonShape.NONE) {
                     editorViewModel.onAddBlankLayer()
                 }
-                azRailSubItem(id = "design.addText", hostId = "host.design", text = "Text", content = DesignR.drawable.ic_ps_text, color = navItemColor, shape = AzButtonShape.NONE) {
+                azRailSubItem(id = "design.addText", hostId = "host.design", text = "Text", color = navItemColor, shape = AzButtonShape.NONE) {
                     editorViewModel.onAddTextLayer()
                 }
 
@@ -1368,7 +1366,7 @@ class MainActivity : ComponentActivity() {
                 // editing tools (edit/size/font/color/blend/invert/paint/retouch/etc.). The hidden
                 // menu carries link/duplicate/copy/flatten/delete.
                 if (editorUiState.layers.isNotEmpty()) {
-                    azRailSubHostItem(id = "design.layers", hostId = "host.design", text = "Layers", content = DesignR.drawable.ic_ps_layers, color = navItemColor, shape = AzButtonShape.RECTANGLE)
+                    azRailSubHostItem(id = "design.layers", hostId = "host.design", text = "Layers", color = navItemColor, shape = AzButtonShape.RECTANGLE)
                 }
                 editorUiState.layers.reversed().forEach { layer ->
                     val activeTool = editorUiState.activeTool
@@ -1937,40 +1935,39 @@ class MainActivity : ComponentActivity() {
             azRailHostItem(
                 id = "host.modes",
                 text = navStrings.modes,
-                content = Icons.Default.SettingsSuggest,
                 color = navItemColor
             )
 
             val showArModeEntry = !arUiState.isArCoreAvailabilityResolved || arUiState.isArCoreAvailable
             if (showArModeEntry) {
                 // AR is a sub-host: it navigates to AR mode and contains its tools.
-                azRailSubHostItem(id = "mode.ar", hostId = "host.modes", text = navStrings.arMode, content = Icons.Default.ViewInAr, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE)
+                azRailSubHostItem(id = "mode.ar", hostId = "host.modes", text = navStrings.arMode, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE)
                 // Target capture — only meaningful while in AR mode.
                 if (editorUiState.editorMode == EditorMode.AR) {
-                    azRailSubItem(id = "target.create", hostId = "mode.ar", text = navStrings.grid, content = Icons.Default.AddAPhoto, color = navItemColor, shape = AzButtonShape.NONE) {
+                    azRailSubItem(id = "target.create", hostId = "mode.ar", text = navStrings.grid, color = navItemColor, shape = AzButtonShape.NONE) {
                         if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
                     }
                 }
                 modeLayerSubHost("mode.ar", EditorMode.AR, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
             }
 
-            azRailSubHostItem(id = "mode.overlay", hostId = "host.modes", text = navStrings.overlay, content = Icons.Default.Layers, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE)
+            azRailSubHostItem(id = "mode.overlay", hostId = "host.modes", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE)
             modeLayerSubHost("mode.overlay", EditorMode.OVERLAY, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
 
             // Mockup ▸ Wall ▸ { Photo (take a photo), File (pick an image) }
-            azRailSubHostItem(id = "mode.mockup", hostId = "host.modes", text = navStrings.mockup, content = Icons.Default.CameraAlt, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE)
-            azRailSubHostItem(id = "mockup.wall", hostId = "mode.mockup", text = navStrings.wall, content = Icons.Default.Wallpaper, color = navItemColor, shape = AzButtonShape.NONE)
-            azRailSubItem(id = "wall.photo", hostId = "mockup.wall", text = navStrings.photo, content = Icons.Default.PhotoCamera, color = navItemColor, shape = AzButtonShape.NONE) {
+            azRailSubHostItem(id = "mode.mockup", hostId = "host.modes", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE)
+            azRailSubHostItem(id = "mockup.wall", hostId = "mode.mockup", text = navStrings.wall, color = navItemColor, shape = AzButtonShape.NONE)
+            azRailSubItem(id = "wall.photo", hostId = "mockup.wall", text = navStrings.photo, color = navItemColor, shape = AzButtonShape.NONE) {
                 onWallPhoto()
             }
-            azRailSubItem(id = "wall.file", hostId = "mockup.wall", text = navStrings.file, content = Icons.Default.InsertDriveFile, color = navItemColor, shape = AzButtonShape.NONE) {
+            azRailSubItem(id = "wall.file", hostId = "mockup.wall", text = navStrings.file, color = navItemColor, shape = AzButtonShape.NONE) {
                 backgroundPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             }
             modeLayerSubHost("mode.mockup", EditorMode.MOCKUP, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
 
             // Trace ▸ Freeze (+ Layer)
-            azRailSubHostItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, content = Icons.Default.LightMode, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE)
-            azRailSubItem(id = "mode.trace.freeze", hostId = "mode.trace", text = "Freeze", content = Icons.Default.Lock, color = navItemColor, shape = AzButtonShape.NONE) {
+            azRailSubHostItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE)
+            azRailSubItem(id = "mode.trace.freeze", hostId = "mode.trace", text = "Freeze", color = navItemColor, shape = AzButtonShape.NONE) {
                 mainViewModel.setTouchLocked(!isTouchLocked)
             }
             modeLayerSubHost("mode.trace", EditorMode.TRACE, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
@@ -1979,16 +1976,15 @@ class MainActivity : ComponentActivity() {
             azRailHostItem(
                 id = "host.project",
                 text = navStrings.project,
-                content = Icons.Default.Folder,
                 color = navItemColor
             )
-            azRailSubItem(id = "proj.new", hostId = "host.project", text = navStrings.new, content = Icons.Default.CreateNewFolder, color = navItemColor, shape = AzButtonShape.NONE) {                dashboardViewModel.onNewProjectTriggered()
+            azRailSubItem(id = "proj.new", hostId = "host.project", text = navStrings.new, color = navItemColor, shape = AzButtonShape.NONE) {                dashboardViewModel.onNewProjectTriggered()
             }
-            azRailSubItem(id = "proj.save", hostId = "host.project", text = navStrings.save, content = Icons.Default.Save, color = navItemColor, shape = AzButtonShape.NONE) {                showSaveDialog = true
+            azRailSubItem(id = "proj.save", hostId = "host.project", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE) {                showSaveDialog = true
             }
-            azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, content = Icons.Default.FolderOpen, color = navItemColor, shape = AzButtonShape.NONE) {                navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
+            azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {                navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
             }
-            azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, content = Icons.Default.Settings, color = navItemColor, shape = AzButtonShape.NONE) {                showSettings = true
+            azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE) {                showSettings = true
             }
 
             azDivider()
@@ -1996,7 +1992,6 @@ class MainActivity : ComponentActivity() {
             azRailItem(
                 id = "item.help",
                 text = navStrings.help,
-                content = Icons.Default.Help,
                 color = if (tutorialModeActive) Cyan else navItemColor,
                 onClick = { mainViewModel.toggleTutorialMode() }
             )
