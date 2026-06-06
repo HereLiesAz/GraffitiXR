@@ -1368,7 +1368,7 @@ class MainActivity : ComponentActivity() {
                 // editing tools (edit/size/font/color/blend/invert/paint/retouch/etc.). The hidden
                 // menu carries link/duplicate/copy/flatten/delete.
                 if (editorUiState.layers.isNotEmpty()) {
-                    azRailSubHostItem(id = "design.layers", hostId = "host.design", text = "Layers", content = DesignR.drawable.ic_ps_layers, color = navItemColor, shape = AzButtonShape.NONE)
+                    azRailSubHostItem(id = "design.layers", hostId = "host.design", text = "Layers", content = DesignR.drawable.ic_ps_layers, color = navItemColor, shape = AzButtonShape.RECTANGLE)
                 }
                 editorUiState.layers.reversed().forEach { layer ->
                     val activeTool = editorUiState.activeTool
@@ -1383,6 +1383,7 @@ class MainActivity : ComponentActivity() {
                             layer.isLinked -> NeonGreen                       // linked (its own color)
                             else -> HotPink                                   // any other layer
                         },
+                        shape = AzButtonShape.NONE,
                         nestedRailAlignment = AzNestedRailAlignment.VERTICAL,
                         keepNestedRailOpen = true,
                         forceHiddenMenuOpen = forceOpenHiddenMenu,
