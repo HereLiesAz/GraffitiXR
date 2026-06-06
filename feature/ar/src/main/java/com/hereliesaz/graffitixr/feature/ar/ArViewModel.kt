@@ -470,8 +470,8 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    // Whether this device can run MURAL scanning (gated on ARCore Depth API support, the app's
-    // existing capability premise). Defaults true until a session reports otherwise.
+    // Whether this device can run MURAL scanning. MURAL needs dual-lens (hardware-stereo) depth
+    // triangulation; set from the session's hardware-stereo support. Defaults true until known.
     @Volatile private var deviceCanDoMural: Boolean = true
 
     // MURAL requires depth; on devices that can't do it, fall back to Canvas (CLOUD_POINTS).
@@ -582,18 +582,13 @@ class ArViewModel @Inject constructor(
             // device offers it); the wall anchor uses plane detection. Re-enabling requires first
             // solving the VIO starvation.
             val useArCoreDepthApi = false
-            // Device capability for MURAL: whether ARCore supports the Depth API here. Independent of
-            // useArCoreDepthApi (which stays off for VIO reasons) — this is the device's true support.
-            deviceCanDoMural = s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
-            if (useArCoreDepthApi && deviceCanDoMural) {
+            if (useArCoreDepthApi && s.isDepthModeSupported(Config.DepthMode.AUTOMATIC)) {
                 config.depthMode = Config.DepthMode.AUTOMATIC
                 _uiState.update { it.copy(isDepthApiSupported = true) }
             } else {
                 config.depthMode = Config.DepthMode.DISABLED
                 _uiState.update { it.copy(isDepthApiSupported = false) }
             }
-            // Auto-fall-back to Canvas if this device can't do MURAL.
-            _uiState.update { it.copy(arScanMode = it.arScanMode.coerceToCapability()) }
             renderer?.depthApiEnabled = useArCoreDepthApi
 
             s.configure(config)
@@ -628,7 +623,16 @@ class ArViewModel @Inject constructor(
                 stereoActive = false
                 Timber.i("dual-lens: no hardware-stereo config on this device — using mono")
             }
-            _uiState.update { it.copy(isDualLensActive = stereoActive, isHardwareStereoActive = stereoActive) }
+            // MURAL needs dual-lens (hardware-stereo) depth triangulation. Devices without a second
+            // rear lens (e.g. Pixel 5) can't do it, so auto-fall-back to Canvas.
+            deviceCanDoMural = stereoActive
+            _uiState.update {
+                it.copy(
+                    isDualLensActive = stereoActive,
+                    isHardwareStereoActive = stereoActive,
+                    arScanMode = it.arScanMode.coerceToCapability()
+                )
+            }
 
             session = s
             _isCameraInUseByAr.value = true
