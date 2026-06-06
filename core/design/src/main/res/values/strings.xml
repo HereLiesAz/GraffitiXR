@@ -257,6 +257,10 @@
     <string name="nav_blur">Blur</string>
     <!-- Action label for the filter/adjustments tool. -->
     <string name="nav_filter">Filter</string>
+    <!-- Wall background source: take a photo with the camera. -->
+    <string name="nav_photo">Photo</string>
+    <!-- Wall background source: pick an existing image file. -->
+    <string name="nav_file">File</string>
     <!-- Action label for the liquify/warp tool. -->
     <string name="nav_liquify">Liquify</string>
     <!-- Action label for the dodge/lighten tool. -->

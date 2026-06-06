@@ -502,7 +502,17 @@ class MainActivity : ComponentActivity() {
                             tutorialModeActive = mainUiState.tutorialModeActive,
                             coopState = coopState,
                             isTouchLocked = mainUiState.isTouchLocked,
-                            onShowJoinScanner = { showJoinScanner = true }
+                            onShowJoinScanner = { showJoinScanner = true },
+                            onWallPhoto = {
+                                if (hasCameraPermission) {
+                                    val tmpFile = File(context.cacheDir, "wall_camera_${System.currentTimeMillis()}.jpg")
+                                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tmpFile)
+                                    cameraUri = uri.toString()
+                                    takePictureLauncher.launch(uri)
+                                } else {
+                                    permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
+                                }
+                            }
                         )
                     }
 
@@ -1251,7 +1261,8 @@ class MainActivity : ComponentActivity() {
         tutorialModeActive: Boolean = false,
         coopState: CoopSessionState = CoopSessionState.Idle,
         isTouchLocked: Boolean,
-        onShowJoinScanner: () -> Unit = {}
+        onShowJoinScanner: () -> Unit = {},
+        onWallPhoto: () -> Unit = {}
     ) {
         val navStrings = strings.nav
         val requestPermissions = {
@@ -1297,17 +1308,20 @@ class MainActivity : ComponentActivity() {
                     editorViewModel.onAddTextLayer()
                 }
 
-                // LAYERS — each layer is a relocItem (drag to reorder) emitted directly under the
-                // Design host. Tapping a layer opens its nested rail of editing tools (edit/size/
-                // font/color/blend/invert/paint/retouch/etc.), restored wholesale from the working
-                // pre-refactor rail. The hidden menu carries link/duplicate/copy/flatten/delete.
+                // LAYERS — contained in a "Layers" sub-host under Design (9.6 nested hosts).
+                // Each layer is a relocItem (drag to reorder); tapping it opens its nested rail of
+                // editing tools (edit/size/font/color/blend/invert/paint/retouch/etc.). The hidden
+                // menu carries link/duplicate/copy/flatten/delete.
+                if (editorUiState.layers.isNotEmpty()) {
+                    azRailSubHostItem(id = "design.layers", hostId = "host.design", text = "Layers", content = DesignR.drawable.ic_ps_layers, color = navItemColor, shape = AzButtonShape.NONE)
+                }
                 editorUiState.layers.reversed().forEach { layer ->
                     val activeTool = editorUiState.activeTool
                     val forceOpenHiddenMenu = layerMenusOpen[layer.id] ?: false
 
                     azRailRelocItem(
                         id = layerId(layer),
-                        hostId = "host.design",
+                        hostId = "design.layers",
                         text = layer.name,
                         color = when {
                             editorUiState.activeLayerId == layer.id -> Cyan   // selected
@@ -1873,26 +1887,32 @@ class MainActivity : ComponentActivity() {
 
             val showArModeEntry = !arUiState.isArCoreAvailabilityResolved || arUiState.isArCoreAvailable
             if (showArModeEntry) {
-                azRailSubItem(id = "mode.ar", hostId = "host.modes", text = navStrings.arMode, content = Icons.Default.ViewInAr, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE)
-            }
-            // Target capture sits directly under AR; only shown while in AR mode.
-            if (editorUiState.editorMode == EditorMode.AR) {
-                azRailSubItem(id = "target.create", hostId = "host.modes", text = navStrings.grid, content = Icons.Default.AddAPhoto, color = navItemColor, shape = AzButtonShape.NONE) {
-                    if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
+                // AR is a sub-host: it navigates to AR mode and contains its tools.
+                azRailSubHostItem(id = "mode.ar", hostId = "host.modes", text = navStrings.arMode, content = Icons.Default.ViewInAr, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE)
+                // Target capture — only meaningful while in AR mode.
+                if (editorUiState.editorMode == EditorMode.AR) {
+                    azRailSubItem(id = "target.create", hostId = "mode.ar", text = navStrings.grid, content = Icons.Default.AddAPhoto, color = navItemColor, shape = AzButtonShape.NONE) {
+                        if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
+                    }
                 }
             }
-            azRailSubItem(id = "mode.overlay", hostId = "host.modes", text = navStrings.overlay, content = Icons.Default.Layers, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE)
-            
-            azRailSubItem(id = "mode.mockup", hostId = "host.modes", text = navStrings.mockup, content = Icons.Default.CameraAlt, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE) {
-                azRailItem(id = "mode.mockup.wall", text = navStrings.wall, content = Icons.Default.Wallpaper, color = navItemColor, shape = AzButtonShape.NONE) {
-                    showWallSourceDialog = true
-                }
+
+            azRailSubHostItem(id = "mode.overlay", hostId = "host.modes", text = navStrings.overlay, content = Icons.Default.Layers, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE)
+
+            // Mockup ▸ Wall ▸ { Photo (take a photo), File (pick an image) }
+            azRailSubHostItem(id = "mode.mockup", hostId = "host.modes", text = navStrings.mockup, content = Icons.Default.CameraAlt, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE)
+            azRailSubHostItem(id = "mockup.wall", hostId = "mode.mockup", text = navStrings.wall, content = Icons.Default.Wallpaper, color = navItemColor, shape = AzButtonShape.NONE)
+            azRailSubItem(id = "wall.photo", hostId = "mockup.wall", text = navStrings.photo, content = Icons.Default.PhotoCamera, color = navItemColor, shape = AzButtonShape.NONE) {
+                onWallPhoto()
             }
-            
-            azRailSubItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, content = Icons.Default.LightMode, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE) {
-                azRailItem(id = "mode.trace.freeze", text = "Freeze", content = Icons.Default.Lock, color = navItemColor, shape = AzButtonShape.NONE) {
-                    mainViewModel.setTouchLocked(!isTouchLocked)
-                }
+            azRailSubItem(id = "wall.file", hostId = "mockup.wall", text = navStrings.file, content = Icons.Default.InsertDriveFile, color = navItemColor, shape = AzButtonShape.NONE) {
+                backgroundPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            }
+
+            // Trace ▸ Freeze (+ Layer)
+            azRailSubHostItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, content = Icons.Default.LightMode, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE)
+            azRailSubItem(id = "mode.trace.freeze", hostId = "mode.trace", text = "Freeze", content = Icons.Default.Lock, color = navItemColor, shape = AzButtonShape.NONE) {
+                mainViewModel.setTouchLocked(!isTouchLocked)
             }
 
             // 4. PROJECT FOLDER
