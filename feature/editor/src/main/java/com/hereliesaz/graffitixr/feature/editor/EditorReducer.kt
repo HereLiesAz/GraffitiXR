@@ -4,6 +4,7 @@ import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorPanel
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.Layer
+import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.common.model.RotationAxis
 import com.hereliesaz.graffitixr.common.model.Tool
 
@@ -72,6 +73,21 @@ internal object EditorReducer {
         EditorIntent.DismissPanel -> state.copy(activePanel = EditorPanel.NONE)
         is EditorIntent.SetGestureInProgress -> state.copy(gestureInProgress = intent.inProgress)
         is EditorIntent.SetEditorMode -> reduceEditorMode(state, intent.mode)
+
+        is EditorIntent.SetEditingModeLayer -> state.copy(editingModeLayer = intent.editing)
+        is EditorIntent.SetModeAdjustment ->
+            state.copy(modeAdjustments = state.modeAdjustments + (intent.mode to intent.adjustment))
+        is EditorIntent.SetAllModeAdjustments -> state.copy(modeAdjustments = intent.adjustments)
+        is EditorIntent.ApplyModeTransformGesture -> {
+            val cur = state.modeAdjustments[intent.mode] ?: ModeAdjustment()
+            val updated = cur.copy(
+                offsetX = cur.offsetX + intent.pan.x,
+                offsetY = cur.offsetY + intent.pan.y,
+                scale = (cur.scale * intent.zoom).coerceIn(0.1f, 10f),
+                rotation = cur.rotation + intent.rotation,
+            )
+            state.copy(modeAdjustments = state.modeAdjustments + (intent.mode to updated))
+        }
 
         is EditorIntent.SetLoading -> state.copy(isLoading = intent.loading)
         is EditorIntent.SetBackgroundBitmap -> state.copy(backgroundBitmap = intent.bitmap)

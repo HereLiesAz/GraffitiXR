@@ -124,5 +124,8 @@ data class GraffitiProject(
     // Path to the point cloud file (.bin) if using cloud-points scan mode
     val cloudPointsPath: String? = null,
     val targetFingerprint: String? = null,
-    val isRightHanded: Boolean = true
+    val isRightHanded: Boolean = true,
+    // Per-mode whole-design adjustments, keyed by EditorMode.name. Defaulted for back-compat with
+    // projects saved before this field existed.
+    val modeAdjustments: Map<String, ModeAdjustment> = emptyMap()
 )
