@@ -39,6 +39,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
+import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.common.model.FeedbackEvent
 import com.hereliesaz.graffitixr.common.model.Tool
 import android.widget.Toast
@@ -280,48 +281,69 @@ fun MainScreen(
 
 
         if (uiState.editorMode != EditorMode.AR && uiState.editorMode != EditorMode.STENCIL) {
-            uiState.layers.filter { it.isVisible }.forEach { layer ->
-                val isLive = layer.id == uiState.liveStrokeLayerId
-                val bmp = if (isLive) uiState.liveStrokeBitmap ?: layer.bitmap else layer.bitmap
-                bmp?.let { displayBmp ->
-                    val imageBitmap = if (isLive) {
-                        val version = uiState.liveStrokeVersion
-                        remember(version) { displayBmp.asImageBitmap() }
-                    } else {
-                        remember(displayBmp) { displayBmp.asImageBitmap() }
+            // Per-mode whole-design adjustment: position/scale/rotate/fade and tone the entire
+            // composited design as a unit for this mode (DESIGN mode is the global, unadjusted view).
+            val modeAdj = if (uiState.editorMode != EditorMode.DESIGN) {
+                uiState.modeAdjustments[uiState.editorMode] ?: ModeAdjustment()
+            } else {
+                ModeAdjustment()
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        translationX = modeAdj.offsetX
+                        translationY = modeAdj.offsetY
+                        scaleX = modeAdj.scale
+                        scaleY = modeAdj.scale
+                        rotationZ = modeAdj.rotation
+                        alpha = modeAdj.opacity
+                        transformOrigin = TransformOrigin.Center
                     }
-                    Image(
-                        bitmap = imageBitmap,
-                        contentDescription = null,
-                        colorFilter = ColorFilter.colorMatrix(
-                            createColorMatrix(
-                                saturation = layer.saturation,
-                                contrast = layer.contrast,
-                                brightness = layer.brightness,
-                                colorBalanceR = layer.colorBalanceR,
-                                colorBalanceG = layer.colorBalanceG,
-                                colorBalanceB = layer.colorBalanceB,
-                                isInverted = layer.isInverted
-                            )
-                        ),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                translationX = layer.offset.x
-                                translationY = layer.offset.y
-                                scaleX = layer.scale
-                                scaleY = layer.scale
-                                rotationX = layer.rotationX
-                                rotationY = layer.rotationY
-                                rotationZ = layer.rotationZ
-                                alpha = layer.opacity
-                                transformOrigin = TransformOrigin.Center
-                                blendMode = layer.blendMode
-                                compositingStrategy =
-                                    androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-                            },
-                        contentScale = ContentScale.Fit
-                    )
+            ) {
+                uiState.layers.filter { it.isVisible }.forEach { layer ->
+                    val isLive = layer.id == uiState.liveStrokeLayerId
+                    val bmp = if (isLive) uiState.liveStrokeBitmap ?: layer.bitmap else layer.bitmap
+                    bmp?.let { displayBmp ->
+                        val imageBitmap = if (isLive) {
+                            val version = uiState.liveStrokeVersion
+                            remember(version) { displayBmp.asImageBitmap() }
+                        } else {
+                            remember(displayBmp) { displayBmp.asImageBitmap() }
+                        }
+                        Image(
+                            bitmap = imageBitmap,
+                            contentDescription = null,
+                            colorFilter = ColorFilter.colorMatrix(
+                                createColorMatrix(
+                                    saturation = layer.saturation * modeAdj.saturation,
+                                    contrast = layer.contrast * modeAdj.contrast,
+                                    brightness = layer.brightness + modeAdj.brightness,
+                                    colorBalanceR = layer.colorBalanceR,
+                                    colorBalanceG = layer.colorBalanceG,
+                                    colorBalanceB = layer.colorBalanceB,
+                                    isInverted = layer.isInverted != modeAdj.isInverted
+                                )
+                            ),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    translationX = layer.offset.x
+                                    translationY = layer.offset.y
+                                    scaleX = layer.scale
+                                    scaleY = layer.scale
+                                    rotationX = layer.rotationX
+                                    rotationY = layer.rotationY
+                                    rotationZ = layer.rotationZ
+                                    alpha = layer.opacity
+                                    transformOrigin = TransformOrigin.Center
+                                    blendMode = layer.blendMode
+                                    compositingStrategy =
+                                        androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                                },
+                            contentScale = ContentScale.Fit
+                        )
+                    }
                 }
             }
         }
@@ -358,15 +380,22 @@ fun MainScreen(
                             }
                         }
                     }
-                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isWaitingForTap, isTouchLocked) {
-                        if (!isTouchLocked && !isImageLocked && activeLayer != null && !isWaitingForTap) {
+                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isWaitingForTap, isTouchLocked, uiState.editingModeLayer) {
+                        // While editing the whole design as a unit for this mode, transform gestures
+                        // drive the mode adjustment instead of the active layer.
+                        val editingMode = uiState.editingModeLayer && uiState.editorMode != EditorMode.DESIGN
+                        if (!isTouchLocked && !isImageLocked && (activeLayer != null || editingMode) && !isWaitingForTap) {
                             if (uiState.activeTool == Tool.NONE) {
                                 detectSmartOverlayGestures(
                                     getValidBounds = { androidx.compose.ui.geometry.Rect(0f, 0f, size.width.toFloat(), size.height.toFloat()) },
                                     onGestureStart = { editorViewModel.onGestureStart() },
                                     onGestureEnd = { editorViewModel.onGestureEnd() },
                                     onGesture = { _, pan, zoom, rotation ->
-                                        editorViewModel.onTransformGesture(pan, zoom, rotation)
+                                        if (editingMode) {
+                                            editorViewModel.onModeTransformGesture(uiState.editorMode, pan, zoom, rotation)
+                                        } else {
+                                            editorViewModel.onTransformGesture(pan, zoom, rotation)
+                                        }
                                     }
                                 )
                             }

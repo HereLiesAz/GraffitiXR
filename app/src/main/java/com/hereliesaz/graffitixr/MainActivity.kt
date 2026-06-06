@@ -83,6 +83,7 @@ import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
+import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.onboarding.ArUnavailableOverlay
 import com.hereliesaz.graffitixr.onboarding.ModeOnboarding
 import com.hereliesaz.graffitixr.onboarding.ModeOnboardingOverlay
@@ -427,6 +428,8 @@ class MainActivity : ComponentActivity() {
                 val navStrings = strings.nav
                 var showFontPicker by remember { mutableStateOf(false) }
                 var fontPickerLayerId by remember { mutableStateOf<String?>(null) }
+                // Non-null while the per-mode whole-design tone panel is open for that mode.
+                var modeAdjustPanelMode by remember { mutableStateOf<EditorMode?>(null) }
                 val layerMenusOpen = remember { mutableStateMapOf<String, Boolean>() }
 
                 val context = LocalContext.current
@@ -512,7 +515,8 @@ class MainActivity : ComponentActivity() {
                                 } else {
                                     permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
                                 }
-                            }
+                            },
+                            onOpenModeAdjust = { modeAdjustPanelMode = it }
                         )
                     }
 
@@ -1106,6 +1110,22 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
+                            modeAdjustPanelMode?.let { panelMode ->
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.CenterEnd
+                                ) {
+                                    ModeAdjustPanel(
+                                        mode = panelMode,
+                                        adjustment = editorUiState.modeAdjustments[panelMode] ?: ModeAdjustment(),
+                                        onChange = { editorViewModel.onModeAdjustmentChanged(panelMode, it) },
+                                        onReset = { editorViewModel.onModeLayerReset(panelMode) },
+                                        onDismiss = { modeAdjustPanelMode = null },
+                                        modifier = Modifier.padding(16.dp)
+                                    )
+                                }
+                            }
+
                             if (showDesignInstructionsDialog) {
                                 androidx.compose.material3.AlertDialog(
                                     onDismissRequest = { showDesignInstructionsDialog = false },
@@ -1243,6 +1263,40 @@ class MainActivity : ComponentActivity() {
         if (isFinishing) slamManager.destroy()
     }
 
+    /**
+     * Adds a "Layer" sub-host under a mode that lets the user edit the whole design as a unit for
+     * that mode: tapping it selects whole-design editing (transform gestures move/scale/rotate the
+     * mural), "Adjust" opens the tone panel, and "Reset" clears the mode's adjustment. These edits
+     * persist per mode; Design-mode layer edits stay global.
+     */
+    private fun AzNavHostScope.modeLayerSubHost(
+        modeId: String,
+        mode: EditorMode,
+        editorUiState: EditorUiState,
+        editorViewModel: EditorViewModel,
+        navStrings: NavStrings,
+        navItemColor: Color,
+        onOpenModeAdjust: (EditorMode) -> Unit
+    ) {
+        val active = editorUiState.editingModeLayer && editorUiState.editorMode == mode
+        azRailSubHostItem(
+            id = "$modeId.layer",
+            hostId = modeId,
+            text = "Layer",
+            content = Icons.Default.Layers,
+            color = if (active) Cyan else navItemColor,
+            shape = AzButtonShape.NONE,
+            onClick = { editorViewModel.onModeLayerSelected(mode) }
+        )
+        azRailSubItem(id = "$modeId.layer.adjust", hostId = "$modeId.layer", text = navStrings.adjust, content = Icons.Default.Tune, color = navItemColor, shape = AzButtonShape.NONE) {
+            editorViewModel.onModeLayerSelected(mode)
+            onOpenModeAdjust(mode)
+        }
+        azRailSubItem(id = "$modeId.layer.reset", hostId = "$modeId.layer", text = "Reset", content = Icons.Default.Refresh, color = navItemColor, shape = AzButtonShape.NONE) {
+            editorViewModel.onModeLayerReset(mode)
+        }
+    }
+
     private fun AzNavHostScope.ConfigureRailItems(
         mainViewModel: MainViewModel,
         editorViewModel: EditorViewModel,
@@ -1262,7 +1316,8 @@ class MainActivity : ComponentActivity() {
         coopState: CoopSessionState = CoopSessionState.Idle,
         isTouchLocked: Boolean,
         onShowJoinScanner: () -> Unit = {},
-        onWallPhoto: () -> Unit = {}
+        onWallPhoto: () -> Unit = {},
+        onOpenModeAdjust: (EditorMode) -> Unit = {}
     ) {
         val navStrings = strings.nav
         val requestPermissions = {
@@ -1895,9 +1950,11 @@ class MainActivity : ComponentActivity() {
                         if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
                     }
                 }
+                modeLayerSubHost("mode.ar", EditorMode.AR, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
             }
 
             azRailSubHostItem(id = "mode.overlay", hostId = "host.modes", text = navStrings.overlay, content = Icons.Default.Layers, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE)
+            modeLayerSubHost("mode.overlay", EditorMode.OVERLAY, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
 
             // Mockup ▸ Wall ▸ { Photo (take a photo), File (pick an image) }
             azRailSubHostItem(id = "mode.mockup", hostId = "host.modes", text = navStrings.mockup, content = Icons.Default.CameraAlt, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE)
@@ -1908,12 +1965,14 @@ class MainActivity : ComponentActivity() {
             azRailSubItem(id = "wall.file", hostId = "mockup.wall", text = navStrings.file, content = Icons.Default.InsertDriveFile, color = navItemColor, shape = AzButtonShape.NONE) {
                 backgroundPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             }
+            modeLayerSubHost("mode.mockup", EditorMode.MOCKUP, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
 
             // Trace ▸ Freeze (+ Layer)
             azRailSubHostItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, content = Icons.Default.LightMode, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE)
             azRailSubItem(id = "mode.trace.freeze", hostId = "mode.trace", text = "Freeze", content = Icons.Default.Lock, color = navItemColor, shape = AzButtonShape.NONE) {
                 mainViewModel.setTouchLocked(!isTouchLocked)
             }
+            modeLayerSubHost("mode.trace", EditorMode.TRACE, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
 
             // 4. PROJECT FOLDER
             azRailHostItem(
