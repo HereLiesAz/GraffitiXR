@@ -623,12 +623,16 @@ class ArViewModel @Inject constructor(
                 stereoActive = false
                 Timber.i("dual-lens: no hardware-stereo config on this device — using mono")
             }
-            _uiState.update { it.copy(isDualLensActive = stereoActive, isHardwareStereoActive = stereoActive) }
-
             // MURAL needs dual-lens (hardware-stereo) depth triangulation. Devices without a second
             // rear lens (e.g. Pixel 5) can't do it, so auto-fall-back to Canvas.
             deviceCanDoMural = stereoActive
-            _uiState.update { it.copy(arScanMode = it.arScanMode.coerceToCapability()) }
+            _uiState.update {
+                it.copy(
+                    isDualLensActive = stereoActive,
+                    isHardwareStereoActive = stereoActive,
+                    arScanMode = it.arScanMode.coerceToCapability()
+                )
+            }
 
             session = s
             _isCameraInUseByAr.value = true
