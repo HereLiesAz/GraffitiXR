@@ -93,8 +93,10 @@ fun EditorUi(
                 )
             }
 
-            // Modes (anything but the Design screen) show the finished design with off-rail adjustment
-            // knobs and NO history controls; Design keeps undo/redo and rail-triggered knobs.
+            // Modes (anything but the Design screen) show the finished design with NO history
+            // controls; per-mode whole-design adjustment is done through the rail's Layer/Adjust
+            // panel (ModeAdjustPanel), so the legacy off-rail knobs must NOT also appear in a mode
+            // or the user sees two duplicate sets of opacity/brightness/contrast/saturation controls.
             val inMode = uiState.editorMode != EditorMode.DESIGN
             AdjustmentsPanel(
                 state = AdjustmentsState(
@@ -110,9 +112,9 @@ fun EditorUi(
                     activeLayer = overlayLayer,
                     showUndoRedo = !inMode
                 ),
-                // In a Mode the adjust knobs are the off-rail tools (opacity/saturation/…); in Design
-                // they're rail-triggered via the Adjust panel.
-                showKnobs = uiState.activePanel == EditorPanel.ADJUST || (inMode && uiState.layers.isNotEmpty()),
+                // Knobs are rail-triggered via the Adjust panel in Design only. In a Mode the
+                // per-mode ModeAdjustPanel owns adjustment, so the off-rail knobs stay hidden.
+                showKnobs = !inMode && uiState.activePanel == EditorPanel.ADJUST,
                 showColorBalance = uiState.activePanel == EditorPanel.COLOR,
                 isLandscape = isLandscape,
                 screenHeight = screenHeight,
