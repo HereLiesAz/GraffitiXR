@@ -56,6 +56,16 @@ interface SettingsRepository {
 
     suspend fun setForcedStereoUnstable(unstable: Boolean)
 
+    /**
+     * Cached result of the one-time hardware-stereo capability probe:
+     * -1 = not yet probed, 0 = device can't run forced stereo (use mono), 1 = stereo tracks (use it).
+     * Probing runs a short throwaway stereo session on a worker thread the first time AR is entered,
+     * so we only adopt the dual-lens path on a device whose motion-stereo actually tracks.
+     */
+    val stereoCapability: Flow<Int>
+
+    suspend fun setStereoCapability(value: Int)
+
     /** Whether distances are displayed in imperial (ft) rather than metric (m/cm). */
     val isImperialUnits: Flow<Boolean>
 

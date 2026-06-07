@@ -31,6 +31,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val MURAL_METHOD = stringPreferencesKey("mural_method")
     private val SHOW_ANCHOR_BOUNDARY = booleanPreferencesKey("show_anchor_boundary")
     private val FORCED_STEREO_UNSTABLE = booleanPreferencesKey("forced_stereo_unstable")
+    private val STEREO_CAPABILITY = intPreferencesKey("stereo_capability")
     private val IS_IMPERIAL_UNITS = booleanPreferencesKey("is_imperial_units")
     private val BACKGROUND_COLOR = intPreferencesKey("background_color")
     private val COMPLETED_TUTORIALS = stringSetPreferencesKey("completed_tutorials")
@@ -102,6 +103,16 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setForcedStereoUnstable(unstable: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[FORCED_STEREO_UNSTABLE] = unstable
+        }
+    }
+
+    override val stereoCapability: Flow<Int> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[STEREO_CAPABILITY] ?: -1 }
+
+    override suspend fun setStereoCapability(value: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[STEREO_CAPABILITY] = value
         }
     }
 

@@ -1,9 +1,17 @@
 // FILE: feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/ArViewModel.kt
 package com.hereliesaz.graffitixr.feature.ar
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.graphics.Bitmap
 import android.graphics.PointF
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
+import android.os.Message
+import android.os.Messenger
 import androidx.camera.core.ImageProxy
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
@@ -45,7 +53,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
@@ -466,6 +473,20 @@ class ArViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            settingsRepository.stereoCapability.collect { cap ->
+                stereoCapable = when (cap) {
+                    1 -> true
+                    0 -> false
+                    else -> null
+                }
+                // A device whose stereo can't track can't do MURAL — fall its scan mode back to Canvas.
+                if (stereoCapable == false) {
+                    deviceCanDoMural = false
+                    _uiState.update { it.copy(arScanMode = it.arScanMode.coerceToCapability()) }
+                }
+            }
+        }
+        viewModelScope.launch {
             settingsRepository.isRightHanded.collect { isRight ->
                 _uiState.update { it.copy(isRightHanded = isRight) }
             }
@@ -489,6 +510,15 @@ class ArViewModel @Inject constructor(
     // Sticky: a device proved its forced hardware-stereo path is broken (ARCore motion-stereo
     // disparity fails / VIO never tracks). Persisted; once set, sessions skip the stereo config.
     @Volatile private var forcedStereoUnstable: Boolean = false
+
+    // One-time hardware-stereo probe result: null = not yet probed, true = stereo tracks (adopt
+    // dual-lens), false = stereo thrashes / never tracks (stay mono). Persisted via
+    // SettingsRepository.stereoCapability so the probe only runs once per install.
+    @Volatile private var stereoCapable: Boolean? = null
+    private val stereoProbeInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
+    // The in-flight session-state update (probe + init/resume/pause). Cancelled on the next update so
+    // a running probe stops and releases the camera immediately when the activity pauses or AR exits.
+    private var sessionUpdateJob: kotlinx.coroutines.Job? = null
 
     // MURAL requires depth; on devices that can't do it, fall back to Canvas (CLOUD_POINTS).
     private fun ArScanMode.coerceToCapability(): ArScanMode =
@@ -564,6 +594,9 @@ class ArViewModel @Inject constructor(
     fun exitArMode() {
         isInArMode = false
         isDestroying = true
+        // Cancel any in-flight session update (including a running stereo probe) so it stops pumping
+        // the camera and releases the session mutex before cleanup tries to acquire it.
+        sessionUpdateJob?.cancel()
         if (_uiState.value.trackingFailed) {
             _uiState.update { it.copy(trackingFailed = false) }
         }
@@ -573,8 +606,19 @@ class ArViewModel @Inject constructor(
     }
 
     private fun updateSessionStateLocked(context: Context? = null) {
-        viewModelScope.launch {
+        sessionUpdateJob?.cancel()
+        sessionUpdateJob = viewModelScope.launch {
             sessionMutex.withLock {
+                // First-ever AR entry on an unprobed device: while the camera is still free (no live
+                // session yet), run a short throwaway stereo session on a worker thread to see whether
+                // dual-lens VIO actually tracks. Done inside the session mutex so no concurrent state
+                // update can open the live session while the probe still holds the camera. Capped at a
+                // few seconds and off the main thread, so a device whose motion-stereo thrashes can't
+                // ANR — and we only adopt stereo if it works. Cancelling this job (AR exit / pause)
+                // cancels the probe too.
+                if (context != null && isInArMode && session == null && !isDestroying && stereoCapable == null) {
+                    probeStereoCapability(context)
+                }
                 if (isInArMode && session == null && context != null && !isDestroying) {
                     initArSessionLocked(context)
                 }
@@ -618,34 +662,52 @@ class ArViewModel @Inject constructor(
 
             s.configure(config)
 
-            // Always use the plain mono 30 FPS back camera config. Forcing a hardware-stereo config
-            // (StereoCameraUsage.REQUIRE_AND_USE) made ARCore run motion-stereo (spherical_rectifier)
-            // on devices that list a "stereo" config but can't actually compute disparity — it pegged
-            // the CPU, starved VIO into permanent kNotTracking, and blocked the main thread into a
-            // 5s input-dispatch ANR with a black camera. The reactive in-session recovery couldn't win
-            // that race because the main thread was already dead. Mono is the only camera path that
-            // tracks reliably here; metric depth comes from VIO-baseline triangulation.
-            val monoConfigs = s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
-                facingDirection = CameraConfig.FacingDirection.BACK
-                targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
-            })
-            if (monoConfigs.isNotEmpty()) s.cameraConfig = monoConfigs[0]
-            Timber.i("ARDIAG dual-lens: forced stereo disabled — using mono camera config")
+            // Camera config selection. Forcing a hardware-stereo config makes ARCore run motion-stereo
+            // (spherical_rectifier); on devices that list a "stereo" config but can't actually compute
+            // disparity that pegs the CPU, starves VIO into kNotTracking, and ANRs the main thread with
+            // a black camera. So we only select stereo when the one-time worker-thread probe has proven
+            // this device's stereo actually tracks (stereoCapable == true) and it hasn't since been
+            // marked unstable. Everything else stays on the safe mono 30 FPS back config.
+            val useStereo = stereoCapable == true && !forcedStereoUnstable
+            var stereoActive = false
+            if (useStereo) {
+                val stereoConfigs = try {
+                    s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
+                        facingDirection = CameraConfig.FacingDirection.BACK
+                        stereoCameraUsage = EnumSet.of(CameraConfig.StereoCameraUsage.REQUIRE_AND_USE)
+                    })
+                } catch (e: Exception) {
+                    Timber.w(e, "dual-lens: stereo config query failed")
+                    emptyList()
+                }
+                if (stereoConfigs.isNotEmpty()) {
+                    s.cameraConfig = stereoConfigs[0]
+                    stereoActive = true
+                    Timber.i("ARDIAG dual-lens: HARDWARE STEREO selected (probe-confirmed) cameraId=${stereoConfigs[0].cameraId}")
+                }
+            }
+            if (!stereoActive) {
+                val monoConfigs = s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
+                    facingDirection = CameraConfig.FacingDirection.BACK
+                    targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
+                })
+                if (monoConfigs.isNotEmpty()) s.cameraConfig = monoConfigs[0]
+                Timber.i("ARDIAG dual-lens: using mono camera config (stereoCapable=$stereoCapable)")
+            }
 
-            // No hardware stereo means no dual-lens depth triangulation, so MURAL auto-falls back to
-            // Canvas.
-            deviceCanDoMural = false
+            // MURAL needs dual-lens depth triangulation; without hardware stereo it falls back to Canvas.
+            deviceCanDoMural = stereoActive
             _uiState.update {
                 it.copy(
-                    isDualLensActive = false,
-                    isHardwareStereoActive = false,
+                    isDualLensActive = stereoActive,
+                    isHardwareStereoActive = stereoActive,
                     arScanMode = it.arScanMode.coerceToCapability()
                 )
             }
 
             session = s
             _isCameraInUseByAr.value = true
-            Timber.i("ARDIAG initArSessionLocked: session created OK (mono camera, rendererAttached=${renderer != null})")
+            Timber.i("ARDIAG initArSessionLocked: session created OK (stereoActive=$stereoActive rendererAttached=${renderer != null})")
 
             // Critical: if the renderer is already attached, update it with the new session
             renderer?.attachSession(s)
@@ -656,6 +718,87 @@ class ArViewModel @Inject constructor(
             _feedback.tryEmit(
                 com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error("Couldn't start AR — your camera may be in use by another app", e)
             )
+        }
+    }
+
+    /**
+     * One-time hardware-stereo capability probe. Runs a short throwaway ARCore session configured for
+     * forced hardware stereo on a worker thread (its own offscreen EGL context), pumps [Session.update]
+     * for a few seconds and adopts dual-lens only if VIO reaches TRACKING. A device whose motion-stereo
+     * is broken never tracks (and thrashes), so we cap the probe and treat any failure as "mono". The
+     * result is cached in settings so this only runs once per install. Must be called while no live
+     * session holds the camera.
+     */
+    private suspend fun probeStereoCapability(context: Context) {
+        if (stereoCapable != null) return
+        if (!stereoProbeInFlight.compareAndSet(false, true)) return
+        try {
+            val capable = runProbeViaService(context)
+            stereoCapable = capable
+            settingsRepository.setStereoCapability(if (capable) 1 else 0)
+            Timber.i("ARDIAG stereo probe complete: capable=$capable")
+        } catch (e: Exception) {
+            // A cancelled probe (AR exit / pause) must NOT be cached as a permanent mono verdict —
+            // let cancellation propagate so the device stays "unprobed" and re-probes next entry.
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            stereoCapable = false
+            settingsRepository.setStereoCapability(0)
+            Timber.w(e, "ARDIAG stereo probe threw -> treating device as mono")
+        } finally {
+            stereoProbeInFlight.set(false)
+        }
+    }
+
+    /**
+     * Drives [StereoProbeService] in the isolated ":probe" process and returns its verdict. The broken
+     * forced-stereo thrash (if any) happens entirely in that throwaway background process, so it can
+     * never starve this UI process into an ANR. If the probe process dies, the binding can't be made,
+     * or no reply arrives within the timeout, we conservatively return false (stay on mono).
+     */
+    private suspend fun runProbeViaService(context: Context): Boolean {
+        val appCtx = context.applicationContext
+        val result = kotlinx.coroutines.CompletableDeferred<Boolean>()
+        val replyMessenger = Messenger(Handler(Looper.getMainLooper()) { msg ->
+            if (msg.what == StereoProbeService.MSG_RESULT) result.complete(msg.arg1 == 1)
+            true
+        })
+        val conn = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+                try {
+                    val m = Message.obtain(null, StereoProbeService.MSG_RUN_PROBE).apply {
+                        replyTo = replyMessenger
+                    }
+                    Messenger(binder).send(m)
+                } catch (e: Exception) {
+                    result.complete(false)
+                }
+            }
+
+            override fun onServiceDisconnected(name: ComponentName?) {
+                // The :probe process died (e.g. killed after a hang) -> treat the device as mono.
+                result.complete(false)
+            }
+        }
+        val bound = try {
+            appCtx.bindService(
+                Intent(appCtx, StereoProbeService::class.java),
+                conn,
+                Context.BIND_AUTO_CREATE
+            )
+        } catch (e: Exception) {
+            false
+        }
+        if (!bound) {
+            try { appCtx.unbindService(conn) } catch (_: Exception) {}
+            return false
+        }
+        return try {
+            // Bound process startup + the probe's own timeout, with headroom; never block forever.
+            kotlinx.coroutines.withTimeoutOrNull(StereoProbeService.PROBE_TIMEOUT_MS + 4_000L) {
+                result.await()
+            } ?: false
+        } finally {
+            try { appCtx.unbindService(conn) } catch (_: Exception) {}
         }
     }
 
