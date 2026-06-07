@@ -6,6 +6,15 @@
     <uses-feature android:name="android.hardware.camera" android:required="true" />
     <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
     <application>
+        <!--
+          Hardware-stereo capability probe, isolated in its own ":probe" process so a device whose
+          ARCore motion-stereo thrashes the CPU can be tested without ever risking an ANR in the main
+          UI process. Not exported: only the app itself binds it.
+        -->
+        <service
+            android:name="com.hereliesaz.graffitixr.feature.ar.StereoProbeService"
+            android:exported="false"
+            android:process=":probe" />
     </application>
 
 </manifest>

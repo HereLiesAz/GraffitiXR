@@ -1,9 +1,17 @@
 // FILE: feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/ArViewModel.kt
 package com.hereliesaz.graffitixr.feature.ar
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
 import android.graphics.Bitmap
 import android.graphics.PointF
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
+import android.os.Message
+import android.os.Messenger
 import androidx.camera.core.ImageProxy
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
@@ -44,9 +52,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
@@ -402,9 +408,6 @@ class ArViewModel @Inject constructor(
     // Forced-stereo "stuck" detection must beat the 5s input-timeout ANR, so it's much shorter
     // than the general tracking-failure grace.
     private val STEREO_STUCK_GRACE_MS: Long = 3_000L
-    // How long the one-time worker-thread stereo probe waits for VIO to reach TRACKING before
-    // concluding the device can't run dual-lens. Off the main thread, so it can't ANR.
-    private val STEREO_PROBE_TIMEOUT_MS: Long = 3_000L
 
     private val isSaving = AtomicBoolean(false)
     private val lastSavedSplatCount = AtomicInteger(0)
@@ -730,7 +733,7 @@ class ArViewModel @Inject constructor(
         if (stereoCapable != null) return
         if (!stereoProbeInFlight.compareAndSet(false, true)) return
         try {
-            val capable = withContext(Dispatchers.Default) { runStereoProbe(context) { isActive } }
+            val capable = runProbeViaService(context)
             stereoCapable = capable
             settingsRepository.setStereoCapability(if (capable) 1 else 0)
             Timber.i("ARDIAG stereo probe complete: capable=$capable")
@@ -746,114 +749,56 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    /** Blocking stereo probe; runs entirely on the caller's (background) thread. Returns true iff a
-     *  forced-stereo session reaches TRACKING within [STEREO_PROBE_TIMEOUT_MS]. [isActive] is polled
-     *  so the loop bails and releases the camera immediately when the coroutine is cancelled. */
-    private fun runStereoProbe(context: Context, isActive: () -> Boolean): Boolean {
-        var egl: ProbeEgl? = null
-        var probe: Session? = null
-        try {
-            probe = Session(context)
-            val cfg = Config(probe).apply {
-                focusMode = Config.FocusMode.AUTO
-                updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                depthMode = Config.DepthMode.DISABLED
-                planeFindingMode = Config.PlaneFindingMode.DISABLED
-            }
-            probe.configure(cfg)
-            val stereoConfigs = probe.getSupportedCameraConfigs(CameraConfigFilter(probe).apply {
-                facingDirection = CameraConfig.FacingDirection.BACK
-                stereoCameraUsage = EnumSet.of(CameraConfig.StereoCameraUsage.REQUIRE_AND_USE)
-            })
-            if (stereoConfigs.isEmpty()) {
-                Timber.i("ARDIAG stereo probe: device exposes no hardware-stereo config")
-                return false
-            }
-            probe.cameraConfig = stereoConfigs[0]
-
-            egl = ProbeEgl()
-            probe.setCameraTextureName(egl.cameraTextureId)
-            probe.resume()
-
-            // Monotonic clock: a wall-clock jump (NTP sync, user change) must not extend or truncate
-            // the probe window.
-            val deadline = android.os.SystemClock.elapsedRealtime() + STEREO_PROBE_TIMEOUT_MS
-            while (android.os.SystemClock.elapsedRealtime() < deadline && isActive()) {
-                val frame = try {
-                    probe.update()
+    /**
+     * Drives [StereoProbeService] in the isolated ":probe" process and returns its verdict. The broken
+     * forced-stereo thrash (if any) happens entirely in that throwaway background process, so it can
+     * never starve this UI process into an ANR. If the probe process dies, the binding can't be made,
+     * or no reply arrives within the timeout, we conservatively return false (stay on mono).
+     */
+    private suspend fun runProbeViaService(context: Context): Boolean {
+        val appCtx = context.applicationContext
+        val result = kotlinx.coroutines.CompletableDeferred<Boolean>()
+        val replyMessenger = Messenger(Handler(Looper.getMainLooper()) { msg ->
+            if (msg.what == StereoProbeService.MSG_RESULT) result.complete(msg.arg1 == 1)
+            true
+        })
+        val conn = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+                try {
+                    val m = Message.obtain(null, StereoProbeService.MSG_RUN_PROBE).apply {
+                        replyTo = replyMessenger
+                    }
+                    Messenger(binder).send(m)
                 } catch (e: Exception) {
-                    Timber.w(e, "ARDIAG stereo probe: update() failed")
-                    return false
+                    result.complete(false)
                 }
-                if (frame.camera.trackingState == com.google.ar.core.TrackingState.TRACKING) {
-                    return true
-                }
-                Thread.sleep(33)
             }
-            return false
-        } catch (e: Exception) {
-            Timber.w(e, "ARDIAG stereo probe: setup failed")
-            return false
-        } finally {
-            try { probe?.pause() } catch (_: Exception) {}
-            try { probe?.close() } catch (_: Exception) {}
-            egl?.release()
+
+            override fun onServiceDisconnected(name: ComponentName?) {
+                // The :probe process died (e.g. killed after a hang) -> treat the device as mono.
+                result.complete(false)
+            }
         }
-    }
-
-    /** Minimal offscreen EGL context (1x1 pbuffer) with a single GL_TEXTURE_EXTERNAL_OES texture, so
-     *  the probe session has somewhere to bind camera frames while we pump [Session.update]. */
-    private class ProbeEgl {
-        private var display: android.opengl.EGLDisplay = android.opengl.EGL14.EGL_NO_DISPLAY
-        private var ctx: android.opengl.EGLContext = android.opengl.EGL14.EGL_NO_CONTEXT
-        private var surface: android.opengl.EGLSurface = android.opengl.EGL14.EGL_NO_SURFACE
-        val cameraTextureId: Int
-
-        init {
-            // Validate every EGL step: a failure on an odd device/emulator must surface as an
-            // exception (probe falls back to mono) rather than running GL on an invalid context.
-            display = android.opengl.EGL14.eglGetDisplay(android.opengl.EGL14.EGL_DEFAULT_DISPLAY)
-            if (display == android.opengl.EGL14.EGL_NO_DISPLAY) throw RuntimeException("eglGetDisplay failed")
-            val version = IntArray(2)
-            if (!android.opengl.EGL14.eglInitialize(display, version, 0, version, 1)) {
-                throw RuntimeException("eglInitialize failed")
-            }
-            val cfgAttribs = intArrayOf(
-                android.opengl.EGL14.EGL_RENDERABLE_TYPE, android.opengl.EGL14.EGL_OPENGL_ES2_BIT,
-                android.opengl.EGL14.EGL_SURFACE_TYPE, android.opengl.EGL14.EGL_PBUFFER_BIT,
-                android.opengl.EGL14.EGL_NONE
+        val bound = try {
+            appCtx.bindService(
+                Intent(appCtx, StereoProbeService::class.java),
+                conn,
+                Context.BIND_AUTO_CREATE
             )
-            val configs = arrayOfNulls<android.opengl.EGLConfig>(1)
-            val numConfig = IntArray(1)
-            if (!android.opengl.EGL14.eglChooseConfig(display, cfgAttribs, 0, configs, 0, 1, numConfig, 0) ||
-                numConfig[0] <= 0 || configs[0] == null) {
-                throw RuntimeException("eglChooseConfig failed")
-            }
-            val ctxAttribs = intArrayOf(android.opengl.EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, android.opengl.EGL14.EGL_NONE)
-            ctx = android.opengl.EGL14.eglCreateContext(display, configs[0], android.opengl.EGL14.EGL_NO_CONTEXT, ctxAttribs, 0)
-            if (ctx == android.opengl.EGL14.EGL_NO_CONTEXT) throw RuntimeException("eglCreateContext failed")
-            val surfAttribs = intArrayOf(android.opengl.EGL14.EGL_WIDTH, 1, android.opengl.EGL14.EGL_HEIGHT, 1, android.opengl.EGL14.EGL_NONE)
-            surface = android.opengl.EGL14.eglCreatePbufferSurface(display, configs[0], surfAttribs, 0)
-            if (surface == android.opengl.EGL14.EGL_NO_SURFACE) throw RuntimeException("eglCreatePbufferSurface failed")
-            if (!android.opengl.EGL14.eglMakeCurrent(display, surface, surface, ctx)) {
-                throw RuntimeException("eglMakeCurrent failed")
-            }
-            val tex = IntArray(1)
-            android.opengl.GLES20.glGenTextures(1, tex, 0)
-            android.opengl.GLES20.glBindTexture(android.opengl.GLES11Ext.GL_TEXTURE_EXTERNAL_OES, tex[0])
-            cameraTextureId = tex[0]
+        } catch (e: Exception) {
+            false
         }
-
-        fun release() {
-            if (display != android.opengl.EGL14.EGL_NO_DISPLAY) {
-                android.opengl.EGL14.eglMakeCurrent(
-                    display, android.opengl.EGL14.EGL_NO_SURFACE,
-                    android.opengl.EGL14.EGL_NO_SURFACE, android.opengl.EGL14.EGL_NO_CONTEXT
-                )
-                if (surface != android.opengl.EGL14.EGL_NO_SURFACE) android.opengl.EGL14.eglDestroySurface(display, surface)
-                if (ctx != android.opengl.EGL14.EGL_NO_CONTEXT) android.opengl.EGL14.eglDestroyContext(display, ctx)
-                android.opengl.EGL14.eglTerminate(display)
-            }
+        if (!bound) {
+            try { appCtx.unbindService(conn) } catch (_: Exception) {}
+            return false
+        }
+        return try {
+            // Bound process startup + the probe's own timeout, with headroom; never block forever.
+            kotlinx.coroutines.withTimeoutOrNull(StereoProbeService.PROBE_TIMEOUT_MS + 4_000L) {
+                result.await()
+            } ?: false
+        } finally {
+            try { appCtx.unbindService(conn) } catch (_: Exception) {}
         }
     }
 
