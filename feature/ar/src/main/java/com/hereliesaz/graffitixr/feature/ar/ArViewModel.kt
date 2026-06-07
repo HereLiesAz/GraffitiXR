@@ -512,6 +512,9 @@ class ArViewModel @Inject constructor(
     // SettingsRepository.stereoCapability so the probe only runs once per install.
     @Volatile private var stereoCapable: Boolean? = null
     private val stereoProbeInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
+    // The in-flight session-state update (probe + init/resume/pause). Cancelled on the next update so
+    // a running probe stops and releases the camera immediately when the activity pauses or AR exits.
+    private var sessionUpdateJob: kotlinx.coroutines.Job? = null
 
     // MURAL requires depth; on devices that can't do it, fall back to Canvas (CLOUD_POINTS).
     private fun ArScanMode.coerceToCapability(): ArScanMode =
@@ -587,6 +590,9 @@ class ArViewModel @Inject constructor(
     fun exitArMode() {
         isInArMode = false
         isDestroying = true
+        // Cancel any in-flight session update (including a running stereo probe) so it stops pumping
+        // the camera and releases the session mutex before cleanup tries to acquire it.
+        sessionUpdateJob?.cancel()
         if (_uiState.value.trackingFailed) {
             _uiState.update { it.copy(trackingFailed = false) }
         }
@@ -596,15 +602,19 @@ class ArViewModel @Inject constructor(
     }
 
     private fun updateSessionStateLocked(context: Context? = null) {
-        viewModelScope.launch {
-            // First-ever AR entry on an unprobed device: while the camera is still free (no live
-            // session yet), run a short throwaway stereo session on a worker thread to see whether
-            // dual-lens VIO actually tracks. Capped at a few seconds and off the main thread, so a
-            // device whose motion-stereo thrashes can't ANR — and we only adopt stereo if it works.
-            if (context != null && isInArMode && session == null && !isDestroying && stereoCapable == null) {
-                probeStereoCapability(context)
-            }
+        sessionUpdateJob?.cancel()
+        sessionUpdateJob = viewModelScope.launch {
             sessionMutex.withLock {
+                // First-ever AR entry on an unprobed device: while the camera is still free (no live
+                // session yet), run a short throwaway stereo session on a worker thread to see whether
+                // dual-lens VIO actually tracks. Done inside the session mutex so no concurrent state
+                // update can open the live session while the probe still holds the camera. Capped at a
+                // few seconds and off the main thread, so a device whose motion-stereo thrashes can't
+                // ANR — and we only adopt stereo if it works. Cancelling this job (AR exit / pause)
+                // cancels the probe too.
+                if (context != null && isInArMode && session == null && !isDestroying && stereoCapable == null) {
+                    probeStereoCapability(context)
+                }
                 if (isInArMode && session == null && context != null && !isDestroying) {
                     initArSessionLocked(context)
                 }
@@ -719,11 +729,14 @@ class ArViewModel @Inject constructor(
         if (stereoCapable != null) return
         if (!stereoProbeInFlight.compareAndSet(false, true)) return
         try {
-            val capable = withContext(Dispatchers.Default) { runStereoProbe(context) }
+            val capable = withContext(Dispatchers.Default) { runStereoProbe(context) { isActive } }
             stereoCapable = capable
             settingsRepository.setStereoCapability(if (capable) 1 else 0)
             Timber.i("ARDIAG stereo probe complete: capable=$capable")
         } catch (e: Exception) {
+            // A cancelled probe (AR exit / pause) must NOT be cached as a permanent mono verdict —
+            // let cancellation propagate so the device stays "unprobed" and re-probes next entry.
+            if (e is kotlinx.coroutines.CancellationException) throw e
             stereoCapable = false
             settingsRepository.setStereoCapability(0)
             Timber.w(e, "ARDIAG stereo probe threw -> treating device as mono")
@@ -733,8 +746,9 @@ class ArViewModel @Inject constructor(
     }
 
     /** Blocking stereo probe; runs entirely on the caller's (background) thread. Returns true iff a
-     *  forced-stereo session reaches TRACKING within [STEREO_PROBE_TIMEOUT_MS]. */
-    private fun runStereoProbe(context: Context): Boolean {
+     *  forced-stereo session reaches TRACKING within [STEREO_PROBE_TIMEOUT_MS]. [isActive] is polled
+     *  so the loop bails and releases the camera immediately when the coroutine is cancelled. */
+    private fun runStereoProbe(context: Context, isActive: () -> Boolean): Boolean {
         var egl: ProbeEgl? = null
         var probe: Session? = null
         try {
@@ -760,8 +774,10 @@ class ArViewModel @Inject constructor(
             probe.setCameraTextureName(egl.cameraTextureId)
             probe.resume()
 
-            val deadline = System.currentTimeMillis() + STEREO_PROBE_TIMEOUT_MS
-            while (System.currentTimeMillis() < deadline) {
+            // Monotonic clock: a wall-clock jump (NTP sync, user change) must not extend or truncate
+            // the probe window.
+            val deadline = android.os.SystemClock.elapsedRealtime() + STEREO_PROBE_TIMEOUT_MS
+            while (android.os.SystemClock.elapsedRealtime() < deadline && isActive()) {
                 val frame = try {
                     probe.update()
                 } catch (e: Exception) {
@@ -793,9 +809,14 @@ class ArViewModel @Inject constructor(
         val cameraTextureId: Int
 
         init {
+            // Validate every EGL step: a failure on an odd device/emulator must surface as an
+            // exception (probe falls back to mono) rather than running GL on an invalid context.
             display = android.opengl.EGL14.eglGetDisplay(android.opengl.EGL14.EGL_DEFAULT_DISPLAY)
+            if (display == android.opengl.EGL14.EGL_NO_DISPLAY) throw RuntimeException("eglGetDisplay failed")
             val version = IntArray(2)
-            android.opengl.EGL14.eglInitialize(display, version, 0, version, 1)
+            if (!android.opengl.EGL14.eglInitialize(display, version, 0, version, 1)) {
+                throw RuntimeException("eglInitialize failed")
+            }
             val cfgAttribs = intArrayOf(
                 android.opengl.EGL14.EGL_RENDERABLE_TYPE, android.opengl.EGL14.EGL_OPENGL_ES2_BIT,
                 android.opengl.EGL14.EGL_SURFACE_TYPE, android.opengl.EGL14.EGL_PBUFFER_BIT,
@@ -803,12 +824,19 @@ class ArViewModel @Inject constructor(
             )
             val configs = arrayOfNulls<android.opengl.EGLConfig>(1)
             val numConfig = IntArray(1)
-            android.opengl.EGL14.eglChooseConfig(display, cfgAttribs, 0, configs, 0, 1, numConfig, 0)
+            if (!android.opengl.EGL14.eglChooseConfig(display, cfgAttribs, 0, configs, 0, 1, numConfig, 0) ||
+                numConfig[0] <= 0 || configs[0] == null) {
+                throw RuntimeException("eglChooseConfig failed")
+            }
             val ctxAttribs = intArrayOf(android.opengl.EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, android.opengl.EGL14.EGL_NONE)
             ctx = android.opengl.EGL14.eglCreateContext(display, configs[0], android.opengl.EGL14.EGL_NO_CONTEXT, ctxAttribs, 0)
+            if (ctx == android.opengl.EGL14.EGL_NO_CONTEXT) throw RuntimeException("eglCreateContext failed")
             val surfAttribs = intArrayOf(android.opengl.EGL14.EGL_WIDTH, 1, android.opengl.EGL14.EGL_HEIGHT, 1, android.opengl.EGL14.EGL_NONE)
             surface = android.opengl.EGL14.eglCreatePbufferSurface(display, configs[0], surfAttribs, 0)
-            android.opengl.EGL14.eglMakeCurrent(display, surface, surface, ctx)
+            if (surface == android.opengl.EGL14.EGL_NO_SURFACE) throw RuntimeException("eglCreatePbufferSurface failed")
+            if (!android.opengl.EGL14.eglMakeCurrent(display, surface, surface, ctx)) {
+                throw RuntimeException("eglMakeCurrent failed")
+            }
             val tex = IntArray(1)
             android.opengl.GLES20.glGenTextures(1, tex, 0)
             android.opengl.GLES20.glBindTexture(android.opengl.GLES11Ext.GL_TEXTURE_EXTERNAL_OES, tex[0])
