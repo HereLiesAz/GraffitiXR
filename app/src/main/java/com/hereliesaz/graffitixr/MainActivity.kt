@@ -83,7 +83,6 @@ import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
-import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.onboarding.ArUnavailableOverlay
 import com.hereliesaz.graffitixr.onboarding.ModeOnboarding
 import com.hereliesaz.graffitixr.onboarding.ModeOnboardingOverlay
@@ -428,8 +427,6 @@ class MainActivity : ComponentActivity() {
                 val navStrings = strings.nav
                 var showFontPicker by remember { mutableStateOf(false) }
                 var fontPickerLayerId by remember { mutableStateOf<String?>(null) }
-                // Non-null while the per-mode whole-design tone panel is open for that mode.
-                var modeAdjustPanelMode by remember { mutableStateOf<EditorMode?>(null) }
                 val layerMenusOpen = remember { mutableStateMapOf<String, Boolean>() }
 
                 val context = LocalContext.current
@@ -516,7 +513,7 @@ class MainActivity : ComponentActivity() {
                                     permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
                                 }
                             },
-                            onOpenModeAdjust = { modeAdjustPanelMode = it }
+                            onOpenModeAdjust = { }
                         )
                     }
 
@@ -1099,22 +1096,6 @@ class MainActivity : ComponentActivity() {
                                     },
                                     strings = strings
                                 )
-                            }
-
-                            modeAdjustPanelMode?.let { panelMode ->
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.CenterEnd
-                                ) {
-                                    ModeAdjustPanel(
-                                        mode = panelMode,
-                                        adjustment = editorUiState.modeAdjustments[panelMode] ?: ModeAdjustment(),
-                                        onChange = { editorViewModel.onModeAdjustmentChanged(panelMode, it) },
-                                        onReset = { editorViewModel.onModeLayerReset(panelMode) },
-                                        onDismiss = { modeAdjustPanelMode = null },
-                                        modifier = Modifier.padding(16.dp)
-                                    )
-                                }
                             }
 
                             if (showDesignInstructionsDialog) {

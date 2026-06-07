@@ -618,52 +618,34 @@ class ArViewModel @Inject constructor(
 
             s.configure(config)
 
-            // Dual-lens mandate: use a hardware-stereo camera config whenever ARCore offers one on
-            // this device; fall back to the mono 30 FPS back config otherwise. We only select a
-            // stereo config that ARCore explicitly lists as supported, so devices that don't expose
-            // one (e.g. Pixel 5) stay exactly on the old mono path — no change, no risk. Where stereo
-            // IS selected the device gets true two-lens depth; watch for the historical caveat that
-            // some phones' VIO destabilized under forced stereo (grep logcat "dual-lens").
-            val stereoConfigs = try {
-                s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
-                    facingDirection = CameraConfig.FacingDirection.BACK
-                    stereoCameraUsage = java.util.EnumSet.of(CameraConfig.StereoCameraUsage.REQUIRE_AND_USE)
-                })
-            } catch (e: Exception) {
-                Timber.w(e, "dual-lens: stereo config query failed")
-                emptyList()
-            }
+            // Always use the plain mono 30 FPS back camera config. Forcing a hardware-stereo config
+            // (StereoCameraUsage.REQUIRE_AND_USE) made ARCore run motion-stereo (spherical_rectifier)
+            // on devices that list a "stereo" config but can't actually compute disparity — it pegged
+            // the CPU, starved VIO into permanent kNotTracking, and blocked the main thread into a
+            // 5s input-dispatch ANR with a black camera. The reactive in-session recovery couldn't win
+            // that race because the main thread was already dead. Mono is the only camera path that
+            // tracks reliably here; metric depth comes from VIO-baseline triangulation.
+            val monoConfigs = s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
+                facingDirection = CameraConfig.FacingDirection.BACK
+                targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
+            })
+            if (monoConfigs.isNotEmpty()) s.cameraConfig = monoConfigs[0]
+            Timber.i("ARDIAG dual-lens: forced stereo disabled — using mono camera config")
 
-            val stereoActive: Boolean
-            // Skip forced stereo if this device previously proved it can't run it (ARCore
-            // motion-stereo disparity fails / VIO never tracks) — stay on the safe mono path.
-            if (stereoConfigs.isNotEmpty() && !forcedStereoUnstable) {
-                s.cameraConfig = stereoConfigs[0]
-                stereoActive = true
-                Timber.i("dual-lens: HARDWARE STEREO selected — cameraId=${stereoConfigs[0].cameraId} imageSize=${stereoConfigs[0].imageSize} (${stereoConfigs.size} stereo config(s))")
-            } else {
-                val monoConfigs = s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
-                    facingDirection = CameraConfig.FacingDirection.BACK
-                    targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
-                })
-                if (monoConfigs.isNotEmpty()) s.cameraConfig = monoConfigs[0]
-                stereoActive = false
-                Timber.i("dual-lens: no hardware-stereo config on this device — using mono")
-            }
-            // MURAL needs dual-lens (hardware-stereo) depth triangulation. Devices without a second
-            // rear lens (e.g. Pixel 5) can't do it, so auto-fall-back to Canvas.
-            deviceCanDoMural = stereoActive
+            // No hardware stereo means no dual-lens depth triangulation, so MURAL auto-falls back to
+            // Canvas.
+            deviceCanDoMural = false
             _uiState.update {
                 it.copy(
-                    isDualLensActive = stereoActive,
-                    isHardwareStereoActive = stereoActive,
+                    isDualLensActive = false,
+                    isHardwareStereoActive = false,
                     arScanMode = it.arScanMode.coerceToCapability()
                 )
             }
 
             session = s
             _isCameraInUseByAr.value = true
-            Timber.i("ARDIAG initArSessionLocked: session created OK (stereoActive=$stereoActive rendererAttached=${renderer != null})")
+            Timber.i("ARDIAG initArSessionLocked: session created OK (mono camera, rendererAttached=${renderer != null})")
 
             // Critical: if the renderer is already attached, update it with the new session
             renderer?.attachSession(s)
