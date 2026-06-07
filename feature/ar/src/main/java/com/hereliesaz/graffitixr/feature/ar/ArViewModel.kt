@@ -398,6 +398,9 @@ class ArViewModel @Inject constructor(
     @Volatile private var arEntryTimestampMs: Long = 0L
     @Volatile private var lastTrackingTimestampMs: Long = 0L
     private val trackingFailureGraceMs: Long = 10_000L
+    // Forced-stereo "stuck" detection must beat the 5s input-timeout ANR, so it's much shorter
+    // than the general tracking-failure grace.
+    private val STEREO_STUCK_GRACE_MS: Long = 3_000L
 
     private val isSaving = AtomicBoolean(false)
     private val lastSavedSplatCount = AtomicInteger(0)
@@ -836,6 +839,14 @@ class ArViewModel @Inject constructor(
                 }
                 Timber.d("Atomic persistence complete: Loaded available mapping components for $projectId")
             }
+        } else {
+            // No saved map for this project — clear any lingering SLAM map left over in native
+            // state from a previous session, so a new AR session doesn't get stuck trying to
+            // relocalize a stale map (kMapTracking with 0 structure matches -> black camera).
+            viewModelScope.launch(Dispatchers.IO) {
+                slamManager.clearMap()
+                lastSavedSplatCount.set(0)
+            }
         }
     }
 
@@ -949,22 +960,59 @@ class ArViewModel @Inject constructor(
             )
         }
 
-        // Runtime fallback: forced hardware-stereo that never lets VIO track in MURAL (the broken
-        // ComputeDisparity / spherical_rectifier case) → persist the unstable flag so the next
-        // session skips stereo and stays on Canvas. The current bad session is handled by the
-        // existing tracking-failed flow; re-entry comes up clean (self-healing).
+        // Forced hardware-stereo that never lets VIO track in MURAL is broken on this device
+        // (ARCore motion-stereo ComputeDisparity / spherical_rectifier fails). Detect it FAST —
+        // well before the 5s input-timeout ANR — and reconfigure the LIVE session to mono so the
+        // first AR entry recovers instead of crashing. Persisted so future sessions skip stereo too.
         if (!forcedStereoUnstable &&
             isInArMode &&
             isHardwareStereo &&
-            trackingFailed &&
+            !isTracking &&
             splatCount == 0 &&
-            _uiState.value.arScanMode == ArScanMode.MURAL
+            _uiState.value.arScanMode == ArScanMode.MURAL &&
+            arEntryTimestampMs > 0L &&
+            (nowMs - lastTrackingTimestampMs) > STEREO_STUCK_GRACE_MS
         ) {
-            forcedStereoUnstable = true
-            deviceCanDoMural = false
-            _uiState.update { it.copy(arScanMode = it.arScanMode.coerceToCapability()) }
-            viewModelScope.launch { settingsRepository.setForcedStereoUnstable(true) }
-            Timber.w("dual-lens: forced stereo never tracked in MURAL — falling back to Canvas + mono on next session")
+            recoverFromBrokenStereo()
+        }
+    }
+
+    private val stereoRecoveryInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /**
+     * The forced hardware-stereo path is broken on this device — switch the LIVE session to the
+     * mono camera config (pause → set mono → resume) so the broken motion-stereo disparity stops
+     * thrashing the tracker, and persist the flag so future sessions skip stereo entirely.
+     * Recoverable: the user re-selecting Mural clears the flag (see setArScanMode).
+     */
+    private fun recoverFromBrokenStereo() {
+        if (!stereoRecoveryInFlight.compareAndSet(false, true)) return
+        forcedStereoUnstable = true
+        deviceCanDoMural = false
+        _uiState.update { it.copy(arScanMode = it.arScanMode.coerceToCapability(), trackingFailed = false) }
+        viewModelScope.launch { settingsRepository.setForcedStereoUnstable(true) }
+        viewModelScope.launch {
+            sessionMutex.withLock {
+                val s = session
+                if (s == null || isDestroying) return@withLock
+                try {
+                    val wasResumed = isSessionResumed
+                    if (wasResumed) pauseArSessionInternal()
+                    val monoConfigs = s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
+                        facingDirection = CameraConfig.FacingDirection.BACK
+                        targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
+                    })
+                    if (monoConfigs.isNotEmpty()) s.cameraConfig = monoConfigs[0]
+                    _uiState.update { it.copy(isDualLensActive = false, isHardwareStereoActive = false) }
+                    if (isActivityResumed && isInArMode && !isDestroying) resumeArSessionInternal()
+                    // Treat the reconfigure as a fresh start so the fast detector doesn't re-fire.
+                    lastTrackingTimestampMs = System.currentTimeMillis()
+                    Timber.w("ARDIAG dual-lens: forced stereo broken -> reconfigured LIVE session to mono")
+                } catch (e: Exception) {
+                    Timber.e(e, "ARDIAG stereo->mono live reconfigure failed")
+                }
+            }
+            stereoRecoveryInFlight.set(false)
         }
     }
 
