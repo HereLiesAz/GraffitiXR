@@ -454,6 +454,15 @@ class ArViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            settingsRepository.forcedStereoUnstable.collect { unstable ->
+                forcedStereoUnstable = unstable
+                if (unstable) {
+                    deviceCanDoMural = false
+                    _uiState.update { it.copy(arScanMode = it.arScanMode.coerceToCapability()) }
+                }
+            }
+        }
+        viewModelScope.launch {
             settingsRepository.isRightHanded.collect { isRight ->
                 _uiState.update { it.copy(isRightHanded = isRight) }
             }
@@ -474,11 +483,22 @@ class ArViewModel @Inject constructor(
     // triangulation; set from the session's hardware-stereo support. Defaults true until known.
     @Volatile private var deviceCanDoMural: Boolean = true
 
+    // Sticky: a device proved its forced hardware-stereo path is broken (ARCore motion-stereo
+    // disparity fails / VIO never tracks). Persisted; once set, sessions skip the stereo config.
+    @Volatile private var forcedStereoUnstable: Boolean = false
+
     // MURAL requires depth; on devices that can't do it, fall back to Canvas (CLOUD_POINTS).
     private fun ArScanMode.coerceToCapability(): ArScanMode =
         if (!deviceCanDoMural && this == ArScanMode.MURAL) ArScanMode.CLOUD_POINTS else this
 
     fun setArScanMode(mode: ArScanMode) {
+        // A user explicitly choosing Mural is a retry: clear the sticky stereo-unstable flag and let
+        // the next session re-evaluate hardware stereo (recovers from any false positive).
+        if (mode == ArScanMode.MURAL && forcedStereoUnstable) {
+            forcedStereoUnstable = false
+            deviceCanDoMural = true
+            viewModelScope.launch { settingsRepository.setForcedStereoUnstable(false) }
+        }
         _uiState.update { it.copy(arScanMode = mode.coerceToCapability()) }
     }
 
@@ -610,7 +630,9 @@ class ArViewModel @Inject constructor(
             }
 
             val stereoActive: Boolean
-            if (stereoConfigs.isNotEmpty()) {
+            // Skip forced stereo if this device previously proved it can't run it (ARCore
+            // motion-stereo disparity fails / VIO never tracks) — stay on the safe mono path.
+            if (stereoConfigs.isNotEmpty() && !forcedStereoUnstable) {
                 s.cameraConfig = stereoConfigs[0]
                 stereoActive = true
                 Timber.i("dual-lens: HARDWARE STEREO selected — cameraId=${stereoConfigs[0].cameraId} imageSize=${stereoConfigs[0].imageSize} (${stereoConfigs.size} stereo config(s))")
@@ -918,6 +940,24 @@ class ArViewModel @Inject constructor(
                     evalProbe.lastMetrics.copy(wallCount = slamManager.getWallKeypointCount())
                 else state.evalLiveMetrics
             )
+        }
+
+        // Runtime fallback: forced hardware-stereo that never lets VIO track in MURAL (the broken
+        // ComputeDisparity / spherical_rectifier case) → persist the unstable flag so the next
+        // session skips stereo and stays on Canvas. The current bad session is handled by the
+        // existing tracking-failed flow; re-entry comes up clean (self-healing).
+        if (!forcedStereoUnstable &&
+            isInArMode &&
+            isHardwareStereo &&
+            trackingFailed &&
+            splatCount == 0 &&
+            _uiState.value.arScanMode == ArScanMode.MURAL
+        ) {
+            forcedStereoUnstable = true
+            deviceCanDoMural = false
+            _uiState.update { it.copy(arScanMode = it.arScanMode.coerceToCapability()) }
+            viewModelScope.launch { settingsRepository.setForcedStereoUnstable(true) }
+            Timber.w("dual-lens: forced stereo never tracked in MURAL — falling back to Canvas + mono on next session")
         }
     }
 

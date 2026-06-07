@@ -47,6 +47,15 @@ interface SettingsRepository {
 
     suspend fun setShowAnchorBoundary(show: Boolean)
 
+    /**
+     * Set once a device proves it can't run forced hardware-stereo (ARCore motion-stereo disparity
+     * fails / VIO never tracks): future sessions skip the stereo config and stay on Canvas, so the
+     * broken path can't thrash the device. Cleared when the user explicitly re-selects Mural.
+     */
+    val forcedStereoUnstable: Flow<Boolean>
+
+    suspend fun setForcedStereoUnstable(unstable: Boolean)
+
     /** Whether distances are displayed in imperial (ft) rather than metric (m/cm). */
     val isImperialUnits: Flow<Boolean>
 
