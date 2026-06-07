@@ -401,6 +401,9 @@ class ArViewModel @Inject constructor(
     // Forced-stereo "stuck" detection must beat the 5s input-timeout ANR, so it's much shorter
     // than the general tracking-failure grace.
     private val STEREO_STUCK_GRACE_MS: Long = 3_000L
+    // How long the one-time worker-thread stereo probe waits for VIO to reach TRACKING before
+    // concluding the device can't run dual-lens. Off the main thread, so it can't ANR.
+    private val STEREO_PROBE_TIMEOUT_MS: Long = 3_000L
 
     private val isSaving = AtomicBoolean(false)
     private val lastSavedSplatCount = AtomicInteger(0)
@@ -466,6 +469,20 @@ class ArViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            settingsRepository.stereoCapability.collect { cap ->
+                stereoCapable = when (cap) {
+                    1 -> true
+                    0 -> false
+                    else -> null
+                }
+                // A device whose stereo can't track can't do MURAL — fall its scan mode back to Canvas.
+                if (stereoCapable == false) {
+                    deviceCanDoMural = false
+                    _uiState.update { it.copy(arScanMode = it.arScanMode.coerceToCapability()) }
+                }
+            }
+        }
+        viewModelScope.launch {
             settingsRepository.isRightHanded.collect { isRight ->
                 _uiState.update { it.copy(isRightHanded = isRight) }
             }
@@ -489,6 +506,12 @@ class ArViewModel @Inject constructor(
     // Sticky: a device proved its forced hardware-stereo path is broken (ARCore motion-stereo
     // disparity fails / VIO never tracks). Persisted; once set, sessions skip the stereo config.
     @Volatile private var forcedStereoUnstable: Boolean = false
+
+    // One-time hardware-stereo probe result: null = not yet probed, true = stereo tracks (adopt
+    // dual-lens), false = stereo thrashes / never tracks (stay mono). Persisted via
+    // SettingsRepository.stereoCapability so the probe only runs once per install.
+    @Volatile private var stereoCapable: Boolean? = null
+    private val stereoProbeInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
 
     // MURAL requires depth; on devices that can't do it, fall back to Canvas (CLOUD_POINTS).
     private fun ArScanMode.coerceToCapability(): ArScanMode =
@@ -574,6 +597,13 @@ class ArViewModel @Inject constructor(
 
     private fun updateSessionStateLocked(context: Context? = null) {
         viewModelScope.launch {
+            // First-ever AR entry on an unprobed device: while the camera is still free (no live
+            // session yet), run a short throwaway stereo session on a worker thread to see whether
+            // dual-lens VIO actually tracks. Capped at a few seconds and off the main thread, so a
+            // device whose motion-stereo thrashes can't ANR — and we only adopt stereo if it works.
+            if (context != null && isInArMode && session == null && !isDestroying && stereoCapable == null) {
+                probeStereoCapability(context)
+            }
             sessionMutex.withLock {
                 if (isInArMode && session == null && context != null && !isDestroying) {
                     initArSessionLocked(context)
@@ -618,34 +648,52 @@ class ArViewModel @Inject constructor(
 
             s.configure(config)
 
-            // Always use the plain mono 30 FPS back camera config. Forcing a hardware-stereo config
-            // (StereoCameraUsage.REQUIRE_AND_USE) made ARCore run motion-stereo (spherical_rectifier)
-            // on devices that list a "stereo" config but can't actually compute disparity — it pegged
-            // the CPU, starved VIO into permanent kNotTracking, and blocked the main thread into a
-            // 5s input-dispatch ANR with a black camera. The reactive in-session recovery couldn't win
-            // that race because the main thread was already dead. Mono is the only camera path that
-            // tracks reliably here; metric depth comes from VIO-baseline triangulation.
-            val monoConfigs = s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
-                facingDirection = CameraConfig.FacingDirection.BACK
-                targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
-            })
-            if (monoConfigs.isNotEmpty()) s.cameraConfig = monoConfigs[0]
-            Timber.i("ARDIAG dual-lens: forced stereo disabled — using mono camera config")
+            // Camera config selection. Forcing a hardware-stereo config makes ARCore run motion-stereo
+            // (spherical_rectifier); on devices that list a "stereo" config but can't actually compute
+            // disparity that pegs the CPU, starves VIO into kNotTracking, and ANRs the main thread with
+            // a black camera. So we only select stereo when the one-time worker-thread probe has proven
+            // this device's stereo actually tracks (stereoCapable == true) and it hasn't since been
+            // marked unstable. Everything else stays on the safe mono 30 FPS back config.
+            val useStereo = stereoCapable == true && !forcedStereoUnstable
+            var stereoActive = false
+            if (useStereo) {
+                val stereoConfigs = try {
+                    s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
+                        facingDirection = CameraConfig.FacingDirection.BACK
+                        stereoCameraUsage = EnumSet.of(CameraConfig.StereoCameraUsage.REQUIRE_AND_USE)
+                    })
+                } catch (e: Exception) {
+                    Timber.w(e, "dual-lens: stereo config query failed")
+                    emptyList()
+                }
+                if (stereoConfigs.isNotEmpty()) {
+                    s.cameraConfig = stereoConfigs[0]
+                    stereoActive = true
+                    Timber.i("ARDIAG dual-lens: HARDWARE STEREO selected (probe-confirmed) cameraId=${stereoConfigs[0].cameraId}")
+                }
+            }
+            if (!stereoActive) {
+                val monoConfigs = s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
+                    facingDirection = CameraConfig.FacingDirection.BACK
+                    targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
+                })
+                if (monoConfigs.isNotEmpty()) s.cameraConfig = monoConfigs[0]
+                Timber.i("ARDIAG dual-lens: using mono camera config (stereoCapable=$stereoCapable)")
+            }
 
-            // No hardware stereo means no dual-lens depth triangulation, so MURAL auto-falls back to
-            // Canvas.
-            deviceCanDoMural = false
+            // MURAL needs dual-lens depth triangulation; without hardware stereo it falls back to Canvas.
+            deviceCanDoMural = stereoActive
             _uiState.update {
                 it.copy(
-                    isDualLensActive = false,
-                    isHardwareStereoActive = false,
+                    isDualLensActive = stereoActive,
+                    isHardwareStereoActive = stereoActive,
                     arScanMode = it.arScanMode.coerceToCapability()
                 )
             }
 
             session = s
             _isCameraInUseByAr.value = true
-            Timber.i("ARDIAG initArSessionLocked: session created OK (mono camera, rendererAttached=${renderer != null})")
+            Timber.i("ARDIAG initArSessionLocked: session created OK (stereoActive=$stereoActive rendererAttached=${renderer != null})")
 
             // Critical: if the renderer is already attached, update it with the new session
             renderer?.attachSession(s)
@@ -656,6 +704,127 @@ class ArViewModel @Inject constructor(
             _feedback.tryEmit(
                 com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error("Couldn't start AR — your camera may be in use by another app", e)
             )
+        }
+    }
+
+    /**
+     * One-time hardware-stereo capability probe. Runs a short throwaway ARCore session configured for
+     * forced hardware stereo on a worker thread (its own offscreen EGL context), pumps [Session.update]
+     * for a few seconds and adopts dual-lens only if VIO reaches TRACKING. A device whose motion-stereo
+     * is broken never tracks (and thrashes), so we cap the probe and treat any failure as "mono". The
+     * result is cached in settings so this only runs once per install. Must be called while no live
+     * session holds the camera.
+     */
+    private suspend fun probeStereoCapability(context: Context) {
+        if (stereoCapable != null) return
+        if (!stereoProbeInFlight.compareAndSet(false, true)) return
+        try {
+            val capable = withContext(Dispatchers.Default) { runStereoProbe(context) }
+            stereoCapable = capable
+            settingsRepository.setStereoCapability(if (capable) 1 else 0)
+            Timber.i("ARDIAG stereo probe complete: capable=$capable")
+        } catch (e: Exception) {
+            stereoCapable = false
+            settingsRepository.setStereoCapability(0)
+            Timber.w(e, "ARDIAG stereo probe threw -> treating device as mono")
+        } finally {
+            stereoProbeInFlight.set(false)
+        }
+    }
+
+    /** Blocking stereo probe; runs entirely on the caller's (background) thread. Returns true iff a
+     *  forced-stereo session reaches TRACKING within [STEREO_PROBE_TIMEOUT_MS]. */
+    private fun runStereoProbe(context: Context): Boolean {
+        var egl: ProbeEgl? = null
+        var probe: Session? = null
+        try {
+            probe = Session(context)
+            val cfg = Config(probe).apply {
+                focusMode = Config.FocusMode.AUTO
+                updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                depthMode = Config.DepthMode.DISABLED
+                planeFindingMode = Config.PlaneFindingMode.DISABLED
+            }
+            probe.configure(cfg)
+            val stereoConfigs = probe.getSupportedCameraConfigs(CameraConfigFilter(probe).apply {
+                facingDirection = CameraConfig.FacingDirection.BACK
+                stereoCameraUsage = EnumSet.of(CameraConfig.StereoCameraUsage.REQUIRE_AND_USE)
+            })
+            if (stereoConfigs.isEmpty()) {
+                Timber.i("ARDIAG stereo probe: device exposes no hardware-stereo config")
+                return false
+            }
+            probe.cameraConfig = stereoConfigs[0]
+
+            egl = ProbeEgl()
+            probe.setCameraTextureName(egl.cameraTextureId)
+            probe.resume()
+
+            val deadline = System.currentTimeMillis() + STEREO_PROBE_TIMEOUT_MS
+            while (System.currentTimeMillis() < deadline) {
+                val frame = try {
+                    probe.update()
+                } catch (e: Exception) {
+                    Timber.w(e, "ARDIAG stereo probe: update() failed")
+                    return false
+                }
+                if (frame.camera.trackingState == com.google.ar.core.TrackingState.TRACKING) {
+                    return true
+                }
+                Thread.sleep(33)
+            }
+            return false
+        } catch (e: Exception) {
+            Timber.w(e, "ARDIAG stereo probe: setup failed")
+            return false
+        } finally {
+            try { probe?.pause() } catch (_: Exception) {}
+            try { probe?.close() } catch (_: Exception) {}
+            egl?.release()
+        }
+    }
+
+    /** Minimal offscreen EGL context (1x1 pbuffer) with a single GL_TEXTURE_EXTERNAL_OES texture, so
+     *  the probe session has somewhere to bind camera frames while we pump [Session.update]. */
+    private class ProbeEgl {
+        private var display: android.opengl.EGLDisplay = android.opengl.EGL14.EGL_NO_DISPLAY
+        private var ctx: android.opengl.EGLContext = android.opengl.EGL14.EGL_NO_CONTEXT
+        private var surface: android.opengl.EGLSurface = android.opengl.EGL14.EGL_NO_SURFACE
+        val cameraTextureId: Int
+
+        init {
+            display = android.opengl.EGL14.eglGetDisplay(android.opengl.EGL14.EGL_DEFAULT_DISPLAY)
+            val version = IntArray(2)
+            android.opengl.EGL14.eglInitialize(display, version, 0, version, 1)
+            val cfgAttribs = intArrayOf(
+                android.opengl.EGL14.EGL_RENDERABLE_TYPE, android.opengl.EGL14.EGL_OPENGL_ES2_BIT,
+                android.opengl.EGL14.EGL_SURFACE_TYPE, android.opengl.EGL14.EGL_PBUFFER_BIT,
+                android.opengl.EGL14.EGL_NONE
+            )
+            val configs = arrayOfNulls<android.opengl.EGLConfig>(1)
+            val numConfig = IntArray(1)
+            android.opengl.EGL14.eglChooseConfig(display, cfgAttribs, 0, configs, 0, 1, numConfig, 0)
+            val ctxAttribs = intArrayOf(android.opengl.EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, android.opengl.EGL14.EGL_NONE)
+            ctx = android.opengl.EGL14.eglCreateContext(display, configs[0], android.opengl.EGL14.EGL_NO_CONTEXT, ctxAttribs, 0)
+            val surfAttribs = intArrayOf(android.opengl.EGL14.EGL_WIDTH, 1, android.opengl.EGL14.EGL_HEIGHT, 1, android.opengl.EGL14.EGL_NONE)
+            surface = android.opengl.EGL14.eglCreatePbufferSurface(display, configs[0], surfAttribs, 0)
+            android.opengl.EGL14.eglMakeCurrent(display, surface, surface, ctx)
+            val tex = IntArray(1)
+            android.opengl.GLES20.glGenTextures(1, tex, 0)
+            android.opengl.GLES20.glBindTexture(android.opengl.GLES11Ext.GL_TEXTURE_EXTERNAL_OES, tex[0])
+            cameraTextureId = tex[0]
+        }
+
+        fun release() {
+            if (display != android.opengl.EGL14.EGL_NO_DISPLAY) {
+                android.opengl.EGL14.eglMakeCurrent(
+                    display, android.opengl.EGL14.EGL_NO_SURFACE,
+                    android.opengl.EGL14.EGL_NO_SURFACE, android.opengl.EGL14.EGL_NO_CONTEXT
+                )
+                if (surface != android.opengl.EGL14.EGL_NO_SURFACE) android.opengl.EGL14.eglDestroySurface(display, surface)
+                if (ctx != android.opengl.EGL14.EGL_NO_CONTEXT) android.opengl.EGL14.eglDestroyContext(display, ctx)
+                android.opengl.EGL14.eglTerminate(display)
+            }
         }
     }
 
