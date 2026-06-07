@@ -995,21 +995,24 @@ class ArViewModel @Inject constructor(
             sessionMutex.withLock {
                 val s = session
                 if (s == null || isDestroying) return@withLock
+                val wasResumed = isSessionResumed
+                if (wasResumed) pauseArSessionInternal()
                 try {
-                    val wasResumed = isSessionResumed
-                    if (wasResumed) pauseArSessionInternal()
                     val monoConfigs = s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
                         facingDirection = CameraConfig.FacingDirection.BACK
                         targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
                     })
                     if (monoConfigs.isNotEmpty()) s.cameraConfig = monoConfigs[0]
                     _uiState.update { it.copy(isDualLensActive = false, isHardwareStereoActive = false) }
-                    if (isActivityResumed && isInArMode && !isDestroying) resumeArSessionInternal()
-                    // Treat the reconfigure as a fresh start so the fast detector doesn't re-fire.
-                    lastTrackingTimestampMs = System.currentTimeMillis()
                     Timber.w("ARDIAG dual-lens: forced stereo broken -> reconfigured LIVE session to mono")
                 } catch (e: Exception) {
                     Timber.e(e, "ARDIAG stereo->mono live reconfigure failed")
+                } finally {
+                    // Always attempt to resume — a throw during the config swap must not leave the
+                    // session permanently paused (black camera, no recovery).
+                    if (isActivityResumed && isInArMode && !isDestroying) resumeArSessionInternal()
+                    // Treat the reconfigure as a fresh start so the fast detector doesn't re-fire.
+                    lastTrackingTimestampMs = System.currentTimeMillis()
                 }
             }
             stereoRecoveryInFlight.set(false)
