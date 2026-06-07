@@ -241,6 +241,8 @@ class ArRenderer(
         planeRenderer.createOnGlThread(context)
         isSurfaceCreated = true
 
+        Timber.i("ARDIAG onSurfaceCreated: bgTexture=${backgroundRenderer.textureId}")
+
         sessionLock.withLock {
             session?.setCameraTextureName(backgroundRenderer.textureId)
         }
@@ -262,7 +264,11 @@ class ArRenderer(
         frameCount++
 
         sessionLock.withLock {
-            val activeSession = session ?: return
+            val activeSession = session
+            if (activeSession == null) {
+                if (frameCount % 120 == 0) Timber.w("ARDIAG onDrawFrame: session null -> camera black")
+                return
+            }
 
             activeSession.setCameraTextureName(backgroundRenderer.textureId)
             displayRotationHelper.updateSessionIfNeeded(activeSession)
@@ -270,9 +276,10 @@ class ArRenderer(
             val frame: Frame = try {
                 activeSession.update()
             } catch (e: SessionPausedException) {
+                if (frameCount % 120 == 0) Timber.w("ARDIAG onDrawFrame: SessionPaused -> camera black")
                 return
             } catch (e: Exception) {
-                Timber.e(e, "ARCore session update failed")
+                Timber.e(e, "ARDIAG ARCore session update failed -> camera black")
                 return
             }
 
@@ -282,6 +289,7 @@ class ArRenderer(
             val scanActive = !anchorEstablished && scanMode == ArScanMode.MURAL && scanPhase == ScanPhase.AMBIENT
             if (scanActive) backgroundRenderer.updateScanMask(visitedSectorsMask)
             backgroundRenderer.draw(frame, scanActive)
+            if (frameCount % 60 == 0) Timber.i("ARDIAG drawFrame f=$frameCount tracking=${frame.camera.trackingState} anchor=$anchorEstablished scanMode=$scanMode scanActive=$scanActive")
 
             // Scan/world-mapping indicator: ink develops on ARCore's detected planes (real 3D surfaces
             // that track with the world), so it reads as colour soaking into the wall/floor — not a flat

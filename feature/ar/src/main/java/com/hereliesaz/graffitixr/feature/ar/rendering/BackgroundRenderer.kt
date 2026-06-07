@@ -30,6 +30,7 @@ class BackgroundRenderer : GlReleasable {
     private var uMask: Int = 0
     private var uDotSize: Int = 0
     private var hasTransformed = false
+    private var diagFrame = 0
 
     // 36-sector scan-coverage mask (for the world-mapping "ink develop" reveal).
     private var maskTextureId = 0
@@ -124,7 +125,12 @@ class BackgroundRenderer : GlReleasable {
      * organically (like spreading ink) as each yaw sector is mapped. Otherwise it's a plain pass-through.
      */
     fun draw(frame: Frame, scanActive: Boolean = false) {
-        if (backgroundProgram == 0) return
+        diagFrame++
+        if (backgroundProgram == 0) {
+            if (diagFrame % 120 == 0) Log.w("ARDIAG", "BackgroundRenderer.draw: shader not ready -> camera black")
+            return
+        }
+        if (diagFrame % 120 == 0) Log.i("ARDIAG", "BackgroundRenderer.draw: drawing camera quad (scanActive=$scanActive)")
 
         if (frame.hasDisplayGeometryChanged() || !hasTransformed) {
             frame.transformCoordinates2d(

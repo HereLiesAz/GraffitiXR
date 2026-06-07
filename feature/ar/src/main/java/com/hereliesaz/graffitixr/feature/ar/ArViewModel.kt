@@ -536,6 +536,7 @@ class ArViewModel @Inject constructor(
             return
         }
         isInArMode = enabled
+        Timber.i("ARDIAG setArMode(enabled=$enabled) layers=${projectRepository.currentProject.value?.layers?.size ?: 0} scanMode=${_uiState.value.arScanMode} sessionExists=${session != null}")
         if (enabled) {
             val now = System.currentTimeMillis()
             arEntryTimestampMs = now
@@ -586,6 +587,7 @@ class ArViewModel @Inject constructor(
 
     private fun initArSessionLocked(context: Context) {
         if (session != null || isDestroying) return
+        Timber.i("ARDIAG initArSessionLocked: creating session")
         try {
             val s = Session(context)
             val config = Config(s)
@@ -658,11 +660,12 @@ class ArViewModel @Inject constructor(
 
             session = s
             _isCameraInUseByAr.value = true
-            
+            Timber.i("ARDIAG initArSessionLocked: session created OK (stereoActive=$stereoActive rendererAttached=${renderer != null})")
+
             // Critical: if the renderer is already attached, update it with the new session
             renderer?.attachSession(s)
         } catch (e: Exception) {
-            Timber.e(e, "Failed to create ARCore session")
+            Timber.e(e, "ARDIAG Failed to create ARCore session -> camera black")
             // Surface the failure instead of leaving the user on a frozen black AR screen.
             _isCameraInUseByAr.value = false
             _feedback.tryEmit(
