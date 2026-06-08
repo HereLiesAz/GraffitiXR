@@ -355,7 +355,10 @@ class EditorViewModel @Inject constructor(
     override fun onAddLayer(uri: Uri) {
         pushHistory()
         viewModelScope.launch(dispatchers.io) {
-            val bitmap = ImageUtils.loadBitmapAsync(context, uri)
+            // Cap imported layers at a screen-reasonable size. A full 12MP+ photo is ~48MB as ARGB;
+            // decoding/copying/PNG-encoding it (then rendering it as a texture every frame) is what
+            // made the first layer take seconds to appear and the canvas lag. 2048px is ample here.
+            val bitmap = ImageUtils.loadBitmapAsync(context, uri, maxDimension = 2048)
             val projectId = _uiState.value.projectId
             if (bitmap != null && projectId != null) {
                 val filename = "layer_${UUID.randomUUID()}.png"
