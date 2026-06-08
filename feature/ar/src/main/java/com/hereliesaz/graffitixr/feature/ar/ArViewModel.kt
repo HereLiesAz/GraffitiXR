@@ -523,6 +523,9 @@ class ArViewModel @Inject constructor(
             forcedStereoUnstable = false
             viewModelScope.launch { settingsRepository.setForcedStereoUnstable(false) }
         }
+        // Persist the choice so it survives app restarts (the arScanMode flow re-emits it; the direct
+        // update below just makes the UI reflect it immediately).
+        viewModelScope.launch { settingsRepository.setArScanMode(mode) }
         _uiState.update { it.copy(arScanMode = mode) }
     }
 
