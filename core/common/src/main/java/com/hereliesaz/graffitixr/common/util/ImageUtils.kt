@@ -55,9 +55,12 @@ object ImageUtils {
                         if (maxDimension != null) {
                             val longest = maxOf(info.size.width, info.size.height)
                             if (longest > maxDimension) {
-                                var sample = 1
-                                while (longest / (sample * 2) >= maxDimension) sample *= 2
-                                if (sample > 1) decoder.setTargetSampleSize(sample)
+                                // ImageDecoder scales precisely during decode (no full-res bitmap held),
+                                // so target the exact max dimension rather than power-of-two subsampling.
+                                val ratio = maxDimension.toFloat() / longest
+                                val targetW = (info.size.width * ratio).toInt().coerceAtLeast(1)
+                                val targetH = (info.size.height * ratio).toInt().coerceAtLeast(1)
+                                decoder.setTargetSize(targetW, targetH)
                             }
                         }
                     }
@@ -68,7 +71,7 @@ object ImageUtils {
                     }
                     var sample = 1
                     val longest = maxOf(bounds.outWidth, bounds.outHeight)
-                    while (longest > 0 && longest / (sample * 2) >= maxDimension) sample *= 2
+                    while (longest > 0 && longest / sample > maxDimension) sample *= 2
                     val opts = BitmapFactory.Options().apply { inSampleSize = sample }
                     context.contentResolver.openInputStream(uri)?.use {
                         BitmapFactory.decodeStream(it, null, opts)
