@@ -1315,6 +1315,7 @@ class MainActivity : ComponentActivity() {
                 id = "host.design",
                 text = navStrings.design,
                 color = if (isDesignMode) Cyan else navItemColor,
+                initiallyExpanded = isDesignMode,
                 onClick = {
                     // From a Mode, tapping Design navigates to the dedicated Design screen. In Design it
                     // just expands the design tools below (this onClick is a no-op there).
@@ -1343,7 +1344,7 @@ class MainActivity : ComponentActivity() {
                 // editing tools (edit/size/font/color/blend/invert/paint/retouch/etc.). The hidden
                 // menu carries link/duplicate/copy/flatten/delete.
                 if (editorUiState.layers.isNotEmpty()) {
-                    azRailSubHostItem(id = "design.layers", hostId = "host.design", text = "Layers", color = navItemColor, shape = AzButtonShape.RECTANGLE)
+                    azRailSubHostItem(id = "design.layers", hostId = "host.design", text = "Layers", color = navItemColor, shape = AzButtonShape.RECTANGLE, initiallyExpanded = true)
                 }
                 editorUiState.layers.reversed().forEach { layer ->
                     val activeTool = editorUiState.activeTool
