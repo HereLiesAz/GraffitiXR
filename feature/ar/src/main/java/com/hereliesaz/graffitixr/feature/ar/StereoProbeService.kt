@@ -79,7 +79,10 @@ class StereoProbeService : Service() {
             probe = Session(this)
             val cfg = Config(probe).apply {
                 focusMode = Config.FocusMode.AUTO
-                updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
+                // BLOCKING, matching the live session: LATEST_CAMERA_IMAGE drops frames the init-time
+                // depth provider needs, which jams VIO into kNotTracking. With it, the probe would
+                // never reach TRACKING and would falsely classify every device as stereo-incapable.
+                updateMode = Config.UpdateMode.BLOCKING
                 depthMode = Config.DepthMode.DISABLED
                 planeFindingMode = Config.PlaneFindingMode.DISABLED
             }
