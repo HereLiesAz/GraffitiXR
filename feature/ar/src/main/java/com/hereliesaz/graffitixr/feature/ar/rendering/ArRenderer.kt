@@ -235,9 +235,19 @@ class ArRenderer(
         backgroundRenderer.createOnGlThread(context)
         onDiag("surface: bg ok tex=${backgroundRenderer.textureId}")
 
-        slamManager.resetGlContext()
-        slamManager.initGl()
-        onDiag("surface: slam ok")
+        // SLAM GL init is isolated: if it throws it must NOT kill the GL thread (that would leave the
+        // camera passthrough permanently black). The bracketing breadcrumbs localize a hang to the
+        // exact native step (resetGlContext rebuilds the GL objects; initGl is the idempotent re-check).
+        try {
+            onDiag("surface: slam reset begin")
+            slamManager.resetGlContext()
+            onDiag("surface: slam reset ok")
+            slamManager.initGl()
+            onDiag("surface: slam ok")
+        } catch (t: Throwable) {
+            Timber.e(t, "ARDIAG slam GL init failed")
+            onDiag("surface: slam FAILED ${t.javaClass.simpleName}: ${t.message}")
+        }
 
         overlayRenderer.createOnGlThread()
         pointCloudRenderer.createOnGlThread(context)

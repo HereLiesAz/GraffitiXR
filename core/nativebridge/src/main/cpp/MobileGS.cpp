@@ -107,8 +107,11 @@ void MobileGS::initialize(int width, int height) {
 }
 
 void MobileGS::initGl() {
+    LOGI("MobileGS::initGl voxel begin");
     mVoxelHash.initGl();
+    LOGI("MobileGS::initGl voxel ok, mesh begin");
     mSurfaceMesh.initGl();
+    LOGI("MobileGS::initGl mesh ok");
 }
 
 void MobileGS::resetGlContext() {
