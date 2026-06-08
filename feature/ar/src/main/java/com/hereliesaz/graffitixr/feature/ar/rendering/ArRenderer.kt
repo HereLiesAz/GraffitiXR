@@ -266,7 +266,10 @@ class ArRenderer(
         sessionLock.withLock {
             val activeSession = session
             if (activeSession == null) {
-                if (frameCount % 120 == 0) Timber.w("ARDIAG onDrawFrame: session null -> camera black")
+                if (frameCount % 120 == 0) {
+                    Timber.w("ARDIAG onDrawFrame: session null -> camera black")
+                    onDiag("render: session null -> black")
+                }
                 return
             }
 
@@ -276,10 +279,14 @@ class ArRenderer(
             val frame: Frame = try {
                 activeSession.update()
             } catch (e: SessionPausedException) {
-                if (frameCount % 120 == 0) Timber.w("ARDIAG onDrawFrame: SessionPaused -> camera black")
+                if (frameCount % 120 == 0) {
+                    Timber.w("ARDIAG onDrawFrame: SessionPaused -> camera black")
+                    onDiag("render: session paused -> black")
+                }
                 return
             } catch (e: Exception) {
                 Timber.e(e, "ARDIAG ARCore session update failed -> camera black")
+                if (frameCount % 120 == 0) onDiag("render: update() failed: ${e.javaClass.simpleName} -> black")
                 return
             }
 
@@ -289,7 +296,12 @@ class ArRenderer(
             val scanActive = !anchorEstablished && scanMode == ArScanMode.MURAL && scanPhase == ScanPhase.AMBIENT
             if (scanActive) backgroundRenderer.updateScanMask(visitedSectorsMask)
             backgroundRenderer.draw(frame, scanActive)
-            if (frameCount % 60 == 0) Timber.i("ARDIAG drawFrame f=$frameCount tracking=${frame.camera.trackingState} anchor=$anchorEstablished scanMode=$scanMode scanActive=$scanActive")
+            if (frameCount % 60 == 0) {
+                Timber.i("ARDIAG drawFrame f=$frameCount tracking=${frame.camera.trackingState} anchor=$anchorEstablished scanMode=$scanMode scanActive=$scanActive")
+                // On-screen heartbeat: if this is updating, the camera IS being drawn and any black
+                // is something painting over it; if it's stuck, the render loop is the problem.
+                onDiag("render: drawing f=$frameCount track=${frame.camera.trackingState}")
+            }
 
             // Scan/world-mapping indicator: ink develops on ARCore's detected planes (real 3D surfaces
             // that track with the world), so it reads as colour soaking into the wall/floor — not a flat
