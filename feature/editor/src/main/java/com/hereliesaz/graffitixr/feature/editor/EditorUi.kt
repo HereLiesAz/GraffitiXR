@@ -111,8 +111,10 @@ fun EditorUi(
                     showUndoRedo = !inMode
                 ),
                 // In a Mode the adjust knobs are the off-rail tools (opacity/saturation/…); in Design
-                // they're rail-triggered via the Adjust panel.
-                showKnobs = uiState.activePanel == EditorPanel.ADJUST || (inMode && uiState.layers.isNotEmpty()),
+                // they're rail-triggered via the Adjust panel. Hidden while capturing a target so they
+                // don't overlap the target-creation dialog.
+                showKnobs = !isCapturingTarget &&
+                    (uiState.activePanel == EditorPanel.ADJUST || (inMode && uiState.layers.isNotEmpty())),
                 showColorBalance = uiState.activePanel == EditorPanel.COLOR,
                 isLandscape = isLandscape,
                 screenHeight = screenHeight,
