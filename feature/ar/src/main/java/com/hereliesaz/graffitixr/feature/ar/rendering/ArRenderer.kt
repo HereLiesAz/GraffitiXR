@@ -235,9 +235,18 @@ class ArRenderer(
         backgroundRenderer.createOnGlThread(context)
         onDiag("surface: bg ok tex=${backgroundRenderer.textureId}")
 
-        slamManager.resetGlContext()
-        slamManager.initGl()
-        onDiag("surface: slam ok")
+        // SLAM GL init is isolated: if it throws it must NOT kill the GL thread (that would leave the
+        // camera passthrough permanently black). resetGlContext() already (re)builds every GL object,
+        // so a separate initGl() call here would be redundant. The breadcrumbs localize a hang (stuck on
+        // "slam begin") vs a throw ("slam FAILED"); the native MobileGS::initGl logs split voxel vs mesh.
+        try {
+            onDiag("surface: slam begin")
+            slamManager.resetGlContext()
+            onDiag("surface: slam ok")
+        } catch (t: Throwable) {
+            Timber.e(t, "ARDIAG slam GL init failed")
+            onDiag("surface: slam FAILED ${t.javaClass.simpleName}: ${t.message}")
+        }
 
         overlayRenderer.createOnGlThread()
         pointCloudRenderer.createOnGlThread(context)
