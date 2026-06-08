@@ -230,16 +230,20 @@ class ArRenderer(
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        onDiag("surface: onSurfaceCreated start")
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         backgroundRenderer.createOnGlThread(context)
+        onDiag("surface: bg ok tex=${backgroundRenderer.textureId}")
 
         slamManager.resetGlContext()
         slamManager.initGl()
+        onDiag("surface: slam ok")
 
         overlayRenderer.createOnGlThread()
         pointCloudRenderer.createOnGlThread(context)
         planeRenderer.createOnGlThread(context)
         isSurfaceCreated = true
+        onDiag("surface: done")
 
         Timber.i("ARDIAG onSurfaceCreated: bgTexture=${backgroundRenderer.textureId}")
 
@@ -266,9 +270,9 @@ class ArRenderer(
         sessionLock.withLock {
             val activeSession = session
             if (activeSession == null) {
-                if (frameCount % 120 == 0) {
+                if (frameCount == 1 || frameCount % 120 == 0) {
                     Timber.w("ARDIAG onDrawFrame: session null -> camera black")
-                    onDiag("render: session null -> black")
+                    onDiag("render: f=$frameCount session null -> black")
                 }
                 return
             }
@@ -296,7 +300,7 @@ class ArRenderer(
             val scanActive = !anchorEstablished && scanMode == ArScanMode.MURAL && scanPhase == ScanPhase.AMBIENT
             if (scanActive) backgroundRenderer.updateScanMask(visitedSectorsMask)
             backgroundRenderer.draw(frame, scanActive)
-            if (frameCount % 60 == 0) {
+            if (frameCount == 1 || frameCount % 60 == 0) {
                 Timber.i("ARDIAG drawFrame f=$frameCount tracking=${frame.camera.trackingState} anchor=$anchorEstablished scanMode=$scanMode scanActive=$scanActive")
                 // On-screen heartbeat: if this is updating, the camera IS being drawn and any black
                 // is something painting over it; if it's stuck, the render loop is the problem.
