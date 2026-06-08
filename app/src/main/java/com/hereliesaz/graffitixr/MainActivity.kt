@@ -1261,7 +1261,7 @@ class MainActivity : ComponentActivity() {
             hostId = modeId,
             text = "Layer",
             color = if (active) Cyan else navItemColor,
-            shape = AzButtonShape.NONE,
+            shape = AzButtonShape.RECTANGLE,
             onClick = { editorViewModel.onModeLayerSelected(mode) }
         )
         azRailSubItem(id = "$modeId.layer.adjust", hostId = "$modeId.layer", text = navStrings.adjust, color = navItemColor, shape = AzButtonShape.NONE) {
@@ -1921,7 +1921,7 @@ class MainActivity : ComponentActivity() {
                 azRailSubHostItem(id = "mode.ar", hostId = "host.modes", text = navStrings.arMode, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE)
                 // Target capture — only meaningful while in AR mode.
                 if (editorUiState.editorMode == EditorMode.AR) {
-                    azRailSubItem(id = "target.create", hostId = "mode.ar", text = navStrings.grid, color = navItemColor, shape = AzButtonShape.NONE) {
+                    azRailSubItem(id = "target.create", hostId = "mode.ar", text = navStrings.grid, color = navItemColor, shape = AzButtonShape.RECTANGLE) {
                         if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
                     }
                 }

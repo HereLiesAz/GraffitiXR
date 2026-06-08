@@ -633,13 +633,12 @@ class ArViewModel @Inject constructor(
             val s = Session(context)
             val config = Config(s)
             config.focusMode = Config.FocusMode.AUTO
-            // BLOCKING (not LATEST_CAMERA_IMAGE): ARCore's init-time visual-feature-track depth
-            // provider requests camera images at specific past timestamps. LATEST_CAMERA_IMAGE drops
-            // intermediate frames, so on some device profiles the provider can't find them
-            // ("image_buffer.cc: Failed to find an image with the requested timestamp"), which jams
-            // VIO into permanent kNotTracking and never publishes a camera texture -> black passthrough.
-            // BLOCKING processes frames in order without dropping, so the provider finds its images.
-            config.updateMode = Config.UpdateMode.BLOCKING
+            // LATEST_CAMERA_IMAGE so session.update() never blocks the GL render thread. On this
+            // device the BLOCKING mode left the renderer stuck "Waiting for first frame" (the render
+            // heartbeat never fired) — update() hung waiting for a frame that never arrived, so the
+            // camera passthrough never drew. LATEST returns the most recent frame immediately, letting
+            // onDrawFrame tick and draw the camera even when ARCore's perception pipeline is degraded.
+            config.updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
             // Detect walls so the overlay can anchor to the real surface at its true distance. Without
             // this, hit-tests only return sparse feature points and the overlay lands short of the wall.
             config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
