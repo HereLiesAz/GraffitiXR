@@ -302,47 +302,67 @@ fun MainScreen(
                     }
             ) {
                 uiState.layers.filter { it.isVisible }.forEach { layer ->
-                    val isLive = layer.id == uiState.liveStrokeLayerId
-                    val bmp = if (isLive) uiState.liveStrokeBitmap ?: layer.bitmap else layer.bitmap
-                    bmp?.let { displayBmp ->
-                        val imageBitmap = if (isLive) {
-                            val version = uiState.liveStrokeVersion
-                            remember(version) { displayBmp.asImageBitmap() }
-                        } else {
-                            remember(displayBmp) { displayBmp.asImageBitmap() }
-                        }
-                        Image(
-                            bitmap = imageBitmap,
-                            contentDescription = null,
-                            colorFilter = ColorFilter.colorMatrix(
-                                createColorMatrix(
-                                    saturation = layer.saturation * modeAdj.saturation,
-                                    contrast = layer.contrast * modeAdj.contrast,
-                                    brightness = layer.brightness + modeAdj.brightness,
-                                    colorBalanceR = layer.colorBalanceR,
-                                    colorBalanceG = layer.colorBalanceG,
-                                    colorBalanceB = layer.colorBalanceB,
-                                    isInverted = layer.isInverted != modeAdj.isInverted
+                    androidx.compose.runtime.key(layer.id) {
+                        val isLive = layer.id == uiState.liveStrokeLayerId
+                        val bmp = if (isLive) uiState.liveStrokeBitmap ?: layer.bitmap else layer.bitmap
+                        bmp?.let { displayBmp ->
+                            val imageBitmap = if (isLive) {
+                                val version = uiState.liveStrokeVersion
+                                remember(version) { displayBmp.asImageBitmap() }
+                            } else {
+                                remember(displayBmp) { displayBmp.asImageBitmap() }
+                            }
+                            // Memoize the colour filter. createColorMatrix() was rebuilt on EVERY
+                            // recomposition for EVERY layer — a per-frame allocation storm that makes
+                            // the whole screen lag. Recompute only when the inputs actually change.
+                            val colorFilter = remember(
+                                layer.saturation, layer.contrast, layer.brightness,
+                                layer.colorBalanceR, layer.colorBalanceG, layer.colorBalanceB,
+                                layer.isInverted, modeAdj.saturation, modeAdj.contrast,
+                                modeAdj.brightness, modeAdj.isInverted
+                            ) {
+                                ColorFilter.colorMatrix(
+                                    createColorMatrix(
+                                        saturation = layer.saturation * modeAdj.saturation,
+                                        contrast = layer.contrast * modeAdj.contrast,
+                                        brightness = layer.brightness + modeAdj.brightness,
+                                        colorBalanceR = layer.colorBalanceR,
+                                        colorBalanceG = layer.colorBalanceG,
+                                        colorBalanceB = layer.colorBalanceB,
+                                        isInverted = layer.isInverted != modeAdj.isInverted
+                                    )
                                 )
-                            ),
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    translationX = layer.offset.x
-                                    translationY = layer.offset.y
-                                    scaleX = layer.scale
-                                    scaleY = layer.scale
-                                    rotationX = layer.rotationX
-                                    rotationY = layer.rotationY
-                                    rotationZ = layer.rotationZ
-                                    alpha = layer.opacity
-                                    transformOrigin = TransformOrigin.Center
-                                    blendMode = layer.blendMode
-                                    compositingStrategy =
-                                        androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-                                },
-                            contentScale = ContentScale.Fit
-                        )
+                            }
+                            // Offscreen compositing forces a full-screen offscreen buffer + extra pass
+                            // per layer, every frame. It's only needed to isolate a non-default blend
+                            // mode; for normal (SrcOver) layers, Auto avoids that cost.
+                            val needsOffscreen =
+                                layer.blendMode != androidx.compose.ui.graphics.BlendMode.SrcOver
+                            Image(
+                                bitmap = imageBitmap,
+                                contentDescription = null,
+                                colorFilter = colorFilter,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        translationX = layer.offset.x
+                                        translationY = layer.offset.y
+                                        scaleX = layer.scale
+                                        scaleY = layer.scale
+                                        rotationX = layer.rotationX
+                                        rotationY = layer.rotationY
+                                        rotationZ = layer.rotationZ
+                                        alpha = layer.opacity
+                                        transformOrigin = TransformOrigin.Center
+                                        blendMode = layer.blendMode
+                                        compositingStrategy = if (needsOffscreen)
+                                            androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                                        else
+                                            androidx.compose.ui.graphics.CompositingStrategy.Auto
+                                    },
+                                contentScale = ContentScale.Fit
+                            )
+                        }
                     }
                 }
             }
