@@ -236,13 +236,12 @@ class ArRenderer(
         onDiag("surface: bg ok tex=${backgroundRenderer.textureId}")
 
         // SLAM GL init is isolated: if it throws it must NOT kill the GL thread (that would leave the
-        // camera passthrough permanently black). The bracketing breadcrumbs localize a hang to the
-        // exact native step (resetGlContext rebuilds the GL objects; initGl is the idempotent re-check).
+        // camera passthrough permanently black). resetGlContext() already (re)builds every GL object,
+        // so a separate initGl() call here would be redundant. The breadcrumbs localize a hang (stuck on
+        // "slam begin") vs a throw ("slam FAILED"); the native MobileGS::initGl logs split voxel vs mesh.
         try {
-            onDiag("surface: slam reset begin")
+            onDiag("surface: slam begin")
             slamManager.resetGlContext()
-            onDiag("surface: slam reset ok")
-            slamManager.initGl()
             onDiag("surface: slam ok")
         } catch (t: Throwable) {
             Timber.e(t, "ARDIAG slam GL init failed")
