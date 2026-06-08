@@ -460,7 +460,7 @@ class ArViewModel @Inject constructor(
         }
         viewModelScope.launch {
             settingsRepository.arScanMode.collect { mode ->
-                _uiState.update { it.copy(arScanMode = mode.coerceToCapability()) }
+                _uiState.update { it.copy(arScanMode = mode) }
             }
         }
         viewModelScope.launch {
@@ -515,7 +515,6 @@ class ArViewModel @Inject constructor(
     // motion depth — they do NOT require hardware stereo. The mono-vs-stereo *camera config* is
     // chosen separately (probe + initArSessionLocked); it must not disable the MURAL *scan mode*.
     // So the scan mode is never auto-downgraded to Canvas; the user picks Canvas explicitly if wanted.
-    private fun ArScanMode.coerceToCapability(): ArScanMode = this
 
     fun setArScanMode(mode: ArScanMode) {
         // A user explicitly choosing Mural is a retry: clear the sticky stereo-unstable flag and let
@@ -524,7 +523,7 @@ class ArViewModel @Inject constructor(
             forcedStereoUnstable = false
             viewModelScope.launch { settingsRepository.setForcedStereoUnstable(false) }
         }
-        _uiState.update { it.copy(arScanMode = mode.coerceToCapability()) }
+        _uiState.update { it.copy(arScanMode = mode) }
     }
 
     fun setMuralMethod(method: MuralMethod) {
@@ -698,8 +697,7 @@ class ArViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isDualLensActive = stereoActive,
-                    isHardwareStereoActive = stereoActive,
-                    arScanMode = it.arScanMode.coerceToCapability()
+                    isHardwareStereoActive = stereoActive
                 )
             }
 
