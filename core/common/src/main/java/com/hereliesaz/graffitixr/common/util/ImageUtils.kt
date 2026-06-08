@@ -42,13 +42,36 @@ object ImageUtils {
      * @param uri The URI of the image to load.
      * @return The loaded [Bitmap], or null if loading failed.
      */
-    suspend fun loadBitmapAsync(context: Context, uri: Uri): Bitmap? {
+    suspend fun loadBitmapAsync(context: Context, uri: Uri, maxDimension: Int? = null): Bitmap? {
         return withContext(Dispatchers.IO) {
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     val source = ImageDecoder.createSource(context.contentResolver, uri)
-                    ImageDecoder.decodeBitmap(source) { decoder, _, _ ->
+                    ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
                         decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE)
+                        // Downsample huge camera photos (often 12MP+) so we don't decode/copy/encode
+                        // a ~48MB bitmap and then feed a giant texture to the GPU every frame — that's
+                        // what made the first layer take seconds to appear and the canvas lag.
+                        if (maxDimension != null) {
+                            val longest = maxOf(info.size.width, info.size.height)
+                            if (longest > maxDimension) {
+                                var sample = 1
+                                while (longest / (sample * 2) >= maxDimension) sample *= 2
+                                if (sample > 1) decoder.setTargetSampleSize(sample)
+                            }
+                        }
+                    }
+                } else if (maxDimension != null) {
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    context.contentResolver.openInputStream(uri)?.use {
+                        BitmapFactory.decodeStream(it, null, bounds)
+                    }
+                    var sample = 1
+                    val longest = maxOf(bounds.outWidth, bounds.outHeight)
+                    while (longest > 0 && longest / (sample * 2) >= maxDimension) sample *= 2
+                    val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+                    context.contentResolver.openInputStream(uri)?.use {
+                        BitmapFactory.decodeStream(it, null, opts)
                     }
                 } else {
                     @Suppress("DEPRECATION")
