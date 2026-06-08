@@ -872,9 +872,14 @@ class MainActivity : ComponentActivity() {
                                     uiState = arUiState,
                                     modifier = Modifier.align(Alignment.TopStart).padding(top = 100.dp, start = 16.dp)
                                 )
+                                // Keep the diag-log readout clear of the stats panel above (both were
+                                // pinned TopStart and overlapped into an unreadable mess). Sit it in the
+                                // empty band below the panel and above the adjustment knobs.
                                 DiagPopup(
                                     diagLog = arUiState.diagLog,
-                                    modifier = Modifier.align(Alignment.TopStart),
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(start = 16.dp, end = 16.dp, bottom = 220.dp),
                                     strings = strings
                                 )
                             }
