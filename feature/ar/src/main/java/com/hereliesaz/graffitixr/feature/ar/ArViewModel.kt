@@ -465,24 +465,19 @@ class ArViewModel @Inject constructor(
         }
         viewModelScope.launch {
             settingsRepository.forcedStereoUnstable.collect { unstable ->
+                // Only controls whether to use the stereo *camera config* next session — does not
+                // disable the MURAL scan mode (which works on mono).
                 forcedStereoUnstable = unstable
-                if (unstable) {
-                    deviceCanDoMural = false
-                    _uiState.update { it.copy(arScanMode = it.arScanMode.coerceToCapability()) }
-                }
             }
         }
         viewModelScope.launch {
             settingsRepository.stereoCapability.collect { cap ->
+                // Only decides whether to adopt the stereo camera config; the MURAL scan mode stays
+                // available on mono either way.
                 stereoCapable = when (cap) {
                     1 -> true
                     0 -> false
                     else -> null
-                }
-                // A device whose stereo can't track can't do MURAL — fall its scan mode back to Canvas.
-                if (stereoCapable == false) {
-                    deviceCanDoMural = false
-                    _uiState.update { it.copy(arScanMode = it.arScanMode.coerceToCapability()) }
                 }
             }
         }
@@ -503,10 +498,6 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    // Whether this device can run MURAL scanning. MURAL needs dual-lens (hardware-stereo) depth
-    // triangulation; set from the session's hardware-stereo support. Defaults true until known.
-    @Volatile private var deviceCanDoMural: Boolean = true
-
     // Sticky: a device proved its forced hardware-stereo path is broken (ARCore motion-stereo
     // disparity fails / VIO never tracks). Persisted; once set, sessions skip the stereo config.
     @Volatile private var forcedStereoUnstable: Boolean = false
@@ -520,16 +511,17 @@ class ArViewModel @Inject constructor(
     // a running probe stops and releases the camera immediately when the activity pauses or AR exits.
     private var sessionUpdateJob: kotlinx.coroutines.Job? = null
 
-    // MURAL requires depth; on devices that can't do it, fall back to Canvas (CLOUD_POINTS).
-    private fun ArScanMode.coerceToCapability(): ArScanMode =
-        if (!deviceCanDoMural && this == ArScanMode.MURAL) ArScanMode.CLOUD_POINTS else this
+    // MURAL (gaussian-splat SLAM) and the other mural methods run on a mono camera using VIO /
+    // motion depth — they do NOT require hardware stereo. The mono-vs-stereo *camera config* is
+    // chosen separately (probe + initArSessionLocked); it must not disable the MURAL *scan mode*.
+    // So the scan mode is never auto-downgraded to Canvas; the user picks Canvas explicitly if wanted.
+    private fun ArScanMode.coerceToCapability(): ArScanMode = this
 
     fun setArScanMode(mode: ArScanMode) {
         // A user explicitly choosing Mural is a retry: clear the sticky stereo-unstable flag and let
         // the next session re-evaluate hardware stereo (recovers from any false positive).
         if (mode == ArScanMode.MURAL && forcedStereoUnstable) {
             forcedStereoUnstable = false
-            deviceCanDoMural = true
             viewModelScope.launch { settingsRepository.setForcedStereoUnstable(false) }
         }
         _uiState.update { it.copy(arScanMode = mode.coerceToCapability()) }
@@ -701,8 +693,8 @@ class ArViewModel @Inject constructor(
                 Timber.i("ARDIAG dual-lens: using mono camera config (stereoCapable=$stereoCapable)")
             }
 
-            // MURAL needs dual-lens depth triangulation; without hardware stereo it falls back to Canvas.
-            deviceCanDoMural = stereoActive
+            // isDualLensActive / isHardwareStereoActive just reflect the camera config for the diag
+            // panel; the MURAL scan mode stays available regardless (it works on mono).
             _uiState.update {
                 it.copy(
                     isDualLensActive = stereoActive,
@@ -1119,8 +1111,7 @@ class ArViewModel @Inject constructor(
     private fun recoverFromBrokenStereo() {
         if (!stereoRecoveryInFlight.compareAndSet(false, true)) return
         forcedStereoUnstable = true
-        deviceCanDoMural = false
-        _uiState.update { it.copy(arScanMode = it.arScanMode.coerceToCapability(), trackingFailed = false) }
+        _uiState.update { it.copy(trackingFailed = false) }
         viewModelScope.launch { settingsRepository.setForcedStereoUnstable(true) }
         viewModelScope.launch {
             sessionMutex.withLock {
