@@ -37,6 +37,12 @@ class GraffitiApplication : Application() {
         // 1.1. Load Native Libraries (OpenCV + GraffitiXR)
         NativeLibLoader.loadAll()
 
+        // 1.1b. Install native crash capture (signal handler) — catches SIGSEGV/SIGABRT in the
+        // AR/SLAM native code, which the JVM CrashReporter below can't see. Surfaced on next launch.
+        com.hereliesaz.graffitixr.nativebridge.NativeCrashHandler.install(
+            java.io.File(cacheDir, "last_native_crash.txt").absolutePath
+        )
+
         // 1.2. Setup Crash Reporting
         CrashReporter(this).initialize()
         MainScope().launch {

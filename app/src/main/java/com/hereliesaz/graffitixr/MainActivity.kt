@@ -30,6 +30,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.detectTapGestures
 import android.content.ClipData
 import android.content.ClipboardManager as AndroidClipboardManager
@@ -180,6 +182,8 @@ class MainActivity : ComponentActivity() {
     var hasBluetoothPermission by mutableStateOf(false)
     var showWallSourceDialog by mutableStateOf(false)
     var isExporting by mutableStateOf(false)
+    // Crash report captured on the previous run (native SIGSEGV and/or JVM), shown on launch.
+    var pendingCrashReport by mutableStateOf<String?>(null)
 
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p ->
         hasCameraPermission = p[Manifest.permission.CAMERA] ?: false
@@ -223,6 +227,20 @@ class MainActivity : ComponentActivity() {
             true
         }
 
+        // Surface any crash captured on the previous run: native backtrace (signal handler) and/or
+        // the JVM CrashReporter dump. Read + delete so it shows exactly once.
+        run {
+            val parts = mutableListOf<String>()
+            listOf("last_native_crash.txt", "last_crash.txt").forEach { name ->
+                val f = java.io.File(cacheDir, name)
+                if (f.exists()) {
+                    runCatching { parts.add("=== $name ===\n" + f.readText()) }
+                    runCatching { f.delete() }
+                }
+            }
+            if (parts.isNotEmpty()) pendingCrashReport = parts.joinToString("\n\n")
+        }
+
         securityProviderManager.installAsync(this)
         slamManager.ensureInitialized()
         checkAndInitializeWearables()
@@ -237,6 +255,33 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             GraffitiXRTheme {
+                pendingCrashReport?.let { report ->
+                    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { pendingCrashReport = null },
+                        title = { androidx.compose.material3.Text("Previous crash captured") },
+                        text = {
+                            androidx.compose.foundation.text.selection.SelectionContainer {
+                                androidx.compose.material3.Text(
+                                    report,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    fontSize = 10.sp,
+                                    modifier = Modifier.verticalScroll(rememberScrollState())
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            androidx.compose.material3.TextButton(onClick = {
+                                clipboard.setText(androidx.compose.ui.text.AnnotatedString(report))
+                            }) { androidx.compose.material3.Text("Copy") }
+                        },
+                        dismissButton = {
+                            androidx.compose.material3.TextButton(onClick = { pendingCrashReport = null }) {
+                                androidx.compose.material3.Text("Dismiss")
+                            }
+                        }
+                    )
+                }
                 val navController = rememberNavController()
                 val currentBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = currentBackStackEntry?.destination?.route

@@ -4,6 +4,12 @@
 #include <android/bitmap.h>
 #include <opencv2/opencv.hpp>
 #include <GLES3/gl3.h>
+#include <signal.h>
+#include <unwind.h>
+#include <dlfcn.h>
+#include <cstdio>
+#include <cstring>
+#include <cstdint>
 #include "include/MobileGS.h"
 #include "include/SurfaceUnroller.h"
 #include "include/StereoProcessor.h"
@@ -25,6 +31,101 @@ JavaVM* gJvm = nullptr;
 
 static int gColorImageWidth  = 0;
 static int gColorImageHeight = 0;
+
+// ── Native crash capture ─────────────────────────────────────────────────────
+// A SIGSEGV/SIGABRT in the AR/SLAM native code kills the process before the JVM
+// UncaughtExceptionHandler can run, so the Kotlin CrashReporter never sees it
+// ("crashed hard, nothing on screen"). This installs a signal handler that writes
+// the native backtrace to a file, then chains to the previous handler so the
+// normal tombstone still happens. MainActivity surfaces the file on next launch.
+namespace {
+struct BtState { void** cur; void** end; };
+_Unwind_Reason_Code btCb(struct _Unwind_Context* ctx, void* arg) {
+    BtState* s = static_cast<BtState*>(arg);
+    uintptr_t pc = _Unwind_GetIP(ctx);
+    if (pc) {
+        if (s->cur == s->end) return _URC_END_OF_STACK;
+        *s->cur++ = reinterpret_cast<void*>(pc);
+    }
+    return _URC_NO_REASON;
+}
+char gCrashPath[1024] = {0};
+char gAltStack[64 * 1024];
+struct sigaction gOldSegv{}, gOldAbort{}, gOldBus{}, gOldIll{}, gOldFpe{};
+void chainOld(int sig, siginfo_t* info, void* uc) {
+    struct sigaction* old = nullptr;
+    switch (sig) {
+        case SIGSEGV: old = &gOldSegv; break;
+        case SIGABRT: old = &gOldAbort; break;
+        case SIGBUS:  old = &gOldBus;  break;
+        case SIGILL:  old = &gOldIll;  break;
+        case SIGFPE:  old = &gOldFpe;  break;
+        default: break;
+    }
+    if (old && (old->sa_flags & SA_SIGINFO) && old->sa_sigaction) {
+        old->sa_sigaction(sig, info, uc);
+    } else if (old && old->sa_handler != SIG_DFL && old->sa_handler != SIG_IGN) {
+        old->sa_handler(sig);
+    } else {
+        signal(sig, SIG_DFL);
+        raise(sig);
+    }
+}
+void nativeCrashHandler(int sig, siginfo_t* info, void* uc) {
+    void* frames[64];
+    BtState st{frames, frames + 64};
+    _Unwind_Backtrace(btCb, &st);
+    size_t n = static_cast<size_t>(st.cur - frames);
+    if (gCrashPath[0]) {
+        FILE* f = fopen(gCrashPath, "w");
+        if (f) {
+            fprintf(f, "NATIVE CRASH sig=%d (%s) addr=%p\n", sig,
+                    strsignal(sig), info ? info->si_addr : nullptr);
+            for (size_t i = 0; i < n; ++i) {
+                Dl_info di;
+                const char* sym = "?";
+                const char* lib = "?";
+                uintptr_t off = 0;
+                if (dladdr(frames[i], &di)) {
+                    if (di.dli_sname) sym = di.dli_sname;
+                    if (di.dli_fname) lib = di.dli_fname;
+                    if (di.dli_saddr) off = reinterpret_cast<uintptr_t>(frames[i]) -
+                                            reinterpret_cast<uintptr_t>(di.dli_saddr);
+                }
+                fprintf(f, "#%02zu %p %s+%zu (%s)\n", i, frames[i], sym, off, lib);
+            }
+            fclose(f);
+        }
+    }
+    chainOld(sig, info, uc);
+}
+} // namespace
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_NativeCrashHandler_nativeInstall(
+        JNIEnv* env, jobject, jstring jpath) {
+    const char* p = env->GetStringUTFChars(jpath, nullptr);
+    if (p) {
+        strncpy(gCrashPath, p, sizeof(gCrashPath) - 1);
+        env->ReleaseStringUTFChars(jpath, p);
+    }
+    stack_t ss;
+    ss.ss_sp = gAltStack;
+    ss.ss_size = sizeof(gAltStack);
+    ss.ss_flags = 0;
+    sigaltstack(&ss, nullptr);
+
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_sigaction = nativeCrashHandler;
+    sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGSEGV, &sa, &gOldSegv);
+    sigaction(SIGABRT, &sa, &gOldAbort);
+    sigaction(SIGBUS,  &sa, &gOldBus);
+    sigaction(SIGILL,  &sa, &gOldIll);
+    sigaction(SIGFPE,  &sa, &gOldFpe);
+}
 
 void bitmapToMat(JNIEnv * env, jobject bitmap, cv::Mat& dst) {
     AndroidBitmapInfo info;
