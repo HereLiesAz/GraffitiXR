@@ -56,20 +56,26 @@ VoxelHash::~VoxelHash() {
 }
 
 void VoxelHash::initGl() {
+    LOGI("VoxelHash::initGl waiting for mMutex");
     std::lock_guard<std::mutex> lock(mMutex);
+    LOGI("VoxelHash::initGl got mMutex");
     if (mProgram != 0 && glIsProgram(mProgram)) return;
     LOGI("Initializing Persistent Voxel Memory GL");
 
     GLuint vs = compileShader(GL_VERTEX_SHADER, kVertexShader);
+    LOGI("VoxelHash::initGl vs compiled (%u)", vs);
     GLuint fs = compileShader(GL_FRAGMENT_SHADER, kFragmentShader);
+    LOGI("VoxelHash::initGl fs compiled (%u)", fs);
     mProgram = glCreateProgram();
     glAttachShader(mProgram, vs); glAttachShader(mProgram, fs);
     glLinkProgram(mProgram);
+    LOGI("VoxelHash::initGl program linked (%u)", mProgram);
     glDeleteShader(vs); glDeleteShader(fs);
 
     glGenBuffers(1, &mPointVbo);
     glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(MAX_SPLATS * sizeof(Splat)), nullptr, GL_DYNAMIC_DRAW);
+    LOGI("VoxelHash::initGl buffer allocated (%d splats)", MAX_SPLATS);
 }
 
 uint32_t VoxelHash::getVoxelHash(float x, float y, float z, float voxelSize) {
