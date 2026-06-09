@@ -169,6 +169,9 @@ class ArRenderer(
         sessionLock.withLock {
             this.session = session
             if (session != null) {
+                // Reset so the per-frame startup heartbeat fires on every (re)attach/resume, not just
+                // the first session — resume is a common spot for camera/GL init stalls.
+                frameCount = 0
                 displayRotationHelper.onResume()
                 if (isSurfaceCreated) {
                     session.setCameraTextureName(backgroundRenderer.textureId)
@@ -233,7 +236,7 @@ class ArRenderer(
         onDiag("surface: onSurfaceCreated start")
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         backgroundRenderer.createOnGlThread(context)
-        onDiag("surface: bg ok tex=${backgroundRenderer.textureId}")
+        onDiag("surface: bg prog=${backgroundRenderer.isProgramReady} shader=${backgroundRenderer.shaderLog} tex=${backgroundRenderer.textureId}")
 
         // SLAM GL init is isolated: if it throws it must NOT kill the GL thread (that would leave the
         // camera passthrough permanently black). resetGlContext() already (re)builds every GL object,
