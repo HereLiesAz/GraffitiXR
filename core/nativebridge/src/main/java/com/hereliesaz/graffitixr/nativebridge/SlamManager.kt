@@ -147,10 +147,18 @@ class SlamManager @Inject constructor(
     }
 
     /** Voxel-only GL init — split out so a caller can localize a GL-init stall on-screen. */
-    fun initVoxelGl() = nativeInitVoxelGl()
+    fun initVoxelGl() {
+        // Guard so a premature call surfaces as a failure breadcrumb instead of a silent native
+        // no-op (gSlamEngine null) that would falsely print "voxel ok".
+        check(isInitialized) { "SlamManager is not initialized" }
+        nativeInitVoxelGl()
+    }
 
     /** Mesh-only GL init — split out so a caller can localize a GL-init stall on-screen. */
-    fun initMeshGl() = nativeInitMeshGl()
+    fun initMeshGl() {
+        check(isInitialized) { "SlamManager is not initialized" }
+        nativeInitMeshGl()
+    }
 
     fun updateCamera(
         viewMatrix: FloatArray,
