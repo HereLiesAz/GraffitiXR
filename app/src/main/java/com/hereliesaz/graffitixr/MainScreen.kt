@@ -117,6 +117,13 @@ fun MainScreen(
                     var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
 
                     DisposableEffect(uiState.editorMode) {
+                        // Release the CameraX (editor/overlay) camera BEFORE ARCore opens the
+                        // device. Otherwise the two camera clients race for the device: ARCore
+                        // opening evicts CameraX (ERROR_CAMERA_DEVICE) and CameraX's in-flight
+                        // capture-session open then throws an uncaught camera SecurityException
+                        // ("Attempt to use camera from a different process than original client"),
+                        // hard-crashing the app on AR entry.
+                        runCatching { cameraController.unbind() }
                         arViewModel.setArMode(true, context)
                         onDispose {
                             // Fully close the session (not just pause) when leaving AR — e.g. into
