@@ -27,6 +27,10 @@ public:
     ~VoxelHash();
 
     void initGl();
+    // Split GL init into program (shader compile/link) and buffer (11MB VBO) stages so a caller
+    // can localize an init stall to the exact stage on-screen. initGl() runs both.
+    void initGlProgram();
+    void initGlBuffer();
     void update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, float voxelSize, float initialConfidence);
     void addSparsePoints(const std::vector<float>& points, const float* viewMat, const float* projMat, float initialConfidence);
     void addKeyframe(const VoxelFrame& kf);

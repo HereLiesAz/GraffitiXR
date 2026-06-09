@@ -154,6 +154,18 @@ class SlamManager @Inject constructor(
         nativeInitVoxelGl()
     }
 
+    /** Voxel program (shader compile/link) GL init — split out to localize a stall on-screen. */
+    fun initVoxelGlProgram() {
+        check(isInitialized) { "SlamManager is not initialized" }
+        nativeInitVoxelGlProgram()
+    }
+
+    /** Voxel buffer (11MB VBO alloc) GL init — split out to localize a stall on-screen. */
+    fun initVoxelGlBuffer() {
+        check(isInitialized) { "SlamManager is not initialized" }
+        nativeInitVoxelGlBuffer()
+    }
+
     /** Mesh-only GL init — split out so a caller can localize a GL-init stall on-screen. */
     fun initMeshGl() {
         check(isInitialized) { "SlamManager is not initialized" }
@@ -401,6 +413,8 @@ class SlamManager @Inject constructor(
     private external fun nativeInitGl()
     private external fun nativeResetGlContext()
     private external fun nativeInitVoxelGl()
+    private external fun nativeInitVoxelGlProgram()
+    private external fun nativeInitVoxelGlBuffer()
     private external fun nativeInitMeshGl()
     private external fun nativeSetViewportSize(width: Int, height: Int)
     private external fun nativeUpdateCamera(

@@ -56,20 +56,37 @@ VoxelHash::~VoxelHash() {
 }
 
 void VoxelHash::initGl() {
+    initGlProgram();
+    initGlBuffer();
+}
+
+void VoxelHash::initGlProgram() {
+    LOGI("VoxelHash::initGlProgram waiting for mMutex");
     std::lock_guard<std::mutex> lock(mMutex);
+    LOGI("VoxelHash::initGlProgram got mMutex");
     if (mProgram != 0 && glIsProgram(mProgram)) return;
     LOGI("Initializing Persistent Voxel Memory GL");
 
     GLuint vs = compileShader(GL_VERTEX_SHADER, kVertexShader);
+    LOGI("VoxelHash::initGlProgram vs compiled (%u)", vs);
     GLuint fs = compileShader(GL_FRAGMENT_SHADER, kFragmentShader);
+    LOGI("VoxelHash::initGlProgram fs compiled (%u)", fs);
     mProgram = glCreateProgram();
     glAttachShader(mProgram, vs); glAttachShader(mProgram, fs);
     glLinkProgram(mProgram);
+    LOGI("VoxelHash::initGlProgram program linked (%u)", mProgram);
     glDeleteShader(vs); glDeleteShader(fs);
+}
 
+void VoxelHash::initGlBuffer() {
+    std::lock_guard<std::mutex> lock(mMutex);
+    // glIsBuffer guards against re-allocating after a real GL-context reset re-creates handles.
+    if (mPointVbo != 0 && glIsBuffer(mPointVbo)) return;
     glGenBuffers(1, &mPointVbo);
     glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
+    LOGI("VoxelHash::initGlBuffer allocating %d splats", MAX_SPLATS);
     glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(MAX_SPLATS * sizeof(Splat)), nullptr, GL_DYNAMIC_DRAW);
+    LOGI("VoxelHash::initGlBuffer buffer allocated");
 }
 
 uint32_t VoxelHash::getVoxelHash(float x, float y, float z, float voxelSize) {
