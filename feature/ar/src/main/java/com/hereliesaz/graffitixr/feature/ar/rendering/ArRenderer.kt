@@ -140,6 +140,10 @@ class ArRenderer(
 
     private var frameCount = 0
     private var diagFrameCount = 0
+    // Camera-streaming watchdog: report the first frame ARCore actually delivers (ts>0) and warn once
+    // if no camera frame has arrived a few seconds after the session started driving.
+    private var camStreamReported = false
+    private var camStallWarned = false
     private var sensorOrientation = 90
     private var isSurfaceCreated = false
 
@@ -311,6 +315,18 @@ class ArRenderer(
             }
 
             latestFrame.set(frame)
+            // Camera-streaming verdict, surfaced on-screen so we don't need adb. ARCore returns ts=0
+            // until its first camera image lands; once ts>0 the camera IS streaming into the texture.
+            val ts = frame.timestamp
+            if (ts > 0L && !camStreamReported) {
+                camStreamReported = true
+                onDiag("CAMERA STREAMING f=$frameCount ts=$ts track=${frame.camera.trackingState}")
+            } else if (ts == 0L && !camStreamReported && !camStallWarned && frameCount >= 90) {
+                // ~3s at 30fps with no camera image: the device's camera pipeline never started
+                // feeding ARCore (resume() succeeded but no frames) — distinct from a slow converge.
+                camStallWarned = true
+                onDiag("CAMERA STALL: no frame after ${frameCount}f (ts still 0) -> camera not streaming")
+            }
             // During the AMBIENT scan, the camera background renders as a newspaper halftone with full
             // colour bleeding in (like ink) as each yaw sector is mapped — the world-mapping indicator.
             val scanActive = !anchorEstablished && scanMode == ArScanMode.MURAL && scanPhase == ScanPhase.AMBIENT
