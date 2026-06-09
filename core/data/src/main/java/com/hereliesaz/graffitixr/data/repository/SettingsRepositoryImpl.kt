@@ -31,7 +31,10 @@ class SettingsRepositoryImpl @Inject constructor(
     private val MURAL_METHOD = stringPreferencesKey("mural_method")
     private val SHOW_ANCHOR_BOUNDARY = booleanPreferencesKey("show_anchor_boundary")
     private val FORCED_STEREO_UNSTABLE = booleanPreferencesKey("forced_stereo_unstable")
-    private val STEREO_CAPABILITY = intPreferencesKey("stereo_capability")
+    // Key intentionally renamed from "stereo_capability": the probe's meaning changed from "stereo
+    // tracks" to "dual lenses actually triangulate depth", so pre-existing verdicts must be discarded
+    // and re-probed under the stricter test. Reading the new key returns -1 (unprobed) on old installs.
+    private val STEREO_CAPABILITY = intPreferencesKey("depth_triangulation_capability")
     private val IS_IMPERIAL_UNITS = booleanPreferencesKey("is_imperial_units")
     private val BACKGROUND_COLOR = intPreferencesKey("background_color")
     private val COMPLETED_TUTORIALS = stringSetPreferencesKey("completed_tutorials")

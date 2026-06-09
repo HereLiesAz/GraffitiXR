@@ -472,8 +472,9 @@ class ArViewModel @Inject constructor(
         }
         viewModelScope.launch {
             settingsRepository.stereoCapability.collect { cap ->
-                // Only decides whether to adopt the stereo camera config; the MURAL scan mode stays
-                // available on mono either way.
+                // "Capable" now means the probe proved the dual lenses actually triangulate depth (not
+                // merely that a stereo config exists and tracks). Only decides whether to adopt the
+                // stereo camera config; the MURAL scan mode stays available on mono either way.
                 stereoCapable = when (cap) {
                     1 -> true
                     0 -> false
@@ -502,9 +503,9 @@ class ArViewModel @Inject constructor(
     // disparity fails / VIO never tracks). Persisted; once set, sessions skip the stereo config.
     @Volatile private var forcedStereoUnstable: Boolean = false
 
-    // One-time hardware-stereo probe result: null = not yet probed, true = stereo tracks (adopt
-    // dual-lens), false = stereo thrashes / never tracks (stay mono). Persisted via
-    // SettingsRepository.stereoCapability so the probe only runs once per install.
+    // One-time dual-lens depth-triangulation probe result: null = not yet probed, true = the lenses
+    // produce a real depth map (adopt the stereo config), false = no usable depth / thrashes / never
+    // tracks (stay mono). Persisted via SettingsRepository.stereoCapability so it runs once per install.
     @Volatile private var stereoCapable: Boolean? = null
     private val stereoProbeInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
     // The in-flight session-state update (probe + init/resume/pause). Cancelled on the next update so
@@ -604,8 +605,8 @@ class ArViewModel @Inject constructor(
         sessionUpdateJob = viewModelScope.launch {
             sessionMutex.withLock {
                 // First-ever AR entry on an unprobed device: while the camera is still free (no live
-                // session yet), run a short throwaway stereo session on a worker thread to see whether
-                // dual-lens VIO actually tracks. Done inside the session mutex so no concurrent state
+                // session yet), run a short throwaway stereo session in an isolated process to see
+                // whether the dual lenses actually triangulate depth. Done inside the session mutex so no concurrent state
                 // update can open the live session while the probe still holds the camera. Capped at a
                 // few seconds and off the main thread, so a device whose motion-stereo thrashes can't
                 // ANR — and we only adopt stereo if it works. Cancelling this job (AR exit / pause)
@@ -665,8 +666,8 @@ class ArViewModel @Inject constructor(
             // (spherical_rectifier); on devices that list a "stereo" config but can't actually compute
             // disparity that pegs the CPU, starves VIO into kNotTracking, and ANRs the main thread with
             // a black camera. So we only select stereo when the one-time worker-thread probe has proven
-            // this device's stereo actually tracks (stereoCapable == true) and it hasn't since been
-            // marked unstable. Everything else stays on the safe mono 30 FPS back config.
+            // this device's dual lenses actually triangulate depth (stereoCapable == true) and it hasn't
+            // since been marked unstable. Everything else stays on the safe mono 30 FPS back config.
             val useStereo = stereoCapable == true && !forcedStereoUnstable
             var stereoActive = false
             if (useStereo) {
@@ -720,12 +721,13 @@ class ArViewModel @Inject constructor(
     }
 
     /**
-     * One-time hardware-stereo capability probe. Runs a short throwaway ARCore session configured for
-     * forced hardware stereo on a worker thread (its own offscreen EGL context), pumps [Session.update]
-     * for a few seconds and adopts dual-lens only if VIO reaches TRACKING. A device whose motion-stereo
-     * is broken never tracks (and thrashes), so we cap the probe and treat any failure as "mono". The
-     * result is cached in settings so this only runs once per install. Must be called while no live
-     * session holds the camera.
+     * One-time dual-lens depth-triangulation probe. Runs a short throwaway ARCore session configured
+     * for forced hardware stereo with the Depth API enabled, in an isolated ":probe" process, and
+     * adopts dual-lens only if it both reaches TRACKING and hands back a populated depth image — proof
+     * the two lenses actually triangulate depth. A device that merely lists a stereo config but can't
+     * compute disparity returns an empty depth map (or thrashes and never tracks), so we cap the probe
+     * and treat any failure as "mono". The result is cached in settings so this only runs once per
+     * install. Must be called while no live session holds the camera.
      */
     private suspend fun probeStereoCapability(context: Context) {
         if (stereoCapable != null) return
@@ -734,14 +736,14 @@ class ArViewModel @Inject constructor(
             val capable = runProbeViaService(context)
             stereoCapable = capable
             settingsRepository.setStereoCapability(if (capable) 1 else 0)
-            Timber.i("ARDIAG stereo probe complete: capable=$capable")
+            Timber.i("ARDIAG depth-triangulation probe complete: capable=$capable")
         } catch (e: Exception) {
             // A cancelled probe (AR exit / pause) must NOT be cached as a permanent mono verdict —
             // let cancellation propagate so the device stays "unprobed" and re-probes next entry.
             if (e is kotlinx.coroutines.CancellationException) throw e
             stereoCapable = false
             settingsRepository.setStereoCapability(0)
-            Timber.w(e, "ARDIAG stereo probe threw -> treating device as mono")
+            Timber.w(e, "ARDIAG depth-triangulation probe threw -> treating device as mono")
         } finally {
             stereoProbeInFlight.set(false)
         }
