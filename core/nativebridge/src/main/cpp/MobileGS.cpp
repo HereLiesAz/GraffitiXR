@@ -114,6 +114,18 @@ void MobileGS::initGl() {
     LOGI("MobileGS::initGl mesh ok");
 }
 
+void MobileGS::initVoxelGl() {
+    LOGI("MobileGS::initVoxelGl begin");
+    mVoxelHash.initGl();
+    LOGI("MobileGS::initVoxelGl ok");
+}
+
+void MobileGS::initMeshGl() {
+    LOGI("MobileGS::initMeshGl begin");
+    mSurfaceMesh.initGl();
+    LOGI("MobileGS::initMeshGl ok");
+}
+
 void MobileGS::resetGlContext() {
     initGl();
 }
