@@ -136,8 +136,10 @@ class StereoProbeService : Service() {
                     Timber.w(e, "ARDIAG depth-triangulation probe: update() failed")
                     return false
                 }
+                // No Thread.sleep here: UpdateMode.BLOCKING already paces update() to the camera frame
+                // rate, so the loop runs at full ~30fps. An explicit sleep would halve that and shrink
+                // the depth-convergence budget inside the timeout.
                 if (frame.camera.trackingState != TrackingState.TRACKING) {
-                    Thread.sleep(33)
                     continue
                 }
                 reachedTracking = true
@@ -155,7 +157,6 @@ class StereoProbeService : Service() {
                 } catch (e: Exception) {
                     Timber.w(e, "ARDIAG depth-triangulation probe: depth acquire failed")
                 }
-                Thread.sleep(33)
             }
             Timber.i(
                 "ARDIAG depth-triangulation probe: tracking=$reachedTracking but no valid depth map " +
