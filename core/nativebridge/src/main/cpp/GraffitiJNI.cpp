@@ -7,6 +7,9 @@
 #include <signal.h>
 #include <unwind.h>
 #include <dlfcn.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/prctl.h>
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
@@ -81,6 +84,20 @@ void nativeCrashHandler(int sig, siginfo_t* info, void* uc) {
         if (f) {
             fprintf(f, "NATIVE CRASH sig=%d (%s) addr=%p\n", sig,
                     strsignal(sig), info ? info->si_addr : nullptr);
+            // Attribute the crash to a process + thread. The hardware-stereo/depth probe runs in the
+            // isolated ":probe" process; without this header a probe-process crash is indistinguishable
+            // from a main-app crash (both share cacheDir). open/read/prctl are async-signal-safe.
+            char pname[256] = {0};
+            int cfd = open("/proc/self/cmdline", O_RDONLY);
+            if (cfd >= 0) {
+                ssize_t r = read(cfd, pname, sizeof(pname) - 1);
+                if (r > 0) pname[r] = '\0';
+                close(cfd);
+            }
+            char tname[32] = {0};
+            prctl(PR_GET_NAME, tname, 0, 0, 0);
+            fprintf(f, "process=%s pid=%d tid=%d thread=%s\n",
+                    pname[0] ? pname : "?", getpid(), gettid(), tname[0] ? tname : "?");
             for (size_t i = 0; i < n; ++i) {
                 Dl_info di;
                 const char* sym = "?";

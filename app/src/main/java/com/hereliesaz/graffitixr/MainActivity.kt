@@ -231,10 +231,18 @@ class MainActivity : ComponentActivity() {
         // the JVM CrashReporter dump. Read + delete so it shows exactly once.
         run {
             val parts = mutableListOf<String>()
-            listOf("last_native_crash.txt", "last_crash.txt").forEach { name ->
+            listOf(
+                "last_native_crash.txt" to "native crash",
+                // The hardware-stereo/depth probe runs in the isolated ":probe" process; a native crash
+                // there is expected on devices with a broken depth graph and is benign (the probe times
+                // out and AR falls back to mono). Surface it for debugging, but framed so it is not
+                // mistaken for an app crash.
+                "last_native_crash_probe.txt" to "probe-process native crash — ISOLATED, not an app crash (AR fell back to mono)",
+                "last_crash.txt" to "JVM crash"
+            ).forEach { (name, label) ->
                 val f = java.io.File(cacheDir, name)
                 if (f.exists()) {
-                    runCatching { parts.add("=== $name ===\n" + f.readText()) }
+                    runCatching { parts.add("=== $label ($name) ===\n" + f.readText()) }
                     runCatching { f.delete() }
                 }
             }

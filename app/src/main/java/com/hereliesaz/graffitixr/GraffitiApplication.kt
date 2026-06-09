@@ -39,8 +39,15 @@ class GraffitiApplication : Application() {
 
         // 1.1b. Install native crash capture (signal handler) — catches SIGSEGV/SIGABRT in the
         // AR/SLAM native code, which the JVM CrashReporter below can't see. Surfaced on next launch.
+        // The hardware-stereo/depth probe runs in the isolated ":probe" process (which shares this
+        // cacheDir); a native crash there is expected on devices with a broken depth graph and is
+        // benign (the client times out and falls back to mono). Give it its OWN file so it can never
+        // overwrite — or masquerade as — a real main-process crash.
+        val crashFileName =
+            if (currentProcessName().endsWith(":probe")) "last_native_crash_probe.txt"
+            else "last_native_crash.txt"
         com.hereliesaz.graffitixr.nativebridge.NativeCrashHandler.install(
-            java.io.File(cacheDir, "last_native_crash.txt").absolutePath
+            java.io.File(cacheDir, crashFileName).absolutePath
         )
 
         // 1.2. Setup Crash Reporting
@@ -60,6 +67,14 @@ class GraffitiApplication : Application() {
                 Timber.e("GraffitiXR: Failed to install Security Provider! Error code: $errorCode")
             }
         })
+    }
+
+    /** Current process name (e.g. "com.hereliesaz.graffitixr" or "...:probe"). Application.getProcessName()
+     *  is API 28+, but minSdk is 26, so read /proc/self/cmdline — available on every API level. */
+    private fun currentProcessName(): String = try {
+        java.io.File("/proc/self/cmdline").readText().takeWhile { it.code != 0 }.trim()
+    } catch (_: Exception) {
+        ""
     }
 
     // NOTE: System.loadLibrary("graffitixr") has been removed from here.
