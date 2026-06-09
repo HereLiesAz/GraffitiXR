@@ -86,25 +86,17 @@ class BackgroundRenderer : GlReleasable {
                 .order(ByteOrder.nativeOrder()).asFloatBuffer()
         }
 
-        val vertexShader = loadShader(GLES30.GL_VERTEX_SHADER, VERTEX_SHADER)
-        val fragmentShader = loadShader(GLES30.GL_FRAGMENT_SHADER, FRAGMENT_SHADER)
-
-        backgroundProgram = GLES30.glCreateProgram()
-        GLES30.glAttachShader(backgroundProgram, vertexShader)
-        GLES30.glAttachShader(backgroundProgram, fragmentShader)
-        GLES30.glLinkProgram(backgroundProgram)
-
-        val linkStatus = IntArray(1)
-        GLES30.glGetProgramiv(backgroundProgram, GLES30.GL_LINK_STATUS, linkStatus, 0)
-        if (linkStatus[0] == 0) {
-            val log = GLES30.glGetProgramInfoLog(backgroundProgram)
-            Log.e("BackgroundRenderer", "Link Error: $log")
-            shaderLog = "linkFail:${log.take(60)}"
-            GLES30.glDeleteProgram(backgroundProgram)
-            backgroundProgram = 0
-            return
+        // Try ESSL3 (matches the rest of the pipeline). If this driver lacks the
+        // GL_OES_EGL_image_external_essl3 extension (some custom ROMs / Mesa Turnip do), that shader
+        // won't compile and the camera passthrough would be black — so fall back to the far more widely
+        // supported ESSL1 (#version 100 / GL_OES_EGL_image_external) external-texture path.
+        backgroundProgram = buildProgram(VERTEX_SHADER, FRAGMENT_SHADER)
+        if (backgroundProgram == 0) {
+            val essl3Err = shaderLog
+            backgroundProgram = buildProgram(VERTEX_SHADER_ES1, FRAGMENT_SHADER_ES1)
+            shaderLog = if (backgroundProgram != 0) "ok(essl1 fallback)" else "bothFail[essl3:$essl3Err|essl1:$shaderLog]"
         }
-        shaderLog = "ok"
+        if (backgroundProgram == 0) return
 
         quadPositionParam = GLES30.glGetAttribLocation(backgroundProgram, "a_Position")
         quadTexCoordParam = GLES30.glGetAttribLocation(backgroundProgram, "a_TexCoord")
@@ -209,6 +201,27 @@ class BackgroundRenderer : GlReleasable {
         if (maskTextureId != 0) { GLES30.glDeleteTextures(1, intArrayOf(maskTextureId), 0); maskTextureId = 0 }
     }
 
+    private fun buildProgram(vsSrc: String, fsSrc: String): Int {
+        val vs = loadShader(GLES30.GL_VERTEX_SHADER, vsSrc)
+        val fs = loadShader(GLES30.GL_FRAGMENT_SHADER, fsSrc)
+        if (vs == 0 || fs == 0) return 0
+        val prog = GLES30.glCreateProgram()
+        GLES30.glAttachShader(prog, vs)
+        GLES30.glAttachShader(prog, fs)
+        GLES30.glLinkProgram(prog)
+        val linkStatus = IntArray(1)
+        GLES30.glGetProgramiv(prog, GLES30.GL_LINK_STATUS, linkStatus, 0)
+        if (linkStatus[0] == 0) {
+            val log = GLES30.glGetProgramInfoLog(prog)
+            Log.e("BackgroundRenderer", "Link Error: $log")
+            shaderLog = "linkFail:${log.take(60)}"
+            GLES30.glDeleteProgram(prog)
+            return 0
+        }
+        shaderLog = "ok"
+        return prog
+    }
+
     private fun loadShader(type: Int, shaderCode: String): Int {
         val shader = GLES30.glCreateShader(type)
         GLES30.glShaderSource(shader, shaderCode)
@@ -287,6 +300,29 @@ class BackgroundRenderer : GlReleasable {
                 // removed: it was a flat 2D effect (same failing as the pink fog). A real scan indicator
                 // must spread on the actual 3D surfaces being mapped, not across the whole frame.
                 FragColor = texture(u_Texture, v_TexCoord);
+            }
+        """.trimIndent()
+
+        // ESSL1 (#version 100) fallback for drivers without GL_OES_EGL_image_external_essl3. Plain
+        // camera pass-through; the unused scan uniforms are simply absent (their locations resolve to
+        // -1, so the draw()-side glUniform calls are silent no-ops).
+        private val VERTEX_SHADER_ES1 = """
+            attribute vec4 a_Position;
+            attribute vec2 a_TexCoord;
+            varying vec2 v_TexCoord;
+            void main() {
+               gl_Position = a_Position;
+               v_TexCoord = a_TexCoord;
+            }
+        """.trimIndent()
+
+        private val FRAGMENT_SHADER_ES1 = """
+            #extension GL_OES_EGL_image_external : require
+            precision mediump float;
+            varying vec2 v_TexCoord;
+            uniform samplerExternalOES u_Texture;
+            void main() {
+               gl_FragColor = texture2D(u_Texture, v_TexCoord);
             }
         """.trimIndent()
     }
