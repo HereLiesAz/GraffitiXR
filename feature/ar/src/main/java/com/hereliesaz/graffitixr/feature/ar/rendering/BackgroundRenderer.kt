@@ -203,12 +203,27 @@ class BackgroundRenderer : GlReleasable {
 
     private fun buildProgram(vsSrc: String, fsSrc: String): Int {
         val vs = loadShader(GLES30.GL_VERTEX_SHADER, vsSrc)
+        if (vs == 0) return 0
+        // Compile fs only after vs succeeds, and free vs if fs fails, so a failed build (e.g. ESSL3
+        // before the ESSL1 fallback) never leaks an orphaned shader object.
         val fs = loadShader(GLES30.GL_FRAGMENT_SHADER, fsSrc)
-        if (vs == 0 || fs == 0) return 0
+        if (fs == 0) {
+            GLES30.glDeleteShader(vs)
+            return 0
+        }
         val prog = GLES30.glCreateProgram()
+        if (prog == 0) {
+            GLES30.glDeleteShader(vs)
+            GLES30.glDeleteShader(fs)
+            return 0
+        }
         GLES30.glAttachShader(prog, vs)
         GLES30.glAttachShader(prog, fs)
         GLES30.glLinkProgram(prog)
+        // Once attached+linked the shader objects are no longer needed; flag for deletion (the driver
+        // frees them when they're detached, i.e. when the program is deleted).
+        GLES30.glDeleteShader(vs)
+        GLES30.glDeleteShader(fs)
         val linkStatus = IntArray(1)
         GLES30.glGetProgramiv(prog, GLES30.GL_LINK_STATUS, linkStatus, 0)
         if (linkStatus[0] == 0) {
