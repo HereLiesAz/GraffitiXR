@@ -66,7 +66,10 @@ SurfaceMesh::~SurfaceMesh() {
 }
 
 void SurfaceMesh::initGl() {
-    std::lock_guard<std::mutex> lock(mMutex);
+    // No mMutex here: mProgram/mVbo/mIbo/mWireIbo/mTextureId are GL handles, created/used/destroyed
+    // only on the GL thread. The data mutex guards the CPU mesh/texture data shared with worker
+    // threads (and is held during the heavy perspective-warp work in updateTexture) — locking it here
+    // only risks the same GL-thread stall that blacked out the camera in VoxelHash::initGl.
 
     // Check if current handles are valid in this GL context
     if (mProgram != 0 && glIsProgram(mProgram)) {

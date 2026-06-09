@@ -61,9 +61,10 @@ void VoxelHash::initGl() {
 }
 
 void VoxelHash::initGlProgram() {
-    LOGI("VoxelHash::initGlProgram waiting for mMutex");
-    std::lock_guard<std::mutex> lock(mMutex);
-    LOGI("VoxelHash::initGlProgram got mMutex");
+    // No mMutex here: mProgram is a GL handle, created/used/destroyed only on the GL thread. The
+    // data mutex guards mSplatData/mSpatialHash (shared with worker threads), which this does not
+    // touch. Locking it here only created contention with the heavy worker-held lock — the exact
+    // stall that blacked out the camera (onSurfaceCreated never returned past this point).
     if (mProgram != 0 && glIsProgram(mProgram)) return;
     LOGI("Initializing Persistent Voxel Memory GL");
 
@@ -79,7 +80,7 @@ void VoxelHash::initGlProgram() {
 }
 
 void VoxelHash::initGlBuffer() {
-    std::lock_guard<std::mutex> lock(mMutex);
+    // No mMutex: mPointVbo is a GL handle, GL-thread-only (see initGlProgram).
     // glIsBuffer guards against re-allocating after a real GL-context reset re-creates handles.
     if (mPointVbo != 0 && glIsBuffer(mPointVbo)) return;
     glGenBuffers(1, &mPointVbo);
