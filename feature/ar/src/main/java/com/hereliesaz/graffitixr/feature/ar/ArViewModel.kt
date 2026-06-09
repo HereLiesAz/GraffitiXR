@@ -1428,7 +1428,7 @@ class ArViewModel @Inject constructor(
     fun appendDiag(text: String) {
         _uiState.update { state ->
             val existing = state.diagLog?.lines() ?: emptyList()
-            val updated = (existing + text).takeLast(10).joinToString("\n")
+            val updated = (existing + text).takeLast(24).joinToString("\n")
             state.copy(diagLog = updated)
         }
     }

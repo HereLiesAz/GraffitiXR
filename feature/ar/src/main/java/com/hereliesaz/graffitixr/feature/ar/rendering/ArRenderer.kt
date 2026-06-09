@@ -144,6 +144,13 @@ class ArRenderer(
     // if no camera frame has arrived a few seconds after the session started driving.
     private var camStreamReported = false
     private var camStallWarned = false
+    // Render-thread stall watchdog. The GL thread can block inside session.update() forever when the
+    // camera never feeds ARCore; a side thread watches these markers and reports the stuck step on
+    // screen (the blocked GL thread can't report for itself).
+    @Volatile private var lastTickMs = 0L
+    @Volatile private var lastStep = "init"
+    @Volatile private var stallReported = false
+    private var watchdog: Thread? = null
     private var sensorOrientation = 90
     private var isSurfaceCreated = false
 
@@ -270,6 +277,28 @@ class ArRenderer(
         sessionLock.withLock {
             session?.setCameraTextureName(backgroundRenderer.textureId)
         }
+
+        startStallWatchdog()
+    }
+
+    /** Watches the GL render thread from the side. If onDrawFrame stops advancing (e.g. blocked in
+     *  session.update() because the camera never feeds ARCore), the blocked thread can't report, so
+     *  this one surfaces the stuck step on screen exactly once. */
+    private fun startStallWatchdog() {
+        if (watchdog != null) return
+        lastTickMs = android.os.SystemClock.elapsedRealtime()
+        watchdog = Thread {
+            while (!isDestroying) {
+                try { Thread.sleep(1000) } catch (_: InterruptedException) { break }
+                val tick = lastTickMs
+                if (tick == 0L || isDestroying) continue
+                val age = android.os.SystemClock.elapsedRealtime() - tick
+                if (age > 2500 && !stallReported && !camStreamReported) {
+                    stallReported = true
+                    onDiag("RENDER STALLED f=$frameCount step=$lastStep for ${age}ms -> camera not feeding ARCore")
+                }
+            }
+        }.apply { isDaemon = true; name = "ArStallWatchdog"; start() }
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -286,6 +315,8 @@ class ArRenderer(
         // instantaneous and we never touch a session that is being closed.
         if (isDestroying) return
         frameCount++
+        lastTickMs = android.os.SystemClock.elapsedRealtime()
+        lastStep = "lock"
 
         sessionLock.withLock {
             val activeSession = session
@@ -297,9 +328,12 @@ class ArRenderer(
                 return
             }
 
+            lastStep = "setTex"
             activeSession.setCameraTextureName(backgroundRenderer.textureId)
+            lastStep = "displayGeom"
             displayRotationHelper.updateSessionIfNeeded(activeSession)
 
+            lastStep = "update"
             val frame: Frame = try {
                 activeSession.update()
             } catch (e: SessionPausedException) {
@@ -1040,6 +1074,8 @@ class ArRenderer(
      */
     fun destroy() {
         isDestroying = true
+        watchdog?.interrupt()
+        watchdog = null
         backgroundScope.cancel("Renderer detached and destroyed.")
         sessionLock.withLock {
             session = null
