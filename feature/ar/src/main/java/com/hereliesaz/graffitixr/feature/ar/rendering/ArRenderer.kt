@@ -240,9 +240,11 @@ class ArRenderer(
         // so a separate initGl() call here would be redundant. The breadcrumbs localize a hang (stuck on
         // "slam begin") vs a throw ("slam FAILED"); the native MobileGS::initGl logs split voxel vs mesh.
         try {
-            onDiag("surface: voxel begin")
-            slamManager.initVoxelGl()
-            onDiag("surface: voxel ok")
+            onDiag("surface: voxel program begin")
+            slamManager.initVoxelGlProgram()
+            onDiag("surface: voxel program ok")
+            slamManager.initVoxelGlBuffer()
+            onDiag("surface: voxel buffer ok")
             slamManager.initMeshGl()
             onDiag("surface: mesh ok")
         } catch (t: Throwable) {

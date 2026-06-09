@@ -120,6 +120,18 @@ void MobileGS::initVoxelGl() {
     LOGI("MobileGS::initVoxelGl ok");
 }
 
+void MobileGS::initVoxelGlProgram() {
+    LOGI("MobileGS::initVoxelGlProgram begin");
+    mVoxelHash.initGlProgram();
+    LOGI("MobileGS::initVoxelGlProgram ok");
+}
+
+void MobileGS::initVoxelGlBuffer() {
+    LOGI("MobileGS::initVoxelGlBuffer begin");
+    mVoxelHash.initGlBuffer();
+    LOGI("MobileGS::initVoxelGlBuffer ok");
+}
+
 void MobileGS::initMeshGl() {
     LOGI("MobileGS::initMeshGl begin");
     mSurfaceMesh.initGl();

@@ -135,6 +135,16 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitVoxelGl(JNIEnv
 }
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitVoxelGlProgram(JNIEnv* env, jobject thiz) {
+    if (gSlamEngine) gSlamEngine->initVoxelGlProgram();
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitVoxelGlBuffer(JNIEnv* env, jobject thiz) {
+    if (gSlamEngine) gSlamEngine->initVoxelGlBuffer();
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitMeshGl(JNIEnv* env, jobject thiz) {
     if (gSlamEngine) gSlamEngine->initMeshGl();
 }
