@@ -169,6 +169,9 @@ class ArRenderer(
         sessionLock.withLock {
             this.session = session
             if (session != null) {
+                // Reset so the per-frame startup heartbeat fires on every (re)attach/resume, not just
+                // the first session — resume is a common spot for camera/GL init stalls.
+                frameCount = 0
                 displayRotationHelper.onResume()
                 if (isSurfaceCreated) {
                     session.setCameraTextureName(backgroundRenderer.textureId)
@@ -233,7 +236,7 @@ class ArRenderer(
         onDiag("surface: onSurfaceCreated start")
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         backgroundRenderer.createOnGlThread(context)
-        onDiag("surface: bg ok tex=${backgroundRenderer.textureId}")
+        onDiag("surface: bg prog=${backgroundRenderer.isProgramReady} shader=${backgroundRenderer.shaderLog} tex=${backgroundRenderer.textureId}")
 
         // SLAM GL init is isolated: if it throws it must NOT kill the GL thread (that would leave the
         // camera passthrough permanently black). resetGlContext() already (re)builds every GL object,
@@ -313,11 +316,13 @@ class ArRenderer(
             val scanActive = !anchorEstablished && scanMode == ArScanMode.MURAL && scanPhase == ScanPhase.AMBIENT
             if (scanActive) backgroundRenderer.updateScanMask(visitedSectorsMask)
             backgroundRenderer.draw(frame, scanActive)
-            if (frameCount == 1 || frameCount % 60 == 0) {
+            if (frameCount <= 10 || frameCount % 60 == 0) {
                 Timber.i("ARDIAG drawFrame f=$frameCount tracking=${frame.camera.trackingState} anchor=$anchorEstablished scanMode=$scanMode scanActive=$scanActive")
-                // On-screen heartbeat: if this is updating, the camera IS being drawn and any black
-                // is something painting over it; if it's stuck, the render loop is the problem.
-                onDiag("render: drawing f=$frameCount track=${frame.camera.trackingState}")
+                // On-screen heartbeat. f climbing => render loop alive; ts (camera frame timestamp)
+                // changing => ARCore is streaming camera images; track => PAUSED until ARCore converges.
+                // f stuck at 1 = loop stalled; f climbs + ts frozen = camera not streaming; f climbs +
+                // ts changes + still black = camera is drawing but hidden (z-order/opaque overlay).
+                onDiag("render: f=$frameCount track=${frame.camera.trackingState} ts=${frame.timestamp}")
             }
 
             // Scan/world-mapping indicator: ink develops on ARCore's detected planes (real 3D surfaces

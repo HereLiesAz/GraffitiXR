@@ -21,6 +21,14 @@ class BackgroundRenderer : GlReleasable {
     var textureId: Int = -1
         private set
 
+    /** True once the camera-background shader program has compiled+linked. If false, draw() can't
+     *  paint the camera and the passthrough is black. */
+    val isProgramReady: Boolean get() = backgroundProgram != 0
+    /** Last shader compile/link diagnostic, surfaced on-screen to catch driver-specific shader fails
+     *  (e.g. a ROM whose GL driver lacks GL_OES_EGL_image_external_essl3). */
+    var shaderLog: String = "uninit"
+        private set
+
     private var quadPositionParam: Int = 0
     private var quadTexCoordParam: Int = 0
     private var uTextureParam: Int = 0
@@ -89,11 +97,14 @@ class BackgroundRenderer : GlReleasable {
         val linkStatus = IntArray(1)
         GLES30.glGetProgramiv(backgroundProgram, GLES30.GL_LINK_STATUS, linkStatus, 0)
         if (linkStatus[0] == 0) {
-            Log.e("BackgroundRenderer", "Link Error: " + GLES30.glGetProgramInfoLog(backgroundProgram))
+            val log = GLES30.glGetProgramInfoLog(backgroundProgram)
+            Log.e("BackgroundRenderer", "Link Error: $log")
+            shaderLog = "linkFail:${log.take(60)}"
             GLES30.glDeleteProgram(backgroundProgram)
             backgroundProgram = 0
             return
         }
+        shaderLog = "ok"
 
         quadPositionParam = GLES30.glGetAttribLocation(backgroundProgram, "a_Position")
         quadTexCoordParam = GLES30.glGetAttribLocation(backgroundProgram, "a_TexCoord")
@@ -206,7 +217,9 @@ class BackgroundRenderer : GlReleasable {
         val compileStatus = IntArray(1)
         GLES30.glGetShaderiv(shader, GLES30.GL_COMPILE_STATUS, compileStatus, 0)
         if (compileStatus[0] == 0) {
-            Log.e("BackgroundRenderer", "Shader Compile Error: " + GLES30.glGetShaderInfoLog(shader))
+            val log = GLES30.glGetShaderInfoLog(shader)
+            Log.e("BackgroundRenderer", "Shader Compile Error: $log")
+            shaderLog = "compileFail(${if (type == GLES30.GL_VERTEX_SHADER) "vs" else "fs"}):${log.take(60)}"
             GLES30.glDeleteShader(shader)
             return 0
         }
