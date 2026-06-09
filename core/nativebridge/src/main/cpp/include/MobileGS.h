@@ -24,6 +24,9 @@ public:
 
     void initialize(int width, int height);
     void initGl();
+    // Split GL init so the caller can localize a stall to the voxel vs mesh stage on-screen.
+    void initVoxelGl();
+    void initMeshGl();
     void resetGlContext();
     void updateCamera(float* viewMat, float* projMat);
     void updateMappingCamera(float* viewMat, float* projMat);

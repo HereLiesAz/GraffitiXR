@@ -240,9 +240,11 @@ class ArRenderer(
         // so a separate initGl() call here would be redundant. The breadcrumbs localize a hang (stuck on
         // "slam begin") vs a throw ("slam FAILED"); the native MobileGS::initGl logs split voxel vs mesh.
         try {
-            onDiag("surface: slam begin")
-            slamManager.resetGlContext()
-            onDiag("surface: slam ok")
+            onDiag("surface: voxel begin")
+            slamManager.initVoxelGl()
+            onDiag("surface: voxel ok")
+            slamManager.initMeshGl()
+            onDiag("surface: mesh ok")
         } catch (t: Throwable) {
             Timber.e(t, "ARDIAG slam GL init failed")
             onDiag("surface: slam FAILED ${t.javaClass.simpleName}: ${t.message}")

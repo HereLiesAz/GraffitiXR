@@ -130,6 +130,16 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeResetGlContext(JNI
 }
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitVoxelGl(JNIEnv* env, jobject thiz) {
+    if (gSlamEngine) gSlamEngine->initVoxelGl();
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitMeshGl(JNIEnv* env, jobject thiz) {
+    if (gSlamEngine) gSlamEngine->initMeshGl();
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDestroy(JNIEnv* env, jobject thiz) {
     if (gSlamEngine) { delete gSlamEngine; gSlamEngine = nullptr; }
     if (gStereoProcessor) { delete gStereoProcessor; gStereoProcessor = nullptr; }
