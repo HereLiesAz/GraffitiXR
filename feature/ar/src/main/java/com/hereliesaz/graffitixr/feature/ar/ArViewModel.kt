@@ -1007,6 +1007,7 @@ class ArViewModel @Inject constructor(
         // `renderer`, resurrecting a reference to an already-destroyed renderer.
         renderer = r
         renderer?.stereoProvider = stereoProvider
+        renderer?.onCameraNotFeeding = { onCameraNotFeeding() }
         renderer?.attachSession(session)
         loadCloudPointsIfExists()
     }
@@ -1102,6 +1103,23 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    /**
+     * The render watchdog reports ARCore is getting no camera frames — either update() stalled on the
+     * GL thread or the camera timestamp stayed 0 for seconds. The only non-default camera config we
+     * ever force is hardware-stereo, and on a device wrongly classified depth-capable that config can
+     * fail to stream. Because update() stalls *before* any tracking callback fires, the callback-driven
+     * detector in onTrackingUpdated (recoverFromBrokenStereo) can never run for this case. This hook is
+     * driven from the side watchdog thread — alive while the GL thread is blocked — so it can still
+     * self-heal: reconfigure the LIVE session to mono. No-op when we're already on mono (then the black
+     * camera is some other fault and must not be mis-blamed on stereo) or when recovery already ran.
+     */
+    private fun onCameraNotFeeding() {
+        if (forcedStereoUnstable) return
+        if (!_uiState.value.isHardwareStereoActive) return
+        Timber.w("ARDIAG dual-lens: camera not feeding ARCore under forced stereo -> self-heal to mono")
+        recoverFromBrokenStereo()
+    }
+
     private val stereoRecoveryInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
 
     /**
@@ -1128,6 +1146,9 @@ class ArViewModel @Inject constructor(
                     })
                     if (monoConfigs.isNotEmpty()) s.cameraConfig = monoConfigs[0]
                     _uiState.update { it.copy(isDualLensActive = false, isHardwareStereoActive = false) }
+                    // Re-arm the streaming verdict so the mono config earns a fresh CAMERA STREAMING /
+                    // STALL readout (and the self-heal hook doesn't stay latched from the stereo run).
+                    renderer?.resetCameraStreamWatchdog()
                     Timber.w("ARDIAG dual-lens: forced stereo broken -> reconfigured LIVE session to mono")
                 } catch (e: Exception) {
                     Timber.e(e, "ARDIAG stereo->mono live reconfigure failed")

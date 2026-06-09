@@ -150,6 +150,11 @@ class ArRenderer(
     @Volatile private var lastTickMs = 0L
     @Volatile private var lastStep = "init"
     @Volatile private var stallReported = false
+    // Self-heal hook. Fired at most once (off the GL thread) the moment ARCore stops receiving camera
+    // frames — i.e. the live session's camera config isn't streaming. Lets the ViewModel reconfigure to
+    // a mono config even while the GL thread is blocked in update() and no tracking callback can fire.
+    @Volatile private var cameraNotFeedingReported = false
+    var onCameraNotFeeding: (() -> Unit)? = null
     private var watchdog: Thread? = null
     private var sensorOrientation = 90
     private var isSurfaceCreated = false
@@ -183,6 +188,7 @@ class ArRenderer(
                 // Reset so the per-frame startup heartbeat fires on every (re)attach/resume, not just
                 // the first session — resume is a common spot for camera/GL init stalls.
                 frameCount = 0
+                resetCameraStreamWatchdog()
                 displayRotationHelper.onResume()
                 if (isSurfaceCreated) {
                     session.setCameraTextureName(backgroundRenderer.textureId)
@@ -296,9 +302,29 @@ class ArRenderer(
                 if (age > 2500 && !stallReported && !camStreamReported) {
                     stallReported = true
                     onDiag("RENDER STALLED f=$frameCount step=$lastStep for ${age}ms -> camera not feeding ARCore")
+                    reportCameraNotFeeding()
                 }
             }
         }.apply { isDaemon = true; name = "ArStallWatchdog"; start() }
+    }
+
+    /** Fire the camera-not-feeding self-heal hook at most once. Called from the side watchdog thread
+     *  (GL thread blocked in update()) or the draw thread's "no frame after Nf" check — both mean the
+     *  selected camera config isn't streaming into ARCore. */
+    private fun reportCameraNotFeeding() {
+        if (cameraNotFeedingReported) return
+        cameraNotFeedingReported = true
+        onCameraNotFeeding?.invoke()
+    }
+
+    /** Clears the camera-streaming/stall verdict so a freshly attached or reconfigured session earns a
+     *  fresh on-screen verdict and the self-heal hook re-arms for the new camera config. */
+    fun resetCameraStreamWatchdog() {
+        camStreamReported = false
+        camStallWarned = false
+        stallReported = false
+        cameraNotFeedingReported = false
+        lastTickMs = android.os.SystemClock.elapsedRealtime()
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -360,6 +386,7 @@ class ArRenderer(
                 // feeding ARCore (resume() succeeded but no frames) — distinct from a slow converge.
                 camStallWarned = true
                 onDiag("CAMERA STALL: no frame after ${frameCount}f (ts still 0) -> camera not streaming")
+                reportCameraNotFeeding()
             }
             // During the AMBIENT scan, the camera background renders as a newspaper halftone with full
             // colour bleeding in (like ink) as each yaw sector is mapped — the world-mapping indicator.
