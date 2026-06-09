@@ -313,11 +313,13 @@ class ArRenderer(
             val scanActive = !anchorEstablished && scanMode == ArScanMode.MURAL && scanPhase == ScanPhase.AMBIENT
             if (scanActive) backgroundRenderer.updateScanMask(visitedSectorsMask)
             backgroundRenderer.draw(frame, scanActive)
-            if (frameCount == 1 || frameCount % 60 == 0) {
+            if (frameCount <= 10 || frameCount % 60 == 0) {
                 Timber.i("ARDIAG drawFrame f=$frameCount tracking=${frame.camera.trackingState} anchor=$anchorEstablished scanMode=$scanMode scanActive=$scanActive")
-                // On-screen heartbeat: if this is updating, the camera IS being drawn and any black
-                // is something painting over it; if it's stuck, the render loop is the problem.
-                onDiag("render: drawing f=$frameCount track=${frame.camera.trackingState}")
+                // On-screen heartbeat. f climbing => render loop alive; ts (camera frame timestamp)
+                // changing => ARCore is streaming camera images; track => PAUSED until ARCore converges.
+                // f stuck at 1 = loop stalled; f climbs + ts frozen = camera not streaming; f climbs +
+                // ts changes + still black = camera is drawing but hidden (z-order/opaque overlay).
+                onDiag("render: f=$frameCount track=${frame.camera.trackingState} ts=${frame.timestamp}")
             }
 
             // Scan/world-mapping indicator: ink develops on ARCore's detected planes (real 3D surfaces
