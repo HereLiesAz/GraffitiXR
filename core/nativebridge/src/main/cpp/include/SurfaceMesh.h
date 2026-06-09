@@ -2,6 +2,7 @@
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include <mutex>
+#include <atomic>
 #include <GLES3/gl3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -36,9 +37,11 @@ private:
 
     cv::Mat mMuralTexture;
     GLuint mTextureId = 0;
-    bool mTextureDirty = false;
-    bool mMeshDirty = false;
-    bool mIndicesUploaded = false;
+    // Atomic so initGl() (GL thread, now lock-free) and the worker threads in update()/updateTexture()
+    // can touch these dirty flags without a data race — without re-taking the contended data mutex.
+    std::atomic<bool> mTextureDirty{false};
+    std::atomic<bool> mMeshDirty{false};
+    std::atomic<bool> mIndicesUploaded{false};
     int mNextTexturePatchIndex = 0;
 
     GLuint mProgram = 0;
