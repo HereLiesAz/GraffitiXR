@@ -706,6 +706,10 @@ class ArViewModel @Inject constructor(
 
             session = s
             _isCameraInUseByAr.value = true
+            // Surface the camera-config decision ON SCREEN (not just logcat) so a black-camera report
+            // tells us whether the live session is on stereo or mono — the difference between a
+            // forced-stereo fault and a deeper camera-feeding fault.
+            appendDiag("AR session: ${if (stereoActive) "STEREO" else "mono"} cam=${s.cameraConfig.cameraId} cap=$stereoCapable unstable=$forcedStereoUnstable")
             Timber.i("ARDIAG initArSessionLocked: session created OK (stereoActive=$stereoActive rendererAttached=${renderer != null})")
 
             // Critical: if the renderer is already attached, update it with the new session
@@ -733,9 +737,13 @@ class ArViewModel @Inject constructor(
         if (stereoCapable != null) return
         if (!stereoProbeInFlight.compareAndSet(false, true)) return
         try {
+            // On-screen so the black "session null" startup window is explained: the probe holds the
+            // camera exclusively while it runs, delaying the live session by up to its timeout.
+            appendDiag("probe: start (camera held ~${StereoProbeService.PROBE_TIMEOUT_MS / 1000}s max)")
             val capable = runProbeViaService(context)
             stereoCapable = capable
             settingsRepository.setStereoCapability(if (capable) 1 else 0)
+            appendDiag("probe: done capable=$capable")
             Timber.i("ARDIAG depth-triangulation probe complete: capable=$capable")
         } catch (e: Exception) {
             // A cancelled probe (AR exit / pause) must NOT be cached as a permanent mono verdict —
@@ -1114,8 +1122,18 @@ class ArViewModel @Inject constructor(
      * camera is some other fault and must not be mis-blamed on stereo) or when recovery already ran.
      */
     private fun onCameraNotFeeding() {
-        if (forcedStereoUnstable) return
-        if (!_uiState.value.isHardwareStereoActive) return
+        if (forcedStereoUnstable) {
+            appendDiag("self-heal: camera not feeding, already mono/unstable — deeper camera fault")
+            return
+        }
+        if (!_uiState.value.isHardwareStereoActive) {
+            // The live session is on the plain mono config and STILL gets no frames. Stereo is not the
+            // culprit here — the camera itself isn't feeding ARCore (e.g. wedged by another client, or a
+            // device/HAL fault). Surfaced so we stop chasing the stereo path.
+            appendDiag("self-heal: camera DEAD on MONO — not a stereo fault")
+            return
+        }
+        appendDiag("self-heal: stereo not feeding -> reconfigure to mono")
         Timber.w("ARDIAG dual-lens: camera not feeding ARCore under forced stereo -> self-heal to mono")
         recoverFromBrokenStereo()
     }
