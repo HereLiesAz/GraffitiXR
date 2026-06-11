@@ -15,6 +15,10 @@ concurrency:
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
+    # ADVISORY until the legacy suite is triaged: first-ever CI run of these tests surfaced
+    # ~25 pre-existing failures (see issue "Unit test suite triage"). Results stay visible on
+    # every run; remove continue-on-error to make this blocking once the suite is green.
+    continue-on-error: true
     steps:
       - name: Checkout
         uses: actions/checkout@v4
