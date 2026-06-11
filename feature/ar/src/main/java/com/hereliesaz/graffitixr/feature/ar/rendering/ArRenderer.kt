@@ -501,7 +501,8 @@ class ArRenderer(
             // so the user literally sees what hasn't been mapped. Mutually exclusive with the
             // halftone scan indicator (which stays for the other mural methods).
             val voxelColorMask = !anchorEstablished && scanMode == ArScanMode.MURAL &&
-                muralMethod == MuralMethod.VOXEL_HASH && isTracking
+                muralMethod == MuralMethod.VOXEL_HASH &&
+                frame.camera.trackingState == TrackingState.TRACKING
             if (scanActive) backgroundRenderer.updateScanMask(visitedSectorsMask)
             lastStep = "bgDraw"
             backgroundRenderer.draw(frame, scanActive && !voxelColorMask, grayscale = voxelColorMask)

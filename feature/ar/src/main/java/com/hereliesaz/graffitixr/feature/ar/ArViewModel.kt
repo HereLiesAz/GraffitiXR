@@ -806,8 +806,10 @@ class ArViewModel @Inject constructor(
                 // old wedge: the prior code took getSupportedCameraConfigs(BACK, 30fps)[0] blindly and
                 // sometimes picked a config this device opens but never streams from (resume() OK, no
                 // frames, update() ANRs). Instead we keep ARCore's DEFAULT config — the broadly
-                // compatible one — and only swap to a same-cameraId, same-resolution variant that
-                // differs solely in fps. If no such match exists, we leave the default untouched.
+                // compatible one — and only swap to a same-cameraId variant that differs in fps.
+                // (Matching cameraId keeps us on the camera/stream ARCore already validated; we don't
+                // also match resolution because CameraConfig doesn't expose it in this ARCore version.)
+                // If no same-cameraId fps variant exists, we leave the default untouched.
                 val targetFps = if (_uiState.value.cameraTargetFps == 60)
                     CameraConfig.TargetFps.TARGET_FPS_60 else CameraConfig.TargetFps.TARGET_FPS_30
                 val defaultCfg = s.cameraConfig
@@ -815,9 +817,7 @@ class ArViewModel @Inject constructor(
                     s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
                         facingDirection = CameraConfig.FacingDirection.BACK
                         this.targetFps = EnumSet.of(targetFps)
-                    }).firstOrNull {
-                        it.cameraId == defaultCfg.cameraId && it.imageDimensions == defaultCfg.imageDimensions
-                    }
+                    }).firstOrNull { it.cameraId == defaultCfg.cameraId }
                 } catch (e: Exception) {
                     Timber.w(e, "camera fps config query failed")
                     null
