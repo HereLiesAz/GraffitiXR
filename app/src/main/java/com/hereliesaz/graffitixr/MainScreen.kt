@@ -135,6 +135,14 @@ fun MainScreen(
                         }
                     }
 
+                    // Method-aware layer defaults: on AR entry and whenever the mural method
+                    // changes, the matching representation defaults on and the other two off.
+                    // Keyed on the method, so a user who manually enables another layer keeps it
+                    // until the method changes again.
+                    LaunchedEffect(arUiState.muralMethod) {
+                        editorViewModel.applyMethodLayerDefaults(arUiState.muralMethod)
+                    }
+
                     DisposableEffect(lifecycleOwner, glView) {
                         if (glView == null) return@DisposableEffect onDispose {}
 

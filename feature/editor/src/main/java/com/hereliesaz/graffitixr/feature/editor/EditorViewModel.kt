@@ -588,6 +588,8 @@ class EditorViewModel @Inject constructor(
     fun toggleVoxels() = dispatch(EditorIntent.ToggleVoxels)
     fun togglePoints() = dispatch(EditorIntent.TogglePoints)
     fun toggleMesh() = dispatch(EditorIntent.ToggleMesh)
+    fun applyMethodLayerDefaults(method: com.hereliesaz.graffitixr.common.model.MuralMethod) =
+        dispatch(EditorIntent.ApplyMethodLayerDefaults(method))
     fun setActiveTool(tool: Tool) = dispatch(EditorIntent.SetActiveTool(tool))
 
     override fun onLayerActivated(id: String) = dispatch(EditorIntent.ActivateLayer(id))

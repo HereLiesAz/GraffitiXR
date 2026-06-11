@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.graffitixr.common.model.EditorMode
+import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.common.model.LayerProps
@@ -85,6 +86,13 @@ internal sealed interface EditorIntent {
     data object ToggleVoxels : EditorIntent
     data object TogglePoints : EditorIntent
     data object ToggleMesh : EditorIntent
+    /**
+     * Sets the method-specific perception layers to their defaults for [activeMethod]: the layer
+     * matching the active mural method on, the other two off. Always-applicable layers (feature
+     * points, plane grids) are untouched. Dispatched on AR entry and on method change; the user
+     * may then turn any layer back on manually until the method changes again.
+     */
+    data class ApplyMethodLayerDefaults(val activeMethod: MuralMethod) : EditorIntent
     data object FeedbackShown : EditorIntent
     data class SetSketchThickness(val value: Int) : EditorIntent
     data class SetBrushSize(val value: Float) : EditorIntent
