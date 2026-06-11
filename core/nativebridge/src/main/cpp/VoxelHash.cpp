@@ -109,6 +109,8 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
     if (depth.empty() || color.empty()) return;
     mLastVoxelSize = voxelSize;
     glm::mat4 invV = glm::inverse(glm::make_mat4(viewMat));
+    const glm::vec3 camPos(invV[3]);  // camera world position, for parallax direction
+    constexpr float kParallaxMinDeg = 4.0f; // a small sidestep qualifies; head-wobble does not
 
     float fx = projMat[0] * (depth.cols / 2.0f);
     float fy = projMat[5] * (depth.rows / 2.0f);
@@ -159,12 +161,37 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
                     glm::vec3 normalW = glm::normalize(glm::mat3(invV) * glm::normalize(glm::vec3(-dz_dx, -dz_dy, 1.0f)));
                     s.nx = normalW.x; s.ny = normalW.y; s.nz = normalW.z;
 
+                    // First-observation direction (voxel→camera), for the later parallax check.
+                    glm::vec3 dir0 = glm::normalize(camPos - glm::vec3(s.x, s.y, s.z));
+                    s.ox = dir0.x; s.oy = dir0.y; s.oz = dir0.z;
+                    s.parallaxDone = 0.0f;
+
                     mSpatialHash[hash] = static_cast<int32_t>(mSplatData.size());
                     mSplatData.push_back(s);
                     mDataDirty = true;
                 }
             } else {
                 Splat& s = mSplatData[existingIdx];
+                // Parallax confidence: the FIRST time this voxel is re-observed from a viewpoint
+                // clearly off the original line of sight (a real baseline, not head-wobble), use
+                // the angular shift to verify depth. If the new depth reading lands the point at
+                // the same sub-voxel place, the depth was correct → +0.1; if it disagrees within
+                // the cell, the original depth was likely wrong → -0.1. Fires once per voxel.
+                if (s.parallaxDone < 0.5f) {
+                    glm::vec3 vpos(s.x, s.y, s.z);
+                    glm::vec3 dirNow = glm::normalize(camPos - vpos);
+                    glm::vec3 dir0(s.ox, s.oy, s.oz);
+                    float c0 = glm::clamp(glm::dot(dir0, dirNow), -1.0f, 1.0f);
+                    float angleDeg = glm::degrees(std::acos(c0));
+                    if (angleDeg >= kParallaxMinDeg) {
+                        float disagreement = glm::length(glm::vec3(p_world) - vpos);
+                        if (disagreement < voxelSize * 0.5f) s.confidence = std::min(1.0f, s.confidence + 0.1f);
+                        else                                  s.confidence = std::max(0.0f, s.confidence - 0.1f);
+                        s.parallaxDone = 1.0f;
+                        mDataDirty = true;
+                    }
+                }
+                // Existing same-view reinforcement (unchanged): refine position, nudge confidence.
                 if (s.confidence < 1.0f) {
                     float alpha = 1.0f / (s.confidence * 10.0f + 1.0f);
                     s.x += (p_world.x - s.x) * alpha;
@@ -180,6 +207,7 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
 
 void VoxelHash::addSparsePoints(const std::vector<float>& points, const float* viewMat, const float* projMat, float initialConfidence) {
     std::lock_guard<std::mutex> lock(mMutex);
+    const glm::vec3 camPos(glm::inverse(glm::make_mat4(viewMat))[3]);
     for (size_t i = 0; i < points.size(); i += 4) {
         float xw = points[i], yw = points[i+1], zw = points[i+2];
         uint32_t hash = getVoxelHash(xw, yw, zw, mLastVoxelSize);
@@ -188,6 +216,9 @@ void VoxelHash::addSparsePoints(const std::vector<float>& points, const float* v
             s.x = xw; s.y = yw; s.z = zw;
             s.r = 1.0f; s.g = 1.0f; s.b = 1.0f; s.a = 1.0f;
             s.confidence = initialConfidence;
+            glm::vec3 dir0 = glm::normalize(camPos - glm::vec3(xw, yw, zw));
+            s.ox = dir0.x; s.oy = dir0.y; s.oz = dir0.z;
+            s.parallaxDone = 0.0f;
             mSpatialHash[hash] = static_cast<int32_t>(mSplatData.size());
             mSplatData.push_back(s);
             mDataDirty = true;
@@ -265,6 +296,13 @@ void VoxelHash::save(const std::string& path) {
     std::lock_guard<std::mutex> lock(mMutex);
     std::ofstream out(path, std::ios::binary);
     if (!out) return;
+    // Magic + version precede the count so load() can tell the current Splat layout (with the
+    // appended parallax fields) from legacy files written before them. Legacy files have no magic;
+    // their first word is the count, which is < kMagic, so the two are unambiguous.
+    const uint32_t magic = kSplatMagic;
+    const uint32_t version = kSplatVersion;
+    out.write(reinterpret_cast<const char*>(&magic), sizeof(uint32_t));
+    out.write(reinterpret_cast<const char*>(&version), sizeof(uint32_t));
     uint32_t count = static_cast<uint32_t>(mSplatData.size());
     out.write(reinterpret_cast<const char*>(&count), sizeof(uint32_t));
     out.write(reinterpret_cast<const char*>(mSplatData.data()), static_cast<std::streamsize>(count * sizeof(Splat)));
@@ -281,12 +319,40 @@ void VoxelHash::load(const std::string& path) {
     // stall) — killing the render loop, starving ARCore's update(), and hard-freezing the app
     // on exit. Triggered on every AR entry for any project with a saved map.
     clearLocked();
-    uint32_t count;
-    in.read(reinterpret_cast<char*>(&count), sizeof(uint32_t));
-    if (count > MAX_SPLATS) count = MAX_SPLATS;
-    mSplatData.resize(count);
-    in.read(reinterpret_cast<char*>(mSplatData.data()), static_cast<std::streamsize>(count * sizeof(Splat)));
-    for (uint32_t i = 0; i < count; ++i) {
+    uint32_t first;
+    if (!in.read(reinterpret_cast<char*>(&first), sizeof(uint32_t))) return;
+
+    if (first == kSplatMagic) {
+        // Current format: magic, version, count, then full Splats.
+        uint32_t version = 0;
+        in.read(reinterpret_cast<char*>(&version), sizeof(uint32_t));
+        uint32_t count = 0;
+        in.read(reinterpret_cast<char*>(&count), sizeof(uint32_t));
+        if (count > MAX_SPLATS) count = MAX_SPLATS;
+        mSplatData.resize(count);
+        in.read(reinterpret_cast<char*>(mSplatData.data()), static_cast<std::streamsize>(count * sizeof(Splat)));
+    } else {
+        // Legacy format (no magic): `first` was the count, followed by the old 11-float Splat
+        // (x,y,z, r,g,b,a, nx,ny,nz, confidence) with no parallax fields. Migrate field-by-field
+        // so existing saved maps survive the struct change; parallax fields start unverified.
+        uint32_t count = first;
+        if (count > MAX_SPLATS) count = MAX_SPLATS;
+        mSplatData.clear();
+        mSplatData.reserve(count);
+        for (uint32_t i = 0; i < count; ++i) {
+            float f[11];
+            if (!in.read(reinterpret_cast<char*>(f), sizeof(f))) break;
+            Splat s{};
+            s.x = f[0]; s.y = f[1]; s.z = f[2];
+            s.r = f[3]; s.g = f[4]; s.b = f[5]; s.a = f[6];
+            s.nx = f[7]; s.ny = f[8]; s.nz = f[9];
+            s.confidence = f[10];
+            s.ox = s.oy = s.oz = 0.0f;   // unknown first-view direction
+            s.parallaxDone = 1.0f;       // don't retroactively parallax-check migrated voxels
+            mSplatData.push_back(s);
+        }
+    }
+    for (uint32_t i = 0; i < mSplatData.size(); ++i) {
         uint32_t hash = getVoxelHash(mSplatData[i].x, mSplatData[i].y, mSplatData[i].z, mLastVoxelSize);
         mSpatialHash[hash] = static_cast<int32_t>(i);
     }

@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <opencv2/opencv.hpp>
 #include <vector>
 #include <mutex>
@@ -12,6 +13,10 @@ struct Splat {
     float r, g, b, a;       // Color and Rendering Opacity
     float nx, ny, nz;       // Surface Normal
     float confidence;       // Observation stability
+    // Parallax verification (appended after confidence so the GL vertex layout — offsets
+    // 0/12/28/40, stride sizeof(Splat) — is unchanged; the shader reads none of these):
+    float ox, oy, oz;       // Unit direction voxel→camera at first observation
+    float parallaxDone;     // 0 until verified from a sufficiently different angle, then 1
 };
 
 struct VoxelFrame {
@@ -57,6 +62,10 @@ private:
     void clearLocked();
 
     mutable std::mutex mMutex;
+    // Disk-format identifiers for save/load. kSplatMagic is large enough that a legacy file's
+    // leading count word can never collide with it, so the absence of the magic marks legacy data.
+    static constexpr uint32_t kSplatMagic = 0x56584831u;   // "VXH1"
+    static constexpr uint32_t kSplatVersion = 2u;          // 2 = parallax fields appended
     std::vector<Splat> mSplatData;
     std::vector<VoxelFrame> mRecentFrames;
 

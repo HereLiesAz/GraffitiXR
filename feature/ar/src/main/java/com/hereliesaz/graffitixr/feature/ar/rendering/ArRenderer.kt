@@ -988,6 +988,16 @@ class ArRenderer(
                 }
             }
 
+            // Cull parallax-failed / never-reinforced voxels. A wrong-depth voxel knocked down by
+            // the parallax check (-0.1) and not re-confirmed trends below threshold and is removed,
+            // so the map converges on geometry verified from multiple baselines. Runs ~every 20s
+            // during active mapping; threshold sits under the seed confidences (sparse 0.4, depth
+            // 0.5) so a fresh, not-yet-verified voxel is never culled before it gets a chance.
+            lastStep = "prune"
+            if (isTracking && !anchorEstablished && frameCount % 600 == 0) {
+                slamManager.pruneByConfidence(0.3f)
+            }
+
             // Continuous wall-depth refinement: keep the overlay flush with the ARCore plane estimate.
             // Runs at ~1 Hz (every 30 frames) to amortise getAllTrackables() overhead.
             // Only runs BEFORE the anchor is established or during manual realignment to
