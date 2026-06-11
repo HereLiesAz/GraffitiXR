@@ -51,7 +51,12 @@ class InterruptedBulkTest {
         host.close(CoopSessionState.EndReason.NetworkLost)
 
         // Guest should transition to Ended once the (here-shortened ~1s) reconnect window lapses.
-        val state = withTimeout(10_000) {
+        // This is a real-socket / real-time / Dispatchers.IO integration test: Ended normally arrives
+        // in ~1-2s, but under parallel-module CI load the IO coroutines can stall for several seconds.
+        // The timeout is only a safety net (a genuine hang still fails it); the 1s reconnect window
+        // above is the actual tuning. 10s raced that stall intermittently, blocking every build now
+        // that the gate is required, so give it real headroom rather than re-tighten.
+        val state = withTimeout(30_000) {
             guest.state.first { it is CoopSessionState.Ended }
         }
         assertTrue("expected Ended state, got $state", state is CoopSessionState.Ended)
