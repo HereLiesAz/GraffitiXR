@@ -1057,19 +1057,26 @@ class ArRenderer(
                 overlayRenderer.drawAnchorBorder(viewMatrix, projMatrix, anchorMatrix)
             }
 
-            // Diagnostic perception view ("what is the AR seeing"): current-frame feature points
-            // + all tracked planes, drawn last so they sit on top of the artwork overlay. Reads
-            // the point cloud non-destructively (acquire/use/close every frame; ARCore hands back
-            // the same cloud until a new one is computed, and ArDebugRenderer dedups by timestamp).
+            // Diagnostic perception view ("what is the AR seeing"): drawn last so it sits on top
+            // of the artwork overlay. Shows ALL active layers of perception, not just ARCore's:
+            //  - current-frame ARCore feature points (yellow, via ArDebugRenderer)
+            //  - tracked planes as metric grids (orientation-readable, not silhouettes)
+            //  - whatever representation the SLAM engine is actually building right now:
+            //    CLOUD_POINTS mode -> the accumulated point cloud; MURAL mode -> the native
+            //    engine's own draw (voxel splats or surface mesh per muralMethod).
             lastStep = "debugView"
-            if (showArDebugView && isTracking) {
+            if (showArDebugView && isTracking && !isCapturingTarget) {
                 try {
                     frame.acquirePointCloud().use { arDebugRenderer.update(it) }
                 } catch (_: Exception) {
                     // NotYetAvailable/DeadlineExceeded — draw the last uploaded cloud instead.
                 }
                 arDebugRenderer.draw(viewMatrix, projMatrix)
-                planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose)
+                planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose, gridMode = true)
+                when (scanMode) {
+                    ArScanMode.CLOUD_POINTS -> pointCloudRenderer.draw(viewMatrix, projMatrix)
+                    else -> slamManager.draw() // voxel splats or surface mesh, per the engine's own muralMethod
+                }
             }
             // A stall reported at "frameDone" means onDrawFrame COMPLETED and the GL thread never
             // came back for the next frame — wedge is in eglSwapBuffers / the GLThread scheduler /

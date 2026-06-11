@@ -23,6 +23,7 @@ class PlaneRenderer : GlReleasable {
     private var gridControlUniform = 0
     private var planeColorUniform = 0
     private var isOutlineUniform = 0
+    private var gridModeUniform = 0
     private var developUniform = 0
     private var firstDrawNs = -1L // for the ink-spread develop ramp
 
@@ -49,10 +50,14 @@ class PlaneRenderer : GlReleasable {
         // Ink-develop fill: the colour is "soaked" into the actual surface as a value-noise texture in
         // plane-local space, so it stays put on the wall/floor as the camera moves (unlike the old
         // screen-space reveal). It spreads in as u_Develop rises. Hue still carries the match meaning.
+        // u_GridMode = 1 (debug perception view) replaces the ink fill with a metric grid in
+        // plane-local metres — 0.25 m cells with the plane's local X/Z axes emphasised — so the
+        // plane's ORIENTATION is readable at a glance, not just its silhouette.
         val fragmentShaderCode = """
             precision mediump float;
             uniform vec4 u_Color;
             uniform int u_IsOutline;
+            uniform int u_GridMode;
             uniform float u_Develop;
             varying vec2 v_PosXZ;
             float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
@@ -65,6 +70,13 @@ class PlaneRenderer : GlReleasable {
             void main() {
                 if (u_IsOutline == 1) {
                     gl_FragColor = vec4(u_Color.rgb, 0.9);
+                } else if (u_GridMode == 1) {
+                    vec2 f = fract(v_PosXZ * 4.0);
+                    vec2 d = min(f, 1.0 - f);
+                    float line = 1.0 - smoothstep(0.0, 0.08, min(d.x, d.y));
+                    float axis = 1.0 - smoothstep(0.0, 0.025, min(abs(v_PosXZ.x), abs(v_PosXZ.y)));
+                    float a = max(line * 0.55, axis * 0.95);
+                    gl_FragColor = vec4(u_Color.rgb, max(a, 0.06));
                 } else {
                     float n = vnoise(v_PosXZ * 18.0);
                     float ink = smoothstep(n - 0.18, n + 0.18, u_Develop);
@@ -86,10 +98,15 @@ class PlaneRenderer : GlReleasable {
         gridControlUniform = GLES20.glGetUniformLocation(planeProgram, "u_gridControl")
         planeColorUniform = GLES20.glGetUniformLocation(planeProgram, "u_Color")
         isOutlineUniform = GLES20.glGetUniformLocation(planeProgram, "u_IsOutline")
+        gridModeUniform = GLES20.glGetUniformLocation(planeProgram, "u_GridMode")
         developUniform = GLES20.glGetUniformLocation(planeProgram, "u_Develop")
     }
 
-    fun drawPlanes(session: Session, viewMatrix: FloatArray, projectionMatrix: FloatArray, cameraPose: Pose) {
+    /**
+     * @param gridMode When true (debug perception view) planes render as a metric grid with
+     * emphasised local axes instead of the ink-develop fill, so their orientation is visible.
+     */
+    fun drawPlanes(session: Session, viewMatrix: FloatArray, projectionMatrix: FloatArray, cameraPose: Pose, gridMode: Boolean = false) {
         val planes = session.getAllTrackables(Plane::class.java)
 
         GLES20.glUseProgram(planeProgram)
@@ -98,6 +115,7 @@ class PlaneRenderer : GlReleasable {
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
 
         GLES20.glUniform1f(gridControlUniform, 1.0f)
+        GLES20.glUniform1i(gridModeUniform, if (gridMode) 1 else 0)
 
         // Ink-spread progress: ramp 0->1 over ~1.5 s from the first drawn frame, so the colour visibly
         // soaks into the surfaces as the scan gets going (then holds).

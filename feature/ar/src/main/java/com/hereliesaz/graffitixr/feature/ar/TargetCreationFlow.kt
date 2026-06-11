@@ -30,7 +30,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -363,8 +366,6 @@ private fun TargetRefinementScreen(
                 )
             }
 
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)))
-            
             maskBitmap?.let { bmp ->
                 Image(
                     bitmap = bmp.asImageBitmap(),
@@ -385,14 +386,29 @@ private fun TargetRefinementScreen(
                 val imgX = (boxW - imgW) / 2f
                 val imgY = (boxH - imgH) / 2f
 
-                // The actual fingerprint features (HotPink dots) overlaid where they sit on the capture,
-                // so the user sees exactly what anchors and can tap/drag to erase the spurious ones.
-                Canvas(modifier = Modifier.fillMaxSize()) {
+                // Fingerprint-as-mask: the preview shows exactly what the CV will look for and
+                // nothing else. A near-opaque scrim covers the capture, punched through (BlendMode
+                // .Clear in an offscreen layer) at each fingerprint keypoint, so the descriptor
+                // patches the matcher anchors on are the ONLY visible image regions. Erasing a
+                // region (tap/drag below) removes its keypoints and the holes close with them.
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+                ) {
+                    drawRect(
+                        color = Color.Black.copy(alpha = 0.92f),
+                        topLeft = Offset(imgX, imgY),
+                        size = Size(imgW, imgH)
+                    )
+                    // Reveal radius approximates the descriptor patch footprint at preview scale.
+                    val reveal = (imgW * 0.018f).coerceAtLeast(10f)
                     keypoints.forEach { kp ->
                         drawCircle(
-                            color = HotPink,
-                            radius = 4f,
-                            center = Offset(imgX + kp.x * imgW, imgY + kp.y * imgH)
+                            color = Color.Transparent,
+                            radius = reveal,
+                            center = Offset(imgX + kp.x * imgW, imgY + kp.y * imgH),
+                            blendMode = BlendMode.Clear
                         )
                     }
                 }
