@@ -357,22 +357,19 @@ class ArViewModel @Inject constructor(
     }
 
     /**
-     * ARCore-based hit test in screen coordinates → world point. Uses the
-     * renderer's latest [com.google.ar.core.Frame] snapshot. Returns null if
-     * no renderer is attached, no frame has been published yet, or no plane/
-     * point is hit at the given screen position.
+     * ARCore-based hit test in screen coordinates → world point. Routed through
+     * [com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer.requestHitTest] so the actual
+     * Frame.hitTest executes on the GL thread under the renderer's session lock — calling it
+     * here directly raced session.update() (ARCore is not thread-safe; same defect class as the
+     * flashlight configure() crash). Returns null if no renderer is attached, the render loop
+     * doesn't serve the request within 1s (paused), or no plane/point is hit.
      */
-    private fun arCoreHitTestToWorld(screenPoint: PointF): Vec3? {
-        val frame = renderer?.latestFrame?.get() ?: return null
-        return try {
-            val hits = frame.hitTest(screenPoint.x, screenPoint.y)
-            val pose = hits.firstOrNull()?.hitPose ?: return null
-            val t = pose.translation
-            Vec3(t[0], t[1], t[2])
-        } catch (e: Exception) {
-            Timber.w(e, "arCoreHitTestToWorld: hitTest failed")
-            null
-        }
+    private suspend fun arCoreHitTestToWorld(screenPoint: PointF): Vec3? {
+        val r = renderer ?: return null
+        val t = kotlinx.coroutines.withTimeoutOrNull(1000L) {
+            r.requestHitTest(screenPoint.x, screenPoint.y).await()
+        } ?: return null
+        return Vec3(t[0], t[1], t[2])
     }
 
     /**
@@ -382,7 +379,7 @@ class ArViewModel @Inject constructor(
      * phone tap so the src/dst point pairs actually correspond. When glasses-side
      * world lookup is wired, replace this with a real lookup keyed on [timestampNs].
      */
-    private fun glassesWorldHitForTimestamp(timestampNs: Long, screenPoint: PointF): Vec3? {
+    private suspend fun glassesWorldHitForTimestamp(timestampNs: Long, screenPoint: PointF): Vec3? {
         // Stand-in: hit-test the same screen point as the phone tap. Using screen-center for
         // every dst made the dst cloud degenerate and Procrustes produced a bogus rotation.
         return arCoreHitTestToWorld(screenPoint)

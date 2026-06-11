@@ -74,16 +74,63 @@ void chainOld(int sig, siginfo_t* info, void* uc) {
         raise(sig);
     }
 }
+// ── async-signal-safe formatting helpers ─────────────────────────────────────
+// The handler runs inside SIGSEGV: no stdio, no heap, no locale (fopen/fprintf/strsignal all
+// allocate or lock — a crash inside malloc would deadlock the handler). Everything below
+// appends into a caller-provided buffer using only stack arithmetic.
+size_t appendStr(char* buf, size_t pos, size_t cap, const char* s) {
+    while (s && *s && pos < cap - 1) buf[pos++] = *s++;
+    return pos;
+}
+size_t appendDec(char* buf, size_t pos, size_t cap, long v) {
+    char tmp[24]; size_t n = 0;
+    bool neg = v < 0; unsigned long u = neg ? static_cast<unsigned long>(-v) : static_cast<unsigned long>(v);
+    do { tmp[n++] = static_cast<char>('0' + (u % 10)); u /= 10; } while (u && n < sizeof(tmp));
+    if (neg && pos < cap - 1) buf[pos++] = '-';
+    while (n && pos < cap - 1) buf[pos++] = tmp[--n];
+    return pos;
+}
+size_t appendHex(char* buf, size_t pos, size_t cap, uintptr_t v) {
+    pos = appendStr(buf, pos, cap, "0x");
+    char tmp[2 * sizeof(uintptr_t)]; size_t n = 0;
+    do { unsigned d = v & 0xF; tmp[n++] = static_cast<char>(d < 10 ? '0' + d : 'a' + d - 10); v >>= 4; } while (v && n < sizeof(tmp));
+    while (n && pos < cap - 1) buf[pos++] = tmp[--n];
+    return pos;
+}
+const char* sigName(int sig) {
+    switch (sig) {
+        case SIGSEGV: return "Segmentation fault";
+        case SIGABRT: return "Abort";
+        case SIGBUS:  return "Bus error";
+        case SIGILL:  return "Illegal instruction";
+        case SIGFPE:  return "Floating point exception";
+        default:      return "Signal";
+    }
+}
 void nativeCrashHandler(int sig, siginfo_t* info, void* uc) {
     void* frames[64];
     BtState st{frames, frames + 64};
+    // _Unwind_Backtrace and dladdr are not formally async-signal-safe (loader lock), but they
+    // are the entire diagnostic value of this handler and in practice safe unless the crash
+    // happened inside the dynamic loader. Everything else below is strictly safe: open/write/
+    // close/prctl/read only, one static line buffer, zero allocation, zero stdio.
     _Unwind_Backtrace(btCb, &st);
     size_t n = static_cast<size_t>(st.cur - frames);
     if (gCrashPath[0]) {
-        FILE* f = fopen(gCrashPath, "w");
-        if (f) {
-            fprintf(f, "NATIVE CRASH sig=%d (%s) addr=%p\n", sig,
-                    strsignal(sig), info ? info->si_addr : nullptr);
+        int fd = open(gCrashPath, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+        if (fd >= 0) {
+            char line[1024]; size_t p;
+
+            p = 0;
+            p = appendStr(line, p, sizeof(line), "NATIVE CRASH sig=");
+            p = appendDec(line, p, sizeof(line), sig);
+            p = appendStr(line, p, sizeof(line), " (");
+            p = appendStr(line, p, sizeof(line), sigName(sig));
+            p = appendStr(line, p, sizeof(line), ") addr=");
+            p = appendHex(line, p, sizeof(line), info ? reinterpret_cast<uintptr_t>(info->si_addr) : 0);
+            p = appendStr(line, p, sizeof(line), "\n");
+            write(fd, line, p);
+
             // Attribute the crash to a process + thread. The hardware-stereo/depth probe runs in the
             // isolated ":probe" process; without this header a probe-process crash is indistinguishable
             // from a main-app crash (both share cacheDir). open/read/prctl are async-signal-safe.
@@ -96,8 +143,18 @@ void nativeCrashHandler(int sig, siginfo_t* info, void* uc) {
             }
             char tname[32] = {0};
             prctl(PR_GET_NAME, tname, 0, 0, 0);
-            fprintf(f, "process=%s pid=%d tid=%d thread=%s\n",
-                    pname[0] ? pname : "?", getpid(), gettid(), tname[0] ? tname : "?");
+            p = 0;
+            p = appendStr(line, p, sizeof(line), "process=");
+            p = appendStr(line, p, sizeof(line), pname[0] ? pname : "?");
+            p = appendStr(line, p, sizeof(line), " pid=");
+            p = appendDec(line, p, sizeof(line), getpid());
+            p = appendStr(line, p, sizeof(line), " tid=");
+            p = appendDec(line, p, sizeof(line), gettid());
+            p = appendStr(line, p, sizeof(line), " thread=");
+            p = appendStr(line, p, sizeof(line), tname[0] ? tname : "?");
+            p = appendStr(line, p, sizeof(line), "\n");
+            write(fd, line, p);
+
             for (size_t i = 0; i < n; ++i) {
                 Dl_info di;
                 const char* sym = "?";
@@ -109,12 +166,31 @@ void nativeCrashHandler(int sig, siginfo_t* info, void* uc) {
                     if (di.dli_saddr) off = reinterpret_cast<uintptr_t>(frames[i]) -
                                             reinterpret_cast<uintptr_t>(di.dli_saddr);
                 }
-                fprintf(f, "#%02zu %p %s+%zu (%s)\n", i, frames[i], sym, off, lib);
+                p = 0;
+                p = appendStr(line, p, sizeof(line), "#");
+                if (i < 10) p = appendStr(line, p, sizeof(line), "0");
+                p = appendDec(line, p, sizeof(line), static_cast<long>(i));
+                p = appendStr(line, p, sizeof(line), " ");
+                p = appendHex(line, p, sizeof(line), reinterpret_cast<uintptr_t>(frames[i]));
+                p = appendStr(line, p, sizeof(line), " ");
+                p = appendStr(line, p, sizeof(line), sym);
+                p = appendStr(line, p, sizeof(line), "+");
+                p = appendDec(line, p, sizeof(line), static_cast<long>(off));
+                p = appendStr(line, p, sizeof(line), " (");
+                p = appendStr(line, p, sizeof(line), lib);
+                p = appendStr(line, p, sizeof(line), ")\n");
+                write(fd, line, p);
             }
-            fclose(f);
+            close(fd);
         }
     }
     chainOld(sig, info, uc);
+    // If the chained handler returned instead of killing the process, the app would keep running
+    // with a dead internal thread — e.g. ARCore minus its VIO worker: session resumes, zero camera
+    // frames, update() wedges forever. A half-alive process is strictly worse than a dead one;
+    // guarantee the default disposition.
+    signal(sig, SIG_DFL);
+    raise(sig);
 }
 } // namespace
 

@@ -1881,14 +1881,10 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Loads the editor state from a serialized project snapshot received as a spectator.
-     * Stub: ProjectManager.deserialize was stubbed in Task 14.
-     * When Task 14-equivalent fills in real deserialization, wire this.
-     */
-    fun loadAsSpectator(projectBytes: ByteArray) {
-        android.util.Log.w("EditorViewModel", "loadAsSpectator received ${projectBytes.size} bytes (stub)")
-    }
+    // NOTE: spectator/guest project loading is handled by ProjectManager.loadAsSpectator (unzip →
+    // createProject → currentProject emission), which this ViewModel's currentProject collector
+    // already reacts to by loading the project's layers. The former loadAsSpectator stub here was
+    // dead code from Task 14 — never called — and implied a second, unimplemented load path.
 
     fun generatePosterPdf(selectedLayerIds: List<String>, outputSizeMm: Float) {
         val state = _uiState.value

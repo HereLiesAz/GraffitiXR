@@ -82,7 +82,57 @@ class ArRenderer(
      * Latest ARCore [Frame] snapshot, refreshed each tick. Read-only for off-thread
      * callers (e.g. UI hit-testing); may be null before the first successful update.
      */
+    /**
+     * Latest ARCore frame snapshot. WARNING: do NOT call Session/Frame methods on this from off
+     * the GL thread — ARCore is not thread-safe and a hitTest here racing update() corrupts
+     * native state. For hit tests, use [requestHitTest], which runs on the GL thread under
+     * [sessionLock].
+     */
     val latestFrame: AtomicReference<Frame?> = AtomicReference(null)
+
+    private class PendingHitTest(
+        val x: Float,
+        val y: Float,
+        val result: kotlinx.coroutines.CompletableDeferred<FloatArray?>
+    )
+    private val hitTestQueue = java.util.concurrent.ConcurrentLinkedQueue<PendingHitTest>()
+
+    /**
+     * Thread-safe ARCore hit test: the request is queued and executed inside the next
+     * [onDrawFrame] under [sessionLock], serialized with update()/configure() like every other
+     * Session access. Completes with the hit pose translation (x, y, z) or null (no hit, no
+     * session, or renderer destroyed). Callers should await with a timeout — if the render loop
+     * is paused, no frame will arrive to serve the request.
+     */
+    fun requestHitTest(x: Float, y: Float): kotlinx.coroutines.Deferred<FloatArray?> {
+        val d = kotlinx.coroutines.CompletableDeferred<FloatArray?>()
+        if (isDestroying || session == null) {
+            d.complete(null)
+            return d
+        }
+        hitTestQueue.add(PendingHitTest(x, y, d))
+        return d
+    }
+
+    private fun drainHitTestQueue(frame: Frame) {
+        while (true) {
+            val req = hitTestQueue.poll() ?: break
+            val translation = try {
+                frame.hitTest(req.x, req.y).firstOrNull()?.hitPose?.translation
+            } catch (e: Exception) {
+                Timber.w(e, "queued hitTest failed")
+                null
+            }
+            req.result.complete(translation)
+        }
+    }
+
+    private fun failPendingHitTests() {
+        while (true) {
+            val req = hitTestQueue.poll() ?: break
+            req.result.complete(null)
+        }
+    }
 
     private val backgroundRenderer = BackgroundRenderer()
     private val displayRotationHelper = DisplayRotationHelper(context)
@@ -418,6 +468,8 @@ class ArRenderer(
             }
 
             latestFrame.set(frame)
+            lastStep = "hitTests"
+            drainHitTestQueue(frame)
             // Camera-streaming verdict, surfaced on-screen so we don't need adb. ARCore returns ts=0
             // until its first camera image lands; once ts>0 the camera IS streaming into the texture.
             val ts = frame.timestamp
@@ -1238,6 +1290,7 @@ class ArRenderer(
         } finally {
             if (locked) sessionLock.unlock()
         }
+        failPendingHitTests()
         anchorOrchestrator.clear()
         pendingOverlayBitmap = null
         latestFrame.set(null)

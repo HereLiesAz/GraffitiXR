@@ -269,8 +269,15 @@ void VoxelHash::load(const std::string& path) {
     mDataDirty = true;
 }
 
-int VoxelHash::getSplatCount() const { return static_cast<int>(mSplatData.size()); }
+// Both counts MUST hold mMutex: the map thread mutates mSplatData under the lock, and an
+// unlocked size()/iteration racing a push_back reallocation is a use-after-free read. These are
+// polled every few frames from the UI-tick coroutine, so the race window was hit constantly.
+int VoxelHash::getSplatCount() const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    return static_cast<int>(mSplatData.size());
+}
 int VoxelHash::getImmutableSplatCount() const {
+    std::lock_guard<std::mutex> lock(mMutex);
     int c = 0;
     for (const auto& s : mSplatData) if (s.confidence >= 0.95f) c++;
     return c;
