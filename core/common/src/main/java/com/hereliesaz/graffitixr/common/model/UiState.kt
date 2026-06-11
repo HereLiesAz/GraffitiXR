@@ -106,6 +106,13 @@ data class ArUiState(
     val parallaxMinDegrees: Float = 4.0f,
     /** ARCore camera target frame rate: 30 (default) or 60. Applies on next AR entry. */
     val cameraTargetFps: Int = 30,
+    /**
+     * TEST-PERCEPTION-FPS: cap (15/20/30) for redrawing the world-locked perception layers; they
+     * cache in an FBO and composite every frame so camera + gestures stay full-rate. Temporary probe.
+     */
+    val perceptionThrottleFps: Int = 30,
+    /** Derived: device under thermal/power-save/low-battery pressure → floor perception at 15 fps. */
+    val perceptionSystemThrottle: Boolean = false,
 
     // Teleological SLAM — fraction [0,1] of locked artwork guide features currently visible
     // on the wall.  0 until addLayerFeaturesToSLAM has been called (layers locked as guide).

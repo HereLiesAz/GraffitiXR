@@ -1194,6 +1194,8 @@ class MainActivity : ComponentActivity() {
                                     onParallaxMinDegreesChanged = { arViewModel.setParallaxMinDegrees(it) },
                                     cameraTargetFps = arUiState.cameraTargetFps,
                                     onCameraTargetFpsChanged = { arViewModel.setCameraTargetFps(it) },
+                                    perceptionThrottleFps = arUiState.perceptionThrottleFps,
+                                    onPerceptionThrottleFpsChanged = { arViewModel.setPerceptionThrottleFps(it) },
                                     arScanMode = arUiState.arScanMode,
                                     onArScanModeChanged = { arViewModel.setArScanMode(it) },
                                     showAnchorBoundary = arUiState.showAnchorBoundary,

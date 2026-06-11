@@ -242,6 +242,9 @@ fun MainScreen(
                                 r.showVoxels = uiState.showVoxels
                                 r.showPoints = uiState.showPoints
                                 r.showMesh = uiState.showMesh
+                                // TEST-PERCEPTION-FPS: throttled-perception redraw cap + adaptive floor.
+                                r.perceptionThrottleFps = arUiState.perceptionThrottleFps
+                                r.systemThrottle = arUiState.perceptionSystemThrottle
                             }
                         },
                         onRelease = { view ->

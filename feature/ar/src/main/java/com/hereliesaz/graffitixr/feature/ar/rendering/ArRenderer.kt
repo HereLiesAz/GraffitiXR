@@ -151,6 +151,24 @@ class ArRenderer(
     @Volatile var showVoxels: Boolean = true          // SLAM voxel splats (confidence-tinted)
     @Volatile var showPoints: Boolean = true          // accumulated sparse point cloud
     @Volatile var showMesh: Boolean = true            // persistent surface mesh
+
+    // --- Throttled perception (FBO-cached) -----------------------------------------------------
+    // World-locked perception is redrawn into an offscreen buffer only when the pose moves or the
+    // map grows, capped at a selectable rate, and composited every frame. Camera + overlay +
+    // gestures keep full display rate; the expensive voxel/coverage passes run at the cap. See
+    // PerceptionFbo. If the FBO is unavailable, perception falls back to drawing every frame.
+    private val perceptionFbo = PerceptionFbo()
+    // TEST-PERCEPTION-FPS: selectable redraw cap (15 / 20 / 30). Temporary on-device probe to settle
+    // the pose-coupling rate; remove the Settings option once a rate is chosen.
+    @Volatile var perceptionThrottleFps: Int = 30
+    // Set by ArViewModel from thermal / power-save / low-battery signals: floors the cap at 15 fps.
+    @Volatile var systemThrottle: Boolean = false
+    private var lastPerceptionRefreshMs = 0L
+    private val lastPerceptionView = FloatArray(16)
+    private var havePerceptionCache = false
+    private var lastPerceptionSplatCount = -1
+    private var perceptionRefreshAvgMs = 0f
+
     private val anchorOrchestrator = AnchorOrchestrator()
     private val poseFusion = com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion()
     // A/B switch for the Sub-project A harness: when false, reproduce the old pre/post-anchor toggle.
@@ -364,6 +382,12 @@ class ArRenderer(
         pointCloudRenderer.createOnGlThread(context)
         planeRenderer.createOnGlThread(context)
         arDebugRenderer.createOnGlThread(context)
+        try {
+            perceptionFbo.createOnGlThread(context)
+        } catch (t: Throwable) {
+            Timber.e(t, "ARDIAG perception FBO init failed — perception will draw un-throttled")
+            onDiag("surface: perceptionFbo FAILED ${t.javaClass.simpleName}")
+        }
         isSurfaceCreated = true
         onDiag("surface: done")
 
@@ -427,6 +451,77 @@ class ArRenderer(
         surfaceHeight = height
         displayRotationHelper.onSurfaceChanged(width, height)
         slamManager.setViewportSize(width, height)
+        if (perceptionFbo.ready) perceptionFbo.resize(width, height)
+    }
+
+    /**
+     * Draw every world-locked perception layer in one pass: coverage mask, scan-time plane grids, and
+     * the diagnostic debug layers (feature points, plane grids, point cloud, voxel splats, mesh).
+     * Called either into the throttled FBO (normal path) or directly every frame (FBO-unavailable
+     * fallback). Mirrors the gating each layer had when drawn inline.
+     */
+    private fun drawPerceptionLayers(
+        frame: Frame,
+        activeSession: Session,
+        camera: com.google.ar.core.Camera,
+        viewMatrix: FloatArray,
+        projMatrix: FloatArray,
+        scanActive: Boolean,
+        voxelColorMask: Boolean,
+        isTracking: Boolean
+    ) {
+        // Coverage colour wash (VOXEL_HASH scanning): grayscale camera + confidence-graded colour.
+        if (voxelColorMask) {
+            slamManager.drawCoverage()
+        }
+        // Scan/world-mapping indicator: detected planes as metric grids on the real surfaces.
+        if (scanActive && !hideVisualization && camera.trackingState == TrackingState.TRACKING) {
+            planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose, gridMode = true)
+        }
+        // Diagnostic perception view: ALL active layers of what the AR is seeing.
+        val anyLayerOn = showFeaturePoints || showPlaneGrids || showVoxels || showPoints || showMesh
+        if (anyLayerOn && isTracking && !isCapturingTarget) {
+            if (showFeaturePoints) {
+                try {
+                    frame.acquirePointCloud().use { arDebugRenderer.update(it) }
+                } catch (_: Exception) {
+                    // NotYetAvailable/DeadlineExceeded — draw the last uploaded cloud instead.
+                }
+                arDebugRenderer.draw(viewMatrix, projMatrix)
+            }
+            if (showPlaneGrids) {
+                planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose, gridMode = true)
+            }
+            if (showPoints) {
+                pointCloudRenderer.draw(viewMatrix, projMatrix)
+            }
+            if (showVoxels || showMesh) {
+                slamManager.drawDebugLayers(voxels = showVoxels, mesh = showMesh)
+            }
+            if (frameCount % 120 == 0) {
+                // Decides "no data" vs "drawn but invisible" from the diag log alone.
+                val planeCount = activeSession.getAllTrackables(com.google.ar.core.Plane::class.java)
+                    .count { it.trackingState == TrackingState.TRACKING && it.subsumedBy == null }
+                onDiag("debugView: feat=${arDebugRenderer.lastPointCount} planes=$planeCount voxels=${slamManager.getSplatCount()} pts=${pointCloudRenderer.accumulatedPointCount} method=$muralMethod fps=${effectivePerceptionFps()}")
+            }
+        }
+    }
+
+    /** Effective perception redraw cap after applying the thermal/battery/lag floor. */
+    private fun effectivePerceptionFps(): Int {
+        val base = perceptionThrottleFps.coerceIn(MIN_PERCEPTION_FPS, MAX_PERCEPTION_FPS)
+        val laggy = perceptionRefreshAvgMs > PERCEPTION_LAG_MS
+        return if (systemThrottle || laggy) minOf(base, PERCEPTION_FLOOR_FPS) else base
+    }
+
+    /** True when the camera pose moved enough since the last perception refresh to warrant a redraw. */
+    private fun perceptionPoseChanged(view: FloatArray): Boolean {
+        var maxDelta = 0f
+        for (i in 0 until 16) {
+            val d = kotlin.math.abs(view[i] - lastPerceptionView[i])
+            if (d > maxDelta) maxDelta = d
+        }
+        return maxDelta > PERCEPTION_POSE_EPSILON
     }
 
     override fun onDrawFrame(gl: GL10?) {
@@ -506,10 +601,7 @@ class ArRenderer(
             if (scanActive) backgroundRenderer.updateScanMask(visitedSectorsMask)
             lastStep = "bgDraw"
             backgroundRenderer.draw(frame, scanActive && !voxelColorMask, grayscale = voxelColorMask)
-            if (voxelColorMask) {
-                lastStep = "coverage"
-                slamManager.drawCoverage()
-            }
+            // Coverage mask is now drawn with the throttled perception layers (see "debugView").
             if (frameCount <= 10 || frameCount % 60 == 0) {
                 Timber.i("ARDIAG drawFrame f=$frameCount tracking=${frame.camera.trackingState} anchor=$anchorEstablished scanMode=$scanMode scanActive=$scanActive")
                 // On-screen heartbeat. f climbing => render loop alive; ts (camera frame timestamp)
@@ -523,14 +615,7 @@ class ArRenderer(
             // real 3D surfaces (0.25 m cells, local axes emphasised), so the user can read each
             // plane's orientation at a glance. Only while scanning and tracking.
             lastStep = "planes"
-            if (scanActive && !hideVisualization) {
-                val cam = frame.camera
-                if (cam.trackingState == com.google.ar.core.TrackingState.TRACKING) {
-                    val pv = FloatArray(16); cam.getProjectionMatrix(pv, 0, 0.1f, 100.0f)
-                    val vv = FloatArray(16); cam.getViewMatrix(vv, 0)
-                    planeRenderer.drawPlanes(activeSession, vv, pv, cam.pose, gridMode = true)
-                }
-            }
+            // Scan-time plane grids are now drawn with the throttled perception layers (see "debugView").
 
             lastStep = "anchorEstablish"
             if (pendingAnchorEstablishment) {
@@ -1144,31 +1229,36 @@ class ArRenderer(
             //    CLOUD_POINTS mode -> the accumulated point cloud; MURAL mode -> the native
             //    engine's own draw (voxel splats or surface mesh per muralMethod).
             lastStep = "debugView"
-            val anyLayerOn = showFeaturePoints || showPlaneGrids || showVoxels || showPoints || showMesh
-            if (anyLayerOn && isTracking && !isCapturingTarget) {
-                if (showFeaturePoints) {
-                    try {
-                        frame.acquirePointCloud().use { arDebugRenderer.update(it) }
-                    } catch (_: Exception) {
-                        // NotYetAvailable/DeadlineExceeded — draw the last uploaded cloud instead.
-                    }
-                    arDebugRenderer.draw(viewMatrix, projMatrix)
+            // Throttled perception: refresh the world-locked layers (coverage, scan grids, feature
+            // points, plane grids, point cloud, voxel splats, mesh) into the FBO only when the pose
+            // moved or the map grew, capped at the selected rate (floored to 15 fps under thermal /
+            // battery / lag), then composite every frame. Camera + overlay + gestures stay full-rate.
+            // FBO-unavailable fallback: draw straight to the screen every frame so perception is never
+            // blank. Relocating coverage + scan grids here moves them from under the artwork overlay to
+            // over it, which is invisible during scanning (no overlay placed yet).
+            if (perceptionFbo.ready && perceptionFbo.isSized()) {
+                val nowMs = android.os.SystemClock.elapsedRealtime()
+                val intervalMs = 1000f / effectivePerceptionFps()
+                val due = nowMs - lastPerceptionRefreshMs >= intervalMs
+                val moved = perceptionPoseChanged(viewMatrix)
+                val splatCount = slamManager.getSplatCount()
+                val mapGrew = splatCount != lastPerceptionSplatCount
+                val refresh = !havePerceptionCache || (due && (moved || mapGrew))
+                if (refresh) {
+                    val t0 = android.os.SystemClock.elapsedRealtime()
+                    perceptionFbo.bindForRender()
+                    drawPerceptionLayers(frame, activeSession, camera, viewMatrix, projMatrix, scanActive, voxelColorMask, isTracking)
+                    perceptionFbo.unbind(surfaceWidth, surfaceHeight)
+                    System.arraycopy(viewMatrix, 0, lastPerceptionView, 0, 16)
+                    lastPerceptionRefreshMs = nowMs
+                    lastPerceptionSplatCount = splatCount
+                    havePerceptionCache = true
+                    val dt = (android.os.SystemClock.elapsedRealtime() - t0).toFloat()
+                    perceptionRefreshAvgMs = perceptionRefreshAvgMs * 0.9f + dt * 0.1f
                 }
-                if (showPlaneGrids) {
-                    planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose, gridMode = true)
-                }
-                if (showPoints) {
-                    pointCloudRenderer.draw(viewMatrix, projMatrix)
-                }
-                if (showVoxels || showMesh) {
-                    slamManager.drawDebugLayers(voxels = showVoxels, mesh = showMesh)
-                }
-                if (frameCount % 120 == 0) {
-                    // Decides "no data" vs "drawn but invisible" from the diag log alone.
-                    val planeCount = activeSession.getAllTrackables(com.google.ar.core.Plane::class.java)
-                        .count { it.trackingState == com.google.ar.core.TrackingState.TRACKING && it.subsumedBy == null }
-                    onDiag("debugView: feat=${arDebugRenderer.lastPointCount} planes=$planeCount voxels=${slamManager.getSplatCount()} pts=${pointCloudRenderer.accumulatedPointCount} method=$muralMethod")
-                }
+                perceptionFbo.composite()
+            } else {
+                drawPerceptionLayers(frame, activeSession, camera, viewMatrix, projMatrix, scanActive, voxelColorMask, isTracking)
             }
             // A stall reported at "frameDone" means onDrawFrame COMPLETED and the GL thread never
             // came back for the next frame — wedge is in eglSwapBuffers / the GLThread scheduler /
@@ -1273,6 +1363,7 @@ class ArRenderer(
         pointCloudRenderer.release()
         planeRenderer.release()
         arDebugRenderer.release()
+        perceptionFbo.release()
     }
 
     /**
@@ -1334,5 +1425,15 @@ class ArRenderer(
         anchorOrchestrator.clear()
         pendingOverlayBitmap = null
         latestFrame.set(null)
+    }
+
+    private companion object {
+        const val MIN_PERCEPTION_FPS = 15
+        const val MAX_PERCEPTION_FPS = 30
+        const val PERCEPTION_FLOOR_FPS = 15
+        // Rolling-average perception-refresh cost (ms) above which we self-throttle to the floor.
+        const val PERCEPTION_LAG_MS = 16f
+        // Per-element view-matrix delta below which the pose is treated as unchanged (skip redraw).
+        const val PERCEPTION_POSE_EPSILON = 1e-4f
     }
 }

@@ -89,6 +89,8 @@ fun SettingsScreen(
     onParallaxMinDegreesChanged: (Float) -> Unit,
     cameraTargetFps: Int,
     onCameraTargetFpsChanged: (Int) -> Unit,
+    perceptionThrottleFps: Int,
+    onPerceptionThrottleFpsChanged: (Int) -> Unit,
     arScanMode: ArScanMode,
     onArScanModeChanged: (ArScanMode) -> Unit,
     showAnchorBoundary: Boolean,
@@ -274,6 +276,17 @@ fun SettingsScreen(
                                 value = "$cameraTargetFps",
                                 modifier = Modifier.clickable {
                                     onCameraTargetFpsChanged(if (cameraTargetFps == 30) 60 else 30)
+                                }
+                            )
+                            // TEST-PERCEPTION-FPS: temporary probe — cycles 15 → 20 → 30. Remove once
+                            // the perception-coupling rate is settled.
+                            SettingsItem(
+                                label = "Perception FPS (test)",
+                                value = "$perceptionThrottleFps",
+                                modifier = Modifier.clickable {
+                                    onPerceptionThrottleFpsChanged(
+                                        when (perceptionThrottleFps) { 15 -> 20; 20 -> 30; else -> 15 }
+                                    )
                                 }
                             )
                             val modes = ArScanMode.entries

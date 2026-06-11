@@ -83,6 +83,10 @@ interface SettingsRepository {
     val cameraTargetFps: Flow<Int>
     suspend fun setCameraTargetFps(fps: Int)
 
+    /** TEST-PERCEPTION-FPS: perception redraw cap, 15/20/30 (default 30). Temporary probe. */
+    val perceptionThrottleFps: Flow<Int>
+    suspend fun setPerceptionThrottleFps(fps: Int)
+
     /** Set of tutorial keys the user has completed. Keys: "tut_ar", "tut_overlay", "tut_mockup", "tut_trace", "tut_design", "tut_project". */
     val completedTutorials: Flow<Set<String>>
 

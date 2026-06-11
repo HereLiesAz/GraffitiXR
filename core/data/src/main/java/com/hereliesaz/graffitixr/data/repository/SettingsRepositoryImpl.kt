@@ -40,6 +40,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val BACKGROUND_COLOR = intPreferencesKey("background_color")
     private val PARALLAX_MIN_DEG = floatPreferencesKey("parallax_min_degrees")
     private val CAMERA_TARGET_FPS = intPreferencesKey("camera_target_fps")
+    private val PERCEPTION_THROTTLE_FPS = intPreferencesKey("perception_throttle_fps")
     private val COMPLETED_TUTORIALS = stringSetPreferencesKey("completed_tutorials")
 
     override val language: Flow<AppLanguage> = context.dataStore.data
@@ -165,6 +166,16 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setCameraTargetFps(fps: Int) {
         context.dataStore.edit { preferences ->
             preferences[CAMERA_TARGET_FPS] = fps
+        }
+    }
+
+    override val perceptionThrottleFps: Flow<Int> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[PERCEPTION_THROTTLE_FPS] ?: 30 }
+
+    override suspend fun setPerceptionThrottleFps(fps: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[PERCEPTION_THROTTLE_FPS] = fps
         }
     }
 

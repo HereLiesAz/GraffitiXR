@@ -425,6 +425,7 @@ class ArViewModel @Inject constructor(
 
     init {
         NativeLibLoader.loadAll()
+        startSystemThrottleMonitoring()
         viewModelScope.launch(Dispatchers.IO) {
             slamManager.loadSuperPoint(appContext.assets)
             slamManager.loadDistortionHead(appContext.assets) // optional; inert if asset absent
@@ -476,6 +477,12 @@ class ArViewModel @Inject constructor(
             // takes effect on the next AR entry (the camera config is fixed at session creation).
             settingsRepository.cameraTargetFps.collect { fps ->
                 _uiState.update { it.copy(cameraTargetFps = fps) }
+            }
+        }
+        viewModelScope.launch {
+            // TEST-PERCEPTION-FPS: perception redraw cap, pushed to the renderer via MainScreen.
+            settingsRepository.perceptionThrottleFps.collect { fps ->
+                _uiState.update { it.copy(perceptionThrottleFps = fps) }
             }
         }
         viewModelScope.launch {
@@ -563,6 +570,11 @@ class ArViewModel @Inject constructor(
     /** Persist the camera target fps (30/60). Takes effect on the next AR entry. */
     fun setCameraTargetFps(fps: Int) {
         viewModelScope.launch { settingsRepository.setCameraTargetFps(fps) }
+    }
+
+    // TEST-PERCEPTION-FPS: persist the selected perception redraw cap (15/20/30). Temporary probe.
+    fun setPerceptionThrottleFps(fps: Int) {
+        viewModelScope.launch { settingsRepository.setPerceptionThrottleFps(fps) }
     }
 
     fun setImperialUnits(imperial: Boolean) {
@@ -1697,8 +1709,78 @@ class ArViewModel @Inject constructor(
         renderer?.hideVisualization = hidden
     }
 
+    // --- Adaptive perception throttle: device-stress signals -----------------------------------
+    // Thermal pressure, power-save mode, and low battery each float perceptionSystemThrottle, which
+    // MainScreen pushes to the renderer to floor perception redraws at 15 fps. The renderer also
+    // self-throttles on measured frame lag; this covers the system-level signals it can't see.
+    private val powerManager by lazy {
+        appContext.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+    }
+    private var thermalListener: android.os.PowerManager.OnThermalStatusChangedListener? = null
+    private var powerReceiver: android.content.BroadcastReceiver? = null
+    @Volatile private var thermalHot = false
+    @Volatile private var batteryLow = false
+
+    private fun recomputeSystemThrottle() {
+        val saver = powerManager?.isPowerSaveMode == true
+        val throttle = thermalHot || batteryLow || saver
+        _uiState.update {
+            if (it.perceptionSystemThrottle == throttle) it else it.copy(perceptionSystemThrottle = throttle)
+        }
+    }
+
+    private fun startSystemThrottleMonitoring() {
+        val pm = powerManager
+        if (pm != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            val listener = android.os.PowerManager.OnThermalStatusChangedListener { status ->
+                thermalHot = status >= android.os.PowerManager.THERMAL_STATUS_MODERATE
+                recomputeSystemThrottle()
+            }
+            try {
+                pm.addThermalStatusListener(listener)
+                thermalListener = listener
+            } catch (_: Throwable) { /* OEM may not support it; power-save + battery still apply. */ }
+        }
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: Context?, intent: android.content.Intent?) {
+                when (intent?.action) {
+                    android.content.Intent.ACTION_BATTERY_LOW -> batteryLow = true
+                    android.content.Intent.ACTION_BATTERY_OKAY -> batteryLow = false
+                }
+                recomputeSystemThrottle()
+            }
+        }
+        val filter = android.content.IntentFilter().apply {
+            addAction(android.content.Intent.ACTION_BATTERY_LOW)
+            addAction(android.content.Intent.ACTION_BATTERY_OKAY)
+            addAction(android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
+        }
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                appContext.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                @Suppress("UnspecifiedRegisterReceiverFlag")
+                appContext.registerReceiver(receiver, filter)
+            }
+            powerReceiver = receiver
+        } catch (_: Throwable) { /* best-effort; thermal listener still applies. */ }
+        recomputeSystemThrottle()
+    }
+
+    private fun stopSystemThrottleMonitoring() {
+        thermalListener?.let { l ->
+            try { powerManager?.removeThermalStatusListener(l) } catch (_: Throwable) {}
+        }
+        thermalListener = null
+        powerReceiver?.let { r ->
+            try { appContext.unregisterReceiver(r) } catch (_: Throwable) {}
+        }
+        powerReceiver = null
+    }
+
     override fun onCleared() {
         super.onCleared()
+        stopSystemThrottleMonitoring()
         // viewModelScope is already cancelled by the time onCleared runs, so leaveSession()'s
         // viewModelScope.launch would never execute and the collaboration session would leak.
         // Cancel the local collector synchronously and tear the session down on the manager's
