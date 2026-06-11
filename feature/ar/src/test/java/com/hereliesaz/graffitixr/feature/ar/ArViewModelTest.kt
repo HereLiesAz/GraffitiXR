@@ -29,6 +29,7 @@ import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import com.hereliesaz.graffitixr.common.model.ArUiState
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -282,6 +283,7 @@ class ArViewModelTest {
     @Test
     fun `session resumes only when in AR mode and activity is resumed`() = runTest {
         setPrivateField(viewModel, "session", session)
+        enableArCore()
         assertFalse(getPrivateField(viewModel, "isSessionResumed") as Boolean)
 
         // Enter AR mode, but activity is paused
@@ -299,6 +301,7 @@ class ArViewModelTest {
     @Test
     fun `session pauses when activity is paused or not in AR mode`() = runTest {
         setPrivateField(viewModel, "session", session)
+        enableArCore()
         viewModel.setArMode(true, context)
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.onActivityResumed()
@@ -422,6 +425,16 @@ class ArViewModelTest {
         val state = viewModel.uiState.value
         assertNull(state.annotatedCaptureBitmap)
         assertEquals(4, state.unwarpPoints.size)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun enableArCore() {
+        // setArMode(true) early-returns unless ARCore is reported available; flip the flag on the
+        // private state flow so the lifecycle tests can actually enter AR mode.
+        val field = viewModel.javaClass.getDeclaredField("_uiState")
+        field.isAccessible = true
+        val flow = field.get(viewModel) as MutableStateFlow<ArUiState>
+        flow.value = flow.value.copy(isArCoreAvailable = true)
     }
 
     private fun setPrivateField(obj: Any, fieldName: String, value: Any?) {
