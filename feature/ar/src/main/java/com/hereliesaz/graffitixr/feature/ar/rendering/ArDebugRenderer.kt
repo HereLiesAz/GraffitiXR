@@ -32,6 +32,8 @@ class ArDebugRenderer : GlReleasable {
 
     private val maxPoints = 20000
     private var pointCount = 0
+    /** Last uploaded current-frame point count — surfaced in the diag log by ArRenderer. */
+    val lastPointCount: Int get() = pointCount
     // Last point-cloud timestamp uploaded; ARCore returns the same cloud object until a new one
     // is computed, so skipping identical timestamps avoids redundant VBO uploads.
     private var lastCloudTimestampNs = 0L

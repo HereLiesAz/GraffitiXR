@@ -511,7 +511,7 @@ class ArRenderer(
                 if (cam.trackingState == com.google.ar.core.TrackingState.TRACKING) {
                     val pv = FloatArray(16); cam.getProjectionMatrix(pv, 0, 0.1f, 100.0f)
                     val vv = FloatArray(16); cam.getViewMatrix(vv, 0)
-                    planeRenderer.drawPlanes(activeSession, vv, pv, cam.pose)
+                    planeRenderer.drawPlanes(activeSession, vv, pv, cam.pose, gridMode = true)
                 }
             }
 
@@ -1128,6 +1128,12 @@ class ArRenderer(
                 when (scanMode) {
                     ArScanMode.CLOUD_POINTS -> pointCloudRenderer.draw(viewMatrix, projMatrix)
                     else -> slamManager.draw() // voxel splats or surface mesh, per the engine's own muralMethod
+                }
+                if (frameCount % 120 == 0) {
+                    // Decides "no data" vs "drawn but invisible" from the diag log alone.
+                    val planeCount = activeSession.getAllTrackables(com.google.ar.core.Plane::class.java)
+                        .count { it.trackingState == com.google.ar.core.TrackingState.TRACKING && it.subsumedBy == null }
+                    onDiag("debugView: pts=${arDebugRenderer.lastPointCount} planes=$planeCount splats=${slamManager.getSplatCount()} cloud=${pointCloudRenderer.accumulatedPointCount}")
                 }
             }
             // A stall reported at "frameDone" means onDrawFrame COMPLETED and the GL thread never
