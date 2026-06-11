@@ -18,16 +18,20 @@ class HelpItemsBuilderTest {
     @Test
     fun `result contains every static main-rail key`() {
         val map = buildHelpItems(strings(), emptyList())
-        // Per AzNavRail v8.11 HelpOverlay scoping: main Help shows every
-        // main-rail item with a helpList entry, popup Help shows only the
-        // open nested rail's items. Both top-level rail items and host
-        // sub-items belong here.
+        // Per AzNavRail HelpOverlay scoping: main Help shows every main-rail item
+        // with a helpList entry. These are the current canonical static keys the
+        // builder emits (host parents, their items, tool groups, and global).
+        // Updated from the legacy mode.host/project.* scheme when the rail key
+        // convention changed; this pins the present contract and catches removals.
         listOf(
-            "mode.host", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace",
-            "target.host", "target.scanModeToggle", "target.create",
-            "design.host", "design.addImg", "design.addDraw", "design.addText", "design.wall",
-            "project.host.main", "project.new", "project.save", "project.load", "project.export", "project.settings",
-            "tool.light", "tool.lockTrace",
+            "host.modes", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace",
+            "target.create", "mode.mockup.wall",
+            "host.design", "design.addImg", "design.addDraw", "design.addText", "mode.trace.freeze",
+            "sub.design.tools", "grp.paint", "tool.brush", "tool.eraser",
+            "grp.retouch", "tool.blur", "tool.liquify",
+            "grp.color", "adj.invert", "adj.balance", "adj.blend", "tool.filter",
+            "host.project", "proj.new", "proj.save", "proj.load", "proj.settings",
+            "item.help",
         ).forEach { id ->
             assertTrue("expected key '$id' in helpItems", id in map)
         }

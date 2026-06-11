@@ -95,7 +95,7 @@ class EditorViewModelTest {
 
         // Mock ImageUtils so ImageDecoder/BitmapFactory isn't invoked in unit tests
         coEvery { com.hereliesaz.graffitixr.common.util.ImageUtils.getBitmapDimensions(any(), any()) } returns Pair(100, 100)
-        coEvery { com.hereliesaz.graffitixr.common.util.ImageUtils.loadBitmapAsync(any(), any()) } returns mockBitmap
+        coEvery { com.hereliesaz.graffitixr.common.util.ImageUtils.loadBitmapAsync(any(), any(), any()) } returns mockBitmap
         coEvery { projectRepository.saveArtifact(any(), any(), any()) } returns "/path/to/artifact.png"
         every { com.hereliesaz.graffitixr.common.util.ImageUtils.bitmapToByteArray(any()) } returns ByteArray(0)
 
