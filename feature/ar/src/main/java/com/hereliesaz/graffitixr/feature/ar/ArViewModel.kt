@@ -613,6 +613,12 @@ class ArViewModel @Inject constructor(
                 // cancels the probe too.
                 if (context != null && isInArMode && session == null && !isDestroying && stereoCapable == null) {
                     probeStereoCapability(context)
+                    // The probe held the camera exclusively, and on devices whose AUTOMATIC-depth graph
+                    // is broken it can crash the :probe process WHILE holding the camera. Opening the
+                    // live session immediately then lands on a camera the HAL hasn't reclaimed yet (no
+                    // frames, ts=0). Wait for the camera service to report the back camera available
+                    // again before continuing. No-op latency when it's already free.
+                    awaitCameraAvailable(context, 3000L)
                 }
                 if (isInArMode && session == null && context != null && !isDestroying) {
                     initArSessionLocked(context)
@@ -624,6 +630,39 @@ class ArViewModel @Inject constructor(
                     pauseArSessionInternal()
                 }
             }
+        }
+    }
+
+    /**
+     * Suspend until the back-facing camera is reported available by the camera service, or [timeoutMs]
+     * elapses. Registering an availability callback immediately delivers the current state, so this
+     * returns instantly when the camera is already free; it only actually waits when something (e.g. a
+     * just-crashed :probe process) still holds the camera and the HAL hasn't reclaimed it. Never throws.
+     */
+    private suspend fun awaitCameraAvailable(context: Context, timeoutMs: Long) {
+        try {
+            val cm = context.getSystemService(Context.CAMERA_SERVICE)
+                as? android.hardware.camera2.CameraManager ?: return
+            val backId = cm.cameraIdList.firstOrNull { id ->
+                cm.getCameraCharacteristics(id)
+                    .get(android.hardware.camera2.CameraCharacteristics.LENS_FACING) ==
+                    android.hardware.camera2.CameraCharacteristics.LENS_FACING_BACK
+            } ?: return
+            val available = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val cb = object : android.hardware.camera2.CameraManager.AvailabilityCallback() {
+                override fun onCameraAvailable(cameraId: String) {
+                    if (cameraId == backId && !available.isCompleted) available.complete(Unit)
+                }
+            }
+            cm.registerAvailabilityCallback(cb, Handler(Looper.getMainLooper()))
+            try {
+                val freed = kotlinx.coroutines.withTimeoutOrNull(timeoutMs) { available.await() } != null
+                appendDiag("camera handoff: ${if (freed) "available" else "TIMEOUT after ${timeoutMs}ms"}")
+            } finally {
+                cm.unregisterAvailabilityCallback(cb)
+            }
+        } catch (e: Exception) {
+            Timber.w(e, "ARDIAG awaitCameraAvailable failed")
         }
     }
 
@@ -1016,6 +1055,7 @@ class ArViewModel @Inject constructor(
         renderer = r
         renderer?.stereoProvider = stereoProvider
         renderer?.onCameraNotFeeding = { onCameraNotFeeding() }
+        renderer?.onCameraStreaming = { onCameraStreamingResumed() }
         renderer?.attachSession(session)
         loadCloudPointsIfExists()
     }
@@ -1128,14 +1168,67 @@ class ArViewModel @Inject constructor(
         }
         if (!_uiState.value.isHardwareStereoActive) {
             // The live session is on the plain mono config and STILL gets no frames. Stereo is not the
-            // culprit here — the camera itself isn't feeding ARCore (e.g. wedged by another client, or a
-            // device/HAL fault). Surfaced so we stop chasing the stereo path.
-            appendDiag("self-heal: camera DEAD on MONO — not a stereo fault")
+            // culprit — the camera itself isn't feeding ARCore, typically because a just-crashed :probe
+            // process left it wedged. Recreate the session (which re-acquires the camera after waiting
+            // for it to be free), bounded so a genuinely dead camera can't loop forever.
+            if (cameraRecoveryAttempts >= MAX_CAMERA_RECOVERY_ATTEMPTS) {
+                appendDiag("self-heal: camera still dead after $cameraRecoveryAttempts recreate(s) — giving up")
+                return
+            }
+            cameraRecoveryAttempts++
+            appendDiag("self-heal: camera dead on mono — recreate #$cameraRecoveryAttempts to re-acquire")
+            recoverFromDeadCamera()
             return
         }
         appendDiag("self-heal: stereo not feeding -> reconfigure to mono")
         Timber.w("ARDIAG dual-lens: camera not feeding ARCore under forced stereo -> self-heal to mono")
         recoverFromBrokenStereo()
+    }
+
+    private val MAX_CAMERA_RECOVERY_ATTEMPTS = 2
+    @Volatile private var cameraRecoveryAttempts = 0
+    private val cameraRecoveryInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /**
+     * The live session is getting no camera frames (camera wedged by the crashed/closed probe process).
+     * Tear the session fully down — pause() unblocks the GL thread stuck in update(), close() releases
+     * the camera handle — wait for the camera to be reported free, then build a fresh session. Bounded
+     * by [cameraRecoveryAttempts]; the counter resets once frames actually start flowing (onCameraStreamingResumed).
+     */
+    private fun recoverFromDeadCamera() {
+        if (!cameraRecoveryInFlight.compareAndSet(false, true)) return
+        viewModelScope.launch {
+            sessionMutex.withLock {
+                try {
+                    if (isDestroying) return@withLock
+                    val s = session
+                    if (s != null) {
+                        if (isSessionResumed) pauseArSessionInternal()
+                        renderer?.attachSession(null)
+                        try { s.close() } catch (_: Exception) {}
+                        session = null
+                    }
+                    awaitCameraAvailable(appContext, 3000L)
+                    if (isInArMode && !isDestroying) {
+                        initArSessionLocked(appContext)
+                        if (isActivityResumed && session != null) resumeArSessionInternal()
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "ARDIAG camera recovery (session recreate) failed")
+                } finally {
+                    cameraRecoveryInFlight.set(false)
+                }
+            }
+        }
+    }
+
+    /** Frames are flowing again — clear the camera-recovery budget so a future independent stall gets a
+     *  fresh set of recreate attempts. Fired from the renderer the first time a session streams (ts>0). */
+    private fun onCameraStreamingResumed() {
+        if (cameraRecoveryAttempts != 0) {
+            appendDiag("camera streaming — recovery budget reset")
+            cameraRecoveryAttempts = 0
+        }
     }
 
     private val stereoRecoveryInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
