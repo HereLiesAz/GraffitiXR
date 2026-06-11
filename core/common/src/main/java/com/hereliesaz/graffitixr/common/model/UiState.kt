@@ -107,11 +107,14 @@ data class ArUiState(
     /** ARCore camera target frame rate: 30 (default) or 60. Applies on next AR entry. */
     val cameraTargetFps: Int = 30,
     /**
-     * TEST-PERCEPTION-FPS: cap (15/20/30) for redrawing the world-locked perception layers; they
-     * cache in an FBO and composite every frame so camera + gestures stay full-rate. Temporary probe.
+     * Perception-throttle triggers. When enabled and active, each drops the world-locked perception
+     * redraw rate from 30 to 15 fps to save power; camera + overlay + gestures stay full-rate.
      */
-    val perceptionThrottleFps: Int = 30,
-    /** Derived: device under thermal/power-save/low-battery pressure → floor perception at 15 fps. */
+    val throttleOnThermal: Boolean = true,
+    val throttleOnPowerSave: Boolean = true,
+    val throttleOnLowBattery: Boolean = true,
+    val throttleOnLag: Boolean = true,
+    /** Derived: any enabled thermal/power-save/low-battery trigger is currently active. */
     val perceptionSystemThrottle: Boolean = false,
 
     // Teleological SLAM — fraction [0,1] of locked artwork guide features currently visible

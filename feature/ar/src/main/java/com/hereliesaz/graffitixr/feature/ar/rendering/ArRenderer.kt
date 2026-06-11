@@ -158,11 +158,12 @@ class ArRenderer(
     // gestures keep full display rate; the expensive voxel/coverage passes run at the cap. See
     // PerceptionFbo. If the FBO is unavailable, perception falls back to drawing every frame.
     private val perceptionFbo = PerceptionFbo()
-    // TEST-PERCEPTION-FPS: selectable redraw cap (15 / 20 / 30). Temporary on-device probe to settle
-    // the pose-coupling rate; remove the Settings option once a rate is chosen.
-    @Volatile var perceptionThrottleFps: Int = 30
-    // Set by ArViewModel from thermal / power-save / low-battery signals: floors the cap at 15 fps.
+    // Perception redraws at PERCEPTION_FULL_FPS normally and drops to PERCEPTION_FLOOR_FPS while a
+    // throttle trigger is active. systemThrottle is OR-ed from the *enabled* thermal / power-save /
+    // low-battery triggers by ArViewModel; lagThrottleEnabled gates the renderer's own measured-lag
+    // trigger. All four triggers are user-toggleable in Settings.
     @Volatile var systemThrottle: Boolean = false
+    @Volatile var lagThrottleEnabled: Boolean = true
     private var lastPerceptionRefreshMs = 0L
     private val lastPerceptionView = FloatArray(16)
     private var havePerceptionCache = false
@@ -507,11 +508,10 @@ class ArRenderer(
         }
     }
 
-    /** Effective perception redraw cap after applying the thermal/battery/lag floor. */
+    /** Perception redraw rate: full normally, floored while any enabled throttle trigger is active. */
     private fun effectivePerceptionFps(): Int {
-        val base = perceptionThrottleFps.coerceIn(MIN_PERCEPTION_FPS, MAX_PERCEPTION_FPS)
-        val laggy = perceptionRefreshAvgMs > PERCEPTION_LAG_MS
-        return if (systemThrottle || laggy) minOf(base, PERCEPTION_FLOOR_FPS) else base
+        val laggy = lagThrottleEnabled && perceptionRefreshAvgMs > PERCEPTION_LAG_MS
+        return if (systemThrottle || laggy) PERCEPTION_FLOOR_FPS else PERCEPTION_FULL_FPS
     }
 
     /** True when the camera pose moved enough since the last perception refresh to warrant a redraw. */
@@ -1428,10 +1428,9 @@ class ArRenderer(
     }
 
     private companion object {
-        const val MIN_PERCEPTION_FPS = 15
-        const val MAX_PERCEPTION_FPS = 30
+        const val PERCEPTION_FULL_FPS = 30
         const val PERCEPTION_FLOOR_FPS = 15
-        // Rolling-average perception-refresh cost (ms) above which we self-throttle to the floor.
+        // Rolling-average perception-refresh cost (ms) above which the lag trigger floors the rate.
         const val PERCEPTION_LAG_MS = 16f
         // Per-element view-matrix delta below which the pose is treated as unchanged (skip redraw).
         const val PERCEPTION_POSE_EPSILON = 1e-4f

@@ -89,8 +89,14 @@ fun SettingsScreen(
     onParallaxMinDegreesChanged: (Float) -> Unit,
     cameraTargetFps: Int,
     onCameraTargetFpsChanged: (Int) -> Unit,
-    perceptionThrottleFps: Int,
-    onPerceptionThrottleFpsChanged: (Int) -> Unit,
+    throttleOnThermal: Boolean,
+    onThrottleOnThermalChanged: (Boolean) -> Unit,
+    throttleOnPowerSave: Boolean,
+    onThrottleOnPowerSaveChanged: (Boolean) -> Unit,
+    throttleOnLowBattery: Boolean,
+    onThrottleOnLowBatteryChanged: (Boolean) -> Unit,
+    throttleOnLag: Boolean,
+    onThrottleOnLagChanged: (Boolean) -> Unit,
     arScanMode: ArScanMode,
     onArScanModeChanged: (ArScanMode) -> Unit,
     showAnchorBoundary: Boolean,
@@ -278,16 +284,27 @@ fun SettingsScreen(
                                     onCameraTargetFpsChanged(if (cameraTargetFps == 30) 60 else 30)
                                 }
                             )
-                            // TEST-PERCEPTION-FPS: temporary probe — cycles 15 → 20 → 30. Remove once
-                            // the perception-coupling rate is settled.
+                            // Perception throttle triggers: each drops perception 30→15 fps to save
+                            // power while active. Default on. Lower = laggier perception but less drain.
                             SettingsItem(
-                                label = "Perception FPS (test)",
-                                value = "$perceptionThrottleFps",
-                                modifier = Modifier.clickable {
-                                    onPerceptionThrottleFpsChanged(
-                                        when (perceptionThrottleFps) { 15 -> 20; 20 -> 30; else -> 15 }
-                                    )
-                                }
+                                label = "Throttle: heat",
+                                value = if (throttleOnThermal) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable { onThrottleOnThermalChanged(!throttleOnThermal) }
+                            )
+                            SettingsItem(
+                                label = "Throttle: power saver",
+                                value = if (throttleOnPowerSave) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable { onThrottleOnPowerSaveChanged(!throttleOnPowerSave) }
+                            )
+                            SettingsItem(
+                                label = "Throttle: low battery",
+                                value = if (throttleOnLowBattery) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable { onThrottleOnLowBatteryChanged(!throttleOnLowBattery) }
+                            )
+                            SettingsItem(
+                                label = "Throttle: frame lag",
+                                value = if (throttleOnLag) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable { onThrottleOnLagChanged(!throttleOnLag) }
                             )
                             val modes = ArScanMode.entries
                             val nextMode = modes[(arScanMode.ordinal + 1) % modes.size]

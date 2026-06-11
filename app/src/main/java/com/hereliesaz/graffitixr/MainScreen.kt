@@ -242,9 +242,10 @@ fun MainScreen(
                                 r.showVoxels = uiState.showVoxels
                                 r.showPoints = uiState.showPoints
                                 r.showMesh = uiState.showMesh
-                                // TEST-PERCEPTION-FPS: throttled-perception redraw cap + adaptive floor.
-                                r.perceptionThrottleFps = arUiState.perceptionThrottleFps
+                                // Perception throttle: system triggers (OR-ed in the VM) + the lag
+                                // trigger's enable flag (evaluated renderer-side).
                                 r.systemThrottle = arUiState.perceptionSystemThrottle
+                                r.lagThrottleEnabled = arUiState.throttleOnLag
                             }
                         },
                         onRelease = { view ->

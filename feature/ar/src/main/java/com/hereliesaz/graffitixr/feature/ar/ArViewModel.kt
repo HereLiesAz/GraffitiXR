@@ -480,9 +480,27 @@ class ArViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            // TEST-PERCEPTION-FPS: perception redraw cap, pushed to the renderer via MainScreen.
-            settingsRepository.perceptionThrottleFps.collect { fps ->
-                _uiState.update { it.copy(perceptionThrottleFps = fps) }
+            settingsRepository.throttleOnThermal.collect { on ->
+                _uiState.update { it.copy(throttleOnThermal = on) }
+                recomputeSystemThrottle()
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.throttleOnPowerSave.collect { on ->
+                _uiState.update { it.copy(throttleOnPowerSave = on) }
+                recomputeSystemThrottle()
+            }
+        }
+        viewModelScope.launch {
+            settingsRepository.throttleOnLowBattery.collect { on ->
+                _uiState.update { it.copy(throttleOnLowBattery = on) }
+                recomputeSystemThrottle()
+            }
+        }
+        viewModelScope.launch {
+            // Lag trigger is evaluated in the renderer; this only forwards the enable toggle.
+            settingsRepository.throttleOnLag.collect { on ->
+                _uiState.update { it.copy(throttleOnLag = on) }
             }
         }
         viewModelScope.launch {
@@ -572,9 +590,20 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.setCameraTargetFps(fps) }
     }
 
-    // TEST-PERCEPTION-FPS: persist the selected perception redraw cap (15/20/30). Temporary probe.
-    fun setPerceptionThrottleFps(fps: Int) {
-        viewModelScope.launch { settingsRepository.setPerceptionThrottleFps(fps) }
+    fun setThrottleOnThermal(on: Boolean) {
+        viewModelScope.launch { settingsRepository.setThrottleOnThermal(on) }
+    }
+
+    fun setThrottleOnPowerSave(on: Boolean) {
+        viewModelScope.launch { settingsRepository.setThrottleOnPowerSave(on) }
+    }
+
+    fun setThrottleOnLowBattery(on: Boolean) {
+        viewModelScope.launch { settingsRepository.setThrottleOnLowBattery(on) }
+    }
+
+    fun setThrottleOnLag(on: Boolean) {
+        viewModelScope.launch { settingsRepository.setThrottleOnLag(on) }
     }
 
     fun setImperialUnits(imperial: Boolean) {
@@ -1723,9 +1752,12 @@ class ArViewModel @Inject constructor(
 
     private fun recomputeSystemThrottle() {
         val saver = powerManager?.isPowerSaveMode == true
-        val throttle = thermalHot || batteryLow || saver
-        _uiState.update {
-            if (it.perceptionSystemThrottle == throttle) it else it.copy(perceptionSystemThrottle = throttle)
+        val s = _uiState.value
+        val throttle = (s.throttleOnThermal && thermalHot) ||
+            (s.throttleOnPowerSave && saver) ||
+            (s.throttleOnLowBattery && batteryLow)
+        if (s.perceptionSystemThrottle != throttle) {
+            _uiState.update { it.copy(perceptionSystemThrottle = throttle) }
         }
     }
 

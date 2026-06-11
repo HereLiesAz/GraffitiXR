@@ -83,9 +83,15 @@ interface SettingsRepository {
     val cameraTargetFps: Flow<Int>
     suspend fun setCameraTargetFps(fps: Int)
 
-    /** TEST-PERCEPTION-FPS: perception redraw cap, 15/20/30 (default 30). Temporary probe. */
-    val perceptionThrottleFps: Flow<Int>
-    suspend fun setPerceptionThrottleFps(fps: Int)
+    /** Perception-throttle triggers: each, when on, drops perception to 15fps while active. Default on. */
+    val throttleOnThermal: Flow<Boolean>
+    suspend fun setThrottleOnThermal(on: Boolean)
+    val throttleOnPowerSave: Flow<Boolean>
+    suspend fun setThrottleOnPowerSave(on: Boolean)
+    val throttleOnLowBattery: Flow<Boolean>
+    suspend fun setThrottleOnLowBattery(on: Boolean)
+    val throttleOnLag: Flow<Boolean>
+    suspend fun setThrottleOnLag(on: Boolean)
 
     /** Set of tutorial keys the user has completed. Keys: "tut_ar", "tut_overlay", "tut_mockup", "tut_trace", "tut_design", "tut_project". */
     val completedTutorials: Flow<Set<String>>

@@ -40,7 +40,10 @@ class SettingsRepositoryImpl @Inject constructor(
     private val BACKGROUND_COLOR = intPreferencesKey("background_color")
     private val PARALLAX_MIN_DEG = floatPreferencesKey("parallax_min_degrees")
     private val CAMERA_TARGET_FPS = intPreferencesKey("camera_target_fps")
-    private val PERCEPTION_THROTTLE_FPS = intPreferencesKey("perception_throttle_fps")
+    private val THROTTLE_ON_THERMAL = booleanPreferencesKey("throttle_on_thermal")
+    private val THROTTLE_ON_POWER_SAVE = booleanPreferencesKey("throttle_on_power_save")
+    private val THROTTLE_ON_LOW_BATTERY = booleanPreferencesKey("throttle_on_low_battery")
+    private val THROTTLE_ON_LAG = booleanPreferencesKey("throttle_on_lag")
     private val COMPLETED_TUTORIALS = stringSetPreferencesKey("completed_tutorials")
 
     override val language: Flow<AppLanguage> = context.dataStore.data
@@ -169,14 +172,29 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
-    override val perceptionThrottleFps: Flow<Int> = context.dataStore.data
-        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { preferences -> preferences[PERCEPTION_THROTTLE_FPS] ?: 30 }
+    private fun throttleFlow(key: androidx.datastore.preferences.core.Preferences.Key<Boolean>): Flow<Boolean> =
+        context.dataStore.data
+            .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+            .map { preferences -> preferences[key] ?: true }
 
-    override suspend fun setPerceptionThrottleFps(fps: Int) {
-        context.dataStore.edit { preferences ->
-            preferences[PERCEPTION_THROTTLE_FPS] = fps
-        }
+    override val throttleOnThermal: Flow<Boolean> = throttleFlow(THROTTLE_ON_THERMAL)
+    override suspend fun setThrottleOnThermal(on: Boolean) {
+        context.dataStore.edit { it[THROTTLE_ON_THERMAL] = on }
+    }
+
+    override val throttleOnPowerSave: Flow<Boolean> = throttleFlow(THROTTLE_ON_POWER_SAVE)
+    override suspend fun setThrottleOnPowerSave(on: Boolean) {
+        context.dataStore.edit { it[THROTTLE_ON_POWER_SAVE] = on }
+    }
+
+    override val throttleOnLowBattery: Flow<Boolean> = throttleFlow(THROTTLE_ON_LOW_BATTERY)
+    override suspend fun setThrottleOnLowBattery(on: Boolean) {
+        context.dataStore.edit { it[THROTTLE_ON_LOW_BATTERY] = on }
+    }
+
+    override val throttleOnLag: Flow<Boolean> = throttleFlow(THROTTLE_ON_LAG)
+    override suspend fun setThrottleOnLag(on: Boolean) {
+        context.dataStore.edit { it[THROTTLE_ON_LAG] = on }
     }
 
     override val completedTutorials: Flow<Set<String>> = context.dataStore.data
