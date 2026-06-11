@@ -2233,15 +2233,36 @@ private fun DiagPopup(
 
                     fontFamily = FontFamily.Monospace
                 )
-                Text(
-                    "✕",
-                    color = Color.Gray,
-                    modifier = Modifier
-                        .padding(start = 12.dp)
-                        .pointerInput(Unit) {
-                            detectTapGestures { _ -> visible = false }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Explicit COPY button in its own gesture region. Tapping the panel body competes
+                    // with the drag handler and often loses, so this guarantees a reliable copy target.
+                    Text(
+                        "COPY",
+                        color = if (copied) Color.Green else Color.Cyan,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.pointerInput(diagLog) {
+                            detectTapGestures {
+                                val text = diagLog ?: return@detectTapGestures
+                                val cm = context.getSystemService(AndroidClipboardManager::class.java)
+                                cm?.setPrimaryClip(ClipData.newPlainText("diag", text))
+                                copied = true
+                                scope.launch {
+                                    kotlinx.coroutines.delay(1500)
+                                    copied = false
+                                }
+                            }
                         }
-                )
+                    )
+                    Text(
+                        "✕",
+                        color = Color.Gray,
+                        modifier = Modifier
+                            .padding(start = 16.dp)
+                            .pointerInput(Unit) {
+                                detectTapGestures { _ -> visible = false }
+                            }
+                    )
+                }
             }
             Text(
                 text = diagLog ?: strings.ar.diagWaiting,

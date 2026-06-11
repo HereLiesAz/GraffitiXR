@@ -155,9 +155,6 @@ class ArRenderer(
     // a mono config even while the GL thread is blocked in update() and no tracking callback can fire.
     @Volatile private var cameraNotFeedingReported = false
     var onCameraNotFeeding: (() -> Unit)? = null
-    // Fired the first time a session actually streams (ts>0) — lets the ViewModel reset its
-    // camera-recovery budget once frames are flowing again.
-    var onCameraStreaming: (() -> Unit)? = null
     private var watchdog: Thread? = null
     private var sensorOrientation = 90
     private var isSurfaceCreated = false
@@ -384,7 +381,6 @@ class ArRenderer(
             if (ts > 0L && !camStreamReported) {
                 camStreamReported = true
                 onDiag("CAMERA STREAMING f=$frameCount ts=$ts track=${frame.camera.trackingState}")
-                onCameraStreaming?.invoke()
             } else if (ts == 0L && !camStreamReported && !camStallWarned && frameCount >= 90) {
                 // ~3s at 30fps with no camera image: the device's camera pipeline never started
                 // feeding ARCore (resume() succeeded but no frames) — distinct from a slow converge.
