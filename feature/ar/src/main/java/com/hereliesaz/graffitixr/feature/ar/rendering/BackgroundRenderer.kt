@@ -37,6 +37,7 @@ class BackgroundRenderer : GlReleasable {
     private var uHalfFov: Int = 0
     private var uMask: Int = 0
     private var uDotSize: Int = 0
+    private var uGrayscale: Int = 0
     private var hasTransformed = false
     private var diagFrame = 0
 
@@ -106,6 +107,7 @@ class BackgroundRenderer : GlReleasable {
         uHalfFov = GLES30.glGetUniformLocation(backgroundProgram, "u_HalfFovHRad")
         uMask = GLES30.glGetUniformLocation(backgroundProgram, "u_MaskTex")
         uDotSize = GLES30.glGetUniformLocation(backgroundProgram, "u_DotSizePx")
+        uGrayscale = GLES30.glGetUniformLocation(backgroundProgram, "u_Grayscale")
     }
 
     /** Push the 36-sector visited bitmask that drives the ink-develop reveal. */
@@ -127,7 +129,7 @@ class BackgroundRenderer : GlReleasable {
      * gritty black-and-white newspaper halftone of the camera, and full colour/tone bleeds in
      * organically (like spreading ink) as each yaw sector is mapped. Otherwise it's a plain pass-through.
      */
-    fun draw(frame: Frame, scanActive: Boolean = false) {
+    fun draw(frame: Frame, scanActive: Boolean = false, grayscale: Boolean = false) {
         diagFrame++
         if (backgroundProgram == 0) {
             if (diagFrame % 120 == 0) Log.w("ARDIAG", "BackgroundRenderer.draw: shader not ready -> camera black")
@@ -166,6 +168,7 @@ class BackgroundRenderer : GlReleasable {
             halfFov = kotlin.math.atan(1.0 / projMatrix[0].toDouble()).toFloat()
         }
         GLES30.glUniform1f(uScanActive, if (scanActive) 1.0f else 0.0f)
+        GLES30.glUniform1f(uGrayscale, if (grayscale) 1.0f else 0.0f)
         GLES30.glUniform1f(uYaw, yaw)
         GLES30.glUniform1f(uHalfFov, halfFov)
         GLES30.glUniform1f(uDotSize, DOT_SIZE_PX)
@@ -299,6 +302,7 @@ class BackgroundRenderer : GlReleasable {
             uniform float u_HalfFovHRad;
             uniform sampler2D u_MaskTex;
             uniform float u_DotSizePx;
+            uniform float u_Grayscale;
             out vec4 FragColor;
 
             const float TWO_PI = 6.28318530718;
@@ -311,10 +315,16 @@ class BackgroundRenderer : GlReleasable {
             }
 
             void main() {
-                // Plain camera pass-through. The screen-space halftone->colour "develop" reveal was
-                // removed: it was a flat 2D effect (same failing as the pink fog). A real scan indicator
-                // must spread on the actual 3D surfaces being mapped, not across the whole frame.
-                FragColor = texture(u_Texture, v_TexCoord);
+                vec4 cam = texture(u_Texture, v_TexCoord);
+                // In voxel-method scanning the camera is desaturated to luminance; the voxel
+                // coverage pass (drawn after, alpha=confidence) bleeds colour back in over scanned
+                // regions, so the grayscale areas are precisely what hasn't been mapped yet.
+                if (u_Grayscale > 0.5) {
+                    float l = dot(cam.rgb, vec3(0.299, 0.587, 0.114));
+                    FragColor = vec4(vec3(l), cam.a);
+                } else {
+                    FragColor = cam;
+                }
             }
         """.trimIndent()
 

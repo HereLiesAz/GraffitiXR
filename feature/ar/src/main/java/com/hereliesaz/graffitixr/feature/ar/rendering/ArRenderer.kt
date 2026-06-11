@@ -496,9 +496,19 @@ class ArRenderer(
             // During the AMBIENT scan, the camera background renders as a newspaper halftone with full
             // colour bleeding in (like ink) as each yaw sector is mapped — the world-mapping indicator.
             val scanActive = !anchorEstablished && scanMode == ArScanMode.MURAL && scanPhase == ScanPhase.AMBIENT
+            // Voxel-method colour-mask: while scanning in VOXEL_HASH, the camera renders grayscale
+            // and the voxel coverage pass (below) re-colorizes scanned regions graded by confidence,
+            // so the user literally sees what hasn't been mapped. Mutually exclusive with the
+            // halftone scan indicator (which stays for the other mural methods).
+            val voxelColorMask = !anchorEstablished && scanMode == ArScanMode.MURAL &&
+                muralMethod == MuralMethod.VOXEL_HASH && isTracking
             if (scanActive) backgroundRenderer.updateScanMask(visitedSectorsMask)
             lastStep = "bgDraw"
-            backgroundRenderer.draw(frame, scanActive)
+            backgroundRenderer.draw(frame, scanActive && !voxelColorMask, grayscale = voxelColorMask)
+            if (voxelColorMask) {
+                lastStep = "coverage"
+                slamManager.drawCoverage()
+            }
             if (frameCount <= 10 || frameCount % 60 == 0) {
                 Timber.i("ARDIAG drawFrame f=$frameCount tracking=${frame.camera.trackingState} anchor=$anchorEstablished scanMode=$scanMode scanActive=$scanActive")
                 // On-screen heartbeat. f climbing => render loop alive; ts (camera frame timestamp)

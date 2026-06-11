@@ -243,6 +243,9 @@ class SlamManager @Inject constructor(
      */
     fun drawDebugLayers(voxels: Boolean, mesh: Boolean) = nativeDrawDebugLayers(voxels, mesh)
 
+    /** Voxel-method colour-mask: draws the splats as a confidence-graded colour wash over the grayscale camera. */
+    fun drawCoverage() = nativeDrawCoverage()
+
     fun feedStereoData(leftBuffer: ByteBuffer, rightBuffer: ByteBuffer, width: Int, height: Int, timestamp: Long) {
         if (leftBuffer.isDirect && rightBuffer.isDirect) {
             nativeFeedStereoData(leftBuffer, rightBuffer, width, height, timestamp)
@@ -441,6 +444,7 @@ class SlamManager @Inject constructor(
     private external fun nativeUpdateLightLevel(level: Float)
     private external fun nativeDraw(debugTint: Boolean)
     private external fun nativeDrawDebugLayers(voxels: Boolean, mesh: Boolean)
+    private external fun nativeDrawCoverage()
     private external fun nativeGetSplatCount(): Int
     private external fun nativeGetImmutableSplatCount(): Int
     private external fun nativeGetVisibleConfidenceAvg(): Float

@@ -111,6 +111,8 @@ public:
     // Debug perception view: draws the requested representations explicitly, regardless of
     // mMuralMethod or mSplatsVisible. Voxels are confidence-tinted; depth-off so nothing occludes.
     void drawDebugLayers(bool voxels, bool mesh);
+    // Voxel-method colour-mask: draws splats as a confidence-graded colour wash over the grayscale camera.
+    void drawCoverage();
     void destroy();
     std::mutex& getMutex() { return mMutex; }
 

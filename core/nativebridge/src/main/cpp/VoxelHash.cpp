@@ -23,19 +23,25 @@ static const char* kVertexShader =
     "layout(location = 3) in float aConfidence;\n"
     "uniform mat4 uMvp;\n"
     "uniform float uFocalY;\n"
-    "uniform int uDebugTint;\n"
+    "uniform int uColorMode;\n" // 0 = normal opaque albedo, 1 = debug confidence ramp, 2 = coverage
     "out vec4 vColor;\n"
     "void main() {\n"
     "    gl_Position = uMvp * vec4(aPosition, 1.0);\n"
     "    // Physical point size mapping: diameter in pixels\n"
     "    gl_PointSize = (0.02 * 1.5 * uFocalY) / gl_Position.w;\n"
-    "    if (uDebugTint == 1) {\n"
+    "    float conf = clamp(aConfidence, 0.0, 1.0);\n"
+    "    if (uColorMode == 1) {\n"
     "        // Perception debug view: splats carry the CAMERA's colours, so rendered raw they\n"
     "        // reproduce the wall on the wall — perfectly camouflaged. Tint by confidence\n"
     "        // (cyan = tentative, magenta = locked) so the voxel map is visible AS a map.\n"
-    "        vColor = vec4(mix(vec3(0.1, 0.9, 1.0), vec3(1.0, 0.2, 0.9), clamp(aConfidence, 0.0, 1.0)), 1.0);\n"
+    "        vColor = vec4(mix(vec3(0.1, 0.9, 1.0), vec3(1.0, 0.2, 0.9), conf), 1.0);\n"
+    "    } else if (uColorMode == 2) {\n"
+    "        // Coverage mask: real albedo, alpha = confidence. Drawn over a grayscale camera so\n"
+    "        // scanned regions bloom into colour and the colour SATURATES as confidence climbs —\n"
+    "        // unscanned (no splat) stays gray, half-verified reads as a faint wash.\n"
+    "        vColor = vec4(aColor.rgb, conf);\n"
     "    } else {\n"
-    "        vColor = aColor;\n"
+    "        vColor = vec4(aColor.rgb, 1.0);\n"
     "    }\n"
     "}\n";
 
@@ -47,8 +53,7 @@ static const char* kFragmentShader =
     "void main() {\n"
     "    vec2 coord = gl_PointCoord - vec2(0.5);\n"
     "    if (length(coord) > 0.5) discard;\n"
-    "    // Fast opaque output\n"
-    "    oColor = vec4(vColor.rgb, 1.0);\n"
+    "    oColor = vColor;\n"
     "}\n";
 
 VoxelHash::VoxelHash() : mProgram(0), mPointVbo(0), mDataDirty(false) {
@@ -226,7 +231,7 @@ void VoxelHash::addSparsePoints(const std::vector<float>& points, const float* v
     }
 }
 
-void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, int screenHeight, bool debugTint) {
+void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, int screenHeight, int colorMode) {
     std::lock_guard<std::mutex> lock(mMutex);
     if (!mProgram || mSplatData.empty()) return;
 
@@ -248,14 +253,17 @@ void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, 
     glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
     glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMvp"), 1, GL_FALSE, glm::value_ptr(mvp));
     glUniform1f(glGetUniformLocation(mProgram, "uFocalY"), focalY);
-    glUniform1i(glGetUniformLocation(mProgram, "uDebugTint"), debugTint ? 1 : 0);
+    glUniform1i(glGetUniformLocation(mProgram, "uColorMode"), colorMode);
 
-    if (debugTint) {
-        // Debug view: splats draw on TOP, unoccluded — same as the ARCore feature dots, which are
-        // visible precisely because they ignore depth. With depth test on and LEQUAL, the camera
-        // background / artwork overlay already in the depth buffer cull the splats (they sit AT the
-        // wall, the overlay sits in front). The point of the perception view is to SEE the map, not
-        // to have it correctly occluded.
+    if (colorMode == 2) {
+        // Coverage mask: alpha = confidence, blended over the grayscale camera. Depth off so the
+        // colour wash isn't self-occluded; it's a 2D-feeling overlay onto the live view.
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDisable(GL_DEPTH_TEST);
+        glDepthMask(GL_FALSE);
+    } else if (colorMode == 1) {
+        // Debug perception view: unoccluded, opaque.
         glDisable(GL_BLEND);
         glDisable(GL_DEPTH_TEST);
         glDepthMask(GL_FALSE);
@@ -275,7 +283,8 @@ void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, 
 
     glDisableVertexAttribArray(0); glDisableVertexAttribArray(1); glDisableVertexAttribArray(2); glDisableVertexAttribArray(3);
 
-    // Restore depth state the rest of the pipeline expects (the debug path disabled it).
+    // Restore depth state the rest of the pipeline expects (debug/coverage disabled it).
+    glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
 }

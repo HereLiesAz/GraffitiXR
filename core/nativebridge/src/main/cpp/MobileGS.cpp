@@ -153,12 +153,13 @@ void MobileGS::draw(bool debugTint) {
 
     if (mSplatsVisible) {
         StageTimer _t(&mStageAccumMs[3], &mStageSamples[3]);
+        int mode = debugTint ? 1 : 0;
         if (mMuralMethod == 0) { // VOXEL_HASH
-            mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight, debugTint);
+            mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight, mode);
         } else if (mMuralMethod == 1) { // SURFACE_MESH
             mSurfaceMesh.draw(mvp);
         } else if (mMuralMethod == 2) { // CLOUD_OFFSET
-            mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight, debugTint);
+            mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight, mode);
         }
     }
 }
@@ -174,8 +175,19 @@ void MobileGS::drawDebugLayers(bool voxels, bool mesh) {
     // Explicit, latch-free: an abandoned capture clears mSplatsVisible process-wide, and
     // muralMethod would otherwise hide whichever representation isn't the active method. The
     // debug view's contract is "show exactly the layers the user enabled, whatever the engine holds".
-    if (voxels) mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight, true);
+    if (voxels) mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight, 1);
     if (mesh) mSurfaceMesh.draw(mvp);
+}
+
+void MobileGS::drawCoverage() {
+    std::lock_guard<std::mutex> lock(mMutex);
+    interpolateAnchorStep();
+    if (!mCameraReady) return;
+    glm::mat4 V = glm::make_mat4(mViewMatrix);
+    glm::mat4 P = glm::make_mat4(mProjMatrix);
+    glm::mat4 mvp = P * V;
+    // Coverage colour-mask: real albedo, alpha = confidence, blended over the grayscale camera.
+    mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight, 2);
 }
 
 void MobileGS::pushPointCloud(const std::vector<float>& points) {
