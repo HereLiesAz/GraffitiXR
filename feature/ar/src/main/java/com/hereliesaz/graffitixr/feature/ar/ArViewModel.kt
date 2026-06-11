@@ -726,12 +726,12 @@ class ArViewModel @Inject constructor(
                 }
             }
             if (!stereoActive) {
-                val monoConfigs = s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
-                    facingDirection = CameraConfig.FacingDirection.BACK
-                    targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
-                })
-                if (monoConfigs.isNotEmpty()) s.cameraConfig = monoConfigs[0]
-                Timber.i("ARDIAG dual-lens: using mono camera config (stereoCapable=$stereoCapable)")
+                // Do NOT force a camera config on the mono path. Forcing getSupportedCameraConfigs(BACK,
+                // 30fps)[0] selected a config this device could open but never stream from (resume()
+                // succeeds, but ARCore receives no camera image — update() blocks forever on the first
+                // frame and the app ANRs). Other ARCore apps work here because they use ARCore's DEFAULT
+                // camera config, which is the most broadly compatible. Leave it unset so ARCore chooses.
+                Timber.i("ARDIAG dual-lens: using ARCore DEFAULT camera config cam=${s.cameraConfig.cameraId} (stereoCapable=$stereoCapable)")
             }
 
             // isDualLensActive / isHardwareStereoActive just reflect the camera config for the diag
