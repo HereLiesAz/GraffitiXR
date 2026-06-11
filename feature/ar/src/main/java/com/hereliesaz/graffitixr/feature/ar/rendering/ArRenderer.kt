@@ -146,9 +146,11 @@ class ArRenderer(
     private val arDebugRenderer = ArDebugRenderer()
     // Independent perception-layer toggles (Settings; default on). Drawn while in AR and tracking,
     // suppressed during target capture. Each governs one layer of "what the AR is seeing".
-    @Volatile var showFeaturePoints: Boolean = true
-    @Volatile var showPlaneGrids: Boolean = true
-    @Volatile var showVoxelMap: Boolean = true
+    @Volatile var showFeaturePoints: Boolean = true  // ARCore tracker landmarks (yellow dots)
+    @Volatile var showPlaneGrids: Boolean = true      // detected planes as metric grids
+    @Volatile var showVoxels: Boolean = true          // SLAM voxel splats (confidence-tinted)
+    @Volatile var showPoints: Boolean = true          // accumulated sparse point cloud
+    @Volatile var showMesh: Boolean = true            // persistent surface mesh
     private val anchorOrchestrator = AnchorOrchestrator()
     private val poseFusion = com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion()
     // A/B switch for the Sub-project A harness: when false, reproduce the old pre/post-anchor toggle.
@@ -944,7 +946,7 @@ class ArRenderer(
                 if (!anchorEstablished) {
                     try {
                         frame.acquirePointCloud().use { pointCloud ->
-                            if (currentScanMode == ArScanMode.CLOUD_POINTS) {
+                            if (currentScanMode == ArScanMode.CLOUD_POINTS || showPoints) {
                                 pointCloudRenderer.update(pointCloud)
                             }
                             
@@ -1121,7 +1123,7 @@ class ArRenderer(
             //    CLOUD_POINTS mode -> the accumulated point cloud; MURAL mode -> the native
             //    engine's own draw (voxel splats or surface mesh per muralMethod).
             lastStep = "debugView"
-            val anyLayerOn = showFeaturePoints || showPlaneGrids || showVoxelMap
+            val anyLayerOn = showFeaturePoints || showPlaneGrids || showVoxels || showPoints || showMesh
             if (anyLayerOn && isTracking && !isCapturingTarget) {
                 if (showFeaturePoints) {
                     try {
@@ -1134,17 +1136,17 @@ class ArRenderer(
                 if (showPlaneGrids) {
                     planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose, gridMode = true)
                 }
-                if (showVoxelMap) {
-                    when (scanMode) {
-                        ArScanMode.CLOUD_POINTS -> pointCloudRenderer.draw(viewMatrix, projMatrix)
-                        else -> slamManager.draw(debugTint = true) // voxel splats or surface mesh, per the engine's own muralMethod
-                    }
+                if (showPoints) {
+                    pointCloudRenderer.draw(viewMatrix, projMatrix)
+                }
+                if (showVoxels || showMesh) {
+                    slamManager.drawDebugLayers(voxels = showVoxels, mesh = showMesh)
                 }
                 if (frameCount % 120 == 0) {
                     // Decides "no data" vs "drawn but invisible" from the diag log alone.
                     val planeCount = activeSession.getAllTrackables(com.google.ar.core.Plane::class.java)
                         .count { it.trackingState == com.google.ar.core.TrackingState.TRACKING && it.subsumedBy == null }
-                    onDiag("debugView: pts=${arDebugRenderer.lastPointCount} planes=$planeCount splats=${slamManager.getSplatCount()} cloud=${pointCloudRenderer.accumulatedPointCount} method=$muralMethod")
+                    onDiag("debugView: feat=${arDebugRenderer.lastPointCount} planes=$planeCount voxels=${slamManager.getSplatCount()} pts=${pointCloudRenderer.accumulatedPointCount} method=$muralMethod")
                 }
             }
             // A stall reported at "frameDone" means onDrawFrame COMPLETED and the GL thread never

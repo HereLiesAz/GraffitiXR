@@ -629,6 +629,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDraw(JNIEnv* env, 
     if (gSlamEngine) gSlamEngine->draw(debugTint == JNI_TRUE);
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDrawDebugLayers(JNIEnv* env, jobject thiz, jboolean voxels, jboolean mesh) {
+    if (gSlamEngine) gSlamEngine->drawDebugLayers(voxels == JNI_TRUE, mesh == JNI_TRUE);
+}
+
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
         JNIEnv* env, jobject thiz, jobject leftBuffer, jobject rightBuffer, jint width, jint height, jlong timestamp) {

@@ -585,7 +585,9 @@ class EditorViewModel @Inject constructor(
     fun toggleDiagOverlay() = dispatch(EditorIntent.ToggleDiagOverlay)
     fun toggleFeaturePoints() = dispatch(EditorIntent.ToggleFeaturePoints)
     fun togglePlaneGrids() = dispatch(EditorIntent.TogglePlaneGrids)
-    fun toggleVoxelMap() = dispatch(EditorIntent.ToggleVoxelMap)
+    fun toggleVoxels() = dispatch(EditorIntent.ToggleVoxels)
+    fun togglePoints() = dispatch(EditorIntent.TogglePoints)
+    fun toggleMesh() = dispatch(EditorIntent.ToggleMesh)
     fun setActiveTool(tool: Tool) = dispatch(EditorIntent.SetActiveTool(tool))
 
     override fun onLayerActivated(id: String) = dispatch(EditorIntent.ActivateLayer(id))

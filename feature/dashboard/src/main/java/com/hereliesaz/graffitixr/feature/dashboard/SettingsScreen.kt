@@ -78,8 +78,12 @@ fun SettingsScreen(
     onFeaturePointsChanged: () -> Unit,
     showPlaneGrids: Boolean,
     onPlaneGridsChanged: () -> Unit,
-    showVoxelMap: Boolean,
-    onVoxelMapChanged: () -> Unit,
+    showVoxels: Boolean,
+    onVoxelsChanged: () -> Unit,
+    showPoints: Boolean,
+    onPointsChanged: () -> Unit,
+    showMesh: Boolean,
+    onMeshChanged: () -> Unit,
     arScanMode: ArScanMode,
     onArScanModeChanged: (ArScanMode) -> Unit,
     showAnchorBoundary: Boolean,
@@ -232,9 +236,19 @@ fun SettingsScreen(
                                 modifier = Modifier.clickable { onPlaneGridsChanged() }
                             )
                             SettingsItem(
-                                label = strings.settings.layerVoxelMap,
-                                value = if (showVoxelMap) strings.settings.on else strings.settings.off,
-                                modifier = Modifier.clickable { onVoxelMapChanged() }
+                                label = strings.settings.layerVoxels,
+                                value = if (showVoxels) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable { onVoxelsChanged() }
+                            )
+                            SettingsItem(
+                                label = strings.settings.layerPoints,
+                                value = if (showPoints) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable { onPointsChanged() }
+                            )
+                            SettingsItem(
+                                label = strings.settings.layerMesh,
+                                value = if (showMesh) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable { onMeshChanged() }
                             )
                             val modes = ArScanMode.entries
                             val nextMode = modes[(arScanMode.ordinal + 1) % modes.size]

@@ -429,7 +429,9 @@
     <string name="settings_diag_label">Depth Diagnostic Overlay</string>
     <string name="settings_layer_feature_points">Show Feature Points</string>
     <string name="settings_layer_plane_grids">Show Plane Grids</string>
-    <string name="settings_layer_voxel_map">Show Voxel Map</string>
+    <string name="settings_layer_voxels">Show Voxels</string>
+    <string name="settings_layer_points">Show Point Cloud</string>
+    <string name="settings_layer_mesh">Show Mesh</string>
     <string name="settings_on">On</string>
     <string name="settings_off">Off</string>
     <string name="settings_scan_mode_label">AR Scan Mode</string>

@@ -231,7 +231,9 @@ fun MainScreen(
                                 // Independent in-world perception layers (Settings, default on).
                                 r.showFeaturePoints = uiState.showFeaturePoints
                                 r.showPlaneGrids = uiState.showPlaneGrids
-                                r.showVoxelMap = uiState.showVoxelMap
+                                r.showVoxels = uiState.showVoxels
+                                r.showPoints = uiState.showPoints
+                                r.showMesh = uiState.showMesh
                             }
                         },
                         onRelease = { view ->

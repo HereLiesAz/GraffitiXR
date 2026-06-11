@@ -82,7 +82,9 @@ internal sealed interface EditorIntent {
     data object ToggleDiagOverlay : EditorIntent
     data object ToggleFeaturePoints : EditorIntent
     data object TogglePlaneGrids : EditorIntent
-    data object ToggleVoxelMap : EditorIntent
+    data object ToggleVoxels : EditorIntent
+    data object TogglePoints : EditorIntent
+    data object ToggleMesh : EditorIntent
     data object FeedbackShown : EditorIntent
     data class SetSketchThickness(val value: Int) : EditorIntent
     data class SetBrushSize(val value: Float) : EditorIntent

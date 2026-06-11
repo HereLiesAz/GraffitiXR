@@ -234,6 +234,13 @@ class SlamManager @Inject constructor(
         nativeDraw(debugTint)
     }
 
+    /**
+     * Debug perception view: draws the requested SLAM representations explicitly, independent of
+     * scan/mural mode. Voxels are confidence-tinted (cyan→magenta) and depth-off. Mesh is the
+     * persistent surface mesh. The accumulated sparse point cloud is a separate Kotlin renderer.
+     */
+    fun drawDebugLayers(voxels: Boolean, mesh: Boolean) = nativeDrawDebugLayers(voxels, mesh)
+
     fun feedStereoData(leftBuffer: ByteBuffer, rightBuffer: ByteBuffer, width: Int, height: Int, timestamp: Long) {
         if (leftBuffer.isDirect && rightBuffer.isDirect) {
             nativeFeedStereoData(leftBuffer, rightBuffer, width, height, timestamp)
@@ -431,6 +438,7 @@ class SlamManager @Inject constructor(
     )
     private external fun nativeUpdateLightLevel(level: Float)
     private external fun nativeDraw(debugTint: Boolean)
+    private external fun nativeDrawDebugLayers(voxels: Boolean, mesh: Boolean)
     private external fun nativeGetSplatCount(): Int
     private external fun nativeGetImmutableSplatCount(): Int
     private external fun nativeGetVisibleConfidenceAvg(): Float

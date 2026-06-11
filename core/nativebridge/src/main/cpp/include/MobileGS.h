@@ -107,6 +107,9 @@ public:
     void alignToFingerprint(const uint8_t* data, size_t size);
 
     void draw(bool debugTint = false);
+    // Debug perception view: draws the requested representations explicitly, regardless of
+    // mMuralMethod or mSplatsVisible. Voxels are confidence-tinted; depth-off so nothing occludes.
+    void drawDebugLayers(bool voxels, bool mesh);
     void destroy();
     std::mutex& getMutex() { return mMutex; }
 

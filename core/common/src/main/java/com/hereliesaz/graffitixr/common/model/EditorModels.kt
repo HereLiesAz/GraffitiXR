@@ -169,7 +169,9 @@ data class EditorUiState(
     // Distinct from showDiagOverlay, which governs the text telemetry HUD.
     val showFeaturePoints: Boolean = true,  // ARCore sparse feature dots (tracker landmarks)
     val showPlaneGrids: Boolean = true,     // detected planes as metric grids
-    val showVoxelMap: Boolean = true,       // SLAM voxel splats / surface mesh
+    val showVoxels: Boolean = true,         // SLAM voxel splats (confidence-tinted)
+    val showPoints: Boolean = true,         // accumulated sparse point cloud
+    val showMesh: Boolean = true,           // persistent surface mesh
 
     // Real-time stroke rendering: the mutable bitmap being actively drawn into.
     // Non-null only while a brush stroke is in progress (non-Liquify tools).
