@@ -151,6 +151,19 @@ void MobileGS::draw(bool debugTint) {
     glm::mat4 P = glm::make_mat4(mProjMatrix);
     glm::mat4 mvp = P * V;
 
+    if (debugTint) {
+        // Perception debug view: show EVERYTHING the engine holds, bypassing two latches that
+        // gate normal rendering. (1) mSplatsVisible — requestCapture() clears it and only
+        // onCaptureRequestHandled() restores it; the engine is a process-lifetime global, so an
+        // abandoned capture flow hides splats for every later session. (2) muralMethod gating —
+        // SURFACE_MESH mode draws the (possibly empty) mesh while tens of thousands of splats
+        // exist invisibly. The debug view's contract is "what does the engine actually have".
+        StageTimer _t(&mStageAccumMs[3], &mStageSamples[3]);
+        mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight, true);
+        mSurfaceMesh.draw(mvp);
+        return;
+    }
+
     if (mSplatsVisible) {
         StageTimer _t(&mStageAccumMs[3], &mStageSamples[3]);
         if (mMuralMethod == 0) { // VOXEL_HASH

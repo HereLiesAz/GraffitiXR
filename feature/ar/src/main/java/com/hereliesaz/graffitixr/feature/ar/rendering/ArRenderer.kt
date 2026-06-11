@@ -1133,7 +1133,7 @@ class ArRenderer(
                     // Decides "no data" vs "drawn but invisible" from the diag log alone.
                     val planeCount = activeSession.getAllTrackables(com.google.ar.core.Plane::class.java)
                         .count { it.trackingState == com.google.ar.core.TrackingState.TRACKING && it.subsumedBy == null }
-                    onDiag("debugView: pts=${arDebugRenderer.lastPointCount} planes=$planeCount splats=${slamManager.getSplatCount()} cloud=${pointCloudRenderer.accumulatedPointCount}")
+                    onDiag("debugView: pts=${arDebugRenderer.lastPointCount} planes=$planeCount splats=${slamManager.getSplatCount()} cloud=${pointCloudRenderer.accumulatedPointCount} method=$muralMethod")
                 }
             }
             // A stall reported at "frameDone" means onDrawFrame COMPLETED and the GL thread never
