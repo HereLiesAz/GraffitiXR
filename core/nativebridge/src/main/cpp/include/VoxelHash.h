@@ -50,6 +50,11 @@ public:
 
 private:
     uint32_t getVoxelHash(float x, float y, float z, float voxelSize);
+    /** Clears all splat/keyframe/spatial-hash state. Caller MUST hold mMutex. Exists because
+     *  load() needs to clear while already holding the (non-recursive) lock — load() calling the
+     *  public clear() self-deadlocked the loading thread, which then wedged every other thread
+     *  that touches the hash, including the GL render loop via MobileGS::mMutex. */
+    void clearLocked();
 
     mutable std::mutex mMutex;
     std::vector<Splat> mSplatData;

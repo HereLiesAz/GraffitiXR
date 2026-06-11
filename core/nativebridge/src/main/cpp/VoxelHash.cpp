@@ -227,6 +227,10 @@ void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, 
 
 void VoxelHash::clear() {
     std::lock_guard<std::mutex> lock(mMutex);
+    clearLocked();
+}
+
+void VoxelHash::clearLocked() {
     mSplatData.clear();
     mRecentFrames.clear();
     for (int i = 0; i < HASH_SIZE; ++i) mSpatialHash[i] = -1;
@@ -246,7 +250,13 @@ void VoxelHash::load(const std::string& path) {
     std::lock_guard<std::mutex> lock(mMutex);
     std::ifstream in(path, std::ios::binary);
     if (!in) return;
-    clear();
+    // clearLocked, NOT clear(): mMutex is non-recursive and already held here. Calling the
+    // public clear() self-deadlocked this (IO) thread permanently holding mMutex; the frame-tick
+    // coroutine then blocked on it inside MobileGS::getConfidenceAvgs while holding
+    // MobileGS::mMutex, and the GL thread blocked on THAT in updateCamera ("step=slamCamera"
+    // stall) — killing the render loop, starving ARCore's update(), and hard-freezing the app
+    // on exit. Triggered on every AR entry for any project with a saved map.
+    clearLocked();
     uint32_t count;
     in.read(reinterpret_cast<char*>(&count), sizeof(uint32_t));
     if (count > MAX_SPLATS) count = MAX_SPLATS;
