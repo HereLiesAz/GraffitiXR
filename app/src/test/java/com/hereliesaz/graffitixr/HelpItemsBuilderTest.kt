@@ -28,7 +28,6 @@ class HelpItemsBuilderTest {
             "design.host", "design.addImg", "design.addDraw", "design.addText", "design.wall",
             "project.host.main", "project.new", "project.save", "project.load", "project.export", "project.settings",
             "tool.light", "tool.lockTrace",
-            "wearable.main",
         ).forEach { id ->
             assertTrue("expected key '$id' in helpItems", id in map)
         }

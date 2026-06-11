@@ -32,6 +32,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
+import com.hereliesaz.graffitixr.common.DispatcherProvider
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -55,6 +57,12 @@ class ArViewModelTest {
     private val session: Session = mockk(relaxed = true)
     private val context: Context = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
+    private val testDispatchers = object : DispatcherProvider {
+        override val main: CoroutineDispatcher = testDispatcher
+        override val io: CoroutineDispatcher = testDispatcher
+        override val default: CoroutineDispatcher = testDispatcher
+        override val unconfined: CoroutineDispatcher = testDispatcher
+    }
 
     @Before
     fun setup() {
@@ -82,7 +90,7 @@ class ArViewModelTest {
         every { settingsRepository.isImperialUnits } returns flowOf(false)
         every { projectRepository.currentProject } returns MutableStateFlow(null)
         every { context.filesDir } returns File("/tmp")
-        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, projectManager, collaborationManager, wearableManager, context)
+        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, projectManager, collaborationManager, wearableManager, context, testDispatchers)
     }
 
     @After
@@ -340,14 +348,14 @@ class ArViewModelTest {
     @Test
     fun `setArScanMode to MURAL updates arScanMode in uiState`() = runTest {
         every { settingsRepository.arScanMode } returns MutableStateFlow(ArScanMode.CLOUD_POINTS)
-        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, projectManager, collaborationManager, wearableManager, context)
+        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, projectManager, collaborationManager, wearableManager, context, testDispatchers)
         testDispatcher.scheduler.advanceUntilIdle()
 
         every { settingsRepository.arScanMode } returns MutableStateFlow(ArScanMode.MURAL)
         // Simulate what setArScanMode does: push the new mode through the settings flow
         val modeFlow = MutableStateFlow(ArScanMode.CLOUD_POINTS)
         every { settingsRepository.arScanMode } returns modeFlow
-        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, projectManager, collaborationManager, wearableManager, context)
+        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, projectManager, collaborationManager, wearableManager, context, testDispatchers)
         testDispatcher.scheduler.advanceUntilIdle()
 
         modeFlow.value = ArScanMode.MURAL
@@ -360,7 +368,7 @@ class ArViewModelTest {
     fun `setArScanMode to CLOUD_POINTS updates arScanMode in uiState`() = runTest {
         val modeFlow = MutableStateFlow(ArScanMode.MURAL)
         every { settingsRepository.arScanMode } returns modeFlow
-        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, projectManager, collaborationManager, wearableManager, context)
+        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, projectManager, collaborationManager, wearableManager, context, testDispatchers)
         testDispatcher.scheduler.advanceUntilIdle()
 
         modeFlow.value = ArScanMode.CLOUD_POINTS

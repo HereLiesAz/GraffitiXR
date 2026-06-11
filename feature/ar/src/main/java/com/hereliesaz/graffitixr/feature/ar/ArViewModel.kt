@@ -19,6 +19,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.ar.core.CameraConfig
 import com.google.ar.core.CameraConfigFilter
+import com.hereliesaz.graffitixr.common.DispatcherProvider
 import com.google.ar.core.Config
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
@@ -75,7 +76,8 @@ class ArViewModel @Inject constructor(
     private val projectManager: com.hereliesaz.graffitixr.data.ProjectManager,
     private val collaborationManager: com.hereliesaz.graffitixr.core.collaboration.CollaborationManager,
     private val wearableManager: WearableManager,
-    @param:ApplicationContext private val appContext: Context
+    @param:ApplicationContext private val appContext: Context,
+    private val dispatchers: DispatcherProvider
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ArUiState())
@@ -623,7 +625,7 @@ class ArViewModel @Inject constructor(
         // close() BLOCKS until any in-flight session.update() returns. When the GL thread
         // is wedged inside update() (camera never fed ARCore), running this on Main froze
         // the entire app on AR exit — exactly when the diag tells the user to exit.
-        viewModelScope.launch(Dispatchers.Default) {
+        viewModelScope.launch(dispatchers.default) {
             performFullCleanupLocked()
         }
     }
@@ -636,7 +638,7 @@ class ArViewModel @Inject constructor(
         // the whole UI (ANR). Off-main, a slow/blocked camera open leaves the UI responsive so the user
         // can back out. All session ops stay serialized by sessionMutex; _uiState and renderer access
         // are thread-safe.
-        sessionUpdateJob = viewModelScope.launch(Dispatchers.Default) {
+        sessionUpdateJob = viewModelScope.launch(dispatchers.default) {
             sessionMutex.withLock {
                 // First-ever AR entry on an unprobed device: while the camera is still free (no live
                 // session yet), run a short throwaway stereo session in an isolated process to see
@@ -1156,7 +1158,7 @@ class ArViewModel @Inject constructor(
         // Off-main for the same reason as exitArMode: session.close() blocks until any
         // in-flight session.update() returns, which never happens when the GL thread is
         // wedged on a camera that isn't feeding ARCore.
-        viewModelScope.launch(Dispatchers.Default) {
+        viewModelScope.launch(dispatchers.default) {
             performFullCleanupLocked()
         }
     }
@@ -1314,7 +1316,7 @@ class ArViewModel @Inject constructor(
         forcedStereoUnstable = true
         _uiState.update { it.copy(trackingFailed = false) }
         viewModelScope.launch { settingsRepository.setForcedStereoUnstable(true) }
-        viewModelScope.launch(Dispatchers.Default) {
+        viewModelScope.launch(dispatchers.default) {
             sessionMutex.withLock {
                 val s = session
                 if (s == null || isDestroying) return@withLock
@@ -1471,7 +1473,7 @@ class ArViewModel @Inject constructor(
 
     fun applyEraseToMask(nx: Float, ny: Float, radius: Float) {
         val currentMask = _uiState.value.annotatedCaptureBitmap ?: return
-        viewModelScope.launch(Dispatchers.Default) {
+        viewModelScope.launch(dispatchers.default) {
             val copy = currentMask.copy(Bitmap.Config.ARGB_8888, true)
             val canvas = android.graphics.Canvas(copy)
             val paint = android.graphics.Paint().apply {
