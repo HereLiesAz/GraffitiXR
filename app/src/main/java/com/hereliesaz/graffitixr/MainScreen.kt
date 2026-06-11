@@ -228,6 +228,9 @@ fun MainScreen(
                                 r.hideVisualization = isExporting
                                 r.visitedSectorsMask = arUiState.visitedSectorsMask
                                 r.scanPhase = arUiState.scanPhase
+                                // Diagnostic Overlay setting also enables the in-world perception
+                                // view (ARCore feature points + tracked planes).
+                                r.showArDebugView = uiState.showDiagOverlay
                             }
                         },
                         onRelease = { view ->

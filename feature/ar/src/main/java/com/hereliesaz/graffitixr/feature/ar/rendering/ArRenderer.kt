@@ -89,6 +89,12 @@ class ArRenderer(
     private val overlayRenderer = OverlayRenderer(context)
     private val pointCloudRenderer = PointCloudRenderer()
     private val planeRenderer = PlaneRenderer()
+    // Diagnostic "what is the AR seeing" view: current-frame ARCore feature points (yellow) +
+    // tracked planes, drawn over the camera whenever showArDebugView is set. Tied by MainScreen
+    // to the Diagnostic Overlay setting. Separate from pointCloudRenderer, which accumulates and
+    // persists with the project.
+    private val arDebugRenderer = ArDebugRenderer()
+    @Volatile var showArDebugView: Boolean = false
     private val anchorOrchestrator = AnchorOrchestrator()
     private val poseFusion = com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion()
     // A/B switch for the Sub-project A harness: when false, reproduce the old pre/post-anchor toggle.
@@ -301,6 +307,7 @@ class ArRenderer(
         overlayRenderer.createOnGlThread()
         pointCloudRenderer.createOnGlThread(context)
         planeRenderer.createOnGlThread(context)
+        arDebugRenderer.createOnGlThread(context)
         isSurfaceCreated = true
         onDiag("surface: done")
 
@@ -1049,6 +1056,21 @@ class ArRenderer(
             if (showBorder) {
                 overlayRenderer.drawAnchorBorder(viewMatrix, projMatrix, anchorMatrix)
             }
+
+            // Diagnostic perception view ("what is the AR seeing"): current-frame feature points
+            // + all tracked planes, drawn last so they sit on top of the artwork overlay. Reads
+            // the point cloud non-destructively (acquire/use/close every frame; ARCore hands back
+            // the same cloud until a new one is computed, and ArDebugRenderer dedups by timestamp).
+            lastStep = "debugView"
+            if (showArDebugView && isTracking) {
+                try {
+                    frame.acquirePointCloud().use { arDebugRenderer.update(it) }
+                } catch (_: Exception) {
+                    // NotYetAvailable/DeadlineExceeded — draw the last uploaded cloud instead.
+                }
+                arDebugRenderer.draw(viewMatrix, projMatrix)
+                planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose)
+            }
             // A stall reported at "frameDone" means onDrawFrame COMPLETED and the GL thread never
             // came back for the next frame — wedge is in eglSwapBuffers / the GLThread scheduler /
             // a pause request, not in this frame body.
@@ -1151,6 +1173,7 @@ class ArRenderer(
         overlayRenderer.release()
         pointCloudRenderer.release()
         planeRenderer.release()
+        arDebugRenderer.release()
     }
 
     /**
