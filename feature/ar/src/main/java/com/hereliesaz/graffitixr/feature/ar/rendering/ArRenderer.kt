@@ -160,6 +160,11 @@ class ArRenderer(
     @Volatile private var lastTickMs = 0L
     @Volatile private var lastStep = "init"
     @Volatile private var stallReported = false
+    // When the current camera config started being driven (attach/reconfigure). The no-first-frame
+    // verdict is measured against this in wall time, not frames: this device's first camera frame
+    // arrives ~3s after resume, which at 30fps blew past the old 90-frame check and produced a
+    // false "camera not streaming" alarm every session.
+    @Volatile private var camWaitStartMs = 0L
     // Self-heal hook. Fired at most once (off the GL thread) the moment ARCore stops receiving camera
     // frames — i.e. the live session's camera config isn't streaming. Lets the ViewModel reconfigure to
     // a mono config even while the GL thread is blocked in update() and no tracking callback can fire.
@@ -350,6 +355,7 @@ class ArRenderer(
         stallReported = false
         cameraNotFeedingReported = false
         lastTickMs = android.os.SystemClock.elapsedRealtime()
+        camWaitStartMs = lastTickMs
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -411,11 +417,15 @@ class ArRenderer(
             if (ts > 0L && !camStreamReported) {
                 camStreamReported = true
                 onDiag("CAMERA STREAMING f=$frameCount ts=$ts track=${frame.camera.trackingState}")
-            } else if (ts == 0L && !camStreamReported && !camStallWarned && frameCount >= 90) {
-                // ~3s at 30fps with no camera image: the device's camera pipeline never started
-                // feeding ARCore (resume() succeeded but no frames) — distinct from a slow converge.
+            } else if (ts == 0L && !camStreamReported && !camStallWarned &&
+                camWaitStartMs > 0L &&
+                android.os.SystemClock.elapsedRealtime() - camWaitStartMs > 8000L
+            ) {
+                // 8s of wall time with no camera image: the device's camera pipeline never started
+                // feeding ARCore (resume() succeeded but no frames) — distinct from a slow first
+                // frame (this device routinely takes ~3s) and from a slow converge.
                 camStallWarned = true
-                onDiag("CAMERA STALL: no frame after ${frameCount}f (ts still 0) -> camera not streaming")
+                onDiag("CAMERA STALL: no frame after ${frameCount}f / ${android.os.SystemClock.elapsedRealtime() - camWaitStartMs}ms (ts still 0) -> camera not streaming")
                 reportCameraNotFeeding()
             }
             // During the AMBIENT scan, the camera background renders as a newspaper halftone with full

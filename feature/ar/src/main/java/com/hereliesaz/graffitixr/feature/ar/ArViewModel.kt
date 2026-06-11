@@ -719,7 +719,13 @@ class ArViewModel @Inject constructor(
         try {
             val s = Session(context)
             val config = Config(s)
-            config.focusMode = Config.FocusMode.AUTO
+            // FIXED, not AUTO: autofocus sweeps shift the effective focal length mid-stream, and on
+            // devices with sloppy OEM intrinsics that destabilizes ARCore's feature triangulation —
+            // this device's perception threads (MTC_vio, MTC_triangulati) have segfaulted inside
+            // libarcore_c during live tracking. FIXED keeps the optics constant, which is also
+            // ARCore's documented recommendation for tracking-priority apps. Revisit if nearby
+            // surfaces render too blurred for mark detection.
+            config.focusMode = Config.FocusMode.FIXED
             // LATEST_CAMERA_IMAGE so session.update() never blocks the GL render thread. On this
             // device the BLOCKING mode left the renderer stuck "Waiting for first frame" (the render
             // heartbeat never fired) — update() hung waiting for a frame that never arrived, so the
