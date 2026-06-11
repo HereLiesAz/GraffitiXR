@@ -619,14 +619,16 @@ class ArViewModel @Inject constructor(
                 // cancels the probe too.
                 if (context != null && isInArMode && session == null && !isDestroying && stereoCapable == null) {
                     probeStereoCapability(context)
-                    // The probe held the camera exclusively, and on devices whose AUTOMATIC-depth graph
-                    // is broken it can crash the :probe process WHILE holding the camera. Opening the
-                    // live session immediately then lands on a camera the HAL hasn't reclaimed yet (no
-                    // frames, ts=0). Wait for the camera service to report the back camera available
-                    // again before continuing. No-op latency when it's already free.
-                    awaitCameraAvailable(context, 3000L)
                 }
                 if (isInArMode && session == null && context != null && !isDestroying) {
+                    // Wait for the camera to actually be FREE before ARCore opens it. AR entry calls
+                    // cameraController.unbind() (CameraX) whose camera-device close is ASYNCHRONOUS, so
+                    // opening the ARCore session immediately races CameraX's release: ARCore gets the
+                    // device but no frames flow (ts=0, update() hangs — the intermittent black camera).
+                    // Registering the availability callback delivers current state immediately, so this
+                    // is ~free when the camera is already idle and only waits out the CameraX (or a
+                    // crashed :probe) release. This is the gate that makes AR entry deterministic.
+                    awaitCameraAvailable(context, 3000L)
                     initArSessionLocked(context)
                 }
 
