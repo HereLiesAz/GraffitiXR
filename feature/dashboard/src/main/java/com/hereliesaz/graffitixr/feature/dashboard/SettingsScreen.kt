@@ -74,6 +74,12 @@ fun SettingsScreen(
     onHandednessChanged: (Boolean) -> Unit,
     showDiagOverlay: Boolean,
     onDiagOverlayChanged: () -> Unit,
+    showFeaturePoints: Boolean,
+    onFeaturePointsChanged: () -> Unit,
+    showPlaneGrids: Boolean,
+    onPlaneGridsChanged: () -> Unit,
+    showVoxelMap: Boolean,
+    onVoxelMapChanged: () -> Unit,
     arScanMode: ArScanMode,
     onArScanModeChanged: (ArScanMode) -> Unit,
     showAnchorBoundary: Boolean,
@@ -214,6 +220,21 @@ fun SettingsScreen(
                                 label = strings.settings.diagOverlay,
                                 value = if (showDiagOverlay) strings.settings.on else strings.settings.off,
                                 modifier = Modifier.clickable { onDiagOverlayChanged() }
+                            )
+                            SettingsItem(
+                                label = strings.settings.layerFeaturePoints,
+                                value = if (showFeaturePoints) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable { onFeaturePointsChanged() }
+                            )
+                            SettingsItem(
+                                label = strings.settings.layerPlaneGrids,
+                                value = if (showPlaneGrids) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable { onPlaneGridsChanged() }
+                            )
+                            SettingsItem(
+                                label = strings.settings.layerVoxelMap,
+                                value = if (showVoxelMap) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable { onVoxelMapChanged() }
                             )
                             val modes = ArScanMode.entries
                             val nextMode = modes[(arScanMode.ordinal + 1) % modes.size]

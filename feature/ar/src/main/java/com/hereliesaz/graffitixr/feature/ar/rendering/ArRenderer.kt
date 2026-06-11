@@ -144,7 +144,11 @@ class ArRenderer(
     // to the Diagnostic Overlay setting. Separate from pointCloudRenderer, which accumulates and
     // persists with the project.
     private val arDebugRenderer = ArDebugRenderer()
-    @Volatile var showArDebugView: Boolean = false
+    // Independent perception-layer toggles (Settings; default on). Drawn while in AR and tracking,
+    // suppressed during target capture. Each governs one layer of "what the AR is seeing".
+    @Volatile var showFeaturePoints: Boolean = true
+    @Volatile var showPlaneGrids: Boolean = true
+    @Volatile var showVoxelMap: Boolean = true
     private val anchorOrchestrator = AnchorOrchestrator()
     private val poseFusion = com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion()
     // A/B switch for the Sub-project A harness: when false, reproduce the old pre/post-anchor toggle.
@@ -1117,17 +1121,24 @@ class ArRenderer(
             //    CLOUD_POINTS mode -> the accumulated point cloud; MURAL mode -> the native
             //    engine's own draw (voxel splats or surface mesh per muralMethod).
             lastStep = "debugView"
-            if (showArDebugView && isTracking && !isCapturingTarget) {
-                try {
-                    frame.acquirePointCloud().use { arDebugRenderer.update(it) }
-                } catch (_: Exception) {
-                    // NotYetAvailable/DeadlineExceeded — draw the last uploaded cloud instead.
+            val anyLayerOn = showFeaturePoints || showPlaneGrids || showVoxelMap
+            if (anyLayerOn && isTracking && !isCapturingTarget) {
+                if (showFeaturePoints) {
+                    try {
+                        frame.acquirePointCloud().use { arDebugRenderer.update(it) }
+                    } catch (_: Exception) {
+                        // NotYetAvailable/DeadlineExceeded — draw the last uploaded cloud instead.
+                    }
+                    arDebugRenderer.draw(viewMatrix, projMatrix)
                 }
-                arDebugRenderer.draw(viewMatrix, projMatrix)
-                planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose, gridMode = true)
-                when (scanMode) {
-                    ArScanMode.CLOUD_POINTS -> pointCloudRenderer.draw(viewMatrix, projMatrix)
-                    else -> slamManager.draw(debugTint = true) // voxel splats or surface mesh, per the engine's own muralMethod
+                if (showPlaneGrids) {
+                    planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose, gridMode = true)
+                }
+                if (showVoxelMap) {
+                    when (scanMode) {
+                        ArScanMode.CLOUD_POINTS -> pointCloudRenderer.draw(viewMatrix, projMatrix)
+                        else -> slamManager.draw(debugTint = true) // voxel splats or surface mesh, per the engine's own muralMethod
+                    }
                 }
                 if (frameCount % 120 == 0) {
                     // Decides "no data" vs "drawn but invisible" from the diag log alone.

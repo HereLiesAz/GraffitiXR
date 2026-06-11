@@ -165,6 +165,11 @@ data class EditorUiState(
     val activeColor: Color = Color.White,
     val showColorPicker: Boolean = false,
     val showDiagOverlay: Boolean = false,
+    // In-world perception layers, each independently toggleable from Settings (default on).
+    // Distinct from showDiagOverlay, which governs the text telemetry HUD.
+    val showFeaturePoints: Boolean = true,  // ARCore sparse feature dots (tracker landmarks)
+    val showPlaneGrids: Boolean = true,     // detected planes as metric grids
+    val showVoxelMap: Boolean = true,       // SLAM voxel splats / surface mesh
 
     // Real-time stroke rendering: the mutable bitmap being actively drawn into.
     // Non-null only while a brush stroke is in progress (non-Liquify tools).

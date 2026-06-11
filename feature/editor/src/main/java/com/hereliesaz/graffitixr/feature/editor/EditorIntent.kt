@@ -80,6 +80,9 @@ internal sealed interface EditorIntent {
     data class SetCanvasBackground(val color: Color) : EditorIntent
     data object ToggleHandedness : EditorIntent
     data object ToggleDiagOverlay : EditorIntent
+    data object ToggleFeaturePoints : EditorIntent
+    data object TogglePlaneGrids : EditorIntent
+    data object ToggleVoxelMap : EditorIntent
     data object FeedbackShown : EditorIntent
     data class SetSketchThickness(val value: Int) : EditorIntent
     data class SetBrushSize(val value: Float) : EditorIntent
