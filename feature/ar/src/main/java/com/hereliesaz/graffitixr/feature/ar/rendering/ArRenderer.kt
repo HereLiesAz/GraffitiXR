@@ -502,9 +502,9 @@ class ArRenderer(
                 onDiag("render: f=$frameCount track=${frame.camera.trackingState} ts=${frame.timestamp}")
             }
 
-            // Scan/world-mapping indicator: ink develops on ARCore's detected planes (real 3D surfaces
-            // that track with the world), so it reads as colour soaking into the wall/floor — not a flat
-            // screen overlay. Only while scanning and tracking.
+            // Scan/world-mapping indicator: detected planes render as metric grids anchored to the
+            // real 3D surfaces (0.25 m cells, local axes emphasised), so the user can read each
+            // plane's orientation at a glance. Only while scanning and tracking.
             lastStep = "planes"
             if (scanActive && !hideVisualization) {
                 val cam = frame.camera
