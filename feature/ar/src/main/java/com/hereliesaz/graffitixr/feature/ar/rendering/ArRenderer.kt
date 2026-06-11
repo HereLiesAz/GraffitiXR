@@ -25,6 +25,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.nio.ByteBuffer
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
 import javax.microedition.khronos.egl.EGLConfig
@@ -68,7 +69,13 @@ class ArRenderer(
     private val backgroundScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val sessionLock = ReentrantLock()
 
-    var session: Session? = null
+    /**
+     * The live ARCore session, or null when detached. @Volatile because [destroy] may null this
+     * WITHOUT holding [sessionLock] (when the GL thread is wedged inside [onDrawFrame] holding the
+     * lock, blocking on it would freeze the caller — see [destroy]). [onDrawFrame] reads it exactly
+     * once into a local under the lock, so a concurrent null is observed cleanly on the next frame.
+     */
+    @Volatile var session: Session? = null
         private set
 
     /**
@@ -119,6 +126,9 @@ class ArRenderer(
     var stereoProvider: com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider? = null
 
     @Volatile private var isFlashlightRequested: Boolean = false
+    // Set by updateFlashlight (any thread); consumed at the top of onDrawFrame so the ARCore
+    // configure() runs on the GL thread under sessionLock, never concurrently with update().
+    @Volatile private var flashDirty: Boolean = false
 
     fun saveCloudPoints(path: String) {
         pointCloudRenderer.saveToFile(path)
@@ -194,8 +204,9 @@ class ArRenderer(
                     session.setCameraTextureName(backgroundRenderer.textureId)
                 }
 
-                // Apply queued flashlight state immediately upon attachment
-                applyFlashlightState()
+                // Apply queued flashlight state immediately upon attachment (sessionLock is held)
+                flashDirty = false
+                applyFlashlightStateLocked(session)
 
                 try {
                     val cameraId = session.cameraConfig.cameraId
@@ -230,13 +241,23 @@ class ArRenderer(
         overlayRenderer.setExtent(OverlayRenderer.QUAD_HALF_EXTENT, OverlayRenderer.QUAD_HALF_EXTENT)
     }
 
+    /**
+     * Request a flashlight state change. ONLY sets flags: the actual ARCore configure() is applied
+     * on the GL thread at the top of the next frame (or in [attachSession], which holds the lock).
+     * Calling configure() directly from here — the main thread — raced session.update() on the GL
+     * thread; ARCore's Session is not thread-safe and that race corrupted its perception pipeline
+     * (native SIGSEGV on ARCore's MTC_vio thread).
+     */
     fun updateFlashlight(isOn: Boolean) {
         isFlashlightRequested = isOn
-        applyFlashlightState()
+        flashDirty = true
     }
 
-    private fun applyFlashlightState() {
-        val activeSession = session ?: return
+    /**
+     * Applies the requested flash mode via Session.configure(). MUST be called with [sessionLock]
+     * held (GL frame body or [attachSession]) so configure() is serialized against update().
+     */
+    private fun applyFlashlightStateLocked(activeSession: Session) {
         try {
             val config = activeSession.config
             val newMode = if (isFlashlightRequested) Config.FlashMode.TORCH else Config.FlashMode.OFF
@@ -301,7 +322,11 @@ class ArRenderer(
                 val age = android.os.SystemClock.elapsedRealtime() - tick
                 if (age > 2500 && !stallReported && !camStreamReported) {
                     stallReported = true
-                    onDiag("RENDER STALLED f=$frameCount step=$lastStep for ${age}ms -> camera not feeding ARCore")
+                    // lastStep now tracks every stage of onDrawFrame (not just up to "update"), so
+                    // this names the actual wedged stage: "update" = ARCore blocked waiting on the
+                    // camera; "slamCamera"/"slamFeed"/"mesh" = a native SLAM call; "frameDone" =
+                    // the frame finished and the GL thread never came back (swap/pause/scheduler).
+                    onDiag("RENDER STALLED f=$frameCount step=$lastStep for ${age}ms (no camera frame ever arrived)")
                     reportCameraNotFeeding()
                 }
             }
@@ -356,6 +381,11 @@ class ArRenderer(
 
             lastStep = "setTex"
             activeSession.setCameraTextureName(backgroundRenderer.textureId)
+            if (flashDirty) {
+                flashDirty = false
+                lastStep = "flash"
+                applyFlashlightStateLocked(activeSession)
+            }
             lastStep = "displayGeom"
             displayRotationHelper.updateSessionIfNeeded(activeSession)
 
@@ -392,6 +422,7 @@ class ArRenderer(
             // colour bleeding in (like ink) as each yaw sector is mapped — the world-mapping indicator.
             val scanActive = !anchorEstablished && scanMode == ArScanMode.MURAL && scanPhase == ScanPhase.AMBIENT
             if (scanActive) backgroundRenderer.updateScanMask(visitedSectorsMask)
+            lastStep = "bgDraw"
             backgroundRenderer.draw(frame, scanActive)
             if (frameCount <= 10 || frameCount % 60 == 0) {
                 Timber.i("ARDIAG drawFrame f=$frameCount tracking=${frame.camera.trackingState} anchor=$anchorEstablished scanMode=$scanMode scanActive=$scanActive")
@@ -405,6 +436,7 @@ class ArRenderer(
             // Scan/world-mapping indicator: ink develops on ARCore's detected planes (real 3D surfaces
             // that track with the world), so it reads as colour soaking into the wall/floor — not a flat
             // screen overlay. Only while scanning and tracking.
+            lastStep = "planes"
             if (scanActive && !hideVisualization) {
                 val cam = frame.camera
                 if (cam.trackingState == com.google.ar.core.TrackingState.TRACKING) {
@@ -414,6 +446,7 @@ class ArRenderer(
                 }
             }
 
+            lastStep = "anchorEstablish"
             if (pendingAnchorEstablishment) {
                 pendingAnchorEstablishment = false
                 try {
@@ -514,8 +547,10 @@ class ArRenderer(
             mappingProjMatrix[14] = -(2.0f * 100.0f * 0.1f) / (99.9f)
             mappingProjMatrix[15] = 0.0f
 
+            lastStep = "slamCamera"
             slamManager.updateCamera(viewMatrix, projMatrix, mappingViewMatrix, mappingProjMatrix, frame.timestamp)
 
+            lastStep = "light"
             val lightEstimate = frame.lightEstimate
             if (lightEstimate.state == com.google.ar.core.LightEstimate.State.VALID) {
                 onLightUpdated(lightEstimate.pixelIntensity)
@@ -535,6 +570,7 @@ class ArRenderer(
 
             slamManager.setArCoreTrackingState(isTracking)
 
+            lastStep = "anchorCandidates"
             if (anchorEstablished && frameCount % 60 == 0) {
                 // Promotion: Check for support anchor candidates
                 val candidates = slamManager.getAnchorCandidates(0.95f, 3)
@@ -555,6 +591,7 @@ class ArRenderer(
             
             // --- Democratic Consensus Transformation + smoothed reloc fusion ---
             // Backbone: ARCore consensus once anchored, else the native cached pose (as before).
+            lastStep = "consensus"
             val backbone = FloatArray(16)
             if (anchorEstablished) {
                 anchorOrchestrator.getConsensusMatrix(backbone)
@@ -574,6 +611,7 @@ class ArRenderer(
             } else backbone
 
             // Throttle UI and distance updates to 15Hz to match SLAM processing frequency and reduce state churn.
+            lastStep = "uiTick"
             if (frameCount % 4 == 0) {
                 driftCostProbe?.let { probe ->
                     val stageMs = slamManager.getStageTimings()
@@ -646,6 +684,7 @@ class ArRenderer(
                 }
             }
 
+            lastStep = "capture"
             if (captureRequested) {
                 captureRequested = false
                 try {
@@ -745,6 +784,7 @@ class ArRenderer(
                 }
             }
 
+            lastStep = "export"
             if (exportRequested) {
                 exportRequested = false
                 try {
@@ -777,6 +817,7 @@ class ArRenderer(
             // Throttle frame feeding to 15Hz (every 4 frames at 60Hz) to halve processing-related power draw.
             // When tracking is stable and the device is stationary, we could throttle even further.
             // ── Frame Data Pipeline (Throttle to 20Hz or 2Hz for Battery Efficiency) ──
+            lastStep = "slamFeed"
             val throttleRate = if (anchorEstablished) 30 else 3 // 2Hz vs 20Hz
             if (isTracking && frameCount % throttleRate == 0) {
                 // Calculate device motion (linear and angular velocity) for deblurring
@@ -876,6 +917,7 @@ class ArRenderer(
             // Runs at ~1 Hz (every 30 frames) to amortise getAllTrackables() overhead.
             // Only runs BEFORE the anchor is established or during manual realignment to
             // prevent the image from following the camera gaze once locked to a target.
+            lastStep = "planeRefine"
             if ((!anchorEstablished || isInPlaneRealignment) && frameCount % 30 == 0) {
                 try {
                     refineAnchorFromBestPlane(activeSession, viewMatrix)
@@ -885,6 +927,7 @@ class ArRenderer(
             }
 
             // Depth-based fallback: sample centre-screen depth every 10 frames
+            lastStep = "depthFallback"
             if ((!anchorEstablished || isInPlaneRealignment) && depthSupported && frameCount % 10 == 0) {
                 try {
                     frame.acquireDepthImage16Bits().use { depthImage ->
@@ -930,6 +973,7 @@ class ArRenderer(
             // newspaper-halftone "ink develop" reveal on the camera background is the mapping indicator.
             // (Mapping/localization still runs; this only suppressed the busy 3D overlays.)
 
+            lastStep = "overlayTex"
             if (overlayBitmapDirty) {
                 overlayBitmapDirty = false
                 val bmp = pendingOverlayBitmap
@@ -978,11 +1022,13 @@ class ArRenderer(
                 quadInitialFitApplied = true
             }
 
+            lastStep = "mesh"
             val hasMeshData = if (scanMode == ArScanMode.MURAL && muralMethod == MuralMethod.SURFACE_MESH) {
                 slamManager.getPersistentMesh(meshVerticesBuffer, meshWeightsBuffer)
                 true
             } else false
 
+            lastStep = "overlayDraw"
             overlayRenderer.draw(viewMatrix, projMatrix, anchorMatrix, 
                 if (hasMeshData) meshVerticesBuffer else null,
                 if (hasMeshData) meshWeightsBuffer else null
@@ -993,6 +1039,10 @@ class ArRenderer(
             if (showBorder) {
                 overlayRenderer.drawAnchorBorder(viewMatrix, projMatrix, anchorMatrix)
             }
+            // A stall reported at "frameDone" means onDrawFrame COMPLETED and the GL thread never
+            // came back for the next frame — wedge is in eglSwapBuffers / the GLThread scheduler /
+            // a pause request, not in this frame body.
+            lastStep = "frameDone"
         }
     }
 
@@ -1094,18 +1144,59 @@ class ArRenderer(
     }
 
     /**
+     * Detach the session with a bounded wait for the GL thread to leave the frame body.
+     * Returns true when [sessionLock] was acquired within [timeoutMs] — i.e. the GL thread is
+     * provably outside [onDrawFrame] and (with the session nulled) cannot touch ARCore again.
+     * Returns false when the GL thread stayed wedged inside the frame (e.g. blocked in
+     * session.update() on a camera that never feeds); the @Volatile session is still nulled so
+     * no NEW frame starts, but the wedged frame holds its own stale reference — the caller must
+     * rely on Session.close() to absorb the in-flight update(). Safe from any thread; never
+     * blocks longer than [timeoutMs]. Does NOT set [isDestroying]: callers that are tearing down
+     * set it themselves, while live-reconfigure callers re-attach via [attachSession] afterwards.
+     */
+    fun detachSessionBounded(timeoutMs: Long): Boolean {
+        val locked = try {
+            sessionLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)
+        } catch (_: InterruptedException) {
+            false
+        }
+        try {
+            session = null
+        } finally {
+            if (locked) sessionLock.unlock()
+        }
+        return locked
+    }
+
+    /**
      * Non-GL teardown: stops the render loop, cancels the background coroutine
      * scope (previously never cancelled — a coroutine leak), detaches the session,
-     * and drops retained references. Safe to call from any thread. GL objects are
-     * freed separately via [releaseGlResources] on the GL thread.
+     * and drops retained references. Safe to call from any thread — including the
+     * main thread while the GL thread is wedged inside [onDrawFrame]: the session
+     * detach uses a bounded tryLock instead of an unconditional withLock, because
+     * the GL thread holds [sessionLock] for the whole frame and can block forever
+     * inside session.update() / a native SLAM call when the camera never feeds.
+     * An unconditional withLock here hard-froze the entire app on AR exit. GL
+     * objects are freed separately via [releaseGlResources] on the GL thread.
      */
     fun destroy() {
         isDestroying = true
         watchdog?.interrupt()
         watchdog = null
         backgroundScope.cancel("Renderer detached and destroyed.")
-        sessionLock.withLock {
+        // Bounded acquisition only. If the GL thread is wedged mid-frame holding the lock,
+        // fall through and null the @Volatile session anyway: isDestroying (checked at the
+        // top of onDrawFrame) already stops any NEW frame from touching it, and the wedged
+        // frame captured its own local reference — blocking the caller helps nothing.
+        val locked = try {
+            sessionLock.tryLock(500, TimeUnit.MILLISECONDS)
+        } catch (_: InterruptedException) {
+            false
+        }
+        try {
             session = null
+        } finally {
+            if (locked) sessionLock.unlock()
         }
         anchorOrchestrator.clear()
         pendingOverlayBitmap = null

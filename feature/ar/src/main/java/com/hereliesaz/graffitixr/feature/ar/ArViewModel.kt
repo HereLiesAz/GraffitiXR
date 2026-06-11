@@ -595,7 +595,12 @@ class ArViewModel @Inject constructor(
         if (_uiState.value.trackingFailed) {
             _uiState.update { it.copy(trackingFailed = false) }
         }
-        viewModelScope.launch {
+        // Dispatchers.Default, NOT viewModelScope's Main: performFullCleanupLocked calls
+        // saveMapBlocking (native SLAM save), session.pause(), and session.close() — and
+        // close() BLOCKS until any in-flight session.update() returns. When the GL thread
+        // is wedged inside update() (camera never fed ARCore), running this on Main froze
+        // the entire app on AR exit — exactly when the diag tells the user to exit.
+        viewModelScope.launch(Dispatchers.Default) {
             performFullCleanupLocked()
         }
     }
@@ -628,8 +633,19 @@ class ArViewModel @Inject constructor(
                     // Registering the availability callback delivers current state immediately, so this
                     // is ~free when the camera is already idle and only waits out the CameraX (or a
                     // crashed :probe) release. This is the gate that makes AR entry deterministic.
-                    awaitCameraAvailable(context, 3000L)
-                    initArSessionLocked(context)
+                    // The gate's verdict is now LOAD-BEARING: a session opened on a camera the gate
+                    // couldn't confirm free is doomed to ts=0 frames and a wedged update(), so on
+                    // timeout/failure we refuse to open the session and tell the user instead.
+                    if (awaitCameraAvailable(context, 3000L)) {
+                        initArSessionLocked(context)
+                    } else {
+                        appendDiag("camera gate FAILED — refusing to open AR session on an unconfirmed camera")
+                        _feedback.tryEmit(
+                            com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                                "Camera is busy or unavailable — close other camera apps, then re-enter AR"
+                            )
+                        )
+                    }
                 }
 
                 if (isActivityResumed && isInArMode && !isSessionResumed && !isDestroying && session != null) {
@@ -648,17 +664,34 @@ class ArViewModel @Inject constructor(
      * Suspend until the back-facing camera is reported available by the camera service, or [timeoutMs]
      * elapses. Registering an availability callback immediately delivers the current state, so this
      * returns instantly when the camera is already free; it only actually waits when something (e.g. a
-     * just-crashed :probe process) still holds the camera and the HAL hasn't reclaimed it. Never throws.
+     * just-crashed :probe process, or the wedged previous session of a force-killed process) still
+     * holds the camera. Never throws.
+     *
+     * Returns true only when the camera was confirmed available. Returns false on timeout AND on any
+     * exception (a wedged cameraserver makes cameraIdList itself throw) — both previously fell through
+     * silently (logcat-only) and the session was opened anyway on a busy camera, producing the ts=0 /
+     * wedged-update() black screen with no "camera handoff" line in the on-screen diag. Every exit
+     * path now appends a diag line so the gate can never silently no-op again. The only non-confirmed
+     * true is when no back camera can even be enumerated structurally (null manager / no back id):
+     * there is nothing to wait on, and refusing would permanently lock such a device out of AR.
      */
-    private suspend fun awaitCameraAvailable(context: Context, timeoutMs: Long) {
+    private suspend fun awaitCameraAvailable(context: Context, timeoutMs: Long): Boolean {
         try {
             val cm = context.getSystemService(Context.CAMERA_SERVICE)
-                as? android.hardware.camera2.CameraManager ?: return
+                as? android.hardware.camera2.CameraManager
+            if (cm == null) {
+                appendDiag("camera gate: no CameraManager — skipping wait")
+                return true
+            }
             val backId = cm.cameraIdList.firstOrNull { id ->
                 cm.getCameraCharacteristics(id)
                     .get(android.hardware.camera2.CameraCharacteristics.LENS_FACING) ==
                     android.hardware.camera2.CameraCharacteristics.LENS_FACING_BACK
-            } ?: return
+            }
+            if (backId == null) {
+                appendDiag("camera gate: no back camera enumerated — skipping wait")
+                return true
+            }
             val available = kotlinx.coroutines.CompletableDeferred<Unit>()
             val cb = object : android.hardware.camera2.CameraManager.AvailabilityCallback() {
                 override fun onCameraAvailable(cameraId: String) {
@@ -666,14 +699,17 @@ class ArViewModel @Inject constructor(
                 }
             }
             cm.registerAvailabilityCallback(cb, Handler(Looper.getMainLooper()))
-            try {
+            return try {
                 val freed = kotlinx.coroutines.withTimeoutOrNull(timeoutMs) { available.await() } != null
                 appendDiag("camera handoff: ${if (freed) "available" else "TIMEOUT after ${timeoutMs}ms"}")
+                freed
             } finally {
                 cm.unregisterAvailabilityCallback(cb)
             }
         } catch (e: Exception) {
             Timber.w(e, "ARDIAG awaitCameraAvailable failed")
+            appendDiag("camera gate: threw ${e.javaClass.simpleName} — camera service unhealthy")
+            return false
         }
     }
 
@@ -897,6 +933,19 @@ class ArViewModel @Inject constructor(
         isDestroying = true
         sessionMutex.withLock {
             stopAutoSave()
+            // Stop the renderer touching ARCore BEFORE pause()/close(). The renderer drives the
+            // session under its OWN ReentrantLock, so closing under sessionMutex alone raced the
+            // GL frame body (hitTest/acquireCameraImage/setCameraTextureName on a session being
+            // closed) — Session is not thread-safe, and that race segfaulted ARCore internally on
+            // its MTC_vio thread. detachSessionBounded confirms the GL thread is out of the frame
+            // (or times out if it's wedged inside update(), in which case close() absorbs the
+            // in-flight call). Saves still work: they read the renderer's sub-renderers, not the
+            // ARCore session.
+            renderer?.isDestroying = true
+            val glThreadOut = renderer?.detachSessionBounded(1500L) ?: true
+            if (!glThreadOut) {
+                appendDiag("cleanup: GL thread wedged in-frame after 1500ms — closing session anyway")
+            }
             saveMapBlocking()
             saveCloudPointsBlocking()
             session?.let {
@@ -1052,7 +1101,10 @@ class ArViewModel @Inject constructor(
     }
 
     fun destroyArSession() {
-        viewModelScope.launch {
+        // Off-main for the same reason as exitArMode: session.close() blocks until any
+        // in-flight session.update() returns, which never happens when the GL thread is
+        // wedged on a camera that isn't feeding ARCore.
+        viewModelScope.launch(Dispatchers.Default) {
             performFullCleanupLocked()
         }
     }
@@ -1198,20 +1250,28 @@ class ArViewModel @Inject constructor(
 
     /**
      * The forced hardware-stereo path is broken on this device — switch the LIVE session to the
-     * mono camera config (pause → set mono → resume) so the broken motion-stereo disparity stops
-     * thrashing the tracker, and persist the flag so future sessions skip stereo entirely.
-     * Recoverable: the user re-selecting Mural clears the flag (see setArScanMode).
+     * mono camera config (detach renderer → pause → set mono → resume → re-attach) so the broken
+     * motion-stereo disparity stops thrashing the tracker, and persist the flag so future sessions
+     * skip stereo entirely. Recoverable: the user re-selecting Mural clears the flag (see
+     * setArScanMode). Runs on Dispatchers.Default — pause()/resume() block on the camera — and
+     * detaches the renderer first because reconfiguring a Session the GL thread is concurrently
+     * driving under a different lock is the not-thread-safe race that crashes ARCore natively.
      */
     private fun recoverFromBrokenStereo() {
         if (!stereoRecoveryInFlight.compareAndSet(false, true)) return
         forcedStereoUnstable = true
         _uiState.update { it.copy(trackingFailed = false) }
         viewModelScope.launch { settingsRepository.setForcedStereoUnstable(true) }
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Default) {
             sessionMutex.withLock {
                 val s = session
                 if (s == null || isDestroying) return@withLock
                 val wasResumed = isSessionResumed
+                // Get the GL thread out of the frame body before touching the session config.
+                val glThreadOut = renderer?.detachSessionBounded(1500L) ?: true
+                if (!glThreadOut) {
+                    appendDiag("stereo recovery: GL thread wedged in-frame after 1500ms — reconfiguring anyway")
+                }
                 if (wasResumed) pauseArSessionInternal()
                 try {
                     val monoConfigs = s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
@@ -1220,9 +1280,6 @@ class ArViewModel @Inject constructor(
                     })
                     if (monoConfigs.isNotEmpty()) s.cameraConfig = monoConfigs[0]
                     _uiState.update { it.copy(isDualLensActive = false, isHardwareStereoActive = false) }
-                    // Re-arm the streaming verdict so the mono config earns a fresh CAMERA STREAMING /
-                    // STALL readout (and the self-heal hook doesn't stay latched from the stereo run).
-                    renderer?.resetCameraStreamWatchdog()
                     Timber.w("ARDIAG dual-lens: forced stereo broken -> reconfigured LIVE session to mono")
                 } catch (e: Exception) {
                     Timber.e(e, "ARDIAG stereo->mono live reconfigure failed")
@@ -1230,6 +1287,10 @@ class ArViewModel @Inject constructor(
                     // Always attempt to resume — a throw during the config swap must not leave the
                     // session permanently paused (black camera, no recovery).
                     if (isActivityResumed && isInArMode && !isDestroying) resumeArSessionInternal()
+                    // Re-attach the renderer to the reconfigured session. attachSession resets the
+                    // camera-streaming watchdog and frame counter, so the mono config earns a fresh
+                    // CAMERA STREAMING / STALL verdict and the self-heal hook re-arms.
+                    renderer?.attachSession(session)
                     // Treat the reconfigure as a fresh start so the fast detector doesn't re-fire.
                     lastTrackingTimestampMs = System.currentTimeMillis()
                 }
