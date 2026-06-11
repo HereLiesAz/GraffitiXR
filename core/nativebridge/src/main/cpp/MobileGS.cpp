@@ -266,6 +266,7 @@ void MobileGS::pruneByConfidence(float threshold) {
 
 void MobileGS::setArScanMode(int mode) { mScanMode = mode; }
 void MobileGS::setMuralMethod(int method) { mMuralMethod = method; }
+void MobileGS::setParallaxMinDegrees(float deg) { mVoxelHash.setParallaxMinDegrees(deg); }
 void MobileGS::setVoxelSize(float size) { mVoxelSize = size; }
 
 void MobileGS::updateCamera(float* viewMat, float* projMat) {

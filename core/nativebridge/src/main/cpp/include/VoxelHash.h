@@ -43,6 +43,8 @@ public:
     void sort(const glm::vec3& camPos);
     void clear();
     void prune(float threshold);
+    /** Minimum angular baseline (degrees) before a re-observation counts as a parallax check. */
+    void setParallaxMinDegrees(float deg) { mParallaxMinDeg = deg; }
     void save(const std::string& path);
     void load(const std::string& path);
 
@@ -62,6 +64,7 @@ private:
     void clearLocked();
 
     mutable std::mutex mMutex;
+    float mParallaxMinDeg = 4.0f;  // default; overridden by the persisted Settings value
     // Disk-format identifiers for save/load. kSplatMagic is large enough that a legacy file's
     // leading count word can never collide with it, so the absence of the magic marks legacy data.
     static constexpr uint32_t kSplatMagic = 0x56584831u;   // "VXH1"

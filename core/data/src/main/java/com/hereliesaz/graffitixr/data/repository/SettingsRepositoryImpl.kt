@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -37,6 +38,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val STEREO_CAPABILITY = intPreferencesKey("depth_triangulation_capability")
     private val IS_IMPERIAL_UNITS = booleanPreferencesKey("is_imperial_units")
     private val BACKGROUND_COLOR = intPreferencesKey("background_color")
+    private val PARALLAX_MIN_DEG = floatPreferencesKey("parallax_min_degrees")
     private val COMPLETED_TUTORIALS = stringSetPreferencesKey("completed_tutorials")
 
     override val language: Flow<AppLanguage> = context.dataStore.data
@@ -142,6 +144,16 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setBackgroundColor(argb: Int) {
         context.dataStore.edit { preferences ->
             preferences[BACKGROUND_COLOR] = argb
+        }
+    }
+
+    override val parallaxMinDegrees: Flow<Float> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[PARALLAX_MIN_DEG] ?: 4.0f }
+
+    override suspend fun setParallaxMinDegrees(deg: Float) {
+        context.dataStore.edit { preferences ->
+            preferences[PARALLAX_MIN_DEG] = deg
         }
     }
 

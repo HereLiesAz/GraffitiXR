@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -84,6 +85,8 @@ fun SettingsScreen(
     onPointsChanged: () -> Unit,
     showMesh: Boolean,
     onMeshChanged: () -> Unit,
+    parallaxMinDegrees: Float,
+    onParallaxMinDegreesChanged: (Float) -> Unit,
     arScanMode: ArScanMode,
     onArScanModeChanged: (ArScanMode) -> Unit,
     showAnchorBoundary: Boolean,
@@ -250,6 +253,20 @@ fun SettingsScreen(
                                 value = if (showMesh) strings.settings.on else strings.settings.off,
                                 modifier = Modifier.clickable { onMeshChanged() }
                             )
+                            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(text = strings.settings.parallaxThreshold, fontWeight = FontWeight.Medium)
+                                    Text(text = "${"%.1f".format(parallaxMinDegrees)}°", color = Color.Gray)
+                                }
+                                Slider(
+                                    value = parallaxMinDegrees,
+                                    onValueChange = onParallaxMinDegreesChanged,
+                                    valueRange = 1f..15f
+                                )
+                            }
                             val modes = ArScanMode.entries
                             val nextMode = modes[(arScanMode.ordinal + 1) % modes.size]
                             val scanModeValue = when (arScanMode) {

@@ -86,6 +86,7 @@ public:
     void setStageEnabled(int stage, bool enabled);
     void setRelocEnabled(bool enabled);
     void setVoxelSize(float size);
+    void setParallaxMinDegrees(float deg);
     void setMappingPaused(bool paused) { mMappingPaused = paused; }
 
     int getSplatCount() const { return mVoxelHash.getSplatCount(); }

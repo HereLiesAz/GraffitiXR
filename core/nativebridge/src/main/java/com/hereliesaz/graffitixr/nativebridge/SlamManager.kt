@@ -136,6 +136,8 @@ class SlamManager @Inject constructor(
     /** Store the canonical patch from a raw [size]x[size] gray byte buffer (persisted on Fingerprint). */
     fun setWallPatchBytes(data: ByteArray, size: Int) = nativeSetWallPatchBytes(data, size)
     fun setVoxelSize(size: Float) = nativeSetVoxelSize(size)
+    /** Minimum angular baseline (degrees) for a re-observation to count as a parallax depth check. */
+    fun setParallaxMinDegrees(deg: Float) = nativeSetParallaxMinDegrees(deg)
     fun setMappingPaused(paused: Boolean) = nativeSetMappingPaused(paused)
 
     fun initGl() {
@@ -495,6 +497,7 @@ class SlamManager @Inject constructor(
     private external fun nativeSetWallPatch(bitmap: Bitmap)
     private external fun nativeSetWallPatchBytes(data: ByteArray, size: Int)
     private external fun nativeSetVoxelSize(size: Float)
+    private external fun nativeSetParallaxMinDegrees(deg: Float)
     private external fun nativeSetMappingPaused(paused: Boolean)
     private external fun nativeFeedPointCloud(points: FloatArray)
     private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int, intrinsics: FloatArray, intrW: Int, intrH: Int, cvRotateCode: Int, confidence: Float)

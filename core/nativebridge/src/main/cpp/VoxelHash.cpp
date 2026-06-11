@@ -110,7 +110,7 @@ void VoxelHash::update(const cv::Mat& depth, const cv::Mat& color, const float* 
     mLastVoxelSize = voxelSize;
     glm::mat4 invV = glm::inverse(glm::make_mat4(viewMat));
     const glm::vec3 camPos(invV[3]);  // camera world position, for parallax direction
-    constexpr float kParallaxMinDeg = 4.0f; // a small sidestep qualifies; head-wobble does not
+    const float kParallaxMinDeg = mParallaxMinDeg; // runtime-settable (Settings slider)
 
     float fx = projMat[0] * (depth.cols / 2.0f);
     float fy = projMat[5] * (depth.rows / 2.0f);

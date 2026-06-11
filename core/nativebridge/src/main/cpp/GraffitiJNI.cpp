@@ -420,6 +420,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetVoxelSize(JNIEn
     if (gSlamEngine) gSlamEngine->setVoxelSize(size);
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetParallaxMinDegrees(JNIEnv* env, jobject thiz, jfloat deg) {
+    if (gSlamEngine) gSlamEngine->setParallaxMinDegrees(deg);
+}
+
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMappingPaused(JNIEnv* env, jobject thiz, jboolean paused) {
     if (gSlamEngine) gSlamEngine->setMappingPaused(paused);

@@ -461,6 +461,15 @@ class ArViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            // Parallax-verification threshold (degrees). Pushed to the native engine on every
+            // change and on first collection; the engine holds it on a process-lifetime global, so
+            // re-applying here also covers session rebuilds.
+            settingsRepository.parallaxMinDegrees.collect { deg ->
+                _uiState.update { it.copy(parallaxMinDegrees = deg) }
+                slamManager.setParallaxMinDegrees(deg)
+            }
+        }
+        viewModelScope.launch {
             settingsRepository.forcedStereoUnstable.collect { unstable ->
                 // Only controls whether to use the stereo *camera config* next session — does not
                 // disable the MURAL scan mode (which works on mono).
@@ -535,6 +544,11 @@ class ArViewModel @Inject constructor(
     fun setShowAnchorBoundary(show: Boolean) {
         _uiState.update { it.copy(showAnchorBoundary = show) }
         renderer?.showAnchorBoundary = show
+    }
+
+    /** Persist the parallax-verification threshold; the settingsRepository collector pushes it to the engine. */
+    fun setParallaxMinDegrees(deg: Float) {
+        viewModelScope.launch { settingsRepository.setParallaxMinDegrees(deg) }
     }
 
     fun setImperialUnits(imperial: Boolean) {
@@ -795,6 +809,8 @@ class ArViewModel @Inject constructor(
 
             session = s
             _isCameraInUseByAr.value = true
+            // Re-assert the persisted parallax threshold onto the (possibly freshly created) engine.
+            slamManager.setParallaxMinDegrees(_uiState.value.parallaxMinDegrees)
             // Surface the camera-config decision ON SCREEN (not just logcat) so a black-camera report
             // tells us whether the live session is on stereo or mono — the difference between a
             // forced-stereo fault and a deeper camera-feeding fault.

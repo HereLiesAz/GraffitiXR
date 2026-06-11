@@ -73,8 +73,11 @@ interface SettingsRepository {
 
     /** Canvas background color as ARGB Int. Default is opaque black (0xFF000000). */
     val backgroundColor: Flow<Int>
-
     suspend fun setBackgroundColor(argb: Int)
+
+    /** Minimum viewpoint shift (degrees) before a re-observation parallax-verifies a voxel. Default 4. */
+    val parallaxMinDegrees: Flow<Float>
+    suspend fun setParallaxMinDegrees(deg: Float)
 
     /** Set of tutorial keys the user has completed. Keys: "tut_ar", "tut_overlay", "tut_mockup", "tut_trace", "tut_design", "tut_project". */
     val completedTutorials: Flow<Set<String>>

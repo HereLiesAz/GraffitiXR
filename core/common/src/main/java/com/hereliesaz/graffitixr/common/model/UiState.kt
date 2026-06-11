@@ -102,6 +102,8 @@ data class ArUiState(
 
     // Phase 5 — When true, OverlayRenderer draws an orange line-loop around the anchor quad boundary.
     val showAnchorBoundary: Boolean = false,
+    /** Minimum viewpoint shift (degrees) before a re-observation parallax-verifies a voxel. */
+    val parallaxMinDegrees: Float = 4.0f,
 
     // Teleological SLAM — fraction [0,1] of locked artwork guide features currently visible
     // on the wall.  0 until addLayerFeaturesToSLAM has been called (layers locked as guide).
