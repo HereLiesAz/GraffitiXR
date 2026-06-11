@@ -625,8 +625,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
 }
 
 JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDraw(JNIEnv* env, jobject thiz) {
-    if (gSlamEngine) gSlamEngine->draw();
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDraw(JNIEnv* env, jobject thiz, jboolean debugTint) {
+    if (gSlamEngine) gSlamEngine->draw(debugTint == JNI_TRUE);
 }
 
 JNIEXPORT void JNICALL

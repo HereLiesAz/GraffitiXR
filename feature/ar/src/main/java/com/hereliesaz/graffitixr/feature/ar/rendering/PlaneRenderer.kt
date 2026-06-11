@@ -73,12 +73,12 @@ class PlaneRenderer : GlReleasable {
                 } else if (u_GridMode == 1) {
                     vec2 f = fract(v_PosXZ * 4.0);
                     vec2 d = min(f, 1.0 - f);
-                    float line = 1.0 - smoothstep(0.0, 0.08, min(d.x, d.y));
-                    float axis = 1.0 - smoothstep(0.0, 0.03, min(abs(v_PosXZ.x), abs(v_PosXZ.y)));
+                    float line = 1.0 - smoothstep(0.0, 0.018, min(d.x, d.y));
+                    float axis = 1.0 - smoothstep(0.0, 0.028, min(abs(v_PosXZ.x), abs(v_PosXZ.y)));
                     // Lines lifted toward white so the grid reads over the camera and any hue.
                     vec3 lineCol = mix(u_Color.rgb, vec3(1.0), 0.55);
                     float a = max(line * 0.85, axis);
-                    gl_FragColor = vec4(lineCol, max(a, 0.05));
+                    gl_FragColor = vec4(lineCol, max(a, 0.03));
                 } else {
                     float n = vnoise(v_PosXZ * 18.0);
                     float ink = smoothstep(n - 0.18, n + 0.18, u_Develop);

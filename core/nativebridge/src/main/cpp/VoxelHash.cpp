@@ -23,12 +23,20 @@ static const char* kVertexShader =
     "layout(location = 3) in float aConfidence;\n"
     "uniform mat4 uMvp;\n"
     "uniform float uFocalY;\n"
+    "uniform int uDebugTint;\n"
     "out vec4 vColor;\n"
     "void main() {\n"
     "    gl_Position = uMvp * vec4(aPosition, 1.0);\n"
     "    // Physical point size mapping: diameter in pixels\n"
     "    gl_PointSize = (0.02 * 1.5 * uFocalY) / gl_Position.w;\n"
-    "    vColor = aColor;\n"
+    "    if (uDebugTint == 1) {\n"
+    "        // Perception debug view: splats carry the CAMERA's colours, so rendered raw they\n"
+    "        // reproduce the wall on the wall — perfectly camouflaged. Tint by confidence\n"
+    "        // (cyan = tentative, magenta = locked) so the voxel map is visible AS a map.\n"
+    "        vColor = vec4(mix(vec3(0.1, 0.9, 1.0), vec3(1.0, 0.2, 0.9), clamp(aConfidence, 0.0, 1.0)), 1.0);\n"
+    "    } else {\n"
+    "        vColor = aColor;\n"
+    "    }\n"
     "}\n";
 
 static const char* kFragmentShader =
@@ -187,7 +195,7 @@ void VoxelHash::addSparsePoints(const std::vector<float>& points, const float* v
     }
 }
 
-void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, int screenHeight) {
+void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, int screenHeight, bool debugTint) {
     std::lock_guard<std::mutex> lock(mMutex);
     if (!mProgram || mSplatData.empty()) return;
 
@@ -209,6 +217,7 @@ void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, 
     glBindBuffer(GL_ARRAY_BUFFER, mPointVbo);
     glUniformMatrix4fv(glGetUniformLocation(mProgram, "uMvp"), 1, GL_FALSE, glm::value_ptr(mvp));
     glUniform1f(glGetUniformLocation(mProgram, "uFocalY"), focalY);
+    glUniform1i(glGetUniformLocation(mProgram, "uDebugTint"), debugTint ? 1 : 0);
 
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);

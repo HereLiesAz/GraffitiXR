@@ -1127,7 +1127,7 @@ class ArRenderer(
                 planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose, gridMode = true)
                 when (scanMode) {
                     ArScanMode.CLOUD_POINTS -> pointCloudRenderer.draw(viewMatrix, projMatrix)
-                    else -> slamManager.draw() // voxel splats or surface mesh, per the engine's own muralMethod
+                    else -> slamManager.draw(debugTint = true) // voxel splats or surface mesh, per the engine's own muralMethod
                 }
                 if (frameCount % 120 == 0) {
                     // Decides "no data" vs "drawn but invisible" from the diag log alone.

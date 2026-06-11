@@ -225,8 +225,13 @@ class SlamManager @Inject constructor(
         }
     }
 
-    fun draw() {
-        nativeDraw()
+    /**
+     * Renders the engine's active representation (voxel splats / surface mesh). [debugTint]
+     * recolours splats by confidence (cyan→magenta) for the perception debug view — raw splats
+     * carry camera colours and are invisible against the very surface they reconstruct.
+     */
+    fun draw(debugTint: Boolean = false) {
+        nativeDraw(debugTint)
     }
 
     fun feedStereoData(leftBuffer: ByteBuffer, rightBuffer: ByteBuffer, width: Int, height: Int, timestamp: Long) {
@@ -425,7 +430,7 @@ class SlamManager @Inject constructor(
         timestampNs: Long
     )
     private external fun nativeUpdateLightLevel(level: Float)
-    private external fun nativeDraw()
+    private external fun nativeDraw(debugTint: Boolean)
     private external fun nativeGetSplatCount(): Int
     private external fun nativeGetImmutableSplatCount(): Int
     private external fun nativeGetVisibleConfidenceAvg(): Float

@@ -106,7 +106,7 @@ public:
     std::vector<uint8_t> exportFingerprint();
     void alignToFingerprint(const uint8_t* data, size_t size);
 
-    void draw();
+    void draw(bool debugTint = false);
     void destroy();
     std::mutex& getMutex() { return mMutex; }
 

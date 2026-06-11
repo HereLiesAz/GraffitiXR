@@ -34,7 +34,7 @@ public:
     void update(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, float voxelSize, float initialConfidence);
     void addSparsePoints(const std::vector<float>& points, const float* viewMat, const float* projMat, float initialConfidence);
     void addKeyframe(const VoxelFrame& kf);
-    void draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, int screenHeight);
+    void draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, int screenHeight, bool debugTint = false);
     void sort(const glm::vec3& camPos);
     void clear();
     void prune(float threshold);

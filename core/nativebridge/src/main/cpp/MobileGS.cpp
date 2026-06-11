@@ -142,7 +142,7 @@ void MobileGS::resetGlContext() {
     initGl();
 }
 
-void MobileGS::draw() {
+void MobileGS::draw(bool debugTint) {
     std::lock_guard<std::mutex> lock(mMutex);
     interpolateAnchorStep();
     if (!mCameraReady) return;
@@ -154,11 +154,11 @@ void MobileGS::draw() {
     if (mSplatsVisible) {
         StageTimer _t(&mStageAccumMs[3], &mStageSamples[3]);
         if (mMuralMethod == 0) { // VOXEL_HASH
-            mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight);
+            mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight, debugTint);
         } else if (mMuralMethod == 1) { // SURFACE_MESH
             mSurfaceMesh.draw(mvp);
         } else if (mMuralMethod == 2) { // CLOUD_OFFSET
-            mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight);
+            mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight, debugTint);
         }
     }
 }
