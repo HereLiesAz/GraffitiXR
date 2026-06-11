@@ -602,7 +602,13 @@ class ArViewModel @Inject constructor(
 
     private fun updateSessionStateLocked(context: Context? = null) {
         sessionUpdateJob?.cancel()
-        sessionUpdateJob = viewModelScope.launch {
+        // Dispatchers.Default, NOT the main thread: initArSessionLocked creates/configures the ARCore
+        // Session and resumeArSessionInternal calls session.resume() — which OPENS THE CAMERA and can
+        // block for hundreds of ms (or hang on a wedged camera). Running that on the main thread froze
+        // the whole UI (ANR). Off-main, a slow/blocked camera open leaves the UI responsive so the user
+        // can back out. All session ops stay serialized by sessionMutex; _uiState and renderer access
+        // are thread-safe.
+        sessionUpdateJob = viewModelScope.launch(Dispatchers.Default) {
             sessionMutex.withLock {
                 // First-ever AR entry on an unprobed device: while the camera is still free (no live
                 // session yet), run a short throwaway stereo session in an isolated process to see
@@ -625,7 +631,10 @@ class ArViewModel @Inject constructor(
                 }
 
                 if (isActivityResumed && isInArMode && !isSessionResumed && !isDestroying && session != null) {
+                    // Time the camera open: if this is slow it explains a frozen-feeling AR entry.
+                    val t0 = android.os.SystemClock.elapsedRealtime()
                     resumeArSessionInternal()
+                    appendDiag("session.resume() took ${android.os.SystemClock.elapsedRealtime() - t0}ms")
                 } else if ((!isActivityResumed || !isInArMode) && isSessionResumed) {
                     pauseArSessionInternal()
                 }
