@@ -1192,6 +1192,8 @@ class MainActivity : ComponentActivity() {
                                     onMeshChanged = { editorViewModel.toggleMesh() },
                                     parallaxMinDegrees = arUiState.parallaxMinDegrees,
                                     onParallaxMinDegreesChanged = { arViewModel.setParallaxMinDegrees(it) },
+                                    cameraTargetFps = arUiState.cameraTargetFps,
+                                    onCameraTargetFpsChanged = { arViewModel.setCameraTargetFps(it) },
                                     arScanMode = arUiState.arScanMode,
                                     onArScanModeChanged = { arViewModel.setArScanMode(it) },
                                     showAnchorBoundary = arUiState.showAnchorBoundary,

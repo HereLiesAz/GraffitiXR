@@ -433,6 +433,7 @@
     <string name="settings_layer_points">Show Point Cloud</string>
     <string name="settings_layer_mesh">Show Mesh</string>
     <string name="settings_parallax_threshold">Parallax Verify Angle</string>
+    <string name="settings_camera_fps">Camera Frame Rate</string>
     <string name="settings_on">On</string>
     <string name="settings_off">Off</string>
     <string name="settings_scan_mode_label">AR Scan Mode</string>

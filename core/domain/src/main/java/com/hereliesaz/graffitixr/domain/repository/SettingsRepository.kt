@@ -79,6 +79,10 @@ interface SettingsRepository {
     val parallaxMinDegrees: Flow<Float>
     suspend fun setParallaxMinDegrees(deg: Float)
 
+    /** ARCore camera target frame rate: 30 (default) or 60. Lower = less power/heat. */
+    val cameraTargetFps: Flow<Int>
+    suspend fun setCameraTargetFps(fps: Int)
+
     /** Set of tutorial keys the user has completed. Keys: "tut_ar", "tut_overlay", "tut_mockup", "tut_trace", "tut_design", "tut_project". */
     val completedTutorials: Flow<Set<String>>
 

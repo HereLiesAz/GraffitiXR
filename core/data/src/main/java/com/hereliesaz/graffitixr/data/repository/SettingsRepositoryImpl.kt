@@ -39,6 +39,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val IS_IMPERIAL_UNITS = booleanPreferencesKey("is_imperial_units")
     private val BACKGROUND_COLOR = intPreferencesKey("background_color")
     private val PARALLAX_MIN_DEG = floatPreferencesKey("parallax_min_degrees")
+    private val CAMERA_TARGET_FPS = intPreferencesKey("camera_target_fps")
     private val COMPLETED_TUTORIALS = stringSetPreferencesKey("completed_tutorials")
 
     override val language: Flow<AppLanguage> = context.dataStore.data
@@ -154,6 +155,16 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setParallaxMinDegrees(deg: Float) {
         context.dataStore.edit { preferences ->
             preferences[PARALLAX_MIN_DEG] = deg
+        }
+    }
+
+    override val cameraTargetFps: Flow<Int> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[CAMERA_TARGET_FPS] ?: 30 }
+
+    override suspend fun setCameraTargetFps(fps: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[CAMERA_TARGET_FPS] = fps
         }
     }
 

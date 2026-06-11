@@ -470,6 +470,13 @@ class ArViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            // Camera target fps (30/60). Stored in state for the session-config selection; a change
+            // takes effect on the next AR entry (the camera config is fixed at session creation).
+            settingsRepository.cameraTargetFps.collect { fps ->
+                _uiState.update { it.copy(cameraTargetFps = fps) }
+            }
+        }
+        viewModelScope.launch {
             settingsRepository.forcedStereoUnstable.collect { unstable ->
                 // Only controls whether to use the stereo *camera config* next session — does not
                 // disable the MURAL scan mode (which works on mono).
@@ -549,6 +556,11 @@ class ArViewModel @Inject constructor(
     /** Persist the parallax-verification threshold; the settingsRepository collector pushes it to the engine. */
     fun setParallaxMinDegrees(deg: Float) {
         viewModelScope.launch { settingsRepository.setParallaxMinDegrees(deg) }
+    }
+
+    /** Persist the camera target fps (30/60). Takes effect on the next AR entry. */
+    fun setCameraTargetFps(fps: Int) {
+        viewModelScope.launch { settingsRepository.setCameraTargetFps(fps) }
     }
 
     fun setImperialUnits(imperial: Boolean) {
@@ -790,12 +802,33 @@ class ArViewModel @Inject constructor(
                 }
             }
             if (!stereoActive) {
-                // Do NOT force a camera config on the mono path. Forcing getSupportedCameraConfigs(BACK,
-                // 30fps)[0] selected a config this device could open but never stream from (resume()
-                // succeeds, but ARCore receives no camera image — update() blocks forever on the first
-                // frame and the app ANRs). Other ARCore apps work here because they use ARCore's DEFAULT
-                // camera config, which is the most broadly compatible. Leave it unset so ARCore chooses.
-                Timber.i("ARDIAG dual-lens: using ARCore DEFAULT camera config cam=${s.cameraConfig.cameraId} (stereoCapable=$stereoCapable)")
+                // Pin the camera frame rate (default 30, user-selectable 30/60) WITHOUT repeating the
+                // old wedge: the prior code took getSupportedCameraConfigs(BACK, 30fps)[0] blindly and
+                // sometimes picked a config this device opens but never streams from (resume() OK, no
+                // frames, update() ANRs). Instead we keep ARCore's DEFAULT config — the broadly
+                // compatible one — and only swap to a same-cameraId, same-resolution variant that
+                // differs solely in fps. If no such match exists, we leave the default untouched.
+                val targetFps = if (_uiState.value.cameraTargetFps == 60)
+                    CameraConfig.TargetFps.TARGET_FPS_60 else CameraConfig.TargetFps.TARGET_FPS_30
+                val defaultCfg = s.cameraConfig
+                val fpsConfig = try {
+                    s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
+                        facingDirection = CameraConfig.FacingDirection.BACK
+                        this.targetFps = EnumSet.of(targetFps)
+                    }).firstOrNull {
+                        it.cameraId == defaultCfg.cameraId && it.imageDimensions == defaultCfg.imageDimensions
+                    }
+                } catch (e: Exception) {
+                    Timber.w(e, "camera fps config query failed")
+                    null
+                }
+                if (fpsConfig != null) {
+                    s.cameraConfig = fpsConfig
+                    appendDiag("camera fps: pinned ${_uiState.value.cameraTargetFps} (matched default cfg)")
+                } else {
+                    appendDiag("camera fps: no ${_uiState.value.cameraTargetFps} match for default cfg — using default")
+                }
+                Timber.i("ARDIAG dual-lens: mono config cam=${s.cameraConfig.cameraId} fps=${_uiState.value.cameraTargetFps} (stereoCapable=$stereoCapable)")
             }
 
             // isDualLensActive / isHardwareStereoActive just reflect the camera config for the diag

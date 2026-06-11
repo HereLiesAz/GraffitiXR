@@ -87,6 +87,8 @@ fun SettingsScreen(
     onMeshChanged: () -> Unit,
     parallaxMinDegrees: Float,
     onParallaxMinDegreesChanged: (Float) -> Unit,
+    cameraTargetFps: Int,
+    onCameraTargetFpsChanged: (Int) -> Unit,
     arScanMode: ArScanMode,
     onArScanModeChanged: (ArScanMode) -> Unit,
     showAnchorBoundary: Boolean,
@@ -267,6 +269,13 @@ fun SettingsScreen(
                                     valueRange = 1f..15f
                                 )
                             }
+                            SettingsItem(
+                                label = strings.settings.cameraFps,
+                                value = "$cameraTargetFps",
+                                modifier = Modifier.clickable {
+                                    onCameraTargetFpsChanged(if (cameraTargetFps == 30) 60 else 30)
+                                }
+                            )
                             val modes = ArScanMode.entries
                             val nextMode = modes[(arScanMode.ordinal + 1) % modes.size]
                             val scanModeValue = when (arScanMode) {

@@ -104,6 +104,8 @@ data class ArUiState(
     val showAnchorBoundary: Boolean = false,
     /** Minimum viewpoint shift (degrees) before a re-observation parallax-verifies a voxel. */
     val parallaxMinDegrees: Float = 4.0f,
+    /** ARCore camera target frame rate: 30 (default) or 60. Applies on next AR entry. */
+    val cameraTargetFps: Int = 30,
 
     // Teleological SLAM — fraction [0,1] of locked artwork guide features currently visible
     // on the wall.  0 until addLayerFeaturesToSLAM has been called (layers locked as guide).
