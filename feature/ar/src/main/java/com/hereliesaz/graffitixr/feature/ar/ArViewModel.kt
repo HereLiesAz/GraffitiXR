@@ -1730,6 +1730,7 @@ class ArViewModel @Inject constructor(
     }
 
     private fun startSystemThrottleMonitoring() {
+      try {
         val pm = powerManager
         if (pm != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
             val listener = android.os.PowerManager.OnThermalStatusChangedListener { status ->
@@ -1755,16 +1756,18 @@ class ArViewModel @Inject constructor(
             addAction(android.content.Intent.ACTION_BATTERY_OKAY)
             addAction(android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
         }
-        try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                appContext.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-            } else {
-                @Suppress("UnspecifiedRegisterReceiverFlag")
-                appContext.registerReceiver(receiver, filter)
-            }
-            powerReceiver = receiver
-        } catch (_: Throwable) { /* best-effort; thermal listener still applies. */ }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            appContext.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            appContext.registerReceiver(receiver, filter)
+        }
+        powerReceiver = receiver
         recomputeSystemThrottle()
+      } catch (_: Throwable) {
+        // Best-effort: device-stress monitoring must never break AR construction. Without it, the
+        // renderer still self-throttles on measured frame lag; only the system-stress floor is lost.
+      }
     }
 
     private fun stopSystemThrottleMonitoring() {
