@@ -219,10 +219,21 @@ void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, 
     glUniform1f(glGetUniformLocation(mProgram, "uFocalY"), focalY);
     glUniform1i(glGetUniformLocation(mProgram, "uDebugTint"), debugTint ? 1 : 0);
 
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_TRUE);
-    glDepthFunc(GL_LEQUAL);
+    if (debugTint) {
+        // Debug view: splats draw on TOP, unoccluded — same as the ARCore feature dots, which are
+        // visible precisely because they ignore depth. With depth test on and LEQUAL, the camera
+        // background / artwork overlay already in the depth buffer cull the splats (they sit AT the
+        // wall, the overlay sits in front). The point of the perception view is to SEE the map, not
+        // to have it correctly occluded.
+        glDisable(GL_BLEND);
+        glDisable(GL_DEPTH_TEST);
+        glDepthMask(GL_FALSE);
+    } else {
+        glDisable(GL_BLEND);
+        glEnable(GL_DEPTH_TEST);
+        glDepthMask(GL_TRUE);
+        glDepthFunc(GL_LEQUAL);
+    }
 
     glEnableVertexAttribArray(0); glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)nullptr);
     glEnableVertexAttribArray(1); glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Splat), (void*)(12));
@@ -232,6 +243,10 @@ void VoxelHash::draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, 
     glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(mSplatData.size()));
 
     glDisableVertexAttribArray(0); glDisableVertexAttribArray(1); glDisableVertexAttribArray(2); glDisableVertexAttribArray(3);
+
+    // Restore depth state the rest of the pipeline expects (the debug path disabled it).
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
 }
 
 void VoxelHash::clear() {
