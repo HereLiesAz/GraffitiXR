@@ -410,7 +410,7 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `onTargetCaptured tap path sets annotatedCaptureBitmap to null and populates unwarpPoints`() = runTest {
+    fun `onTargetCaptured tap path sets annotatedCaptureBitmap to isolated markings and populates unwarpPoints`() = runTest {
         val rawBmp = mockk<Bitmap>(relaxed = true)
         viewModel.onScreenTap(0.5f, 0.5f)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -423,7 +423,9 @@ class ArViewModelTest {
         )
 
         val state = viewModel.uiState.value
-        assertNull(state.annotatedCaptureBitmap)
+        // The tap path isolates markings on the raw capture; onUnwarpConfirm later reads this mask
+        // and unwarps it, so it MUST be non-null here (nulling it loses the mask through RECTIFY).
+        assertNotNull(state.annotatedCaptureBitmap)
         assertEquals(4, state.unwarpPoints.size)
     }
 
