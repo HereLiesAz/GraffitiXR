@@ -1780,10 +1780,11 @@ class ArViewModel @Inject constructor(
     private val BATTERY_TIER_LOW = 15
 
     /**
-     * Folds device-stress signals into the AR rate policy. The coarse perception floor
-     * (perceptionSystemThrottle) is unchanged; the battery *level* additionally degrades the
-     * adaptive-rate ceilings in tiers, and at the low tier also forces the perception floor and a
-     * 30fps-capped camera on the next AR entry. All gated by the existing throttleOnLowBattery toggle.
+     * Folds device-stress signals into the AR rate policy. The existing perception floor (15fps via
+     * perceptionSystemThrottle) is the "super battery saver" and is left exactly as-is — thermal,
+     * OS power-save mode, and the coarse low-battery warning. The battery *level* tiers added here do
+     * NOT touch that floor: a merely low level keeps perception at the full 30fps and only tightens
+     * the adaptive idle/active rate ceilings (and caps the camera to 30fps on the next AR entry).
      */
     private fun recomputeSystemThrottle() {
         val saver = powerManager?.isPowerSaveMode == true
@@ -1794,10 +1795,11 @@ class ArViewModel @Inject constructor(
             batteryPct <= BATTERY_TIER_MED -> 1
             else -> 0
         }
+        // Unchanged super-saver floor (15fps). The battery-level tier is intentionally NOT a trigger
+        // here — it only drives the rate ceilings below.
         val throttle = (s.throttleOnThermal && thermalHot) ||
             (s.throttleOnPowerSave && saver) ||
-            (s.throttleOnLowBattery && batteryLow) ||
-            tier >= 2
+            (s.throttleOnLowBattery && batteryLow)
         val idleCeiling = when (tier) { 2 -> 8; 1 -> 10; else -> 12 }
         val activeCeiling = when (tier) { 2 -> 24; 1 -> 30; else -> 0 }
         if (s.perceptionSystemThrottle != throttle || s.batteryTier != tier ||
