@@ -116,6 +116,18 @@ data class ArUiState(
     val throttleOnLag: Boolean = true,
     /** Derived: any enabled thermal/power-save/low-battery trigger is currently active. */
     val perceptionSystemThrottle: Boolean = false,
+    /**
+     * Master toggle for the adaptive AR frame-rate coach. When on (default), the renderer gates the
+     * heavy native SLAM/VIO work while the projection is locked and the phone is held still, snapping
+     * back to full rate instantly on motion — a still scene looks identical, so it's imperceptible.
+     */
+    val adaptiveRateEnabled: Boolean = true,
+    /** Heavy-work cadence (fps) while idle. Tightened under battery/thermal pressure. */
+    val idleRateCeilingFps: Int = 12,
+    /** Heavy-work cadence cap (fps) while active; 0 = uncapped. Set >0 only under battery pressure. */
+    val activeRateCeilingFps: Int = 0,
+    /** Battery pressure tier: 0 = normal, 1 = medium (≤30%), 2 = low (≤15%). Drives degradation. */
+    val batteryTier: Int = 0,
 
     // Teleological SLAM — fraction [0,1] of locked artwork guide features currently visible
     // on the wall.  0 until addLayerFeaturesToSLAM has been called (layers locked as guide).

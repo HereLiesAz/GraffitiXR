@@ -170,6 +170,25 @@ class ArRenderer(
     private var lastPerceptionSplatCount = -1
     private var perceptionRefreshAvgMs = 0f
 
+    // --- Adaptive idle rate (pushed from ArViewModel via MainScreen) -----------------------------
+    // When the projection is locked and the phone is held still, the heavy native SLAM/VIO map
+    // integration is gated to idleRateCeilingFps; it snaps back to full rate instantly on motion or
+    // interaction. session.update() and the cheap camera+overlay draw keep running every vsync, so
+    // tracking stays healthy and a static scene looks identical — the saving is the gated SLAM work.
+    @Volatile var adaptiveRateEnabled: Boolean = true
+    @Volatile var idleRateCeilingFps: Int = 12
+    @Volatile var activeRateCeilingFps: Int = 0   // 0 = uncapped
+    @Volatile var gestureInProgress: Boolean = false
+    /** True while the pipeline is in the gated idle state. Read-only for callers (e.g. DualAnalyzer). */
+    @Volatile var isIdle: Boolean = false
+        private set
+    // GL-thread-only idle bookkeeping.
+    private val idlePose = FloatArray(16)
+    private var haveIdlePose = false
+    private var noMotionSinceMs = 0L
+    private var resumeHoldUntilMs = 0L
+    private var lastHeavyWorkMs = 0L
+
     private val anchorOrchestrator = AnchorOrchestrator()
     private val poseFusion = com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion()
     // A/B switch for the Sub-project A harness: when false, reproduce the old pre/post-anchor toggle.
@@ -529,6 +548,54 @@ class ArRenderer(
         return maxDelta > PERCEPTION_POSE_EPSILON
     }
 
+    /** True when the camera pose moved past the (coarser) idle threshold since the last heavy frame. */
+    private fun idlePoseChanged(view: FloatArray): Boolean {
+        var maxDelta = 0f
+        for (i in 0 until 16) {
+            val d = kotlin.math.abs(view[i] - idlePose[i])
+            if (d > maxDelta) maxDelta = d
+        }
+        return maxDelta > IDLE_POSE_EPSILON
+    }
+
+    /**
+     * Decides whether to run the heavy native SLAM/VIO work this frame, updating [isIdle]. Returns
+     * true on a full (heavy) frame; false on a gated idle frame. The phone is "idle" only when the
+     * anchor is established, no scan/capture/realign/gesture is active, tracking is healthy, and the
+     * pose has been still past the enter-debounce. Exit from idle is instant (first motion frame),
+     * with a brief full-rate hold so it can't oscillate at the threshold. While idle, heavy work runs
+     * at [idleRateCeilingFps]; while active it's uncapped unless [activeRateCeilingFps] > 0.
+     */
+    private fun shouldRunHeavyThisFrame(view: FloatArray, tracking: Boolean): Boolean {
+        val now = android.os.SystemClock.elapsedRealtime()
+        val active = !anchorEstablished || captureRequested || isCapturingTarget ||
+            isInPlaneRealignment || scanPhase == ScanPhase.AMBIENT || gestureInProgress || !tracking
+        val moved = !haveIdlePose || idlePoseChanged(view)
+        if (active || moved) {
+            isIdle = false
+            resumeHoldUntilMs = now + RESUME_HOLD_MS
+            noMotionSinceMs = 0L
+        } else if (now >= resumeHoldUntilMs) {
+            if (noMotionSinceMs == 0L) noMotionSinceMs = now
+            if (now - noMotionSinceMs >= IDLE_ENTER_DEBOUNCE_MS) isIdle = true
+        }
+        val targetFps = when {
+            !adaptiveRateEnabled -> 0   // master off → always full rate (no idle or battery capping)
+            isIdle -> idleRateCeilingFps.coerceAtLeast(1)
+            activeRateCeilingFps > 0 -> activeRateCeilingFps
+            else -> 0
+        }
+        val heavy = targetFps <= 0 || (now - lastHeavyWorkMs) >= (1000L / targetFps)
+        if (heavy) {
+            lastHeavyWorkMs = now
+            // Re-baseline the idle pose only on heavy frames, so slow drift accumulates across gated
+            // frames and eventually trips idlePoseChanged() rather than being silently tracked away.
+            System.arraycopy(view, 0, idlePose, 0, 16)
+            haveIdlePose = true
+        }
+        return heavy
+    }
+
     override fun onDrawFrame(gl: GL10?) {
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
         // Mode-exit was requested: stop driving ARCore so teardown is effectively
@@ -724,15 +791,21 @@ class ArRenderer(
             mappingProjMatrix[15] = 0.0f
 
             lastStep = "slamCamera"
-            slamManager.updateCamera(viewMatrix, projMatrix, mappingViewMatrix, mappingProjMatrix, frame.timestamp)
+            val isTracking = camera.trackingState == TrackingState.TRACKING
+            // Adaptive idle gating: skip the heavy native SLAM/VIO map integration on gated idle
+            // frames (projection locked + phone still). session.update() above still ran, so ARCore's
+            // pose keeps advancing and the first heavy frame after resume re-feeds a correct pose.
+            // The not-tracking case is never gated (shouldRunHeavyThisFrame forces active), so a
+            // relocalization always re-feeds SLAM immediately.
+            if (shouldRunHeavyThisFrame(viewMatrix, isTracking)) {
+                slamManager.updateCamera(viewMatrix, projMatrix, mappingViewMatrix, mappingProjMatrix, frame.timestamp)
+            }
 
             lastStep = "light"
             val lightEstimate = frame.lightEstimate
             if (lightEstimate.state == com.google.ar.core.LightEstimate.State.VALID) {
                 onLightUpdated(lightEstimate.pixelIntensity)
             }
-
-            val isTracking = camera.trackingState == TrackingState.TRACKING
             // Re-arm the hard cold-snap whenever ARCore isn't tracking (pocket / screen-off / loss), so
             // the next confident relocalization snaps the overlay back instantly rather than easing in.
             if (!isTracking) poseFusion.markRelocalizing()
@@ -1443,6 +1516,16 @@ class ArRenderer(
         const val PERCEPTION_LAG_MS = 16f
         // Per-element view-matrix delta below which the pose is treated as unchanged (skip redraw).
         const val PERCEPTION_POSE_EPSILON = 1e-4f
+
+        // --- Adaptive idle gating ---
+        // Per-element view-matrix delta below which the phone is treated as "still" for idle. Coarser
+        // than the perception epsilon so handheld micro-jitter doesn't count as motion (≈0.09° / 1.5mm).
+        const val IDLE_POSE_EPSILON = 1.5e-3f
+        // Continuous no-motion + no-interaction time before entering idle (slow to sleep).
+        const val IDLE_ENTER_DEBOUNCE_MS = 700L
+        // After resuming from idle, hold full rate this long so a single threshold-straddling jitter
+        // frame can't immediately re-sleep (instant to wake, brief hold).
+        const val RESUME_HOLD_MS = 500L
     }
 }
 

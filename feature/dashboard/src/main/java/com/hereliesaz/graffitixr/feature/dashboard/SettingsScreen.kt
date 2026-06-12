@@ -97,6 +97,8 @@ fun SettingsScreen(
     onThrottleOnLowBatteryChanged: (Boolean) -> Unit,
     throttleOnLag: Boolean,
     onThrottleOnLagChanged: (Boolean) -> Unit,
+    adaptiveRateEnabled: Boolean,
+    onAdaptiveRateEnabledChanged: (Boolean) -> Unit,
     arScanMode: ArScanMode,
     onArScanModeChanged: (ArScanMode) -> Unit,
     showAnchorBoundary: Boolean,
@@ -305,6 +307,14 @@ fun SettingsScreen(
                                 label = "Throttle: frame lag",
                                 value = if (throttleOnLag) strings.settings.on else strings.settings.off,
                                 modifier = Modifier.clickable { onThrottleOnLagChanged(!throttleOnLag) }
+                            )
+                            // Adaptive rate: gates heavy SLAM work while the projection is locked and
+                            // the phone is still (snaps back instantly on motion), plus battery-tier
+                            // degradation. Default on; imperceptible. Off = always full rate.
+                            SettingsItem(
+                                label = "Adaptive rate (idle)",
+                                value = if (adaptiveRateEnabled) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable { onAdaptiveRateEnabledChanged(!adaptiveRateEnabled) }
                             )
                             val modes = ArScanMode.entries
                             val nextMode = modes[(arScanMode.ordinal + 1) % modes.size]

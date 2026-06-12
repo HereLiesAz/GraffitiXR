@@ -362,14 +362,22 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                LaunchedEffect(mainUiState.isTouchLocked) {
+                LaunchedEffect(mainUiState.isTouchLocked, editorUiState.editorMode, arUiState.batteryTier) {
+                    val params = window.attributes
                     if (mainUiState.isTouchLocked) {
-                        val params = window.attributes
-                        params.screenBrightness = 1.0f
+                        // Keep the screen on in every mode while locked, but force MAX brightness only
+                        // where it's functionally needed — the TRACE lightbox. Other modes keep system
+                        // brightness (AR touch-lock at max brightness was pure waste). Even in TRACE,
+                        // cap brightness once battery is low.
+                        params.screenBrightness = when {
+                            editorUiState.editorMode != EditorMode.TRACE ->
+                                WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                            arUiState.batteryTier >= 2 -> 0.85f
+                            else -> 1.0f
+                        }
                         window.attributes = params
                         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     } else {
-                        val params = window.attributes
                         params.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
                         window.attributes = params
                         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -1180,6 +1188,8 @@ class MainActivity : ComponentActivity() {
                                     onThrottleOnLowBatteryChanged = { arViewModel.setThrottleOnLowBattery(it) },
                                     throttleOnLag = arUiState.throttleOnLag,
                                     onThrottleOnLagChanged = { arViewModel.setThrottleOnLag(it) },
+                                    adaptiveRateEnabled = arUiState.adaptiveRateEnabled,
+                                    onAdaptiveRateEnabledChanged = { arViewModel.setAdaptiveRateEnabled(it) },
                                     arScanMode = arUiState.arScanMode,
                                     onArScanModeChanged = { arViewModel.setArScanMode(it) },
                                     showAnchorBoundary = arUiState.showAnchorBoundary,

@@ -246,6 +246,12 @@ fun MainScreen(
                                 // trigger's enable flag (evaluated renderer-side).
                                 r.systemThrottle = arUiState.perceptionSystemThrottle
                                 r.lagThrottleEnabled = arUiState.throttleOnLag
+                                // Adaptive idle rate: policy ceilings from the VM + the live
+                                // interaction flag (so a gesture instantly forces full rate).
+                                r.adaptiveRateEnabled = arUiState.adaptiveRateEnabled
+                                r.idleRateCeilingFps = arUiState.idleRateCeilingFps
+                                r.activeRateCeilingFps = arUiState.activeRateCeilingFps
+                                r.gestureInProgress = uiState.gestureInProgress
                             }
                         },
                         onRelease = { view ->
