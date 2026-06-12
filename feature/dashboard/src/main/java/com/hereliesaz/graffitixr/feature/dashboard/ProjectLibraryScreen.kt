@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -34,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.aznavrail.AzButton
@@ -142,59 +145,80 @@ fun ProjectLibraryScreen(
                 ) {
                     items(projects) { project ->
                         Card(
-                            modifier = Modifier.fillMaxWidth()
-                                .border(1.dp, Color.White.copy(alpha = 0.15f), CardDefaults.shape),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(16f / 9f)
+                                .border(1.dp, Color.White.copy(alpha = 0.15f), CardDefaults.shape)
+                                .clickable { onLoadProject(project) },
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .clickable { onLoadProject(project) }
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Thumbnail or Default Icon
+                            // The project's design imagery fills the whole box (full-bleed); the
+                            // name, date and delete control are overlaid over a bottom scrim so they
+                            // stay legible over any artwork.
+                            Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
                                 if (project.thumbnailUri != null) {
                                     coil.compose.AsyncImage(
                                         model = project.thumbnailUri,
                                         contentDescription = strings.lib.projectThumbnail,
-                                        modifier = Modifier
-                                            .size(96.dp)
-                                            .background(Color.Black)
-                                            .padding(1.dp),
+                                        modifier = Modifier.fillMaxSize(),
                                         contentScale = androidx.compose.ui.layout.ContentScale.Crop
                                     )
                                 } else {
                                     Icon(
                                         Icons.Default.Folder,
                                         contentDescription = null,
-                                        tint = Color.White,
-                                        modifier = Modifier.size(96.dp).padding(12.dp)
-                                    )
-                                }
-                                Spacer(Modifier.width(16.dp))
-
-                                // Project Info
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = project.name,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = Color.White
-                                    )
-                                    Text(
-                                        text = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
-                                            .format(Date(project.lastModified)),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color.LightGray
+                                        tint = Color.White.copy(alpha = 0.35f),
+                                        modifier = Modifier.size(72.dp).align(Alignment.Center)
                                     )
                                 }
 
-                                // Delete Action
-                                IconButton(onClick = { onDeleteProject(project.id) }) {
-                                    Icon(
-                                        Icons.Default.Delete,
-                                        contentDescription = strings.lib.deleteProjectDesc(project.name),
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
+                                // Bottom-up gradient scrim for text contrast.
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .fillMaxWidth()
+                                        .height(110.dp)
+                                        .background(
+                                            Brush.verticalGradient(
+                                                colors = listOf(
+                                                    Color.Transparent,
+                                                    Color.Black.copy(alpha = 0.8f)
+                                                )
+                                            )
+                                        )
+                                )
+
+                                Row(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = project.name,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+                                                .format(Date(project.lastModified)),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color.White.copy(alpha = 0.85f)
+                                        )
+                                    }
+
+                                    IconButton(onClick = { onDeleteProject(project.id) }) {
+                                        Icon(
+                                            Icons.Default.Delete,
+                                            contentDescription = strings.lib.deleteProjectDesc(project.name),
+                                            tint = Color.White
+                                        )
+                                    }
                                 }
                             }
                         }
