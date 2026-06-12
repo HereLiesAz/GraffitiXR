@@ -47,8 +47,11 @@ fun rememberCoachStep(editor: EditorUiState, ar: ArUiState): CoachStep? {
         hasWallPhoto, hasTarget,
     ) {
         fun arr(id: Int): List<String> = ctx.resources.getStringArray(id).toList()
-        fun lines(src: List<String>, vararg idx: Int): List<String> =
-            idx.mapNotNull { src.getOrNull(it) }
+        fun lines(src: List<String>, vararg idx: Int): List<String> {
+            val out = ArrayList<String>(idx.size)
+            for (i in idx) src.getOrNull(i)?.let { out.add(it) }
+            return out
+        }
 
         val design = arr(DesignR.array.onboarding_design)
         val arLines = arr(DesignR.array.onboarding_ar)
