@@ -261,12 +261,14 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetAnchorCandidate
     gSlamEngine->getAnchorCandidates(candidates, threshold, maxCount);
     if (candidates.empty()) return nullptr;
 
-    jfloatArray result = env->NewFloatArray(candidates.size() * 3);
+    jfloatArray result = env->NewFloatArray((jsize)(candidates.size() * 3));
+    if (!result) return nullptr;
     std::vector<float> flat;
+    flat.reserve(candidates.size() * 3);
     for (const auto& s : candidates) {
         flat.push_back(s.x); flat.push_back(s.y); flat.push_back(s.z);
     }
-    env->SetFloatArrayRegion(result, 0, flat.size(), flat.data());
+    env->SetFloatArrayRegion(result, 0, (jsize)flat.size(), flat.data());
     return result;
 }
 
@@ -907,10 +909,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
     std::vector<cv::KeyPoint> kps;
     cv::Mat descs;
     if (gSlamEngine) {
-        gSlamEngine->getMutex().lock();
+        // Scoped lock so an exception from detectAndCompute can't leak the mutex
+        // and permanently deadlock every other JNI entry point.
+        std::lock_guard<std::mutex> lock(gSlamEngine->getMutex());
         // Use consistent feature detection for visualization
         cv::ORB::create(500)->detectAndCompute(gray, cv::noArray(), kps, descs);
-        gSlamEngine->getMutex().unlock();
     }
 
     // Convert frame to RGBA if it isn't already for drawing
@@ -990,7 +993,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetKeypoints(
         cv::ORB::create(500)->detect(gray, kps);
     }
 
-    jfloatArray result = env->NewFloatArray(kps.size() * 2);
+    jfloatArray result = env->NewFloatArray((jsize)(kps.size() * 2));
+    if (!result) return nullptr;
     jfloat* ptr = env->GetFloatArrayElements(result, nullptr);
     for (size_t i = 0; i < kps.size(); ++i) {
         ptr[i * 2] = kps[i].pt.x;
@@ -1020,6 +1024,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetSplatsVisible(J
 extern "C" JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetAnchorTransform(JNIEnv* env, jobject) {
     jfloatArray result = env->NewFloatArray(16);
+    if (!result) return nullptr;
     if (gSlamEngine) {
         float mat[16];
         gSlamEngine->getAnchorTransform(mat);
@@ -1095,10 +1100,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUnrollMesh(JNIEnv*
     SurfaceUnroller unroller(32); // Default dim
     auto uv = unroller.unroll(v);
 
-    jfloatArray result = env->NewFloatArray(uv.size() * 2);
+    jfloatArray result = env->NewFloatArray((jsize)(uv.size() * 2));
+    if (!result) return nullptr;
     std::vector<float> flatUv;
+    flatUv.reserve(uv.size() * 2);
     for (const auto& p : uv) { flatUv.push_back(p.x); flatUv.push_back(p.y); }
-    env->SetFloatArrayRegion(result, 0, flatUv.size(), flatUv.data());
+    env->SetFloatArrayRegion(result, 0, (jsize)flatUv.size(), flatUv.data());
     return result;
 }
 
@@ -1109,8 +1116,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportFingerprint(
     std::vector<uint8_t> fingerprint = gSlamEngine->exportFingerprint();
     if (fingerprint.empty()) return nullptr;
 
-    jbyteArray result = env->NewByteArray(fingerprint.size());
-    env->SetByteArrayRegion(result, 0, fingerprint.size(), (jbyte*)fingerprint.data());
+    jbyteArray result = env->NewByteArray((jsize)fingerprint.size());
+    if (!result) return nullptr;
+    env->SetByteArrayRegion(result, 0, (jsize)fingerprint.size(), (jbyte*)fingerprint.data());
     return result;
 }
 
@@ -1123,27 +1131,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAlignToFingerprint
 
     gSlamEngine->alignToFingerprint((uint8_t*)buffer, size);
 
-    env->ReleaseByteArrayElements(data, buffer, JNI_ABORT);
-}
-
-extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_hereliesaz_graffitixr_core_collaboration_CollaborationManager_nativeExportFingerprint(
-        JNIEnv* env, jobject thiz) {
-    if (!gSlamEngine) return nullptr;
-    std::vector<uint8_t> fingerprint = gSlamEngine->exportFingerprint();
-    if (fingerprint.empty()) return nullptr;
-    jbyteArray result = env->NewByteArray(fingerprint.size());
-    env->SetByteArrayRegion(result, 0, fingerprint.size(), (jbyte*)fingerprint.data());
-    return result;
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_core_collaboration_CollaborationManager_nativeAlignToPeer(
-        JNIEnv* env, jobject thiz, jbyteArray data) {
-    if (!gSlamEngine) return;
-    jsize size = env->GetArrayLength(data);
-    jbyte* buffer = env->GetByteArrayElements(data, nullptr);
-    gSlamEngine->alignToFingerprint((uint8_t*)buffer, size);
     env->ReleaseByteArrayElements(data, buffer, JNI_ABORT);
 }
 

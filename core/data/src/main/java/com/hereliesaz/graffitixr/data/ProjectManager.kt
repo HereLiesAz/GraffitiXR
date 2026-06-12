@@ -289,7 +289,14 @@ class ProjectManager @Inject constructor(
                     for ((name, tmpFile) in extractedFiles) {
                         val dest = File(destDir, name)
                         dest.parentFile?.mkdirs()
-                        tmpFile.renameTo(dest)
+                        // renameTo can silently fail across filesystems (cache vs files dir) or when
+                        // the destination exists — fall back to an explicit copy so an imported
+                        // project is never left with missing files.
+                        if (dest.exists()) dest.delete()
+                        if (!tmpFile.renameTo(dest)) {
+                            tmpFile.copyTo(dest, overwrite = true)
+                            tmpFile.delete()
+                        }
                     }
 
                     project
