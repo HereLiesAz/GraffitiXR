@@ -258,6 +258,8 @@ class ArRenderer(
     private var lastPoseX = 0f
     private var lastPoseY = 0f
     private var lastPoseZ = 0f
+    // Last camera rotation quaternion [x,y,z,w], for delta-based angular velocity.
+    private var lastQuat: FloatArray? = null
 
     @Volatile var captureRequested: Boolean = false
     // Normalized (0..1) screen tap to measure distance for on the next capture; consumed on the GL thread.
@@ -1002,9 +1004,13 @@ class ArRenderer(
                         (currentPose.ty() - lastPoseY) / dt,
                         (currentPose.tz() - lastPoseZ) / dt
                     )
-                    // Angular velocity approx from quaternion delta
-                    val angVel = floatArrayOf(0f, 0f, 0f) // Stub for now
+                    // Angular velocity from the quaternion delta between throttled frames:
+                    // q_rel = q_cur * conj(q_prev) -> axis-angle -> (axis * angle / dt).
+                    val q = currentPose.rotationQuaternion
+                    val prev = lastQuat
+                    val angVel = if (prev != null) angularVelocity(prev, q, dt) else floatArrayOf(0f, 0f, 0f)
                     slamManager.updateDeviceMotion(angVel, linVel)
+                    lastQuat = q
                 }
                 lastPoseX = currentPose.tx(); lastPoseY = currentPose.ty(); lastPoseZ = currentPose.tz()
 
@@ -1435,4 +1441,29 @@ class ArRenderer(
         // Per-element view-matrix delta below which the pose is treated as unchanged (skip redraw).
         const val PERCEPTION_POSE_EPSILON = 1e-4f
     }
+}
+
+/**
+ * Angular velocity (rad/s) from two unit rotation quaternions [x,y,z,w] sampled [dt] apart:
+ * the relative rotation q_rel = q_cur * conj(q_prev), converted to an axis-angle vector divided
+ * by dt. Returns a zero vector for degenerate inputs.
+ */
+private fun angularVelocity(prev: FloatArray, cur: FloatArray, dt: Float): FloatArray {
+    if (dt <= 0f) return floatArrayOf(0f, 0f, 0f)
+    val px = -prev[0]; val py = -prev[1]; val pz = -prev[2]; val pw = prev[3] // conj(prev)
+    val cx = cur[0]; val cy = cur[1]; val cz = cur[2]; val cw = cur[3]
+    // q_rel = cur * conj(prev)  (Hamilton product)
+    var rw = cw * pw - cx * px - cy * py - cz * pz
+    var rx = cw * px + cx * pw + cy * pz - cz * py
+    var ry = cw * py - cx * pz + cy * pw + cz * px
+    var rz = cw * pz + cx * py - cy * px + cz * pw
+    val n = kotlin.math.sqrt(rw * rw + rx * rx + ry * ry + rz * rz)
+    if (n <= 1e-6f) return floatArrayOf(0f, 0f, 0f)
+    rw /= n; rx /= n; ry /= n; rz /= n
+    if (rw < 0f) { rw = -rw; rx = -rx; ry = -ry; rz = -rz } // shorter arc
+    val angle = 2f * kotlin.math.acos(rw.coerceIn(-1f, 1f))
+    val s = kotlin.math.sqrt(1f - rw * rw)
+    if (s <= 1e-6f) return floatArrayOf(0f, 0f, 0f)
+    val k = angle / (s * dt)
+    return floatArrayOf(rx * k, ry * k, rz * k)
 }
