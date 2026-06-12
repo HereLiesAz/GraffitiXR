@@ -257,13 +257,14 @@ class EditorViewModel @Inject constructor(
         when (command) {
             is EditCommand.Draw -> {
                 if (!layerStore.removeLastStroke(command.layerId)) return
-                rebuildLayerBitmap(command.layerId)
+                rebuildLayerBitmap(command.layerId, emitOp = true)
             }
             is EditCommand.PropertyChange -> {
                 val currentBitmaps = _uiState.value.layers.associate { it.id to it.bitmap }
                 val restoredLayers = command.oldLayers.map { it.copy(bitmap = currentBitmaps[it.id]) }
                 dispatch(EditorIntent.SetLayers(restoredLayers))
                 saveProject()
+                emitLayerStateResync(restoredLayers)
             }
         }
         updateHistoryCounts()
@@ -280,24 +281,31 @@ class EditorViewModel @Inject constructor(
         when (command) {
             is EditCommand.Draw -> {
                 layerStore.addStroke(command.layerId, command.command)
-                rebuildLayerBitmap(command.layerId)
+                rebuildLayerBitmap(command.layerId, emitOp = true)
             }
             is EditCommand.PropertyChange -> {
                 val currentBitmaps = _uiState.value.layers.associate { it.id to it.bitmap }
                 val restoredLayers = command.oldLayers.map { it.copy(bitmap = currentBitmaps[it.id]) }
                 dispatch(EditorIntent.SetLayers(restoredLayers))
                 saveProject()
+                emitLayerStateResync(restoredLayers)
             }
         }
         updateHistoryCounts()
     }
 
-    private fun rebuildLayerBitmap(layerId: String) {
+    private fun rebuildLayerBitmap(layerId: String, emitOp: Boolean = false) {
         val base = layerStore.base(layerId) ?: return
         val strokes = layerStore.strokes(layerId)
 
         viewModelScope.launch(dispatchers.default) {
             val currentBitmap = drawingEngine.composite(base, strokes)
+
+            if (emitOp) {
+                // Used by undo/redo: the layer's pixels changed in a way the guest can't replay,
+                // so push the whole baked bitmap.
+                opEmitter.emit(Op.LayerBitmapReplace(layerId, ImageUtils.bitmapToByteArray(currentBitmap)))
+            }
 
             withContext(dispatchers.main) {
                 _uiState.update { state ->
@@ -1137,6 +1145,18 @@ class EditorViewModel @Inject constructor(
         saveProject()
     }
 
+    /** Re-pushes layer order, props and transforms to guests after a non-draw undo/redo. */
+    private fun emitLayerStateResync(layers: List<Layer>) {
+        opEmitter.emit(Op.LayerReorder(layers.map { it.id }))
+        layers.forEach { l ->
+            opEmitter.emit(Op.LayerPropsChange(l.id, l.toLayerProps()))
+            opEmitter.emit(Op.LayerTransform(l.id, listOf(
+                l.scale, l.offset.x, l.offset.y, l.rotationX, l.rotationY, l.rotationZ,
+                0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f
+            )))
+        }
+    }
+
     private fun Layer.toLayerProps() = LayerProps(
         isVisible = isVisible,
         opacity = opacity,
@@ -1436,8 +1456,8 @@ class EditorViewModel @Inject constructor(
             scheduleDiskSave(layerId, workBitmap, layer.uri)
         }
 
-        // Emit StrokeComplete for non-Liquify strokes only (Liquify bakes into the bitmap
-        // and doesn't map cleanly to a BrushStroke replay; leave Liquify sync as a TODO).
+        // Co-op sync: replayable brush strokes go as StrokeComplete; Liquify bakes into the
+        // bitmap and can't map to a BrushStroke, so it propagates as a whole-bitmap replace.
         if (state.activeTool != Tool.LIQUIFY) {
             val bitmap = layer.bitmap
             if (bitmap != null) {
@@ -1454,6 +1474,11 @@ class EditorViewModel @Inject constructor(
                     blendModeOrdinal = state.activeTool.ordinal
                 )
                 opEmitter.emit(Op.StrokeComplete(layerId, brushStroke))
+            }
+        } else {
+            val baked = _uiState.value.layers.find { it.id == layerId }?.bitmap
+            if (baked != null) {
+                opEmitter.emit(Op.LayerBitmapReplace(layerId, ImageUtils.bitmapToByteArray(baked)))
             }
         }
 
@@ -1941,6 +1966,20 @@ class EditorViewModel @Inject constructor(
                     .find { it.id == op.layerId }?.textParams?.copy(text = op.text)
                 if (updatedParams != null) {
                     rerasterizeTextLayer(op.layerId, updatedParams)
+                }
+            }
+            is Op.LayerBitmapReplace -> {
+                val layerId = op.layerId
+                if (_uiState.value.layers.none { it.id == layerId }) return
+                viewModelScope.launch(dispatchers.default) {
+                    val decoded = android.graphics.BitmapFactory.decodeByteArray(op.png, 0, op.png.size)
+                        ?: return@launch
+                    val base = decoded.copy(Bitmap.Config.ARGB_8888, false)
+                    if (base != decoded) decoded.recycle()
+                    // The png is the full baked layer; replace base and drop local stroke history.
+                    layerStore.putBase(layerId, base)
+                    layerStore.initStrokes(layerId)
+                    rebuildLayerBitmap(layerId)
                 }
             }
         }

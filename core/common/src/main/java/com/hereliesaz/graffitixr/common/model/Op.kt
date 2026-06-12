@@ -31,4 +31,19 @@ sealed class Op {
 
     @Serializable
     data class TextContentChange(val layerId: String, val text: String) : Op()
+
+    /**
+     * Wholesale replacement of a layer's pixels (PNG-encoded), for mutations that don't map to a
+     * replayable [StrokeComplete] — Liquify warps and undo/redo of a layer's bitmap. The guest
+     * decodes [png] and uses it as the layer's new base, dropping any local stroke history.
+     */
+    @Serializable
+    data class LayerBitmapReplace(val layerId: String, val png: ByteArray) : Op() {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is LayerBitmapReplace) return false
+            return layerId == other.layerId && png.contentEquals(other.png)
+        }
+        override fun hashCode(): Int = 31 * layerId.hashCode() + png.contentHashCode()
+    }
 }
