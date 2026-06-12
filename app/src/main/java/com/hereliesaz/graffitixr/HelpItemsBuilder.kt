@@ -24,6 +24,8 @@ internal fun buildHelpItems(strings: AppStrings, layers: List<Layer>): Map<Strin
         "mode.mockup" to strings.help.mockup,
         "mode.trace" to strings.help.trace,
         "target.create" to strings.help.create,
+        "mode.ar.light" to strings.help.flashlight,
+        "mode.overlay.light" to strings.help.flashlight,
         "mode.mockup.wall" to strings.help.wall,
 
         // Design menu
@@ -51,6 +53,7 @@ internal fun buildHelpItems(strings: AppStrings, layers: List<Layer>): Map<Strin
         "host.project" to strings.help.projectHost,
         "proj.new" to strings.help.newProject,
         "proj.save" to strings.help.saveProject,
+        "proj.export" to strings.help.exportImage,
         "proj.load" to strings.help.loadProject,
         "proj.settings" to strings.help.appSettings,
 

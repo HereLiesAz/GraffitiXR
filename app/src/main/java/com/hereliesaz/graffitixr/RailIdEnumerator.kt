@@ -41,6 +41,10 @@ internal fun enumerateRailItemIdRegistrations(layers: List<Layer>, mode: EditorM
     )
     if (mode == EditorMode.AR) {
         ids += "target.create"
+        ids += "mode.ar.light"
+    }
+    if (mode == EditorMode.OVERLAY) {
+        ids += "mode.overlay.light"
     }
 
     // Design menu
@@ -50,7 +54,7 @@ internal fun enumerateRailItemIdRegistrations(layers: List<Layer>, mode: EditorM
 
     // Project menu
     ids += listOf(
-        "host.project", "proj.new", "proj.save", "proj.load", "proj.settings"
+        "host.project", "proj.new", "proj.save", "proj.export", "proj.load", "proj.settings"
     )
 
     // Global tools
