@@ -26,6 +26,7 @@ fun rememberRailTutorialLines(strings: AppStrings): (String) -> List<String> {
     val modeOverlay = array(DesignR.array.onboarding_overlay)
     val modeMockup = array(DesignR.array.onboarding_mockup)
     val modeTrace = array(DesignR.array.onboarding_trace)
+    val modeDesign = array(DesignR.array.onboarding_design)
 
     @Composable
     fun s(any: Any): String = when (any) {
@@ -36,28 +37,28 @@ fun rememberRailTutorialLines(strings: AppStrings): (String) -> List<String> {
 
     val h = strings.help
 
+    // Keys MUST match the rail-item ids registered in ConfigureRailItems (and enumerated by
+    // RailIdEnumerator / surfaced by buildHelpItems) — otherwise the do-it-to-advance walkthrough
+    // produces no steps. These are the real ids, not the older mode.host/design.host/project.* scheme.
     val staticMap: Map<String, List<String>> = mapOf(
-        "mode.host" to listOf(s(h.modeHost)),
+        "host.modes" to listOf(s(h.modeHost)),
         "mode.ar" to modeAr,
         "mode.overlay" to modeOverlay,
         "mode.mockup" to modeMockup,
         "mode.trace" to modeTrace,
-        "target.host" to listOf(s(h.targetHost)),
-        "target.scanModeToggle" to listOf(s(h.scanModeToggle)),
+        "mode.mockup.wall" to listOf(s(h.wall)),
+        "mode.trace.freeze" to listOf(s(h.lockTrace)),
         "target.create" to listOf(s(h.create)),
-        "design.host" to listOf(s(h.designHost)),
+        "host.design" to modeDesign,
         "design.addImg" to listOf(s(h.addImg)),
         "design.addDraw" to listOf(s(h.addDraw)),
         "design.addText" to listOf(s(h.addText)),
-        "design.wall" to listOf(s(h.wall)),
-        "project.host.main" to listOf(s(h.projectHost)),
-        "project.new" to listOf(s(h.newProject)),
-        "project.save" to listOf(s(h.saveProject)),
-        "project.load" to listOf(s(h.loadProject)),
-        "project.export" to listOf(s(h.exportImage)),
-        "project.settings" to listOf(s(h.appSettings)),
-        "tool.light" to listOf(s(h.flashlight)),
-        "tool.lockTrace" to listOf(s(h.lockTrace)),
+        "host.project" to listOf(s(h.projectHost)),
+        "proj.new" to listOf(s(h.newProject)),
+        "proj.save" to listOf(s(h.saveProject)),
+        "proj.load" to listOf(s(h.loadProject)),
+        "proj.settings" to listOf(s(h.appSettings)),
+        "item.help" to listOf(s(strings.nav.help)),
     )
 
     // Per-layer editing tools, keyed by the suffix after ".tool." in the rail id.
