@@ -757,6 +757,9 @@ class MainActivity : ComponentActivity() {
                                     ProjectLibraryScreen(
                                         projects = dashboardState.availableProjects,
                                         onLoadProject = { project ->
+                                            // Switching projects ends any active guest co-op session
+                                            // so host ops can't keep mutating the newly-opened project.
+                                            if (arUiState.coopRole == CoopRole.GUEST) arViewModel.leaveSession()
                                             dashboardViewModel.openProject(project)
                                             navController.navigate(EditorMode.DESIGN.name) {
                                                 popUpTo(LIBRARY_ROUTE) { inclusive = true }
@@ -764,7 +767,10 @@ class MainActivity : ComponentActivity() {
                                             }
                                         },
                                         onDeleteProject = { dashboardViewModel.deleteProject(it) },
-                                        onNewProject = { dashboardViewModel.onNewProjectTriggered() },
+                                        onNewProject = {
+                                            if (arUiState.coopRole == CoopRole.GUEST) arViewModel.leaveSession()
+                                            dashboardViewModel.onNewProjectTriggered()
+                                        },
                                         onImportProject = { uri -> dashboardViewModel.importProject(uri) },
                                         onClose = { /* no-op: ProjectLibraryScreen no longer exposes a close affordance */ },
                                         strings = strings
