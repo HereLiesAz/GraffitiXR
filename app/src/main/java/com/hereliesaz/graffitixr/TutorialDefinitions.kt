@@ -167,21 +167,6 @@ fun getTutorials(layers: List<Layer>, strings: AppStrings): Map<String, AzTutori
     tutorials["design.addText"] = createSimpleTutorial("design.addText", resolve(strings.nav.text), resolve(strings.help.addText))
     tutorials["design.wall"] = createSimpleTutorial("design.wall", navWall, helpWall)
 
-    // --- Tools Menu ---
-    tutorials["sub.design.tools"] = createSimpleTutorial("sub.design.tools", "Tools", helpDesignHost)
-    tutorials["grp.paint"] = createSimpleTutorial("grp.paint", "Paint", resolve(strings.help.addDraw))
-    tutorials["tool.brush"] = createSimpleTutorial("tool.brush", "Brush", helpSize)
-    tutorials["tool.eraser"] = createSimpleTutorial("tool.eraser", navEraser, helpEraser)
-    tutorials["grp.retouch"] = createSimpleTutorial("grp.retouch", "Retouch", helpBlur)
-    tutorials["tool.blur"] = createSimpleTutorial("tool.blur", navBlur, helpBlur)
-    tutorials["tool.liquify"] = createSimpleTutorial("tool.liquify", navLiquify, helpLiquify)
-    tutorials["grp.color"] = createSimpleTutorial("grp.color", "Color", helpAdj)
-    tutorials["adj.invert"] = createSimpleTutorial("adj.invert", navInvert, helpInvert)
-    tutorials["adj.balance"] = createSimpleTutorial("adj.balance", navBalance, helpBalance)
-    tutorials["adj.blend"] = createSimpleTutorial("adj.blend", navBuild, helpBlend)
-    tutorials["tool.filter"] = createSimpleTutorial("tool.filter", "Filter", helpAdj)
-
-
     // --- Project Menu ---
     tutorials["host.project"] = createSimpleTutorial("host.project", navProject, helpProjectHost)
     tutorials["proj.new"] = createSimpleTutorial("proj.new", navNew, helpNewProject)
@@ -197,6 +182,12 @@ fun getTutorials(layers: List<Layer>, strings: AppStrings): Map<String, AzTutori
         val layerNameHelp = strings.help.layer(layer.name)
 
         tutorials[layerId(layer)] = createSimpleTutorial(layerId(layer), layerNameHelp, layerNameHelp)
+        // Tool-category folders (host items) inside the layer's nested rail.
+        tutorials[layerId(layer, "grp.text")] = createSimpleTutorial(layerId(layer, "grp.text"), "Text", helpEditText)
+        tutorials[layerId(layer, "grp.paint")] = createSimpleTutorial(layerId(layer, "grp.paint"), "Paint", resolve(strings.help.addDraw))
+        tutorials[layerId(layer, "grp.retouch")] = createSimpleTutorial(layerId(layer, "grp.retouch"), "Retouch", helpBlur)
+        tutorials[layerId(layer, "grp.adjust")] = createSimpleTutorial(layerId(layer, "grp.adjust"), navAdjust, helpAdj)
+        tutorials[layerId(layer, "grp.effects")] = createSimpleTutorial(layerId(layer, "grp.effects"), navStencil, helpStencilGen)
         tutorials[layerId(layer, "editText")] = createSimpleTutorial(layerId(layer, "editText"), navEdit, helpEditText)
         tutorials[layerId(layer, "size.brush")] = createSimpleTutorial(layerId(layer, "size.brush"), strings.editor.brushSize, helpSize)
         tutorials[layerId(layer, "size.text")] = createSimpleTutorial(layerId(layer, "size.text"), strings.editor.brushSize, helpSize)

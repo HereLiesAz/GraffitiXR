@@ -1568,8 +1568,10 @@ class MainActivity : ComponentActivity() {
                             when {
                                 layer.textParams != null -> {
                                     val tp = layer.textParams!!
-                                    azRailItem(
+                                    azRailHostItem(id = layerId(layer, "grp.text"), text = "Text", color = navItemColor, shape = AzButtonShape.RECTANGLE)
+                                    azRailSubItem(
                                         id = layerId(layer, "font"),
+                                        hostId = layerId(layer, "grp.text"),
                                         text = navStrings.font,
                                         color = navItemColor,
                                         shape = AzButtonShape.CIRCLE
@@ -1577,8 +1579,9 @@ class MainActivity : ComponentActivity() {
                                         activate()
                                         onShowFontPicker(layer.id)
                                     }
-                                    azRailItem(
+                                    azRailSubItem(
                                         id = layerId(layer, "size.text"),
+                                        hostId = layerId(layer, "grp.text"),
                                         text = navStrings.size,
                                         color = navItemColor,
                                         shape = AzButtonShape.CIRCLE,
@@ -1608,8 +1611,9 @@ class MainActivity : ComponentActivity() {
                                             }
                                         }
                                     )
-                                    azRailItem(
+                                    azRailSubItem(
                                         id = layerId(layer, "color"),
+                                        hostId = layerId(layer, "grp.text"),
                                         text = navStrings.color,
                                         color = navItemColor,
                                         shape = AzButtonShape.CIRCLE,
@@ -1643,8 +1647,9 @@ class MainActivity : ComponentActivity() {
                                             }
                                         }
                                     )
-                                    azRailItem(
+                                    azRailSubItem(
                                         id = layerId(layer, "kern"),
+                                        hostId = layerId(layer, "grp.text"),
                                         text = navStrings.kern,
                                         color = navItemColor,
                                         shape = AzButtonShape.CIRCLE,
@@ -1674,8 +1679,9 @@ class MainActivity : ComponentActivity() {
                                             }
                                         }
                                     )
-                                    azRailItem(
+                                    azRailSubItem(
                                         id = layerId(layer, "bold"),
+                                        hostId = layerId(layer, "grp.text"),
                                         text = navStrings.bold,
                                         color = if (tp.isBold) Cyan else navItemColor,
                                         shape = AzButtonShape.CIRCLE
@@ -1683,8 +1689,9 @@ class MainActivity : ComponentActivity() {
                                         activate()
                                         editorViewModel.onTextStyleChanged(layer.id, !tp.isBold, tp.isItalic, tp.hasOutline, tp.hasDropShadow)
                                     }
-                                    azRailItem(
+                                    azRailSubItem(
                                         id = layerId(layer, "italic"),
+                                        hostId = layerId(layer, "grp.text"),
                                         text = navStrings.italic,
                                         color = if (tp.isItalic) Cyan else navItemColor,
                                         shape = AzButtonShape.CIRCLE
@@ -1692,8 +1699,9 @@ class MainActivity : ComponentActivity() {
                                         activate()
                                         editorViewModel.onTextStyleChanged(layer.id, tp.isBold, !tp.isItalic, tp.hasOutline, tp.hasDropShadow)
                                     }
-                                    azRailItem(
+                                    azRailSubItem(
                                         id = layerId(layer, "outline"),
+                                        hostId = layerId(layer, "grp.text"),
                                         text = navStrings.outline,
                                         color = if (tp.hasOutline) Cyan else navItemColor,
                                         shape = AzButtonShape.CIRCLE
@@ -1701,8 +1709,9 @@ class MainActivity : ComponentActivity() {
                                         activate()
                                         editorViewModel.onTextStyleChanged(layer.id, tp.isBold, tp.isItalic, !tp.hasOutline, tp.hasDropShadow)
                                     }
-                                    azRailItem(
+                                    azRailSubItem(
                                         id = layerId(layer, "shadow"),
+                                        hostId = layerId(layer, "grp.text"),
                                         text = navStrings.shadow,
                                         color = if (tp.hasDropShadow) Cyan else navItemColor,
                                         shape = AzButtonShape.CIRCLE
@@ -1711,8 +1720,10 @@ class MainActivity : ComponentActivity() {
                                         editorViewModel.onTextStyleChanged(layer.id, tp.isBold, tp.isItalic, tp.hasOutline, !tp.hasDropShadow)
                                     }
                                     if (layer.stencilType == null) {
-                                        azRailItem(
+                                        azRailHostItem(id = layerId(layer, "grp.effects"), text = "Effects", color = navItemColor, shape = AzButtonShape.RECTANGLE)
+                                        azRailSubItem(
                                             id = layerId(layer, "stencil"),
+                                            hostId = layerId(layer, "grp.effects"),
                                             text = navStrings.stencil,
                                             color = navItemColor,
                                             shape = AzButtonShape.CIRCLE,
@@ -1739,22 +1750,26 @@ class MainActivity : ComponentActivity() {
                                             editorViewModel.onGenerateStencil(layer.id)
                                         }
                                     }
-                                    azRailItem(
+                                    azRailHostItem(id = layerId(layer, "grp.adjust"), text = "Adjust", color = navItemColor, shape = AzButtonShape.RECTANGLE)
+                                    azRailSubItem(
                                         id = layerId(layer, "blend"),
+                                        hostId = layerId(layer, "grp.adjust"),
                                         text = navStrings.build,
                                         color = navItemColor,
                                         shape = AzButtonShape.CIRCLE,
                                         onClick = { activate(); editorViewModel.onCycleBlendMode() }
                                     )
-                                    azRailItem(
+                                    azRailSubItem(
                                         id = layerId(layer, "adj"),
+                                        hostId = layerId(layer, "grp.adjust"),
                                         text = navStrings.adjust,
                                         color = navItemColor,
                                         shape = AzButtonShape.CIRCLE,
                                         onClick = { activate(); editorViewModel.onAdjustClicked() }
                                     )
-                                    azRailItem(
+                                    azRailSubItem(
                                         id = layerId(layer, "invert"),
+                                        hostId = layerId(layer, "grp.adjust"),
                                         text = navStrings.invert,
                                         color = if (layer.isInverted) Cyan else navItemColor,
                                         shape = AzButtonShape.CIRCLE,

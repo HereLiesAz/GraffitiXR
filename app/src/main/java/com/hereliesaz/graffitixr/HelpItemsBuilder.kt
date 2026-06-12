@@ -65,6 +65,7 @@ internal fun buildHelpItems(strings: AppStrings, layers: List<Layer>): Map<Strin
         base[layerId(layer, "grp.retouch")] = strings.help.blur
         base[layerId(layer, "grp.adjust")] = strings.help.adj
         base[layerId(layer, "grp.effects")] = strings.help.stencilGen
+        base[layerId(layer, "grp.text")] = strings.help.editText
         base[layerId(layer, "editText")] = strings.help.editText
         base[layerId(layer, "size.brush")] = strings.help.size
         base[layerId(layer, "size.text")] = strings.help.size
