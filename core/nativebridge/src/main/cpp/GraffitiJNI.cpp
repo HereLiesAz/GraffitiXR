@@ -946,6 +946,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDetectSuperPoint(
     jfloatArray result = env->NewFloatArray(2 + 2 * n + n * d);
     if (!result) return nullptr;
     jfloat* ptr = env->GetFloatArrayElements(result, nullptr);
+    if (!ptr) return nullptr;
     ptr[0] = (float)n; ptr[1] = (float)d;
     for (int i = 0; i < n; ++i) { ptr[2 + 2*i] = kps[i].pt.x; ptr[2 + 2*i + 1] = kps[i].pt.y; }
     std::memcpy(ptr + 2 + 2*n, dc.ptr<float>(0), (size_t)n * d * sizeof(float));
@@ -969,6 +970,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintKeyp
     jfloatArray result = env->NewFloatArray((jsize)(pts.size() * 2));
     if (!result) return nullptr;
     jfloat* ptr = env->GetFloatArrayElements(result, nullptr);
+    if (!ptr) return nullptr;
     for (size_t i = 0; i < pts.size(); ++i) { ptr[i * 2] = pts[i].x; ptr[i * 2 + 1] = pts[i].y; }
     env->ReleaseFloatArrayElements(result, ptr, 0);
     return result;
@@ -996,6 +998,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetKeypoints(
     jfloatArray result = env->NewFloatArray((jsize)(kps.size() * 2));
     if (!result) return nullptr;
     jfloat* ptr = env->GetFloatArrayElements(result, nullptr);
+    if (!ptr) return nullptr;
     for (size_t i = 0; i < kps.size(); ++i) {
         ptr[i * 2] = kps[i].pt.x;
         ptr[i * 2 + 1] = kps[i].pt.y;

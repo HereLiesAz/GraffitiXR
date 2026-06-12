@@ -522,32 +522,41 @@ class EditorViewModel @Inject constructor(
      */
     private fun scheduleThumbnailUpdate() {
         val projectId = _uiState.value.projectId ?: return
-        thumbnailJob?.cancel()
-        thumbnailJob = viewModelScope.launch(dispatchers.default) {
-            kotlinx.coroutines.delay(2000)
-            if (_uiState.value.layers.none { it.isVisible && it.bitmap != null }) return@launch
-            val metrics = context.resources.displayMetrics
-            val w = metrics.widthPixels.takeIf { it > 0 } ?: 1080
-            val h = metrics.heightPixels.takeIf { it > 0 } ?: 1920
-            val composite = exportManager.compositeLayers(_uiState.value.layers, w, h)
-            // Downscale to a small preview so the file stays tiny and decodes fast in the library.
-            val maxDim = 512
-            val longest = maxOf(composite.width, composite.height).coerceAtLeast(1)
-            val scale = maxDim.toFloat() / longest
-            val thumb = if (scale < 1f) {
-                Bitmap.createScaledBitmap(
-                    composite,
-                    (composite.width * scale).toInt().coerceAtLeast(1),
-                    (composite.height * scale).toInt().coerceAtLeast(1),
-                    true
-                )
-            } else composite
-            val bytes = ImageUtils.bitmapToByteArray(thumb)
-            if (thumb !== composite) thumb.recycle()
-            composite.recycle()
-            val path = projectRepository.saveArtifact(projectId, "thumbnail.png", bytes)
-            projectRepository.updateProject {
-                if (it.id == projectId) it.copy(thumbnailUri = "file://$path".toUri()) else it
+        // Confine the job cancel/assign to the main thread so concurrent saveProject() calls (which
+        // run on the multi-threaded IO dispatcher) can't race on thumbnailJob and leak coroutines.
+        viewModelScope.launch(dispatchers.main) {
+            thumbnailJob?.cancel()
+            thumbnailJob = viewModelScope.launch(dispatchers.default) {
+                try {
+                    kotlinx.coroutines.delay(2000)
+                    if (_uiState.value.layers.none { it.isVisible && it.bitmap != null }) return@launch
+                    val metrics = context.resources.displayMetrics
+                    val w = metrics.widthPixels.takeIf { it > 0 } ?: 1080
+                    val h = metrics.heightPixels.takeIf { it > 0 } ?: 1920
+                    val composite = exportManager.compositeLayers(_uiState.value.layers, w, h)
+                    // Downscale to a small preview so the file stays tiny and decodes fast.
+                    val maxDim = 512
+                    val longest = maxOf(composite.width, composite.height).coerceAtLeast(1)
+                    val scale = maxDim.toFloat() / longest
+                    val thumb = if (scale < 1f) {
+                        Bitmap.createScaledBitmap(
+                            composite,
+                            (composite.width * scale).toInt().coerceAtLeast(1),
+                            (composite.height * scale).toInt().coerceAtLeast(1),
+                            true
+                        )
+                    } else composite
+                    val bytes = ImageUtils.bitmapToByteArray(thumb)
+                    if (thumb !== composite) thumb.recycle()
+                    composite.recycle()
+                    val path = projectRepository.saveArtifact(projectId, "thumbnail.png", bytes)
+                    projectRepository.updateProject {
+                        if (it.id == projectId) it.copy(thumbnailUri = "file://$path".toUri()) else it
+                    }
+                } catch (e: Exception) {
+                    // Thumbnails are best-effort; never let one crash the app.
+                    android.util.Log.e("EditorViewModel", "Failed to generate thumbnail", e)
+                }
             }
         }
     }
