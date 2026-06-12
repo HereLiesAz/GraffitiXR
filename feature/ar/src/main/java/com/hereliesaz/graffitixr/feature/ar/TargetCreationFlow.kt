@@ -366,15 +366,6 @@ private fun TargetRefinementScreen(
                 )
             }
 
-            maskBitmap?.let { bmp ->
-                Image(
-                    bitmap = bmp.asImageBitmap(),
-                    contentDescription = "Feature Mask",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
-            }
-
             if (rawBitmap != null && boxSize != IntSize.Zero) {
                 val bmpW = rawBitmap.width.toFloat()
                 val bmpH = rawBitmap.height.toFloat()
@@ -386,33 +377,8 @@ private fun TargetRefinementScreen(
                 val imgX = (boxW - imgW) / 2f
                 val imgY = (boxH - imgH) / 2f
 
-                // Fingerprint-as-mask: the preview shows exactly what the CV will look for and
-                // nothing else. A near-opaque scrim covers the capture, punched through (BlendMode
-                // .Clear in an offscreen layer) at each fingerprint keypoint, so the descriptor
-                // patches the matcher anchors on are the ONLY visible image regions. Erasing a
-                // region (tap/drag below) removes its keypoints and the holes close with them.
-                Canvas(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-                ) {
-                    drawRect(
-                        color = Color.Black.copy(alpha = 0.92f),
-                        topLeft = Offset(imgX, imgY),
-                        size = Size(imgW, imgH)
-                    )
-                    // Reveal radius approximates the descriptor patch footprint at preview scale.
-                    val reveal = (imgW * 0.018f).coerceAtLeast(10f)
-                    keypoints.forEach { kp ->
-                        drawCircle(
-                            color = Color.Transparent,
-                            radius = reveal,
-                            center = Offset(imgX + kp.x * imgW, imgY + kp.y * imgH),
-                            blendMode = BlendMode.Clear
-                        )
-                    }
-                }
-
+                // The captured photo stays fully visible for refinement (the feature/voxel mask
+                // belongs on the live camera scan, not here). Tap/drag still excludes regions.
                 Box(
                     modifier = Modifier.fillMaxSize()
                         .pointerInput(Unit) {
