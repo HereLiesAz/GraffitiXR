@@ -95,6 +95,10 @@ class EditorViewModel @Inject constructor(
     // A's strokes; per-layer jobs cancel only the same layer's superseded save.
     private val pendingSaveJobs = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Job>()
 
+    // Debounced project-preview thumbnail generation. saveProject() fires on nearly every edit,
+    // so the thumbnail is regenerated at most once the edits settle, off the main thread.
+    private var thumbnailJob: kotlinx.coroutines.Job? = null
+
     private var copiedLayerState: Layer? = null
     private var anchorHalfExtentMeters: Pair<Float, Float>? = null
 
@@ -497,12 +501,53 @@ class EditorViewModel @Inject constructor(
             if (name != null) {
                 exportProjectInternal(manifestToSave)
             }
+
+            scheduleThumbnailUpdate()
             } catch (e: Exception) {
                 // Don't let a failed save die silently — the user believes their work is safe.
                 android.util.Log.e("EditorViewModel", "Failed to save project", e)
                 withContext(dispatchers.main) {
                     Toast.makeText(context, "Couldn't save the project — storage may be full", Toast.LENGTH_LONG).show()
                 }
+            }
+        }
+    }
+
+    /**
+     * Regenerates the project's preview thumbnail off the main thread, debounced so the rapid
+     * stream of autosaves doesn't composite on every stroke. Writes the standard
+     * projects/<id>/thumbnail.png (which ProjectManager.saveProject also auto-detects) and records
+     * its uri on the project. The update keeps the same project id, so the currentProject collector
+     * treats it as a no-op and never reloads the editor.
+     */
+    private fun scheduleThumbnailUpdate() {
+        val projectId = _uiState.value.projectId ?: return
+        thumbnailJob?.cancel()
+        thumbnailJob = viewModelScope.launch(dispatchers.default) {
+            kotlinx.coroutines.delay(2000)
+            if (_uiState.value.layers.none { it.isVisible && it.bitmap != null }) return@launch
+            val metrics = context.resources.displayMetrics
+            val w = metrics.widthPixels.takeIf { it > 0 } ?: 1080
+            val h = metrics.heightPixels.takeIf { it > 0 } ?: 1920
+            val composite = exportManager.compositeLayers(_uiState.value.layers, w, h)
+            // Downscale to a small preview so the file stays tiny and decodes fast in the library.
+            val maxDim = 512
+            val longest = maxOf(composite.width, composite.height).coerceAtLeast(1)
+            val scale = maxDim.toFloat() / longest
+            val thumb = if (scale < 1f) {
+                Bitmap.createScaledBitmap(
+                    composite,
+                    (composite.width * scale).toInt().coerceAtLeast(1),
+                    (composite.height * scale).toInt().coerceAtLeast(1),
+                    true
+                )
+            } else composite
+            val bytes = ImageUtils.bitmapToByteArray(thumb)
+            if (thumb !== composite) thumb.recycle()
+            composite.recycle()
+            val path = projectRepository.saveArtifact(projectId, "thumbnail.png", bytes)
+            projectRepository.updateProject {
+                if (it.id == projectId) it.copy(thumbnailUri = "file://$path".toUri()) else it
             }
         }
     }
