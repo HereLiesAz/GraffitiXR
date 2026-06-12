@@ -86,9 +86,6 @@ import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.onboarding.ArUnavailableOverlay
-import com.hereliesaz.graffitixr.onboarding.ModeOnboarding
-import com.hereliesaz.graffitixr.onboarding.ModeOnboardingOverlay
-import com.hereliesaz.graffitixr.onboarding.rememberModeOnboardings
 import com.hereliesaz.graffitixr.common.model.Tool
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
@@ -505,9 +502,6 @@ class MainActivity : ComponentActivity() {
                 val tutorials = remember(rawTutorials, allHelpItems) {
                     rawTutorials.filterKeys { it in allHelpItems }
                 }
-                val onboardings = rememberModeOnboardings()
-                var activeOnboarding by remember { mutableStateOf<ModeOnboarding?>(null) }
-
                 if (BuildConfig.DEBUG) {
                     RailIntegrityCheck.verify(
                         layers = editorUiState.layers,
@@ -610,17 +604,6 @@ class MainActivity : ComponentActivity() {
                             mainUiState.isCapturingTarget || showSaveDialog ||
                             dashboardUiState.showNewProjectDialog
 
-                        // The ordered do-it-to-advance walkthrough for the current mode/layers.
-                        // Derived from the rail enumeration + help/text maps so it always matches
-                        // what's actually on the rail; remembered, so it only changes on mode/layer
-                        // changes and the effect below doesn't re-fire every recomposition.
-                        val tutorialSeq = rememberTutorialSequence(strings, editorUiState.layers, editorUiState.editorMode)
-                        LaunchedEffect(tutorialSeq, mainUiState.tutorialModeActive) {
-                            if (mainUiState.tutorialModeActive) {
-                                mainViewModel.setTutorialSequence(tutorialSeq)
-                            }
-                        }
-
                         // Auto-open the edit-text box the instant a new text layer is created.
                         // The new layer's rail item must compose first (with its hidden menu
                         // closed) so flipping layerMenusOpen to true is a clean closed->open edge
@@ -635,54 +618,32 @@ class MainActivity : ComponentActivity() {
 
                         val completedTutorials by mainViewModel.completedTutorials.collectAsState()
 
-                        LaunchedEffect(
-                            editorUiState.editorMode,
-                            showLibrary,
-                            showSettings,
-                            isExporting,
-                            mainUiState.isCapturingTarget,
-                            mainUiState.tutorialModeActive,
-                            completedTutorials
-                        ) {
-                            if (anyModalActive) return@LaunchedEffect
-                            // Tutorial mode drives its own walkthrough overlay (below); don't also
-                            // auto-fire the first-run onboarding underneath it.
-                            if (mainUiState.tutorialModeActive) return@LaunchedEffect
-                            // First-run behaviour: auto-onboard a brand-new (empty) project per mode,
-                            // but only until the user has completed that mode's onboarding once.
-                            if (editorUiState.layers.isNotEmpty()) return@LaunchedEffect
-                            val mode = editorUiState.editorMode
-                            if ("mode.${mode.name}" in completedTutorials) return@LaunchedEffect
-                            activeOnboarding = onboardings[mode]
-                        }
-
-                        if (!anyModalActive) {
-                            val currentStep = mainUiState.tutorialSteps.getOrNull(mainUiState.tutorialStepIndex)
-                            if (mainUiState.tutorialModeActive && currentStep != null) {
-                                // Do-it-to-advance walkthrough: show the current step's instruction.
-                                // It advances when the user performs the targeted interaction
-                                // (onInteraction -> onRailInteraction); the screen tap / idle timer
-                                // here advance via advanceTutorialIdle so a stuck user isn't trapped.
-                                ModeOnboardingOverlay(
-                                    positionKey = currentStep.targetId,
-                                    step = mainUiState.tutorialLineIndex,
-                                    lines = currentStep.lines,
-                                    onAdvance = { mainViewModel.advanceTutorialIdle() },
-                                    onDismiss = { mainViewModel.dismissCurrentTutorial() },
-                                    targetBounds = railItemBounds[currentStep.targetId]
+                        // Adaptive onboarding coach. A single step is derived from the *current* app
+                        // state (mode, layers, active layer, wall photo, AR target) — the coach adapts
+                        // to the user instead of forcing a fixed path: performing the action changes
+                        // the state, which moves the coach to the next step on its own. It shows only
+                        // when the user is idle (never over a modal, never mid-gesture), reveals a
+                        // step's lines one at a time (screen tap or idle timer), and remembers each
+                        // step as shown so it never nags. Tapping Help (tutorialModeActive) replays
+                        // coaching for the session, ignoring the persisted "already seen" set.
+                        val coachStep = rememberCoachStep(editorUiState, arUiState)
+                        val replayCoaching = mainUiState.tutorialModeActive
+                        val coachSeenThisSession =
+                            remember(replayCoaching) { androidx.compose.runtime.mutableStateListOf<String>() }
+                        if (!anyModalActive && coachStep != null) {
+                            val key = coachStep.key
+                            val suppressed = key in coachSeenThisSession ||
+                                (!replayCoaching && key in completedTutorials)
+                            if (!suppressed) {
+                                OnboardingCoachOverlay(
+                                    step = coachStep,
+                                    gestureInProgress = editorUiState.gestureInProgress,
+                                    targetBounds = coachStep.targetId?.let { railItemBounds[it] },
+                                    onSeen = {
+                                        coachSeenThisSession.add(key)
+                                        if (!replayCoaching) mainViewModel.markTutorialCompletePersistent(key)
+                                    },
                                 )
-                            } else if (!mainUiState.tutorialModeActive) {
-                                activeOnboarding?.let { ob ->
-                                    ModeOnboardingOverlay(
-                                        onboarding = ob,
-                                        onDismiss = {
-                                            // Persist so a mode's first-run onboarding shows once, not
-                                            // on every new empty project.
-                                            mainViewModel.markTutorialCompletePersistent("mode.${ob.mode.name}")
-                                            activeOnboarding = null
-                                        }
-                                    )
-                                }
                             }
                         }
 

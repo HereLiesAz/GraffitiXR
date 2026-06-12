@@ -483,7 +483,10 @@ class ArRenderer(
         }
         // Diagnostic perception view: ALL active layers of what the AR is seeing.
         val anyLayerOn = showFeaturePoints || showPlaneGrids || showVoxels || showPoints || showMesh
-        if (anyLayerOn && isTracking && !isCapturingTarget) {
+        // Show the perception mask (feature points / voxels) on the LIVE camera during scanning —
+        // including while aiming a target. The captured frame is the raw camera image (GL overlays
+        // aren't baked in), so the mask belongs here, not painted onto the frozen target preview.
+        if (anyLayerOn && isTracking) {
             if (showFeaturePoints) {
                 try {
                     frame.acquirePointCloud().use { arDebugRenderer.update(it) }
