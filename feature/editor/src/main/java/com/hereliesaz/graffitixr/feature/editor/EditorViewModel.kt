@@ -1262,7 +1262,12 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.default) {
             val workBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
             val workCanvas = Canvas(workBitmap)
-            val paint = buildStrokePaint(tool, argb, brushSize, feathering)
+            // Match the rail size preview exactly: brushSize is screen px; scale it into this layer's
+            // bitmap space (1f for an unscaled sketch) so the painted dab is the previewed diameter.
+            val brushScale = ImageProcessor.screenToBitmapScale(
+                canvasSize.width, canvasSize.height, workBitmap.width, workBitmap.height, strokeLayerScale
+            )
+            val paint = buildStrokePaint(tool, argb, brushSize * brushScale, feathering)
 
             // Snapshot the collected points at this moment — may include points that arrived
             // during the bitmap-copy phase.

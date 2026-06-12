@@ -45,8 +45,14 @@ internal class DrawingEngine(private val slamManager: SlamManager) {
             stroke.path, stroke.canvasSize.width, stroke.canvasSize.height, bitmap.width, bitmap.height,
             stroke.layerScale, stroke.layerOffset, stroke.layerRotationZ
         )
+        // brushSize is stored in screen px (what the rail size preview shows). Convert it to bitmap
+        // space with the same scale the coordinates use, so the painted stroke renders at exactly the
+        // previewed on-screen diameter regardless of the layer's resolution/scale.
+        val brushScale = ImageProcessor.screenToBitmapScale(
+            stroke.canvasSize.width, stroke.canvasSize.height, bitmap.width, bitmap.height, stroke.layerScale
+        )
         return ImageProcessor.applyToolToBitmap(
-            bitmap, mapped, stroke.tool, stroke.brushSize, stroke.brushColor, stroke.intensity,
+            bitmap, mapped, stroke.tool, stroke.brushSize * brushScale, stroke.brushColor, stroke.intensity,
             replaceExisting, stroke.feathering
         )
     }
