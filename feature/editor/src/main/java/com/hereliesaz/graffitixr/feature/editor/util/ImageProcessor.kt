@@ -28,6 +28,29 @@ object ImageProcessor {
     }
 
         /**
+         * The linear scale that [mapScreenToBitmap] applies to a *length* (e.g. a brush diameter):
+         * screen_px * scale = bitmap_px. It is the same `fitScaleX / layerScale` used for coordinates
+         * (ContentScale.Fit is uniform, so X and Y scales are equal). Drawing a stroke whose width is
+         * `brushSize * scale` in bitmap space therefore renders at exactly `brushSize` screen px,
+         * matching the size preview shown in the rail item. Returns 1f for a 1:1, unscaled layer.
+         */
+        fun screenToBitmapScale(
+            screenWidth: Int,
+            screenHeight: Int,
+            bitmapWidth: Int,
+            bitmapHeight: Int,
+            layerScale: Float,
+        ): Float {
+            if (screenWidth <= 0 || screenHeight <= 0 || bitmapWidth <= 0 || bitmapHeight <= 0) return 1f
+            val imageAspect = bitmapWidth.toFloat() / bitmapHeight.toFloat()
+            val screenAspect = screenWidth.toFloat() / screenHeight.toFloat()
+            val renderWidth = if (imageAspect > screenAspect) screenWidth.toFloat() else screenHeight * imageAspect
+            val fitScaleX = if (renderWidth > 0f) bitmapWidth / renderWidth else 1f
+            val safeLayerScale = if (layerScale > 0.0001f) layerScale else 1f
+            return fitScaleX / safeLayerScale
+        }
+
+        /**
              * Maps screen-space touch coordinates to pixel-space bitmap coordinates,
                   * accounting for Compose's ContentScale.Fit logic used in the UI.
                        */

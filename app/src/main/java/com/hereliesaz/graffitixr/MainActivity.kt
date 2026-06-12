@@ -1467,12 +1467,12 @@ class MainActivity : ComponentActivity() {
                                     shape = AzButtonShape.CIRCLE,
                                     content = AzComposableContent { isEnabled ->
                                         val liveState by editorViewModel.uiState.collectAsState()
-                                        var itemRadiusPx by remember { mutableFloatStateOf(100f) }
+                                        var itemSizePx by remember { mutableFloatStateOf(100f) }
                                         val density = LocalDensity.current
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxSize()
-                                                .onSizeChanged { size -> itemRadiusPx = size.width / 2f }
+                                                .onSizeChanged { size -> itemSizePx = size.width.toFloat() }
                                                 .pointerInput(isEnabled) {
                                                     if (!isEnabled) return@pointerInput
                                                     detectDragGestures { change, dragAmount ->
@@ -1480,7 +1480,7 @@ class MainActivity : ComponentActivity() {
                                                         if (abs(dragAmount.y) >= abs(dragAmount.x)) {
                                                             val currentSize = editorViewModel.uiState.value.brushSize
                                                             editorViewModel.setBrushSize(
-                                                                (currentSize - dragAmount.y * 0.5f).coerceIn(1f, itemRadiusPx)
+                                                                (currentSize - dragAmount.y * 0.5f).coerceIn(1f, maxOf(1f, itemSizePx))
                                                             )
                                                         } else {
                                                             val currentFeather = editorViewModel.uiState.value.brushFeathering
@@ -1493,7 +1493,7 @@ class MainActivity : ComponentActivity() {
                                             contentAlignment = Alignment.Center
                                         ) {
                                             val sizeDp = with(density) {
-                                                liveState.brushSize.coerceIn(1f, itemRadiusPx).toDp()
+                                                liveState.brushSize.coerceIn(1f, maxOf(1f, itemSizePx)).toDp()
                                             }
                                             val checkerModifier = Modifier.drawBehind {
                                                 val squareSize = 6.dp.toPx()
@@ -1522,7 +1522,7 @@ class MainActivity : ComponentActivity() {
                                                     )
                                                 }
                                                 val hardCoreDp = with(density) {
-                                                    (liveState.brushSize * (1f - liveState.brushFeathering * 0.7f)).coerceIn(2f, itemRadiusPx).toDp()
+                                                    (liveState.brushSize * (1f - liveState.brushFeathering * 0.7f)).coerceIn(2f, maxOf(2f, itemSizePx)).toDp()
                                                 }
                                                 Box(
                                                     modifier = Modifier
@@ -1609,9 +1609,11 @@ class MainActivity : ComponentActivity() {
                                                     },
                                                 contentAlignment = Alignment.Center
                                             ) {
+                                                // Fill the whole rail item with the colour swatch.
                                                 Box(
                                                     modifier = Modifier
-                                                        .size(28.dp)
+                                                        .fillMaxSize()
+                                                        .clip(CircleShape)
                                                         .background(Color(currentColor), CircleShape)
                                                         .border(1.dp, navItemColor.copy(alpha = 0.5f), CircleShape)
                                                 )
