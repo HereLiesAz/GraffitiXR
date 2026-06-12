@@ -60,6 +60,7 @@ class MetaGlassProvider @Inject constructor(
     private var clockOffsetNs: Long = 0L
     @Volatile private var clockOffsetCaptured: Boolean = false
 
+    @Synchronized
     private fun normalizeTimestamp(glassesNs: Long): Long {
         if (!clockOffsetCaptured) {
             clockOffsetNs = System.nanoTime() - glassesNs

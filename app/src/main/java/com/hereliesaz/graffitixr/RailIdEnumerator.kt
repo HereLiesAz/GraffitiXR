@@ -56,25 +56,20 @@ internal fun enumerateRailItemIdRegistrations(layers: List<Layer>, mode: EditorM
     // Global tools
     ids += "item.help"
 
-    // Sub-design tools
-    if (layers.isNotEmpty()) {
-        ids += listOf(
-            "sub.design.tools",
-            "grp.paint", "tool.brush", "tool.eraser",
-            "grp.retouch", "tool.blur", "tool.liquify",
-            "grp.color", "adj.invert", "adj.balance", "adj.blend",
-            "tool.filter"
-        )
-    }
-
-    // Per-layer
+    // Per-layer: the layer item, its tool-category folders, the union of every
+    // layer-type tool suffix (see CAVEAT above), and the per-layer help item.
     layers.forEach { layer ->
+        ids += layerId(layer)
         ids += listOf(
-            "layer.${layer.id}",
-            "layer.${layer.id}.edit",
-            "layer.${layer.id}.hide",
-            "layer.${layer.id}.del"
-        )
+            "grp.text", "grp.paint", "grp.retouch", "grp.adjust", "grp.effects",
+        ).map { layerId(layer, it) }
+        ids += listOf(
+            "editText", "font", "size.text", "color", "kern", "bold", "italic",
+            "outline", "shadow", "size.brush", "eraser", "blur", "liquify",
+            "dodge", "burn", "adj", "balance", "blend", "invert", "stencil",
+            "iso", "line",
+        ).map { layerId(layer, it) }
+        ids += "${layerId(layer)}.help"
     }
 
     return ids

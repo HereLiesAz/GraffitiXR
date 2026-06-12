@@ -81,11 +81,13 @@ class AnchorOrchestrator {
 
         for (ca in tracking) {
             val suggestion = ca.anchor.pose.compose(ca.artworkOffset)
-            
-            // Weight based on proximity? Or just equal weight for now.
-            // A simple distance-based weight (1/d) could improve local precision.
-            val weight = 1.0f 
-            
+
+            // Proximity weight: anchors closer to the artwork (smaller stored offset) are more
+            // reliable for local precision, so weight by 1/(1+distance) rather than equally.
+            val off = ca.artworkOffset
+            val dist = kotlin.math.sqrt(off.tx() * off.tx() + off.ty() * off.ty() + off.tz() * off.tz())
+            val weight = 1.0f / (1.0f + dist)
+
             totalX += suggestion.tx() * weight
             totalY += suggestion.ty() * weight
             totalZ += suggestion.tz() * weight

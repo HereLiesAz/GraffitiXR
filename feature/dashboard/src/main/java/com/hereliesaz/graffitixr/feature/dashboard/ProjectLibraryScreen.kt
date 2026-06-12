@@ -158,7 +158,7 @@ fun ProjectLibraryScreen(
                                         model = project.thumbnailUri,
                                         contentDescription = strings.lib.projectThumbnail,
                                         modifier = Modifier
-                                            .size(60.dp)
+                                            .size(96.dp)
                                             .background(Color.Black)
                                             .padding(1.dp),
                                         contentScale = androidx.compose.ui.layout.ContentScale.Crop
@@ -168,7 +168,7 @@ fun ProjectLibraryScreen(
                                         Icons.Default.Folder,
                                         contentDescription = null,
                                         tint = Color.White,
-                                        modifier = Modifier.size(60.dp).padding(12.dp)
+                                        modifier = Modifier.size(96.dp).padding(12.dp)
                                     )
                                 }
                                 Spacer(Modifier.width(16.dp))

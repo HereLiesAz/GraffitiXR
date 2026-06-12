@@ -173,7 +173,11 @@ class ArViewModel @Inject constructor(
                         slamManager.alignToPeer(fingerprint)
                         projectManager.loadAsSpectator(project)
                     },
-                    onOp = { op -> spectatorOpHandler?.invoke(op) },
+                    onOp = { op ->
+                        val handler = spectatorOpHandler
+                        if (handler != null) handler(op)
+                        else android.util.Log.w("ArViewModel", "Spectator op dropped — handler not wired yet: $op")
+                    },
                 )
                 _uiState.update { it.copy(coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) }
                 observeCoopState()

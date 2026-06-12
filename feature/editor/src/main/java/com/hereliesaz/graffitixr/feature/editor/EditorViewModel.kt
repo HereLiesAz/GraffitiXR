@@ -95,6 +95,10 @@ class EditorViewModel @Inject constructor(
     // A's strokes; per-layer jobs cancel only the same layer's superseded save.
     private val pendingSaveJobs = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Job>()
 
+    // Debounced project-preview thumbnail generation. saveProject() fires on nearly every edit,
+    // so the thumbnail is regenerated at most once the edits settle, off the main thread.
+    private var thumbnailJob: kotlinx.coroutines.Job? = null
+
     private var copiedLayerState: Layer? = null
     private var anchorHalfExtentMeters: Pair<Float, Float>? = null
 
@@ -253,13 +257,14 @@ class EditorViewModel @Inject constructor(
         when (command) {
             is EditCommand.Draw -> {
                 if (!layerStore.removeLastStroke(command.layerId)) return
-                rebuildLayerBitmap(command.layerId)
+                rebuildLayerBitmap(command.layerId, emitOp = true)
             }
             is EditCommand.PropertyChange -> {
                 val currentBitmaps = _uiState.value.layers.associate { it.id to it.bitmap }
                 val restoredLayers = command.oldLayers.map { it.copy(bitmap = currentBitmaps[it.id]) }
                 dispatch(EditorIntent.SetLayers(restoredLayers))
                 saveProject()
+                emitLayerStateResync(restoredLayers)
             }
         }
         updateHistoryCounts()
@@ -276,24 +281,31 @@ class EditorViewModel @Inject constructor(
         when (command) {
             is EditCommand.Draw -> {
                 layerStore.addStroke(command.layerId, command.command)
-                rebuildLayerBitmap(command.layerId)
+                rebuildLayerBitmap(command.layerId, emitOp = true)
             }
             is EditCommand.PropertyChange -> {
                 val currentBitmaps = _uiState.value.layers.associate { it.id to it.bitmap }
                 val restoredLayers = command.oldLayers.map { it.copy(bitmap = currentBitmaps[it.id]) }
                 dispatch(EditorIntent.SetLayers(restoredLayers))
                 saveProject()
+                emitLayerStateResync(restoredLayers)
             }
         }
         updateHistoryCounts()
     }
 
-    private fun rebuildLayerBitmap(layerId: String) {
+    private fun rebuildLayerBitmap(layerId: String, emitOp: Boolean = false) {
         val base = layerStore.base(layerId) ?: return
         val strokes = layerStore.strokes(layerId)
 
         viewModelScope.launch(dispatchers.default) {
             val currentBitmap = drawingEngine.composite(base, strokes)
+
+            if (emitOp) {
+                // Used by undo/redo: the layer's pixels changed in a way the guest can't replay,
+                // so push the whole baked bitmap.
+                opEmitter.emit(Op.LayerBitmapReplace(layerId, ImageUtils.bitmapToByteArray(currentBitmap)))
+            }
 
             withContext(dispatchers.main) {
                 _uiState.update { state ->
@@ -497,11 +509,61 @@ class EditorViewModel @Inject constructor(
             if (name != null) {
                 exportProjectInternal(manifestToSave)
             }
+
+            scheduleThumbnailUpdate()
             } catch (e: Exception) {
                 // Don't let a failed save die silently — the user believes their work is safe.
                 android.util.Log.e("EditorViewModel", "Failed to save project", e)
                 withContext(dispatchers.main) {
                     Toast.makeText(context, "Couldn't save the project — storage may be full", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    /**
+     * Regenerates the project's preview thumbnail off the main thread, debounced so the rapid
+     * stream of autosaves doesn't composite on every stroke. Writes the standard
+     * projects/<id>/thumbnail.png (which ProjectManager.saveProject also auto-detects) and records
+     * its uri on the project. The update keeps the same project id, so the currentProject collector
+     * treats it as a no-op and never reloads the editor.
+     */
+    private fun scheduleThumbnailUpdate() {
+        val projectId = _uiState.value.projectId ?: return
+        // Confine the job cancel/assign to the main thread so concurrent saveProject() calls (which
+        // run on the multi-threaded IO dispatcher) can't race on thumbnailJob and leak coroutines.
+        viewModelScope.launch(dispatchers.main) {
+            thumbnailJob?.cancel()
+            thumbnailJob = viewModelScope.launch(dispatchers.default) {
+                try {
+                    kotlinx.coroutines.delay(2000)
+                    if (_uiState.value.layers.none { it.isVisible && it.bitmap != null }) return@launch
+                    val metrics = context.resources.displayMetrics
+                    val w = metrics.widthPixels.takeIf { it > 0 } ?: 1080
+                    val h = metrics.heightPixels.takeIf { it > 0 } ?: 1920
+                    val composite = exportManager.compositeLayers(_uiState.value.layers, w, h)
+                    // Downscale to a small preview so the file stays tiny and decodes fast.
+                    val maxDim = 512
+                    val longest = maxOf(composite.width, composite.height).coerceAtLeast(1)
+                    val scale = maxDim.toFloat() / longest
+                    val thumb = if (scale < 1f) {
+                        Bitmap.createScaledBitmap(
+                            composite,
+                            (composite.width * scale).toInt().coerceAtLeast(1),
+                            (composite.height * scale).toInt().coerceAtLeast(1),
+                            true
+                        )
+                    } else composite
+                    val bytes = ImageUtils.bitmapToByteArray(thumb)
+                    if (thumb !== composite) thumb.recycle()
+                    composite.recycle()
+                    val path = projectRepository.saveArtifact(projectId, "thumbnail.png", bytes)
+                    projectRepository.updateProject {
+                        if (it.id == projectId) it.copy(thumbnailUri = "file://$path".toUri()) else it
+                    }
+                } catch (e: Exception) {
+                    // Thumbnails are best-effort; never let one crash the app.
+                    android.util.Log.e("EditorViewModel", "Failed to generate thumbnail", e)
                 }
             }
         }
@@ -1083,6 +1145,18 @@ class EditorViewModel @Inject constructor(
         saveProject()
     }
 
+    /** Re-pushes layer order, props and transforms to guests after a non-draw undo/redo. */
+    private fun emitLayerStateResync(layers: List<Layer>) {
+        opEmitter.emit(Op.LayerReorder(layers.map { it.id }))
+        layers.forEach { l ->
+            opEmitter.emit(Op.LayerPropsChange(l.id, l.toLayerProps()))
+            opEmitter.emit(Op.LayerTransform(l.id, listOf(
+                l.scale, l.offset.x, l.offset.y, l.rotationX, l.rotationY, l.rotationZ,
+                0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f
+            )))
+        }
+    }
+
     private fun Layer.toLayerProps() = LayerProps(
         isVisible = isVisible,
         opacity = opacity,
@@ -1382,8 +1456,8 @@ class EditorViewModel @Inject constructor(
             scheduleDiskSave(layerId, workBitmap, layer.uri)
         }
 
-        // Emit StrokeComplete for non-Liquify strokes only (Liquify bakes into the bitmap
-        // and doesn't map cleanly to a BrushStroke replay; leave Liquify sync as a TODO).
+        // Co-op sync: replayable brush strokes go as StrokeComplete; Liquify bakes into the
+        // bitmap and can't map to a BrushStroke, so it propagates as a whole-bitmap replace.
         if (state.activeTool != Tool.LIQUIFY) {
             val bitmap = layer.bitmap
             if (bitmap != null) {
@@ -1400,6 +1474,11 @@ class EditorViewModel @Inject constructor(
                     blendModeOrdinal = state.activeTool.ordinal
                 )
                 opEmitter.emit(Op.StrokeComplete(layerId, brushStroke))
+            }
+        } else {
+            val baked = _uiState.value.layers.find { it.id == layerId }?.bitmap
+            if (baked != null) {
+                opEmitter.emit(Op.LayerBitmapReplace(layerId, ImageUtils.bitmapToByteArray(baked)))
             }
         }
 
@@ -1626,7 +1705,11 @@ class EditorViewModel @Inject constructor(
                 try {
                     val file = java.io.File(uri.path ?: return@launch)
                     java.io.FileOutputStream(file).use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    // Don't swallow silently — the layer bitmap is still updated in memory, but a
+                    // failed disk write means the text edit won't survive reload.
+                    android.util.Log.e("EditorViewModel", "Failed to persist text layer bitmap", e)
+                }
             }
 
             layerStore.putBase(layerId, bitmap.copy(Bitmap.Config.ARGB_8888, false))
@@ -1883,6 +1966,20 @@ class EditorViewModel @Inject constructor(
                     .find { it.id == op.layerId }?.textParams?.copy(text = op.text)
                 if (updatedParams != null) {
                     rerasterizeTextLayer(op.layerId, updatedParams)
+                }
+            }
+            is Op.LayerBitmapReplace -> {
+                val layerId = op.layerId
+                if (_uiState.value.layers.none { it.id == layerId }) return
+                viewModelScope.launch(dispatchers.default) {
+                    val decoded = android.graphics.BitmapFactory.decodeByteArray(op.png, 0, op.png.size)
+                        ?: return@launch
+                    val base = decoded.copy(Bitmap.Config.ARGB_8888, false)
+                    if (base != decoded) decoded.recycle()
+                    // The png is the full baked layer; replace base and drop local stroke history.
+                    layerStore.putBase(layerId, base)
+                    layerStore.initStrokes(layerId)
+                    rebuildLayerBitmap(layerId)
                 }
             }
         }

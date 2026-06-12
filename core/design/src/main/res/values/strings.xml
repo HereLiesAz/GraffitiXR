@@ -630,6 +630,12 @@
         <item>Open \'Design\' and tap \'Wall\' to choose or take a photo of your surface. Do this first!</item>
         <item>Use \'Image\', \'Draw\', or \'Text\' to add layers on top of the wall. Pinch and drag to size and position them.</item>
     </string-array>
+    <string-array name="onboarding_design">
+        <item>This is Design — your workspace. Whatever you build here carries over into every other mode.</item>
+        <item>Open \'Design\' and add a layer: \'Image\' to import a photo, \'Sketch\' to draw, or \'Text\' to type.</item>
+        <item>Tap a layer to open its tools — grouped into Paint, Retouch, Adjust and Effects folders. Pinch and drag on the canvas to size and place it.</item>
+        <item>When it looks right, choose how to use it: \'Trace\' to turn your phone into a lightbox, \'Mockup\' to preview on a photo, or \'AR\' to project it onto a wall.</item>
+    </string-array>
 
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
     <string name="tut_create_anchor_title">Create Anchor</string>

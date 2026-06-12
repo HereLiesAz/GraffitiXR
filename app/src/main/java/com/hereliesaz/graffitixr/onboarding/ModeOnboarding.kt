@@ -13,6 +13,10 @@ fun rememberModeOnboardings(): Map<EditorMode, ModeOnboarding> {
     val context = LocalContext.current
     return remember(context) {
         mapOf(
+            EditorMode.DESIGN to ModeOnboarding(
+                EditorMode.DESIGN,
+                context.resources.getStringArray(DesignR.array.onboarding_design).toList()
+            ),
             EditorMode.TRACE to ModeOnboarding(
                 EditorMode.TRACE,
                 context.resources.getStringArray(DesignR.array.onboarding_trace).toList()

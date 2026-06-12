@@ -67,7 +67,11 @@ android {
             }
         }
 
-        buildConfigField("String", "GH_TOKEN", "\"${localProperties.getProperty("GH_TOKEN") ?: ""}\"")
+        // Do NOT bake a GitHub token into the shipped APK — a PAT embedded in a distributed app can
+        // be extracted from BuildConfig. CrashUploadWorker reads this and already no-ops when empty,
+        // so crash-log upload via an embedded token is intentionally disabled. (The GitHub Packages
+        // maven repo still authenticates at build time via the GH_TOKEN env var in settings.gradle.kts.)
+        buildConfigField("String", "GH_TOKEN", "\"\"")
     }
 
     buildTypes {
