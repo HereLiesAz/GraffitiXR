@@ -31,13 +31,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -357,15 +354,6 @@ private fun TargetRefinementScreen(
                 .padding(top = 40.dp, bottom = 260.dp),
             contentAlignment = Alignment.TopStart
         ) {
-            rawBitmap?.let { bmp ->
-                Image(
-                    bitmap = bmp.asImageBitmap(),
-                    contentDescription = "Raw Capture",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
-            }
-
             if (rawBitmap != null && boxSize != IntSize.Zero) {
                 val bmpW = rawBitmap.width.toFloat()
                 val bmpH = rawBitmap.height.toFloat()
@@ -377,30 +365,25 @@ private fun TargetRefinementScreen(
                 val imgX = (boxW - imgW) / 2f
                 val imgY = (boxH - imgH) / 2f
 
-                // Fingerprint-as-mask: show the identified wall features and mask out the rest.
-                // A near-opaque scrim covers the capture, punched through (BlendMode.Clear in an
-                // offscreen layer) at each fingerprint keypoint, so only the matched descriptor
-                // patches of the photo stay visible. Erasing a region removes its keypoints and the
-                // holes close. NOTE: the voxel/splat visualization is intentionally NOT drawn here —
-                // that belongs on the live camera scan (see ArRenderer).
-                Canvas(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-                ) {
+                // Fingerprint-as-mask: the photo and everything else is masked out, leaving only
+                // black shapes that match the fingerprint target — one filled mark per descriptor
+                // keypoint over a blank field. Erasing a region removes its keypoints, so the
+                // corresponding shapes disappear. NOTE: the voxel/splat visualization is
+                // intentionally NOT drawn here — that belongs on the live camera scan (ArRenderer).
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    // Masked-out field.
                     drawRect(
-                        color = Color.Black.copy(alpha = 0.92f),
+                        color = Color.White,
                         topLeft = Offset(imgX, imgY),
                         size = Size(imgW, imgH)
                     )
-                    // Reveal radius approximates the descriptor patch footprint at preview scale.
-                    val reveal = (imgW * 0.018f).coerceAtLeast(10f)
+                    // Black shapes matching the fingerprint doodles (descriptor patch footprint).
+                    val markRadius = (imgW * 0.018f).coerceAtLeast(10f)
                     keypoints.forEach { kp ->
                         drawCircle(
-                            color = Color.Transparent,
-                            radius = reveal,
-                            center = Offset(imgX + kp.x * imgW, imgY + kp.y * imgH),
-                            blendMode = BlendMode.Clear
+                            color = Color.Black,
+                            radius = markRadius,
+                            center = Offset(imgX + kp.x * imgW, imgY + kp.y * imgH)
                         )
                     }
                 }
