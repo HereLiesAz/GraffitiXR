@@ -44,6 +44,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val THROTTLE_ON_POWER_SAVE = booleanPreferencesKey("throttle_on_power_save")
     private val THROTTLE_ON_LOW_BATTERY = booleanPreferencesKey("throttle_on_low_battery")
     private val THROTTLE_ON_LAG = booleanPreferencesKey("throttle_on_lag")
+    private val ADAPTIVE_RATE_ENABLED = booleanPreferencesKey("adaptive_rate_enabled")
     private val COMPLETED_TUTORIALS = stringSetPreferencesKey("completed_tutorials")
 
     override val language: Flow<AppLanguage> = context.dataStore.data
@@ -195,6 +196,11 @@ class SettingsRepositoryImpl @Inject constructor(
     override val throttleOnLag: Flow<Boolean> = throttleFlow(THROTTLE_ON_LAG)
     override suspend fun setThrottleOnLag(on: Boolean) {
         context.dataStore.edit { it[THROTTLE_ON_LAG] = on }
+    }
+
+    override val adaptiveRateEnabled: Flow<Boolean> = throttleFlow(ADAPTIVE_RATE_ENABLED)
+    override suspend fun setAdaptiveRateEnabled(on: Boolean) {
+        context.dataStore.edit { it[ADAPTIVE_RATE_ENABLED] = on }
     }
 
     override val completedTutorials: Flow<Set<String>> = context.dataStore.data

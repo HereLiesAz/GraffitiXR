@@ -508,6 +508,12 @@ class ArViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
+            // Master adaptive-rate toggle; the renderer reads it to enable/disable idle gating.
+            settingsRepository.adaptiveRateEnabled.collect { on ->
+                _uiState.update { it.copy(adaptiveRateEnabled = on) }
+            }
+        }
+        viewModelScope.launch {
             settingsRepository.forcedStereoUnstable.collect { unstable ->
                 // Only controls whether to use the stereo *camera config* next session — does not
                 // disable the MURAL scan mode (which works on mono).
@@ -608,6 +614,10 @@ class ArViewModel @Inject constructor(
 
     fun setThrottleOnLag(on: Boolean) {
         viewModelScope.launch { settingsRepository.setThrottleOnLag(on) }
+    }
+
+    fun setAdaptiveRateEnabled(on: Boolean) {
+        viewModelScope.launch { settingsRepository.setAdaptiveRateEnabled(on) }
     }
 
     fun setImperialUnits(imperial: Boolean) {
@@ -857,7 +867,14 @@ class ArViewModel @Inject constructor(
                 // (Matching cameraId keeps us on the camera/stream ARCore already validated; we don't
                 // also match resolution because CameraConfig doesn't expose it in this ARCore version.)
                 // If no same-cameraId fps variant exists, we leave the default untouched.
-                val targetFps = if (_uiState.value.cameraTargetFps == 60)
+                // Under battery pressure (tier ≥ medium) cap the camera to 30fps even if 60 was
+                // chosen. Done here at session build only — a mid-session CameraConfig swap resets
+                // tracking, which would be perceptible; the seamless mid-session levers are the
+                // render/SLAM rate ceilings instead.
+                val effectiveCameraFps =
+                    if (_uiState.value.adaptiveRateEnabled && _uiState.value.batteryTier >= 1) 30
+                    else _uiState.value.cameraTargetFps
+                val targetFps = if (effectiveCameraFps == 60)
                     CameraConfig.TargetFps.TARGET_FPS_60 else CameraConfig.TargetFps.TARGET_FPS_30
                 val defaultCfg = s.cameraConfig
                 val fpsConfig = try {
@@ -1749,19 +1766,51 @@ class ArViewModel @Inject constructor(
     private val powerManager by lazy {
         appContext.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
     }
+    private val batteryManager by lazy {
+        appContext.getSystemService(Context.BATTERY_SERVICE) as? android.os.BatteryManager
+    }
     private var thermalListener: android.os.PowerManager.OnThermalStatusChangedListener? = null
     private var powerReceiver: android.content.BroadcastReceiver? = null
     @Volatile private var thermalHot = false
     @Volatile private var batteryLow = false
+    /** Live battery level [0..100], or -1 when unknown. Sampled from ACTION_BATTERY_CHANGED. */
+    @Volatile private var batteryPct = -1
+    /** Battery-level thresholds (%) for the medium / low degradation tiers. */
+    private val BATTERY_TIER_MED = 30
+    private val BATTERY_TIER_LOW = 15
 
+    /**
+     * Folds device-stress signals into the AR rate policy. The coarse perception floor
+     * (perceptionSystemThrottle) is unchanged; the battery *level* additionally degrades the
+     * adaptive-rate ceilings in tiers, and at the low tier also forces the perception floor and a
+     * 30fps-capped camera on the next AR entry. All gated by the existing throttleOnLowBattery toggle.
+     */
     private fun recomputeSystemThrottle() {
         val saver = powerManager?.isPowerSaveMode == true
         val s = _uiState.value
+        val tier = when {
+            !s.throttleOnLowBattery || batteryPct !in 0..100 -> 0
+            batteryPct <= BATTERY_TIER_LOW -> 2
+            batteryPct <= BATTERY_TIER_MED -> 1
+            else -> 0
+        }
         val throttle = (s.throttleOnThermal && thermalHot) ||
             (s.throttleOnPowerSave && saver) ||
-            (s.throttleOnLowBattery && batteryLow)
-        if (s.perceptionSystemThrottle != throttle) {
-            _uiState.update { it.copy(perceptionSystemThrottle = throttle) }
+            (s.throttleOnLowBattery && batteryLow) ||
+            tier >= 2
+        val idleCeiling = when (tier) { 2 -> 8; 1 -> 10; else -> 12 }
+        val activeCeiling = when (tier) { 2 -> 24; 1 -> 30; else -> 0 }
+        if (s.perceptionSystemThrottle != throttle || s.batteryTier != tier ||
+            s.idleRateCeilingFps != idleCeiling || s.activeRateCeilingFps != activeCeiling
+        ) {
+            _uiState.update {
+                it.copy(
+                    perceptionSystemThrottle = throttle,
+                    batteryTier = tier,
+                    idleRateCeilingFps = idleCeiling,
+                    activeRateCeilingFps = activeCeiling,
+                )
+            }
         }
     }
 
@@ -1783,6 +1832,10 @@ class ArViewModel @Inject constructor(
                 when (intent?.action) {
                     android.content.Intent.ACTION_BATTERY_LOW -> batteryLow = true
                     android.content.Intent.ACTION_BATTERY_OKAY -> batteryLow = false
+                    android.content.Intent.ACTION_BATTERY_CHANGED ->
+                        batteryPct = batteryManager
+                            ?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                            ?.takeIf { it in 0..100 } ?: batteryPct
                 }
                 recomputeSystemThrottle()
             }
@@ -1790,6 +1843,7 @@ class ArViewModel @Inject constructor(
         val filter = android.content.IntentFilter().apply {
             addAction(android.content.Intent.ACTION_BATTERY_LOW)
             addAction(android.content.Intent.ACTION_BATTERY_OKAY)
+            addAction(android.content.Intent.ACTION_BATTERY_CHANGED)
             addAction(android.os.PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
         }
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {

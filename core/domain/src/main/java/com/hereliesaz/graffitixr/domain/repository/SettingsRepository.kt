@@ -93,6 +93,13 @@ interface SettingsRepository {
     val throttleOnLag: Flow<Boolean>
     suspend fun setThrottleOnLag(on: Boolean)
 
+    /**
+     * Master toggle for the adaptive AR frame-rate coach (gates heavy SLAM work while idle, plus the
+     * battery-tier degradation). Default on. Off = always full rate (more drain, no behaviour change).
+     */
+    val adaptiveRateEnabled: Flow<Boolean>
+    suspend fun setAdaptiveRateEnabled(on: Boolean)
+
     /** Set of tutorial keys the user has completed. Keys: "tut_ar", "tut_overlay", "tut_mockup", "tut_trace", "tut_design", "tut_project". */
     val completedTutorials: Flow<Set<String>>
 
