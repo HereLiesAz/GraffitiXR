@@ -1787,32 +1787,29 @@ class ArViewModel @Inject constructor(
      * the adaptive idle/active rate ceilings (and caps the camera to 30fps on the next AR entry).
      */
     private fun recomputeSystemThrottle() {
-        val saver = powerManager?.isPowerSaveMode == true
-        val s = _uiState.value
-        val tier = when {
-            !s.throttleOnLowBattery || batteryPct !in 0..100 -> 0
-            batteryPct <= BATTERY_TIER_LOW -> 2
-            batteryPct <= BATTERY_TIER_MED -> 1
-            else -> 0
-        }
-        // Unchanged super-saver floor (15fps). The battery-level tier is intentionally NOT a trigger
-        // here — it only drives the rate ceilings below.
-        val throttle = (s.throttleOnThermal && thermalHot) ||
-            (s.throttleOnPowerSave && saver) ||
-            (s.throttleOnLowBattery && batteryLow)
-        val idleCeiling = when (tier) { 2 -> 8; 1 -> 10; else -> 12 }
-        val activeCeiling = when (tier) { 2 -> 24; 1 -> 30; else -> 0 }
-        if (s.perceptionSystemThrottle != throttle || s.batteryTier != tier ||
-            s.idleRateCeilingFps != idleCeiling || s.activeRateCeilingFps != activeCeiling
-        ) {
-            _uiState.update {
-                it.copy(
-                    perceptionSystemThrottle = throttle,
-                    batteryTier = tier,
-                    idleRateCeilingFps = idleCeiling,
-                    activeRateCeilingFps = activeCeiling,
-                )
+        // Read + check + write atomically inside update {} — this is called from broadcast/thermal
+        // listener threads, so the lambda re-runs on CAS contention with a fresh snapshot.
+        _uiState.update { s ->
+            val saver = powerManager?.isPowerSaveMode == true
+            val tier = when {
+                !s.throttleOnLowBattery || batteryPct !in 0..100 -> 0
+                batteryPct <= BATTERY_TIER_LOW -> 2
+                batteryPct <= BATTERY_TIER_MED -> 1
+                else -> 0
             }
+            // Unchanged super-saver floor (15fps). The battery-level tier is intentionally NOT a
+            // trigger here — it only drives the rate ceilings below.
+            val throttle = (s.throttleOnThermal && thermalHot) ||
+                (s.throttleOnPowerSave && saver) ||
+                (s.throttleOnLowBattery && batteryLow)
+            val idleCeiling = when (tier) { 2 -> 8; 1 -> 10; else -> 12 }
+            val activeCeiling = when (tier) { 2 -> 24; 1 -> 30; else -> 0 }
+            s.copy(
+                perceptionSystemThrottle = throttle,
+                batteryTier = tier,
+                idleRateCeilingFps = idleCeiling,
+                activeRateCeilingFps = activeCeiling,
+            )
         }
     }
 
