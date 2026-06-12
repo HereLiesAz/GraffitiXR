@@ -104,8 +104,8 @@ data class ArUiState(
     val showAnchorBoundary: Boolean = false,
     /** Minimum viewpoint shift (degrees) before a re-observation parallax-verifies a voxel. */
     val parallaxMinDegrees: Float = 4.0f,
-    /** ARCore camera target frame rate: 30 (default) or 60. Applies on next AR entry. */
-    val cameraTargetFps: Int = 30,
+    /** ARCore camera target frame rate: 60 (default) or 30. Applies on next AR entry. */
+    val cameraTargetFps: Int = 60,
     /**
      * Perception-throttle triggers. When enabled and active, each drops the world-locked perception
      * redraw rate from 30 to 15 fps to save power; camera + overlay + gestures stay full-rate.

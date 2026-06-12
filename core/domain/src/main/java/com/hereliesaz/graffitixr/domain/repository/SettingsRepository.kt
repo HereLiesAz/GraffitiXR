@@ -79,7 +79,7 @@ interface SettingsRepository {
     val parallaxMinDegrees: Flow<Float>
     suspend fun setParallaxMinDegrees(deg: Float)
 
-    /** ARCore camera target frame rate: 30 (default) or 60. Lower = less power/heat. */
+    /** ARCore camera target frame rate: 60 (default) or 30. Lower = less power/heat. */
     val cameraTargetFps: Flow<Int>
     suspend fun setCameraTargetFps(fps: Int)
 

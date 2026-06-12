@@ -164,7 +164,7 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override val cameraTargetFps: Flow<Int> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { preferences -> preferences[CAMERA_TARGET_FPS] ?: 30 }
+        .map { preferences -> preferences[CAMERA_TARGET_FPS] ?: 60 }
 
     override suspend fun setCameraTargetFps(fps: Int) {
         context.dataStore.edit { preferences ->
