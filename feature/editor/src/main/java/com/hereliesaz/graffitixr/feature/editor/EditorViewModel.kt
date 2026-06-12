@@ -1262,10 +1262,15 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.default) {
             val workBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
             val workCanvas = Canvas(workBitmap)
+            // Read the transform off the captured immutable `layer` (not the mutable stroke* members,
+            // which a quick second stroke could overwrite before this coroutine runs).
+            val layerScale = layer.scale
+            val layerOffset = layer.offset
+            val layerRotationZ = layer.rotationZ
             // Match the rail size preview exactly: brushSize is screen px; scale it into this layer's
             // bitmap space (1f for an unscaled sketch) so the painted dab is the previewed diameter.
             val brushScale = ImageProcessor.screenToBitmapScale(
-                canvasSize.width, canvasSize.height, workBitmap.width, workBitmap.height, strokeLayerScale
+                canvasSize.width, canvasSize.height, workBitmap.width, workBitmap.height, layerScale
             )
             val paint = buildStrokePaint(tool, argb, brushSize * brushScale, feathering)
 
@@ -1274,7 +1279,7 @@ class EditorViewModel @Inject constructor(
             val catchUpPoints = strokeCollectedPoints.toList()
             val mappedAll = ImageProcessor.mapScreenToBitmap(
                 catchUpPoints, canvasSize.width, canvasSize.height, workBitmap.width, workBitmap.height,
-                strokeLayerScale, strokeLayerOffset, strokeLayerRotationZ
+                layerScale, layerOffset, layerRotationZ
             )
 
             if (mappedAll.size == 1) {

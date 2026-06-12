@@ -1480,7 +1480,7 @@ class MainActivity : ComponentActivity() {
                                                         if (abs(dragAmount.y) >= abs(dragAmount.x)) {
                                                             val currentSize = editorViewModel.uiState.value.brushSize
                                                             editorViewModel.setBrushSize(
-                                                                (currentSize - dragAmount.y * 0.5f).coerceIn(1f, itemSizePx)
+                                                                (currentSize - dragAmount.y * 0.5f).coerceIn(1f, maxOf(1f, itemSizePx))
                                                             )
                                                         } else {
                                                             val currentFeather = editorViewModel.uiState.value.brushFeathering
@@ -1493,7 +1493,7 @@ class MainActivity : ComponentActivity() {
                                             contentAlignment = Alignment.Center
                                         ) {
                                             val sizeDp = with(density) {
-                                                liveState.brushSize.coerceIn(1f, itemSizePx).toDp()
+                                                liveState.brushSize.coerceIn(1f, maxOf(1f, itemSizePx)).toDp()
                                             }
                                             val checkerModifier = Modifier.drawBehind {
                                                 val squareSize = 6.dp.toPx()
@@ -1522,7 +1522,7 @@ class MainActivity : ComponentActivity() {
                                                     )
                                                 }
                                                 val hardCoreDp = with(density) {
-                                                    (liveState.brushSize * (1f - liveState.brushFeathering * 0.7f)).coerceIn(2f, itemSizePx).toDp()
+                                                    (liveState.brushSize * (1f - liveState.brushFeathering * 0.7f)).coerceIn(2f, maxOf(2f, itemSizePx)).toDp()
                                                 }
                                                 Box(
                                                     modifier = Modifier
