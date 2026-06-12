@@ -136,6 +136,14 @@ class SimpleQuadRenderer {
         val shader = GLES30.glCreateShader(type)
         GLES30.glShaderSource(shader, shaderCode)
         GLES30.glCompileShader(shader)
+        val status = IntArray(1)
+        GLES30.glGetShaderiv(shader, GLES30.GL_COMPILE_STATUS, status, 0)
+        if (status[0] == 0) {
+            val log = GLES30.glGetShaderInfoLog(shader)
+            android.util.Log.e("SimpleQuadRenderer", "Shader compile failed: $log")
+            GLES30.glDeleteShader(shader)
+            return 0
+        }
         return shader
     }
 

@@ -1671,7 +1671,11 @@ class EditorViewModel @Inject constructor(
                 try {
                     val file = java.io.File(uri.path ?: return@launch)
                     java.io.FileOutputStream(file).use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    // Don't swallow silently — the layer bitmap is still updated in memory, but a
+                    // failed disk write means the text edit won't survive reload.
+                    android.util.Log.e("EditorViewModel", "Failed to persist text layer bitmap", e)
+                }
             }
 
             layerStore.putBase(layerId, bitmap.copy(Bitmap.Config.ARGB_8888, false))

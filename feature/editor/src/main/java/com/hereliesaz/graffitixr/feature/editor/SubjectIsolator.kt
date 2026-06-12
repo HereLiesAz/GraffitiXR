@@ -73,7 +73,9 @@ class SubjectIsolator @Inject constructor(
         val pixels = IntArray(w * h)
         source.getPixels(pixels, 0, w, 0, 0, w, h)
         for (i in pixels.indices) {
-            val conf = confidence[i]
+            // Guard against a confidence array that doesn't match the pixel count: treat missing
+            // entries as zero confidence rather than throwing ArrayIndexOutOfBounds.
+            val conf = if (i < confidence.size) confidence[i] else 0f
             val alpha = when {
                 conf >= threshold -> 255
                 conf <= threshold - featherRange -> 0
