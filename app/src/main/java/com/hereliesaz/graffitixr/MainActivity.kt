@@ -1913,11 +1913,21 @@ class MainActivity : ComponentActivity() {
                     azRailSubItem(id = "target.create", hostId = "mode.ar", text = navStrings.grid, color = navItemColor, shape = AzButtonShape.RECTANGLE) {
                         if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
                     }
+                    // Flashlight — illuminate the wall in low light while tracking.
+                    azRailSubItem(id = "mode.ar.light", hostId = "mode.ar", text = navStrings.light, color = if (arUiState.isFlashlightOn) Cyan else navItemColor, shape = AzButtonShape.NONE) {
+                        arViewModel.toggleFlashlight()
+                    }
                 }
                 modeLayerSubHost("mode.ar", EditorMode.AR, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
             }
 
             azRailSubHostItem(id = "mode.overlay", hostId = "host.modes", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE)
+            // Flashlight — illuminate the wall in low light while overlaying.
+            if (editorUiState.editorMode == EditorMode.OVERLAY) {
+                azRailSubItem(id = "mode.overlay.light", hostId = "mode.overlay", text = navStrings.light, color = if (arUiState.isFlashlightOn) Cyan else navItemColor, shape = AzButtonShape.NONE) {
+                    arViewModel.toggleFlashlight()
+                }
+            }
             modeLayerSubHost("mode.overlay", EditorMode.OVERLAY, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
 
             // Mockup ▸ Wall ▸ { Photo (take a photo), File (pick an image) }
@@ -1947,6 +1957,9 @@ class MainActivity : ComponentActivity() {
             azRailSubItem(id = "proj.new", hostId = "host.project", text = navStrings.new, color = navItemColor, shape = AzButtonShape.NONE) {                dashboardViewModel.onNewProjectTriggered()
             }
             azRailSubItem(id = "proj.save", hostId = "host.project", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE) {                showSaveDialog = true
+            }
+            azRailSubItem(id = "proj.export", hostId = "host.project", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE) {
+                editorViewModel.exportImage()
             }
             azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {                navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
             }
