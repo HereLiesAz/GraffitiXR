@@ -12,7 +12,6 @@ import com.hereliesaz.graffitixr.common.util.ImageUtils
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -366,10 +365,10 @@ class ProjectManager @Inject constructor(
     /**
      * Loads a project received as raw bytes from a host device (spectator/guest path).
      */
-    fun loadAsSpectator(bytes: ByteArray) {
-        if (bytes.isEmpty()) return
-        
-        runBlocking {
+    suspend fun loadAsSpectator(bytes: ByteArray) = withContext(Dispatchers.IO) {
+        if (bytes.isEmpty()) return@withContext
+
+        run {
             try {
                 ZipInputStream(bytes.inputStream()).use { zis ->
                     var projectData: GraffitiProject? = null

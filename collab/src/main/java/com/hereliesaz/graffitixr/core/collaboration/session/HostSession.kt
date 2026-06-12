@@ -21,6 +21,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -49,7 +50,10 @@ internal class HostSession(
 ) : Session() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val outQueue: Channel<Op> = Channel(capacity = Channel.UNLIMITED)
+    // Bounded so a stalled guest can't make the host buffer ops without limit (OOM) — important now
+    // that LayerBitmapReplace ops can be large. On sustained overflow the oldest unsent ops are
+    // dropped (the guest can rejoin for a fresh snapshot) rather than exhausting memory.
+    private val outQueue: Channel<Op> = Channel(capacity = 128, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     private val deltaBuffer = DeltaBuffer()
     private val seqCounter = AtomicLong(0L)
 
