@@ -45,7 +45,6 @@ import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.math.sin
 import kotlin.random.Random
-import kotlinx.coroutines.delay
 
 @Composable
 fun ModeOnboardingOverlay(
@@ -65,8 +64,8 @@ fun ModeOnboardingOverlay(
 
 /**
  * Generic onboarding overlay over arbitrary [lines]. The current [step] is controlled by the
- * caller so any tap source — the non-consuming screen observer below, the per-step timer, or an
- * external rail tap — can drive advancement through the same [onAdvance]. [positionKey] seeds the
+ * caller so any tap source — the non-consuming screen observer below or an external rail tap — can
+ * drive advancement through the same [onAdvance]. [positionKey] seeds the
  * popup zone and resets the tap observer when the context changes.
  *
  * The overlay never consumes pointer events, so taps fall through to the canvas/editor underneath
@@ -92,16 +91,11 @@ fun ModeOnboardingOverlay(
         return
     }
 
-    // Keep advance current without restarting the pointer loop on every step.
+    // Advancement is entirely user-driven. A screen tap (observed below, non-consuming) pages
+    // through a step's explanatory lines, and performing the actual action changes app state, which
+    // swaps in the next step. There is deliberately NO timer — the coach waits on the user and never
+    // auto-advances on its own.
     val advance by rememberUpdatedState(onAdvance)
-
-    // Idle safety-net timer: longer lines linger longer. With the do-it-to-advance walkthrough the
-    // user is expected to perform the targeted interaction, so this only fires when they don't —
-    // hence the doubled durations. Restarts whenever the step (from any source) or context changes.
-    LaunchedEffect(positionKey, step) {
-        delay(stepDurationMs(line))
-        advance()
-    }
 
     // Pointer geometry: the overlay's own window origin (to convert the target's window-space
     // bounds into local draw coords) and the instruction card's bounds (the pointer's tail).
@@ -176,9 +170,6 @@ fun ModeOnboardingOverlay(
         }
     }
 }
-
-private fun stepDurationMs(line: String): Long =
-    (6000L + 100L * line.length).coerceIn(6000L, 20000L)
 
 /**
  * Draws a pointer from the instruction [cardLocal] to the [targetLocal] rail item: a pulsing
