@@ -348,6 +348,9 @@ private fun TargetRefinementScreen(
     onEraseAtPoint: (Float, Float, Float) -> Unit
 ) {
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
+    // Regions the user has excluded (tap/drag), drawn as a translucent wash so refinement isn't
+    // blind. Reset on a new capture. This is NOT the keypoint/voxel mask — just erase feedback.
+    val excluded = remember(rawBitmap) { mutableStateListOf<SelectionStroke>() }
 
     Box(modifier = Modifier.fillMaxSize().onSizeChanged { boxSize = it }) {
 
@@ -378,13 +381,19 @@ private fun TargetRefinementScreen(
                 val imgY = (boxH - imgH) / 2f
 
                 // The captured photo stays fully visible for refinement (the feature/voxel mask
-                // belongs on the live camera scan, not here). Tap/drag still excludes regions.
+                // belongs on the live camera scan, not here). A translucent wash marks excluded
+                // regions so editing isn't blind — without reintroducing the dot mask.
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawStrokes(excluded, imgX, imgY, imgW, imgH)
+                }
+
                 Box(
                     modifier = Modifier.fillMaxSize()
                         .pointerInput(Unit) {
                             detectTapGestures { pos ->
                                 val nx = ((pos.x - imgX) / imgW).coerceIn(0f, 1f)
                                 val ny = ((pos.y - imgY) / imgH).coerceIn(0f, 1f)
+                                excluded.add(SelectionStroke(nx, ny, 0.05f))
                                 onEraseAtPoint(nx, ny, 0.05f) // 5% brush size
                             }
                         }
@@ -393,6 +402,7 @@ private fun TargetRefinementScreen(
                                 val pos = change.position
                                 val nx = ((pos.x - imgX) / imgW).coerceIn(0f, 1f)
                                 val ny = ((pos.y - imgY) / imgH).coerceIn(0f, 1f)
+                                excluded.add(SelectionStroke(nx, ny, 0.05f))
                                 onEraseAtPoint(nx, ny, 0.05f)
                             }
                         }
