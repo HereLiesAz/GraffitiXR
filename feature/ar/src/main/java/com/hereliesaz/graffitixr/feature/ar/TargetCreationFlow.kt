@@ -348,9 +348,6 @@ private fun TargetRefinementScreen(
     onEraseAtPoint: (Float, Float, Float) -> Unit
 ) {
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
-    // Regions the user has excluded (tap/drag), drawn as a translucent wash so refinement isn't
-    // blind. Reset on a new capture. This is NOT the keypoint/voxel mask — just erase feedback.
-    val excluded = remember(rawBitmap) { mutableStateListOf<SelectionStroke>() }
 
     Box(modifier = Modifier.fillMaxSize().onSizeChanged { boxSize = it }) {
 
@@ -380,11 +377,32 @@ private fun TargetRefinementScreen(
                 val imgX = (boxW - imgW) / 2f
                 val imgY = (boxH - imgH) / 2f
 
-                // The captured photo stays fully visible for refinement (the feature/voxel mask
-                // belongs on the live camera scan, not here). A translucent wash marks excluded
-                // regions so editing isn't blind — without reintroducing the dot mask.
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawStrokes(excluded, imgX, imgY, imgW, imgH)
+                // Fingerprint-as-mask: show the identified wall features and mask out the rest.
+                // A near-opaque scrim covers the capture, punched through (BlendMode.Clear in an
+                // offscreen layer) at each fingerprint keypoint, so only the matched descriptor
+                // patches of the photo stay visible. Erasing a region removes its keypoints and the
+                // holes close. NOTE: the voxel/splat visualization is intentionally NOT drawn here —
+                // that belongs on the live camera scan (see ArRenderer).
+                Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+                ) {
+                    drawRect(
+                        color = Color.Black.copy(alpha = 0.92f),
+                        topLeft = Offset(imgX, imgY),
+                        size = Size(imgW, imgH)
+                    )
+                    // Reveal radius approximates the descriptor patch footprint at preview scale.
+                    val reveal = (imgW * 0.018f).coerceAtLeast(10f)
+                    keypoints.forEach { kp ->
+                        drawCircle(
+                            color = Color.Transparent,
+                            radius = reveal,
+                            center = Offset(imgX + kp.x * imgW, imgY + kp.y * imgH),
+                            blendMode = BlendMode.Clear
+                        )
+                    }
                 }
 
                 Box(
@@ -393,7 +411,6 @@ private fun TargetRefinementScreen(
                             detectTapGestures { pos ->
                                 val nx = ((pos.x - imgX) / imgW).coerceIn(0f, 1f)
                                 val ny = ((pos.y - imgY) / imgH).coerceIn(0f, 1f)
-                                excluded.add(SelectionStroke(nx, ny, 0.05f))
                                 onEraseAtPoint(nx, ny, 0.05f) // 5% brush size
                             }
                         }
@@ -402,7 +419,6 @@ private fun TargetRefinementScreen(
                                 val pos = change.position
                                 val nx = ((pos.x - imgX) / imgW).coerceIn(0f, 1f)
                                 val ny = ((pos.y - imgY) / imgH).coerceIn(0f, 1f)
-                                excluded.add(SelectionStroke(nx, ny, 0.05f))
                                 onEraseAtPoint(nx, ny, 0.05f)
                             }
                         }
