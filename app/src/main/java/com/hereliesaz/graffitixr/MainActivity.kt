@@ -633,21 +633,27 @@ class MainActivity : ComponentActivity() {
                             editorViewModel.consumeAutoEditTextLayer()
                         }
 
+                        val completedTutorials by mainViewModel.completedTutorials.collectAsState()
+
                         LaunchedEffect(
                             editorUiState.editorMode,
                             showLibrary,
                             showSettings,
                             isExporting,
                             mainUiState.isCapturingTarget,
-                            mainUiState.tutorialModeActive
+                            mainUiState.tutorialModeActive,
+                            completedTutorials
                         ) {
                             if (anyModalActive) return@LaunchedEffect
                             // Tutorial mode drives its own walkthrough overlay (below); don't also
                             // auto-fire the first-run onboarding underneath it.
                             if (mainUiState.tutorialModeActive) return@LaunchedEffect
-                            // First-run behaviour: auto-onboard a brand-new (empty) project per mode.
+                            // First-run behaviour: auto-onboard a brand-new (empty) project per mode,
+                            // but only until the user has completed that mode's onboarding once.
                             if (editorUiState.layers.isNotEmpty()) return@LaunchedEffect
-                            activeOnboarding = onboardings[editorUiState.editorMode]
+                            val mode = editorUiState.editorMode
+                            if ("mode.${mode.name}" in completedTutorials) return@LaunchedEffect
+                            activeOnboarding = onboardings[mode]
                         }
 
                         if (!anyModalActive) {
@@ -669,7 +675,12 @@ class MainActivity : ComponentActivity() {
                                 activeOnboarding?.let { ob ->
                                     ModeOnboardingOverlay(
                                         onboarding = ob,
-                                        onDismiss = { activeOnboarding = null }
+                                        onDismiss = {
+                                            // Persist so a mode's first-run onboarding shows once, not
+                                            // on every new empty project.
+                                            mainViewModel.markTutorialCompletePersistent("mode.${ob.mode.name}")
+                                            activeOnboarding = null
+                                        }
                                     )
                                 }
                             }
@@ -678,8 +689,7 @@ class MainActivity : ComponentActivity() {
                         // First-launch explainer for devices where ARCore is
                         // unavailable. Modal-gated identically to the per-mode
                         // onboarding above, and dismissed-once via the same
-                        // completedTutorials DataStore set.
-                        val completedTutorials by mainViewModel.completedTutorials.collectAsState()
+                        // completedTutorials DataStore set (collected above).
                         val arExplainerKey = "ar_unavailable_explainer"
                         var arExplainerDismissedThisSession by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
                         val arUnavailableLines = remember {
