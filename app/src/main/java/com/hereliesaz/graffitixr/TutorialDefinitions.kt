@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import com.hereliesaz.aznavrail.tutorial.AzAdvanceCondition
 import com.hereliesaz.aznavrail.tutorial.AzHighlight
 import com.hereliesaz.aznavrail.tutorial.AzTutorial
 import com.hereliesaz.aznavrail.tutorial.azTutorial
@@ -25,7 +26,13 @@ fun getTutorials(layers: List<Layer>, strings: AppStrings): Map<String, AzTutori
     fun createSimpleTutorial(id: String, title: String, text: String): AzTutorial {
         return azTutorial {
             scene(id = "${id}_intro", content = { Box(Modifier.fillMaxSize()) }) {
-                card(title = title, text = text, highlight = AzHighlight.Item(id))
+                // Action-driven: advance when the user actually taps the highlighted rail item.
+                card(
+                    title = title,
+                    text = text,
+                    highlight = AzHighlight.Item(id),
+                    advanceCondition = AzAdvanceCondition.TapTarget
+                )
             }
         }
     }
