@@ -1752,30 +1752,26 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                                 layer.isSketch -> {
-                                    azRailItem(
-                                        id = layerId(layer, "blend"),
-                                        text = navStrings.build,
-                                        color = navItemColor,
-                                        shape = AzButtonShape.CIRCLE,
-                                        onClick = { activate(); editorViewModel.onCycleBlendMode() }
-                                    )
-                                    azRailItem(
-                                        id = layerId(layer, "adj"),
-                                        text = navStrings.adjust,
-                                        color = navItemColor,
-                                        shape = AzButtonShape.CIRCLE,
-                                        onClick = { activate(); editorViewModel.onAdjustClicked() }
-                                    )
-                                    azRailItem(
-                                        id = layerId(layer, "invert"),
-                                        text = navStrings.invert,
-                                        color = if (layer.isInverted) Cyan else navItemColor,
-                                        shape = AzButtonShape.CIRCLE,
-                                        onClick = { activate(); editorViewModel.onToggleInvert() }
-                                    )
+                                    azRailHostItem(id = layerId(layer, "grp.paint"), text = "Paint", color = navItemColor, shape = AzButtonShape.RECTANGLE)
+                                    azRailSubItem(id = layerId(layer, "eraser"), hostId = layerId(layer, "grp.paint"), text = navStrings.eraser, color = if (activeTool == Tool.ERASER) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
+
+                                    azRailHostItem(id = layerId(layer, "grp.retouch"), text = "Retouch", color = navItemColor, shape = AzButtonShape.RECTANGLE)
+                                    azRailSubItem(id = layerId(layer, "blur"), hostId = layerId(layer, "grp.retouch"), text = navStrings.blur, color = if (activeTool == Tool.BLUR) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
+                                    azRailSubItem(id = layerId(layer, "liquify"), hostId = layerId(layer, "grp.retouch"), text = navStrings.liquify, color = if (activeTool == Tool.LIQUIFY) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                                    azRailSubItem(id = layerId(layer, "dodge"), hostId = layerId(layer, "grp.retouch"), text = navStrings.dodge, color = if (activeTool == Tool.DODGE) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.DODGE) }
+                                    azRailSubItem(id = layerId(layer, "burn"), hostId = layerId(layer, "grp.retouch"), text = navStrings.burn, color = if (activeTool == Tool.BURN) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.BURN) }
+
+                                    azRailHostItem(id = layerId(layer, "grp.adjust"), text = "Adjust", color = navItemColor, shape = AzButtonShape.RECTANGLE)
+                                    azRailSubItem(id = layerId(layer, "adj"), hostId = layerId(layer, "grp.adjust"), text = navStrings.adjust, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onAdjustClicked() }
+                                    azRailSubItem(id = layerId(layer, "balance"), hostId = layerId(layer, "grp.adjust"), text = navStrings.balance, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onBalanceClicked() }
+                                    azRailSubItem(id = layerId(layer, "blend"), hostId = layerId(layer, "grp.adjust"), text = navStrings.build, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onCycleBlendMode() }
+                                    azRailSubItem(id = layerId(layer, "invert"), hostId = layerId(layer, "grp.adjust"), text = navStrings.invert, color = if (layer.isInverted) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onToggleInvert() }
+
                                     if (layer.stencilType == null) {
-                                        azRailItem(
+                                        azRailHostItem(id = layerId(layer, "grp.effects"), text = "Effects", color = navItemColor, shape = AzButtonShape.RECTANGLE)
+                                        azRailSubItem(
                                             id = layerId(layer, "stencil"),
+                                            hostId = layerId(layer, "grp.effects"),
                                             text = navStrings.stencil,
                                             color = navItemColor,
                                             shape = AzButtonShape.CIRCLE,
@@ -1802,76 +1798,35 @@ class MainActivity : ComponentActivity() {
                                             editorViewModel.onGenerateStencil(layer.id)
                                         }
                                     }
-                                    azRailItem(
-                                        id = layerId(layer, "balance"),
-                                        text = navStrings.balance,
-                                        color = navItemColor,
-                                        shape = AzButtonShape.CIRCLE,
-                                        onClick = { activate(); editorViewModel.onBalanceClicked() }
-                                    )
-                                    // --- Brush tools at bottom ---
-                                    azRailItem(
-                                        id = layerId(layer, "eraser"),
-                                        shape = AzButtonShape.CIRCLE,
-                                        text = navStrings.eraser,
-                                        color = if (activeTool == Tool.ERASER) Cyan else navItemColor,
-                                        onClick = { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
-                                    )
-                                    azRailItem(
-                                        id = layerId(layer, "blur"),
-                                        shape = AzButtonShape.CIRCLE,
-                                        text = navStrings.blur,
-                                        color = if (activeTool == Tool.BLUR) Cyan else navItemColor,
-                                        onClick = { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
-                                    )
-                                    azRailItem(
-                                        id = layerId(layer, "liquify"),
-                                        shape = AzButtonShape.CIRCLE,
-                                        text = navStrings.liquify,
-                                        color = if (activeTool == Tool.LIQUIFY) Cyan else navItemColor,
-                                        onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
-                                    )
-                                    azRailItem(
-                                        id = layerId(layer, "dodge"),
-                                        shape = AzButtonShape.CIRCLE,
-                                        text = navStrings.dodge,
-                                        color = if (activeTool == Tool.DODGE) Cyan else navItemColor,
-                                        onClick = { activate(); editorViewModel.setActiveTool(Tool.DODGE) }
-                                    )
-                                    azRailItem(
-                                        id = layerId(layer, "burn"),
-                                        shape = AzButtonShape.CIRCLE,
-                                        text = navStrings.burn,
-                                        color = if (activeTool == Tool.BURN) Cyan else navItemColor,
-                                        onClick = { activate(); editorViewModel.setActiveTool(Tool.BURN) }
-                                    )
+
                                     addSizeItem()
                                 }
                                 else -> {
-                                    azRailItem(
-                                        id = layerId(layer, "iso"),
-                                        text = navStrings.isolate,
-                                        color = navItemColor,
-                                        shape = AzButtonShape.CIRCLE,
-                                        onClick = { activate(); editorViewModel.onRemoveBackgroundClicked() }
-                                    )
-                                    azRailItem(
-                                        id = layerId(layer, "line"),
-                                        text = navStrings.outline,
-                                        color = navItemColor,
-                                        shape = AzButtonShape.CIRCLE,
-                                        onClick = { activate(); editorViewModel.onSketchClicked() }
-                                    )
-                                    azRailItem(
-                                        id = layerId(layer, "invert"),
-                                        text = navStrings.invert,
-                                        color = if (layer.isInverted) Cyan else navItemColor,
-                                        shape = AzButtonShape.CIRCLE,
-                                        onClick = { activate(); editorViewModel.onToggleInvert() }
-                                    )
+                                    // Image-layer tools grouped into folders (host/sub) so the nested
+                                    // rail isn't an overwhelming flat list. Size stays a standalone
+                                    // widget (most-used control); all other tools live under a folder.
+                                    azRailHostItem(id = layerId(layer, "grp.paint"), text = "Paint", color = navItemColor, shape = AzButtonShape.RECTANGLE)
+                                    azRailSubItem(id = layerId(layer, "eraser"), hostId = layerId(layer, "grp.paint"), text = navStrings.eraser, color = if (activeTool == Tool.ERASER) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
+
+                                    azRailHostItem(id = layerId(layer, "grp.retouch"), text = "Retouch", color = navItemColor, shape = AzButtonShape.RECTANGLE)
+                                    azRailSubItem(id = layerId(layer, "blur"), hostId = layerId(layer, "grp.retouch"), text = navStrings.blur, color = if (activeTool == Tool.BLUR) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
+                                    azRailSubItem(id = layerId(layer, "liquify"), hostId = layerId(layer, "grp.retouch"), text = navStrings.liquify, color = if (activeTool == Tool.LIQUIFY) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
+                                    azRailSubItem(id = layerId(layer, "dodge"), hostId = layerId(layer, "grp.retouch"), text = navStrings.dodge, color = if (activeTool == Tool.DODGE) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.DODGE) }
+                                    azRailSubItem(id = layerId(layer, "burn"), hostId = layerId(layer, "grp.retouch"), text = navStrings.burn, color = if (activeTool == Tool.BURN) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.BURN) }
+
+                                    azRailHostItem(id = layerId(layer, "grp.adjust"), text = "Adjust", color = navItemColor, shape = AzButtonShape.RECTANGLE)
+                                    azRailSubItem(id = layerId(layer, "adj"), hostId = layerId(layer, "grp.adjust"), text = navStrings.adjust, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onAdjustClicked() }
+                                    azRailSubItem(id = layerId(layer, "balance"), hostId = layerId(layer, "grp.adjust"), text = navStrings.balance, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onBalanceClicked() }
+                                    azRailSubItem(id = layerId(layer, "blend"), hostId = layerId(layer, "grp.adjust"), text = navStrings.build, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onCycleBlendMode() }
+                                    azRailSubItem(id = layerId(layer, "invert"), hostId = layerId(layer, "grp.adjust"), text = navStrings.invert, color = if (layer.isInverted) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onToggleInvert() }
+
+                                    azRailHostItem(id = layerId(layer, "grp.effects"), text = "Effects", color = navItemColor, shape = AzButtonShape.RECTANGLE)
+                                    azRailSubItem(id = layerId(layer, "iso"), hostId = layerId(layer, "grp.effects"), text = navStrings.isolate, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onRemoveBackgroundClicked() }
+                                    azRailSubItem(id = layerId(layer, "line"), hostId = layerId(layer, "grp.effects"), text = navStrings.outline, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onSketchClicked() }
                                     if (layer.stencilType == null) {
-                                        azRailItem(
+                                        azRailSubItem(
                                             id = layerId(layer, "stencil"),
+                                            hostId = layerId(layer, "grp.effects"),
                                             text = navStrings.stencil,
                                             color = navItemColor,
                                             shape = AzButtonShape.CIRCLE,
@@ -1898,64 +1853,7 @@ class MainActivity : ComponentActivity() {
                                             editorViewModel.onGenerateStencil(layer.id)
                                         }
                                     }
-                                    azRailItem(
-                                        id = layerId(layer, "adj"),
-                                        text = navStrings.adjust,
-                                        color = navItemColor,
-                                        shape = AzButtonShape.CIRCLE,
-                                        onClick = { activate(); editorViewModel.onAdjustClicked() }
-                                    )
-                                    azRailItem(
-                                        id = layerId(layer, "balance"),
-                                        text = navStrings.balance,
-                                        color = navItemColor,
-                                        shape = AzButtonShape.CIRCLE,
-                                        onClick = { activate(); editorViewModel.onBalanceClicked() }
-                                    )
-                                    azRailItem(
-                                        id = layerId(layer, "blend"),
-                                        text = navStrings.build,
-                                        color = navItemColor,
-                                        shape = AzButtonShape.CIRCLE,
-                                        onClick = { activate(); editorViewModel.onCycleBlendMode() }
-                                    )
 
-                                    // --- Brush tools at bottom ---
-                                    azRailItem(
-                                        id = layerId(layer, "eraser"),
-                                        shape = AzButtonShape.CIRCLE,
-                                        text = navStrings.eraser,
-                                        color = if (activeTool == Tool.ERASER) Cyan else navItemColor,
-                                        onClick = { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
-                                    )
-                                    azRailItem(
-                                        id = layerId(layer, "blur"),
-                                        shape = AzButtonShape.CIRCLE,
-                                        text = navStrings.blur,
-                                        color = if (activeTool == Tool.BLUR) Cyan else navItemColor,
-                                        onClick = { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
-                                    )
-                                    azRailItem(
-                                        id = layerId(layer, "liquify"),
-                                        shape = AzButtonShape.CIRCLE,
-                                        text = navStrings.liquify,
-                                        color = if (activeTool == Tool.LIQUIFY) Cyan else navItemColor,
-                                        onClick = { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
-                                    )
-                                    azRailItem(
-                                        id = layerId(layer, "dodge"),
-                                        shape = AzButtonShape.CIRCLE,
-                                        text = navStrings.dodge,
-                                        color = if (activeTool == Tool.DODGE) Cyan else navItemColor,
-                                        onClick = { activate(); editorViewModel.setActiveTool(Tool.DODGE) }
-                                    )
-                                    azRailItem(
-                                        id = layerId(layer, "burn"),
-                                        shape = AzButtonShape.CIRCLE,
-                                        text = navStrings.burn,
-                                        color = if (activeTool == Tool.BURN) Cyan else navItemColor,
-                                        onClick = { activate(); editorViewModel.setActiveTool(Tool.BURN) }
-                                    )
                                     addSizeItem()
                                 }
                             }

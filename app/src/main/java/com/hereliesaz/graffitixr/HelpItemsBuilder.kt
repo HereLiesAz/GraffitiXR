@@ -60,6 +60,11 @@ internal fun buildHelpItems(strings: AppStrings, layers: List<Layer>): Map<Strin
 
     layers.forEach { layer ->
         base[layerId(layer)] = strings.help.layer(layer.name)
+        // Tool category folders (host items) inside the per-layer nested rail.
+        base[layerId(layer, "grp.paint")] = strings.help.addDraw
+        base[layerId(layer, "grp.retouch")] = strings.help.blur
+        base[layerId(layer, "grp.adjust")] = strings.help.adj
+        base[layerId(layer, "grp.effects")] = strings.help.stencilGen
         base[layerId(layer, "editText")] = strings.help.editText
         base[layerId(layer, "size.brush")] = strings.help.size
         base[layerId(layer, "size.text")] = strings.help.size
