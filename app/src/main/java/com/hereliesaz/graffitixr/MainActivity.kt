@@ -311,6 +311,9 @@ class MainActivity : ComponentActivity() {
                 val arUiState by arViewModel.uiState.collectAsState()
                 val coopState = arUiState.coopSessionState
                 var showJoinScanner by remember { mutableStateOf(false) }
+                // Which mode's whole-design adjustment panel is open (null = closed). Driven by the
+                // mode Layer "Adjust" rail item.
+                var modeAdjustTarget by remember { mutableStateOf<EditorMode?>(null) }
                 val hostQr by arViewModel.hostQrPayload.collectAsState()
                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
                 val dashboardNavigation by dashboardViewModel.navigationTrigger.collectAsState()
@@ -566,7 +569,7 @@ class MainActivity : ComponentActivity() {
                                     permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
                                 }
                             },
-                            onOpenModeAdjust = { }
+                            onOpenModeAdjust = { modeAdjustTarget = it }
                         )
                     }
 
@@ -883,7 +886,6 @@ class MainActivity : ComponentActivity() {
                                     && arUiState.paintingProgress > 0.01f
                                     && !mainUiState.isCapturingTarget
                                     && !showLibrary && !showSettings
-                                    && false
                             if (showProgress) {
                                 PaintingProgressIndicator(
                                     progress = arUiState.paintingProgress,
@@ -898,7 +900,6 @@ class MainActivity : ComponentActivity() {
                                 && arUiState.isAnchorEstablished
                                 && distanceM > 0f
                                 && !showLibrary && !showSettings
-                                && false
                             ) {
                                 DistanceBadge(
                                     distanceMeters = distanceM,
@@ -1242,6 +1243,18 @@ class MainActivity : ComponentActivity() {
                                     isReconnecting = coopState is CoopSessionState.Reconnecting,
                                     onLeave = { arViewModel.leaveSession() },
                                     modifier = Modifier.align(Alignment.TopCenter),
+                                )
+                            }
+
+                            modeAdjustTarget?.let { mode ->
+                                ModeAdjustPanel(
+                                    mode = mode,
+                                    adjustment = editorUiState.modeAdjustments[mode]
+                                        ?: com.hereliesaz.graffitixr.common.model.ModeAdjustment(),
+                                    onChange = { editorViewModel.onModeAdjustmentChanged(mode, it) },
+                                    onReset = { editorViewModel.onModeLayerReset(mode) },
+                                    onDismiss = { modeAdjustTarget = null },
+                                    modifier = Modifier.align(Alignment.CenterEnd),
                                 )
                             }
 
