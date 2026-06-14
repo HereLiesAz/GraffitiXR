@@ -174,16 +174,11 @@ data class EditorUiState(
     val showMesh: Boolean = true,           // persistent surface mesh
 
     // Real-time stroke rendering: the mutable bitmap being actively drawn into.
-    // Non-null only while a Liquify stroke is in progress (Liquify warps pixels and can't be
-    // previewed as a vector path, so it still streams a baked bitmap).
+    // Non-null only while a brush stroke is in progress (non-Liquify tools).
     val liveStrokeLayerId: String? = null,
     val liveStrokeBitmap: Bitmap? = null,
     // Incremented after each stroke segment so Compose re-reads the modified pixels.
     val liveStrokeVersion: Int = 0,
-    // Live vector preview for all non-Liquify tools: the in-progress stroke's raw screen-space points.
-    // Rendered as a cheap vector overlay (no per-point bitmap upload) so the result is instant; the
-    // stroke is rasterized into the layer bitmap once, on finger-up. Empty when no stroke is active.
-    val liveStrokePoints: List<Offset> = emptyList(),
     val canvasBackground: Color = Color.Black,
     val isSegmenting: Boolean = false,
     val segmentationInfluence: Float = 0.5f,

@@ -25,14 +25,9 @@ import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.foundation.Canvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
-import com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.hereliesaz.graffitixr.design.R as DesignR
@@ -340,14 +335,9 @@ fun MainScreen(
                 uiState.layers.filter { it.isVisible }.forEach { layer ->
                     androidx.compose.runtime.key(layer.id) {
                         val isLive = layer.id == uiState.liveStrokeLayerId
-                        // Liquify streams a baked bitmap; every other tool shows an instant vector
-                        // overlay (no per-point bitmap upload) composited with the layer below.
-                        val liquifyLive = isLive && uiState.liveStrokeBitmap != null
-                        val vectorLive = isLive && uiState.liveStrokeBitmap == null &&
-                            uiState.liveStrokePoints.isNotEmpty()
-                        val bmp = if (liquifyLive) uiState.liveStrokeBitmap ?: layer.bitmap else layer.bitmap
+                        val bmp = if (isLive) uiState.liveStrokeBitmap ?: layer.bitmap else layer.bitmap
                         bmp?.let { displayBmp ->
-                            val imageBitmap = if (liquifyLive) {
+                            val imageBitmap = if (isLive) {
                                 val version = uiState.liveStrokeVersion
                                 remember(version) { displayBmp.asImageBitmap() }
                             } else {
@@ -377,92 +367,32 @@ fun MainScreen(
                             // Offscreen compositing forces a full-screen offscreen buffer + extra pass
                             // per layer, every frame. It's only needed to isolate a non-default blend
                             // mode; for normal (SrcOver) layers, Auto avoids that cost.
-                            // Offscreen compositing forces a full-screen offscreen buffer + extra pass
-                            // per layer, every frame. It's only needed to isolate a non-default blend
-                            // mode; for normal (SrcOver) layers, Auto avoids that cost.
                             val needsOffscreen =
                                 layer.blendMode != androidx.compose.ui.graphics.BlendMode.SrcOver
-                            if (vectorLive) {
-                                // Live stroke: draw the committed layer and the in-progress stroke into
-                                // one offscreen group so destructive tools (eraser CLEAR, burn DARKEN,
-                                // dodge LIGHTEN…) composite against the layer and reveal what's beneath —
-                                // exactly like the final raster, but with no per-point bitmap upload.
-                                val strokeColorArgb = uiState.activeColor.toArgb()
-                                val strokeTool = uiState.activeTool
-                                val brushPx = uiState.brushSize
-                                val feather = uiState.brushFeathering
-                                val pts = uiState.liveStrokePoints
-                                androidx.compose.foundation.layout.Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .graphicsLayer {
-                                            translationX = layer.offset.x
-                                            translationY = layer.offset.y
-                                            scaleX = layer.scale
-                                            scaleY = layer.scale
-                                            rotationX = layer.rotationX
-                                            rotationY = layer.rotationY
-                                            rotationZ = layer.rotationZ
-                                            alpha = layer.opacity
-                                            transformOrigin = TransformOrigin.Center
-                                            blendMode = layer.blendMode
-                                            compositingStrategy =
-                                                androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-                                        }
-                                ) {
-                                    Image(
-                                        bitmap = imageBitmap,
-                                        contentDescription = null,
-                                        colorFilter = colorFilter,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Fit
-                                    )
-                                    // Brush width is screen px; the enclosing group scales drawing by
-                                    // layer.scale, so divide it out so the preview matches the commit.
-                                    val localWidth = brushPx / layer.scale.coerceAtLeast(0.0001f)
-                                    Canvas(modifier = Modifier.fillMaxSize()) {
-                                        val paint = ImageProcessor.buildToolPaint(
-                                            strokeTool, strokeColorArgb, localWidth, 0.5f, feather
-                                        )
-                                        drawIntoCanvas { c ->
-                                            if (pts.size == 1) {
-                                                c.nativeCanvas.drawPoint(pts[0].x, pts[0].y, paint)
-                                            } else {
-                                                val path = android.graphics.Path().apply {
-                                                    moveTo(pts[0].x, pts[0].y)
-                                                    for (i in 1 until pts.size) lineTo(pts[i].x, pts[i].y)
-                                                }
-                                                c.nativeCanvas.drawPath(path, paint)
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                Image(
-                                    bitmap = imageBitmap,
-                                    contentDescription = null,
-                                    colorFilter = colorFilter,
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .graphicsLayer {
-                                            translationX = layer.offset.x
-                                            translationY = layer.offset.y
-                                            scaleX = layer.scale
-                                            scaleY = layer.scale
-                                            rotationX = layer.rotationX
-                                            rotationY = layer.rotationY
-                                            rotationZ = layer.rotationZ
-                                            alpha = layer.opacity
-                                            transformOrigin = TransformOrigin.Center
-                                            blendMode = layer.blendMode
-                                            compositingStrategy = if (needsOffscreen)
-                                                androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-                                            else
-                                                androidx.compose.ui.graphics.CompositingStrategy.Auto
-                                        },
-                                    contentScale = ContentScale.Fit
-                                )
-                            }
+                            Image(
+                                bitmap = imageBitmap,
+                                contentDescription = null,
+                                colorFilter = colorFilter,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        translationX = layer.offset.x
+                                        translationY = layer.offset.y
+                                        scaleX = layer.scale
+                                        scaleY = layer.scale
+                                        rotationX = layer.rotationX
+                                        rotationY = layer.rotationY
+                                        rotationZ = layer.rotationZ
+                                        alpha = layer.opacity
+                                        transformOrigin = TransformOrigin.Center
+                                        blendMode = layer.blendMode
+                                        compositingStrategy = if (needsOffscreen)
+                                            androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                                        else
+                                            androidx.compose.ui.graphics.CompositingStrategy.Auto
+                                    },
+                                contentScale = ContentScale.Fit
+                            )
                         }
                     }
                 }
