@@ -310,7 +310,7 @@ public class VideoWriter {
 
 
     //
-    // C++:  void cv::VideoWriter::write(Mat image)
+    // C++:  bool cv::VideoWriter::write(Mat image)
     //
 
     /**
@@ -320,9 +320,14 @@ public class VideoWriter {
      *
      *     The function/method writes the specified image to video file. It must have the same size as has
      *     been specified when opening the video writer.
+     *
+     *     @return {@code true} if the frame was written successfully by the underlying backend,
+     *     {@code false} otherwise (for example, on network errors when streaming, encoder failures,
+     *     or unsupported input frames). Backends that do not surface per-frame status from
+     *     their native API report {@code true} on best-effort success.
      */
-    public void write(Mat image) {
-        write_0(nativeObj, image.nativeObj);
+    public boolean write(Mat image) {
+        return write_0(nativeObj, image.nativeObj);
     }
 
 
@@ -442,8 +447,8 @@ public class VideoWriter {
     // C++:  void cv::VideoWriter::release()
     private static native void release_0(long nativeObj);
 
-    // C++:  void cv::VideoWriter::write(Mat image)
-    private static native void write_0(long nativeObj, long image_nativeObj);
+    // C++:  bool cv::VideoWriter::write(Mat image)
+    private static native boolean write_0(long nativeObj, long image_nativeObj);
 
     // C++:  bool cv::VideoWriter::set(int propId, double value)
     private static native boolean set_0(long nativeObj, int propId, double value);

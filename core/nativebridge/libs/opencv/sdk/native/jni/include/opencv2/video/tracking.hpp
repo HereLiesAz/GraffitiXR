@@ -77,11 +77,12 @@ See the OpenCV sample camshiftdemo.c that tracks colored objects.
 
 @note
 -   (Python) A sample explaining the camshift tracking algorithm can be found at
-    opencv_source_code/samples/python/camshift.py
+    opencv_source_code/samples/python/snippets/camshift.py
  */
 CV_EXPORTS_W RotatedRect CamShift( InputArray probImage, CV_IN_OUT Rect& window,
                                    TermCriteria criteria );
-/** @example samples/cpp/camshiftdemo.cpp
+
+/** @example samples/cpp/snippets/camshiftdemo.cpp
 An example using the mean-shift tracking algorithm
 */
 
@@ -129,6 +130,10 @@ CV_EXPORTS_W int buildOpticalFlowPyramid( InputArray img, OutputArrayOfArrays py
 
 /** @example samples/cpp/lkdemo.cpp
 An example using the Lucas-Kanade optical flow algorithm
+*/
+
+/** @example samples/python/snippets/lk_track.py
+An example using the Lucas-Kanade optical flow algorithm in python
 */
 
 /** @brief Calculates an optical flow for a sparse feature set using the iterative Lucas-Kanade method with
@@ -184,6 +189,10 @@ CV_EXPORTS_W void calcOpticalFlowPyrLK( InputArray prevImg, InputArray nextImg,
                                         Size winSize = Size(21,21), int maxLevel = 3,
                                         TermCriteria criteria = TermCriteria(TermCriteria::COUNT+TermCriteria::EPS, 30, 0.01),
                                         int flags = 0, double minEigThreshold = 1e-4 );
+
+/** @example samples/python/snippets/opt_flow.py
+An example to show optical flow in python
+*/
 
 /** @brief Computes a dense optical flow using the Gunnar Farneback's algorithm.
 
@@ -419,9 +428,96 @@ CV_EXPORTS_W double findTransformECCWithMask( InputArray templateImage,
                                  TermCriteria criteria = TermCriteria(TermCriteria::COUNT + TermCriteria::EPS, 50, 1e-6),
                                  int gaussFiltSize = 5 );
 
-/** @example samples/cpp/kalman.cpp
+/** @brief struct ECCParameters is used by findTransformECCMultiScale
+
+@param motionType parameter, specifying the type of motion:
+ -   **MOTION_TRANSLATION** sets a translational motion model; warpMatrix is \f$2\times 3\f$ with
+     the first \f$2\times 2\f$ part being the unity matrix and the rest two parameters being
+     estimated.
+ -   **MOTION_EUCLIDEAN** sets a Euclidean (rigid) transformation as motion model; three
+     parameters are estimated; warpMatrix is \f$2\times 3\f$.
+ -   **MOTION_AFFINE** sets an affine motion model (DEFAULT); six parameters are estimated;
+     warpMatrix is \f$2\times 3\f$.
+ -   **MOTION_HOMOGRAPHY** sets a homography as a motion model; eight parameters are
+     estimated;\`warpMatrix\` is \f$3\times 3\f$.
+@param criteria parameter, specifying the termination criteria of the ECC algorithm;
+criteria.epsilon defines the threshold of the increment in the correlation coefficient between two
+iterations (a negative criteria.epsilon makes criteria.maxcount the only termination criterion).
+Default values are shown in the declaration above.
+@param itersPerLevel Criterion extension: distribution of iterations limit over pyramid levels.
+Can be empty, in this case, this algorithm will use criteria.maxCount on each level.
+@param gaussFiltSize An optional value indicating size of gaussian blur filter; (DEFAULT: 5)
+@param nlevels An optional value indicating amount of levels in the pyramid; (DEFAULT: 4)
+@param interpolation Type of warp interpolation. Possible values are INTER_NEAREST and INTER_LINEAR.
+Affects accuracy, especially when motionType == MOTION_TRANSLATION. (DEFAULT: INTER_LINEAR)
+ */
+struct CV_EXPORTS_W_SIMPLE ECCParameters
+{
+    CV_WRAP ECCParameters();
+    CV_PROP_RW int motionType = MOTION_AFFINE;
+    CV_PROP_RW cv::TermCriteria criteria;
+    CV_PROP_RW std::vector<int> itersPerLevel;
+    CV_PROP_RW int gaussFiltSize = 5;
+    CV_PROP_RW int nlevels = 4;
+    CV_PROP_RW int interpolation = INTER_LINEAR;
+};
+
+/** @brief Finds the geometric transform (warp) between two images in terms of the ECC criterion @cite EP08. Uses pyramids.
+
+@param reference Single channel reference image; CV_8U, CV_16U, CV_32F, CV_64F type.
+@param sample sample image which should be warped with the final warpMatrix in
+order to provide an image similar to reference, same type as reference.
+@param warpMatrix floating-point \f$2\times 3\f$ or \f$3\times 3\f$ mapping matrix (warp).
+@param eccParams List of the algorithm parameters. See ECCParameters for details.
+@param referenceMask An optional single channel mask to indicate valid values of reference.
+@param sampleMask An optional single channel mask to indicate valid values of sample.
+
+The function estimates the optimum transformation (warpMatrix) with respect to ECC criterion
+(@cite EP08), that is
+
+\f[\texttt{warpMatrix} = \arg\max_{W} \texttt{ECC}(\texttt{templateImage}(x,y),\texttt{inputImage}(x',y'))\f]
+
+where
+
+\f[\begin{bmatrix} x' \\ y' \end{bmatrix} = W \cdot \begin{bmatrix} x \\ y \\ 1 \end{bmatrix}\f]
+
+(the equation holds with homogeneous coordinates for homography). It returns the final enhanced
+correlation coefficient, that is the correlation coefficient between the template image and the
+final warped input image. When a \f$3\times 3\f$ matrix is given with motionType =0, 1 or 2, the third
+row is ignored.
+
+Unlike findHomography and estimateRigidTransform, the function findTransformECCMultiScale implements
+an area-based alignment that builds on intensity similarities. In essence, the function updates the
+initial transformation that roughly aligns the images. If this information is missing, the identity
+warp (unity matrix) is used as an initialization. Note that if images undergo strong
+displacements/rotations, an initial transformation that roughly aligns the images is necessary
+(e.g., a simple euclidean/similarity transform that allows for the images showing the same image
+content approximately). Use inverse warping in the second image to take an image close to the first
+one, i.e. use the flag WARP_INVERSE_MAP with warpAffine or warpPerspective. See also the OpenCV
+sample image_alignment.cpp that demonstrates the use of the function. Note that the function throws
+an exception if algorithm does not converges.
+Unlike findTransformECC, the findTransformECCMultiScale uses pyramids, making function more stable
+and able to handle correctly more sophisticated cases.
+
+@sa
+computeECC, estimateAffine2D, estimateAffinePartial2D, findHomography
+*/
+
+CV_EXPORTS_W double findTransformECCMultiScale(InputArray reference,
+                        InputArray sample,
+                        InputOutputArray warpMatrix,
+                        const ECCParameters& eccParams = ECCParameters(),
+                        InputArray referenceMask = noArray(),
+                        InputArray sampleMask = noArray());
+
+/** @example samples/cpp/snippets/kalman.cpp
 An example using the standard Kalman filter
 */
+
+
+/** @example samples/python/snippets/kalman.py
+An example using the standard Kalman filter in Python.
+ */
 
 /** @brief Kalman filter class.
 
@@ -503,6 +599,14 @@ CV_EXPORTS_W Mat readOpticalFlow( const String& path );
  to the flow in the horizontal direction (u), second - vertical (v).
  */
 CV_EXPORTS_W bool writeOpticalFlow( const String& path, InputArray flow );
+
+/** @example samples/python/snippets/dis_opt_flow.py
+An example using the dense optical flow and DIS optical flow algorithms in python
+*/
+
+/** @example samples/cpp/snippets/dis_opticalflow.cpp
+An example using the dense optical flow and DIS optical flow algorithms
+*/
 
 /**
    Base class for dense optical flow algorithms
@@ -831,6 +935,11 @@ public:
     */
     CV_WRAP virtual
     bool update(InputArray image, CV_OUT Rect& boundingBox) = 0;
+
+    /** @brief Return tracking score
+    */
+    CV_WRAP virtual float getTrackingScore() { return -1; }
+
 };
 
 
@@ -873,54 +982,6 @@ public:
     //bool update(InputArray image, CV_OUT Rect& boundingBox) CV_OVERRIDE;
 };
 
-
-
-/** @brief the GOTURN (Generic Object Tracking Using Regression Networks) tracker
- *
- *  GOTURN (@cite GOTURN) is kind of trackers based on Convolutional Neural Networks (CNN). While taking all advantages of CNN trackers,
- *  GOTURN is much faster due to offline training without online fine-tuning nature.
- *  GOTURN tracker addresses the problem of single target tracking: given a bounding box label of an object in the first frame of the video,
- *  we track that object through the rest of the video. NOTE: Current method of GOTURN does not handle occlusions; however, it is fairly
- *  robust to viewpoint changes, lighting changes, and deformations.
- *  Inputs of GOTURN are two RGB patches representing Target and Search patches resized to 227x227.
- *  Outputs of GOTURN are predicted bounding box coordinates, relative to Search patch coordinate system, in format X1,Y1,X2,Y2.
- *  Original paper is here: <http://davheld.github.io/GOTURN/GOTURN.pdf>
- *  As long as original authors implementation: <https://github.com/davheld/GOTURN#train-the-tracker>
- *  Implementation of training algorithm is placed in separately here due to 3d-party dependencies:
- *  <https://github.com/Auron-X/GOTURN_Training_Toolkit>
- *  GOTURN architecture goturn.prototxt and trained model goturn.caffemodel are accessible on opencv_extra GitHub repository.
- */
-class CV_EXPORTS_W TrackerGOTURN : public Tracker
-{
-protected:
-    TrackerGOTURN();  // use ::create()
-public:
-    virtual ~TrackerGOTURN() CV_OVERRIDE;
-
-    struct CV_EXPORTS_W_SIMPLE Params
-    {
-        CV_WRAP Params();
-        CV_PROP_RW std::string modelTxt;
-        CV_PROP_RW std::string modelBin;
-    };
-
-    /** @brief Constructor
-    @param parameters GOTURN parameters TrackerGOTURN::Params
-    */
-    static CV_WRAP
-    Ptr<TrackerGOTURN> create(const TrackerGOTURN::Params& parameters = TrackerGOTURN::Params());
-
-#ifdef HAVE_OPENCV_DNN
-    /** @brief Constructor
-    @param model pre-loaded GOTURN model
-    */
-    static CV_WRAP Ptr<TrackerGOTURN> create(const dnn::Net& model);
-#endif
-
-    //void init(InputArray image, const Rect& boundingBox) CV_OVERRIDE;
-    //bool update(InputArray image, CV_OUT Rect& boundingBox) CV_OVERRIDE;
-};
-
 class CV_EXPORTS_W TrackerDaSiamRPN : public Tracker
 {
 protected:
@@ -953,10 +1014,6 @@ public:
     static CV_WRAP
     Ptr<TrackerDaSiamRPN> create(const dnn::Net& siam_rpn, const dnn::Net& kernel_cls1, const dnn::Net& kernel_r1);
 #endif
-
-    /** @brief Return tracking score
-    */
-    CV_WRAP virtual float getTrackingScore() = 0;
 
     //void init(InputArray image, const Rect& boundingBox) CV_OVERRIDE;
     //bool update(InputArray image, CV_OUT Rect& boundingBox) CV_OVERRIDE;
@@ -1000,10 +1057,6 @@ public:
     static CV_WRAP
     Ptr<TrackerNano> create(const dnn::Net& backbone, const dnn::Net& neckhead);
 #endif
-
-    /** @brief Return tracking score
-    */
-    CV_WRAP virtual float getTrackingScore() = 0;
 
     //void init(InputArray image, const Rect& boundingBox) CV_OVERRIDE;
     //bool update(InputArray image, CV_OUT Rect& boundingBox) CV_OVERRIDE;
@@ -1050,10 +1103,6 @@ public:
     Ptr<TrackerVit> create(const dnn::Net& model, Scalar meanvalue = Scalar(0.485, 0.456, 0.406),
                            Scalar stdvalue = Scalar(0.229, 0.224, 0.225), float tracking_score_threshold = 0.20f);
 #endif
-
-    /** @brief Return tracking score
-    */
-    CV_WRAP virtual float getTrackingScore() = 0;
 
     // void init(InputArray image, const Rect& boundingBox) CV_OVERRIDE;
     // bool update(InputArray image, CV_OUT Rect& boundingBox) CV_OVERRIDE;

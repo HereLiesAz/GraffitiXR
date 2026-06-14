@@ -7,7 +7,9 @@ import org.opencv.objdetect.QRCodeDetectorAruco;
 import org.opencv.objdetect.QRCodeDetectorAruco_Params;
 
 // C++: class QRCodeDetectorAruco
-
+/**
+ * QR code detector based on Aruco markers detection code.
+ */
 public class QRCodeDetectorAruco extends GraphicalCodeDetector {
 
     protected QRCodeDetectorAruco(long addr) { super(addr); }

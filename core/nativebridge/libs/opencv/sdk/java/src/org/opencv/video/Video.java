@@ -16,6 +16,7 @@ import org.opencv.core.TermCriteria;
 import org.opencv.utils.Converters;
 import org.opencv.video.BackgroundSubtractorKNN;
 import org.opencv.video.BackgroundSubtractorMOG2;
+import org.opencv.video.ECCParameters;
 
 // C++: class Video
 
@@ -183,7 +184,7 @@ public class Video {
      * <ul>
      *   <li>
      *    (Python) A sample explaining the camshift tracking algorithm can be found at
-     *     opencv_source_code/samples/python/camshift.py
+     *     opencv_source_code/samples/python/snippets/camshift.py
      *   </li>
      * </ul>
      * @return automatically generated
@@ -1220,6 +1221,189 @@ public class Video {
 
 
     //
+    // C++:  double cv::findTransformECCMultiScale(Mat reference, Mat sample, Mat& warpMatrix, ECCParameters eccParams = ECCParameters(), Mat referenceMask = Mat(), Mat sampleMask = Mat())
+    //
+
+    /**
+     * Finds the geometric transform (warp) between two images in terms of the ECC criterion CITE: EP08. Uses pyramids.
+     *
+     * @param reference Single channel reference image; CV_8U, CV_16U, CV_32F, CV_64F type.
+     * @param sample sample image which should be warped with the final warpMatrix in
+     * order to provide an image similar to reference, same type as reference.
+     * @param warpMatrix floating-point \(2\times 3\) or \(3\times 3\) mapping matrix (warp).
+     * @param eccParams List of the algorithm parameters. See ECCParameters for details.
+     * @param referenceMask An optional single channel mask to indicate valid values of reference.
+     * @param sampleMask An optional single channel mask to indicate valid values of sample.
+     *
+     * The function estimates the optimum transformation (warpMatrix) with respect to ECC criterion
+     * (CITE: EP08), that is
+     *
+     * \(\texttt{warpMatrix} = \arg\max_{W} \texttt{ECC}(\texttt{templateImage}(x,y),\texttt{inputImage}(x',y'))\)
+     *
+     * where
+     *
+     * \(\begin{bmatrix} x' \\ y' \end{bmatrix} = W \cdot \begin{bmatrix} x \\ y \\ 1 \end{bmatrix}\)
+     *
+     * (the equation holds with homogeneous coordinates for homography). It returns the final enhanced
+     * correlation coefficient, that is the correlation coefficient between the template image and the
+     * final warped input image. When a \(3\times 3\) matrix is given with motionType =0, 1 or 2, the third
+     * row is ignored.
+     *
+     * Unlike findHomography and estimateRigidTransform, the function findTransformECCMultiScale implements
+     * an area-based alignment that builds on intensity similarities. In essence, the function updates the
+     * initial transformation that roughly aligns the images. If this information is missing, the identity
+     * warp (unity matrix) is used as an initialization. Note that if images undergo strong
+     * displacements/rotations, an initial transformation that roughly aligns the images is necessary
+     * (e.g., a simple euclidean/similarity transform that allows for the images showing the same image
+     * content approximately). Use inverse warping in the second image to take an image close to the first
+     * one, i.e. use the flag WARP_INVERSE_MAP with warpAffine or warpPerspective. See also the OpenCV
+     * sample image_alignment.cpp that demonstrates the use of the function. Note that the function throws
+     * an exception if algorithm does not converges.
+     * Unlike findTransformECC, the findTransformECCMultiScale uses pyramids, making function more stable
+     * and able to handle correctly more sophisticated cases.
+     *
+     * SEE:
+     * computeECC, estimateAffine2D, estimateAffinePartial2D, findHomography
+     * @return automatically generated
+     */
+    public static double findTransformECCMultiScale(Mat reference, Mat sample, Mat warpMatrix, ECCParameters eccParams, Mat referenceMask, Mat sampleMask) {
+        return findTransformECCMultiScale_0(reference.nativeObj, sample.nativeObj, warpMatrix.nativeObj, eccParams.getNativeObjAddr(), referenceMask.nativeObj, sampleMask.nativeObj);
+    }
+
+    /**
+     * Finds the geometric transform (warp) between two images in terms of the ECC criterion CITE: EP08. Uses pyramids.
+     *
+     * @param reference Single channel reference image; CV_8U, CV_16U, CV_32F, CV_64F type.
+     * @param sample sample image which should be warped with the final warpMatrix in
+     * order to provide an image similar to reference, same type as reference.
+     * @param warpMatrix floating-point \(2\times 3\) or \(3\times 3\) mapping matrix (warp).
+     * @param eccParams List of the algorithm parameters. See ECCParameters for details.
+     * @param referenceMask An optional single channel mask to indicate valid values of reference.
+     *
+     * The function estimates the optimum transformation (warpMatrix) with respect to ECC criterion
+     * (CITE: EP08), that is
+     *
+     * \(\texttt{warpMatrix} = \arg\max_{W} \texttt{ECC}(\texttt{templateImage}(x,y),\texttt{inputImage}(x',y'))\)
+     *
+     * where
+     *
+     * \(\begin{bmatrix} x' \\ y' \end{bmatrix} = W \cdot \begin{bmatrix} x \\ y \\ 1 \end{bmatrix}\)
+     *
+     * (the equation holds with homogeneous coordinates for homography). It returns the final enhanced
+     * correlation coefficient, that is the correlation coefficient between the template image and the
+     * final warped input image. When a \(3\times 3\) matrix is given with motionType =0, 1 or 2, the third
+     * row is ignored.
+     *
+     * Unlike findHomography and estimateRigidTransform, the function findTransformECCMultiScale implements
+     * an area-based alignment that builds on intensity similarities. In essence, the function updates the
+     * initial transformation that roughly aligns the images. If this information is missing, the identity
+     * warp (unity matrix) is used as an initialization. Note that if images undergo strong
+     * displacements/rotations, an initial transformation that roughly aligns the images is necessary
+     * (e.g., a simple euclidean/similarity transform that allows for the images showing the same image
+     * content approximately). Use inverse warping in the second image to take an image close to the first
+     * one, i.e. use the flag WARP_INVERSE_MAP with warpAffine or warpPerspective. See also the OpenCV
+     * sample image_alignment.cpp that demonstrates the use of the function. Note that the function throws
+     * an exception if algorithm does not converges.
+     * Unlike findTransformECC, the findTransformECCMultiScale uses pyramids, making function more stable
+     * and able to handle correctly more sophisticated cases.
+     *
+     * SEE:
+     * computeECC, estimateAffine2D, estimateAffinePartial2D, findHomography
+     * @return automatically generated
+     */
+    public static double findTransformECCMultiScale(Mat reference, Mat sample, Mat warpMatrix, ECCParameters eccParams, Mat referenceMask) {
+        return findTransformECCMultiScale_1(reference.nativeObj, sample.nativeObj, warpMatrix.nativeObj, eccParams.getNativeObjAddr(), referenceMask.nativeObj);
+    }
+
+    /**
+     * Finds the geometric transform (warp) between two images in terms of the ECC criterion CITE: EP08. Uses pyramids.
+     *
+     * @param reference Single channel reference image; CV_8U, CV_16U, CV_32F, CV_64F type.
+     * @param sample sample image which should be warped with the final warpMatrix in
+     * order to provide an image similar to reference, same type as reference.
+     * @param warpMatrix floating-point \(2\times 3\) or \(3\times 3\) mapping matrix (warp).
+     * @param eccParams List of the algorithm parameters. See ECCParameters for details.
+     *
+     * The function estimates the optimum transformation (warpMatrix) with respect to ECC criterion
+     * (CITE: EP08), that is
+     *
+     * \(\texttt{warpMatrix} = \arg\max_{W} \texttt{ECC}(\texttt{templateImage}(x,y),\texttt{inputImage}(x',y'))\)
+     *
+     * where
+     *
+     * \(\begin{bmatrix} x' \\ y' \end{bmatrix} = W \cdot \begin{bmatrix} x \\ y \\ 1 \end{bmatrix}\)
+     *
+     * (the equation holds with homogeneous coordinates for homography). It returns the final enhanced
+     * correlation coefficient, that is the correlation coefficient between the template image and the
+     * final warped input image. When a \(3\times 3\) matrix is given with motionType =0, 1 or 2, the third
+     * row is ignored.
+     *
+     * Unlike findHomography and estimateRigidTransform, the function findTransformECCMultiScale implements
+     * an area-based alignment that builds on intensity similarities. In essence, the function updates the
+     * initial transformation that roughly aligns the images. If this information is missing, the identity
+     * warp (unity matrix) is used as an initialization. Note that if images undergo strong
+     * displacements/rotations, an initial transformation that roughly aligns the images is necessary
+     * (e.g., a simple euclidean/similarity transform that allows for the images showing the same image
+     * content approximately). Use inverse warping in the second image to take an image close to the first
+     * one, i.e. use the flag WARP_INVERSE_MAP with warpAffine or warpPerspective. See also the OpenCV
+     * sample image_alignment.cpp that demonstrates the use of the function. Note that the function throws
+     * an exception if algorithm does not converges.
+     * Unlike findTransformECC, the findTransformECCMultiScale uses pyramids, making function more stable
+     * and able to handle correctly more sophisticated cases.
+     *
+     * SEE:
+     * computeECC, estimateAffine2D, estimateAffinePartial2D, findHomography
+     * @return automatically generated
+     */
+    public static double findTransformECCMultiScale(Mat reference, Mat sample, Mat warpMatrix, ECCParameters eccParams) {
+        return findTransformECCMultiScale_2(reference.nativeObj, sample.nativeObj, warpMatrix.nativeObj, eccParams.getNativeObjAddr());
+    }
+
+    /**
+     * Finds the geometric transform (warp) between two images in terms of the ECC criterion CITE: EP08. Uses pyramids.
+     *
+     * @param reference Single channel reference image; CV_8U, CV_16U, CV_32F, CV_64F type.
+     * @param sample sample image which should be warped with the final warpMatrix in
+     * order to provide an image similar to reference, same type as reference.
+     * @param warpMatrix floating-point \(2\times 3\) or \(3\times 3\) mapping matrix (warp).
+     *
+     * The function estimates the optimum transformation (warpMatrix) with respect to ECC criterion
+     * (CITE: EP08), that is
+     *
+     * \(\texttt{warpMatrix} = \arg\max_{W} \texttt{ECC}(\texttt{templateImage}(x,y),\texttt{inputImage}(x',y'))\)
+     *
+     * where
+     *
+     * \(\begin{bmatrix} x' \\ y' \end{bmatrix} = W \cdot \begin{bmatrix} x \\ y \\ 1 \end{bmatrix}\)
+     *
+     * (the equation holds with homogeneous coordinates for homography). It returns the final enhanced
+     * correlation coefficient, that is the correlation coefficient between the template image and the
+     * final warped input image. When a \(3\times 3\) matrix is given with motionType =0, 1 or 2, the third
+     * row is ignored.
+     *
+     * Unlike findHomography and estimateRigidTransform, the function findTransformECCMultiScale implements
+     * an area-based alignment that builds on intensity similarities. In essence, the function updates the
+     * initial transformation that roughly aligns the images. If this information is missing, the identity
+     * warp (unity matrix) is used as an initialization. Note that if images undergo strong
+     * displacements/rotations, an initial transformation that roughly aligns the images is necessary
+     * (e.g., a simple euclidean/similarity transform that allows for the images showing the same image
+     * content approximately). Use inverse warping in the second image to take an image close to the first
+     * one, i.e. use the flag WARP_INVERSE_MAP with warpAffine or warpPerspective. See also the OpenCV
+     * sample image_alignment.cpp that demonstrates the use of the function. Note that the function throws
+     * an exception if algorithm does not converges.
+     * Unlike findTransformECC, the findTransformECCMultiScale uses pyramids, making function more stable
+     * and able to handle correctly more sophisticated cases.
+     *
+     * SEE:
+     * computeECC, estimateAffine2D, estimateAffinePartial2D, findHomography
+     * @return automatically generated
+     */
+    public static double findTransformECCMultiScale(Mat reference, Mat sample, Mat warpMatrix) {
+        return findTransformECCMultiScale_3(reference.nativeObj, sample.nativeObj, warpMatrix.nativeObj);
+    }
+
+
+    //
     // C++:  Mat cv::readOpticalFlow(String path)
     //
 
@@ -1314,6 +1498,12 @@ public class Video {
     private static native double findTransformECCWithMask_1(long templateImage_nativeObj, long inputImage_nativeObj, long templateMask_nativeObj, long inputMask_nativeObj, long warpMatrix_nativeObj, int motionType, int criteria_type, int criteria_maxCount, double criteria_epsilon);
     private static native double findTransformECCWithMask_2(long templateImage_nativeObj, long inputImage_nativeObj, long templateMask_nativeObj, long inputMask_nativeObj, long warpMatrix_nativeObj, int motionType);
     private static native double findTransformECCWithMask_3(long templateImage_nativeObj, long inputImage_nativeObj, long templateMask_nativeObj, long inputMask_nativeObj, long warpMatrix_nativeObj);
+
+    // C++:  double cv::findTransformECCMultiScale(Mat reference, Mat sample, Mat& warpMatrix, ECCParameters eccParams = ECCParameters(), Mat referenceMask = Mat(), Mat sampleMask = Mat())
+    private static native double findTransformECCMultiScale_0(long reference_nativeObj, long sample_nativeObj, long warpMatrix_nativeObj, long eccParams_nativeObj, long referenceMask_nativeObj, long sampleMask_nativeObj);
+    private static native double findTransformECCMultiScale_1(long reference_nativeObj, long sample_nativeObj, long warpMatrix_nativeObj, long eccParams_nativeObj, long referenceMask_nativeObj);
+    private static native double findTransformECCMultiScale_2(long reference_nativeObj, long sample_nativeObj, long warpMatrix_nativeObj, long eccParams_nativeObj);
+    private static native double findTransformECCMultiScale_3(long reference_nativeObj, long sample_nativeObj, long warpMatrix_nativeObj);
 
     // C++:  Mat cv::readOpticalFlow(String path)
     private static native long readOpticalFlow_0(String path);

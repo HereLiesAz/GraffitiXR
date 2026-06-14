@@ -50,6 +50,7 @@
 #endif
 
 #include <cstdio>
+#include <ostream>
 
 #if defined(__GNUC__) || defined(__clang__) // at least GCC 3.1+, clang 3.5+
 #  if defined(__MINGW_PRINTF_FORMAT)  // https://sourceforge.net/p/mingw-w64/wiki2/gnu%20printf/.
@@ -263,7 +264,17 @@ Matx<_Tp, n, l> Matx<_Tp, m, n>::solve(const Matx<_Tp, m, l>& rhs, int method) c
     return ok ? x : Matx<_Tp, n, l>::zeros();
 }
 
+template<typename _Tp, int m, int n> inline
+void Matx<_Tp, m, n>::copyTo(OutputArray dst) const
+{
+    Mat(*this, false).copyTo(dst);
+}
 
+template<typename _Tp, int m, int n> inline
+void Matx<_Tp, m, n>::convertTo(OutputArray dst, int type, double scale, double shift) const
+{
+    Mat(*this, false).convertTo(dst, type, scale, shift);
+}
 
 ////////////////////////// Augmenting algebraic & logical operations //////////////////////////
 
@@ -474,6 +485,11 @@ int print(const Matx<_Tp, m, n>& matx, FILE* stream = stdout)
     return print(Formatter::get()->format(cv::Mat(matx)), stream);
 }
 
+// numpy/ONNXRuntime-style matrix pretty-printer
+CV_EXPORTS std::ostream& pprint(std::ostream& strm, InputArray tensor, int indent=0,
+                                int edge=3, int wholeTensorThreshold=100,
+                                char parens='\0');
+
 //! @endcond
 
 ///////////////////////////////// Formatted string generation /////////////////////////////////
@@ -490,7 +506,7 @@ message in the Exception constructor.
 |`const char*`|`%s`|
 |`char`|`%c`|
 |`float` / `double`|`%f`,`%g`|
-|`int`, `long`, `long long`|`%d`, `%ld`, ``%lld`|
+|`int`, `long`, `long long`|`%d`, `%ld`, `%lld`|
 |`unsigned`, `unsigned long`, `unsigned long long`|`%u`, `%lu`, `%llu`|
 |`uint64` -> `uintmax_t`, `int64` -> `intmax_t`|`%ju`, `%jd`|
 |`size_t`|`%zu`|

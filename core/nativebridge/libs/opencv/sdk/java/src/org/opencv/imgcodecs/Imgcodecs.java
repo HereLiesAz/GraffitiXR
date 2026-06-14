@@ -90,6 +90,7 @@ public class Imgcodecs {
             IMWRITE_EXR_COMPRESSION = (3 << 4) + 1,
             IMWRITE_EXR_DWA_COMPRESSION_LEVEL = (3 << 4) + 2,
             IMWRITE_WEBP_QUALITY = 64,
+            IMWRITE_WEBP_LOSSLESS_MODE = 65,
             IMWRITE_HDR_COMPRESSION = (5 << 4) + 0,
             IMWRITE_PAM_TUPLETYPE = 128,
             IMWRITE_TIFF_RESUNIT = 256,
@@ -221,6 +222,13 @@ public class Imgcodecs {
             IMWRITE_TIFF_RESOLUTION_UNIT_NONE = 1,
             IMWRITE_TIFF_RESOLUTION_UNIT_INCH = 2,
             IMWRITE_TIFF_RESOLUTION_UNIT_CENTIMETER = 3;
+
+
+    // C++: enum ImwriteWEBPLosslessMode (cv.ImwriteWEBPLosslessMode)
+    public static final int
+            IMWRITE_WEBP_LOSSLESS_OFF = 0,
+            IMWRITE_WEBP_LOSSLESS_ON = 1,
+            IMWRITE_WEBP_LOSSLESS_PRESERVE_COLOR = 2;
 
 
     //
@@ -476,7 +484,7 @@ public class Imgcodecs {
 
 
     //
-    // C++:  Mat cv::imreadWithMetadata(String filename, vector_int& metadataTypes, vector_Mat& metadata, int flags = IMREAD_ANYCOLOR)
+    // C++:  Mat cv::imreadWithMetadata(String filename, vector_int& metadataTypes, vector_Mat& metadata, int flags)
     //
 
     /**
@@ -490,7 +498,7 @@ public class Imgcodecs {
      * @param filename Name of the file to be loaded.
      * @param metadataTypes Output vector with types of metadata chunks returned in metadata, see ImageMetadataType.
      * @param metadata Output vector of vectors or vector of matrices to store the retrieved metadata.
-     * @param flags Flag that can take values of cv::ImreadModes, default with cv::IMREAD_ANYCOLOR.
+     * @param flags Flag that can take values of cv::ImreadModes.
      *
      * @return The loaded image as a cv::Mat object. If the image cannot be read, the function returns an empty matrix.
      */
@@ -503,32 +511,9 @@ public class Imgcodecs {
         return retVal;
     }
 
-    /**
-     * Reads an image from a file along with associated metadata.
-     *
-     * This function behaves similarly to cv::imread(), loading an image from the specified file.
-     * In addition to the image pixel data, it also attempts to extract any available metadata
-     * embedded in the file (such as EXIF, XMP, etc.), depending on file format support.
-     *
-     * <b>Note:</b> In the case of color images, the decoded images will have the channels stored in <b>B G R</b> order.
-     * @param filename Name of the file to be loaded.
-     * @param metadataTypes Output vector with types of metadata chunks returned in metadata, see ImageMetadataType.
-     * @param metadata Output vector of vectors or vector of matrices to store the retrieved metadata.
-     *
-     * @return The loaded image as a cv::Mat object. If the image cannot be read, the function returns an empty matrix.
-     */
-    public static Mat imreadWithMetadata(String filename, MatOfInt metadataTypes, List<Mat> metadata) {
-        Mat metadataTypes_mat = metadataTypes;
-        Mat metadata_mat = new Mat();
-        Mat retVal = new Mat(imreadWithMetadata_1(filename, metadataTypes_mat.nativeObj, metadata_mat.nativeObj));
-        Converters.Mat_to_vector_Mat(metadata_mat, metadata);
-        metadata_mat.release();
-        return retVal;
-    }
-
 
     //
-    // C++:  bool cv::imreadmulti(String filename, vector_Mat& mats, int flags = IMREAD_ANYCOLOR)
+    // C++:  bool cv::imreadmulti(String filename, vector_Mat& mats, int flags = IMREAD_COLOR_BGR)
     //
 
     /**
@@ -537,7 +522,8 @@ public class Imgcodecs {
      * The function imreadmulti loads a multi-page image from the specified file into a vector of Mat objects.
      * @param filename Name of file to be loaded.
      * @param mats A vector of Mat objects holding each page.
-     * @param flags Flag that can take values of cv::ImreadModes, default with cv::IMREAD_ANYCOLOR.
+     * @param flags Flag that can take values of cv::ImreadModes, default with cv::IMREAD_COLOR_BGR.
+     * <b>Note:</b> The default flags value was changed from cv::IMREAD_ANYCOLOR to cv::IMREAD_COLOR_BGR for unification.
      * SEE: cv::imread
      * @return automatically generated
      */
@@ -555,6 +541,7 @@ public class Imgcodecs {
      * The function imreadmulti loads a multi-page image from the specified file into a vector of Mat objects.
      * @param filename Name of file to be loaded.
      * @param mats A vector of Mat objects holding each page.
+     * <b>Note:</b> The default flags value was changed from cv::IMREAD_ANYCOLOR to cv::IMREAD_COLOR_BGR for unification.
      * SEE: cv::imread
      * @return automatically generated
      */
@@ -804,7 +791,7 @@ public class Imgcodecs {
 
 
     //
-    // C++:  size_t cv::imcount(String filename, int flags = IMREAD_ANYCOLOR)
+    // C++:  size_t cv::imcount(String filename, int flags = IMREAD_COLOR_BGR)
     //
 
     /**
@@ -813,7 +800,8 @@ public class Imgcodecs {
      * The function imcount returns the number of pages in a multi-page image (e.g. TIFF), the number of frames in an animation (e.g. AVIF), and 1 otherwise.
      * If the image cannot be decoded, 0 is returned.
      * @param filename Name of file to be loaded.
-     * @param flags Flag that can take values of cv::ImreadModes, default with cv::IMREAD_ANYCOLOR.
+     * @param flags Flag that can take values of cv::ImreadModes, default with cv::IMREAD_COLOR_BGR.
+     * <b>Note:</b> The default flags value was changed from cv::IMREAD_ANYCOLOR to cv::IMREAD_COLOR_BGR for unification.
      * TODO: when cv::IMREAD_LOAD_GDAL flag used the return value will be 0 or 1 because OpenCV's GDAL decoder doesn't support multi-page reading yet.
      * @return automatically generated
      */
@@ -827,6 +815,7 @@ public class Imgcodecs {
      * The function imcount returns the number of pages in a multi-page image (e.g. TIFF), the number of frames in an animation (e.g. AVIF), and 1 otherwise.
      * If the image cannot be decoded, 0 is returned.
      * @param filename Name of file to be loaded.
+     * <b>Note:</b> The default flags value was changed from cv::IMREAD_ANYCOLOR to cv::IMREAD_COLOR_BGR for unification.
      * TODO: when cv::IMREAD_LOAD_GDAL flag used the return value will be 0 or 1 because OpenCV's GDAL decoder doesn't support multi-page reading yet.
      * @return automatically generated
      */
@@ -902,15 +891,21 @@ public class Imgcodecs {
      *   <li>
      *  With TIFF encoder, 8-bit unsigned (CV_8U), 8-bit signed (CV_8S),
      *                      16-bit unsigned (CV_16U), 16-bit signed (CV_16S),
-     *                      32-bit signed (CV_32S),
+     *                      32-bit unsigned (CV_32U), 32-bit signed (CV_32S),
+     *                      64-bit unsigned (CV_64U), 64-bit signed (CV_64S),
      *                      32-bit float (CV_32F) and 64-bit float (CV_64F) images can be saved.
      *   <ul>
      *     <li>
      *    Multiple images (vector of Mat) can be saved in TIFF format (see the code sample below).
      *     </li>
      *     <li>
-     *    32-bit float 3-channel (CV_32FC3) TIFF images will be saved
-     *     using the LogLuv high dynamic range encoding (4 bytes per pixel)
+     *    32-bit float 3-channel (CV_32FC3) TIFF images can be saved
+     *     using the LogLuv high dynamic range encoding (4 bytes per pixel) through TIFF_COMPRESSION_SGILOG or
+     *     (3 bytes per pixel) through TIFF_COMPRESSION_SGILOG24.
+     *     </li>
+     *     <li>
+     *    Other compression schemes (LZW...) are supported as well for 32F depth, but the efficiency might not
+     *     be very good for the floating-point representation bit patterns.
      *     </li>
      *   </ul>
      *   <li>
@@ -1022,15 +1017,21 @@ public class Imgcodecs {
      *   <li>
      *  With TIFF encoder, 8-bit unsigned (CV_8U), 8-bit signed (CV_8S),
      *                      16-bit unsigned (CV_16U), 16-bit signed (CV_16S),
-     *                      32-bit signed (CV_32S),
+     *                      32-bit unsigned (CV_32U), 32-bit signed (CV_32S),
+     *                      64-bit unsigned (CV_64U), 64-bit signed (CV_64S),
      *                      32-bit float (CV_32F) and 64-bit float (CV_64F) images can be saved.
      *   <ul>
      *     <li>
      *    Multiple images (vector of Mat) can be saved in TIFF format (see the code sample below).
      *     </li>
      *     <li>
-     *    32-bit float 3-channel (CV_32FC3) TIFF images will be saved
-     *     using the LogLuv high dynamic range encoding (4 bytes per pixel)
+     *    32-bit float 3-channel (CV_32FC3) TIFF images can be saved
+     *     using the LogLuv high dynamic range encoding (4 bytes per pixel) through TIFF_COMPRESSION_SGILOG or
+     *     (3 bytes per pixel) through TIFF_COMPRESSION_SGILOG24.
+     *     </li>
+     *     <li>
+     *    Other compression schemes (LZW...) are supported as well for 32F depth, but the efficiency might not
+     *     be very good for the floating-point representation bit patterns.
      *     </li>
      *   </ul>
      *   <li>
@@ -1156,7 +1157,7 @@ public class Imgcodecs {
 
 
     //
-    // C++:  Mat cv::imdecodeWithMetadata(Mat buf, vector_int& metadataTypes, vector_Mat& metadata, int flags = IMREAD_ANYCOLOR)
+    // C++:  Mat cv::imdecodeWithMetadata(Mat buf, vector_int& metadataTypes, vector_Mat& metadata, int flags)
     //
 
     /**
@@ -1171,7 +1172,7 @@ public class Imgcodecs {
      * @param buf Input array or vector of bytes containing the encoded image data.
      * @param metadataTypes Output vector with types of metadata chucks returned in metadata, see cv::ImageMetadataType
      * @param metadata Output vector of vectors or vector of matrices to store the retrieved metadata
-     * @param flags Flag that can take values of cv::ImreadModes, default with cv::IMREAD_ANYCOLOR.
+     * @param flags Flag that can take values of cv::ImreadModes.
      *
      * @return The decoded image as a cv::Mat object. If decoding fails, the function returns an empty matrix.
      */
@@ -1179,30 +1180,6 @@ public class Imgcodecs {
         Mat metadataTypes_mat = metadataTypes;
         Mat metadata_mat = new Mat();
         Mat retVal = new Mat(imdecodeWithMetadata_0(buf.nativeObj, metadataTypes_mat.nativeObj, metadata_mat.nativeObj, flags));
-        Converters.Mat_to_vector_Mat(metadata_mat, metadata);
-        metadata_mat.release();
-        return retVal;
-    }
-
-    /**
-     * Reads an image from a memory buffer and extracts associated metadata.
-     *
-     * This function decodes an image from the specified memory buffer. If the buffer is too short or
-     * contains invalid data, the function returns an empty matrix ( Mat::data==NULL ).
-     *
-     * See cv::imread for the list of supported formats and flags description.
-     *
-     * <b>Note:</b> In the case of color images, the decoded images will have the channels stored in <b>B G R</b> order.
-     * @param buf Input array or vector of bytes containing the encoded image data.
-     * @param metadataTypes Output vector with types of metadata chucks returned in metadata, see cv::ImageMetadataType
-     * @param metadata Output vector of vectors or vector of matrices to store the retrieved metadata
-     *
-     * @return The decoded image as a cv::Mat object. If decoding fails, the function returns an empty matrix.
-     */
-    public static Mat imdecodeWithMetadata(Mat buf, MatOfInt metadataTypes, List<Mat> metadata) {
-        Mat metadataTypes_mat = metadataTypes;
-        Mat metadata_mat = new Mat();
-        Mat retVal = new Mat(imdecodeWithMetadata_1(buf.nativeObj, metadataTypes_mat.nativeObj, metadata_mat.nativeObj));
         Converters.Mat_to_vector_Mat(metadata_mat, metadata);
         metadata_mat.release();
         return retVal;
@@ -1444,11 +1421,10 @@ public class Imgcodecs {
     private static native void imread_2(String filename, long dst_nativeObj, int flags);
     private static native void imread_3(String filename, long dst_nativeObj);
 
-    // C++:  Mat cv::imreadWithMetadata(String filename, vector_int& metadataTypes, vector_Mat& metadata, int flags = IMREAD_ANYCOLOR)
+    // C++:  Mat cv::imreadWithMetadata(String filename, vector_int& metadataTypes, vector_Mat& metadata, int flags)
     private static native long imreadWithMetadata_0(String filename, long metadataTypes_mat_nativeObj, long metadata_mat_nativeObj, int flags);
-    private static native long imreadWithMetadata_1(String filename, long metadataTypes_mat_nativeObj, long metadata_mat_nativeObj);
 
-    // C++:  bool cv::imreadmulti(String filename, vector_Mat& mats, int flags = IMREAD_ANYCOLOR)
+    // C++:  bool cv::imreadmulti(String filename, vector_Mat& mats, int flags = IMREAD_COLOR_BGR)
     private static native boolean imreadmulti_0(String filename, long mats_mat_nativeObj, int flags);
     private static native boolean imreadmulti_1(String filename, long mats_mat_nativeObj);
 
@@ -1474,7 +1450,7 @@ public class Imgcodecs {
     private static native boolean imencodeanimation_0(String ext, long animation_nativeObj, long buf_mat_nativeObj, long params_mat_nativeObj);
     private static native boolean imencodeanimation_1(String ext, long animation_nativeObj, long buf_mat_nativeObj);
 
-    // C++:  size_t cv::imcount(String filename, int flags = IMREAD_ANYCOLOR)
+    // C++:  size_t cv::imcount(String filename, int flags = IMREAD_COLOR_BGR)
     private static native long imcount_0(String filename, int flags);
     private static native long imcount_1(String filename);
 
@@ -1493,9 +1469,8 @@ public class Imgcodecs {
     // C++:  Mat cv::imdecode(Mat buf, int flags)
     private static native long imdecode_0(long buf_nativeObj, int flags);
 
-    // C++:  Mat cv::imdecodeWithMetadata(Mat buf, vector_int& metadataTypes, vector_Mat& metadata, int flags = IMREAD_ANYCOLOR)
+    // C++:  Mat cv::imdecodeWithMetadata(Mat buf, vector_int& metadataTypes, vector_Mat& metadata, int flags)
     private static native long imdecodeWithMetadata_0(long buf_nativeObj, long metadataTypes_mat_nativeObj, long metadata_mat_nativeObj, int flags);
-    private static native long imdecodeWithMetadata_1(long buf_nativeObj, long metadataTypes_mat_nativeObj, long metadata_mat_nativeObj);
 
     // C++:  bool cv::imdecodemulti(Mat buf, int flags, vector_Mat& mats, Range range = Range::all())
     private static native boolean imdecodemulti_0(long buf_nativeObj, int flags, long mats_mat_nativeObj, int range_start, int range_end);
