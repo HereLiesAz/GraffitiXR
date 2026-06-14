@@ -36,6 +36,11 @@ class MainViewModelTest {
         Dispatchers.setMain(testDispatcher)
         every { settingsRepository.completedTutorials } returns flowOf(emptySet<String>())
         viewModel = MainViewModel(projectRepository, slamManager, projectManager, settingsRepository, context)
+        // The do-it-to-advance walkthrough tests below were written against a tutorial-mode-OFF
+        // start and toggle it on themselves. Production now defaults the mode ON (so the coach
+        // surfaces automatically at launch), so normalize back to off here. The production default
+        // is covered separately by `tutorial mode is on by default`.
+        if (viewModel.uiState.value.tutorialModeActive) viewModel.toggleTutorialMode()
     }
 
     @After
@@ -73,6 +78,14 @@ class MainViewModelTest {
     fun `setCaptureStep updates state`() = runTest {
         viewModel.setCaptureStep(CaptureStep.REVIEW)
         assertEquals(CaptureStep.REVIEW, viewModel.uiState.value.captureStep)
+    }
+
+    @Test
+    fun `tutorial mode is on by default`() = runTest {
+        // A fresh ViewModel (not the setup() one, which normalizes the mode off) must start with
+        // tutorial mode enabled so the onboarding coach surfaces automatically at launch.
+        val fresh = MainViewModel(projectRepository, slamManager, projectManager, settingsRepository, context)
+        assertEquals(true, fresh.uiState.value.tutorialModeActive)
     }
 
     // --- Do-it-to-advance walkthrough ---------------------------------------------------------
