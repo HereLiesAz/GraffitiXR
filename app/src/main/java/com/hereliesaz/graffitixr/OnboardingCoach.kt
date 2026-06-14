@@ -76,12 +76,21 @@ fun rememberCoachStep(editor: EditorUiState, ar: ArUiState): CoachStep? {
             EditorMode.DESIGN -> when {
                 // Intro on 'Design', then — once the user presses it open — walk the pointer across
                 // the layer sources (Open / Sketch / Text), explaining each in turn before they pick.
-                !hasLayers -> CoachStep(
-                    key = "coach.design.add",
-                    targetId = "host.design",
-                    lines = listOf(design.getOrNull(0).orEmpty()) + designLayers,
-                    lineTargets = listOf("host.design", "design.addImg", "design.addDraw", "design.addText"),
-                )
+                // Falls back to the plain 2-line step if the per-source copy is missing (e.g. an
+                // incomplete localization) so the card never shows a blank line.
+                !hasLayers -> {
+                    val intro = design.getOrNull(0)
+                    if (intro != null && designLayers.isNotEmpty()) {
+                        CoachStep(
+                            key = "coach.design.add",
+                            targetId = "host.design",
+                            lines = listOf(intro) + designLayers,
+                            lineTargets = listOf("host.design", "design.addImg", "design.addDraw", "design.addText"),
+                        )
+                    } else {
+                        CoachStep("coach.design.add", "host.design", lines(design, 0, 1))
+                    }
+                }
                 activeLayer == null -> CoachStep("coach.design.select", firstLayerTarget, lines(design, 2))
                 else -> CoachStep("coach.design.use", "host.modes", lines(design, 3))
             }
