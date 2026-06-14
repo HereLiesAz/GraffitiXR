@@ -4,7 +4,8 @@
 #include <algorithm>
 #include <fstream>
 #include <opencv2/imgproc.hpp>
-#include <opencv2/geometry/2d.hpp>
+#include <opencv2/geometry.hpp>
+#include <opencv2/calib3d.hpp>
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "SurfaceMesh", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "SurfaceMesh", __VA_ARGS__)

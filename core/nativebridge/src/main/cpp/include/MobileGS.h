@@ -1,5 +1,7 @@
 #pragma once
 #include <opencv2/opencv.hpp>
+#include <opencv2/geometry.hpp>
+#include <opencv2/calib3d.hpp>
 #include "SuperPointDetector.h"
 #include "DistortionHead.h"
 #include "LowLightEnhancer.h"
