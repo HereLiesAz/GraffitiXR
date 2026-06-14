@@ -636,6 +636,13 @@
         <item>Tap a layer to open its tools — grouped into Paint, Retouch, Adjust and Effects folders. Pinch and drag on the canvas to size and place it.</item>
         <item>When it looks right, choose how to use it: \'Trace\' to turn your phone into a lightbox, \'Mockup\' to preview on a photo, or \'AR\' to project it onto a wall.</item>
     </string-array>
+    <!-- Sub-item walkthrough shown after the Design menu is opened: one line per layer source,
+         each pointing at its own rail button (Open / Sketch / Text). -->
+    <string-array name="onboarding_design_layers">
+        <item>Open — import a photo or artwork; it lands as a new layer.</item>
+        <item>Sketch — start a blank layer and draw your own marks.</item>
+        <item>Text — type words and style them as their own layer.</item>
+    </string-array>
 
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
     <string name="tut_create_anchor_title">Create Anchor</string>

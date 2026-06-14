@@ -21,8 +21,20 @@ import kotlinx.coroutines.delay
  * state. [targetId] is the rail item the pointer aims at (null = text only). [lines] are revealed
  * one at a time. [key] is stable per situation, so the same step is never re-derived as "new" and is
  * remembered as shown once it has been seen.
+ *
+ * [lineTargets], when present, gives a per-line target id so a single step's pointer can move between
+ * rail items as the user pages through its lines (e.g. walking Open → Sketch → Text after the Design
+ * menu opens). An entry of null — or running past the list — falls back to [targetId].
  */
-data class CoachStep(val key: String, val targetId: String?, val lines: List<String>)
+data class CoachStep(
+    val key: String,
+    val targetId: String?,
+    val lines: List<String>,
+    val lineTargets: List<String?>? = null,
+) {
+    /** The rail item the pointer should aim at for [lineIdx]: per-line override, else [targetId]. */
+    fun targetForLine(lineIdx: Int): String? = lineTargets?.getOrNull(lineIdx) ?: targetId
+}
 
 /**
  * Derives the current coaching step purely from app state — the coach adapts to the user, it never
@@ -54,6 +66,7 @@ fun rememberCoachStep(editor: EditorUiState, ar: ArUiState): CoachStep? {
         }
 
         val design = arr(DesignR.array.onboarding_design)
+        val designLayers = arr(DesignR.array.onboarding_design_layers)
         val arLines = arr(DesignR.array.onboarding_ar)
         val overlay = arr(DesignR.array.onboarding_overlay)
         val mockup = arr(DesignR.array.onboarding_mockup)
@@ -61,7 +74,14 @@ fun rememberCoachStep(editor: EditorUiState, ar: ArUiState): CoachStep? {
 
         when (editor.editorMode) {
             EditorMode.DESIGN -> when {
-                !hasLayers -> CoachStep("coach.design.add", "host.design", lines(design, 0, 1))
+                // Intro on 'Design', then — once the user presses it open — walk the pointer across
+                // the layer sources (Open / Sketch / Text), explaining each in turn before they pick.
+                !hasLayers -> CoachStep(
+                    key = "coach.design.add",
+                    targetId = "host.design",
+                    lines = listOf(design.getOrNull(0).orEmpty()) + designLayers,
+                    lineTargets = listOf("host.design", "design.addImg", "design.addDraw", "design.addText"),
+                )
                 activeLayer == null -> CoachStep("coach.design.select", firstLayerTarget, lines(design, 2))
                 else -> CoachStep("coach.design.use", "host.modes", lines(design, 3))
             }
@@ -101,7 +121,7 @@ fun rememberCoachStep(editor: EditorUiState, ar: ArUiState): CoachStep? {
 fun OnboardingCoachOverlay(
     step: CoachStep,
     gestureInProgress: Boolean,
-    targetBounds: Rect?,
+    boundsFor: (String) -> Rect?,
     onSeen: () -> Unit,
 ) {
     var settled by remember(step.key) { mutableStateOf(false) }
@@ -115,6 +135,10 @@ fun OnboardingCoachOverlay(
     if (gestureInProgress || !settled) return
 
     var lineIdx by rememberSaveable(step.key) { mutableStateOf(0) }
+    // Resolve the pointer target for the line currently showing — for a multi-target step this moves
+    // the arrow from item to item as the user pages through (e.g. Open → Sketch → Text). Reading the
+    // bounds here keeps the arrow live as the rail reports positions (the Design menu opening, etc.).
+    val targetBounds = step.targetForLine(lineIdx)?.let(boundsFor)
     ModeOnboardingOverlay(
         positionKey = step.key,
         step = lineIdx,
