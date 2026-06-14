@@ -1226,7 +1226,8 @@ class EditorViewModel @Inject constructor(
      */
     fun onStrokeStart(startPoint: Offset, canvasSize: IntSize) {
         val state = _uiState.value
-        if (state.activeTool == Tool.NONE) return
+        // NONE and COLOR aren't paint tools — they never produce a stroke.
+        if (state.activeTool == Tool.NONE || state.activeTool == Tool.COLOR) return
         val layerId = state.activeLayerId ?: return
         val layer = state.layers.find { it.id == layerId } ?: return
         val originalBitmap = layer.bitmap ?: return

@@ -179,6 +179,7 @@ object ImageProcessor {
 
                                         when (tool) {
                                             Tool.LIQUIFY -> applyLiquifyNative(resultBitmap, stroke, brushSize, intensity)
+                                            Tool.NONE, Tool.COLOR -> Unit // not paint tools — nothing to rasterize
                                             else -> drawStroke(
                                                 canvas, stroke,
                                                 buildToolPaint(tool, brushColor, brushSize, intensity, feathering)
