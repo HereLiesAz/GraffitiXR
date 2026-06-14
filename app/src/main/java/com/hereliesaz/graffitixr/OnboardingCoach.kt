@@ -1,11 +1,11 @@
 package com.hereliesaz.graffitixr
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
@@ -125,6 +125,7 @@ fun OnboardingCoachOverlay(
     boundsFor: (String) -> Rect?,
     onAdvance: () -> Unit,
     onSeen: () -> Unit,
+    onVisibilityChanged: (Boolean) -> Unit = {},
 ) {
     var settled by remember(step.key) { mutableStateOf(false) }
     LaunchedEffect(step.key, gestureInProgress) {
@@ -134,6 +135,13 @@ fun OnboardingCoachOverlay(
             settled = true
         }
     }
+    // Report whether the coach is actually surfaced. A rail interaction must only advance a *visible*
+    // step — otherwise a startup/selection sync that fires onInteraction before the coach appears
+    // would silently skip its first line (the "tap Design" intro the user needs to see).
+    val visible = settled && !gestureInProgress
+    LaunchedEffect(visible) { onVisibilityChanged(visible) }
+    DisposableEffect(Unit) { onDispose { onVisibilityChanged(false) } }
+
     if (gestureInProgress || !settled) return
 
     // The current line is controlled by the caller, so two sources can drive it: the overlay's own

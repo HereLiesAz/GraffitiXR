@@ -533,6 +533,9 @@ class MainActivity : ComponentActivity() {
                 var coachLineIdx by androidx.compose.runtime.saveable.rememberSaveable(coachStep?.key) {
                     mutableStateOf(0)
                 }
+                // True only while the coach overlay is actually on screen — gates rail-tap advancement
+                // so a startup/selection sync can't skip the first ("tap Design") line.
+                var coachVisible by remember { mutableStateOf(false) }
 
                 AzHostActivityLayout(navController = navController, currentDestination = currentRoute, initiallyExpanded = false) {
                     azTheme(
@@ -559,8 +562,9 @@ class MainActivity : ComponentActivity() {
                             // Advance the adaptive coach when the user taps the item it's pointing at
                             // (Design → Open → Sketch → Text). Rail taps don't reach the overlay's
                             // own tap observer, so this is what moves the coach forward on the rail.
+                            // Gated on coachVisible so a startup sync can't skip the first line.
                             val cs = coachStep
-                            if (cs != null && id == cs.targetForLine(coachLineIdx)) coachLineIdx++
+                            if (cs != null && coachVisible && id == cs.targetForLine(coachLineIdx)) coachLineIdx++
                         },
                         // Window-space bounds per item, so the walkthrough can point at its target.
                         onItemGloballyPositioned = { id, rect -> railItemBounds[id] = rect }
@@ -671,6 +675,7 @@ class MainActivity : ComponentActivity() {
                                         coachSeenThisSession.add(key)
                                         if (!replayCoaching) mainViewModel.markTutorialCompletePersistent(key)
                                     },
+                                    onVisibilityChanged = { coachVisible = it },
                                 )
                             }
                         }

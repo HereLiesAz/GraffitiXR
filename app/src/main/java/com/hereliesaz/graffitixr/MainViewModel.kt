@@ -38,9 +38,11 @@ data class MainUiState(
     // True when the current capture was initiated via the tap-to-target path (Phase 4).
     val captureOriginatedFromTap: Boolean = false,
     val tutorialCompleted: Map<String, Boolean> = emptyMap(),
-    // When true, the do-it-to-advance walkthrough is running: the card shows the next action and
-    // performing that exact rail interaction advances the tour. An explicit, user-toggled mode.
-    val tutorialModeActive: Boolean = false,
+    // Drives the adaptive onboarding coach in "replay" mode: when true the coach surfaces every
+    // session, ignoring the persisted "already seen" set. Enabled by default so the tutorial is on
+    // automatically at launch; the Help button toggles it off (and the do-it-to-advance walkthrough,
+    // which also reads this flag, follows the same switch).
+    val tutorialModeActive: Boolean = true,
     // The ordered walkthrough for the current mode/layers. Each step targets one rail item id and
     // carries its instruction lines. Fed by the composable via [setTutorialSequence]; empty when no
     // tour is active. Reaching the end clears this but leaves [tutorialModeActive] on.
