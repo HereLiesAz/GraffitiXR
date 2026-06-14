@@ -121,7 +121,9 @@ fun rememberCoachStep(editor: EditorUiState, ar: ArUiState): CoachStep? {
 fun OnboardingCoachOverlay(
     step: CoachStep,
     gestureInProgress: Boolean,
+    lineIdx: Int,
     boundsFor: (String) -> Rect?,
+    onAdvance: () -> Unit,
     onSeen: () -> Unit,
 ) {
     var settled by remember(step.key) { mutableStateOf(false) }
@@ -134,16 +136,16 @@ fun OnboardingCoachOverlay(
     }
     if (gestureInProgress || !settled) return
 
-    var lineIdx by rememberSaveable(step.key) { mutableStateOf(0) }
-    // Resolve the pointer target for the line currently showing — for a multi-target step this moves
-    // the arrow from item to item as the user pages through (e.g. Open → Sketch → Text). Reading the
-    // bounds here keeps the arrow live as the rail reports positions (the Design menu opening, etc.).
+    // The current line is controlled by the caller, so two sources can drive it: the overlay's own
+    // screen tap (canvas), and a matching rail interaction (rail taps are consumed by the rail and
+    // never reach this overlay, so they advance through the hoisted state instead). The pointer
+    // target is resolved per line — for a multi-target step the arrow moves item to item.
     val targetBounds = step.targetForLine(lineIdx)?.let(boundsFor)
     ModeOnboardingOverlay(
         positionKey = step.key,
         step = lineIdx,
         lines = step.lines,
-        onAdvance = { lineIdx++ },
+        onAdvance = onAdvance,
         onDismiss = onSeen,
         targetBounds = targetBounds,
     )

@@ -374,7 +374,7 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `onStrokeStart replays all buffered points after bitmap copy`() = runTest {
+    fun `onStrokePoint accumulates the live vector stroke for non-Liquify tools`() = runTest {
         val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -393,8 +393,13 @@ class EditorViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertNotNull(state.liveStrokeBitmap)
-        assertTrue("Expected liveStrokeVersion >= 1, got ${state.liveStrokeVersion}", state.liveStrokeVersion >= 1)
+        // Non-Liquify tools render as an instant vector overlay — no per-point bitmap upload.
+        assertEquals(layerId, state.liveStrokeLayerId)
+        assertNull(state.liveStrokeBitmap)
+        assertEquals(
+            listOf(Offset(10f, 10f), Offset(20f, 20f), Offset(30f, 30f), Offset(40f, 40f)),
+            state.liveStrokePoints
+        )
     }
 
     @Test

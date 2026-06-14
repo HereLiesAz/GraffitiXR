@@ -524,6 +524,16 @@ class MainActivity : ComponentActivity() {
                 // current walkthrough step is asking the user to interact with.
                 val railItemBounds = remember { androidx.compose.runtime.mutableStateMapOf<String, androidx.compose.ui.geometry.Rect>() }
 
+                // Coach state is hoisted here (above azAdvanced) so the rail's onInteraction callback
+                // can advance the walkthrough when the user taps the very item it points at. The rail
+                // consumes its own taps, so they never reach the coach overlay's screen-tap observer —
+                // onInteraction is the supported "the user used the rail" signal, and it fires for the
+                // Design host and the Open/Sketch/Text sub-items alike.
+                val coachStep = rememberCoachStep(editorUiState, arUiState)
+                var coachLineIdx by androidx.compose.runtime.saveable.rememberSaveable(coachStep?.key) {
+                    mutableStateOf(0)
+                }
+
                 AzHostActivityLayout(navController = navController, currentDestination = currentRoute, initiallyExpanded = false) {
                     azTheme(
                         activeColor = Cyan,
@@ -544,7 +554,14 @@ class MainActivity : ComponentActivity() {
                         // interaction (tap, toggle, cycler, nested-rail open, reloc drag) here, so
                         // the do-it-to-advance walkthrough advances when the user performs the
                         // targeted action. Replaces the scattered per-item onRailTap calls.
-                        onInteraction = { id, _ -> mainViewModel.onRailInteraction(id) },
+                        onInteraction = { id, _ ->
+                            mainViewModel.onRailInteraction(id)
+                            // Advance the adaptive coach when the user taps the item it's pointing at
+                            // (Design → Open → Sketch → Text). Rail taps don't reach the overlay's
+                            // own tap observer, so this is what moves the coach forward on the rail.
+                            val cs = coachStep
+                            if (cs != null && id == cs.targetForLine(coachLineIdx)) coachLineIdx++
+                        },
                         // Window-space bounds per item, so the walkthrough can point at its target.
                         onItemGloballyPositioned = { id, rect -> railItemBounds[id] = rect }
                     )
@@ -634,7 +651,8 @@ class MainActivity : ComponentActivity() {
                         // step's lines one at a time (screen tap or idle timer), and remembers each
                         // step as shown so it never nags. Tapping Help (tutorialModeActive) replays
                         // coaching for the session, ignoring the persisted "already seen" set.
-                        val coachStep = rememberCoachStep(editorUiState, arUiState)
+                        // coachStep / coachLineIdx are hoisted above azAdvanced so rail taps can drive
+                        // them; the overlay below is the canvas-tap driver for the same line index.
                         val replayCoaching = mainUiState.tutorialModeActive
                         val coachSeenThisSession =
                             remember(replayCoaching) { androidx.compose.runtime.mutableStateListOf<String>() }
@@ -646,7 +664,9 @@ class MainActivity : ComponentActivity() {
                                 OnboardingCoachOverlay(
                                     step = coachStep,
                                     gestureInProgress = editorUiState.gestureInProgress,
+                                    lineIdx = coachLineIdx,
                                     boundsFor = { railItemBounds[it] },
+                                    onAdvance = { coachLineIdx++ },
                                     onSeen = {
                                         coachSeenThisSession.add(key)
                                         if (!replayCoaching) mainViewModel.markTutorialCompletePersistent(key)
