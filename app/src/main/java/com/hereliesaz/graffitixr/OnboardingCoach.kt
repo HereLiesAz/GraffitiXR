@@ -92,7 +92,23 @@ fun rememberCoachStep(editor: EditorUiState, ar: ArUiState): CoachStep? {
                     }
                 }
                 activeLayer == null -> CoachStep("coach.design.select", firstLayerTarget, lines(design, 2))
-                else -> CoachStep("coach.design.use", "host.modes", lines(design, 3))
+                // A layer exists and is active (e.g. just created). First point at that layer and
+                // explain its tools, THEN point at Modes to use the finished design. Per-line targets
+                // keep the new layer highlighted for line 0 and Modes for line 1.
+                else -> {
+                    val toolsLine = design.getOrNull(2)
+                    val useLine = design.getOrNull(3)
+                    val lns = listOfNotNull(toolsLine, useLine)
+                    val tgts = buildList {
+                        if (toolsLine != null) add(layerPointer)
+                        if (useLine != null) add("host.modes")
+                    }
+                    if (lns.isNotEmpty()) {
+                        CoachStep("coach.design.use", "host.modes", lns, tgts)
+                    } else {
+                        CoachStep("coach.design.use", "host.modes", lines(design, 3))
+                    }
+                }
             }
             EditorMode.OVERLAY -> when {
                 !hasLayers -> CoachStep("coach.overlay.add", "host.design", lines(overlay, 0, 1))

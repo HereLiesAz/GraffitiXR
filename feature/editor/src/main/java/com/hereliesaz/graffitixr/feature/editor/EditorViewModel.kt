@@ -299,20 +299,29 @@ class EditorViewModel @Inject constructor(
         val strokes = layerStore.strokes(layerId)
 
         viewModelScope.launch(dispatchers.default) {
-            val currentBitmap = drawingEngine.composite(base, strokes)
+            // Compositing replays strokes through OpenCV (and SLAM for Liquify). Guard it so a
+            // failure during undo/redo logs instead of taking down the app — the stroke list and
+            // base are unchanged, so the next edit re-renders cleanly.
+            try {
+                val currentBitmap = drawingEngine.composite(base, strokes)
 
-            if (emitOp) {
-                // Used by undo/redo: the layer's pixels changed in a way the guest can't replay,
-                // so push the whole baked bitmap.
-                opEmitter.emit(Op.LayerBitmapReplace(layerId, ImageUtils.bitmapToByteArray(currentBitmap)))
-            }
-
-            withContext(dispatchers.main) {
-                _uiState.update { state ->
-                    state.copy(layers = state.layers.map { if (it.id == layerId) it.copy(bitmap = currentBitmap) else it })
+                if (emitOp) {
+                    // Used by undo/redo: the layer's pixels changed in a way the guest can't replay,
+                    // so push the whole baked bitmap.
+                    opEmitter.emit(Op.LayerBitmapReplace(layerId, ImageUtils.bitmapToByteArray(currentBitmap)))
                 }
-                val layer = _uiState.value.layers.find { it.id == layerId } ?: return@withContext
-                scheduleDiskSave(layerId, currentBitmap, layer.uri)
+
+                withContext(dispatchers.main) {
+                    _uiState.update { state ->
+                        state.copy(layers = state.layers.map { if (it.id == layerId) it.copy(bitmap = currentBitmap) else it })
+                    }
+                    val layer = _uiState.value.layers.find { it.id == layerId } ?: return@withContext
+                    scheduleDiskSave(layerId, currentBitmap, layer.uri)
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                android.util.Log.e("EditorViewModel", "Failed to rebuild layer $layerId on undo/redo", e)
             }
         }
     }
