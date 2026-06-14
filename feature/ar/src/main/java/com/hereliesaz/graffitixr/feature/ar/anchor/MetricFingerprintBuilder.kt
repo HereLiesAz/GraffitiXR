@@ -8,8 +8,8 @@ import org.opencv.core.KeyPoint
 import org.opencv.core.Mat
 import org.opencv.core.MatOfDMatch
 import org.opencv.core.MatOfKeyPoint
-import org.opencv.features2d.DescriptorMatcher
-import org.opencv.features2d.ORB
+import org.opencv.features.DescriptorMatcher
+import org.opencv.features.ORB
 import org.opencv.imgproc.Imgproc
 
 /**

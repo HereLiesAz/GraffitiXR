@@ -1,36 +1,43 @@
-# Implementation Plan - Fix Build Failures
+# Implementation Plan - Fix Native Build (Ninja) and OpenCV References
 
-The project is currently failing to build due to a Kotlin compilation error in `:core:common` and a native build error (Ninja) in `:opencv`.
+The build is currently failing with a `ninja: error: manifest 'build.ninja' still dirty after 100 tries` loop. This is a common issue when building native code on synced drives like Google Drive. We will also address the unresolved OpenCV references in `:core:common`.
 
 ## User Review Required
 
 > [!IMPORTANT]
-> The project is located on a Google Drive synced folder (`G:\My Drive\GraffitiXR`). This is causing the C++ build system (Ninja) to fail with `manifest 'build.ninja' still dirty` because of file timestamp inconsistencies common with cloud-sync providers.
+> **Google Drive Conflict:** The error `manifest 'build.ninja' still dirty` is almost certainly caused by Google Drive's sync mechanism touching files during the build process, which confuses Ninja's timestamp-based dependency tracking.
 >
-> **Recommended Action:** If possible, move the project to a local, non-synced directory (e.g., `C:\Projects\GraffitiXR`) to avoid persistent build issues with native code.
+> **Recommendation:** While the steps below attempt a workaround, the most reliable fix is to **move the project to a local, non-synced directory** (e.g., `C:\GraffitiXR`).
 
 ## Proposed Changes
 
-### [core:common]
+### [opencv] `:opencv`
 
-Fix the unresolved reference to `getPerspectiveTransform`. In the version of OpenCV used in this project, this function is located in `org.opencv.geometry.Geometry` rather than the standard `org.opencv.imgproc.Imgproc`.
+We will restrict the build to ARM architectures to match `:core:nativebridge` and ensure a consistent CMake version is used. This reduces the build surface and avoids failing on `x86`/`x86_64` if those environments are causing issues.
+
+#### [MODIFY] [build.gradle](file:///G:/My%20Drive/GraffitiXR/core/nativebridge/libs/opencv/sdk/build.gradle)
+- Add `abiFilters 'arm64-v8a', 'armeabi-v7a'` to `defaultConfig`.
+- Set `version "3.22.1"` in the `externalNativeBuild.cmake` block.
+
+### [core:common] `:core:common`
+
+Fix the unresolved reference to `getPerspectiveTransform` by using the correct class for this OpenCV version.
 
 #### [MODIFY] [ImageProcessor.kt](file:///G:/My%20Drive/GraffitiXR/core/common/src/main/java/com/hereliesaz/graffitixr/common/util/ImageProcessor.kt)
-- Update the call to `getPerspectiveTransform` to use the `Geometry` class.
+- Ensure it uses `org.opencv.geometry.Geometry.getPerspectiveTransform` as intended in the current OpenCV 5.0.0 SDK structure.
 
-### [opencv]
+### [Build System]
 
-Address the Ninja "still dirty" error by performing a clean of the native build.
-
-#### [ACTION] Clean Build
-- Run `./gradlew :opencv:clean` to remove stale build artifacts and reset the Ninja manifest.
+#### [ACTION] Deep Clean
+- Manually delete the `.cxx` directories in both `:opencv` and `:core:nativebridge` to force a clean Ninja state.
+- Run `./gradlew clean`.
 
 ## Verification Plan
 
 ### Automated Tests
-- Run `:core:common:compileReleaseKotlin` to verify the Kotlin fix.
-- Run `:opencv:assembleRelease` to verify the native build fix.
-- Run a full `:app:assembleDebug` or `:app:assembleRelease` to ensure the entire project builds.
+- Run `./gradlew :opencv:assembleRelease` to verify the native build succeeds.
+- Run `./gradlew :core:common:compileReleaseKotlin` to verify the Kotlin fix.
+- Run `./gradlew :app:assembleDebug` to verify the full application build.
 
 ### Manual Verification
-- Verify that the app starts and the image processing features (if accessible) work as expected.
+- Deploy the app to a device and verify that image unwarping works correctly.
