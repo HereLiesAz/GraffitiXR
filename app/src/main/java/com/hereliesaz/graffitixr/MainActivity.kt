@@ -646,7 +646,7 @@ class MainActivity : ComponentActivity() {
                                 OnboardingCoachOverlay(
                                     step = coachStep,
                                     gestureInProgress = editorUiState.gestureInProgress,
-                                    targetBounds = coachStep.targetId?.let { railItemBounds[it] },
+                                    boundsFor = { railItemBounds[it] },
                                     onSeen = {
                                         coachSeenThisSession.add(key)
                                         if (!replayCoaching) mainViewModel.markTutorialCompletePersistent(key)
