@@ -112,6 +112,55 @@ object ImageProcessor {
                     }
         }
 
+        /**
+         * Single source of truth for a tool's stroke [Paint]. Used both for the live vector preview
+         * and the final rasterization so the in-progress stroke looks identical to the committed
+         * result. [brushSize] is in the destination's pixel units (bitmap px when committing, local
+         * canvas px when previewing). Liquify isn't paint-based, so it returns a plain brush paint.
+         */
+        fun buildToolPaint(
+            tool: Tool,
+            brushColor: Int,
+            brushSize: Float,
+            intensity: Float = 0.5f,
+            feathering: Float = 0f,
+        ): Paint = Paint().apply {
+            strokeWidth = brushSize
+            style = Paint.Style.STROKE
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+            isAntiAlias = true
+            when (tool) {
+                Tool.BRUSH -> {
+                    color = brushColor
+                    if (feathering > 0f) maskFilter = BlurMaskFilter(brushSize * feathering * 0.5f, BlurMaskFilter.Blur.NORMAL)
+                }
+                Tool.ERASER -> {
+                    xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
+                    if (feathering > 0f) maskFilter = BlurMaskFilter(brushSize * feathering * 0.5f, BlurMaskFilter.Blur.NORMAL)
+                }
+                Tool.BLUR -> {
+                    maskFilter = BlurMaskFilter(brushSize * intensity.coerceAtLeast(0.1f), BlurMaskFilter.Blur.NORMAL)
+                    alpha = 150
+                }
+                Tool.HEAL -> {
+                    color = brushColor
+                    alpha = 128
+                }
+                Tool.BURN -> {
+                    color = Color.BLACK
+                    alpha = (255 * intensity * 0.3f).toInt().coerceIn(0, 255)
+                    xfermode = PorterDuffXfermode(PorterDuff.Mode.DARKEN)
+                }
+                Tool.DODGE -> {
+                    color = Color.WHITE
+                    alpha = (255 * intensity * 0.3f).toInt().coerceIn(0, 255)
+                    xfermode = PorterDuffXfermode(PorterDuff.Mode.LIGHTEN)
+                }
+                else -> { color = brushColor }
+            }
+        }
+
             suspend fun applyToolToBitmap(
                         originalBitmap: Bitmap,
                         stroke: List<Offset>,
@@ -129,93 +178,11 @@ object ImageProcessor {
                                 val canvas = Canvas(resultBitmap)
 
                                         when (tool) {
-                                                        Tool.BRUSH -> {
-                                                                            val paint = Paint().apply {
-                                                                                                    color = brushColor
-                                                                                                    strokeWidth = brushSize
-                                                                                                    style = Paint.Style.STROKE
-                                                                                                    strokeCap = Paint.Cap.ROUND
-                                                                                                    strokeJoin = Paint.Join.ROUND
-                                                                                                    isAntiAlias = true
-                                                                                                    if (feathering > 0f) {
-                                                                                                        maskFilter = BlurMaskFilter(brushSize * feathering * 0.5f, BlurMaskFilter.Blur.NORMAL)
-                                                                                                    }
-                                                                            }
-                                                                                            drawStroke(canvas, stroke, paint)
-                                                        }
-
-                                                                    Tool.ERASER -> {
-                                                                                        val paint = Paint().apply {
-                                                                                                                strokeWidth = brushSize
-                                                                                                                style = Paint.Style.STROKE
-                                                                                                                strokeCap = Paint.Cap.ROUND
-                                                                                                                strokeJoin = Paint.Join.ROUND
-                                                                                                                isAntiAlias = true
-                                                                                                                xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
-                                                                                                                if (feathering > 0f) {
-                                                                                                                    maskFilter = BlurMaskFilter(brushSize * feathering * 0.5f, BlurMaskFilter.Blur.NORMAL)
-                                                                                                                }
-                                                                                        }
-                                                                                                        drawStroke(canvas, stroke, paint)
-                                                                    }
-
-                                                                                Tool.BLUR -> {
-                                                                                                    val paint = Paint().apply {
-                                                                                                                            strokeWidth = brushSize
-                                                                                                                            style = Paint.Style.STROKE
-                                                                                                                            strokeCap = Paint.Cap.ROUND
-                                                                                                                            strokeJoin = Paint.Join.ROUND
-                                                                                                                            isAntiAlias = true
-                                                                                                                            maskFilter = BlurMaskFilter(brushSize * intensity.coerceAtLeast(0.1f), BlurMaskFilter.Blur.NORMAL)
-                                                                                                                                                alpha = 150
-                                                                                                    }
-                                                                                                                    drawStroke(canvas, stroke, paint)
-                                                                                }
-
-                                                                                            Tool.LIQUIFY -> {
-                                                                                                                applyLiquifyNative(resultBitmap, stroke, brushSize, intensity)
-                                                                                            }
-
-                                                                                                        Tool.HEAL -> {
-                                                                                                                            val paint = Paint().apply {
-                                                                                                                                                    color = brushColor
-                                                                                                                                                    strokeWidth = brushSize
-                                                                                                                                                    style = Paint.Style.STROKE
-                                                                                                                                                    strokeCap = Paint.Cap.ROUND
-                                                                                                                                                    strokeJoin = Paint.Join.ROUND
-                                                                                                                                                    isAntiAlias = true
-                                                                                                                                                    alpha = 128
-                                                                                                                            }
-                                                                                                                                            drawStroke(canvas, stroke, paint)
-                                                                                                        }
-                                                                                                        
-                                                                                                                    Tool.BURN -> {
-                                                                                                                                        val paint = Paint().apply {
-                                                                                                                                                                color = Color.BLACK
-                                                                                                                                                                strokeWidth = brushSize
-                                                                                                                                                                style = Paint.Style.STROKE
-                                                                                                                                                                strokeCap = Paint.Cap.ROUND
-                                                                                                                                                                strokeJoin = Paint.Join.ROUND
-                                                                                                                                                                alpha = (255 * intensity * 0.3f).toInt().coerceIn(0, 255)
-                                                                                                                                                                                    xfermode = PorterDuffXfermode(PorterDuff.Mode.DARKEN)
-                                                                                                                                        }
-                                                                                                                                                        drawStroke(canvas, stroke, paint)
-                                                                                                                    }
-                                                                                                                    
-                                                                                                                                Tool.DODGE -> {
-                                                                                                                                                    val paint = Paint().apply {
-                                                                                                                                                                            color = Color.WHITE
-                                                                                                                                                                            strokeWidth = brushSize
-                                                                                                                                                                            style = Paint.Style.STROKE
-                                                                                                                                                                            strokeCap = Paint.Cap.ROUND
-                                                                                                                                                                            strokeJoin = Paint.Join.ROUND
-                                                                                                                                                                            alpha = (255 * intensity * 0.3f).toInt().coerceIn(0, 255)
-                                                                                                                                                                                                xfermode = PorterDuffXfermode(PorterDuff.Mode.LIGHTEN)
-                                                                                                                                                                                                                }
-                                                                                                                                                                    drawStroke(canvas, stroke, paint)
-                                                                                                                                }
-                                                                                                                                
-                                                                                                                                            else -> {}
+                                            Tool.LIQUIFY -> applyLiquifyNative(resultBitmap, stroke, brushSize, intensity)
+                                            else -> drawStroke(
+                                                canvas, stroke,
+                                                buildToolPaint(tool, brushColor, brushSize, intensity, feathering)
+                                            )
                                         }
 
                                                 resultBitmap
