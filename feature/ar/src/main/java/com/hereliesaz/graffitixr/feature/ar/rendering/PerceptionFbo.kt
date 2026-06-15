@@ -35,6 +35,8 @@ class PerceptionFbo : GlReleasable {
     private var aPos = 0
     private var aUv = 0
     private var uTex = 0
+    private var uReveal = 0
+    private var uDim = 0
     private var quadVbo = 0
 
     /** True once the composite program + quad are built. The FBO attachment is sized lazily. */
@@ -54,9 +56,20 @@ class PerceptionFbo : GlReleasable {
         val fs = """
             precision mediump float;
             uniform sampler2D u_Tex;
+            uniform float u_Reveal;
+            uniform float u_Dim;
             varying vec2 v_Uv;
             void main() {
-                gl_FragColor = texture2D(u_Tex, v_Uv);
+                vec4 c = texture2D(u_Tex, v_Uv);
+                if (u_Reveal > 0.5) {
+                    // Reveal-mask mode: the perception texture's alpha is the voxel coverage. Emit a
+                    // black scrim whose alpha is strongest where there's NO coverage, so the bright,
+                    // full-colour camera underneath shows through only where the world has been mapped.
+                    float coverage = clamp(c.a, 0.0, 1.0);
+                    gl_FragColor = vec4(0.0, 0.0, 0.0, (1.0 - coverage) * u_Dim);
+                } else {
+                    gl_FragColor = c;
+                }
             }
         """.trimIndent()
         val v = ShaderUtil.loadGLShader(TAG, context, GLES20.GL_VERTEX_SHADER, vs)
@@ -69,6 +82,8 @@ class PerceptionFbo : GlReleasable {
         aPos = GLES20.glGetAttribLocation(program, "a_Pos")
         aUv = GLES20.glGetAttribLocation(program, "a_Uv")
         uTex = GLES20.glGetUniformLocation(program, "u_Tex")
+        uReveal = GLES20.glGetUniformLocation(program, "u_Reveal")
+        uDim = GLES20.glGetUniformLocation(program, "u_Dim")
 
         // Full-screen triangle strip: x, y, u, v (NDC quad).
         val quad = floatArrayOf(
@@ -139,8 +154,15 @@ class PerceptionFbo : GlReleasable {
         GLES20.glViewport(0, 0, surfaceW, surfaceH)
     }
 
-    /** Composite the cached perception texture over the current framebuffer (alpha-blended). */
-    fun composite() {
+    /**
+     * Composite the cached perception texture over the current framebuffer (alpha-blended).
+     *
+     * [reveal] switches to dark-reveal-mask mode: instead of drawing the perception colour (e.g. the
+     * voxel splats) over the camera, it darkens the camera everywhere EXCEPT where voxel coverage
+     * exists, so the mapped world shows through bright and in full colour. [dim] is the maximum
+     * darkening applied to un-mapped areas (0 = none, 1 = black).
+     */
+    fun composite(reveal: Boolean = false, dim: Float = 0.85f) {
         if (!ready || colorTex == 0) return
         val depthWasOn = GLES20.glIsEnabled(GLES20.GL_DEPTH_TEST)
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
@@ -151,6 +173,8 @@ class PerceptionFbo : GlReleasable {
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, colorTex)
         GLES20.glUniform1i(uTex, 0)
+        GLES20.glUniform1f(uReveal, if (reveal) 1f else 0f)
+        GLES20.glUniform1f(uDim, dim)
 
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, quadVbo)
         GLES20.glEnableVertexAttribArray(aPos)
