@@ -489,11 +489,12 @@ class ArRenderer(
         viewMatrix: FloatArray,
         projMatrix: FloatArray,
         scanActive: Boolean,
-        voxelColorMask: Boolean,
+        voxelRevealMaskActive: Boolean,
         isTracking: Boolean
     ) {
-        // Coverage colour wash (VOXEL_HASH scanning): grayscale camera + confidence-graded colour.
-        if (voxelColorMask) {
+        // Coverage pass (VOXEL_HASH scanning): its alpha is the reveal mask the composite uses to
+        // un-dim the full-colour camera over mapped regions (see PerceptionFbo.composite reveal mode).
+        if (voxelRevealMaskActive) {
             slamManager.drawCoverage()
         }
         // Scan/world-mapping indicator: detected planes as metric grids on the real surfaces.
@@ -668,14 +669,14 @@ class ArRenderer(
             // at full brightness/colour only where it has been mapped — so the user literally sees
             // what hasn't been scanned yet (it stays dark). Mutually exclusive with the halftone scan
             // indicator (which stays for the other mural methods).
-            val voxelColorMask = !anchorEstablished && scanMode == ArScanMode.MURAL &&
+            val voxelRevealMaskActive = !anchorEstablished && scanMode == ArScanMode.MURAL &&
                 muralMethod == MuralMethod.VOXEL_HASH &&
                 frame.camera.trackingState == TrackingState.TRACKING
             if (scanActive) backgroundRenderer.updateScanMask(visitedSectorsMask)
             lastStep = "bgDraw"
             // Always draw the camera in full colour (the B&W path is retired); the dimming + reveal
             // for voxel scanning is done by the perception composite (reveal mask), not the camera shader.
-            backgroundRenderer.draw(frame, scanActive && !voxelColorMask, grayscale = false)
+            backgroundRenderer.draw(frame, scanActive && !voxelRevealMaskActive, grayscale = false)
             // Coverage mask is now drawn with the throttled perception layers (see "debugView").
             if (frameCount <= 10 || frameCount % 60 == 0) {
                 Timber.i("ARDIAG drawFrame f=$frameCount tracking=${frame.camera.trackingState} anchor=$anchorEstablished scanMode=$scanMode scanActive=$scanActive")
@@ -1332,7 +1333,7 @@ class ArRenderer(
                 if (refresh) {
                     val t0 = android.os.SystemClock.elapsedRealtime()
                     perceptionFbo.bindForRender()
-                    drawPerceptionLayers(frame, activeSession, camera, viewMatrix, projMatrix, scanActive, voxelColorMask, isTracking)
+                    drawPerceptionLayers(frame, activeSession, camera, viewMatrix, projMatrix, scanActive, voxelRevealMaskActive, isTracking)
                     perceptionFbo.unbind(surfaceWidth, surfaceHeight)
                     System.arraycopy(viewMatrix, 0, lastPerceptionView, 0, 16)
                     lastPerceptionRefreshMs = nowMs
@@ -1343,9 +1344,9 @@ class ArRenderer(
                 }
                 // During voxel scanning, composite the perception layers as a dark reveal mask: the
                 // mapped (voxel-covered) world shows through bright and full-colour, the rest dims.
-                perceptionFbo.composite(reveal = voxelColorMask, dim = 0.85f)
+                perceptionFbo.composite(reveal = voxelRevealMaskActive, dim = 0.85f)
             } else {
-                drawPerceptionLayers(frame, activeSession, camera, viewMatrix, projMatrix, scanActive, voxelColorMask, isTracking)
+                drawPerceptionLayers(frame, activeSession, camera, viewMatrix, projMatrix, scanActive, voxelRevealMaskActive, isTracking)
             }
             // A stall reported at "frameDone" means onDrawFrame COMPLETED and the GL thread never
             // came back for the next frame — wedge is in eglSwapBuffers / the GLThread scheduler /

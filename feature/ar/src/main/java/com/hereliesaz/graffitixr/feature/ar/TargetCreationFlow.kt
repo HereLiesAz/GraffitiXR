@@ -376,6 +376,22 @@ private fun TargetRefinementScreen(
                 // NOTE: the voxel/splat visualization is intentionally NOT drawn here — that belongs
                 // on the live camera scan (ArRenderer).
                 val image = remember(rawBitmap) { rawBitmap.asImageBitmap() }
+                val markRadius = (imgW * 0.03f).coerceAtLeast(14f)
+                // Build the reveal path once per input change, never inside the draw scope (which runs
+                // every frame during drag/erase) — avoids per-frame Path allocation / GC churn.
+                val revealPath = remember(keypoints, imgX, imgY, imgW, imgH, markRadius) {
+                    if (keypoints.isNotEmpty()) {
+                        Path().apply {
+                            keypoints.forEach { kp ->
+                                val cx = imgX + kp.x * imgW
+                                val cy = imgY + kp.y * imgH
+                                addOval(Rect(cx - markRadius, cy - markRadius, cx + markRadius, cy + markRadius))
+                            }
+                        }
+                    } else {
+                        null
+                    }
+                }
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val dstOffset = IntOffset(imgX.roundToInt(), imgY.roundToInt())
                     val dstSize = IntSize(imgW.roundToInt(), imgH.roundToInt())
@@ -388,15 +404,7 @@ private fun TargetRefinementScreen(
                         size = Size(imgW, imgH)
                     )
                     // Reveal the real marks: redraw the photo only within circles at each keypoint.
-                    val markRadius = (imgW * 0.03f).coerceAtLeast(14f)
-                    if (keypoints.isNotEmpty()) {
-                        val revealPath = Path().apply {
-                            keypoints.forEach { kp ->
-                                val cx = imgX + kp.x * imgW
-                                val cy = imgY + kp.y * imgH
-                                addOval(Rect(cx - markRadius, cy - markRadius, cx + markRadius, cy + markRadius))
-                            }
-                        }
+                    if (revealPath != null) {
                         clipPath(revealPath) {
                             drawImage(image = image, dstOffset = dstOffset, dstSize = dstSize)
                         }

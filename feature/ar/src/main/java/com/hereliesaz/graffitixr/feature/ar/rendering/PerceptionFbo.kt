@@ -66,7 +66,8 @@ class PerceptionFbo : GlReleasable {
                     // black scrim whose alpha is strongest where there's NO coverage, so the bright,
                     // full-colour camera underneath shows through only where the world has been mapped.
                     float coverage = clamp(c.a, 0.0, 1.0);
-                    gl_FragColor = vec4(0.0, 0.0, 0.0, (1.0 - coverage) * u_Dim);
+                    float dim = clamp(u_Dim, 0.0, 1.0);
+                    gl_FragColor = vec4(0.0, 0.0, 0.0, (1.0 - coverage) * dim);
                 } else {
                     gl_FragColor = c;
                 }
@@ -160,7 +161,7 @@ class PerceptionFbo : GlReleasable {
      * [reveal] switches to dark-reveal-mask mode: instead of drawing the perception colour (e.g. the
      * voxel splats) over the camera, it darkens the camera everywhere EXCEPT where voxel coverage
      * exists, so the mapped world shows through bright and in full colour. [dim] is the maximum
-     * darkening applied to un-mapped areas (0 = none, 1 = black).
+     * darkening applied to un-mapped areas (0 = none, 1 = black); values outside [0f, 1f] are clamped.
      */
     fun composite(reveal: Boolean = false, dim: Float = 0.85f) {
         if (!ready || colorTex == 0) return
@@ -174,7 +175,7 @@ class PerceptionFbo : GlReleasable {
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, colorTex)
         GLES20.glUniform1i(uTex, 0)
         GLES20.glUniform1f(uReveal, if (reveal) 1f else 0f)
-        GLES20.glUniform1f(uDim, dim)
+        GLES20.glUniform1f(uDim, dim.coerceIn(0f, 1f))
 
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, quadVbo)
         GLES20.glEnableVertexAttribArray(aPos)
