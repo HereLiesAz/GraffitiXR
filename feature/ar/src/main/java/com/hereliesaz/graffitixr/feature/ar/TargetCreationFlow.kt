@@ -30,11 +30,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -365,26 +369,37 @@ private fun TargetRefinementScreen(
                 val imgX = (boxW - imgW) / 2f
                 val imgY = (boxH - imgH) / 2f
 
-                // Fingerprint-as-mask: the photo and everything else is masked out, leaving only
-                // black shapes that match the fingerprint target — one filled mark per descriptor
-                // keypoint over a blank field. Erasing a region removes its keypoints, so the
-                // corresponding shapes disappear. NOTE: the voxel/splat visualization is
-                // intentionally NOT drawn here — that belongs on the live camera scan (ArRenderer).
+                // Fingerprint-as-mask over the REAL photo: show the captured image, dimmed, with the
+                // actual painted marks revealed at full brightness through circles at each descriptor
+                // keypoint — so the user sees their doodles in context, the rest of the photo masked
+                // out (darkened). Erasing a region removes its keypoints, so those reveals disappear.
+                // NOTE: the voxel/splat visualization is intentionally NOT drawn here — that belongs
+                // on the live camera scan (ArRenderer).
+                val image = remember(rawBitmap) { rawBitmap.asImageBitmap() }
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    // Masked-out field.
+                    val dstOffset = IntOffset(imgX.roundToInt(), imgY.roundToInt())
+                    val dstSize = IntSize(imgW.roundToInt(), imgH.roundToInt())
+                    // The captured photo.
+                    drawImage(image = image, dstOffset = dstOffset, dstSize = dstSize)
+                    // Dark scrim masking the rest of the photo.
                     drawRect(
-                        color = Color.White,
+                        color = Color.Black.copy(alpha = 0.82f),
                         topLeft = Offset(imgX, imgY),
                         size = Size(imgW, imgH)
                     )
-                    // Black shapes matching the fingerprint doodles (descriptor patch footprint).
-                    val markRadius = (imgW * 0.018f).coerceAtLeast(10f)
-                    keypoints.forEach { kp ->
-                        drawCircle(
-                            color = Color.Black,
-                            radius = markRadius,
-                            center = Offset(imgX + kp.x * imgW, imgY + kp.y * imgH)
-                        )
+                    // Reveal the real marks: redraw the photo only within circles at each keypoint.
+                    val markRadius = (imgW * 0.03f).coerceAtLeast(14f)
+                    if (keypoints.isNotEmpty()) {
+                        val revealPath = Path().apply {
+                            keypoints.forEach { kp ->
+                                val cx = imgX + kp.x * imgW
+                                val cy = imgY + kp.y * imgH
+                                addOval(Rect(cx - markRadius, cy - markRadius, cx + markRadius, cy + markRadius))
+                            }
+                        }
+                        clipPath(revealPath) {
+                            drawImage(image = image, dstOffset = dstOffset, dstSize = dstSize)
+                        }
                     }
                 }
 
