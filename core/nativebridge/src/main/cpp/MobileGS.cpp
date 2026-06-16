@@ -420,7 +420,8 @@ void MobileGS::relocThreadFunc() {
         for (float s : {0.5f, 2.0f}) {
             cv::Mat scaled;
             cv::resize(gray, scaled, cv::Size(), s, s, cv::INTER_LINEAR);
-            cv::Mat Hback = (cv::Mat_<double>(3,3) << 1.0/(double)s, 0, 0, 0, 1.0/(double)s, 0, 0, 0, 1);
+            double hdata[] = {1.0/(double)s, 0.0, 0.0, 0.0, 1.0/(double)s, 0.0, 0.0, 0.0, 1.0};
+            cv::Mat Hback = cv::Mat(3, 3, CV_64F, hdata).clone();
             buildCorr(scaled, Hback, imgPts, objPts);
         }
 
@@ -490,7 +491,8 @@ void MobileGS::relocThreadFunc() {
                 fx = fpIntrinsics[0]; fy = fpIntrinsics[1];
                 cx = fpIntrinsics[2]; cy = fpIntrinsics[3];
             }
-            cv::Mat intr = (cv::Mat_<double>(3,3) << fx, 0, cx, 0, fy, cy, 0, 0, 1);
+            double idata[] = {fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0};
+            cv::Mat intr = cv::Mat(3, 3, CV_64F, idata).clone();
             StageTimer _pnpTimer(&mStageAccumMs[4], &mStageSamples[4]);
             if (cv::solvePnPRansac(objPts, imgPts, intr, cv::Mat(), rvec, tvec, false, 100, 8.0, 0.99, inliers)) {
                 if (inliers.size() >= 6) {

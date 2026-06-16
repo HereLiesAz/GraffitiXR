@@ -1,0 +1,3 @@
+- [ ] Update headers to include missing OpenCV geometry modules
+- [ ] Refactor `MobileGS.cpp` to use modern `cv::Mat` initialization
+- [ ] Verify build

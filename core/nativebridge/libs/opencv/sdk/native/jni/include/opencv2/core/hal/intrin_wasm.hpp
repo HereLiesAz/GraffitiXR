@@ -20,6 +20,16 @@
 #include <emscripten/version.h>
 #endif
 
+// Emscripten v5.0.1
+// Emscripten has changed its version macros from lowercase (EMSCRIPTEN_major) to uppercase (EMSCRIPTEN_MAJOR) and deprecated the old ones.
+//
+// See https://github.com/opencv/opencv/issues/28901
+#if !defined(__EMSCRIPTEN_MAJOR__) && defined(__EMSCRIPTEN_major__)
+#  define __EMSCRIPTEN_MAJOR__ __EMSCRIPTEN_major__
+#  define __EMSCRIPTEN_MINOR__ __EMSCRIPTEN_minor__
+#  define __EMSCRIPTEN_TINY__  __EMSCRIPTEN_tiny__
+#endif
+
 #define CV_SIMD128 1
 #define CV_SIMD128_64F 0 // Now all implementation of f64 use fallback, so disable it.
 #define CV_SIMD128_FP16 0
@@ -31,7 +41,7 @@ namespace cv
 
 CV_CPU_OPTIMIZATION_HAL_NAMESPACE_BEGIN
 
-#if (__EMSCRIPTEN_major__ * 1000000 + __EMSCRIPTEN_minor__ * 1000 + __EMSCRIPTEN_tiny__) < (1038046)
+#if (__EMSCRIPTEN_MAJOR__ * 1000000 + __EMSCRIPTEN_MINOR__ * 1000 + __EMSCRIPTEN_TINY__) < (1038046)
 // handle renames: https://github.com/emscripten-core/emscripten/pull/9440 (https://github.com/emscripten-core/emscripten/commit/755d5b46cb84d0aa120c10981b11d05646c29673)
 #define wasm_i32x4_trunc_saturate_f32x4 wasm_trunc_saturate_i32x4_f32x4
 #define wasm_u32x4_trunc_saturate_f32x4 wasm_trunc_saturate_u32x4_f32x4
@@ -1238,17 +1248,14 @@ OPENCV_HAL_IMPL_WASM_INIT_CMP_OP(v_uint16x8, u16x8, i16x8)
 OPENCV_HAL_IMPL_WASM_INIT_CMP_OP(v_int16x8, i16x8, i16x8)
 OPENCV_HAL_IMPL_WASM_INIT_CMP_OP(v_uint32x4, u32x4, i32x4)
 OPENCV_HAL_IMPL_WASM_INIT_CMP_OP(v_int32x4, i32x4, i32x4)
+OPENCV_HAL_IMPL_WASM_INIT_CMP_OP(v_int64x2, i64x2, i64x2)
 OPENCV_HAL_IMPL_WASM_INIT_CMP_OP(v_float32x4, f32x4, f32x4)
 OPENCV_HAL_IMPL_WASM_INIT_CMP_OP(v_float64x2, f64x2, f64x2)
 
-#define OPENCV_HAL_IMPL_WASM_64BIT_CMP_OP(_Tpvec, cast) \
-inline _Tpvec v_eq(const _Tpvec& a, const _Tpvec& b) \
-{ return cast(v_eq(v_reinterpret_as_f64(a), v_reinterpret_as_f64(b))); } \
-inline _Tpvec v_ne(const _Tpvec& a, const _Tpvec& b) \
-{ return cast(v_ne(v_reinterpret_as_f64(a), v_reinterpret_as_f64(b))); }
-
-OPENCV_HAL_IMPL_WASM_64BIT_CMP_OP(v_uint64x2, v_reinterpret_as_u64)
-OPENCV_HAL_IMPL_WASM_64BIT_CMP_OP(v_int64x2, v_reinterpret_as_s64)
+inline v_uint64x2 v_eq(const v_uint64x2& a, const v_uint64x2& b)
+{ return v_reinterpret_as_u64(v_eq(v_reinterpret_as_f64(a), v_reinterpret_as_f64(b))); }
+inline v_uint64x2 v_ne(const v_uint64x2& a, const v_uint64x2& b)
+{ return v_reinterpret_as_u64(v_ne(v_reinterpret_as_f64(a), v_reinterpret_as_f64(b))); }
 
 inline v_float32x4 v_not_nan(const v_float32x4& a)
 {
@@ -1271,7 +1278,7 @@ OPENCV_HAL_IMPL_WASM_BIN_FUNC(v_uint8x16, v_sub_wrap, wasm_i8x16_sub)
 OPENCV_HAL_IMPL_WASM_BIN_FUNC(v_int8x16, v_sub_wrap, wasm_i8x16_sub)
 OPENCV_HAL_IMPL_WASM_BIN_FUNC(v_uint16x8, v_sub_wrap, wasm_i16x8_sub)
 OPENCV_HAL_IMPL_WASM_BIN_FUNC(v_int16x8, v_sub_wrap, wasm_i16x8_sub)
-#if (__EMSCRIPTEN_major__ * 1000000 + __EMSCRIPTEN_minor__ * 1000 + __EMSCRIPTEN_tiny__) >= (1039012)
+#if (__EMSCRIPTEN_MAJOR__ * 1000000 + __EMSCRIPTEN_MINOR__ * 1000 + __EMSCRIPTEN_TINY__) >= (1039012)
 // details: https://github.com/opencv/opencv/issues/18097 ( https://github.com/emscripten-core/emscripten/issues/12018 )
 // 1.39.12: https://github.com/emscripten-core/emscripten/commit/cd801d0f110facfd694212a3c8b2ed2ffcd630e2
 inline v_uint8x16 v_mul_wrap(const v_uint8x16& a, const v_uint8x16& b)
@@ -1859,9 +1866,12 @@ inline _Tpwvec v_expand_high(const _Tpvec& a)                        \
 { return _Tpwvec(__CV_CAT(intrin, _high)(a.val)); }                  \
 inline _Tpwvec v_load_expand(const _Tp* ptr)                         \
 {                                                                    \
-    v128_t a = wasm_v128_load(ptr);                                  \
-    return _Tpwvec(intrin(a));                                       \
-}
+    using lane_t = typename _Tpwvec::lane_type;                      \
+    alignas(16) lane_t tmp[_Tpwvec::nlanes];                         \
+    for(int i = 0; i < _Tpwvec::nlanes; i++)                         \
+        tmp[i] = static_cast<lane_t>(ptr[i]);                        \
+    return _Tpwvec(wasm_v128_load(tmp));                             \
+}                                                                    \
 
 OPENCV_HAL_IMPL_WASM_EXPAND(v_uint8x16, v_uint16x8, uchar, v128_cvtu8x16_i16x8)
 OPENCV_HAL_IMPL_WASM_EXPAND(v_int8x16,  v_int16x8,  schar, v128_cvti8x16_i16x8)
@@ -1873,9 +1883,12 @@ OPENCV_HAL_IMPL_WASM_EXPAND(v_int32x4,  v_int64x2,  int, v128_cvti32x4_i64x2)
 #define OPENCV_HAL_IMPL_WASM_EXPAND_Q(_Tpvec, _Tp, intrin)  \
 inline _Tpvec v_load_expand_q(const _Tp* ptr)               \
 {                                                           \
-    v128_t a = wasm_v128_load(ptr);                         \
-    return _Tpvec(intrin(a));                               \
-}
+    using lane_t =  typename _Tpvec::lane_type;             \
+    alignas(16) lane_t tmp[_Tpvec::nlanes];                 \
+    for(int i = 0; i < _Tpvec::nlanes; i++)                 \
+        tmp[i] = static_cast<lane_t>(ptr[i]);               \
+    return _Tpvec(wasm_v128_load(tmp));                     \
+}                                                           \
 
 OPENCV_HAL_IMPL_WASM_EXPAND_Q(v_uint32x4, uchar, v128_cvtu8x16_i32x4)
 OPENCV_HAL_IMPL_WASM_EXPAND_Q(v_int32x4, schar, v128_cvti8x16_i32x4)

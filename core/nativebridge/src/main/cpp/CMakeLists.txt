@@ -25,6 +25,7 @@ add_library(graffitixr SHARED
     DistortionHead.cpp
     LowLightEnhancer.cpp
     ImageWarper.cpp
+    MlasStub.cpp
 )
 
 # Include directories
