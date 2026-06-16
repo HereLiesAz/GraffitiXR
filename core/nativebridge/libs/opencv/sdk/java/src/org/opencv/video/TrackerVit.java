@@ -93,19 +93,6 @@ public class TrackerVit extends Tracker {
     }
 
 
-    //
-    // C++:  float cv::TrackerVit::getTrackingScore()
-    //
-
-    /**
-     * Return tracking score
-     * @return automatically generated
-     */
-    public float getTrackingScore() {
-        return getTrackingScore_0(nativeObj);
-    }
-
-
     @Override
     protected void finalize() throws Throwable {
         delete(nativeObj);
@@ -122,9 +109,6 @@ public class TrackerVit extends Tracker {
     private static native long create_3(long model_nativeObj, double meanvalue_val0, double meanvalue_val1, double meanvalue_val2, double meanvalue_val3, double stdvalue_val0, double stdvalue_val1, double stdvalue_val2, double stdvalue_val3);
     private static native long create_4(long model_nativeObj, double meanvalue_val0, double meanvalue_val1, double meanvalue_val2, double meanvalue_val3);
     private static native long create_5(long model_nativeObj);
-
-    // C++:  float cv::TrackerVit::getTrackingScore()
-    private static native float getTrackingScore_0(long nativeObj);
 
     // native support for java finalize() or cleaner
     private static native void delete(long nativeObj);

@@ -7,7 +7,9 @@ import org.opencv.core.Mat;
 import org.opencv.objdetect.QRCodeDetector;
 
 // C++: class QRCodeDetector
-
+/**
+ * QR code detector.
+ */
 public class QRCodeDetector extends GraphicalCodeDetector {
 
     protected QRCodeDetector(long addr) { super(addr); }

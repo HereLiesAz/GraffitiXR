@@ -8,6 +8,7 @@ import java.util.List;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfFloat;
 import org.opencv.core.Point;
+import org.opencv.core.Size;
 import org.opencv.photo.AlignMTB;
 import org.opencv.photo.CalibrateDebevec;
 import org.opencv.photo.CalibrateRobertson;
@@ -41,6 +42,91 @@ public class Photo {
             NORMAL_CLONE_WIDE = 9,
             MIXED_CLONE_WIDE = 10,
             MONOCHROME_TRANSFER_WIDE = 11;
+
+
+    // C++: enum CcmType (cv.ccm.CcmType)
+    public static final int
+            CCM_LINEAR = 0,
+            CCM_AFFINE = 1;
+
+
+    // C++: enum ColorCheckerType (cv.ccm.ColorCheckerType)
+    public static final int
+            COLORCHECKER_MACBETH = 0,
+            COLORCHECKER_VINYL = 1,
+            COLORCHECKER_DIGITAL_SG = 2;
+
+
+    // C++: enum ColorSpace (cv.ccm.ColorSpace)
+    public static final int
+            COLOR_SPACE_SRGB = 0,
+            COLOR_SPACE_SRGBL = 1,
+            COLOR_SPACE_ADOBE_RGB = 2,
+            COLOR_SPACE_ADOBE_RGBL = 3,
+            COLOR_SPACE_WIDE_GAMUT_RGB = 4,
+            COLOR_SPACE_WIDE_GAMUT_RGBL = 5,
+            COLOR_SPACE_PRO_PHOTO_RGB = 6,
+            COLOR_SPACE_PRO_PHOTO_RGBL = 7,
+            COLOR_SPACE_DCI_P3_RGB = 8,
+            COLOR_SPACE_DCI_P3_RGBL = 9,
+            COLOR_SPACE_APPLE_RGB = 10,
+            COLOR_SPACE_APPLE_RGBL = 11,
+            COLOR_SPACE_REC_709_RGB = 12,
+            COLOR_SPACE_REC_709_RGBL = 13,
+            COLOR_SPACE_REC_2020_RGB = 14,
+            COLOR_SPACE_REC_2020_RGBL = 15,
+            COLOR_SPACE_XYZ_D65_2 = 16,
+            COLOR_SPACE_XYZ_D50_2 = 17,
+            COLOR_SPACE_XYZ_D65_10 = 18,
+            COLOR_SPACE_XYZ_D50_10 = 19,
+            COLOR_SPACE_XYZ_A_2 = 20,
+            COLOR_SPACE_XYZ_A_10 = 21,
+            COLOR_SPACE_XYZ_D55_2 = 22,
+            COLOR_SPACE_XYZ_D55_10 = 23,
+            COLOR_SPACE_XYZ_D75_2 = 24,
+            COLOR_SPACE_XYZ_D75_10 = 25,
+            COLOR_SPACE_XYZ_E_2 = 26,
+            COLOR_SPACE_XYZ_E_10 = 27,
+            COLOR_SPACE_LAB_D65_2 = 28,
+            COLOR_SPACE_LAB_D50_2 = 29,
+            COLOR_SPACE_LAB_D65_10 = 30,
+            COLOR_SPACE_LAB_D50_10 = 31,
+            COLOR_SPACE_LAB_A_2 = 32,
+            COLOR_SPACE_LAB_A_10 = 33,
+            COLOR_SPACE_LAB_D55_2 = 34,
+            COLOR_SPACE_LAB_D55_10 = 35,
+            COLOR_SPACE_LAB_D75_2 = 36,
+            COLOR_SPACE_LAB_D75_10 = 37,
+            COLOR_SPACE_LAB_E_2 = 38,
+            COLOR_SPACE_LAB_E_10 = 39;
+
+
+    // C++: enum DistanceType (cv.ccm.DistanceType)
+    public static final int
+            DISTANCE_CIE76 = 0,
+            DISTANCE_CIE94_GRAPHIC_ARTS = 1,
+            DISTANCE_CIE94_TEXTILES = 2,
+            DISTANCE_CIE2000 = 3,
+            DISTANCE_CMC_1TO1 = 4,
+            DISTANCE_CMC_2TO1 = 5,
+            DISTANCE_RGB = 6,
+            DISTANCE_RGBL = 7;
+
+
+    // C++: enum InitialMethodType (cv.ccm.InitialMethodType)
+    public static final int
+            INITIAL_METHOD_WHITE_BALANCE = 0,
+            INITIAL_METHOD_LEAST_SQUARE = 1;
+
+
+    // C++: enum LinearizationType (cv.ccm.LinearizationType)
+    public static final int
+            LINEARIZATION_IDENTITY = 0,
+            LINEARIZATION_GAMMA = 1,
+            LINEARIZATION_COLORPOLYFIT = 2,
+            LINEARIZATION_COLORLOGPOLYFIT = 3,
+            LINEARIZATION_GRAYPOLYFIT = 4,
+            LINEARIZATION_GRAYLOGPOLYFIT = 5;
 
 
     //
@@ -1775,6 +1861,81 @@ public class Photo {
 
 
     //
+    // C++:  void cv::correctChromaticAberration(Mat input_image, Mat coefficients, Mat& output_image, Size image_size, int calib_degree, int bayer_pattern = -1)
+    //
+
+    /**
+     * Corrects lateral chromatic aberration in an image using polynomial distortion model.
+     *
+     * This function loads polynomial calibration data from the specified file and applies
+     * a channel‐specific warp to remove chromatic aberration.
+     * If {@code input_image} has one channel, it is assumed to be a raw Bayer image and is
+     * first demosaiced using {@code bayer_pattern}. If it has three channels, it is treated
+     * as a BGR image and {@code bayer_pattern} is ignored.
+     *
+     * Firstly, calibration needs to be done using apps/chromatic-aberration-calibration/ca_calibration.py on a photo of
+     * a pattern of black discs on white background, included in opencv_extra/testdata/cv/cameracalibration/chromatic_aberration/chromatic_aberration_pattern_a3.png
+     *
+     * Calibration and correction are based on the algorithm described in CITE: rudakova2013precise.
+     * The chromatic aberration is modeled as a polynomial of some degree in red and blue channels compared to green.
+     * In calibration, a photo of many black discs on white background is used, and the displacements
+     * between the centres of discs in red and blue channels compared to green are minimized. The coefficients
+     * are then saved in a yaml file which can be used with this function to correct lateral chromatic aberration.
+     *
+     * @param input_image Input BGR image to correct
+     * @param coefficients Coefficient model
+     * @param output_image Corrected BGR image
+     * @param image_size Size of images for the calibration coefficient model
+     * @param calib_degree Degree of the calibration coefficient model
+     * @param bayer_pattern Bayer pattern code (e.g. cv::COLOR_BayerBG2BGR) used for
+     * demosaicing when {@code input_image} has one channel; ignored otherwise.
+     *
+     * SEE: loadChromaticAberrationParams, demosaicing
+     */
+    public static void correctChromaticAberration(Mat input_image, Mat coefficients, Mat output_image, Size image_size, int calib_degree, int bayer_pattern) {
+        correctChromaticAberration_0(input_image.nativeObj, coefficients.nativeObj, output_image.nativeObj, image_size.width, image_size.height, calib_degree, bayer_pattern);
+    }
+
+    /**
+     * Corrects lateral chromatic aberration in an image using polynomial distortion model.
+     *
+     * This function loads polynomial calibration data from the specified file and applies
+     * a channel‐specific warp to remove chromatic aberration.
+     * If {@code input_image} has one channel, it is assumed to be a raw Bayer image and is
+     * first demosaiced using {@code bayer_pattern}. If it has three channels, it is treated
+     * as a BGR image and {@code bayer_pattern} is ignored.
+     *
+     * Firstly, calibration needs to be done using apps/chromatic-aberration-calibration/ca_calibration.py on a photo of
+     * a pattern of black discs on white background, included in opencv_extra/testdata/cv/cameracalibration/chromatic_aberration/chromatic_aberration_pattern_a3.png
+     *
+     * Calibration and correction are based on the algorithm described in CITE: rudakova2013precise.
+     * The chromatic aberration is modeled as a polynomial of some degree in red and blue channels compared to green.
+     * In calibration, a photo of many black discs on white background is used, and the displacements
+     * between the centres of discs in red and blue channels compared to green are minimized. The coefficients
+     * are then saved in a yaml file which can be used with this function to correct lateral chromatic aberration.
+     *
+     * @param input_image Input BGR image to correct
+     * @param coefficients Coefficient model
+     * @param output_image Corrected BGR image
+     * @param image_size Size of images for the calibration coefficient model
+     * @param calib_degree Degree of the calibration coefficient model
+     * demosaicing when {@code input_image} has one channel; ignored otherwise.
+     *
+     * SEE: loadChromaticAberrationParams, demosaicing
+     */
+    public static void correctChromaticAberration(Mat input_image, Mat coefficients, Mat output_image, Size image_size, int calib_degree) {
+        correctChromaticAberration_1(input_image.nativeObj, coefficients.nativeObj, output_image.nativeObj, image_size.width, image_size.height, calib_degree);
+    }
+
+
+    //
+    // C++:  void cv::loadChromaticAberrationParams(FileNode node, Mat& coeffMat, Size& calib_size, int& degree)
+    //
+
+    // Unknown type 'FileNode' (I), skipping the function
+
+
+    //
     // C++:  void cv::cuda::nonLocalMeans(GpuMat src, GpuMat& dst, float h, int search_window = 21, int block_size = 7, int borderMode = BORDER_DEFAULT, Stream stream = Stream::Null())
     //
 
@@ -1793,6 +1954,21 @@ public class Photo {
     //
 
     // Unknown type 'GpuMat' (I), skipping the function
+
+
+    //
+    // C++:  void cv::ccm::gammaCorrection(Mat src, Mat& dst, double gamma)
+    //
+
+    /**
+     * Applies gamma correction to the input image.
+     * @param src Input image.
+     * @param dst Output image.
+     * @param gamma Gamma correction greater than zero.
+     */
+    public static void gammaCorrection(Mat src, Mat dst, double gamma) {
+        gammaCorrection_0(src.nativeObj, dst.nativeObj, gamma);
+    }
 
 
 
@@ -1939,5 +2115,12 @@ public class Photo {
     private static native void stylization_0(long src_nativeObj, long dst_nativeObj, float sigma_s, float sigma_r);
     private static native void stylization_1(long src_nativeObj, long dst_nativeObj, float sigma_s);
     private static native void stylization_2(long src_nativeObj, long dst_nativeObj);
+
+    // C++:  void cv::correctChromaticAberration(Mat input_image, Mat coefficients, Mat& output_image, Size image_size, int calib_degree, int bayer_pattern = -1)
+    private static native void correctChromaticAberration_0(long input_image_nativeObj, long coefficients_nativeObj, long output_image_nativeObj, double image_size_width, double image_size_height, int calib_degree, int bayer_pattern);
+    private static native void correctChromaticAberration_1(long input_image_nativeObj, long coefficients_nativeObj, long output_image_nativeObj, double image_size_width, double image_size_height, int calib_degree);
+
+    // C++:  void cv::ccm::gammaCorrection(Mat src, Mat& dst, double gamma)
+    private static native void gammaCorrection_0(long src_nativeObj, long dst_nativeObj, double gamma);
 
 }

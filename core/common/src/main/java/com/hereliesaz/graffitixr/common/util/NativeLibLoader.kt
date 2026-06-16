@@ -13,12 +13,12 @@ object NativeLibLoader {
         
         try {
             // Step 1: Ensure OpenCV is loaded. GraffitiXR depends on its native symbols.
-            // Priority 1: Try exact versioned name (v4)
+            // Priority 1: Try exact versioned name (v5)
             // Priority 2: Try generic name
             // Priority 3: Try OpenCVLoader.initLocal()
             val opencvLoaded = try {
-                System.loadLibrary("opencv_java4")
-                Log.i("NativeLibLoader", "libopencv_java4.so loaded directly.")
+                System.loadLibrary("opencv_java5")
+                Log.i("NativeLibLoader", "libopencv_java5.so loaded directly.")
                 true
             } catch (e: UnsatisfiedLinkError) {
                 try {

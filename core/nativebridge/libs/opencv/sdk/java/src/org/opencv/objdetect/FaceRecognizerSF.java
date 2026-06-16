@@ -97,7 +97,7 @@ public class FaceRecognizerSF {
     /**
      * Creates an instance of this class with given parameters
      * @param model the path of the onnx model used for face recognition
-     * @param config the path to the config file for compability, which is not requested for ONNX models
+     * @param config the path to the config file for compatibility, which is not requested for ONNX models
      * @param backend_id the id of backend
      * @param target_id the id of target device
      * @return automatically generated
@@ -109,7 +109,7 @@ public class FaceRecognizerSF {
     /**
      * Creates an instance of this class with given parameters
      * @param model the path of the onnx model used for face recognition
-     * @param config the path to the config file for compability, which is not requested for ONNX models
+     * @param config the path to the config file for compatibility, which is not requested for ONNX models
      * @param backend_id the id of backend
      * @return automatically generated
      */
@@ -120,7 +120,7 @@ public class FaceRecognizerSF {
     /**
      * Creates an instance of this class with given parameters
      * @param model the path of the onnx model used for face recognition
-     * @param config the path to the config file for compability, which is not requested for ONNX models
+     * @param config the path to the config file for compatibility, which is not requested for ONNX models
      * @return automatically generated
      */
     public static FaceRecognizerSF create(String model, String config) {
