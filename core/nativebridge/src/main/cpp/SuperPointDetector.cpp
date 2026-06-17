@@ -119,13 +119,17 @@ bool SuperPointDetector::detect(const cv::Mat& gray,
             kps = std::move(filtered);
         }
 
+        if (kps.empty()) return false;
+
+        // Sample descriptors while keypoints are still in network-input space
+        // (the descriptor tensor is at input/8 resolution). Only after sampling
+        // do we rescale the keypoints back to original image space for the caller.
+        descs = cv::Mat();
+        sampleDescriptors(*descPtr, kps, descs);
+
         if (scaleX != 1.0f || scaleY != 1.0f) {
             for (auto& kp : kps) { kp.pt.x *= scaleX; kp.pt.y *= scaleY; }
         }
-
-        if (kps.empty()) return false;
-        descs = cv::Mat();
-        sampleDescriptors(*descPtr, kps, descs);
         return true;
     } catch (...) {
         return false;
@@ -173,7 +177,8 @@ void SuperPointDetector::sampleDescriptors(const cv::Mat& descTensor, const std:
     descs.create((int)kps.size(), D, CV_32F);
     for (int i = 0; i < (int)kps.size(); ++i) {
         float u = kps[i].pt.x / 8.0f, v = kps[i].pt.y / 8.0f;
-        int u0 = std::max(0, (int)u), v0 = std::max(0, (int)v);
+        int u0 = std::min(Wd - 1, std::max(0, (int)u));
+        int v0 = std::min(Hd - 1, std::max(0, (int)v));
         int u1 = std::min(Wd - 1, u0 + 1), v1 = std::min(Hd - 1, v0 + 1);
         float fu = u - u0, fv = v - v0;
         float* row = descs.ptr<float>(i);
