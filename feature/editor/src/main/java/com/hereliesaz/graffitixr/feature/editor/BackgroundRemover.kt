@@ -2,7 +2,7 @@
 package com.hereliesaz.graffitixr.feature.editor
 
 import android.graphics.Bitmap
-import com.hereliesaz.graffitixr.common.util.ImageProcessor
+import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -15,7 +15,7 @@ class BackgroundRemover @Inject constructor() {
 
     suspend fun removeBackground(bitmap: Bitmap): Result<Bitmap> = withContext(Dispatchers.Default) {
         try {
-            val result = ImageProcessor.removeBackground(bitmap)
+            val result = PerspectiveProcessor.removeBackground(bitmap)
             if (result != null) {
                 Result.success(result)
             } else {

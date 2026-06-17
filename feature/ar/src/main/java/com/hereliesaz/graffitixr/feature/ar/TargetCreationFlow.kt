@@ -2,16 +2,10 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 import android.graphics.Bitmap
-import android.graphics.Canvas as AndroidCanvas
-import java.nio.ByteBuffer
-import android.graphics.Paint
-import android.graphics.PorterDuff
-import android.graphics.PorterDuffXfermode
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -19,7 +13,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import com.hereliesaz.aznavrail.AzButton
@@ -27,14 +20,11 @@ import com.hereliesaz.aznavrail.model.AzButtonShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -49,12 +39,6 @@ import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.design.theme.AppStrings
 import com.hereliesaz.graffitixr.design.theme.HotPink
 
-private data class SelectionStroke(
-    val nx: Float,
-    val ny: Float,
-    val nr: Float,
-)
-
 @Composable
 fun TargetCreationUi(
     uiState: ArUiState,
@@ -62,33 +46,15 @@ fun TargetCreationUi(
     isWaitingForTap: Boolean,
     isLoading: Boolean,
     strings: AppStrings,
+    onConfirmTarget: (bitmap: Bitmap?, mask: Bitmap?) -> Unit,
     onRetake: () -> Unit,
     onCancel: () -> Unit,
     onUnwarpConfirm: (List<Offset>) -> Unit,
-    onMaskConfirmed: (Bitmap) -> Unit,
     onUpdateUnwarpPoints: (List<Offset>) -> Unit,
-    onEraseAtPoint: (Float, Float, Float) -> Unit
+    onEraseAtPoint: (Float, Float) -> Unit
 ) {
-
     Box(modifier = Modifier.fillMaxSize()) {
         when (captureStep) {
-            CaptureStep.MASK, CaptureStep.REVIEW -> {
-                TargetRefinementScreen(
-                    rawBitmap = uiState.tempCaptureBitmap,
-                    maskBitmap = uiState.annotatedCaptureBitmap,
-                    keypoints = uiState.targetKeypoints,
-                    strings = strings,
-                    onNext = { mask ->
-                        if (mask != null) {
-                            onMaskConfirmed(mask)
-                        }
-                    },
-                    onRetake = onRetake,
-                    onCancel = onCancel,
-                    onEraseAtPoint = { nx, ny, r -> onEraseAtPoint(nx, ny, r) }
-                )
-            }
-
             CaptureStep.RECTIFY -> {
                 uiState.tempCaptureBitmap?.let { bitmap ->
                     UnwarpScreen(
@@ -101,25 +67,48 @@ fun TargetCreationUi(
                     )
                 }
             }
+
+            CaptureStep.MASK, CaptureStep.REVIEW -> {
+                FeatureSelectionReview(
+                    annotatedBitmap = uiState.annotatedCaptureBitmap,
+                    rawBitmap = uiState.tempCaptureBitmap,
+                    strings = strings,
+                    onConfirm = {
+                        // The annotatedCaptureBitmap IS the mask — its alpha channel
+                        // (opaque = detect, transparent = skip) drives native ORB masking.
+                        onConfirmTarget(uiState.tempCaptureBitmap, uiState.annotatedCaptureBitmap)
+                    },
+                    onRetake = onRetake,
+                    onEraseAtPoint = onEraseAtPoint
+                )
+            }
+
             else -> {
                 if (isWaitingForTap) {
                     Box(Modifier.fillMaxSize()) {
-                         TargetInstructionCard(
+                        TargetInstructionCard(
                             isWaitingForTap = true,
                             captureStep = CaptureStep.NONE,
                             strings = strings,
                             onCancel = onCancel,
                             onNext = null,
-                            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp)
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 32.dp)
                         )
                     }
                 }
             }
         }
-        
+
         if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f))) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center), color = HotPink)
+            Box(modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f))) {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center),
+                    color = HotPink
+                )
             }
         }
     }
@@ -136,8 +125,14 @@ private fun TargetInstructionCard(
 ) {
     val data = when {
         isWaitingForTap -> Pair(strings.ar.targetCreationTitle, strings.ar.targetCreationText)
-        captureStep == CaptureStep.RECTIFY -> Pair("RECTIFY SURFACE", "Now, drag the corners to align the cyan frame with the flat surface of your wall.")
-        captureStep == CaptureStep.MASK || captureStep == CaptureStep.REVIEW -> Pair("REFINE TARGET", "Tap any area to remove it, or drag your finger through markings you want to exclude.")
+        captureStep == CaptureStep.RECTIFY -> Pair(
+            "RECTIFY SURFACE",
+            "Now, drag the corners to align the cyan frame with the flat surface of your wall."
+        )
+        captureStep == CaptureStep.MASK || captureStep == CaptureStep.REVIEW -> Pair(
+            "ERASE FEATURES",
+            "Tap or drag across any features you don't want tracked."
+        )
         else -> Pair("", "")
     }
     val title = data.first
@@ -190,6 +185,142 @@ private fun TargetInstructionCard(
     }
 }
 
+/**
+ * REVIEW step: shows the captured image with the detected-feature annotation overlay.
+ *
+ * The user taps or drags across features they don't want tracked — applyEraseToMask()
+ * clears those pixels from annotatedCaptureBitmap (PorterDuff CLEAR). The native ORB
+ * engine reads the alpha channel of that bitmap as its detection mask (opaque = detect,
+ * transparent = skip), so erased areas are excluded from the fingerprint automatically.
+ *
+ * On confirm, annotatedCaptureBitmap is passed directly as the selection mask.
+ */
+@Composable
+private fun FeatureSelectionReview(
+    annotatedBitmap: Bitmap?,
+    rawBitmap: Bitmap?,
+    strings: AppStrings,
+    onConfirm: () -> Unit,
+    onRetake: () -> Unit,
+    onEraseAtPoint: (Float, Float) -> Unit
+) {
+    var showFeatures by remember { mutableStateOf(true) }
+    var boxSize by remember { mutableStateOf(IntSize.Zero) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onSizeChanged { boxSize = it }
+    ) {
+        // -- Raw capture as base layer --
+        rawBitmap?.let { bmp ->
+            Image(
+                bitmap = bmp.asImageBitmap(),
+                contentDescription = "Raw Capture",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
+            )
+        }
+
+        // -- Annotated feature overlay --
+        if (showFeatures) {
+            annotatedBitmap?.let { bmp ->
+                Image(
+                    bitmap = bmp.asImageBitmap(),
+                    contentDescription = "Feature Overlay",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+            }
+        }
+
+        // -- Tap / drag gesture layer for erasing --
+        if (rawBitmap != null && boxSize != IntSize.Zero) {
+            val bmpW = rawBitmap.width.toFloat()
+            val bmpH = rawBitmap.height.toFloat()
+            val boxW = boxSize.width.toFloat()
+            val boxH = boxSize.height.toFloat()
+            val bmpAspect = bmpW / bmpH
+            val boxAspect = boxW / boxH
+            val imgW: Float
+            val imgH: Float
+            val imgX: Float
+            val imgY: Float
+            if (bmpAspect > boxAspect) {
+                imgW = boxW; imgH = boxW / bmpAspect
+                imgX = 0f; imgY = (boxH - imgH) / 2f
+            } else {
+                imgH = boxH; imgW = boxH * bmpAspect
+                imgX = (boxW - imgW) / 2f; imgY = 0f
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures { pos ->
+                            val nx = ((pos.x - imgX) / imgW).coerceIn(0f, 1f)
+                            val ny = ((pos.y - imgY) / imgH).coerceIn(0f, 1f)
+                            onEraseAtPoint(nx, ny)
+                        }
+                    }
+                    .pointerInput(Unit) {
+                        detectDragGestures { change, _ ->
+                            val pos = change.position
+                            val nx = ((pos.x - imgX) / imgW).coerceIn(0f, 1f)
+                            val ny = ((pos.y - imgY) / imgH).coerceIn(0f, 1f)
+                            onEraseAtPoint(nx, ny)
+                        }
+                    }
+            )
+        }
+
+        // -- Show Features toggle --
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 12.dp)
+                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                strings.ar.targetShowFeatures,
+                color = Color.White,
+                style = MaterialTheme.typography.labelSmall
+            )
+            Switch(
+                checked = showFeatures,
+                onCheckedChange = { showFeatures = it },
+                modifier = Modifier.scale(0.7f)
+            )
+        }
+
+        // -- Retake / Confirm FABs --
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(32.dp)
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            FloatingActionButton(
+                onClick = onRetake,
+                containerColor = MaterialTheme.colorScheme.errorContainer
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = "Retake")
+            }
+            FloatingActionButton(
+                onClick = onConfirm,
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Icon(Icons.Default.Check, contentDescription = "Confirm")
+            }
+        }
+    }
+}
+
 @Composable
 private fun UnwarpScreen(
     bitmap: Bitmap,
@@ -200,14 +331,14 @@ private fun UnwarpScreen(
     strings: AppStrings
 ) {
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
-    
+
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = 40.dp, bottom = 260.dp)
                 .onSizeChanged { boxSize = it },
-            contentAlignment = Alignment.TopStart // CRITICAL: Align to top-start for absolute coordinate mapping
+            contentAlignment = Alignment.TopStart
         ) {
             Image(
                 bitmap = bitmap.asImageBitmap(),
@@ -232,7 +363,9 @@ private fun UnwarpScreen(
             strings = strings,
             onCancel = onCancel,
             onNext = { onConfirm(points) },
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp)
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 32.dp)
         )
     }
 }
@@ -248,7 +381,7 @@ private fun UnwarpOverlay(
     val boxH = boxSize.height.toFloat()
     val bmpW = bitmapSize.width.toFloat()
     val bmpH = bitmapSize.height.toFloat()
-    
+
     val scale = if (bmpW / bmpH > boxW / boxH) boxW / bmpW else boxH / bmpH
     val imgW = bmpW * scale
     val imgH = bmpH * scale
@@ -256,8 +389,7 @@ private fun UnwarpOverlay(
     val imgY = (boxH - imgH) / 2f
 
     val density = LocalDensity.current
-    
-    // Prevent stale captures during drag gestures
+
     val currentPoints by rememberUpdatedState(points)
     val currentOnUpdate by rememberUpdatedState(onUpdatePoints)
 
@@ -269,12 +401,13 @@ private fun UnwarpOverlay(
             .pointerInput(imgW, imgH) {
                 detectDragGestures(
                     onDragStart = { pos ->
-                        // Hit-test to find which corner is being grabbed
                         val thresholdPx = with(density) { 40.dp.toPx() }
                         activePointIndex = currentPoints.indexOfFirst { p ->
                             val sx = imgX + p.x * imgW
                             val sy = imgY + p.y * imgH
-                            val dist = Math.sqrt(((pos.x - sx) * (pos.x - sx) + (pos.y - sy) * (pos.y - sy)).toDouble())
+                            val dist = Math.sqrt(
+                                ((pos.x - sx) * (pos.x - sx) + (pos.y - sy) * (pos.y - sy)).toDouble()
+                            )
                             dist < thresholdPx
                         }
                     },
@@ -283,7 +416,7 @@ private fun UnwarpOverlay(
                             change.consume()
                             val nx = dragAmount.x / imgW
                             val ny = dragAmount.y / imgH
-                            
+
                             val newList = currentPoints.toMutableList()
                             val p = newList[activePointIndex]
                             newList[activePointIndex] = Offset(
@@ -307,14 +440,18 @@ private fun UnwarpOverlay(
                     lineTo(imgX + currentPoints[3].x * imgW, imgY + currentPoints[3].y * imgH)
                     close()
                 }
-                drawPath(path, Color.Cyan, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4f))
+                drawPath(
+                    path,
+                    Color.Cyan,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4f)
+                )
             }
         }
-        
+
         currentPoints.forEachIndexed { index, point ->
             val screenX = imgX + point.x * imgW
             val screenY = imgY + point.y * imgH
-            
+
             Box(
                 modifier = Modifier
                     .offset(
@@ -323,8 +460,8 @@ private fun UnwarpOverlay(
                     )
                     .size(40.dp)
                     .background(
-                        if (activePointIndex == index) Color.Cyan.copy(alpha = 0.5f) 
-                        else Color.White.copy(alpha = 0.5f), 
+                        if (activePointIndex == index) Color.Cyan.copy(alpha = 0.5f)
+                        else Color.White.copy(alpha = 0.5f),
                         CircleShape
                     )
                     .border(2.dp, Color.Cyan, CircleShape)
@@ -332,142 +469,3 @@ private fun UnwarpOverlay(
         }
     }
 }
-
-@Composable
-private fun TargetRefinementScreen(
-    rawBitmap: Bitmap?,
-    maskBitmap: Bitmap?,
-    keypoints: List<Offset>,
-    strings: AppStrings,
-    onNext: (Bitmap?) -> Unit,
-    onRetake: () -> Unit,
-    onCancel: () -> Unit,
-    onEraseAtPoint: (Float, Float, Float) -> Unit
-) {
-    var boxSize by remember { mutableStateOf(IntSize.Zero) }
-
-    Box(modifier = Modifier.fillMaxSize().onSizeChanged { boxSize = it }) {
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 40.dp, bottom = 260.dp),
-            contentAlignment = Alignment.TopStart
-        ) {
-            if (rawBitmap != null && boxSize != IntSize.Zero) {
-                val bmpW = rawBitmap.width.toFloat()
-                val bmpH = rawBitmap.height.toFloat()
-                val boxW = boxSize.width.toFloat()
-                val boxH = boxSize.height.toFloat()
-                val scale = if (bmpW / bmpH > boxW / boxH) boxW / bmpW else boxH / bmpH
-                val imgW = bmpW * scale
-                val imgH = bmpH * scale
-                val imgX = (boxW - imgW) / 2f
-                val imgY = (boxH - imgH) / 2f
-
-                // Fingerprint-as-mask: the photo and everything else is masked out, leaving only
-                // black shapes that match the fingerprint target — one filled mark per descriptor
-                // keypoint over a blank field. Erasing a region removes its keypoints, so the
-                // corresponding shapes disappear. NOTE: the voxel/splat visualization is
-                // intentionally NOT drawn here — that belongs on the live camera scan (ArRenderer).
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    // Masked-out field.
-                    drawRect(
-                        color = Color.White,
-                        topLeft = Offset(imgX, imgY),
-                        size = Size(imgW, imgH)
-                    )
-                    // Black shapes matching the fingerprint doodles (descriptor patch footprint).
-                    val markRadius = (imgW * 0.018f).coerceAtLeast(10f)
-                    keypoints.forEach { kp ->
-                        drawCircle(
-                            color = Color.Black,
-                            radius = markRadius,
-                            center = Offset(imgX + kp.x * imgW, imgY + kp.y * imgH)
-                        )
-                    }
-                }
-
-                Box(
-                    modifier = Modifier.fillMaxSize()
-                        .pointerInput(Unit) {
-                            detectTapGestures { pos ->
-                                val nx = ((pos.x - imgX) / imgW).coerceIn(0f, 1f)
-                                val ny = ((pos.y - imgY) / imgH).coerceIn(0f, 1f)
-                                onEraseAtPoint(nx, ny, 0.05f) // 5% brush size
-                            }
-                        }
-                        .pointerInput(Unit) {
-                            detectDragGestures { change, _ ->
-                                val pos = change.position
-                                val nx = ((pos.x - imgX) / imgW).coerceIn(0f, 1f)
-                                val ny = ((pos.y - imgY) / imgH).coerceIn(0f, 1f)
-                                onEraseAtPoint(nx, ny, 0.05f)
-                            }
-                        }
-                )
-            }
-        }
-
-        Column(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
-                AzButton(text = "RETAKE", onClick = onRetake, color = HotPink, shape = AzButtonShape.RECTANGLE)
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            TargetInstructionCard(
-                isWaitingForTap = false,
-                captureStep = CaptureStep.REVIEW,
-                strings = strings,
-                onCancel = onCancel,
-                onNext = { onNext(maskBitmap) }
-            )
-        }
-    }
-}
-
-
-private fun recordStroke(pos: Offset, imgX: Float, imgY: Float, imgW: Float, imgH: Float, brushNorm: Float, strokes: MutableList<SelectionStroke>) {
-    val nx = ((pos.x - imgX) / imgW).coerceIn(0f, 1f)
-    val ny = ((pos.y - imgY) / imgH).coerceIn(0f, 1f)
-    strokes.add(SelectionStroke(nx, ny, brushNorm))
-}
-
-private fun DrawScope.drawStrokes(strokes: List<SelectionStroke>, imgX: Float, imgY: Float, imgW: Float, imgH: Float) {
-    for (s in strokes) {
-        drawCircle(
-            color = Color(0xBBCC2200),
-            radius = s.nr * imgW,
-            center = Offset(imgX + s.nx * imgW, imgY + s.ny * imgH)
-        )
-    }
-}
-
-private fun rasterizeStrokes(strokes: List<SelectionStroke>, width: Int, height: Int): Bitmap {
-    val mask = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-    val canvas = AndroidCanvas(mask)
-    canvas.drawColor(android.graphics.Color.WHITE)
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { 
-        style = Paint.Style.FILL 
-        xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR)
-    }
-    for (s in strokes) {
-        canvas.drawCircle(s.nx * width, s.ny * height, s.nr * width, paint)
-    }
-    return mask
-}
-
-private fun applyMaskToBitmap(bitmap: Bitmap, mask: Bitmap): Bitmap {
-    val out = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
-    val canvas = AndroidCanvas(out)
-    canvas.drawBitmap(bitmap, 0f, 0f, null)
-    val paint = Paint().apply {
-        xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
-    }
-    canvas.drawBitmap(mask, 0f, 0f, paint)
-    return out
-}
-
-@Composable
-fun TargetCreationBackground(uiState: ArUiState, captureStep: CaptureStep, onInitUnwarpPoints: (List<Offset>) -> Unit) {}

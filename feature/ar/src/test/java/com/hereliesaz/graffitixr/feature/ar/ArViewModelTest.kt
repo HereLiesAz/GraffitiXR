@@ -211,24 +211,6 @@ class ArViewModelTest {
     }
 
     @Test
-    fun `setActiveUnwarpPoint updates index`() = runTest {
-        assertEquals(-1, viewModel.uiState.value.activeUnwarpPointIndex)
-
-        viewModel.setActiveUnwarpPoint(2)
-        assertEquals(2, viewModel.uiState.value.activeUnwarpPointIndex)
-    }
-
-    @Test
-    fun `setMagnifierPosition updates position`() = runTest {
-        val position = Offset(150f, 200f)
-
-        assertEquals(Offset.Zero, viewModel.uiState.value.magnifierPosition)
-        viewModel.setMagnifierPosition(position)
-
-        assertEquals(position, viewModel.uiState.value.magnifierPosition)
-    }
-
-    @Test
     fun `requestCapture sets flag`() = runTest {
         assertFalse(viewModel.uiState.value.isCaptureRequested)
 

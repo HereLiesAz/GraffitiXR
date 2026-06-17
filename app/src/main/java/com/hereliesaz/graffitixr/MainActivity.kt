@@ -90,7 +90,7 @@ import com.hereliesaz.graffitixr.common.model.Tool
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.hereliesaz.graffitixr.common.security.SecurityProviderState
-import com.hereliesaz.graffitixr.common.util.ImageProcessor
+import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.design.components.InfoDialog
 import com.hereliesaz.graffitixr.design.components.PosterOptionsDialog
@@ -109,7 +109,6 @@ import com.hereliesaz.graffitixr.common.model.CoopRole
 import com.hereliesaz.graffitixr.ui.coop.CoopHostQrOverlay
 import com.hereliesaz.graffitixr.ui.coop.CoopJoinQrScannerOverlay
 import com.hereliesaz.graffitixr.ui.coop.CoopSpectatorBanner
-import com.hereliesaz.graffitixr.feature.ar.TargetCreationBackground
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
 import com.hereliesaz.graffitixr.feature.ar.rememberCameraController
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
@@ -332,9 +331,9 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(currentTempCapture, currentCaptureStep, isWaitingForTap) {
                     if (currentTempCapture != null) {
                         if (currentCaptureStep == CaptureStep.NONE && isWaitingForTap) {
-                            mainViewModel.setCaptureStep(CaptureStep.MASK)
+                            mainViewModel.setCaptureStep(CaptureStep.REVIEW)
                         } else if (currentCaptureStep == CaptureStep.CAPTURE) {
-                            mainViewModel.setCaptureStep(CaptureStep.MASK)
+                            mainViewModel.setCaptureStep(CaptureStep.REVIEW)
                         }
                     }
                 }
@@ -613,13 +612,6 @@ class MainActivity : ComponentActivity() {
                             onRendererCreated = { _ -> }
                         )
 
-                        if (mainUiState.isCapturingTarget) {
-                            TargetCreationBackground(
-                                uiState = arUiState,
-                                captureStep = mainUiState.captureStep,
-                                onInitUnwarpPoints = { arViewModel.setUnwarpPoints(it) }
-                            )
-                        }
                     }
 
                     onscreen {
@@ -1033,11 +1025,25 @@ class MainActivity : ComponentActivity() {
                                     isWaitingForTap = mainUiState.isWaitingForTap,
                                     isLoading = isProcessing,
                                     strings = strings,
+                                    onConfirmTarget = { bitmap, mask ->
+                                        arViewModel.setInitialAnchorFromCapture()
+                                        mainViewModel.onConfirmTargetCreation(
+                                            bitmap,
+                                            mask,
+                                            arUiState.targetDepthBuffer,
+                                            arUiState.targetDepthBufferWidth,
+                                            arUiState.targetDepthBufferHeight,
+                                            arUiState.targetDepthStride,
+                                            arUiState.targetIntrinsics,
+                                            arUiState.targetCaptureViewMatrix
+                                        )
+                                    },
                                     onRetake = {
                                         mainViewModel.onRetakeCapture()
                                         if (mainUiState.captureOriginatedFromTap) {
                                             arViewModel.clearTapHighlights()
                                         } else {
+                                            arViewModel.clearTapHighlights()
                                             arViewModel.requestCapture()
                                         }
                                     },
@@ -1052,25 +1058,13 @@ class MainActivity : ComponentActivity() {
                                                 val pixelPoints = points.map {
                                                     Offset(it.x * currentBitmap.width, it.y * currentBitmap.height)
                                                 }
-                                                val unwarped = ImageProcessor.unwarpImage(currentBitmap, pixelPoints)
-                                                val mask = arUiState.annotatedCaptureBitmap
-                                                val unwarpedMask = if (mask != null) ImageProcessor.unwarpImage(mask, pixelPoints) else null
+                                                val unwarped = PerspectiveProcessor.unwarpImage(currentBitmap, pixelPoints)
 
                                                 withContext(Dispatchers.Main) {
                                                     if (unwarped != null) {
                                                         arViewModel.setTempCapture(unwarped)
-                                                        arViewModel.setAnnotatedCapture(unwarpedMask)
-                                                        arViewModel.setInitialAnchorFromCapture()
-                                                        mainViewModel.onConfirmTargetCreation(
-                                                            unwarped,
-                                                            unwarpedMask,
-                                                            arUiState.targetDepthBuffer,
-                                                            arUiState.targetDepthBufferWidth,
-                                                            arUiState.targetDepthBufferHeight,
-                                                            arUiState.targetDepthStride,
-                                                            arUiState.targetIntrinsics,
-                                                            arUiState.targetCaptureViewMatrix
-                                                        )
+                                                        arViewModel.setAnnotatedCapture(unwarped.isolateMarkings())
+                                                        mainViewModel.setCaptureStep(CaptureStep.REVIEW)
                                                     } else {
                                                         mainViewModel.setCaptureStep(CaptureStep.NONE)
                                                     }
@@ -1079,12 +1073,8 @@ class MainActivity : ComponentActivity() {
                                             }
                                         }
                                     },
-                                    onMaskConfirmed = { mask ->
-                                        arViewModel.setAnnotatedCapture(mask)
-                                        mainViewModel.setCaptureStep(CaptureStep.RECTIFY)
-                                    },
                                     onUpdateUnwarpPoints = { arViewModel.setUnwarpPoints(it) },
-                                    onEraseAtPoint = { nx, ny, r -> arViewModel.applyEraseToMask(nx, ny, r) }
+                                    onEraseAtPoint = { nx, ny -> arViewModel.applyEraseToMask(nx, ny, 0.05f) }
                                 )
 
                             }
@@ -1096,7 +1086,6 @@ class MainActivity : ComponentActivity() {
                                     onSaveRequest = { name ->
                                         lifecycleScope.launch {
                                             arViewModel.saveMapBlocking()
-                                            arViewModel.saveCloudPointsBlocking()
                                             editorViewModel.saveProject(name)
                                             showSaveDialog = false
                                         }

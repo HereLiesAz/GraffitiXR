@@ -213,7 +213,7 @@ class EditorViewModelTest {
 
     @Test
     fun `onRemoveBackgroundClicked calls subjectIsolator and saves artifact`() = runTest {
-        mockkObject(com.hereliesaz.graffitixr.common.util.ImageProcessor)
+        mockkObject(com.hereliesaz.graffitixr.common.util.PerspectiveProcessor)
         val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
@@ -237,7 +237,7 @@ class EditorViewModelTest {
 
         coVerify { subjectIsolator.isolate(any()) }
         coVerify { projectRepository.saveArtifact(any(), any(), any()) }
-        unmockkObject(com.hereliesaz.graffitixr.common.util.ImageProcessor)
+        unmockkObject(com.hereliesaz.graffitixr.common.util.PerspectiveProcessor)
     }
 
     @Test

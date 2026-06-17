@@ -1,4 +1,4 @@
-// FILE: core/common/src/main/java/com/hereliesaz/graffitixr/common/util/ImageProcessor.kt
+// FILE: core/common/src/main/java/com/hereliesaz/graffitixr/common/util/PerspectiveProcessor.kt
 package com.hereliesaz.graffitixr.common.util
 
 import android.graphics.Bitmap
@@ -15,7 +15,7 @@ import org.opencv.core.Size
 import org.opencv.geometry.Geometry
 import org.opencv.imgproc.Imgproc
 
-object ImageProcessor {
+object PerspectiveProcessor {
 
     init {
         NativeLibLoader.loadAll()
@@ -38,15 +38,13 @@ object ImageProcessor {
             val src = Mat().also { mats.add(it) }
             Utils.bitmapToMat(bitmap, src)
 
-            // Geometric Sort: Ensure TL, TR, BR, BL order
-            val sortedByY = points.sortedBy { it.y }
-            val topRow = sortedByY.take(2).sortedBy { it.x }
-            val bottomRow = sortedByY.takeLast(2).sortedBy { it.x }
-
-            val tl = topRow[0]
-            val tr = topRow[1]
-            val bl = bottomRow[0]
-            val br = bottomRow[1]
+            // Points are passed in TL, TR, BR, BL order by the caller (UnwarpOverlay
+            // maintains indexed identity through drag gestures). Do NOT re-sort — a
+            // geometric sort by Y/X mis-assigns corners for tilted or rotated quads.
+            val tl = points[0]
+            val tr = points[1]
+            val br = points[2]
+            val bl = points[3]
 
             // Source points
             val srcPoints = MatOfPoint2f(
@@ -83,7 +81,7 @@ object ImageProcessor {
 
             resultBitmap
         } catch (e: Exception) {
-            Timber.e(e, "ImageProcessor: processing failed")
+            Timber.e(e, "PerspectiveProcessor: processing failed")
             null
         } finally {
             // Release native Mats on every path — they leaked whenever an OpenCV op above threw.
@@ -132,7 +130,7 @@ object ImageProcessor {
 
             outputBitmap
         } catch (e: Exception) {
-            Timber.e(e, "ImageProcessor: processing failed")
+            Timber.e(e, "PerspectiveProcessor: processing failed")
             null
         } finally {
             // Release native Mats on every path — they leaked whenever an OpenCV op above threw.

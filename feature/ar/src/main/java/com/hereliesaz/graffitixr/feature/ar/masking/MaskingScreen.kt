@@ -21,7 +21,7 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import com.hereliesaz.graffitixr.common.util.ImageProcessor
+import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -120,5 +120,5 @@ fun MaskingUi(
 }
 
 suspend fun applyAutoMask(bitmap: Bitmap): Bitmap? = withContext(Dispatchers.Default) {
-    ImageProcessor.removeBackground(bitmap)
+    PerspectiveProcessor.removeBackground(bitmap)
 }

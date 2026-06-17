@@ -1063,7 +1063,6 @@ class ArViewModel @Inject constructor(
                 appendDiag("cleanup: GL thread wedged in-frame after 1500ms — closing session anyway")
             }
             saveMapBlocking()
-            saveCloudPointsBlocking()
             session?.let {
                 if (isSessionResumed) it.pause()
                 it.close()
@@ -1073,7 +1072,7 @@ class ArViewModel @Inject constructor(
             isSessionResumed = false
             _isCameraInUseByAr.value = false
             isDestroying = false
-            clearCaptureBitmaps()
+            clearCaptureState()
         }
     }
 
@@ -1085,13 +1084,17 @@ class ArViewModel @Inject constructor(
      * cause a "trying to use a recycled bitmap" crash. Nulling the references is deterministic
      * and safe; the platform reclaims the memory once no coroutine references them.
      */
-    private fun clearCaptureBitmaps() {
+    private fun clearCaptureState() {
+        pendingTapPosition = null
         _uiState.update {
             it.copy(
                 tempCaptureBitmap = null,
                 annotatedCaptureBitmap = null,
                 targetRawBitmap = null,
-                targetDepthBuffer = null
+                targetDepthBuffer = null,
+                tapMarks = emptyList(),
+                unwarpPoints = emptyList(),
+                targetKeypoints = emptyList()
             )
         }
     }
@@ -1109,12 +1112,6 @@ class ArViewModel @Inject constructor(
         Timber.d("Atomic persistence complete: Saved all mapping components for $projectId")
     }
 
-    fun saveCloudPointsBlocking() {
-        val projectId = loadedProjectId ?: return
-        val path = projectManager.getCloudPointsPath(appContext, projectId)
-        renderer?.saveCloudPoints(path)
-    }
-
     fun saveMapNow() {
         val projectId = loadedProjectId ?: return
         if (slamManager.getSplatCount() <= 0) return
@@ -1124,7 +1121,6 @@ class ArViewModel @Inject constructor(
             isSaving.set(true)
             try {
                 saveMapBlocking()
-                saveCloudPointsBlocking()
             } catch (e: Exception) {
                 Timber.e(e, "Background map save failed")
             } finally {
@@ -1153,12 +1149,6 @@ class ArViewModel @Inject constructor(
                 }
             }
         }
-    }
-
-    fun saveCloudPointsNow() {
-        val projectId = loadedProjectId ?: return
-        val path = projectManager.getCloudPointsPath(appContext, projectId)
-        renderer?.saveCloudPoints(path)
     }
 
     private fun loadCloudPointsIfExists() {
@@ -1569,8 +1559,14 @@ class ArViewModel @Inject constructor(
     }
 
     fun clearTapHighlights() {
-        _uiState.update { it.copy(tapMarks = emptyList()) }
         pendingTapPosition = null
+        _uiState.update {
+            it.copy(
+                tapMarks = emptyList(),
+                unwarpPoints = emptyList(),
+                targetKeypoints = emptyList()
+            )
+        }
     }
 
     fun computePhysicalExtent(
@@ -1636,7 +1632,7 @@ class ArViewModel @Inject constructor(
 
 
     fun onCaptureConsumed() {
-        clearCaptureBitmaps()
+        clearCaptureState()
         slamManager.setMappingPaused(false)
     }
 
@@ -1666,14 +1662,6 @@ class ArViewModel @Inject constructor(
 
     fun setUnwarpPoints(points: List<Offset>) {
         _uiState.update { it.copy(unwarpPoints = points) }
-    }
-
-    fun setActiveUnwarpPoint(index: Int) {
-        _uiState.update { it.copy(activeUnwarpPointIndex = index) }
-    }
-
-    fun setMagnifierPosition(offset: Offset) {
-        _uiState.update { it.copy(magnifierPosition = offset) }
     }
 
     fun updateMaskPath(path: Path) {

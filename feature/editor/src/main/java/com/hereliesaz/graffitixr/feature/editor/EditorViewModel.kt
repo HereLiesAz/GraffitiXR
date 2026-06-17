@@ -95,6 +95,10 @@ class EditorViewModel @Inject constructor(
     // A's strokes; per-layer jobs cancel only the same layer's superseded save.
     private val pendingSaveJobs = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Job>()
 
+    // Per-layer rebuild jobs: cancels stale compositing coroutines on rapid undo/redo so
+    // only the most recent rebuild's result lands in the UI state.
+    private val rebuildJobs = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Job>()
+
     // Debounced project-preview thumbnail generation. saveProject() fires on nearly every edit,
     // so the thumbnail is regenerated at most once the edits settle, off the main thread.
     private var thumbnailJob: kotlinx.coroutines.Job? = null
@@ -298,7 +302,8 @@ class EditorViewModel @Inject constructor(
         val base = layerStore.base(layerId) ?: return
         val strokes = layerStore.strokes(layerId)
 
-        viewModelScope.launch(dispatchers.default) {
+        rebuildJobs[layerId]?.cancel()
+        rebuildJobs[layerId] = viewModelScope.launch(dispatchers.default) {
             // Compositing replays strokes through OpenCV (and SLAM for Liquify). Guard it so a
             // failure during undo/redo logs instead of taking down the app — the stroke list and
             // base are unchanged, so the next edit re-renders cleanly.
