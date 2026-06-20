@@ -97,39 +97,49 @@ fun Bitmap.isolateMarkings(tapPos: Pair<Float, Float>? = null): Bitmap {
     val minMarkPixels = maxOf(MIN_MARK_PIXELS_FLOOR, n / NOISE_AREA_DIVISOR)
     val outPixels = IntArray(n) // zero == transparent void
     val visited = BooleanArray(n)
-    val queue = integral // reuse: the integral image is no longer needed
-    for (start in 0 until n) {
-        if (!isMark[start] || visited[start]) continue
-        var head = 0
-        var tail = 0
-        queue[tail++] = start
-        visited[start] = true
-        while (head < tail) {
-            val p = queue[head++]
-            val px = p % w
-            val py = p / w
-            var dy = -1
-            while (dy <= 1) {
-                var dx = -1
-                while (dx <= 1) {
-                    if (!(dx == 0 && dy == 0)) {
-                        val nx = px + dx
-                        val ny = py + dy
-                        if (nx in 0 until w && ny in 0 until h) {
-                            val q = ny * w + nx
-                            if (isMark[q] && !visited[q]) {
-                                visited[q] = true
-                                queue[tail++] = q
+    // The queue stores packed (y shl 16 or x) coordinates so the inner loop avoids per-pixel
+    // div/mod to recover x,y (image dims are always < 65536). Reuses the integral buffer, which
+    // is no longer needed after thresholding.
+    val queue = integral
+    var start = -1
+    for (y in 0 until h) {
+        for (x in 0 until w) {
+            start++
+            if (!isMark[start] || visited[start]) continue
+            var head = 0
+            var tail = 0
+            queue[tail++] = (y shl 16) or x
+            visited[start] = true
+            while (head < tail) {
+                val p = queue[head++]
+                val px = p and 0xFFFF
+                val py = p ushr 16
+                var dy = -1
+                while (dy <= 1) {
+                    var dx = -1
+                    while (dx <= 1) {
+                        if (!(dx == 0 && dy == 0)) {
+                            val nx = px + dx
+                            val ny = py + dy
+                            if (nx in 0 until w && ny in 0 until h) {
+                                val q = ny * w + nx
+                                if (isMark[q] && !visited[q]) {
+                                    visited[q] = true
+                                    queue[tail++] = (ny shl 16) or nx
+                                }
                             }
                         }
+                        dx++
                     }
-                    dx++
+                    dy++
                 }
-                dy++
             }
-        }
-        if (tail >= minMarkPixels) {
-            for (k in 0 until tail) outPixels[queue[k]] = MARK_HIGHLIGHT_COLOR
+            if (tail >= minMarkPixels) {
+                for (k in 0 until tail) {
+                    val p = queue[k]
+                    outPixels[(p ushr 16) * w + (p and 0xFFFF)] = MARK_HIGHLIGHT_COLOR
+                }
+            }
         }
     }
     out.setPixels(outPixels, 0, w, 0, 0, w, h)

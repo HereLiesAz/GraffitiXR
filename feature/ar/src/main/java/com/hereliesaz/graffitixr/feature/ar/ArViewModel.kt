@@ -53,6 +53,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -1530,11 +1532,20 @@ class ArViewModel @Inject constructor(
      * is cleared, re-touching its now-transparent area is a cheap no-op. The mask's alpha channel
      * is what the native fingerprint masker reads, so the mark simply stops contributing.
      */
+    // Serializes drag-time mark removals so each flood-fill starts from the LATEST mask rather than
+    // a snapshot taken when the gesture sample fired. Without this, two rapid removeMarkAt calls both
+    // read the same bitmap and the later write clobbers the earlier removal, making erased marks
+    // reappear. A mutex (vs. doing the work inside _uiState.update {}) guarantees the expensive
+    // flood-fill runs exactly once per call instead of being re-evaluated on CAS contention.
+    private val markRemovalMutex = Mutex()
+
     fun removeMarkAt(nx: Float, ny: Float) {
-        val current = _uiState.value.annotatedCaptureBitmap ?: return
         viewModelScope.launch(dispatchers.default) {
-            val updated = current.eraseColorBlob(nx, ny)
-            _uiState.update { it.copy(annotatedCaptureBitmap = updated) }
+            markRemovalMutex.withLock {
+                val current = _uiState.value.annotatedCaptureBitmap ?: return@withLock
+                val updated = current.eraseColorBlob(nx, ny)
+                _uiState.update { it.copy(annotatedCaptureBitmap = updated) }
+            }
         }
     }
 
