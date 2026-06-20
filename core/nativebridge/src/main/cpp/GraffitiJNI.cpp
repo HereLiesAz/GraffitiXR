@@ -858,6 +858,7 @@ jobject buildFingerprintObject(JNIEnv* env, const MobileGS::FingerprintData& fd)
     // patchData (the distortion-head patch): this native path produces none — FingerprintData has
     // no patch field — so pass an empty array, matching the Kotlin default `patchData = ByteArray(0)`.
     jbyteArray patchArray = env->NewByteArray(0);
+    if (!patchArray) return bail("patchArray alloc");
     jobject fpObj = env->NewObject(fpClass, fpCtor, kpList, ptsList, descArray,
                                    fd.descriptors.rows, fd.descriptors.cols, fd.descriptors.type(), patchArray);
 
