@@ -1523,6 +1523,21 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Remove the ENTIRE mark the user tapped or dragged onto from the fingerprint mask.
+     * Floods the whole connected highlighted blob to transparent (see eraseColorBlob) — no
+     * partial pixel erasing, no per-point dots. A drag calls this per touch sample; once a mark
+     * is cleared, re-touching its now-transparent area is a cheap no-op. The mask's alpha channel
+     * is what the native fingerprint masker reads, so the mark simply stops contributing.
+     */
+    fun removeMarkAt(nx: Float, ny: Float) {
+        val current = _uiState.value.annotatedCaptureBitmap ?: return
+        viewModelScope.launch(dispatchers.default) {
+            val updated = current.eraseColorBlob(nx, ny)
+            _uiState.update { it.copy(annotatedCaptureBitmap = updated) }
+        }
+    }
+
     fun applyEraseToMask(nx: Float, ny: Float, radius: Float) {
         val currentMask = _uiState.value.annotatedCaptureBitmap ?: return
         viewModelScope.launch(dispatchers.default) {

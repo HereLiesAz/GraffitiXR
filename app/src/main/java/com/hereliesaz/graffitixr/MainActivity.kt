@@ -1074,7 +1074,7 @@ class MainActivity : ComponentActivity() {
                                         }
                                     },
                                     onUpdateUnwarpPoints = { arViewModel.setUnwarpPoints(it) },
-                                    onEraseAtPoint = { nx, ny -> arViewModel.applyEraseToMask(nx, ny, 0.05f) }
+                                    onEraseAtPoint = { nx, ny -> arViewModel.removeMarkAt(nx, ny) }
                                 )
 
                             }
