@@ -12,6 +12,18 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Align Java + Kotlin JVM targets at 17 (this module previously set neither,
+    // leaving Kotlin on its default target while the rest of the project is on 17).
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
