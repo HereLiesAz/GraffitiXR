@@ -20,7 +20,6 @@ import com.hereliesaz.aznavrail.model.AzButtonShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -130,8 +129,8 @@ private fun TargetInstructionCard(
             "Now, drag the corners to align the cyan frame with the flat surface of your wall."
         )
         captureStep == CaptureStep.MASK || captureStep == CaptureStep.REVIEW -> Pair(
-            "ERASE FEATURES",
-            "Tap or drag across any features you don't want tracked."
+            "REMOVE MARKS",
+            "Tap a mark to remove it, or drag across marks to remove several."
         )
         else -> Pair("", "")
     }
@@ -186,12 +185,14 @@ private fun TargetInstructionCard(
 }
 
 /**
- * REVIEW step: shows the captured image with the detected-feature annotation overlay.
+ * REVIEW step: shows the user every mark on the wall, each whole mark highlighted over a
+ * dimmed photo of the capture (annotatedCaptureBitmap is the despeckled, highlighted mask
+ * from isolateMarkings — whole marks, never dots).
  *
- * The user taps or drags across features they don't want tracked — applyEraseToMask()
- * clears those pixels from annotatedCaptureBitmap (PorterDuff CLEAR). The native ORB
+ * Tap a mark to remove it, or drag across marks to remove each one the finger passes over;
+ * removeMarkAt() flood-fills the WHOLE touched mark out of annotatedCaptureBitmap. The native
  * engine reads the alpha channel of that bitmap as its detection mask (opaque = detect,
- * transparent = skip), so erased areas are excluded from the fingerprint automatically.
+ * transparent = skip), so a removed mark stops contributing to the fingerprint automatically.
  *
  * On confirm, annotatedCaptureBitmap is passed directly as the selection mask.
  */
@@ -204,7 +205,6 @@ private fun FeatureSelectionReview(
     onRetake: () -> Unit,
     onEraseAtPoint: (Float, Float) -> Unit
 ) {
-    var showFeatures by remember { mutableStateOf(true) }
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
 
     Box(
@@ -212,7 +212,7 @@ private fun FeatureSelectionReview(
             .fillMaxSize()
             .onSizeChanged { boxSize = it }
     ) {
-        // -- Raw capture as base layer --
+        // -- Raw capture as faint context, dimmed so the highlighted marks dominate --
         rawBitmap?.let { bmp ->
             Image(
                 bitmap = bmp.asImageBitmap(),
@@ -221,17 +221,20 @@ private fun FeatureSelectionReview(
                 contentScale = ContentScale.Fit
             )
         }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.6f))
+        )
 
-        // -- Annotated feature overlay --
-        if (showFeatures) {
-            annotatedBitmap?.let { bmp ->
-                Image(
-                    bitmap = bmp.asImageBitmap(),
-                    contentDescription = "Feature Overlay",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
-            }
+        // -- Highlighted marks (the whole-mark fingerprint mask), always shown --
+        annotatedBitmap?.let { bmp ->
+            Image(
+                bitmap = bmp.asImageBitmap(),
+                contentDescription = "Detected marks",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
+            )
         }
 
         // -- Tap / drag gesture layer for erasing --
@@ -275,27 +278,18 @@ private fun FeatureSelectionReview(
             )
         }
 
-        // -- Show Features toggle --
-        Row(
+        // -- Hint: tap/drag removes a whole mark --
+        Text(
+            text = "Tap a mark to remove it, or drag across marks to remove several.",
+            color = Color.White,
+            style = MaterialTheme.typography.labelMedium,
+            textAlign = TextAlign.Center,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 12.dp)
+                .padding(top = 12.dp, start = 24.dp, end = 24.dp)
                 .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
-                .padding(horizontal = 12.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                strings.ar.targetShowFeatures,
-                color = Color.White,
-                style = MaterialTheme.typography.labelSmall
-            )
-            Switch(
-                checked = showFeatures,
-                onCheckedChange = { showFeatures = it },
-                modifier = Modifier.scale(0.7f)
-            )
-        }
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+        )
 
         // -- Retake / Confirm FABs --
         Row(
