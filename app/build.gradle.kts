@@ -35,7 +35,7 @@ val localProperties = Properties().apply {
 //      so the ephemeral CI checkout stays clean and Play receives exactly <n>.
 //   2. Otherwise fall back to the value stored in version.properties, preserving
 //      the existing local behaviour of auto-incrementing on release builds.
-val versionBuildOverride = (project.findProperty("versionBuild") as String?)?.toIntOrNull()
+val versionBuildOverride = project.findProperty("versionBuild")?.toString()?.toIntOrNull()
 var currentVersionCode = versionBuildOverride ?: versionProps.getProperty("versionBuild", "1").toInt()
 
 // Automatically increment versionCode for local release builds (no override supplied).
