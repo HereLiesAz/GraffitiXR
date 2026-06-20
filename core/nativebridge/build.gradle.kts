@@ -59,3 +59,13 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
 }
+
+// Pin Kotlin's JVM target to match Java (17). Without this, Kotlin defaults to a lower target
+// than the Java sources, which AGP flags as an inconsistent JVM-target compatibility error.
+// Uses the same task-based approach as :app (this module applies only AGP + KSP, so the
+// `kotlin {}` extension is not registered).
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}

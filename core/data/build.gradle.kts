@@ -23,6 +23,16 @@ android {
     }
 }
 
+// Pin Kotlin's JVM target to match Java (17). Without this, Kotlin defaults to a lower target
+// than the Java sources, which AGP flags as an inconsistent JVM-target compatibility error.
+// Uses the same task-based approach as :app (no `kotlin {}` extension, which this module's
+// plugin set does not register).
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(project(":core:common"))
