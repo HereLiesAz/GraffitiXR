@@ -215,6 +215,9 @@ class ArRenderer(
             if (!value) {
                 anchorOrchestrator.clear()
                 quadInitialFitApplied = false
+                // Anchor cleared → the artist is back to scanning, so the voxel/perception map
+                // must become visible again. (It was hidden when the anchor was established.)
+                hideVisualization = false
             }
         }
     /** When true the SLAM/cloud visualization is suppressed — processing continues but nothing is drawn. */
@@ -506,7 +509,10 @@ class ArRenderer(
         // Show the perception mask (feature points / voxels) on the LIVE camera during scanning —
         // including while aiming a target. The captured frame is the raw camera image (GL overlays
         // aren't baked in), so the mask belongs here, not painted onto the frozen target preview.
-        if (anyLayerOn && isTracking) {
+        // Honor hideVisualization: once the anchor is established (and during freeze/export) the
+        // confidence-tinted voxel cloud must NOT be drawn over the artwork — it would occlude the
+        // very thing the artist is here to see. Processing keeps running; only the draw is gated.
+        if (anyLayerOn && isTracking && !hideVisualization) {
             if (showFeaturePoints) {
                 try {
                     frame.acquirePointCloud().use { arDebugRenderer.update(it) }
