@@ -28,11 +28,19 @@ val localProperties = Properties().apply {
     }
 }
 
-var currentVersionCode = versionProps.getProperty("versionBuild", "1").toInt()
+// versionCode resolution:
+//   1. An explicit override via `-PversionBuild=<n>` always wins (CI passes a
+//      monotonic value derived from the git commit count — see release-aab.yml).
+//      When the override is present we do NOT auto-increment or rewrite the file,
+//      so the ephemeral CI checkout stays clean and Play receives exactly <n>.
+//   2. Otherwise fall back to the value stored in version.properties, preserving
+//      the existing local behaviour of auto-incrementing on release builds.
+val versionBuildOverride = project.findProperty("versionBuild")?.toString()?.toIntOrNull()
+var currentVersionCode = versionBuildOverride ?: versionProps.getProperty("versionBuild", "1").toInt()
 
-// Automatically increment versionCode for release builds
+// Automatically increment versionCode for local release builds (no override supplied).
 val isReleaseBuild = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
-if (isReleaseBuild) {
+if (isReleaseBuild && versionBuildOverride == null) {
     currentVersionCode++
     versionProps.setProperty("versionBuild", currentVersionCode.toString())
     versionPropsFile.outputStream().use {
@@ -104,6 +112,18 @@ android {
         jniLibs {
             pickFirsts += "**/libc++_shared.so"
         }
+    }
+
+    // App Bundle configuration. These splits are ON by default for an AAB; we set
+    // them explicitly so the modular-delivery intent is documented in the build.
+    // Play generates optimized per-device APKs from `bundleRelease`, so the large
+    // per-ABI native payload (:core:nativebridge / OpenCV / LiteRT NPU runtimes)
+    // is only downloaded for the device's actual ABI — no separate artifacts to
+    // build. See docs/RELEASE.md.
+    bundle {
+        abi { enableSplit = true }
+        density { enableSplit = true }
+        language { enableSplit = true }
     }
 }
 

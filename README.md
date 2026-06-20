@@ -51,6 +51,7 @@ Strictly decoupled multi-module Clean Architecture:
 - [Testing Strategy](docs/testing.md)
 - [Data Formats](docs/data_formats.md)
 - [Contributing](docs/contributing.md)
+- [Release & Google Play Delivery](docs/RELEASE.md)
 
 ---
 *Documentation updated on 2026-04-26 during multi-glass integration and co-op robustness phase.*
