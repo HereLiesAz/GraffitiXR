@@ -64,6 +64,7 @@ internal sealed interface EditorIntent {
     data class SetModeAdjustment(val mode: EditorMode, val adjustment: ModeAdjustment) : EditorIntent
     data class SetAllModeAdjustments(val adjustments: Map<EditorMode, ModeAdjustment>) : EditorIntent
     data class ApplyModeTransformGesture(val mode: EditorMode, val pan: Offset, val zoom: Float, val rotation: Float) : EditorIntent
+    data class ToggleModeTransformLocked(val mode: EditorMode) : EditorIntent
     data class SetGestureInProgress(val inProgress: Boolean) : EditorIntent
 
     // ── Effect-result / transient flags (dispatched by the VM around async work) ───

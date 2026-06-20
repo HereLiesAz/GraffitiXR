@@ -132,6 +132,10 @@ data class ModeAdjustment(
     val saturation: Float = 1f,
     val opacity: Float = 1f,
     val isInverted: Boolean = false,
+    // When true, pan/zoom/rotate gestures for this mode are ignored — the user has positioned the
+    // whole-design layer and locked it in place (e.g. a Trace reference that must not drift while
+    // tracing). Tone/opacity edits and the lightbox touch-lock are independent of this.
+    val isTransformLocked: Boolean = false,
 ) {
     val isIdentity: Boolean
         get() = offsetX == 0f && offsetY == 0f && scale == 1f && rotation == 0f &&

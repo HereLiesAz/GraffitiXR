@@ -1357,6 +1357,10 @@ class MainActivity : ComponentActivity() {
             editorViewModel.onModeLayerSelected(mode)
             onOpenModeAdjust(mode)
         }
+        val locked = editorUiState.modeAdjustments[mode]?.isTransformLocked == true
+        azRailSubItem(id = "$modeId.layer.lock", hostId = "$modeId.layer", text = if (locked) "Unlock" else "Lock", color = if (locked) Cyan else navItemColor, shape = AzButtonShape.NONE) {
+            editorViewModel.onToggleModeTransformLocked(mode)
+        }
         azRailSubItem(id = "$modeId.layer.reset", hostId = "$modeId.layer", text = "Reset", color = navItemColor, shape = AzButtonShape.NONE) {
             editorViewModel.onModeLayerReset(mode)
         }
