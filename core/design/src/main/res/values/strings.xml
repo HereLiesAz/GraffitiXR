@@ -93,6 +93,10 @@
 
     <!-- Label for the AI-powered background removal tool. -->
     <string name="nav_isolate">Isolate</string>
+    <!-- Label for the Magic tool: auto-fits the layer to the AR anchor, or auto-tones it. -->
+    <string name="nav_magic">Magic</string>
+    <!-- Label for the Edges tool: generates a Canny edge-detect outline of the layer. -->
+    <string name="nav_edges">Edges</string>
     <!-- Description of the Isolate tool, explaining that it removes the background from a layer. -->
     <string name="nav_isolate_info">Automatically remove the background from this layer, leaving only the subject on a transparent background.</string>
 
