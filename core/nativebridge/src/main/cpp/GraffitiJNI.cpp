@@ -846,10 +846,20 @@ jobject buildFingerprintObject(JNIEnv* env, const MobileGS::FingerprintData& fd)
 
     jclass fpClass = env->FindClass("com/hereliesaz/graffitixr/common/model/Fingerprint");
     if (!fpClass) return bail("Fingerprint class");
-    jmethodID fpCtor = env->GetMethodID(fpClass, "<init>", "(Ljava/util/List;Ljava/util/List;[BIII)V");
-    if (!fpCtor) return bail("Fingerprint(List,List,[B,I,I,I) ctor — likely R8-stripped; add a -keep rule for com.hereliesaz.graffitixr.common.model.Fingerprint");
+    // Fingerprint's Kotlin primary constructor takes 7 params:
+    //   (List keypoints, List points3d, byte[] descriptorsData, int rows, int cols, int type,
+    //    byte[] patchData)
+    // The two params with defaults (points3d, patchData) do NOT produce a 6-arg JVM overload, so
+    // the descriptor MUST include the trailing [B. The old 6-arg lookup never matched, GetMethodID
+    // returned null, and setWallFingerprint silently produced null on every call.
+    jmethodID fpCtor = env->GetMethodID(fpClass, "<init>", "(Ljava/util/List;Ljava/util/List;[BIII[B)V");
+    if (!fpCtor) return bail("Fingerprint(List,List,[B,I,I,I,[B) ctor");
 
-    jobject fpObj = env->NewObject(fpClass, fpCtor, kpList, ptsList, descArray, fd.descriptors.rows, fd.descriptors.cols, fd.descriptors.type());
+    // patchData (the distortion-head patch): this native path produces none — FingerprintData has
+    // no patch field — so pass an empty array, matching the Kotlin default `patchData = ByteArray(0)`.
+    jbyteArray patchArray = env->NewByteArray(0);
+    jobject fpObj = env->NewObject(fpClass, fpCtor, kpList, ptsList, descArray,
+                                   fd.descriptors.rows, fd.descriptors.cols, fd.descriptors.type(), patchArray);
 
     return fpObj;
 }
