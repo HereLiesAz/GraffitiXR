@@ -1831,10 +1831,12 @@ class MainActivity : ComponentActivity() {
                                     azRailSubItem(id = layerId(layer, "balance"), hostId = layerId(layer, "grp.adjust"), text = navStrings.balance, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onBalanceClicked() }
                                     azRailSubItem(id = layerId(layer, "blend"), hostId = layerId(layer, "grp.adjust"), text = navStrings.build, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onCycleBlendMode() }
                                     azRailSubItem(id = layerId(layer, "invert"), hostId = layerId(layer, "grp.adjust"), text = navStrings.invert, color = if (layer.isInverted) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onToggleInvert() }
+                                    azRailSubItem(id = layerId(layer, "magic"), hostId = layerId(layer, "grp.adjust"), text = navStrings.magic, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onMagicClicked() }
 
                                     azRailHostItem(id = layerId(layer, "grp.effects"), text = "Effects", color = navItemColor, shape = AzButtonShape.RECTANGLE)
                                     azRailSubItem(id = layerId(layer, "iso"), hostId = layerId(layer, "grp.effects"), text = navStrings.isolate, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onRemoveBackgroundClicked() }
                                     azRailSubItem(id = layerId(layer, "line"), hostId = layerId(layer, "grp.effects"), text = navStrings.outline, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onSketchClicked() }
+                                    azRailSubItem(id = layerId(layer, "edges"), hostId = layerId(layer, "grp.effects"), text = navStrings.edges, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onApplyCannyEdgeClicked() }
                                     if (layer.stencilType == null) {
                                         azRailSubItem(
                                             id = layerId(layer, "stencil"),
