@@ -509,10 +509,15 @@ class ArRenderer(
         // Show the perception mask (feature points / voxels) on the LIVE camera during scanning —
         // including while aiming a target. The captured frame is the raw camera image (GL overlays
         // aren't baked in), so the mask belongs here, not painted onto the frozen target preview.
-        // Honor hideVisualization: once the anchor is established (and during freeze/export) the
-        // confidence-tinted voxel cloud must NOT be drawn over the artwork — it would occlude the
-        // very thing the artist is here to see. Processing keeps running; only the draw is gated.
-        if (anyLayerOn && isTracking && !hideVisualization) {
+        // The confidence-tinted voxel cloud must NOT be drawn over the artwork — it would occlude
+        // the very thing the artist is here to see. anchorEstablished is the authoritative gate:
+        // once a target exists the map is hidden (the artist is painting), EXCEPT while actively
+        // re-aligning to a plane, when seeing the map helps. We deliberately key off anchorEstablished
+        // rather than the shared hideVisualization flag, which freeze/export/user-settings also toggle
+        // and would otherwise flip the cloud back on mid-session. hideVisualization still suppresses it
+        // on demand (freeze preview, export capture, manual setting). Processing keeps running
+        // regardless; only the draw is gated.
+        if (anyLayerOn && isTracking && (!anchorEstablished || isInPlaneRealignment) && !hideVisualization) {
             if (showFeaturePoints) {
                 try {
                     frame.acquirePointCloud().use { arDebugRenderer.update(it) }
