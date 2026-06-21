@@ -28,7 +28,7 @@ And then, there's a decent suite of pertinent design tools, with support for mul
 ## Modes
 *   **AR Mural:** The core precision instrument for anchoring digital concepts to physical surfaces using confidence-based voxel mapping.
 *   **Mockup Mode:** Fast tools for visualizing layers and blend modes on top of static wall photos.
-*   **Trace (Lightbox):** Full-brightness surface for copying onto paper with touch-lock and triple-tap exit.
+*   **Trace (Lightbox):** Full-brightness surface for copying onto paper with touch-lock and four-tap exit.
 *   **Stencil Tool:** Automated generation of multi-layer printable stencils (1-3 colors) with tiled PDF export.
 
 ## Architecture

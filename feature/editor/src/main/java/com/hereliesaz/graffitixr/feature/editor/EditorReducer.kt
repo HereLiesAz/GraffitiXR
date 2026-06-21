@@ -81,13 +81,21 @@ internal object EditorReducer {
         is EditorIntent.SetAllModeAdjustments -> state.copy(modeAdjustments = intent.adjustments)
         is EditorIntent.ApplyModeTransformGesture -> {
             val cur = state.modeAdjustments[intent.mode] ?: ModeAdjustment()
-            val updated = cur.copy(
-                offsetX = cur.offsetX + intent.pan.x,
-                offsetY = cur.offsetY + intent.pan.y,
-                scale = (cur.scale * intent.zoom).coerceIn(0.1f, 10f),
-                rotation = cur.rotation + intent.rotation,
-            )
-            state.copy(modeAdjustments = state.modeAdjustments + (intent.mode to updated))
+            // Locked: the user pinned this mode's whole-design position, so ignore transform gestures.
+            if (cur.isTransformLocked) state
+            else {
+                val updated = cur.copy(
+                    offsetX = cur.offsetX + intent.pan.x,
+                    offsetY = cur.offsetY + intent.pan.y,
+                    scale = (cur.scale * intent.zoom).coerceIn(0.1f, 10f),
+                    rotation = cur.rotation + intent.rotation,
+                )
+                state.copy(modeAdjustments = state.modeAdjustments + (intent.mode to updated))
+            }
+        }
+        is EditorIntent.ToggleModeTransformLocked -> {
+            val cur = state.modeAdjustments[intent.mode] ?: ModeAdjustment()
+            state.copy(modeAdjustments = state.modeAdjustments + (intent.mode to cur.copy(isTransformLocked = !cur.isTransformLocked)))
         }
 
         is EditorIntent.SetLoading -> state.copy(isLoading = intent.loading)

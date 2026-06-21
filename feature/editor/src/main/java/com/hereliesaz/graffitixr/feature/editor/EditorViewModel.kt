@@ -1029,6 +1029,12 @@ class EditorViewModel @Inject constructor(
         saveProject()
     }
 
+    /** Toggle the per-mode transform lock — pins/unpins the whole-design position for [mode]. */
+    fun onToggleModeTransformLocked(mode: EditorMode) {
+        dispatch(EditorIntent.ToggleModeTransformLocked(mode))
+        saveProject()
+    }
+
     override fun onGestureEnd() {
         saveProject()
         dispatch(EditorIntent.SetGestureInProgress(false))
