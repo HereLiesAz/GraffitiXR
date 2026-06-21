@@ -40,7 +40,7 @@ jobs:
           echo "ARCORE_API_KEY=$ARCORE_API_KEY" >> local.properties
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -129,7 +129,7 @@ jobs:
           rm private_key.pem certificate_chain.crt keystore.p12
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
