@@ -644,6 +644,9 @@ class ArViewModel @Inject constructor(
             return
         }
         isInArMode = enabled
+        // A new/destroyed session resets native mapping to running, so drop our cached command and
+        // let the next tracking frame re-assert the correct auto-mapping state.
+        lastMappingPausedCmd = null
         Timber.i("ARDIAG setArMode(enabled=$enabled) layers=${projectRepository.currentProject.value?.layers?.size ?: 0} scanMode=${_uiState.value.arScanMode} sessionExists=${session != null}")
         if (enabled) {
             val now = System.currentTimeMillis()
@@ -669,6 +672,7 @@ class ArViewModel @Inject constructor(
     fun exitArMode() {
         isInArMode = false
         isDestroying = true
+        lastMappingPausedCmd = null
         // Cancel any in-flight session update (including a running stereo probe) so it stops pumping
         // the camera and releases the session mutex before cleanup tries to acquire it.
         sessionUpdateJob?.cancel()
@@ -1333,6 +1337,33 @@ class ArViewModel @Inject constructor(
             (nowMs - lastTrackingTimestampMs) > STEREO_STUCK_GRACE_MS
         ) {
             recoverFromBrokenStereo()
+        }
+
+        // Battery: SLAM mapping (gaussian-splat optimization) is the dominant AR power cost. Once the
+        // projection anchor is locked and tracking is solid the wall is mapped, so settle mapping;
+        // tracking + relocalization keep running. It resumes automatically on tracking loss so the
+        // map can re-acquire/extend.
+        updateAutoMapping(isTracking)
+    }
+
+    // Last steady-state mapping-paused command we issued, so we only call into native on a change.
+    // Reset to null while capture/export owns the flag, so we re-assert once that flow releases it.
+    private var lastMappingPausedCmd: Boolean? = null
+
+    /**
+     * Auto-settle SLAM mapping to save battery: pause the heavy gaussian-splat mapping once the
+     * projection anchor is established and tracking is solid, and resume it on tracking loss so the
+     * map can re-acquire. Capture/export drive [SlamManager.setMappingPaused] directly via the
+     * isCaptureRequested flow, so while a capture is requested we step aside (and forget our last
+     * command, re-asserting the correct state once the capture releases the flag).
+     */
+    private fun updateAutoMapping(isTracking: Boolean) {
+        val state = _uiState.value
+        if (state.isCaptureRequested) { lastMappingPausedCmd = null; return }
+        val shouldPause = isInArMode && state.isAnchorEstablished && isTracking
+        if (shouldPause != lastMappingPausedCmd) {
+            slamManager.setMappingPaused(shouldPause)
+            lastMappingPausedCmd = shouldPause
         }
     }
 
