@@ -30,6 +30,10 @@ on:
         type: boolean
         default: false
 
+# Least-privilege default token; jobs needing more declare their own permissions block.
+permissions:
+  contents: read
+
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
