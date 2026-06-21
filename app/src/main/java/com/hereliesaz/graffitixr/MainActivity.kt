@@ -1939,6 +1939,33 @@ class MainActivity : ComponentActivity() {
                     azRailSubItem(id = "mode.ar.light", hostId = "mode.ar", text = navStrings.light, color = if (arUiState.isFlashlightOn) Cyan else navItemColor, shape = AzButtonShape.NONE) {
                         arViewModel.toggleFlashlight()
                     }
+                    // Co-op ▸ { Host, Join, Leave } — share this AR coordinate system with a nearby peer.
+                    azRailSubHostItem(id = "coop", hostId = "mode.ar", text = navStrings.coop, color = navItemColor, shape = AzButtonShape.NONE)
+                    val canHost = arUiState.isAnchorEstablished && arUiState.splatCount > 0
+                    val isHosting = arUiState.coopRole == CoopRole.HOST
+                    val isGuest = arUiState.coopRole == CoopRole.GUEST
+                    azRailSubItem(
+                        id = "coop.host", hostId = "coop", text = navStrings.hostCoop,
+                        color = if (isHosting) Cyan else if (canHost) navItemColor else Color.Gray,
+                        shape = AzButtonShape.NONE
+                    ) {
+                        // Hosting requires an established anchor with mapped splats to share.
+                        if (canHost && !isHosting) arViewModel.startHosting()
+                    }
+                    azRailSubItem(
+                        id = "coop.join", hostId = "coop", text = navStrings.joinCoop,
+                        color = if (isGuest) Cyan else navItemColor, shape = AzButtonShape.NONE
+                    ) {
+                        // Joining scans the host's QR, so the camera must be granted first.
+                        if (!isGuest) {
+                            if (hasCameraPermission) onShowJoinScanner() else requestPermissions()
+                        }
+                    }
+                    if (arUiState.coopRole != CoopRole.NONE) {
+                        azRailSubItem(id = "coop.leave", hostId = "coop", text = "Leave", color = HotPink, shape = AzButtonShape.NONE) {
+                            arViewModel.leaveSession()
+                        }
+                    }
                 }
                 modeLayerSubHost("mode.ar", EditorMode.AR, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
             }

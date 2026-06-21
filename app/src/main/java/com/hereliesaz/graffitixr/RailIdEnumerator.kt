@@ -11,7 +11,8 @@ import com.hereliesaz.graffitixr.common.model.Layer
  * Conditional registration in ConfigureRailItems is mirrored here:
  *   - target.host / target.create only registered in AR mode
  *   - design.wall only registered in MOCKUP mode
- *   - target.scanModeToggle / coop.main / coop.join only in AR mode
+ *   - coop / coop.host / coop.join only registered in AR mode (coop.leave is
+ *     additionally gated on an active session, so it is omitted here)
  *
  * CAVEAT: the per-layer block below emits the UNION of every layer-menu suffix, whereas
  * ConfigureRailItems registers a different suffix subset per layer type (text vs sketch vs
@@ -42,6 +43,7 @@ internal fun enumerateRailItemIdRegistrations(layers: List<Layer>, mode: EditorM
     if (mode == EditorMode.AR) {
         ids += "target.create"
         ids += "mode.ar.light"
+        ids += listOf("coop", "coop.host", "coop.join")
     }
     if (mode == EditorMode.OVERLAY) {
         ids += "mode.overlay.light"
