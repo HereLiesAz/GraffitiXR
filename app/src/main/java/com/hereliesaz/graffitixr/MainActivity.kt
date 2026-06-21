@@ -1988,6 +1988,12 @@ class MainActivity : ComponentActivity() {
             azRailSubItem(id = "wall.file", hostId = "mockup.wall", text = navStrings.file, color = navItemColor, shape = AzButtonShape.NONE) {
                 backgroundPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             }
+            // Clear — only offered once a wall photo is set, so there is something to remove.
+            if (editorUiState.backgroundBitmap != null) {
+                azRailSubItem(id = "wall.clear", hostId = "mockup.wall", text = navStrings.wallClear, color = navItemColor, shape = AzButtonShape.NONE) {
+                    editorViewModel.clearBackgroundImage()
+                }
+            }
             modeLayerSubHost("mode.mockup", EditorMode.MOCKUP, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
 
             // Trace ▸ Freeze (+ Layer)
