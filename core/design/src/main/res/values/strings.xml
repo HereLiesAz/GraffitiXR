@@ -62,6 +62,8 @@
     <string name="nav_host_coop_info">Host a co-op session to share your AR coordinate system with nearby peers.</string>
     <string name="nav_join_coop">Join</string>
     <string name="nav_join_coop_info">Join a nearby co-op session to align your AR view with the host.</string>
+    <string name="nav_leave_coop">Leave</string>
+    <string name="nav_leave_coop_info">Leave the current co-op session.</string>
 
     <string name="nav_wearable">Wearable</string>
     <string name="nav_wearable_info">Connect to smart glasses for a hands-free AR experience and perspective-aligned camera input.</string>

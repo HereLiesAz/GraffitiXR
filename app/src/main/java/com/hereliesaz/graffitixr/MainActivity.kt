@@ -1962,7 +1962,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     if (arUiState.coopRole != CoopRole.NONE) {
-                        azRailSubItem(id = "coop.leave", hostId = "coop", text = "Leave", color = HotPink, shape = AzButtonShape.NONE) {
+                        azRailSubItem(id = "coop.leave", hostId = "coop", text = navStrings.leaveCoop, color = HotPink, shape = AzButtonShape.NONE) {
                             arViewModel.leaveSession()
                         }
                     }
