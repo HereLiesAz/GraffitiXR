@@ -1,0 +1,52 @@
+# Dependabot configuration — keeps Gradle dependencies and GitHub Actions up to date.
+# Docs: https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+version: 2
+updates:
+  # Android / Gradle dependencies across all modules. Tightly-coupled library families are grouped
+  # into one PR each so versions stay mutually compatible (a lone Compose/Hilt/CameraX bump can
+  # break the build) and a handful of updates don't exhaust the open-PR limit.
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    groups:
+      androidx-lifecycle:
+        patterns:
+          - "androidx.lifecycle*"
+      camerax:
+        patterns:
+          - "androidx.camera*"
+      compose:
+        patterns:
+          - "androidx.compose*"
+          - "org.jetbrains.kotlin.plugin.compose"
+      navigation:
+        patterns:
+          - "androidx.navigation*"
+      room:
+        patterns:
+          - "androidx.room*"
+      hilt:
+        patterns:
+          - "com.google.dagger*"
+          - "androidx.hilt*"
+      okhttp-retrofit:
+        patterns:
+          - "com.squareup.okhttp3*"
+          - "com.squareup.retrofit2*"
+      kotlin:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "org.jetbrains.kotlinx*"
+
+  # Versions of the actions used by the workflows in .github/workflows.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
