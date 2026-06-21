@@ -192,13 +192,29 @@ class EditorViewModel @Inject constructor(
                             }
 
                             project.fingerprint?.let { fp ->
-                                slamManager.restoreWallFingerprint(
-                                    fp.descriptorsData,
-                                    fp.descriptorsRows,
-                                    fp.descriptorsCols,
-                                    fp.descriptorsType,
-                                    fp.points3d.toFloatArray()
-                                )
+                                val intr = project.fingerprintIntrinsics
+                                val anchor = project.fingerprintAnchor
+                                if (intr.size >= 4 && anchor.size == 16) {
+                                    // Metric fingerprint: replay the true capture intrinsics + anchor
+                                    // so reload reloc matches the live capture, not a default guess.
+                                    slamManager.restoreWallFingerprintMetric(
+                                        fp.descriptorsData,
+                                        fp.descriptorsRows,
+                                        fp.descriptorsCols,
+                                        fp.descriptorsType,
+                                        fp.points3d.toFloatArray(),
+                                        anchor.toFloatArray(),
+                                        intr.toFloatArray(),
+                                    )
+                                } else {
+                                    slamManager.restoreWallFingerprint(
+                                        fp.descriptorsData,
+                                        fp.descriptorsRows,
+                                        fp.descriptorsCols,
+                                        fp.descriptorsType,
+                                        fp.points3d.toFloatArray()
+                                    )
+                                }
                                 // Restore the distortion-head canonical patch (256x256 raw gray).
                                 if (fp.patchData.isNotEmpty()) {
                                     val s = kotlin.math.sqrt(fp.patchData.size.toDouble()).toInt()

@@ -127,5 +127,14 @@ data class GraffitiProject(
     val isRightHanded: Boolean = true,
     // Per-mode whole-design adjustments, keyed by EditorMode.name. Defaulted for back-compat with
     // projects saved before this field existed.
-    val modeAdjustments: Map<String, ModeAdjustment> = emptyMap()
+    val modeAdjustments: Map<String, ModeAdjustment> = emptyMap(),
+
+    // Camera intrinsics (fx,fy,cx,cy) and the anchor pose (column-major 4x4, 16 floats) captured
+    // alongside a metric fingerprint. Persisted so relocalization on reload replays the TRUE capture
+    // intrinsics + anchor through SlamManager.restoreWallFingerprintMetric instead of falling back to
+    // a default guess. Kept here rather than on Fingerprint because Fingerprint is constructed in
+    // native JNI with a fixed constructor signature (changing it would break depth-path capture).
+    // Both empty on depth-path or pre-existing projects, which keep the legacy descriptors-only restore.
+    val fingerprintIntrinsics: List<Float> = emptyList(),
+    val fingerprintAnchor: List<Float> = emptyList()
 )

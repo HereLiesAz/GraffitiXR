@@ -1134,13 +1134,30 @@ class ArViewModel @Inject constructor(
             val project = projectRepository.currentProject.value ?: return@launch
             val fp = project.fingerprint
             if (fp != null) {
-                slamManager.restoreWallFingerprint(
-                    fp.descriptorsData,
-                    fp.descriptorsRows,
-                    fp.descriptorsCols,
-                    fp.descriptorsType,
-                    fp.points3d.toFloatArray()
-                )
+                val intr = project.fingerprintIntrinsics
+                val anchor = project.fingerprintAnchor
+                if (intr.size >= 4 && anchor.size == 16) {
+                    // Metric fingerprint: replay the true capture intrinsics + anchor so PnP reloc
+                    // matches the live capture instead of using a default-intrinsics guess.
+                    slamManager.restoreWallFingerprintMetric(
+                        fp.descriptorsData,
+                        fp.descriptorsRows,
+                        fp.descriptorsCols,
+                        fp.descriptorsType,
+                        fp.points3d.toFloatArray(),
+                        anchor.toFloatArray(),
+                        intr.toFloatArray(),
+                    )
+                } else {
+                    // Depth-path or pre-existing project: descriptors-only legacy restore.
+                    slamManager.restoreWallFingerprint(
+                        fp.descriptorsData,
+                        fp.descriptorsRows,
+                        fp.descriptorsCols,
+                        fp.descriptorsType,
+                        fp.points3d.toFloatArray()
+                    )
+                }
                 // Restore the distortion-head canonical patch so the head works after reload, not only
                 // in the capture session. 256x256 raw gray (= sqrt(len)); inert if absent/head unloaded.
                 if (fp.patchData.isNotEmpty()) {
