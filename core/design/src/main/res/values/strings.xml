@@ -92,6 +92,10 @@
     <string name="nav_wall">Wall</string>
     <!-- Description for the action to change the background wall image. -->
     <string name="nav_wall_info">Replace the background wall photo used in Mockup mode.</string>
+    <!-- Label for the action to remove the background wall photo. -->
+    <string name="nav_wall_clear">Clear</string>
+    <!-- Description for the action to remove the background wall photo. -->
+    <string name="nav_wall_clear_info">Remove the background wall photo used in Mockup mode.</string>
 
     <!-- Label for the AI-powered background removal tool. -->
     <string name="nav_isolate">Isolate</string>

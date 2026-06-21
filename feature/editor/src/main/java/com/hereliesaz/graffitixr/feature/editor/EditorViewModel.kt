@@ -484,6 +484,18 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    /** Remove the Mockup wall photo: clears the persisted background URI and the live bitmap. */
+    fun clearBackgroundImage() {
+        viewModelScope.launch(dispatchers.io) {
+            projectRepository.currentProject.value?.let { project ->
+                projectRepository.updateProject(project.copy(backgroundImageUri = null))
+            }
+            withContext(dispatchers.main) {
+                dispatch(EditorIntent.SetBackgroundBitmap(null))
+            }
+        }
+    }
+
     fun saveProject(name: String? = null) {
         viewModelScope.launch(dispatchers.io) {
             try {
