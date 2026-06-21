@@ -25,6 +25,10 @@ defaults:
   run:
     shell: 'bash'
 
+# Least-privilege default token; jobs needing more declare their own permissions block.
+permissions:
+  contents: read
+
 jobs:
   triage:
     runs-on: 'ubuntu-latest'

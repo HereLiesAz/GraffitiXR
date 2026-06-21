@@ -3,6 +3,10 @@ name: Update Dependencies
 on:
   workflow_dispatch:
 
+# Least-privilege default token; jobs needing more declare their own permissions block.
+permissions:
+  contents: read
+
 jobs:
   update-libs:
     runs-on: ubuntu-latest

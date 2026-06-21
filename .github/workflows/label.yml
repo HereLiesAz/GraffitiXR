@@ -8,6 +8,10 @@
 name: Labeler
 on: [pull_request]
 
+# Least-privilege default token; jobs needing more declare their own permissions block.
+permissions:
+  contents: read
+
 jobs:
   label:
 
