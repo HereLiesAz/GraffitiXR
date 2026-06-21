@@ -384,7 +384,13 @@ class MainViewModel @Inject constructor(
 
             projectManager.saveProject(
                 context = context,
-                projectData = currentProject.copy(fingerprint = fp.copy(patchData = patch)),
+                projectData = currentProject.copy(
+                    fingerprint = fp.copy(patchData = patch),
+                    // Persist keyframe-0's intrinsics + anchor — the exact values just fed to
+                    // restoreWallFingerprintMetric — so reload relocalizes with the true intrinsics.
+                    fingerprintIntrinsics = kf0.intr.toList(),
+                    fingerprintAnchor = kf0.anchor.toList(),
+                ),
                 targetImages = listOf(bitmap)
             )
             projectRepository.loadProject(currentProject.id)
