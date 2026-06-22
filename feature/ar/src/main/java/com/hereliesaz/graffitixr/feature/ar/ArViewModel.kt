@@ -1691,6 +1691,8 @@ class ArViewModel @Inject constructor(
             )
         }
     }
+
+    fun computePhysicalExtent(
         depthBuffer: ByteBuffer?,
         depthW: Int, depthH: Int,
         colorW: Int, colorH: Int,
