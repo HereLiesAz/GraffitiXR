@@ -28,17 +28,16 @@ val localProperties = Properties().apply {
     }
 }
 
-// versionCode resolution:
-//   1. An explicit override via `-PversionBuild=<n>` always wins (CI passes a
-//      monotonic value derived from the git commit count — see release-aab.yml).
-//      When the override is present we do NOT auto-increment or rewrite the file,
-//      so the ephemeral CI checkout stays clean and Play receives exactly <n>.
-//   2. Otherwise, auto-increment the stored build number on EVERY compile — any
-//      build type (debug or release), any machine. The increment is gated to an
-//      actual build/compile being requested so routine configuration (most
-//      importantly Android Studio's frequent project syncs) does NOT inflate it.
+// Version resolution. On EVERY compile (any build type, any machine) both the build number and the
+// patch are incremented:
+//   - versionBuild  -> the Android versionCode. Monotonic; NEVER resets.
+//   - versionPatch  -> the patch segment of the versionName. Increments each compile, but resets to
+//                      0 when versionMinor was bumped since the last build (a new minor starts at .0).
+//                      versionMinorLast tracks the minor we last built so that reset is automatic.
+// An explicit `-PversionBuild=<n>` override always wins (CI passes a monotonic value derived from the
+// git commit count — see release-aab.yml); when present we do NOT auto-increment or rewrite the file,
+// so the ephemeral CI checkout stays clean and Play receives exactly <n>.
 val versionBuildOverride = project.findProperty("versionBuild")?.toString()?.toIntOrNull()
-var currentVersionCode = versionBuildOverride ?: versionProps.getProperty("versionBuild", "1").toInt()
 
 // True when the requested tasks actually compile/assemble the app — not a sync, `tasks`, `clean`,
 // a `--dry-run`, or a diagnostic like `buildEnvironment`/`buildHealth`. Build verbs are matched as a
@@ -49,18 +48,27 @@ val isBuilding = !startParameter.isDryRun && startParameter.taskNames.any { task
     val task = taskName.substringAfterLast(':').lowercase()
     task == "build" || buildVerbs.any { task.startsWith(it) }
 }
+
+val verMajor = versionProps.getProperty("versionMajor", "1")
+val verMinor = versionProps.getProperty("versionMinor", "0")
+var currentVersionCode = versionBuildOverride ?: versionProps.getProperty("versionBuild", "1").toInt()
+var currentPatch = versionProps.getProperty("versionPatch", "0").toInt()
+
 if (versionBuildOverride == null && isBuilding) {
-    currentVersionCode++
+    currentVersionCode++ // build never resets
+    // Reset patch to 0 when minor changed since the last build; otherwise increment it.
+    val lastMinor = versionProps.getProperty("versionMinorLast", verMinor)
+    currentPatch = if (verMinor != lastMinor) 0 else currentPatch + 1
+
     versionProps.setProperty("versionBuild", currentVersionCode.toString())
+    versionProps.setProperty("versionPatch", currentPatch.toString())
+    versionProps.setProperty("versionMinorLast", verMinor)
     versionPropsFile.outputStream().use {
         versionProps.store(it, "Auto-incremented on compile")
     }
 }
 
-val verMajor = versionProps.getProperty("versionMajor", "1")
-val verMinor = versionProps.getProperty("versionMinor", "0")
-val verPatch = versionProps.getProperty("versionPatch", "0")
-val currentVersionName = "$verMajor.$verMinor.$verPatch"
+val currentVersionName = "$verMajor.$verMinor.$currentPatch"
 
 android {
     namespace = "com.hereliesaz.graffitixr"
