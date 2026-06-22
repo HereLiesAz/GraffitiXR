@@ -316,7 +316,7 @@
 
     <div class="marquee-container">
         <div class="marquee">
-            // OFFLINE AR TOOLKIT // ZERO TRACKING // NATIVE C++ ENGINE // SLAM // PERSISTENT VOXEL MEMORY // MULTI-LAYER STENCILS // OPENCV // OFFLINE AR TOOLKIT // ZERO TRACKING // NATIVE C++ ENGINE // SLAM // PERSISTENT VOXEL MEMORY // MULTI-LAYER STENCILS // OPENCV //
+            // OFFLINE AR TOOLKIT // ZERO TRACKING // NATIVE C++ ENGINE // FINGERPRINT RELOCALIZATION // SELF-GROWING MAP // MULTI-LAYER STENCILS // OPENCV // OFFLINE AR TOOLKIT // ZERO TRACKING // NATIVE C++ ENGINE // FINGERPRINT RELOCALIZATION // SELF-GROWING MAP // MULTI-LAYER STENCILS // OPENCV //
         </div>
     </div>
 
@@ -426,7 +426,7 @@
                     <ul class="space-y-6 text-slate-400 font-mono text-lg">
                         <li class="flex items-start bg-[#0a0a0e] p-5 border border-slate-800 hover:border-cyan-500 transition-colors shadow-lg hover:-translate-y-1 transform duration-300">
                             <span class="text-cyan-500 text-2xl mr-4 mt-1 font-bold">>></span>
-                            <span><strong class="text-white font-display text-2xl tracking-wide block mb-1">Persistent Voxel Memory:</strong> Confidence-based opaque-surfel voxel mapping for structural understanding.</span>
+                            <span><strong class="text-white font-display text-2xl tracking-wide block mb-1">Fingerprint Relocalization:</strong> A confidence-weighted ORB/SuperPoint feature map snaps your reference back onto the wall via offline PnP — surviving pocketing, lighting shifts, and painting over the marks.</span>
                         </li>
                         <li class="flex items-start bg-[#0a0a0e] p-5 border border-slate-800 hover:border-pink-500 transition-colors shadow-lg hover:-translate-y-1 transform duration-300">
                             <span class="text-pink-500 text-2xl mr-4 mt-1 font-bold">>></span>
@@ -583,10 +583,10 @@
 > Verifying Native Bridge... [OK]
 > Engine: C++17 JNI Active
 > ARCore: Session Bound [DEPTH16 Supported]
-> Loading OpenCV Module... v4.8.0 loaded
+> Loading OpenCV Module... v5.0.0 loaded
 > Initializing DualAnalyzer...
-> SLAM: Point cloud mapping initialized.
-> Voxel generation matrix standing by.
+> Fingerprint relocalizer initialized.
+> Plane back-projection matrix standing by.
 > Teleological correction active.
 > Status: READY
 >
@@ -613,8 +613,8 @@
                             } else if(terminalText.substring(i, i+5) === "READY") {
                                 typeWriterElement.innerHTML += '<span class="text-lime-400 font-bold">READY</span>';
                                 i += 4;
-                            } else if(terminalText.substring(i, i+6) === "v4.8.0") {
-                                typeWriterElement.innerHTML += '<span class="text-pink-400">v4.8.0</span>';
+                            } else if(terminalText.substring(i, i+6) === "v5.0.0") {
+                                typeWriterElement.innerHTML += '<span class="text-pink-400">v5.0.0</span>';
                                 i += 5;
                             } else if(terminalText.substring(i, i+5) === "C++17") {
                                 typeWriterElement.innerHTML += '<span class="text-orange-400">C++17</span>';
