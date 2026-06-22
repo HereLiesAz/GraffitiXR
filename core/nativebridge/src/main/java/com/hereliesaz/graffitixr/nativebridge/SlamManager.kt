@@ -5,6 +5,7 @@ import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.util.Log
 import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.WallFeatureMap
 import com.hereliesaz.graffitixr.common.sensor.CameraFrame
 import com.hereliesaz.graffitixr.common.sensor.ImuSample
 import com.hereliesaz.graffitixr.common.sensor.PixelFormat
@@ -97,6 +98,18 @@ class SlamManager @Inject constructor(
     ) {
         nativeRestoreWallFingerprintMetric(descriptorsData, rows, cols, type, points3d, anchorMatrix, intrinsics)
     }
+
+    /** Restore the persistent wall feature map into native (Phase 2a: stored; matched in Phase 2b). */
+    fun restoreWallFeatureMap(map: WallFeatureMap) {
+        nativeRestoreWallFeatureMap(
+            map.descriptorsData, map.descriptorsRows, map.descriptorsCols, map.descriptorsType,
+            map.points3d, map.confidence, map.obsCount, map.anchor, map.intrinsics,
+        )
+    }
+    /** Drop the in-native wall feature map. */
+    fun clearWallFeatureMap() = nativeClearWallFeatureMap()
+    /** Live wall-feature-map point count — diagnostic. */
+    fun getMapPointCount(): Int = nativeGetMapPointCount()
 
     fun setArtworkFingerprint(
         bitmap: Bitmap,
@@ -489,6 +502,13 @@ class SlamManager @Inject constructor(
         descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,
         points3d: FloatArray, anchorMatrix: FloatArray, intrinsics: FloatArray
     )
+    private external fun nativeRestoreWallFeatureMap(
+        descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,
+        points3d: FloatArray, confidence: FloatArray, obsCount: IntArray,
+        anchor: FloatArray, intrinsics: FloatArray
+    )
+    private external fun nativeClearWallFeatureMap()
+    private external fun nativeGetMapPointCount(): Int
     private external fun nativeSetArtworkFingerprint(
         bitmap: Bitmap, depthBuffer: ByteBuffer?,
         depthW: Int, depthH: Int, depthStride: Int,

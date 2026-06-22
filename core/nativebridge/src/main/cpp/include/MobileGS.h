@@ -46,6 +46,14 @@ public:
     // fingerprint anchor pose and the intrinsics the reloc PnP should use.
     void restoreWallFingerprintMetric(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d,
                                       const float* anchorMatrix16, const float* intrinsics4);
+    // Persistent wall *feature* map (lean reloc backbone; docs/RELOC_MAP_DESIGN.md), co-registered to
+    // the fingerprint anchor. Restore replaces the stored map (confidence/obs optional). Phase 2a stores
+    // it only; reloc matching against it (Phase 2b) is gated separately.
+    void restoreWallFeatureMap(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d,
+                               const std::vector<float>& confidence, const std::vector<int>& obs,
+                               const float* anchorMatrix16, const float* intrinsics4);
+    void clearWallFeatureMap();
+    int getMapPointCount() const { std::lock_guard<std::mutex> lock(mMutex); return (int)mMapPoints3D.size(); }
     void scheduleRelocCheck(const cv::Mat& colorFrame);
     void getAnchorTransform(float* outMat16) const;
     void getRelocResult(float* out19) const;       // [0..15]=pnpMat,16=inliers,17=matches,18=seq
@@ -161,6 +169,16 @@ private:
     cv::Mat mArtworkDescriptors;
     std::vector<cv::Point3f> mArtworkKeypoints3D;
     std::atomic<float> mPaintingProgress{0.0f};
+
+    // --- Persistent wall feature map (lean reloc backbone; docs/RELOC_MAP_DESIGN.md) ---
+    // Co-registered to the fingerprint anchor. Phase 2a stores it; reloc matching (Phase 2b) is gated
+    // separately, so today this is inert state with no effect on relocalization.
+    cv::Mat mMapDescriptors;
+    std::vector<cv::Point3f> mMapPoints3D;
+    std::vector<float> mMapConfidence;
+    std::vector<int> mMapObs;
+    float mMapAnchorMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    float mMapIntrinsics[4] = {0,0,0,0};
 
     float mAnchorMatrix[16];
 

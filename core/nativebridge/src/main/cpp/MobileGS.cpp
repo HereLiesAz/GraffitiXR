@@ -625,6 +625,34 @@ void MobileGS::restoreWallFingerprintMetric(const cv::Mat& d, const std::vector<
     if (intrinsics4)    memcpy(mFingerprintIntrinsics, intrinsics4, 4 * sizeof(float));
 }
 
+void MobileGS::restoreWallFeatureMap(const cv::Mat& d, const std::vector<cv::Point3f>& p,
+                                     const std::vector<float>& conf, const std::vector<int>& obs,
+                                     const float* anchorMatrix16, const float* intrinsics4) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mMapDescriptors = d.clone();
+    mMapPoints3D = p;
+    mMapConfidence = conf;
+    mMapObs = obs;
+    // Reset (not leave stale) when a map omits co-registration, so it can't inherit a previous
+    // project's anchor/intrinsics.
+    static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    memcpy(mMapAnchorMatrix, anchorMatrix16 ? anchorMatrix16 : kIdentity16, 16 * sizeof(float));
+    if (intrinsics4) memcpy(mMapIntrinsics, intrinsics4, 4 * sizeof(float));
+    else             memset(mMapIntrinsics, 0, 4 * sizeof(float));
+}
+
+void MobileGS::clearWallFeatureMap() {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mMapDescriptors.release();
+    mMapPoints3D.clear();
+    mMapConfidence.clear();
+    mMapObs.clear();
+    // Also drop stale co-registration so a later project can't inherit it.
+    static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    memcpy(mMapAnchorMatrix, kIdentity16, 16 * sizeof(float));
+    memset(mMapIntrinsics, 0, 4 * sizeof(float));
+}
+
 std::vector<uint8_t> MobileGS::exportFingerprint() {
     std::lock_guard<std::mutex> lock(mMutex);
     if (mWallDescriptors.empty() || mWallKeypoints3D.empty()) return {};
