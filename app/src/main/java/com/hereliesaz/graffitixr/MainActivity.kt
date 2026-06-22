@@ -2551,7 +2551,7 @@ private fun EvalOverlay(
     val fusionOn = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
     // Teleological self-grow defaults ON to match the native default (lets the reloc fingerprint
     // self-grow so snap-back survives repainting; hard-guarded). Toggle to disable.
-    val selfGrowOn = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
+    val selfGrowOn = androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(true) }
     androidx.compose.foundation.layout.Column(
         androidx.compose.ui.Modifier
             .background(androidx.compose.ui.graphics.Color(0xAA000000))
