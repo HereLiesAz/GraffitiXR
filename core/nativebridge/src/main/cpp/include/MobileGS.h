@@ -56,6 +56,9 @@ public:
     int getMapPointCount() const { std::lock_guard<std::mutex> lock(mMutex); return (int)mMapPoints3D.size(); }
     // Phase 2b: gate live map-matching in relocThreadFunc. Default OFF — ships inert until validated.
     void setMapRelocEnabled(bool e) { mMapRelocEnabled.store(e, std::memory_order_relaxed); }
+    // Phase 3: passively grow the feature map from reloc-locked frames. Default OFF, and independent of
+    // the match flag (accumulate without matching, or match a persisted map without growing).
+    void setMapBuildEnabled(bool e) { mMapBuildEnabled.store(e, std::memory_order_relaxed); }
     void scheduleRelocCheck(const cv::Mat& colorFrame);
     void getAnchorTransform(float* outMat16) const;
     void getRelocResult(float* out19) const;       // [0..15]=pnpMat,16=inliers,17=matches,18=seq
@@ -154,6 +157,11 @@ private:
     // and the VIO baseline between the current and fingerprint-capture views, plus the viewing
     // obliquity in degrees. False if no fingerprint view is stored or the geometry is degenerate.
     bool computeRectifyHomography(const float* viewCur16, cv::Mat& Hcur_fp, cv::Mat& Hfp_cur, double& obliquityDeg);
+    // Phase 3 passive builder: on a reloc lock, back-project the frame's features onto the wall plane
+    // (fit from the fingerprint points) to get 3D points in the fingerprint frame, associate to the map
+    // by descriptor (bump confidence) or add new (capped). Co-registers the map to the fingerprint anchor.
+    void growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv::KeyPoint>& kps,
+                          const cv::Mat& descs, double fx, double fy, double cx, double cy);
 
     mutable std::mutex mMutex;
     std::atomic<bool> mIsArCoreTracking{false};
@@ -184,6 +192,7 @@ private:
     // Phase 2b flag: when true, relocThreadFunc also matches the frustum-gated map and merges those
     // correspondences into PnP. Default OFF so the map has zero effect on reloc until device-validated.
     std::atomic<bool> mMapRelocEnabled{false};
+    std::atomic<bool> mMapBuildEnabled{false};
 
     float mAnchorMatrix[16];
 
