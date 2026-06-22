@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.data.repository
 
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.common.model.OverlayLayer
+import com.hereliesaz.graffitixr.common.model.WallFeatureMap
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -66,5 +67,27 @@ class GraffitiProjectTest {
         assertEquals(true, decoded.layers[0].isImageLocked)
         assertEquals(listOf(0f, 1f, 2f, 3f), decoded.layers[0].warpMesh)
         assertEquals("/path/to/fingerprint", decoded.targetFingerprintPath)
+    }
+
+    @Test
+    fun `serialization preserves the wall feature map`() {
+        // The persistent feature map rides in project.json (and thus the .gxr), parallel to the
+        // fingerprint. Verify it survives the project round-trip intact (descriptor blob included).
+        val map = WallFeatureMap(
+            points3d = floatArrayOf(0f, 0f, 1f, 0.1f, 0.2f, 1.1f),
+            descriptorsData = ByteArray(64) { (it % 251).toByte() },
+            descriptorsRows = 2,
+            descriptorsCols = 32,
+            descriptorsType = 0,
+            confidence = floatArrayOf(0.9f, 0.4f),
+            obsCount = intArrayOf(4, 1),
+            anchor = FloatArray(16) { it.toFloat() },
+            intrinsics = floatArrayOf(500f, 500f, 320f, 240f),
+        )
+        val project = GraffitiProject(id = "id", name = "n", wallFeatureMap = map)
+
+        val decoded = json.decodeFromString<GraffitiProject>(json.encodeToString(project))
+
+        assertEquals(map, decoded.wallFeatureMap)
     }
 }
