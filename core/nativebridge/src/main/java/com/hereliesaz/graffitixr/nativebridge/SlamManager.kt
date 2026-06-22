@@ -110,6 +110,8 @@ class SlamManager @Inject constructor(
     fun clearWallFeatureMap() = nativeClearWallFeatureMap()
     /** Live wall-feature-map point count — diagnostic. */
     fun getMapPointCount(): Int = nativeGetMapPointCount()
+    /** Phase 2b: enable live map-matching in reloc. Default OFF — experimental until device-validated. */
+    fun setMapRelocEnabled(enabled: Boolean) = nativeSetMapRelocEnabled(enabled)
 
     fun setArtworkFingerprint(
         bitmap: Bitmap,
@@ -509,6 +511,7 @@ class SlamManager @Inject constructor(
     )
     private external fun nativeClearWallFeatureMap()
     private external fun nativeGetMapPointCount(): Int
+    private external fun nativeSetMapRelocEnabled(enabled: Boolean)
     private external fun nativeSetArtworkFingerprint(
         bitmap: Bitmap, depthBuffer: ByteBuffer?,
         depthW: Int, depthH: Int, depthStride: Int,

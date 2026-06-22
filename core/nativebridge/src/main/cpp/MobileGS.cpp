@@ -220,6 +220,13 @@ void MobileGS::relocThreadFunc() {
         cv::Mat wallPatch;
         float fpIntrinsics[4];
         bool hasFpView = false;
+        // Phase 2b snapshot: the persistent feature map + the last reloc pose, used (when the flag is on)
+        // as the frustum-gate prior. The map is co-registered to the fingerprint anchor, so its points
+        // share wallKps3d's frame and the prior pose (camera_from_fpWorld) projects them directly.
+        cv::Mat mapDescs;
+        std::vector<cv::Point3f> mapKps3d;
+        float mapPriorPose[16];
+        long mapPriorSeq = 0;
         {
             std::lock_guard<std::mutex> lock(mMutex);
             wallDescs = mWallDescriptors.clone();
@@ -227,6 +234,10 @@ void MobileGS::relocThreadFunc() {
             wallPatch = mWallPatch.clone();
             memcpy(fpIntrinsics, mFingerprintIntrinsics, 4 * sizeof(float));
             hasFpView = mHasFingerprintView;
+            mapDescs = mMapDescriptors.clone();
+            mapKps3d = mMapPoints3D;
+            memcpy(mapPriorPose, mPnpCamFromFpWorld, 16 * sizeof(float));
+            mapPriorSeq = mPnpResultSeq.load(std::memory_order_relaxed);
         }
 
         if (frame.empty() || wallDescs.empty() || wallKps3d.empty() || !mRelocEnabled) continue;
@@ -249,12 +260,27 @@ void MobileGS::relocThreadFunc() {
         // the matched keypoints are mapped through it (rectified frame -> current image) before being
         // stored, so the returned 2D points are ALWAYS in the current camera image — exactly what the
         // PnP below expects.
-        auto buildCorr = [&](const cv::Mat& g, const cv::Mat& Hback,
-                             std::vector<cv::Point2f>& outImg, std::vector<cv::Point3f>& outObj) {
-            std::vector<cv::KeyPoint> kps; cv::Mat descs;
+        // Detect base-frame features ONCE and reuse them: SuperPoint is an ONNX model, so detecting the
+        // same gray twice (plain pass + map matching) would roughly double per-reloc cost. The scaled and
+        // rectified passes run on different images, so buildCorr still detects internally for those.
+        std::vector<cv::KeyPoint> baseKps; cv::Mat baseDescs;
+        {
             bool sp = spOk;
-            if (sp && !mSuperPoint.detect(g, kps, descs)) sp = false;
-            if (!sp) mFeatureDetector->detectAndCompute(g, cv::noArray(), kps, descs);
+            if (sp && !mSuperPoint.detect(gray, baseKps, baseDescs)) sp = false;
+            if (!sp) mFeatureDetector->detectAndCompute(gray, cv::noArray(), baseKps, baseDescs);
+        }
+
+        auto buildCorr = [&](const cv::Mat& g, const cv::Mat& Hback,
+                             std::vector<cv::Point2f>& outImg, std::vector<cv::Point3f>& outObj,
+                             const std::vector<cv::KeyPoint>* preKps = nullptr, const cv::Mat* preDescs = nullptr) {
+            std::vector<cv::KeyPoint> localKps; cv::Mat localDescs;
+            if (!(preKps && preDescs)) {
+                bool sp = spOk;
+                if (sp && !mSuperPoint.detect(g, localKps, localDescs)) sp = false;
+                if (!sp) mFeatureDetector->detectAndCompute(g, cv::noArray(), localKps, localDescs);
+            }
+            const std::vector<cv::KeyPoint>& kps = (preKps && preDescs) ? *preKps : localKps;
+            const cv::Mat& descs = (preKps && preDescs) ? *preDescs : localDescs;
             if (descs.empty() || wallDescs.empty()) return;
             if (descs.type() != wallDescs.type()) return;
 
@@ -278,7 +304,7 @@ void MobileGS::relocThreadFunc() {
 
         std::vector<cv::Point2f> imgPts;
         std::vector<cv::Point3f> objPts;
-        buildCorr(gray, cv::Mat(), imgPts, objPts);
+        buildCorr(gray, cv::Mat(), imgPts, objPts, &baseKps, &baseDescs);
 
         // Multi-scale matching (distance robustness). SuperPoint isn't scale-invariant, and the marks
         // shrink in the frame from far away and grow up close, so also match the frame DOWN- and
@@ -308,6 +334,54 @@ void MobileGS::relocThreadFunc() {
                 if (imgPts.size() > before)
                     LOGI("Reloc: rectified (obliquity %.0f deg) added %zu corr (total %zu)",
                          obliqDeg, imgPts.size() - before, imgPts.size());
+            }
+        }
+
+        // --- Persistent feature-map matching (Phase 2b; default OFF via mMapRelocEnabled) ---
+        // When the overlay is larger than the marks, the marks leave frame; the map carries features
+        // across the whole wall so reloc still locks. Hard constraint: NEVER brute-force the whole map —
+        // frustum-gate to the subset the last reloc pose says is in view, then match only those and
+        // APPEND the correspondences (same fingerprint frame + intrinsics) so PnP solves over both.
+        // Requires a prior pose (mapPriorSeq>0, i.e. the fingerprint has locked at least once) and a
+        // matching descriptor type. Default-off, so this is inert until device-validated.
+        if (mMapRelocEnabled.load(std::memory_order_relaxed) && !mapDescs.empty() && mapPriorSeq > 0
+                && mapDescs.type() == wallDescs.type() && mapKps3d.size() == (size_t)mapDescs.rows) {
+            glm::mat4 camFromFp = glm::make_mat4(mapPriorPose);
+            double gfx = (fpIntrinsics[0] > 0.f) ? (double)fpIntrinsics[0] : 1000.0;
+            double gfy = (fpIntrinsics[1] > 0.f) ? (double)fpIntrinsics[1] : 1000.0;
+            double gcx = (fpIntrinsics[0] > 0.f) ? (double)fpIntrinsics[2] : gray.cols * 0.5;
+            double gcy = (fpIntrinsics[1] > 0.f) ? (double)fpIntrinsics[3] : gray.rows * 0.5;
+            std::vector<int> visible;
+            visible.reserve(mapKps3d.size());
+            for (int i = 0; i < (int)mapKps3d.size(); ++i) {
+                glm::vec4 pc = camFromFp * glm::vec4(mapKps3d[i].x, mapKps3d[i].y, mapKps3d[i].z, 1.0f);
+                if (pc.z <= 0.05f) continue; // behind / too close to the camera
+                float u = (float)(gfx * pc.x / pc.z + gcx);
+                float v = (float)(gfy * pc.y / pc.z + gcy);
+                if (u >= 0.f && u < gray.cols && v >= 0.f && v < gray.rows) visible.push_back(i);
+            }
+            if (visible.size() >= 8) {
+                // Preallocate the gated descriptor block with the right size+type and copy rows
+                // (cv::Mat has no usable reserve() on an empty/typeless matrix). Reuse the base detection.
+                cv::Mat gatedDescs((int)visible.size(), mapDescs.cols, mapDescs.type());
+                for (size_t i = 0; i < visible.size(); ++i)
+                    mapDescs.row(visible[i]).copyTo(gatedDescs.row((int)i));
+                if (!baseDescs.empty() && baseDescs.type() == gatedDescs.type()) {
+                    cv::Ptr<cv::DescriptorMatcher>& matcher = (baseDescs.type() == CV_32F) ? mL2Matcher : mMatcher;
+                    std::vector<std::vector<cv::DMatch>> matches;
+                    matcher->knnMatch(baseDescs, gatedDescs, matches, 2);
+                    size_t before = imgPts.size();
+                    for (auto& m : matches) {
+                        if (m.size() < 2) continue;
+                        if (m[0].distance < 0.75f * m[1].distance) {
+                            imgPts.push_back(baseKps[m[0].queryIdx].pt);
+                            objPts.push_back(mapKps3d[visible[m[0].trainIdx]]);
+                        }
+                    }
+                    if (imgPts.size() > before)
+                        LOGI("Reloc map: gated %zu/%zu pts, added %zu corr (total %zu)",
+                             visible.size(), mapKps3d.size(), imgPts.size() - before, imgPts.size());
+                }
             }
         }
 

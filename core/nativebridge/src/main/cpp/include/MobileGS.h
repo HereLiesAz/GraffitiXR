@@ -54,6 +54,8 @@ public:
                                const float* anchorMatrix16, const float* intrinsics4);
     void clearWallFeatureMap();
     int getMapPointCount() const { std::lock_guard<std::mutex> lock(mMutex); return (int)mMapPoints3D.size(); }
+    // Phase 2b: gate live map-matching in relocThreadFunc. Default OFF — ships inert until validated.
+    void setMapRelocEnabled(bool e) { mMapRelocEnabled.store(e, std::memory_order_relaxed); }
     void scheduleRelocCheck(const cv::Mat& colorFrame);
     void getAnchorTransform(float* outMat16) const;
     void getRelocResult(float* out19) const;       // [0..15]=pnpMat,16=inliers,17=matches,18=seq
@@ -179,6 +181,9 @@ private:
     std::vector<int> mMapObs;
     float mMapAnchorMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     float mMapIntrinsics[4] = {0,0,0,0};
+    // Phase 2b flag: when true, relocThreadFunc also matches the frustum-gated map and merges those
+    // correspondences into PnP. Default OFF so the map has zero effect on reloc until device-validated.
+    std::atomic<bool> mMapRelocEnabled{false};
 
     float mAnchorMatrix[16];
 

@@ -841,6 +841,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetMapPointCount(J
     return gSlamEngine ? gSlamEngine->getMapPointCount() : 0;
 }
 
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMapRelocEnabled(JNIEnv*, jobject, jboolean enabled) {
+    if (gSlamEngine) gSlamEngine->setMapRelocEnabled(enabled == JNI_TRUE);
+}
+
 jobject buildFingerprintObject(JNIEnv* env, const MobileGS::FingerprintData& fd) {
     if (fd.descriptors.empty()) return nullptr;
 
