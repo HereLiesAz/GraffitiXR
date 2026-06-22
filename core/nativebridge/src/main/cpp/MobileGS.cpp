@@ -143,19 +143,10 @@ void MobileGS::mapThreadFunc() {
     }
 }
 
-void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence) {
-    if (!mMapRunning) return;
-    std::lock_guard<std::mutex> lock(mQueueMutex);
-    if (mFrameQueue.size() >= 1) mFrameQueue.erase(mFrameQueue.begin()); // Low-latency queue
-    FrameData data;
-    data.depth = depth.clone(); data.color = color.clone(); data.isYuv = isYuv; data.confidence = confidence;
-    memcpy(data.viewMatrix, viewMat, 16 * sizeof(float));
-    memcpy(data.projMatrix, projMat, 16 * sizeof(float));
-    if (intrinsics) { memcpy(data.intrinsics, intrinsics, 4 * sizeof(float)); data.hasIntrinsics = true; }
-    else data.hasIntrinsics = false;
-    mFrameQueue.push_back(std::move(data));
-    mQueueCv.notify_one();
-}
+// Voxel/splat map deleted: depth frames are no longer cloned/queued (the queue was only
+// drained-and-discarded). This removes the per-frame cv::Mat::clone() cost on the sensor thread.
+// The idle map thread parks on mQueueCv and exits cleanly on destroy (mMapRunning=false + notify).
+void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence) {}
 
 void MobileGS::clearMap() {}                            // voxel/splat map deleted
 void MobileGS::pruneByConfidence(float threshold) {}   // voxel/splat map deleted
