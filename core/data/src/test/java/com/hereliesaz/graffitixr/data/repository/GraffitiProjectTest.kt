@@ -90,4 +90,14 @@ class GraffitiProjectTest {
 
         assertEquals(map, decoded.wallFeatureMap)
     }
+
+    @Test
+    fun `serialization preserves per-host rail expansion`() {
+        val expansion = mapOf("host.design" to true, "design.layers" to false)
+        val project = GraffitiProject(id = "id", name = "n", railExpansion = expansion)
+
+        val decoded = json.decodeFromString<GraffitiProject>(json.encodeToString(project))
+
+        assertEquals(expansion, decoded.railExpansion)
+    }
 }
