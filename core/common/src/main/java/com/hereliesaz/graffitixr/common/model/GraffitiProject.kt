@@ -141,5 +141,11 @@ data class GraffitiProject(
     // Persistent confidence-weighted feature map of the wall around the marks fingerprint — the
     // lean spatial backbone for wide-area relocalization (see docs/RELOC_MAP_DESIGN.md). Null on
     // projects without one; built passively during normal use. Defaulted for back-compat.
-    val wallFeatureMap: WallFeatureMap? = null
+    val wallFeatureMap: WallFeatureMap? = null,
+
+    // Per-host AzNavRail expansion state (host id -> expanded), so the rail restores exactly as the
+    // user left it on reopen. Defaulted for back-compat. Populated via onRailHostExpansionChanged once
+    // AzNavRail exposes a per-host expansion-change callback (onExpandedChange, expected 10.11); until
+    // then it stays empty and the reactive initiallyExpanded/expandWhen rules drive the rail.
+    val railExpansion: Map<String, Boolean> = emptyMap()
 )

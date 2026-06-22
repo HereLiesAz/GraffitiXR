@@ -70,7 +70,10 @@ public:
     // Detect the same features generateFingerprint would (SuperPoint/ORB-1000, masked) and return their
     // 2D positions in image pixels — for a truthful "what anchors the fingerprint" curation overlay.
     void getFingerprintKeypoints(const cv::Mat& image, const cv::Mat& mask, std::vector<cv::Point2f>& out);
-    // Teleological self-grow (default OFF — mutates the live reloc fingerprint, so opt-in only).
+    // Teleological self-grow (default ON): promotes validated new marks into the live reloc
+    // fingerprint so snap-back survives the original reference being painted over. Mutates the
+    // authoritative set but is hard-guarded (fresh+confident relock, gatekeeper-validated, plane-fit,
+    // re-projection dedup, per-relock + total caps, RANSAC backstop). Toggleable via the UI.
     void setSelfGrowEnabled(bool e) { mSelfGrowEnabled.store(e, std::memory_order_relaxed); }
     // Live wall-fingerprint size — diagnostic for relocalization health and watching self-grow.
     int getWallKeypointCount() const { std::lock_guard<std::mutex> lock(mMutex); return (int)mWallKeypoints3D.size(); }
@@ -212,9 +215,9 @@ private:
     // restored without a capture view (rectification is then skipped — plain matching still runs).
     float mFingerprintViewMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     bool mHasFingerprintView = false;
-    // Teleological self-grow: opt-in flag + the last reloc seq we grew from (only grow on a fresh,
+    // Teleological self-grow: default ON + the last reloc seq we grew from (only grow on a fresh,
     // confident relock so promoted marks are placed with a current pose, never a stale one).
-    std::atomic<bool> mSelfGrowEnabled{false};
+    std::atomic<bool> mSelfGrowEnabled{true};
     long mLastGrowSeq = 0;
     cv::Mat mWallPatch; // raw 256x256 gray canonical patch for the distortion head (desc_fp source)
     // VIO view snapshot captured alongside the reloc frame, so the rectifying warp matches that frame.
