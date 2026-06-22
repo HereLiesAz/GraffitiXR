@@ -91,4 +91,23 @@ class FingerprintSerializationTest {
         assertArrayEquals(byteArrayOf(1, 2, 3), decoded.descriptorsData)
         assertEquals(1, decoded.descriptorsRows)
     }
+
+    @Test
+    fun `Fingerprint equals and hashCode are value-based across distinct KeyPoint instances`() {
+        // Two fingerprints with separately-constructed but value-identical KeyPoints. OpenCV's
+        // KeyPoint compares by reference, so without the field-wise fix in Fingerprint.equals these
+        // would be unequal — silently breaking any state-diffing/caching that relies on equality.
+        fun make() = Fingerprint(
+            keypoints = listOf(KeyPoint(1f, 2f, 3f, 10f, 0.5f, 0, 1)),
+            points3d = listOf(0.5f, 0.25f),
+            descriptorsData = byteArrayOf(9, 8, 7),
+            descriptorsRows = 1,
+            descriptorsCols = 3,
+            descriptorsType = 0,
+        )
+        val a = make()
+        val b = make()
+        assertEquals(a, b)
+        assertEquals(a.hashCode().toLong(), b.hashCode().toLong())
+    }
 }

@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.common.model
 
 import kotlinx.serialization.Serializable
+import org.opencv.core.KeyPoint
 
 /**
  * A unique identifier for an AR target image.
@@ -24,7 +25,10 @@ data class Fingerprint(
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
         other as Fingerprint
-        if (keypoints != other.keypoints) return false
+        // OpenCV's KeyPoint has no value-based equals(), so a plain List<KeyPoint> comparison is
+        // reference-based and returns false for structurally-identical fingerprints. Compare
+        // field-wise to honour the value-equality this override already provides for the ByteArrays.
+        if (!keypointsValueEqual(keypoints, other.keypoints)) return false
         if (points3d != other.points3d) return false
         if (!descriptorsData.contentEquals(other.descriptorsData)) return false
         if (descriptorsRows != other.descriptorsRows) return false
@@ -35,7 +39,7 @@ data class Fingerprint(
     }
 
     override fun hashCode(): Int {
-        var result = keypoints.hashCode()
+        var result = keypointsValueHash(keypoints)
         result = 31 * result + points3d.hashCode()
         result = 31 * result + descriptorsData.contentHashCode()
         result = 31 * result + descriptorsRows
@@ -44,4 +48,32 @@ data class Fingerprint(
         result = 31 * result + patchData.contentHashCode()
         return result
     }
+}
+
+/** Value-equality for OpenCV KeyPoints (which compare by reference): all geometric fields match. */
+private fun keypointsValueEqual(a: List<KeyPoint>, b: List<KeyPoint>): Boolean {
+    if (a.size != b.size) return false
+    for (i in a.indices) {
+        val p = a[i]
+        val q = b[i]
+        if (p.pt.x != q.pt.x || p.pt.y != q.pt.y) return false
+        if (p.size != q.size || p.angle != q.angle || p.response != q.response) return false
+        if (p.octave != q.octave || p.class_id != q.class_id) return false
+    }
+    return true
+}
+
+/** Field-wise hash matching [keypointsValueEqual] (KeyPoint.hashCode is identity-based). */
+private fun keypointsValueHash(kps: List<KeyPoint>): Int {
+    var h = 1
+    for (k in kps) {
+        h = 31 * h + k.pt.x.hashCode()
+        h = 31 * h + k.pt.y.hashCode()
+        h = 31 * h + k.size.hashCode()
+        h = 31 * h + k.angle.hashCode()
+        h = 31 * h + k.response.hashCode()
+        h = 31 * h + k.octave
+        h = 31 * h + k.class_id
+    }
+    return h
 }
