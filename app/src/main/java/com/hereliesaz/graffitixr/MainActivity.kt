@@ -74,7 +74,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.core.content.FileProvider
 import java.io.File
-import com.meta.wearable.dat.core.Wearables
 import com.google.android.gms.common.GoogleApiAvailability
 import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.*
@@ -194,18 +193,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkAndInitializeWearables() {
-        val bluetoothPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
-        } else {
-            true
-        }
-        if (bluetoothPermission) {
-            try {
-                Wearables.initialize(this)
-            } catch (e: Exception) {
-                // Ignore initialization errors if already initialized or permissions still missing
-            }
-        }
+        // Meta Wearables DAT SDK removed (the mwdat dependency was dropped). The smart-glasses
+        // provider abstraction (WearableManager/SmartGlassProvider) remains for Xreal; no Meta init.
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
