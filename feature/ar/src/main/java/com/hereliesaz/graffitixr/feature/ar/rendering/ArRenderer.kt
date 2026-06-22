@@ -533,7 +533,7 @@ class ArRenderer(
                 pointCloudRenderer.draw(viewMatrix, projMatrix)
             }
             // A1 (voxel-map removal): voxel/mesh debug draw retired — the dense map is being removed
-            // (A3 deletes the native subsystem). ARCore-based perception layers below (feature points,
+            // (A3 deletes the native subsystem). ARCore-based perception layers above (feature points,
             // plane grids, accumulated cloud points) remain as the cheap "what am I seeing" indicators.
             if (frameCount % 120 == 0) {
                 // Decides "no data" vs "drawn but invisible" from the diag log alone.
