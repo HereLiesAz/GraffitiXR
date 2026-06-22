@@ -280,16 +280,20 @@ private fun FeatureSelectionReview(
                         awaitEachGesture {
                             var lastErase: Offset? = null
                             val down = awaitFirstDown(requireUnconsumed = false)
+                            // Follow ONLY the finger that started the gesture. Without tracking the id,
+                            // a second finger could alternate into `active`, making lastErase jump
+                            // between two far-apart points every frame — that defeats the movement
+                            // threshold and spams the mutex-serialized flood-fill.
+                            val pointerId = down.id
                             if (eraseAt(down.position, lastErase)) lastErase = down.position
                             down.consume()
-                            do {
+                            while (true) {
                                 val event = awaitPointerEvent()
-                                val active = event.changes.firstOrNull { it.pressed }
-                                if (active != null) {
-                                    if (eraseAt(active.position, lastErase)) lastErase = active.position
-                                    active.consume()
-                                }
-                            } while (event.changes.any { it.pressed })
+                                val active = event.changes.firstOrNull { it.id == pointerId } ?: break
+                                if (!active.pressed) break
+                                if (eraseAt(active.position, lastErase)) lastErase = active.position
+                                active.consume()
+                            }
                         }
                     }
             )
