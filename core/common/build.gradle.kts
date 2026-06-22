@@ -66,11 +66,6 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.serialization.cbor)
 
-    // Meta Wearables SDK
-    implementation(libs.mwdat.core)
-    implementation(libs.mwdat.camera)
-    implementation(libs.mwdat.mockdevice)
-
     // Networking (Crash Reporting)
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)
