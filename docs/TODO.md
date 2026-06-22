@@ -24,7 +24,7 @@
 - [x] **3D Imports:** .obj point-cloud ingestion implemented natively.
 - [x] **Photogrammetry:** Keyframe capture pipeline (OpenCV + Pose metadata).
 - [x] **CI/CD:** Static analysis (**Detekt**) and build hardening.
-- [x] **Stencil Mode:** Automatic multi-layer stencil generation.
+- [x] **Stencil generation:** Automatic multi-layer stencil generation (a layer tool, not a mode).
 
 ## AR Pipeline — End-to-End Wiring `[DONE]`
 - [x] **ARCore session wiring:** Mandatory hardware stereo enforcement.
