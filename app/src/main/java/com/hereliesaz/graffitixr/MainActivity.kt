@@ -174,7 +174,6 @@ class MainActivity : ComponentActivity() {
     var showPosterDialog by mutableStateOf(false)
     var posterSourceLayerId by mutableStateOf<String?>(null)
     var hasCameraPermission by mutableStateOf(false)
-    var hasBluetoothPermission by mutableStateOf(false)
     var showWallSourceDialog by mutableStateOf(false)
     var isExporting by mutableStateOf(false)
     // Crash report captured on the previous run (native SIGSEGV and/or JVM), shown on launch.
@@ -182,19 +181,6 @@ class MainActivity : ComponentActivity() {
 
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p ->
         hasCameraPermission = p[Manifest.permission.CAMERA] ?: false
-        hasBluetoothPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            p[Manifest.permission.BLUETOOTH_CONNECT] ?: false
-        } else {
-            true
-        }
-        if (hasBluetoothPermission) {
-            checkAndInitializeWearables()
-        }
-    }
-
-    private fun checkAndInitializeWearables() {
-        // Meta Wearables DAT SDK removed (the mwdat dependency was dropped). The smart-glasses
-        // provider abstraction (WearableManager/SmartGlassProvider) remains for Xreal; no Meta init.
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -203,14 +189,6 @@ class MainActivity : ComponentActivity() {
         hasCameraPermission = ContextCompat.checkSelfPermission(
             this, Manifest.permission.CAMERA
         ) == PackageManager.PERMISSION_GRANTED
-
-        hasBluetoothPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            ContextCompat.checkSelfPermission(
-                this, Manifest.permission.BLUETOOTH_CONNECT
-            ) == PackageManager.PERMISSION_GRANTED
-        } else {
-            true
-        }
 
         // Surface any crash captured on the previous run: native backtrace (signal handler) and/or
         // the JVM CrashReporter dump. Read + delete so it shows exactly once.
@@ -236,7 +214,6 @@ class MainActivity : ComponentActivity() {
 
         securityProviderManager.installAsync(this)
         slamManager.ensureInitialized()
-        checkAndInitializeWearables()
 
         lifecycleScope.launch {
             securityProviderManager.securityProviderState.collect { state ->
@@ -1380,10 +1357,6 @@ class MainActivity : ComponentActivity() {
         val navStrings = strings.nav
         val requestPermissions = {
             val perms = mutableListOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                perms.add(Manifest.permission.BLUETOOTH_CONNECT)
-                perms.add(Manifest.permission.BLUETOOTH_SCAN)
-            }
             permissionLauncher.launch(perms.toTypedArray())
         }
 

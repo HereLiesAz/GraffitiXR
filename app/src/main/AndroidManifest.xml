@@ -31,20 +31,12 @@
     <!-- OTA Updater Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- Meta Wearables Permissions -->
-    <uses-permission android:name="android.permission.BLUETOOTH" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
-
     <!--
-        Permissions above (BLUETOOTH*, ACCESS_*_LOCATION, ACCESS_WIFI_STATE, etc.)
-        would otherwise imply required hardware features and filter the Play Store
-        listing. Mark them optional explicitly: the wearables / location flows are
-        not core to the app, and core camera is the only required hardware.
+        Permissions above (ACCESS_*_LOCATION, ACCESS_WIFI_STATE, etc.) would otherwise
+        imply required hardware features and filter the Play Store listing. Mark them
+        optional explicitly: the location/wifi flows are not core to the app, and core
+        camera is the only required hardware.
     -->
-    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
-    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
     <uses-feature android:name="android.hardware.wifi" android:required="false" />
     <uses-feature android:name="android.hardware.location" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
