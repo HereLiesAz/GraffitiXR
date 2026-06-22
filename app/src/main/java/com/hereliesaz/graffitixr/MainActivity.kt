@@ -1397,7 +1397,11 @@ class MainActivity : ComponentActivity() {
                 id = "host.design",
                 text = navStrings.design,
                 color = if (isDesignMode) Cyan else navItemColor,
+                // Expand Design whenever we enter Design mode (new project opens straight into it, and
+                // re-entering Design from a Mode). expandWhen re-fires on the false->true edge; the user
+                // can still collapse it manually. initiallyExpanded seeds the very first render.
                 initiallyExpanded = isDesignMode,
+                expandWhen = { isDesignMode },
                 onClick = {
                     // From a Mode, tapping Design navigates to the dedicated Design screen. In Design it
                     // just expands the design tools below (this onClick is a no-op there).
@@ -1426,7 +1430,13 @@ class MainActivity : ComponentActivity() {
                 // editing tools (edit/size/font/color/blend/invert/paint/retouch/etc.). The hidden
                 // menu carries link/duplicate/copy/flatten/delete.
                 if (editorUiState.layers.isNotEmpty()) {
-                    azRailSubHostItem(id = "design.layers", hostId = "host.design", text = "Layers", color = navItemColor, shape = AzButtonShape.RECTANGLE, initiallyExpanded = true)
+                    // Keep Layers expanded whenever there are layers and we're in Design mode (reactive,
+                    // so re-entering Design with existing layers re-expands it — not just first render).
+                    azRailSubHostItem(
+                        id = "design.layers", hostId = "host.design", text = "Layers",
+                        color = navItemColor, shape = AzButtonShape.RECTANGLE,
+                        expandWhen = { editorUiState.layers.isNotEmpty() && isDesignMode }
+                    )
                 }
                 editorUiState.layers.reversed().forEach { layer ->
                     val activeTool = editorUiState.activeTool
