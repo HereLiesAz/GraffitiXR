@@ -388,6 +388,17 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    /**
+     * The single-capture tap wasn't on a green (parallel, in-range) wall plane. Guide the artist;
+     * the capture frame is discarded separately (ArViewModel.clearCaptureForRetry) so they stay in
+     * tap mode and can simply re-aim and tap again.
+     */
+    fun notifyTargetNotOnWall() {
+        Toast.makeText(context,
+            "Aim at a wall shown in green (face it straight-on, within ~3 m), then tap your marks.",
+            Toast.LENGTH_LONG).show()
+    }
+
     fun onCancelCaptureClicked() {
         _uiState.update {
             it.copy(

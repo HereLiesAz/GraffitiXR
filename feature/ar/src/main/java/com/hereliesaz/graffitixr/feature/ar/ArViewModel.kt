@@ -1672,7 +1672,25 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    fun computePhysicalExtent(
+    /**
+     * Discard a just-captured frame so the artist can re-aim and re-tap without restarting capture —
+     * used when single-capture target creation is refused because the tap wasn't on a green wall
+     * plane. Nulls the captured bitmap (so the capture→review effect won't re-fire on stale data) and
+     * the captured wall plane, and clears the on-image markers.
+     */
+    fun clearCaptureForRetry() {
+        pendingTapPosition = null
+        _uiState.update {
+            it.copy(
+                tempCaptureBitmap = null,
+                annotatedCaptureBitmap = null,
+                targetWallPlane = null,
+                tapMarks = emptyList(),
+                unwarpPoints = emptyList(),
+                targetKeypoints = emptyList()
+            )
+        }
+    }
         depthBuffer: ByteBuffer?,
         depthW: Int, depthH: Int,
         colorW: Int, colorH: Int,
