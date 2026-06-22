@@ -565,6 +565,12 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
     if (mWallKeypoints3D.size() < 8) return;                                   // need the fingerprint plane
     if (!mMapDescriptors.empty() && mMapDescriptors.type() != descs.type()) return;
 
+    // Keep the parallel arrays aligned with the points: a restored map may have carried points +
+    // descriptors but empty confidence/obs (both optional in WallFeatureMap). Without this, the add
+    // path below would desync them from mMapPoints3D and corrupt per-point confidence.
+    if (mMapConfidence.size() != mMapPoints3D.size()) mMapConfidence.resize(mMapPoints3D.size(), 1.0f);
+    if (mMapObs.size() != mMapPoints3D.size()) mMapObs.resize(mMapPoints3D.size(), 1);
+
     // Fit the wall plane (centroid + normal) from the fingerprint's 3D points (in the fingerprint frame).
     cv::Point3f c(0.f, 0.f, 0.f);
     for (const auto& p : mWallKeypoints3D) c += p;
@@ -582,7 +588,7 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
 
     // Associate detected features to the existing map by descriptor; bump confidence on re-observation.
     std::vector<char> matched(kps.size(), 0);
-    if (!mMapDescriptors.empty()) {
+    if (mMapDescriptors.rows >= 2) {   // knnMatch(k=2) needs >=2 candidates for the Lowe ratio
         cv::Ptr<cv::DescriptorMatcher>& matcher = (descs.type() == CV_32F) ? mL2Matcher : mMatcher;
         std::vector<std::vector<cv::DMatch>> matches;
         matcher->knnMatch(descs, mMapDescriptors, matches, 2);
