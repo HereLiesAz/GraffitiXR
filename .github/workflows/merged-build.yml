@@ -98,35 +98,22 @@ jobs:
           # Inject ARCore API Key into local.properties for build.gradle.kts to pick up
           echo "ARCORE_API_KEY=$ARCORE_API_KEY" >> local.properties
 
-      - name: Generate Keystore from Secrets
+      - name: Decode signing keystore
         env:
-          KEYSTORE_PRIVATE: ${{ secrets.KEYSTORE_PRIVATE }}
-          KEYSTORE_CHAIN: ${{ secrets.KEYSTORE_CHAIN }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEYSTORE_RAW: ${{ secrets.KEYSTORE_RAW }}
         run: |
-          echo "Generating keystore from certificate chain and private key..."
-
-          # Write the private key and certificate chain to temporary files
-          echo "$KEYSTORE_PRIVATE" > private_key.pem
-          echo "$KEYSTORE_CHAIN" > certificate_chain.crt
-
-          # Create a PKCS12 file from the key and certificate chain
-          openssl pkcs12 -export -in certificate_chain.crt -inkey private_key.pem \
-            -name "$KEY_ALIAS" -out keystore.p12 \
-            -password pass:"$KEYSTORE_PASSWORD"
-
-          # Convert the PKCS12 file to a JKS keystore
-          keytool -importkeystore -srckeystore keystore.p12 -srcstoretype PKCS12 \
-            -destkeystore app/keystore.jks -deststoretype JKS \
-            -srcstorepass "$KEYSTORE_PASSWORD" \
-            -deststorepass "$KEYSTORE_PASSWORD" \
-            -alias "$KEY_ALIAS" -noprompt
-
-          echo "Keystore generated successfully at app/keystore.jks"
-
-          # Clean up temporary files
-          rm private_key.pem certificate_chain.crt keystore.p12
+          # Empty secret (e.g. on a fork without access) → skip; the debug build then signs with the
+          # default debug key rather than failing the whole CI run.
+          if [ -z "$KEYSTORE_RAW" ]; then
+            echo "::warning::KEYSTORE_RAW secret is empty — building with the default debug key."
+            exit 0
+          fi
+          echo "$KEYSTORE_RAW" | base64 -d > app/keystore.jks
+          if [ ! -s app/keystore.jks ]; then
+            echo "::error::Decoded keystore is empty — KEYSTORE_RAW is not valid base64."
+            exit 1
+          fi
+          echo "Keystore decoded to app/keystore.jks ($(stat -c%s app/keystore.jks) bytes)"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -150,20 +137,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          # Consumed by the signingConfigs.release block in app/build.gradle.kts. The debug build type
+          # uses this release config when the keystore is present (see app/build.gradle.kts), keeping
+          # the auto-published artifact's signature stable; absent it, the default debug key is used.
+          KEYSTORE_FILE: ${{ github.workspace }}/app/keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set +e
           export BUILD_NUMBER=$(git rev-list --count HEAD)
-          
-          # Build the APK
-          ./gradlew assembleDebug -PversionBuild=$BUILD_NUMBER --build-cache \
-            -Pandroid.injected.signing.store.file=$(pwd)/app/keystore.jks \
-            -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
-            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
-            -Pandroid.injected.signing.key.password=$KEY_PASSWORD > build.log 2>&1
-          
+
+          # Build the APK (signing comes from the env-driven signingConfigs.release in Gradle)
+          ./gradlew assembleDebug -PversionBuild=$BUILD_NUMBER --build-cache > build.log 2>&1
+
           EXIT_CODE=$?
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
           cat build.log
