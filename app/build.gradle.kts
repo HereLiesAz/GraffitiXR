@@ -33,18 +33,27 @@ val localProperties = Properties().apply {
 //      monotonic value derived from the git commit count — see release-aab.yml).
 //      When the override is present we do NOT auto-increment or rewrite the file,
 //      so the ephemeral CI checkout stays clean and Play receives exactly <n>.
-//   2. Otherwise fall back to the value stored in version.properties, preserving
-//      the existing local behaviour of auto-incrementing on release builds.
+//   2. Otherwise, auto-increment the stored build number on EVERY compile — any
+//      build type (debug or release), any machine. The increment is gated to an
+//      actual build/compile being requested so routine configuration (most
+//      importantly Android Studio's frequent project syncs) does NOT inflate it.
 val versionBuildOverride = project.findProperty("versionBuild")?.toString()?.toIntOrNull()
 var currentVersionCode = versionBuildOverride ?: versionProps.getProperty("versionBuild", "1").toInt()
 
-// Automatically increment versionCode for local release builds (no override supplied).
-val isReleaseBuild = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
-if (isReleaseBuild && versionBuildOverride == null) {
+// True when the requested tasks actually compile/assemble the app — not a sync, `tasks`, `clean`,
+// a `--dry-run`, or a diagnostic like `buildEnvironment`/`buildHealth`. Build verbs are matched as a
+// prefix and the `build` lifecycle task exactly, so diagnostics that merely contain "build" don't trip it.
+val startParameter = gradle.startParameter
+val buildVerbs = listOf("assemble", "bundle", "install", "package", "compile")
+val isBuilding = !startParameter.isDryRun && startParameter.taskNames.any { taskName ->
+    val task = taskName.substringAfterLast(':').lowercase()
+    task == "build" || buildVerbs.any { task.startsWith(it) }
+}
+if (versionBuildOverride == null && isBuilding) {
     currentVersionCode++
     versionProps.setProperty("versionBuild", currentVersionCode.toString())
     versionPropsFile.outputStream().use {
-        versionProps.store(it, "Auto-incremented by release build")
+        versionProps.store(it, "Auto-incremented on compile")
     }
 }
 
