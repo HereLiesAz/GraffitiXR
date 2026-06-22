@@ -1530,7 +1530,8 @@ class ArViewModel @Inject constructor(
         intrinsics: FloatArray?,
         viewMatrix: FloatArray,
         displayRotation: Int,
-        tapDistanceMeters: Float
+        tapDistanceMeters: Float,
+        wallPlane: FloatArray? = null
     ) {
         val tapPos = pendingTapPosition
         val extent = computePhysicalExtent(depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics, depthBufStride)
@@ -1565,6 +1566,7 @@ class ArViewModel @Inject constructor(
                     targetDepthStride = depthBufStride,
                     targetIntrinsics = intrinsics,
                     targetCaptureViewMatrix = viewMatrix,
+                    targetWallPlane = wallPlane,
                     targetPhysicalExtent = extent,
                     isCaptureRequested = false,
                     tempCaptureBitmap = rotatedBmp,
@@ -1593,6 +1595,7 @@ class ArViewModel @Inject constructor(
                 targetDepthStride = depthBufStride,
                 targetIntrinsics = intrinsics,
                 targetCaptureViewMatrix = viewMatrix,
+                targetWallPlane = wallPlane,
                 targetPhysicalExtent = extent,
                 isCaptureRequested = false
             )

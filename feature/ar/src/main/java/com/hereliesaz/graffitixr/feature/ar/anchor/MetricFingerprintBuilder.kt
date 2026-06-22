@@ -130,6 +130,100 @@ object MetricFingerprintBuilder {
         }
     }
 
+    /**
+     * Single-capture path: build the wall fingerprint from ONE view by back-projecting detected
+     * features onto a known wall plane (the green ARCore plane, whose metric pose ARCore has already
+     * solved). No triangulation, no second view. Detects SuperPoint first (CV_32F → reloc runs its
+     * SuperPoint path), falls back to ORB. Returns null if too few features hit the plane.
+     *
+     * @param glView the capture's ARCore/GL world→camera matrix.
+     * @param planePointWorld a point on the wall plane in world space (e.g. plane centre).
+     * @param planeNormalWorld the wall plane normal in world space.
+     * @param anchorModel the anchor's world pose (column-major 4x4) at capture time.
+     */
+    fun buildSingle(
+        slam: SlamManager,
+        bitmap: Bitmap, glView: FloatArray, intr: FloatArray,
+        planePointWorld: FloatArray, planeNormalWorld: FloatArray,
+        anchorModel: FloatArray,
+        minPoints: Int = 20,
+    ): Fingerprint? {
+        val cvView = MetricMarks.glViewToCv(glView)
+
+        val sp = unpackSuperPoint(slam.detectSuperPoint(bitmap))
+        if (sp != null) {
+            val (pos, descs) = sp
+            try {
+                val pixels = ArrayList<PlaneMarks.Pixel>(pos.size / 2)
+                var i = 0
+                while (i + 1 < pos.size) { pixels.add(PlaneMarks.Pixel(pos[i], pos[i + 1])); i += 2 }
+                val fp = ingestSingle(slam, descs, pixels, cvView, intr,
+                    planePointWorld, planeNormalWorld, anchorModel, minPoints)
+                if (fp != null) return fp
+            } finally {
+                descs.release()
+            }
+        }
+
+        // ORB fallback — CLAHE-normalize identically to the native reloc path so descriptors match.
+        val gray = toGray(bitmap)
+        val orb = ORB.create(1500)
+        val clahe = Imgproc.createCLAHE(2.0, org.opencv.core.Size(8.0, 8.0))
+        val norm = Mat()
+        val kp = MatOfKeyPoint(); val d = Mat()
+        try {
+            clahe.apply(gray, norm)
+            orb.detectAndCompute(norm, Mat(), kp, d)
+            if (d.empty()) return null
+            val pixels = kp.toArray().map { PlaneMarks.Pixel(it.pt.x.toFloat(), it.pt.y.toFloat()) }
+            return ingestSingle(slam, d, pixels, cvView, intr,
+                planePointWorld, planeNormalWorld, anchorModel, minPoints)
+        } finally {
+            gray.release(); norm.release(); kp.release(); d.release()
+        }
+    }
+
+    /** Back-project the detected pixels onto the plane, keep the descriptors that hit, ingest. */
+    private fun ingestSingle(
+        slam: SlamManager,
+        descAll: Mat,
+        pixels: List<PlaneMarks.Pixel>,
+        cvView: FloatArray, intr: FloatArray,
+        planePointWorld: FloatArray, planeNormalWorld: FloatArray,
+        anchorModel: FloatArray, minPoints: Int,
+    ): Fingerprint? {
+        val res = PlaneMarks.backProject(
+            pixels, cvView, planePointWorld, planeNormalWorld,
+            intr[0], intr[1], intr[2], intr[3],
+        )
+        if (res.count < minPoints) return null
+
+        val keptDesc = Mat(res.count, descAll.cols(), descAll.type())
+        val keypoints = ArrayList<KeyPoint>(res.count)
+        for ((dst, src) in res.kept.withIndex()) {
+            descAll.row(src).copyTo(keptDesc.row(dst))
+            val px = pixels[src]
+            keypoints.add(KeyPoint(px.u, px.v, 7f))
+        }
+        val type = keptDesc.type()
+        val rows = keptDesc.rows(); val cols = keptDesc.cols()
+        val bytes: ByteArray
+        if (type == org.opencv.core.CvType.CV_32F) {
+            val floats = FloatArray(rows * cols)
+            keptDesc.get(0, 0, floats)
+            val buffer = java.nio.ByteBuffer.allocate(floats.size * 4).order(java.nio.ByteOrder.nativeOrder())
+            buffer.asFloatBuffer().put(floats)
+            bytes = buffer.array()
+        } else {
+            bytes = ByteArray(rows * cols * keptDesc.elemSize().toInt())
+            keptDesc.get(0, 0, bytes)
+        }
+        keptDesc.release()
+
+        slam.restoreWallFingerprintMetric(bytes, rows, cols, type, res.pointsCam, anchorModel, intr)
+        return Fingerprint(keypoints, res.pointsCam.toList(), bytes, rows, cols, type)
+    }
+
     /** SuperPoint detect (native, CLAHE'd) on both views + L2 ratio match → Matched (CV_32F descs). */
     private fun matchSuperPoint(slam: SlamManager, bitmap0: Bitmap, bitmap1: Bitmap, ratio: Float): Matched? {
         val sp0 = unpackSuperPoint(slam.detectSuperPoint(bitmap0)) ?: return null

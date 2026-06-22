@@ -36,7 +36,7 @@ class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
     // Last arg is the camera→point distance (meters) at the tapped pixel, or -1f when unavailable.
-    private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int, Float) -> Unit,
+    private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int, Float, FloatArray?) -> Unit,
     private val onTrackingUpdated: (Boolean, Int, Int, Boolean, Float, Float, Triple<Float, Float, Float>?, Boolean, Boolean, Float, Float, Float) -> Unit,
     private val onLightUpdated: (Float) -> Unit,
     private val onDiag: (String) -> Unit = {},
@@ -1042,12 +1042,39 @@ class ArRenderer(
                             }
                         }
 
+                        // Single-capture target creation needs the metric wall plane being aimed at.
+                        // Hit-test the tapped pixel for an ARCore plane that classifies as MATCH (green
+                        // = parallel and within range) and capture its world point + normal. Null when
+                        // the tap isn't on a green plane, which gates target creation downstream.
+                        var wallPlane: FloatArray? = null
+                        if (tap != null && surfaceWidth > 0) {
+                            try {
+                                val px = tap[0] * surfaceWidth
+                                val py = tap[1] * surfaceHeight
+                                for (h in frame.hitTest(px, py)) {
+                                    val tr = h.trackable
+                                    if (tr is com.google.ar.core.Plane && tr.isPoseInPolygon(h.hitPose) &&
+                                        planeRenderer.classifyPlane(tr, camera.pose) ==
+                                            PlaneRenderer.PlaneMatchResult.MATCH) {
+                                        val c = tr.centerPose
+                                        val nrm = FloatArray(3)
+                                        c.getTransformedAxis(1, 1.0f, nrm, 0) // plane local +Y = normal
+                                        wallPlane = floatArrayOf(c.tx(), c.ty(), c.tz(), nrm[0], nrm[1], nrm[2])
+                                        break
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Timber.w(e, "Wall-plane hit-test for capture failed")
+                            }
+                        }
+
                         onTargetCaptured(
                             bitmap, image.width, image.height,
                             depthBuffer,
                             depthWidth, depthHeight, depthStride,
                             intrArr, mappingViewMatrix.copyOf(),
-                            rotationNeeded, tapDistanceMeters
+                            rotationNeeded, tapDistanceMeters,
+                            wallPlane
                         )
                     }
                 } catch (e: Exception) {
