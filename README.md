@@ -6,7 +6,7 @@ So I'm making something better by repurposing (what those in-the-know call) the 
 
 So, now, that's what those doodles do.
 
-I had to invent a custom **Persistent Voxel Memory** engine that works on Android without the help of the cloud—because graffiti is, you know, illegal. By building a high-performance 3D map of your surroundings in the background, the phone always knows exactly where it is. Even after tracking loss or a screen-off event, the engine uses OpenCV "fingerprints" to **snap back** and realign your mural to the wall in milliseconds.
+I had to invent a custom **fingerprint relocalizer** that works on Android without the help of the cloud—because graffiti is, you know, illegal. When you lock onto a wall, it captures an OpenCV feature **fingerprint** of your marks—descriptors plus a handful of triangulated 3D points. Even after tracking loss or a screen-off event, the engine matches the live camera against that fingerprint and solves the pose (PnP) to **snap back** and realign your mural to the wall in milliseconds—no cloud, and no pre-scan of the whole room.
 
 And I followed it up with what I call a **Teleological SLAM**—since we know what the result is supposed to look like, I use OpenCV to look for your progress, meaning that the further along you are, the more tightly the overlay sticks to the wall. Without this, you'd cover those marks up with the painting itself, making the app less accurate as you go. That's exactly where other apps like this truly fail.
 
@@ -17,9 +17,8 @@ And then, there's a decent suite of pertinent design tools, with support for mul
 ## Key Features
 *   **Offline-First:** Zero cloud dependencies; 100% local processing and zero data collection.
 *   **Pocket-Ready:** Built-in relocalization ensures your mural stays "stuck" even after putting the phone in your pocket.
-*   **Persistent Voxel Memory:** C++17 native engine using a zero-allocation fixed-size spatial hash table for O(1) discovery speed.
-*   **Opaque Surfel Pipeline:** High-performance rendering with hardware Z-buffering, replacing expensive alpha blending.
-*   **Stochastic Integration:** Optimized depth integration (2048 random pixels per frame) to reduce CPU overhead by 90%.
+*   **Fingerprint Relocalization:** C++17 native OpenCV pipeline (ORB/SuperPoint descriptors + PnP/RANSAC) that snaps the overlay back onto the wall after tracking loss — fully offline, no room pre-scan.
+*   **Teleological Self-Grow:** the wall fingerprint can extend itself from validated new marks as you paint, so snap-back survives the original reference being painted over.
 *   **Dual-Lens Aware:** Auto-selects hardware stereo depth on devices that expose it; falls back to single-camera tracking with motion-based (VIO-baseline) depth elsewhere.
 *   **AI Glasses Support:** Integrated support for **Meta Ray-Bans** and **Xreal Air/Ultra** via a provider-based abstraction layer.
 *   **Co-op Mode:** Robust peer-to-peer AR synchronization for collaborative painting.

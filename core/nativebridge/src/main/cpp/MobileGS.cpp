@@ -102,131 +102,29 @@ void MobileGS::initialize(int width, int height) {
     }
 }
 
-void MobileGS::initGl() {
-    LOGI("MobileGS::initGl voxel begin");
-    mVoxelHash.initGl();
-    LOGI("MobileGS::initGl voxel ok, mesh begin");
-    mSurfaceMesh.initGl();
-    LOGI("MobileGS::initGl mesh ok");
-}
-
-void MobileGS::initVoxelGl() {
-    LOGI("MobileGS::initVoxelGl begin");
-    mVoxelHash.initGl();
-    LOGI("MobileGS::initVoxelGl ok");
-}
-
-void MobileGS::initVoxelGlProgram() {
-    LOGI("MobileGS::initVoxelGlProgram begin");
-    mVoxelHash.initGlProgram();
-    LOGI("MobileGS::initVoxelGlProgram ok");
-}
-
-void MobileGS::initVoxelGlBuffer() {
-    LOGI("MobileGS::initVoxelGlBuffer begin");
-    mVoxelHash.initGlBuffer();
-    LOGI("MobileGS::initVoxelGlBuffer ok");
-}
-
-void MobileGS::initMeshGl() {
-    LOGI("MobileGS::initMeshGl begin");
-    mSurfaceMesh.initGl();
-    LOGI("MobileGS::initMeshGl ok");
-}
+// Voxel/splat map deleted: GL-init stubs retained for the JNI/Kotlin surface (no map to init).
+void MobileGS::initGl() {}
+void MobileGS::initVoxelGl() {}
+void MobileGS::initVoxelGlProgram() {}
+void MobileGS::initVoxelGlBuffer() {}
+void MobileGS::initMeshGl() {}
 
 void MobileGS::resetGlContext() {
     initGl();
 }
 
-void MobileGS::draw(bool debugTint) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    if (!mCameraReady) return;
+// Voxel/splat map deleted: render stubs retained for the JNI/Kotlin surface.
+void MobileGS::draw(bool debugTint) {}
 
-    glm::mat4 V = glm::make_mat4(mViewMatrix);
-    glm::mat4 P = glm::make_mat4(mProjMatrix);
-    glm::mat4 mvp = P * V;
+void MobileGS::drawDebugLayers(bool voxels, bool mesh) {}
 
-    if (mSplatsVisible) {
-        StageTimer _t(&mStageAccumMs[3], &mStageSamples[3]);
-        int mode = debugTint ? 1 : 0;
-        if (mMuralMethod == 0) { // VOXEL_HASH
-            mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight, mode);
-        } else if (mMuralMethod == 1) { // SURFACE_MESH
-            mSurfaceMesh.draw(mvp);
-        } else if (mMuralMethod == 2) { // CLOUD_OFFSET
-            mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight, mode);
-        }
-    }
-}
+void MobileGS::drawCoverage() {}
 
-void MobileGS::drawDebugLayers(bool voxels, bool mesh) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    if (!mCameraReady) return;
-    glm::mat4 V = glm::make_mat4(mViewMatrix);
-    glm::mat4 P = glm::make_mat4(mProjMatrix);
-    glm::mat4 mvp = P * V;
-    StageTimer _t(&mStageAccumMs[3], &mStageSamples[3]);
-    // Explicit, latch-free: an abandoned capture clears mSplatsVisible process-wide, and
-    // muralMethod would otherwise hide whichever representation isn't the active method. The
-    // debug view's contract is "show exactly the layers the user enabled, whatever the engine holds".
-    if (voxels) mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight, 1);
-    if (mesh) mSurfaceMesh.draw(mvp);
-}
+void MobileGS::pushPointCloud(const std::vector<float>& points) {}
 
-void MobileGS::drawCoverage() {
-    std::lock_guard<std::mutex> lock(mMutex);
-    if (!mCameraReady) return;
-    glm::mat4 V = glm::make_mat4(mViewMatrix);
-    glm::mat4 P = glm::make_mat4(mProjMatrix);
-    glm::mat4 mvp = P * V;
-    // Coverage colour-mask: real albedo, alpha = confidence, blended over the grayscale camera.
-    mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight, 2);
-}
-
-void MobileGS::pushPointCloud(const std::vector<float>& points) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    if (!mCameraReady) return;
-    mVoxelHash.addSparsePoints(points, mViewMatrix, mProjMatrix, 0.4f);
-}
-
-void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence) {
-    bool isTrackingState = false;
-    {
-        std::lock_guard<std::mutex> lock(mMutex);
-        if (depth.empty() || color.empty() || !mCameraReady || mMappingPaused) return;
-        isTrackingState = mIsArCoreTracking;
-    }
-    if (!isTrackingState) return;
-
-    cv::Mat colorRGB;
-    if (isYuv) cv::cvtColor(color, colorRGB, cv::COLOR_YUV2RGB_NV21);
-    else colorRGB = color;
-
-    // Universal Ingestion: Build the Voxel Map in ALL modes to enable Snap-Back relocalization.
-    { StageTimer _t(&mStageAccumMs[0], &mStageSamples[0]);
-      mVoxelHash.update(depth, colorRGB, viewMat, projMat, mVoxelSize, confidence); }
-
-    if (mScanMode == 0) return; // Canvas mode only needs the voxel map for background recovery.
-
-    mFrameCounter++;
-    if (mMuralMethod == 0) { // VOXEL_HASH
-        if (mStageEnabled[1].load(std::memory_order_relaxed) && mFrameCounter % 30 == 0) {
-            StageTimer _t(&mStageAccumMs[1], &mStageSamples[1]);
-            VoxelFrame kf;
-            kf.depth = depth.clone(); kf.color = colorRGB.clone();
-            memcpy(kf.viewMatrix, viewMat, 16 * sizeof(float));
-            memcpy(kf.projMatrix, projMat, 16 * sizeof(float));
-            mVoxelHash.addKeyframe(kf);
-        }
-    } else if (mMuralMethod == 1) { // SURFACE_MESH
-        if (mStageEnabled[2].load(std::memory_order_relaxed)) {
-            StageTimer _t(&mStageAccumMs[2], &mStageSamples[2]);
-            mSurfaceMesh.update(depth, colorRGB, viewMat, projMat, mAnchorMatrix, mLightLevel);
-        }
-    } else if (mMuralMethod == 2) { // CLOUD_OFFSET
-        // Cloud Offset mode leverages the mVoxelHash map updated above.
-    }
-}
+// Voxel/splat map deleted: depth integration removed. The relocalizer uses color frames via
+// scheduleRelocCheck, not this path. Stub retained so mapThreadFunc / pushFrame still compile.
+void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence) {}
 
 void MobileGS::mapThreadFunc() {
     setpriority(PRIO_PROCESS, 0, 15);
@@ -245,33 +143,17 @@ void MobileGS::mapThreadFunc() {
     }
 }
 
-void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence) {
-    if (!mMapRunning) return;
-    std::lock_guard<std::mutex> lock(mQueueMutex);
-    if (mFrameQueue.size() >= 1) mFrameQueue.erase(mFrameQueue.begin()); // Low-latency queue
-    FrameData data;
-    data.depth = depth.clone(); data.color = color.clone(); data.isYuv = isYuv; data.confidence = confidence;
-    memcpy(data.viewMatrix, viewMat, 16 * sizeof(float));
-    memcpy(data.projMatrix, projMat, 16 * sizeof(float));
-    if (intrinsics) { memcpy(data.intrinsics, intrinsics, 4 * sizeof(float)); data.hasIntrinsics = true; }
-    else data.hasIntrinsics = false;
-    mFrameQueue.push_back(std::move(data));
-    mQueueCv.notify_one();
-}
+// Voxel/splat map deleted: depth frames are no longer cloned/queued (the queue was only
+// drained-and-discarded). This removes the per-frame cv::Mat::clone() cost on the sensor thread.
+// The idle map thread parks on mQueueCv and exits cleanly on destroy (mMapRunning=false + notify).
+void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence) {}
 
-void MobileGS::clearMap() {
-    std::lock_guard<std::mutex> lock(mMutex);
-    mVoxelHash.clear();
-    mSurfaceMesh.clear();
-}
-
-void MobileGS::pruneByConfidence(float threshold) {
-    mVoxelHash.prune(threshold);
-}
+void MobileGS::clearMap() {}                            // voxel/splat map deleted
+void MobileGS::pruneByConfidence(float threshold) {}   // voxel/splat map deleted
 
 void MobileGS::setArScanMode(int mode) { mScanMode = mode; }
 void MobileGS::setMuralMethod(int method) { mMuralMethod = method; }
-void MobileGS::setParallaxMinDegrees(float deg) { mVoxelHash.setParallaxMinDegrees(deg); }
+void MobileGS::setParallaxMinDegrees(float deg) {}   // voxel/splat map deleted
 void MobileGS::setVoxelSize(float size) { mVoxelSize = size; }
 
 void MobileGS::updateCamera(float* viewMat, float* projMat) {
@@ -309,20 +191,14 @@ void MobileGS::getAnchorTransform(float* outMat16) const {
 }
 
 void MobileGS::getConfidenceAvgs(float& outVisible, float& outGlobal) const {
-    std::lock_guard<std::mutex> lock(mMutex);
-    glm::mat4 view = glm::make_mat4(mViewMatrix);
-    glm::mat4 proj = glm::make_mat4(mProjMatrix);
-    outVisible = mVoxelHash.getVisibleConfidenceAvg(proj * view);
-    outGlobal = mVoxelHash.getGlobalConfidenceAvg();
+    // Voxel/splat map deleted; reloc no longer depends on this (Kotlin confGlobal is decoupled).
+    outVisible = 0.0f;
+    outGlobal = 0.0f;
 }
 
-void MobileGS::updatePersistentMesh(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat) {
-    mSurfaceMesh.update(depth, color, viewMat, projMat, mAnchorMatrix, mLightLevel);
-}
-
-void MobileGS::getPersistentMesh(std::vector<float>& outVertices, std::vector<float>& outWeights) {
-    mSurfaceMesh.getMesh(outVertices, outWeights);
-}
+// Voxel/splat map deleted: SurfaceMesh removed.
+void MobileGS::updatePersistentMesh(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat) {}
+void MobileGS::getPersistentMesh(std::vector<float>& outVertices, std::vector<float>& outWeights) {}
 
 void MobileGS::relocThreadFunc() {
     setpriority(PRIO_PROCESS, 0, 10); // Standard background priority
@@ -729,14 +605,9 @@ void MobileGS::destroy() {
     if (mRelocThread.joinable()) mRelocThread.join();
 }
 
-void MobileGS::saveModel(const std::string& p) {
-    mVoxelHash.save(p);
-    mSurfaceMesh.save(p + ".mesh");
-}
-void MobileGS::loadModel(const std::string& p) {
-    mVoxelHash.load(p);
-    mSurfaceMesh.load(p + ".mesh");
-}
+// Voxel/splat map deleted: .gxr keeps the fingerprint; old model.map files are ignored.
+void MobileGS::saveModel(const std::string& p) {}
+void MobileGS::loadModel(const std::string& p) {}
 bool MobileGS::importModel3D(const std::string& p) { return false; }
 void MobileGS::setViewportSize(int w, int h) { mScreenWidth = w; mScreenHeight = h; }
 void MobileGS::setRelocEnabled(bool e) { mRelocEnabled = e; }
