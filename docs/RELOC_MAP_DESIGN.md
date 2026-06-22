@@ -66,8 +66,8 @@ Keep the marks fingerprint as the high-precision anchor; add Option A for covera
 
 ## 4. Recommendation
 **Option A, built to keep the marks fingerprint as the precision anchor (→ effectively D).**
-Confidence persistence + a purposeful scan + wide-area reloc — exactly your intuition,
-delivered leanly (sparse features, *not* the dense splat/mesh we removed).
+Confidence persistence + automatic (passive) map-building + wide-area reloc — exactly your
+intuition, delivered leanly (sparse features, *not* the dense splat/mesh we removed).
 
 This is **not a reversal** of the right-size: we deleted the dense map that carried no
 descriptors and never fed reloc (dead weight). This adds the **lean feature map that
@@ -109,6 +109,9 @@ Design *requirements*, not options, so leanness stays enforceable:
 4. **Per-keyframe build, periodic reloc.** No per-frame work is ever reintroduced — the
    per-frame depth-integration cost we removed must not come back.
 5. **No GPU footprint.** Features are CPU-side data; nothing renders (no VBO/splats/mesh).
+6. **No explicit scan.** The map builds **passively** from whatever keyframes normal use
+   provides (positioning, painting, looking around) — no scan step, prompt, or forced sweep.
+   It uses what it can get and improves over the session.
 
 **Weight budget that must hold:** ≤ ~1 MB RAM and ≤ ~1 MB added to `.gxr` at the 5k ORB
 default; the SuperPoint path (≤ ~5 MB quantized) is gated behind an explicit setting.
@@ -116,22 +119,27 @@ default; the SuperPoint path (≤ ~5 MB quantized) is gated behind an explicit s
 ## 5. Architecture sketch (Option A)
 - **Data:** `WallFeatureMap { points3d[N], descriptors[N×D], confidence[N], obsCount[N] }`,
   in a fingerprint-relative frame with a fixed anchor + intrinsics (like the fingerprint).
-- **Build (during scan):** per keyframe → SuperPoint detect → triangulate via VIO
-  baseline (or depth when available) → associate to existing map points (descriptor +
-  reprojection); bump `confidence`/`obsCount`, or add new. Prune `confidence < τ` or long-unobserved.
-- **Persist:** extend `.gxr` (new `featuremap.bin`), parallel to the fingerprint.
+- **Build (passive — no explicit scan):** opportunistically, from normal-use keyframes →
+  ORB/SuperPoint detect → triangulate via VIO baseline (or depth when available) → associate
+  to existing map points (descriptor + reprojection); bump `confidence`/`obsCount`, or add new.
+  Prune `confidence < τ` or long-unobserved.
+- **Persist:** in the project / `.gxr` (Phase 1 rides in `project.json` via `WallFeatureMap`;
+  a binary sidecar is a later optimization if maps get large).
 - **Native:** `mWallMap` (cv::Mat descriptors + `vector<Point3f>` + conf); **ORB default**,
   cap configurable (default 5k, max 20k) by confidence. `relocThreadFunc` **frustum-gates**
   the map to the VIO-visible subset, then merges those correspondences into the PnP set (or
   runs map-PnP + fingerprint-PnP and takes the higher inlier count).
-- **Scan UX:** a sweep that shows **coverage genuinely growing** (can reuse the sector mask —
-  now tied to *real* map growth, replacing the dead `splatCount >= 30000` gate).
+- **No scan UX:** the map builds silently in the background. Separately, **remove the
+  vestigial `AMBIENT`/`WALL` scan phases** + the dead `splatCount >= 30000` gate so
+  pre-placement is just camera → capture marks → place. An optional subtle coverage hint is
+  the most that's warranted.
 - **Self-grow (B1):** extends naturally — promote validated live features into the map.
 
 ## 6. Sequencing (each phase device-gated, behind an A/B flag)
 1. Data model + `.gxr` persistence + **round-trip test** (no reloc risk).
 2. Native map storage + reloc matching **behind a flag** (compare vs fingerprint-only).
-3. Scan build + coverage UX (replaces the vestigial AMBIENT/WALL phases).
+3. **Passive** map build from normal-use keyframes (no scan UX); remove the vestigial
+   AMBIENT/WALL scan phases + dead `splatCount` gate.
 4. Confidence/pruning + matcher tuning **on device**.
 
 ## 7. Decisions & remaining open question
@@ -139,9 +147,10 @@ default; the SuperPoint path (≤ ~5 MB quantized) is gated behind an explicit s
 keep the marks fingerprint as the precision anchor · **ORB default**, SuperPoint opt-in ·
 budget bounded by the configurable cap + frustum gating (§4b).
 
-**Still open:**
-1. **Scan effort:** how much sweeping is acceptable before painting? (sets the density target /
-   default cap). Can be tuned in Phase 4 on device, so it does **not** block Phase 1.
+**Still open (tuning only — does not block Phases 1–2):**
+1. **Passive accumulation rate:** keyframe cadence + how quickly the map fills / when it's
+   "good enough" — tuned in Phase 4 on device. No explicit scan, so this is about the
+   background accumulation rate, not user effort.
 
 ---
 *If A/D looks right, I'll turn §5–6 into a phased implementation plan and start with Phase 1
