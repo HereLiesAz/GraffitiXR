@@ -6,8 +6,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -260,19 +261,35 @@ private fun FeatureSelectionReview(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(Unit) {
-                        detectTapGestures { pos ->
+                    // One gesture handler for BOTH tap and drag so they never compete for the
+                    // gesture (the old two-pointerInput setup let the tap detector win, so a drag
+                    // only registered on lift). Erase the whole touched mark on touch-DOWN — a tap
+                    // erases instantly — and again on every move while the finger stays down, so a
+                    // drag clears each mark it crosses live, not after the finger is lifted.
+                    .pointerInput(imgX, imgY, imgW, imgH) {
+                        // Skip redundant erases at essentially the same spot (cheap, keeps the
+                        // mutex-serialized flood-fill from being spammed while dwelling on one mark).
+                        val minMovePx = 6.dp.toPx()
+                        fun eraseAt(pos: Offset, last: Offset?): Boolean {
+                            if (last != null && (pos - last).getDistance() < minMovePx) return false
                             val nx = ((pos.x - imgX) / imgW).coerceIn(0f, 1f)
                             val ny = ((pos.y - imgY) / imgH).coerceIn(0f, 1f)
                             onEraseAtPoint(nx, ny)
+                            return true
                         }
-                    }
-                    .pointerInput(Unit) {
-                        detectDragGestures { change, _ ->
-                            val pos = change.position
-                            val nx = ((pos.x - imgX) / imgW).coerceIn(0f, 1f)
-                            val ny = ((pos.y - imgY) / imgH).coerceIn(0f, 1f)
-                            onEraseAtPoint(nx, ny)
+                        awaitEachGesture {
+                            var lastErase: Offset? = null
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            if (eraseAt(down.position, lastErase)) lastErase = down.position
+                            down.consume()
+                            do {
+                                val event = awaitPointerEvent()
+                                val active = event.changes.firstOrNull { it.pressed }
+                                if (active != null) {
+                                    if (eraseAt(active.position, lastErase)) lastErase = active.position
+                                    active.consume()
+                                }
+                            } while (event.changes.any { it.pressed })
                         }
                     }
             )
