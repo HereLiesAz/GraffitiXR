@@ -74,15 +74,15 @@ class GraffitiProjectTest {
         // The persistent feature map rides in project.json (and thus the .gxr), parallel to the
         // fingerprint. Verify it survives the project round-trip intact (descriptor blob included).
         val map = WallFeatureMap(
-            points3d = listOf(0f, 0f, 1f, 0.1f, 0.2f, 1.1f),
+            points3d = floatArrayOf(0f, 0f, 1f, 0.1f, 0.2f, 1.1f),
             descriptorsData = ByteArray(64) { (it % 251).toByte() },
             descriptorsRows = 2,
             descriptorsCols = 32,
             descriptorsType = 0,
-            confidence = listOf(0.9f, 0.4f),
-            obsCount = listOf(4, 1),
-            anchor = List(16) { it.toFloat() },
-            intrinsics = listOf(500f, 500f, 320f, 240f),
+            confidence = floatArrayOf(0.9f, 0.4f),
+            obsCount = intArrayOf(4, 1),
+            anchor = FloatArray(16) { it.toFloat() },
+            intrinsics = floatArrayOf(500f, 500f, 320f, 240f),
         )
         val project = GraffitiProject(id = "id", name = "n", wallFeatureMap = map)
 

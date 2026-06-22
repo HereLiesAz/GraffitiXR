@@ -24,15 +24,15 @@ class WallFeatureMapTest {
         val n = 3
         val cols = 32 // ORB descriptor width in bytes
         val original = WallFeatureMap(
-            points3d = listOf(0f, 0f, 1f, 0.1f, 0.2f, 1.1f, -0.3f, 0.4f, 0.9f),
+            points3d = floatArrayOf(0f, 0f, 1f, 0.1f, 0.2f, 1.1f, -0.3f, 0.4f, 0.9f),
             descriptorsData = ByteArray(n * cols) { (it % 251).toByte() },
             descriptorsRows = n,
             descriptorsCols = cols,
             descriptorsType = 0, // CV_8U (ORB)
-            confidence = listOf(0.9f, 0.5f, 0.75f),
-            obsCount = listOf(5, 2, 3),
-            anchor = listOf(1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f),
-            intrinsics = listOf(500f, 500f, 320f, 240f),
+            confidence = floatArrayOf(0.9f, 0.5f, 0.75f),
+            obsCount = intArrayOf(5, 2, 3),
+            anchor = floatArrayOf(1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f),
+            intrinsics = floatArrayOf(500f, 500f, 320f, 240f),
         )
 
         val decoded = json.decodeFromString<WallFeatureMap>(json.encodeToString(original))
@@ -48,13 +48,13 @@ class WallFeatureMapTest {
     @Test
     fun `round-trips a SuperPoint-typed map (CV_32F descriptor type preserved)`() {
         val original = WallFeatureMap(
-            points3d = listOf(1f, 2f, 3f),
+            points3d = floatArrayOf(1f, 2f, 3f),
             descriptorsData = ByteArray(256 * 4) { (it % 97).toByte() }, // 1 point x 256 floats
             descriptorsRows = 1,
             descriptorsCols = 256,
             descriptorsType = 5, // CV_32F (SuperPoint) — must round-trip unchanged
-            confidence = listOf(0.6f),
-            obsCount = listOf(1),
+            confidence = floatArrayOf(0.6f),
+            obsCount = intArrayOf(1),
         )
 
         val decoded = json.decodeFromString<WallFeatureMap>(json.encodeToString(original))
