@@ -532,9 +532,9 @@ class ArRenderer(
             if (showPoints) {
                 pointCloudRenderer.draw(viewMatrix, projMatrix)
             }
-            if (showVoxels || showMesh) {
-                slamManager.drawDebugLayers(voxels = showVoxels, mesh = showMesh)
-            }
+            // A1 (voxel-map removal): voxel/mesh debug draw retired — the dense map is being removed
+            // (A3 deletes the native subsystem). ARCore-based perception layers below (feature points,
+            // plane grids, accumulated cloud points) remain as the cheap "what am I seeing" indicators.
             if (frameCount % 120 == 0) {
                 // Decides "no data" vs "drawn but invisible" from the diag log alone.
                 val planeCount = activeSession.getAllTrackables(com.google.ar.core.Plane::class.java)
@@ -680,9 +680,13 @@ class ArRenderer(
             // at full brightness/colour only where it has been mapped — so the user literally sees
             // what hasn't been scanned yet (it stays dark). Mutually exclusive with the halftone scan
             // indicator (which stays for the other mural methods).
-            val voxelRevealMaskActive = !anchorEstablished && scanMode == ArScanMode.MURAL &&
-                muralMethod == MuralMethod.VOXEL_HASH &&
-                frame.camera.trackingState == TrackingState.TRACKING
+            // A1 (voxel-map removal): the dense voxel map is being retired — it never fed pose
+            // (relocalization rides the fingerprint + PnP), and was scan-reveal visualization only.
+            // Forcing the reveal mask off disables drawCoverage() and the camera dimming; the halftone
+            // scan indicator takes over for VOXEL_HASH mode (same as the other mural methods). Reversible:
+            // restore the !anchorEstablished/VOXEL_HASH predicate to re-enable. Native map processing is
+            // untouched here (A3 removes it).
+            val voxelRevealMaskActive = false
             if (scanActive) backgroundRenderer.updateScanMask(visitedSectorsMask)
             lastStep = "bgDraw"
             // Always draw the camera in full colour (the B&W path is retired); the dimming + reveal
