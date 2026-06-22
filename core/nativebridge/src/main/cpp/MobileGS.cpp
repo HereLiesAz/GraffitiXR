@@ -560,7 +560,8 @@ bool MobileGS::computeRectifyHomography(const float* viewCur16, cv::Mat& Hcur_fp
 
 std::vector<uint8_t> MobileGS::exportWallFeatureMap() const {
     std::lock_guard<std::mutex> lock(mMutex);
-    if (mMapPoints3D.empty() || mMapDescriptors.empty()) return {};
+    if (mMapPoints3D.empty() || mMapDescriptors.empty() ||
+        mMapPoints3D.size() != (size_t)mMapDescriptors.rows) return {};  // never export an inconsistent map
     cv::Mat dm = mMapDescriptors.isContinuous() ? mMapDescriptors : mMapDescriptors.clone();
     const int32_t n = (int32_t)mMapPoints3D.size();
     const int32_t descRows = dm.rows, descCols = dm.cols, descType = dm.type();
@@ -590,6 +591,7 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
     std::lock_guard<std::mutex> lock(mMutex);
     if (mWallKeypoints3D.size() < 8) return;                                   // need the fingerprint plane
     if (!mMapDescriptors.empty() && mMapDescriptors.type() != descs.type()) return;
+    if (mMapPoints3D.size() != (size_t)mMapDescriptors.rows) return;  // corrupted map: bail rather than crash
 
     // Keep the parallel arrays aligned with the points: a restored map may have carried points +
     // descriptors but empty confidence/obs (both optional in WallFeatureMap). Without this, the add
@@ -601,12 +603,20 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
     // never earned a re-observation). Compacts all four parallel arrays + the descriptor matrix.
     const size_t kMapCap = 5000;
     if (mMapPoints3D.size() >= kMapCap) {
-        std::vector<cv::Point3f> np; std::vector<float> nc; std::vector<int> no; cv::Mat nd;
-        np.reserve(mMapPoints3D.size());
-        for (size_t i = 0; i < mMapPoints3D.size(); ++i) {
-            if (mMapConfidence[i] >= 0.2f) {
+        std::vector<size_t> kept;
+        kept.reserve(mMapPoints3D.size());
+        for (size_t i = 0; i < mMapPoints3D.size(); ++i)
+            if (mMapConfidence[i] >= 0.2f) kept.push_back(i);
+        std::vector<cv::Point3f> np; np.reserve(kept.size());
+        std::vector<float> nc; nc.reserve(kept.size());
+        std::vector<int> no; no.reserve(kept.size());
+        cv::Mat nd;
+        if (!kept.empty()) {
+            nd.create((int)kept.size(), mMapDescriptors.cols, mMapDescriptors.type());
+            for (size_t idx = 0; idx < kept.size(); ++idx) {
+                size_t i = kept[idx];
                 np.push_back(mMapPoints3D[i]); nc.push_back(mMapConfidence[i]); no.push_back(mMapObs[i]);
-                nd.push_back(mMapDescriptors.row((int)i));
+                mMapDescriptors.row((int)i).copyTo(nd.row((int)idx));
             }
         }
         mMapPoints3D.swap(np); mMapConfidence.swap(nc); mMapObs.swap(no); mMapDescriptors = nd;

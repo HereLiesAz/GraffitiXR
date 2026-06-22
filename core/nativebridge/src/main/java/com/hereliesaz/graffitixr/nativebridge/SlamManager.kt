@@ -127,6 +127,9 @@ class SlamManager @Inject constructor(
         val bb = ByteBuffer.wrap(blob).order(ByteOrder.LITTLE_ENDIAN)
         val n = bb.int; val rows = bb.int; val cols = bb.int; val type = bb.int
         if (n < 0 || rows < 0 || cols < 0) return null
+        // Bail before reading if the blob can't even hold the fixed-size fields (header + points/conf/obs
+        // + anchor + intrinsics = 96 + n*20 bytes), rather than catching a BufferUnderflowException.
+        if (blob.size < 96 + n * 20) return null
         return try {
             val points = FloatArray(n * 3) { bb.float }
             val conf = FloatArray(n) { bb.float }
