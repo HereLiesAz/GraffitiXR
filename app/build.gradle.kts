@@ -51,14 +51,19 @@ val isBuilding = !startParameter.isDryRun && startParameter.taskNames.any { task
 
 val verMajor = versionProps.getProperty("versionMajor", "1")
 val verMinor = versionProps.getProperty("versionMinor", "0")
+// Detect a minor bump BEFORE the build-gated block so the reset also applies to CI/override builds
+// (and IDE syncs), where the block is skipped: a new minor always reads as patch 0 even if the file
+// still holds the previous minor's patch (it may not have been rewritten by a local build yet).
+val lastMinor = versionProps.getProperty("versionMinorLast", verMinor)
+val isMinorBumped = verMinor != lastMinor
+
 var currentVersionCode = versionBuildOverride ?: versionProps.getProperty("versionBuild", "1").toInt()
-var currentPatch = versionProps.getProperty("versionPatch", "0").toInt()
+var currentPatch = if (isMinorBumped) 0 else versionProps.getProperty("versionPatch", "0").toInt()
 
 if (versionBuildOverride == null && isBuilding) {
     currentVersionCode++ // build never resets
-    // Reset patch to 0 when minor changed since the last build; otherwise increment it.
-    val lastMinor = versionProps.getProperty("versionMinorLast", verMinor)
-    currentPatch = if (verMinor != lastMinor) 0 else currentPatch + 1
+    // A minor bump makes this build the new minor's .0; otherwise advance the patch.
+    if (!isMinorBumped) currentPatch++
 
     versionProps.setProperty("versionBuild", currentVersionCode.toString())
     versionProps.setProperty("versionPatch", currentPatch.toString())
