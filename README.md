@@ -6,7 +6,7 @@ So I'm making something better by repurposing (what those in-the-know call) the 
 
 So, now, that's what those doodles do.
 
-I had to invent a custom **fingerprint relocalizer** that works on Android without the help of the cloud—because graffiti is, you know, illegal. When you lock onto a wall, it captures an OpenCV feature **fingerprint** of your marks—descriptors plus a handful of triangulated 3D points. Even after tracking loss or a screen-off event, the engine matches the live camera against that fingerprint and solves the pose (PnP) to **snap back** and realign your mural to the wall in milliseconds—no cloud, and no pre-scan of the whole room.
+I had to invent a custom **fingerprinted relocalizer** that works on Android without the help of the cloud—because graffiti is, you know, illegal. When you lock onto a wall, it captures an OpenCV feature **fingerprint** of your marks—descriptors plus a handful of triangulated 3D points. Even after tracking loss or a screen-off event, the engine matches the live camera against that fingerprint and solves the pose (PnP) to **snap back** and realign your mural to the wall in milliseconds—no cloud, and no pre-scan of the whole room.
 
 And I followed it up with what I call a **Teleological SLAM**—since we know what the result is supposed to look like, I use OpenCV to look for your progress, meaning that the further along you are, the more tightly the overlay sticks to the wall. Without this, you'd cover those marks up with the painting itself, making the app less accurate as you go. That's exactly where other apps like this truly fail.
 
