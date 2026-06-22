@@ -6,7 +6,7 @@ Kaya ako ay gumagawa ng isang bagay na mas mahusay sa pamamagitan ng repurposing
 
 Kaya, ngayon, iyon ang ginagawa ng mga doodle na iyon.
 
-Kinailangan kong mag-imbento ng custom na Gaussian Splatting engine na gumagana sa Android nang walang tulong ng cloud--dahil ang graffiti ay, alam mo, ilegal.
+Kinailangan kong mag-imbento ng custom na Persistent Voxel Memory engine na gumagana sa Android nang walang tulong ng cloud--dahil ang graffiti ay, alam mo, ilegal.
 
 At sinundan ko ito ng tinatawag kong Teleological Slam--dahil alam natin kung ano ang magiging hitsura ng resulta, ginagamit ko ang OpenCV upang hanapin ang iyong pag-unlad, ibig sabihin, habang mas malayo ka, mas mahigpit na dumidikit ang overlay sa dingding. Kung wala ito, sasakupin mo ang mga markang iyon gamit ang mismong pagpipinta, na ginagawang hindi gaanong tumpak ang app habang nagpapatuloy ka. Iyan mismo kung saan ang ibang mga app na tulad nito ay talagang nabigo.
 
@@ -18,7 +18,7 @@ Ang **GraffitiXR** ay isang offline na Android app para sa mga street artist. Gu
 
 ## Mga Pangunahing Tampok
 * **Offline-Una:** Walang cloud dependencies;zero data na nakolekta.
-* **Custom Engine (MobileGS):** C++17 native engine para sa 3D Gaussian Splatting at spatial mapping.
+* **Custom Engine (MobileGS):** C++17 native engine para sa Persistent Voxel Memory (opaque surfels) at spatial mapping.
 * **Full ARCore Pipeline:** Live camera feed sa pamamagitan ng `BackgroundRenderer`, color frame relocalization, at ARCore Depth API — lahat ay nagpapakain ng totoong data sa SLAM engine.
 * **AzNavRail UI:** Thumb-driven navigation para sa isang kamay na paggamit sa field.
 * **Single GL Render Path:** Pinangangasiwaan ng `ArRenderer` ang parehong background ng camera (`BackgroundRenderer`) at SLAM voxel splats (`slamManager.draw()`) sa iisang `GLSurfaceView`.

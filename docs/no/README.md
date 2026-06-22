@@ -6,7 +6,7 @@ Så jeg gjør noe bedre ved å gjenbruke (det de som er kjente kaller) rutenettm
 
 Så, nå, det er hva disse doodlene gjør.
 
-Jeg måtte finne opp en tilpasset Gaussian Slatting-motor som fungerer på Android uten hjelp fra skyen – fordi graffiti er ulovlig.
+Jeg måtte finne opp en tilpasset Persistent Voxel Memory-motor som fungerer på Android uten hjelp fra skyen – fordi graffiti er ulovlig.
 
 Og jeg fulgte det opp med det jeg kaller en Teleologisk Slam – siden vi vet hvordan resultatet skal se ut, bruker jeg OpenCV for å se etter fremgangen din, noe som betyr at jo lenger du er, jo tettere fester overlegget seg til veggen. Uten dette ville du dekket disse merkene med selve maleriet, noe som gjør appen mindre nøyaktig mens du går. Det er akkurat der andre apper som dette virkelig mislykkes.
 
@@ -18,7 +18,7 @@ Og så er det en anstendig serie med relevante designverktøy, med støtte for f
 
 ## Nøkkelfunksjoner
 * **Offline-First:** Ingen skyavhengigheter; null data samlet inn.
-* **Custom Engine (MobileGS):** C++17 innebygd motor for 3D Gaussian Slatting og romlig kartlegging.
+* **Custom Engine (MobileGS):** C++17 innebygd motor for Persistent Voxel Memory (ugjennomsiktige surfels) og romlig kartlegging.
 * **Full ARCore Pipeline:** Live kamerafeed via `BackgroundRenderer`, fargerammeflytting og ARCore Depth API – alle mater ekte data til SLAM-motoren.
 * **AzNavRail UI:** Tommeldrevet navigasjon for enhåndsbruk i felten.
 * **Single GL Render Path:** `ArRenderer` håndterer både kamerabakgrunn (`BackgroundRenderer`) og SLAM voxel-markeringer (`slamManager.draw()`) i en enkelt `GLSurfaceView`.

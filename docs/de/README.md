@@ -6,7 +6,7 @@ Also mache ich etwas Besseres, indem ich (was Kenner nennen) die Rastermethode u
 
 Und genau das tun diese Kritzeleien jetzt.
 
-Ich musste eine spezielle Gaussian Splatting-Engine erfinden, die auf Android ohne Cloud-Unterstützung funktioniert – denn Graffiti ist ja bekanntlich illegal.
+Ich musste eine spezielle Persistent-Voxel-Memory-Engine erfinden, die auf Android ohne Cloud-Unterstützung funktioniert – denn Graffiti ist ja bekanntlich illegal.
 
 Und ich habe es mit dem ergänzt, was ich einen "Teleologischen Slam" nenne: Da wir wissen, wie das Ergebnis aussehen soll, verwende ich OpenCV, um nach Ihrem Fortschritt zu suchen. Das bedeutet, je weiter Sie sind, desto fester haftet das Overlay an der Wand. Ohne dies würden Sie die Markierungen mit der Malerei selbst überdecken, wodurch die App ungenauer wird. Das ist genau der Punkt, an dem andere Apps dieser Art wirklich scheitern.
 
@@ -18,7 +18,7 @@ Außerdem gibt es eine ordentliche Suite an relevanten Designwerkzeugen, mit Unt
 
 ## Hauptmerkmale
 *   **Offline-First:** Keine Cloud-Abhängigkeiten; es werden keine Daten gesammelt.
-*   **Custom Engine (MobileGS):** Native C++17-Engine für 3D Gaussian Splatting und Spatial Mapping.
+*   **Custom Engine (MobileGS):** Native C++17-Engine für Persistent Voxel Memory (opake Surfel) und Spatial Mapping.
 *   **Vollständige ARCore-Pipeline:** Live-Kamera-Feed über `BackgroundRenderer`, Color-Frame-Relokalisierung und ARCore Depth API — alles füttert die SLAM-Engine mit echten Daten.
 *   **AzNavRail UI:** Daumengesteuerte Navigation für die einhändige Bedienung vor Ort.
 *   **Single GL Render Path:** `ArRenderer` verarbeitet sowohl den Kamerahintergrund (`BackgroundRenderer`) als auch die SLAM-Voxel-Splats (`slamManager.draw()`) in einer einzigen `GLSurfaceView`.
