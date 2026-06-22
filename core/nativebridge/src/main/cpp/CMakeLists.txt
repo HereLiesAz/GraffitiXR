@@ -17,9 +17,6 @@ set(GLM_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../libs/glm)
 add_library(graffitixr SHARED
     GraffitiJNI.cpp
     MobileGS.cpp
-    VoxelHash.cpp
-    SurfaceMesh.cpp
-    SurfaceUnroller.cpp
     StereoProcessor.cpp
     SuperPointDetector.cpp
     DistortionHead.cpp
