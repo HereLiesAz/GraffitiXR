@@ -260,12 +260,27 @@ void MobileGS::relocThreadFunc() {
         // the matched keypoints are mapped through it (rectified frame -> current image) before being
         // stored, so the returned 2D points are ALWAYS in the current camera image — exactly what the
         // PnP below expects.
-        auto buildCorr = [&](const cv::Mat& g, const cv::Mat& Hback,
-                             std::vector<cv::Point2f>& outImg, std::vector<cv::Point3f>& outObj) {
-            std::vector<cv::KeyPoint> kps; cv::Mat descs;
+        // Detect base-frame features ONCE and reuse them: SuperPoint is an ONNX model, so detecting the
+        // same gray twice (plain pass + map matching) would roughly double per-reloc cost. The scaled and
+        // rectified passes run on different images, so buildCorr still detects internally for those.
+        std::vector<cv::KeyPoint> baseKps; cv::Mat baseDescs;
+        {
             bool sp = spOk;
-            if (sp && !mSuperPoint.detect(g, kps, descs)) sp = false;
-            if (!sp) mFeatureDetector->detectAndCompute(g, cv::noArray(), kps, descs);
+            if (sp && !mSuperPoint.detect(gray, baseKps, baseDescs)) sp = false;
+            if (!sp) mFeatureDetector->detectAndCompute(gray, cv::noArray(), baseKps, baseDescs);
+        }
+
+        auto buildCorr = [&](const cv::Mat& g, const cv::Mat& Hback,
+                             std::vector<cv::Point2f>& outImg, std::vector<cv::Point3f>& outObj,
+                             const std::vector<cv::KeyPoint>* preKps = nullptr, const cv::Mat* preDescs = nullptr) {
+            std::vector<cv::KeyPoint> localKps; cv::Mat localDescs;
+            if (!(preKps && preDescs)) {
+                bool sp = spOk;
+                if (sp && !mSuperPoint.detect(g, localKps, localDescs)) sp = false;
+                if (!sp) mFeatureDetector->detectAndCompute(g, cv::noArray(), localKps, localDescs);
+            }
+            const std::vector<cv::KeyPoint>& kps = (preKps && preDescs) ? *preKps : localKps;
+            const cv::Mat& descs = (preKps && preDescs) ? *preDescs : localDescs;
             if (descs.empty() || wallDescs.empty()) return;
             if (descs.type() != wallDescs.type()) return;
 
@@ -289,7 +304,7 @@ void MobileGS::relocThreadFunc() {
 
         std::vector<cv::Point2f> imgPts;
         std::vector<cv::Point3f> objPts;
-        buildCorr(gray, cv::Mat(), imgPts, objPts);
+        buildCorr(gray, cv::Mat(), imgPts, objPts, &baseKps, &baseDescs);
 
         // Multi-scale matching (distance robustness). SuperPoint isn't scale-invariant, and the marks
         // shrink in the frame from far away and grow up close, so also match the frame DOWN- and
@@ -346,22 +361,20 @@ void MobileGS::relocThreadFunc() {
                 if (u >= 0.f && u < gray.cols && v >= 0.f && v < gray.rows) visible.push_back(i);
             }
             if (visible.size() >= 8) {
-                cv::Mat gatedDescs;
-                gatedDescs.reserve(visible.size());
-                for (int i : visible) gatedDescs.push_back(mapDescs.row(i));
-                std::vector<cv::KeyPoint> kps; cv::Mat descs;
-                bool sp = spOk;
-                if (sp && !mSuperPoint.detect(gray, kps, descs)) sp = false;
-                if (!sp) mFeatureDetector->detectAndCompute(gray, cv::noArray(), kps, descs);
-                if (!descs.empty() && descs.type() == gatedDescs.type()) {
-                    cv::Ptr<cv::DescriptorMatcher>& matcher = (descs.type() == CV_32F) ? mL2Matcher : mMatcher;
+                // Preallocate the gated descriptor block with the right size+type and copy rows
+                // (cv::Mat has no usable reserve() on an empty/typeless matrix). Reuse the base detection.
+                cv::Mat gatedDescs((int)visible.size(), mapDescs.cols, mapDescs.type());
+                for (size_t i = 0; i < visible.size(); ++i)
+                    mapDescs.row(visible[i]).copyTo(gatedDescs.row((int)i));
+                if (!baseDescs.empty() && baseDescs.type() == gatedDescs.type()) {
+                    cv::Ptr<cv::DescriptorMatcher>& matcher = (baseDescs.type() == CV_32F) ? mL2Matcher : mMatcher;
                     std::vector<std::vector<cv::DMatch>> matches;
-                    matcher->knnMatch(descs, gatedDescs, matches, 2);
+                    matcher->knnMatch(baseDescs, gatedDescs, matches, 2);
                     size_t before = imgPts.size();
                     for (auto& m : matches) {
                         if (m.size() < 2) continue;
                         if (m[0].distance < 0.75f * m[1].distance) {
-                            imgPts.push_back(kps[m[0].queryIdx].pt);
+                            imgPts.push_back(baseKps[m[0].queryIdx].pt);
                             objPts.push_back(mapKps3d[visible[m[0].trainIdx]]);
                         }
                     }
