@@ -34,4 +34,4 @@ We are building a tool that respects the "flow" of painting. It must be:
 * **No Gamification:** No points, no leaderboards, no avatars.
 
 ---
-*Documentation updated on 2026-04-24 during Persistent Voxel Memory and Pocket-Ready recovery implementation.*
+*Documentation updated on 2026-06-22 during the SLAM right-size and documentation-accuracy pass.*

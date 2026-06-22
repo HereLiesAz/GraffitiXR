@@ -20,7 +20,7 @@ Unit tests live in `src/test/` inside each module. Run all at once or per-module
 | `EditorViewModelTest` | `:feature:editor` | Layer operations, bitmap dimensions, undo/redo |
 | `ProjectManagerTest` | `:core:data` | `getProjectList`, `deleteProject`, `getMapPath`, `importProjectFromUri` failure paths |
 
-*Note: Teleological PnP tracking was migrated completely to the C++ layer (`MobileGS::runPnPMatch`) to eliminate JVM overhead. As a result, it is tested visually on-device rather than via JVM unit tests.*
+*Note: Relocalization and teleological progress tracking run entirely in the C++ layer (`MobileGS::relocThreadFunc` for background PnP snap-back, `MobileGS::tryUpdateFingerprint` for painting-progress) to eliminate JVM overhead. As a result, they are verified visually on-device rather than via JVM unit tests.*
 
 ### Mock patterns
 

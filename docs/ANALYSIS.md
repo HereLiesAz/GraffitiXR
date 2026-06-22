@@ -1,7 +1,7 @@
 # GRAFFITIXR: AUTOPSY & ANALYSIS
 
 ## STATUS: PRODUCTION READY (STABLE)
-**Date:** 2026-04-24
+**Date:** 2026-06-22
 **Condition:** The patient is in peak physical condition. The engine has been streamlined for real-world street art conditions, prioritizing spatial memory over visual vanity.
 
 ---
@@ -28,6 +28,11 @@
 * **Fix:** **Mandatory HW Stereo**. Session initialization now forces `REQUIRE_AND_USE`.
 * **Reward:** HW Stereo data is assigned **0.9 confidence** (nearly immutable), while mono gets 0.5.
 
+### [FIXED] The Dead Scaffolding (Right-Size)
+* **Issue:** Vestigial no-op machinery survived earlier pivots: an idle background thread polling frames only to call an empty `VoxelHash::optimize()`, a never-started sort thread, and empty stubs (`runPnPMatch`, `interpolateAnchorStep`).
+* **Fix:** Excised the dead threads, members, and stubs. Relocalization stays in `relocThreadFunc`; pose smoothing stays in the Kotlin `PoseFusion` layer.
+* **Win:** One fewer always-on thread, lower idle battery/CPU, smaller maintenance surface — with zero behavior change.
+
 ---
 
 ## 2. ARCHITECTURAL OVERVIEW (Current)
@@ -44,4 +49,4 @@
 3.  **Community:** Prepare for Beta launch.
 
 ---
-*Documentation updated on 2026-04-24 during Persistent Voxel Memory and Pocket-Ready recovery implementation.*
+*Documentation updated on 2026-06-22 during the SLAM right-size and documentation-accuracy pass.*
