@@ -94,6 +94,25 @@ How the lean map helps reloc *best* in that case:
 4. **Stays lean via confidence.** Points earn confidence by repeated consistent observation;
    low-confidence pruned, total capped — sparse features, no dense splats/mesh.
 
+## 4b. Hard constraints — the "lean" budget (non-negotiable)
+Design *requirements*, not options, so leanness stays enforceable:
+
+1. **Frustum-gated matching (mandatory).** Never brute-force the whole map. Use the VIO
+   pose to cull to the map points in the current frustum (~hundreds) and match only those,
+   so per-reloc cost stays ≈ today's fingerprint reloc. (Brute-forcing 20k SuperPoint
+   descriptors is ~5 B ops/check — explicitly forbidden.)
+2. **ORB by default** (`CV_8U`, 32 B, Hamming) → ~1 MB at the cap. **SuperPoint is an
+   opt-in quality upgrade** (int8-quantizable); the data model stores the descriptor
+   **type**, so either works with no schema change.
+3. **Configurable cap** — default **5k** points, hard max **20k** — pruned by confidence,
+   so memory/storage are bounded *by construction*.
+4. **Per-keyframe build, periodic reloc.** No per-frame work is ever reintroduced — the
+   per-frame depth-integration cost we removed must not come back.
+5. **No GPU footprint.** Features are CPU-side data; nothing renders (no VBO/splats/mesh).
+
+**Weight budget that must hold:** ≤ ~1 MB RAM and ≤ ~1 MB added to `.gxr` at the 5k ORB
+default; the SuperPoint path (≤ ~5 MB quantized) is gated behind an explicit setting.
+
 ## 5. Architecture sketch (Option A)
 - **Data:** `WallFeatureMap { points3d[N], descriptors[N×D], confidence[N], obsCount[N] }`,
   in a fingerprint-relative frame with a fixed anchor + intrinsics (like the fingerprint).
@@ -101,8 +120,9 @@ How the lean map helps reloc *best* in that case:
   baseline (or depth when available) → associate to existing map points (descriptor +
   reprojection); bump `confidence`/`obsCount`, or add new. Prune `confidence < τ` or long-unobserved.
 - **Persist:** extend `.gxr` (new `featuremap.bin`), parallel to the fingerprint.
-- **Native:** `mWallMap` (cv::Mat descriptors + `vector<Point3f>` + conf); cap size (≈5–20k
-  points) by confidence. `relocThreadFunc` merges map correspondences into the PnP set (or
+- **Native:** `mWallMap` (cv::Mat descriptors + `vector<Point3f>` + conf); **ORB default**,
+  cap configurable (default 5k, max 20k) by confidence. `relocThreadFunc` **frustum-gates**
+  the map to the VIO-visible subset, then merges those correspondences into the PnP set (or
   runs map-PnP + fingerprint-PnP and takes the higher inlier count).
 - **Scan UX:** a sweep that shows **coverage genuinely growing** (can reuse the sector mask —
   now tied to *real* map growth, replacing the dead `splatCount >= 30000` gate).
@@ -114,13 +134,14 @@ How the lean map helps reloc *best* in that case:
 3. Scan build + coverage UX (replaces the vestigial AMBIENT/WALL phases).
 4. Confidence/pruning + matcher tuning **on device**.
 
-## 7. Open questions for you
-1. **Scan effort:** how much sweeping is acceptable before painting? (sets the density target)
-2. **Budget:** memory/storage ceiling for the map? (descriptors dominate)
-3. **Keep the marks fingerprint** as the precision anchor alongside the map? (recommend **yes**)
-4. **SuperPoint asset**: ship the `.onnx` so the map uses learned descriptors (best), or ORB?
-5. Is **Option A** the right ambition, or do you want to start with **C** (multi-region) as a
-   stepping stone and grow into A later?
+## 7. Decisions & remaining open question
+**Decided:** direction = lean feature map (A/D), co-registered to the fingerprint (§4a) ·
+keep the marks fingerprint as the precision anchor · **ORB default**, SuperPoint opt-in ·
+budget bounded by the configurable cap + frustum gating (§4b).
+
+**Still open:**
+1. **Scan effort:** how much sweeping is acceptable before painting? (sets the density target /
+   default cap). Can be tuned in Phase 4 on device, so it does **not** block Phase 1.
 
 ---
 *If A/D looks right, I'll turn §5–6 into a phased implementation plan and start with Phase 1
