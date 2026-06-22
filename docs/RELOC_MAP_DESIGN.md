@@ -1,8 +1,8 @@
 # Relocalization Robustness — Persistent Spatial Map (Design for Review)
 
-> Status: **proposal for your reconsideration**. Nothing built. This lays out the
-> honest options + trade-offs so you can choose the direction before I touch the
-> relocalizer (the crown jewel).
+> Status: **direction confirmed — lean feature map (Option A/D), co-registered to the
+> fingerprint** (see §4a). Options A–D are retained for context. Nothing built yet; Phase 1
+> (data model + persistence + tests) is next, before touching the relocalizer.
 
 ## 1. The goal (your concern, restated)
 Relocalization that is **thorough and smooth over a whole mural** — locks back on from
@@ -40,8 +40,8 @@ consistency); low-confidence points get pruned. Persist it in the `.gxr`. `reloc
 matches the live frame against the **whole map** → wide-area reloc.
 - **Pros:** genuinely robust/smooth wide-area reloc; *is* a confidence system; keeps a
   *purposeful* scan; **subsumes B2** (multi-region is just a coarse version of this).
-- **Cons:** biggest build; touches the relocalizer; descriptor memory (~32–256 B/point);
-  needs tuning.
+- **Cons:** biggest build; touches the relocalizer; descriptor memory (~32–1024 B/point —
+  ORB 32 B, SuperPoint 256 floats = 1024 B → ~20 MB at a 20k-point cap); needs tuning.
 - Effort **High** · Risk **High**.
 
 ### Option B — Geometric point-cloud assist (ICP)
@@ -72,6 +72,27 @@ delivered leanly (sparse features, *not* the dense splat/mesh we removed).
 This is **not a reversal** of the right-size: we deleted the dense map that carried no
 descriptors and never fed reloc (dead weight). This adds the **lean feature map that
 actually serves reloc**. The cleanup cleared the deck; this builds the correct thing on it.
+
+## 4a. Confirmed direction — keep the map (lean) and make it *anticipate* the fingerprint
+
+**Decision:** keep a map, but a **lean feature map** (Option A/D). The driving case:
+**the overlaid artwork is larger than the fingerprint**, so while painting the far reaches
+of the mural the marks are out of frame and the fingerprint alone can't hold the lock there.
+
+How the lean map helps reloc *best* in that case:
+
+1. **One coordinate frame.** Map features are stored **relative to the fingerprint anchor**,
+   so relocalizing against *any* wall patch yields the fingerprint/overlay pose directly —
+   the map is the bridge from "what the camera sees" to "where the fingerprint is."
+2. **Coarse-to-fine.** Map = **wide-area coverage** (holds the lock anywhere on the mural);
+   marks fingerprint = **precision snap** when visible. Fuse by inlier count / confidence.
+3. **Anticipate the fingerprint.** Map + VIO keep a live pose with the marks off-screen, so
+   the app **projects the fingerprint anchor into the current frustum**; when it's about to
+   enter view → *"fingerprint imminent"* → **prime the matcher with the fingerprint
+   descriptors + raise reloc cadence** so the precision snap is instant. Panning away, the
+   map holds the lock so the far mural doesn't drift.
+4. **Stays lean via confidence.** Points earn confidence by repeated consistent observation;
+   low-confidence pruned, total capped — sparse features, no dense splats/mesh.
 
 ## 5. Architecture sketch (Option A)
 - **Data:** `WallFeatureMap { points3d[N], descriptors[N×D], confidence[N], obsCount[N] }`,
