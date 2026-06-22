@@ -95,7 +95,13 @@ class EditorViewModel @Inject constructor(
     val railExpansion: StateFlow<Map<String, Boolean>> =
         projectRepository.currentProject
             .map { it?.railExpansion ?: emptyMap() }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+            // Seed synchronously from the loaded project: initiallyExpanded is one-shot, so if the first
+            // composition saw an empty map the restored state would be ignored when it arrived a frame later.
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                projectRepository.currentProject.value?.railExpansion ?: emptyMap()
+            )
 
     /**
      * Persist a host item's expanded/collapsed state into the project record so it survives reopen.
