@@ -484,6 +484,9 @@ void MobileGS::relocThreadFunc() {
                     mPnpMatchCount.store((int)imgPts.size(), std::memory_order_relaxed);
                     mPnpResultSeq.fetch_add(1, std::memory_order_relaxed);
                     LOGI("Relocalization: PnP match published (%zu/%zu inliers)", inliers.size(), imgPts.size());
+                    // Phase 3 passive build: grow the feature map from this locked frame (default OFF).
+                    if (mMapBuildEnabled.load(std::memory_order_relaxed))
+                        growMapFromReloc(pnpMat, baseKps, baseDescs, fx, fy, cx, cy);
                 }
             }
         }
@@ -553,6 +556,82 @@ bool MobileGS::computeRectifyHomography(const float* viewCur16, cv::Mat& Hcur_fp
     Hcur_fp = cv::Mat(Hc);
     Hfp_cur = Hcur_fp.inv();
     return true;
+}
+
+void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv::KeyPoint>& kps,
+                                const cv::Mat& descs, double fx, double fy, double cx, double cy) {
+    if (descs.empty() || kps.empty() || (int)kps.size() != descs.rows) return;
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (mWallKeypoints3D.size() < 8) return;                                   // need the fingerprint plane
+    if (!mMapDescriptors.empty() && mMapDescriptors.type() != descs.type()) return;
+
+    // Keep the parallel arrays aligned with the points: a restored map may have carried points +
+    // descriptors but empty confidence/obs (both optional in WallFeatureMap). Without this, the add
+    // path below would desync them from mMapPoints3D and corrupt per-point confidence.
+    if (mMapConfidence.size() != mMapPoints3D.size()) mMapConfidence.resize(mMapPoints3D.size(), 1.0f);
+    if (mMapObs.size() != mMapPoints3D.size()) mMapObs.resize(mMapPoints3D.size(), 1);
+
+    // Fit the wall plane (centroid + normal) from the fingerprint's 3D points (in the fingerprint frame).
+    cv::Point3f c(0.f, 0.f, 0.f);
+    for (const auto& p : mWallKeypoints3D) c += p;
+    c *= 1.0f / (float)mWallKeypoints3D.size();
+    double cov[6] = {0,0,0,0,0,0}; // xx,xy,xz,yy,yz,zz
+    for (const auto& p : mWallKeypoints3D) {
+        double dx = p.x - c.x, dy = p.y - c.y, dz = p.z - c.z;
+        cov[0]+=dx*dx; cov[1]+=dx*dy; cov[2]+=dx*dz; cov[3]+=dy*dy; cov[4]+=dy*dz; cov[5]+=dz*dz;
+    }
+    cv::Matx33d C(cov[0],cov[1],cov[2], cov[1],cov[3],cov[4], cov[2],cov[4],cov[5]);
+    cv::Vec3d eval; cv::Matx33d evec;
+    if (!cv::eigen(C, eval, evec)) return;
+    glm::vec3 n((float)evec(2,0), (float)evec(2,1), (float)evec(2,2));   // smallest-eigenvalue eigenvector
+    glm::vec3 cc(c.x, c.y, c.z);
+
+    // Associate detected features to the existing map by descriptor; bump confidence on re-observation.
+    std::vector<char> matched(kps.size(), 0);
+    if (mMapDescriptors.rows >= 2) {   // knnMatch(k=2) needs >=2 candidates for the Lowe ratio
+        cv::Ptr<cv::DescriptorMatcher>& matcher = (descs.type() == CV_32F) ? mL2Matcher : mMatcher;
+        std::vector<std::vector<cv::DMatch>> matches;
+        matcher->knnMatch(descs, mMapDescriptors, matches, 2);
+        for (auto& m : matches) {
+            if (m.size() < 2) continue;
+            if (m[0].distance < 0.75f * m[1].distance) {
+                int ti = m[0].trainIdx, qi = m[0].queryIdx;
+                if (ti >= 0 && ti < (int)mMapConfidence.size() && qi >= 0 && qi < (int)matched.size()) {
+                    mMapConfidence[ti] = std::min(1.0f, mMapConfidence[ti] + 0.1f);
+                    mMapObs[ti] += 1;
+                    matched[qi] = 1;
+                }
+            }
+        }
+    }
+
+    // Back-project unmatched features onto the wall plane and add them, up to the cap.
+    glm::mat4 fpFromCam = glm::inverse(camFromFp);
+    glm::vec3 camCenter(fpFromCam[3][0], fpFromCam[3][1], fpFromCam[3][2]);
+    glm::mat3 R = glm::mat3(fpFromCam);
+    const size_t kMapCap = 5000;
+    int added = 0;
+    for (size_t i = 0; i < kps.size(); ++i) {
+        if (matched[i]) continue;
+        if (mMapPoints3D.size() >= kMapCap) break;
+        glm::vec3 dir = R * glm::vec3((float)((kps[i].pt.x - cx) / fx),
+                                      (float)((kps[i].pt.y - cy) / fy), 1.0f);
+        float denom = glm::dot(n, dir);
+        if (std::fabs(denom) < 1e-6f) continue;
+        float t = glm::dot(n, cc - camCenter) / denom;
+        if (t <= 0.f) continue;            // plane intersection behind the camera
+        glm::vec3 P = camCenter + t * dir;
+        mMapPoints3D.push_back(cv::Point3f(P.x, P.y, P.z));
+        mMapConfidence.push_back(0.1f);
+        mMapObs.push_back(1);
+        mMapDescriptors.push_back(descs.row((int)i));
+        ++added;
+    }
+
+    // Co-register the map to the fingerprint anchor + intrinsics (same frame as the points above).
+    memcpy(mMapAnchorMatrix, mFingerprintAnchorMatrix, 16 * sizeof(float));
+    mMapIntrinsics[0]=(float)fx; mMapIntrinsics[1]=(float)fy; mMapIntrinsics[2]=(float)cx; mMapIntrinsics[3]=(float)cy;
+    if (added > 0) LOGI("Map build: +%d pts (map now %zu)", added, mMapPoints3D.size());
 }
 
 void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean) {

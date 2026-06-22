@@ -846,6 +846,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMapRelocEnabled
     if (gSlamEngine) gSlamEngine->setMapRelocEnabled(enabled == JNI_TRUE);
 }
 
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMapBuildEnabled(JNIEnv*, jobject, jboolean enabled) {
+    if (gSlamEngine) gSlamEngine->setMapBuildEnabled(enabled == JNI_TRUE);
+}
+
 jobject buildFingerprintObject(JNIEnv* env, const MobileGS::FingerprintData& fd) {
     if (fd.descriptors.empty()) return nullptr;
 
