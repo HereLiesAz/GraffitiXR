@@ -82,6 +82,28 @@ android {
         buildConfigField("String", "GH_TOKEN", "\"\"")
     }
 
+    // Release signing is a property of the project, not of each CI invocation. The keystore and
+    // credentials come from the environment: CI decodes the base64 `KEYSTORE_RAW` secret to
+    // app/keystore.jks and exports KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD (see the
+    // release-apk / release-aab / merged-build workflows). KEYSTORE_FILE may override the path.
+    //
+    // When no keystore is present (local dev without the secrets) the "release" config is simply
+    // not created — `findByName` then returns null below, so release builds stay unsigned and debug
+    // builds keep the default debug key. Nothing breaks, and no plaintext credentials live in Git.
+    val releaseKeystore = (System.getenv("KEYSTORE_FILE")?.let { file(it) } ?: file("keystore.jks"))
+        .takeIf { it.exists() }
+
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = releaseKeystore
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -90,6 +112,14 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Null (unsigned) only when no keystore was supplied — e.g. a local build without secrets.
+            signingConfig = signingConfigs.findByName("release")
+        }
+        debug {
+            // The auto-published CI build (merged-build.yml) assembles the debug variant. Sign it with
+            // the RELEASE key when available so its signature stays stable across builds (in-place
+            // updates keep working); fall back to the default debug key for local development.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfig
         }
     }
 
