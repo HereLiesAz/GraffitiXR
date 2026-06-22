@@ -786,33 +786,42 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFeature
         JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type,
         jfloatArray ptsArray, jfloatArray confArray, jintArray obsArray,
         jfloatArray anchorArray, jfloatArray intrArray) {
-    if (!gSlamEngine) return;
+    // Defensive validation (a malformed/old .gxr must never crash native): null refs, a descriptor
+    // blob big enough for rows*cols*elemSize, and parallel arrays of matching length.
+    if (!gSlamEngine || !descArray || !ptsArray) return;
+    if (rows < 0 || cols < 0) return;
+    jsize descLen = env->GetArrayLength(descArray);
+    if (descLen < (jsize)(rows * cols * CV_ELEM_SIZE(type))) return;
+    jsize ptsLen = env->GetArrayLength(ptsArray);
+    if (ptsLen != rows * 3) return;
+    jsize confLen = confArray ? env->GetArrayLength(confArray) : 0;
+    if (confLen > 0 && confLen != rows) return;
+    jsize obsLen = obsArray ? env->GetArrayLength(obsArray) : 0;
+    if (obsLen > 0 && obsLen != rows) return;
+
     jbyte* descData = env->GetByteArrayElements(descArray, nullptr);
     cv::Mat descriptors(rows, cols, type, descData);
-    jsize ptsLen = env->GetArrayLength(ptsArray);
     jfloat* ptsData = env->GetFloatArrayElements(ptsArray, nullptr);
     std::vector<cv::Point3f> points3d;
-    points3d.reserve(ptsLen / 3);
+    points3d.reserve(rows);
     for (int i = 0; i + 2 < ptsLen; i += 3)
         points3d.push_back(cv::Point3f(ptsData[i], ptsData[i+1], ptsData[i+2]));
 
     std::vector<float> conf;
-    jsize confLen = env->GetArrayLength(confArray);
     if (confLen > 0) {
         jfloat* c = env->GetFloatArrayElements(confArray, nullptr);
         conf.assign(c, c + confLen);
         env->ReleaseFloatArrayElements(confArray, c, JNI_ABORT);
     }
     std::vector<int> obs;
-    jsize obsLen = env->GetArrayLength(obsArray);
     if (obsLen > 0) {
         jint* o = env->GetIntArrayElements(obsArray, nullptr);
         obs.assign(o, o + obsLen);
         env->ReleaseIntArrayElements(obsArray, o, JNI_ABORT);
     }
 
-    jfloat* anchor = (env->GetArrayLength(anchorArray) == 16) ? env->GetFloatArrayElements(anchorArray, nullptr) : nullptr;
-    jfloat* intr   = (env->GetArrayLength(intrArray) == 4)    ? env->GetFloatArrayElements(intrArray, nullptr)   : nullptr;
+    jfloat* anchor = (anchorArray && env->GetArrayLength(anchorArray) == 16) ? env->GetFloatArrayElements(anchorArray, nullptr) : nullptr;
+    jfloat* intr   = (intrArray && env->GetArrayLength(intrArray) == 4)    ? env->GetFloatArrayElements(intrArray, nullptr)   : nullptr;
 
     gSlamEngine->restoreWallFeatureMap(descriptors, points3d, conf, obs, anchor, intr);
 

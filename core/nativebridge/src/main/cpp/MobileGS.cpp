@@ -633,8 +633,12 @@ void MobileGS::restoreWallFeatureMap(const cv::Mat& d, const std::vector<cv::Poi
     mMapPoints3D = p;
     mMapConfidence = conf;
     mMapObs = obs;
-    if (anchorMatrix16) memcpy(mMapAnchorMatrix, anchorMatrix16, 16 * sizeof(float));
-    if (intrinsics4)    memcpy(mMapIntrinsics, intrinsics4, 4 * sizeof(float));
+    // Reset (not leave stale) when a map omits co-registration, so it can't inherit a previous
+    // project's anchor/intrinsics.
+    static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    memcpy(mMapAnchorMatrix, anchorMatrix16 ? anchorMatrix16 : kIdentity16, 16 * sizeof(float));
+    if (intrinsics4) memcpy(mMapIntrinsics, intrinsics4, 4 * sizeof(float));
+    else             memset(mMapIntrinsics, 0, 4 * sizeof(float));
 }
 
 void MobileGS::clearWallFeatureMap() {
@@ -643,6 +647,10 @@ void MobileGS::clearWallFeatureMap() {
     mMapPoints3D.clear();
     mMapConfidence.clear();
     mMapObs.clear();
+    // Also drop stale co-registration so a later project can't inherit it.
+    static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    memcpy(mMapAnchorMatrix, kIdentity16, 16 * sizeof(float));
+    memset(mMapIntrinsics, 0, 4 * sizeof(float));
 }
 
 std::vector<uint8_t> MobileGS::exportFingerprint() {
