@@ -6,7 +6,7 @@ A GraffitiXR egy androidos alkalmazás utcai művészek számára. Rengeteg olya
 
 Tehát most pontosan ezt csinálják ezek a firkák.
 
-Fel kellett találnom egy egyedi Gauss-splatting motort, amely a felhő segítsége nélkül működik Androidon – mert a graffiti, mint tudjuk, illegális.
+Fel kellett találnom egy egyedi Persistent Voxel Memory motort, amely a felhő segítsége nélkül működik Androidon – mert a graffiti, mint tudjuk, illegális.
 
 Ezt egy úgynevezett Teleologikus SLAM-mel követtem: mivel tudjuk, hogyan kellene kinéznie az eredménynek, az OpenCV segítségével figyelem a haladásodat. Ez azt jelenti, hogy minél előrébb tartasz, a rétegzés annál szorosabban tapad a falra. Enélkül magával a festménnyel takarnád le azokat a jeleket, ami miatt az alkalmazás egyre kevésbé lenne pontos a folyamat során. Pontosan itt bukik el a többi hasonló alkalmazás.
 
@@ -18,7 +18,7 @@ A **GraffitiXR** egy offline Android-alkalmazás utcai művészek számára. Az 
 
 ## Főbb jellemzők
 *   **Elsősorban Offline:** Nincsenek felhőfüggőségek; nulla adatgyűjtés.
-*   **Egyedi motor (MobileGS):** C++17 natív motor a 3D Gauss-splattinghoz és térbeli térképezéshez.
+*   **Egyedi motor (MobileGS):** C++17 natív motor a Persistent Voxel Memory-hez (opak szurfel) és térbeli térképezéshez.
 *   **Teljes ARCore Pipeline:** Élő kamerakép a `BackgroundRenderer` segítségével, színképkocka-relokalizáció és ARCore Mélységi API — melyek mind valós adatokat táplálnak a SLAM motorba.
 *   **AzNavRail Felület:** Hüvelykujjal vezérelhető navigáció az egykezes terepi használathoz.
 *   **Egységes GL Render Útvonal:** Az `ArRenderer` egyetlen `GLSurfaceView`-ban kezeli a kamerahátteret (`BackgroundRenderer`) és a SLAM voxel splatteket (`slamManager.draw()`).

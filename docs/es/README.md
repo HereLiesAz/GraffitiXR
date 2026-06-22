@@ -4,7 +4,7 @@ GraffitiXR es una herramienta de realidad aumentada de nivel profesional para pi
 
 ## Características Principales
 
-*   **Proyección AR:** Proyecta diseños a escala 1:1 en paredes usando mapeo espacial ARCore y Gaussian Splatting para seguimiento de texturas.
+*   **Proyección AR:** Proyecta diseños a escala 1:1 en paredes usando mapeo espacial ARCore y Persistent Voxel Memory (surfels opacos) para seguimiento espacial.
 *   **Modo Superposición:** Capa de cámara en vivo de la vieja escuela para encuadres y verificaciones rápidas sin seguimiento espacial complejo.
 *   **Modo Maqueta:** Haz maquetas de tus diseños en fotos de paredes estáticas para previsualizar cómo se verán sin necesitar pintar una sola gota.
 *   **Modo Mesa de Luz:** Convierte tu teléfono en una caja de luz para calcar diseños físicamente en papel. Bloquea la pantalla para evitar gestos accidentales.
@@ -29,7 +29,7 @@ La aplicación utiliza la arquitectura recomendada por Android (Arquitectura lim
     *   `:core:data`: Manejo de datos, repositorios, Base de datos Room, preferencias.
     *   `:core:domain`: Casos de uso e interfaces de repositorio.
     *   `:core:design`: Componentes de diseño, tipografía (`BlackoutFontFamily`), temas.
-    *   `:core:nativebridge`: Contiene el código JNI/C++ nativo para SLAM, Gaussian Splatting y procesamiento de imágenes.
+    *   `:core:nativebridge`: Contiene el código JNI/C++ nativo para SLAM, Persistent Voxel Memory y procesamiento de imágenes.
 *   **`:feature`**: Módulos de funcionalidad independientes.
     *   `:feature:dashboard`: La pantalla de "Biblioteca" para listar y gestionar proyectos.
     *   `:feature:editor`: Contiene la lógica del editor, `MainScreen`, el sistema de capas, los rieles de navegación y herramientas (Pinceles, Filtros, Ajustes).

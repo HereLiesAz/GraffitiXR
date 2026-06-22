@@ -6,7 +6,7 @@ Então, estou criando algo melhor, adaptando (o que os especialistas chamam de) 
 
 Então, agora, é isso que esses rabiscos fazem.
 
-Eu tive que inventar um motor de Gaussian Splatting personalizado que funciona no Android sem a ajuda da nuvem — porque graffiti é, sabe, ilegal.
+Eu tive que inventar um motor de Persistent Voxel Memory personalizado que funciona no Android sem a ajuda da nuvem — porque graffiti é, sabe, ilegal.
 
 E segui com o que chamo de Teleological Slam (SLAM Teleológico) — já que sabemos como deve ser o resultado, uso o OpenCV para observar o seu progresso, o que significa que quanto mais você avança, mais firmemente a sobreposição se prende à parede. Sem isso, você cobriria essas marcas com a própria pintura, tornando o aplicativo menos preciso à medida que você avança. É exatamente aí que outros aplicativos semelhantes falham de verdade.
 
@@ -18,7 +18,7 @@ Além disso, há um conjunto decente de ferramentas de design pertinentes, com s
 
 ## Principais Recursos
 *   **Primeiro Offline:** Sem dependências da nuvem; zero dados coletados.
-*   **Motor Personalizado (MobileGS):** Motor nativo em C++17 para Gaussian Splatting 3D e mapeamento espacial.
+*   **Motor Personalizado (MobileGS):** Motor nativo em C++17 para Persistent Voxel Memory (surfels opacos) e mapeamento espacial.
 *   **Pipeline Completo do ARCore:** Feed da câmera ao vivo via `BackgroundRenderer`, relocalização de quadros de cor e ARCore Depth API — todos alimentando o motor SLAM com dados reais.
 *   **Interface AzNavRail:** Navegação acionada pelo polegar para uso com uma mão em campo.
 *   **Caminho Único de Renderização GL:** `ArRenderer` lida tanto com o fundo da câmera (`BackgroundRenderer`) quanto com os splats de voxel SLAM (`slamManager.draw()`) em uma única `GLSurfaceView`.

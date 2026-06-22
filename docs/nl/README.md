@@ -6,7 +6,7 @@ Dus ik maak iets beters door de rastermethode opnieuw te gebruiken (wat de kenne
 
 Dus dat is wat die krabbels doen.
 
-Ik moest een aangepaste Gaussiaanse Splatting-engine uitvinden die op Android werkt zonder de hulp van de cloud - omdat graffiti, weet je, illegaal is.
+Ik moest een aangepaste Persistent Voxel Memory-engine uitvinden die op Android werkt zonder de hulp van de cloud - omdat graffiti, weet je, illegaal is.
 
 En ik volgde het op met wat ik een Teleological Slam noem - omdat we weten hoe het resultaat eruit zou moeten zien, gebruik ik OpenCV om je voortgang te bekijken, wat betekent dat hoe verder je komt, hoe strakker de overlay aan de muur blijft plakken. Zonder dit zou je die markeringen met het schilderij zelf bedekken, waardoor de app gaandeweg minder nauwkeurig wordt. Dat is precies waar andere apps zoals deze echt falen.
 
@@ -18,7 +18,7 @@ En dan is er nog een behoorlijke reeks relevante ontwerptools, met ondersteuning
 
 ## Belangrijkste kenmerken
 *   **Offline-First:** Geen cloudafhankelijkheden; nul gegevens verzameld.
-*   **Aangepaste engine (MobileGS):** Native C++17-engine voor 3D Gaussiaanse splatting en ruimtelijke mapping.
+*   **Aangepaste engine (MobileGS):** Native C++17-engine voor Persistent Voxel Memory (opake surfels) en ruimtelijke mapping.
 *   **Volledige ARCore Pipeline:** Live camerafeed via `BackgroundRenderer`, herlokalisatie van kleurframes en ARCore Depth API - die allemaal echte gegevens naar de SLAM-engine sturen.
 *   **AzNavRail UI:** Duimgestuurde navigatie voor gebruik met één hand in het veld.
 *   **Enkel GL Render-pad:** `ArRenderer` verwerkt zowel de camera-achtergrond (`BackgroundRenderer`) als SLAM-voxelmarkeringen (`slamManager.draw()`) in een enkele `GLSurfaceView`.
