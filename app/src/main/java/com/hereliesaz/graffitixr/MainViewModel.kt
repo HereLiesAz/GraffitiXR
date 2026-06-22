@@ -343,9 +343,7 @@ class MainViewModel @Inject constructor(
     private fun handleSingleCapture(bitmap: Bitmap, intr: FloatArray, view: FloatArray, wallPlane: FloatArray?) {
         if (wallPlane == null || wallPlane.size < 6) {
             resetCaptureUi()
-            Toast.makeText(context,
-                "Aim at a wall shown in green (face it straight-on, within ~3 m), then tap your marks.",
-                Toast.LENGTH_LONG).show()
+            Toast.makeText(context, notOnGreenWallMessage, Toast.LENGTH_LONG).show()
             return
         }
         resetCaptureUi()
@@ -386,6 +384,21 @@ class MainViewModel @Inject constructor(
                 Toast.makeText(context, "Target Saved & Locked", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    // Shared guidance shown when single-capture target creation isn't aimed at a green wall plane
+    // (used by both the pre-review gate and the handleSingleCapture backstop). Toast-in-VM matches the
+    // existing capture toasts here; a full AppStrings/event-channel i18n pass is a separate cleanup.
+    private val notOnGreenWallMessage =
+        "Aim at a wall shown in green (face it straight-on, within ~3 m), then tap your marks."
+
+    /**
+     * The single-capture tap wasn't on a green (parallel, in-range) wall plane. Guide the artist;
+     * the capture frame is discarded separately (ArViewModel.clearCaptureForRetry) so they stay in
+     * tap mode and can simply re-aim and tap again.
+     */
+    fun notifyTargetNotOnWall() {
+        Toast.makeText(context, notOnGreenWallMessage, Toast.LENGTH_LONG).show()
     }
 
     fun onCancelCaptureClicked() {
