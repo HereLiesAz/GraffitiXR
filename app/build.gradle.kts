@@ -90,16 +90,28 @@ android {
     // When no keystore is present (local dev without the secrets) the "release" config is simply
     // not created — `findByName` then returns null below, so release builds stay unsigned and debug
     // builds keep the default debug key. Nothing breaks, and no plaintext credentials live in Git.
-    val releaseKeystore = (System.getenv("KEYSTORE_FILE")?.let { file(it) } ?: file("keystore.jks"))
-        .takeIf { it.exists() }
+    val envKeystorePassword = System.getenv("KEYSTORE_PASSWORD")
+    val envKeyAlias = System.getenv("KEY_ALIAS")
+    val envKeyPassword = System.getenv("KEY_PASSWORD")
+    // Resolve KEYSTORE_FILE against the repo root so a relative CI path can't become app/app/...;
+    // default to this module's keystore.jks. Enable signing only when the keystore AND all three
+    // credentials are present, so a stray local keystore without env credentials still falls back
+    // gracefully (configuration succeeds; the build doesn't blow up at execution on missing creds).
+    val releaseKeystore = (System.getenv("KEYSTORE_FILE")?.let { rootProject.file(it) } ?: file("keystore.jks"))
+        .takeIf {
+            it.exists() &&
+                !envKeystorePassword.isNullOrEmpty() &&
+                !envKeyAlias.isNullOrEmpty() &&
+                !envKeyPassword.isNullOrEmpty()
+        }
 
     signingConfigs {
         if (releaseKeystore != null) {
             create("release") {
                 storeFile = releaseKeystore
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
+                storePassword = envKeystorePassword
+                keyAlias = envKeyAlias
+                keyPassword = envKeyPassword
             }
         }
     }
