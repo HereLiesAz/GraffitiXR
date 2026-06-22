@@ -1169,6 +1169,12 @@ class ArViewModel @Inject constructor(
                     if (s * s == fp.patchData.size) slamManager.setWallPatchBytes(fp.patchData, s)
                 }
             }
+            // Restore the persistent wall feature map (Phase 2a: stored in native; matched in Phase 2b).
+            // Independent of the marks fingerprint above and co-registered to the same anchor. Null on
+            // every current project until the passive builder (Phase 3) starts producing one.
+            project.wallFeatureMap?.let { map ->
+                if (map.pointCount > 0) slamManager.restoreWallFeatureMap(map)
+            }
         }
     }
 

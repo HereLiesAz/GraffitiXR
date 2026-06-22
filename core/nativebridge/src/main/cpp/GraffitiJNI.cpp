@@ -778,6 +778,60 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
     env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
 }
 
+// Persistent wall feature map (Phase 2a: store only). Mirrors the metric-fingerprint restore but
+// adds parallel per-point confidence (jfloatArray) + obs (jintArray); anchor/intrinsics are
+// passed through only when correctly sized (16 / 4), else left at their native defaults.
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFeatureMap(
+        JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type,
+        jfloatArray ptsArray, jfloatArray confArray, jintArray obsArray,
+        jfloatArray anchorArray, jfloatArray intrArray) {
+    if (!gSlamEngine) return;
+    jbyte* descData = env->GetByteArrayElements(descArray, nullptr);
+    cv::Mat descriptors(rows, cols, type, descData);
+    jsize ptsLen = env->GetArrayLength(ptsArray);
+    jfloat* ptsData = env->GetFloatArrayElements(ptsArray, nullptr);
+    std::vector<cv::Point3f> points3d;
+    points3d.reserve(ptsLen / 3);
+    for (int i = 0; i + 2 < ptsLen; i += 3)
+        points3d.push_back(cv::Point3f(ptsData[i], ptsData[i+1], ptsData[i+2]));
+
+    std::vector<float> conf;
+    jsize confLen = env->GetArrayLength(confArray);
+    if (confLen > 0) {
+        jfloat* c = env->GetFloatArrayElements(confArray, nullptr);
+        conf.assign(c, c + confLen);
+        env->ReleaseFloatArrayElements(confArray, c, JNI_ABORT);
+    }
+    std::vector<int> obs;
+    jsize obsLen = env->GetArrayLength(obsArray);
+    if (obsLen > 0) {
+        jint* o = env->GetIntArrayElements(obsArray, nullptr);
+        obs.assign(o, o + obsLen);
+        env->ReleaseIntArrayElements(obsArray, o, JNI_ABORT);
+    }
+
+    jfloat* anchor = (env->GetArrayLength(anchorArray) == 16) ? env->GetFloatArrayElements(anchorArray, nullptr) : nullptr;
+    jfloat* intr   = (env->GetArrayLength(intrArray) == 4)    ? env->GetFloatArrayElements(intrArray, nullptr)   : nullptr;
+
+    gSlamEngine->restoreWallFeatureMap(descriptors, points3d, conf, obs, anchor, intr);
+
+    env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
+    env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
+    if (anchor) env->ReleaseFloatArrayElements(anchorArray, anchor, JNI_ABORT);
+    if (intr)   env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearWallFeatureMap(JNIEnv*, jobject) {
+    if (gSlamEngine) gSlamEngine->clearWallFeatureMap();
+}
+
+JNIEXPORT jint JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetMapPointCount(JNIEnv*, jobject) {
+    return gSlamEngine ? gSlamEngine->getMapPointCount() : 0;
+}
+
 jobject buildFingerprintObject(JNIEnv* env, const MobileGS::FingerprintData& fd) {
     if (fd.descriptors.empty()) return nullptr;
 
