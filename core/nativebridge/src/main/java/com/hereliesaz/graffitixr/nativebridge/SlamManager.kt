@@ -118,7 +118,7 @@ class SlamManager @Inject constructor(
     fun pruneByConfidence(threshold: Float) = nativePruneByConfidence(threshold)
 
     fun setRelocEnabled(enabled: Boolean) = nativeSetRelocEnabled(enabled)
-    /** Teleological self-grow (default OFF): promote validated new marks into the live fingerprint. */
+    /** Teleological self-grow (default ON): promote validated new marks into the live fingerprint. */
     fun setSelfGrowEnabled(enabled: Boolean) = nativeSetSelfGrowEnabled(enabled)
 
     /**
