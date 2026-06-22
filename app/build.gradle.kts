@@ -40,10 +40,14 @@ val localProperties = Properties().apply {
 val versionBuildOverride = project.findProperty("versionBuild")?.toString()?.toIntOrNull()
 var currentVersionCode = versionBuildOverride ?: versionProps.getProperty("versionBuild", "1").toInt()
 
-// True when the requested tasks actually compile/assemble the app (not a sync, `tasks`, `clean`, etc.).
-val isBuilding = gradle.startParameter.taskNames.any { taskName ->
+// True when the requested tasks actually compile/assemble the app — not a sync, `tasks`, `clean`,
+// a `--dry-run`, or a diagnostic like `buildEnvironment`/`buildHealth`. Build verbs are matched as a
+// prefix and the `build` lifecycle task exactly, so diagnostics that merely contain "build" don't trip it.
+val startParameter = gradle.startParameter
+val buildVerbs = listOf("assemble", "bundle", "install", "package", "compile")
+val isBuilding = !startParameter.isDryRun && startParameter.taskNames.any { taskName ->
     val task = taskName.substringAfterLast(':').lowercase()
-    listOf("assemble", "build", "bundle", "install", "package", "compile").any { task.contains(it) }
+    task == "build" || buildVerbs.any { task.startsWith(it) }
 }
 if (versionBuildOverride == null && isBuilding) {
     currentVersionCode++
