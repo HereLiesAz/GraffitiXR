@@ -1401,7 +1401,9 @@ class MainActivity : ComponentActivity() {
                 // re-entering Design from a Mode). expandWhen re-fires on the false->true edge; the user
                 // can still collapse it manually. initiallyExpanded seeds the very first render.
                 initiallyExpanded = isDesignMode,
-                expandWhen = { isDesignMode },
+                // Read editorMode directly in the lambda (not the captured isDesignMode snapshot) so the
+                // evaluator subscribes to the state and re-fires on mode changes.
+                expandWhen = { editorUiState.editorMode == EditorMode.DESIGN },
                 onClick = {
                     // From a Mode, tapping Design navigates to the dedicated Design screen. In Design it
                     // just expands the design tools below (this onClick is a no-op there).
@@ -1435,7 +1437,7 @@ class MainActivity : ComponentActivity() {
                     azRailSubHostItem(
                         id = "design.layers", hostId = "host.design", text = "Layers",
                         color = navItemColor, shape = AzButtonShape.RECTANGLE,
-                        expandWhen = { editorUiState.layers.isNotEmpty() && isDesignMode }
+                        expandWhen = { editorUiState.layers.isNotEmpty() && editorUiState.editorMode == EditorMode.DESIGN }
                     )
                 }
                 editorUiState.layers.reversed().forEach { layer ->
