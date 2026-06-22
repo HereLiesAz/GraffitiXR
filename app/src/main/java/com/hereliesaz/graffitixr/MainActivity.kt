@@ -456,8 +456,14 @@ class MainActivity : ComponentActivity() {
                 var showDesignInstructionsDialog by remember { mutableStateOf(false) }
 
                 LaunchedEffect(arUiState.isAnchorEstablished) {
-                    if (arUiState.isAnchorEstablished && editorUiState.layers.isEmpty()) {
-                        showDesignInstructionsDialog = true
+                    if (arUiState.isAnchorEstablished) {
+                        if (editorUiState.layers.isEmpty()) {
+                            showDesignInstructionsDialog = true
+                        } else if (editorUiState.activeLayerId == null) {
+                            // Target is locked in — hand screen gestures to a layer so the user can
+                            // place artwork immediately instead of being stuck in target mode.
+                            editorViewModel.onLayerActivated(editorUiState.layers.first().id)
+                        }
                     }
                 }
 
@@ -1930,8 +1936,23 @@ class MainActivity : ComponentActivity() {
                 azRailSubHostItem(id = "mode.ar", hostId = "host.modes", text = navStrings.arMode, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE)
                 // Target capture — only meaningful while in AR mode.
                 if (editorUiState.editorMode == EditorMode.AR) {
-                    azRailSubItem(id = "target.create", hostId = "mode.ar", text = navStrings.grid, color = navItemColor, shape = AzButtonShape.RECTANGLE) {
-                        if (hasCameraPermission) mainViewModel.startTargetCapture() else requestPermissions()
+                    // Target button is a toggle: selected (cyan) means screen taps create the target;
+                    // tapping it again cancels. After a target is accepted it deselects, so making
+                    // another target requires re-selecting this button.
+                    azRailSubItem(
+                        id = "target.create",
+                        hostId = "mode.ar",
+                        text = navStrings.grid,
+                        color = if (mainUiState.isWaitingForTap) Cyan else navItemColor,
+                        shape = AzButtonShape.RECTANGLE
+                    ) {
+                        if (mainUiState.isWaitingForTap) {
+                            mainViewModel.cancelTapMode()
+                        } else if (hasCameraPermission) {
+                            mainViewModel.startTargetCapture()
+                        } else {
+                            requestPermissions()
+                        }
                     }
                     // Flashlight — illuminate the wall in low light while tracking.
                     azRailSubItem(id = "mode.ar.light", hostId = "mode.ar", text = navStrings.light, color = if (arUiState.isFlashlightOn) Cyan else navItemColor, shape = AzButtonShape.NONE) {

@@ -269,7 +269,9 @@ private fun FeatureSelectionReview(
                     .pointerInput(imgX, imgY, imgW, imgH) {
                         // Skip redundant erases at essentially the same spot (cheap, keeps the
                         // mutex-serialized flood-fill from being spammed while dwelling on one mark).
-                        val minMovePx = 6.dp.toPx()
+                        // Kept tight so a drag samples often enough that the per-sample snap radius
+                        // (eraseColorBlob) covers the gaps between samples — no marks slip through.
+                        val minMovePx = 3.dp.toPx()
                         fun eraseAt(pos: Offset, last: Offset?): Boolean {
                             if (last != null && (pos - last).getDistance() < minMovePx) return false
                             val nx = ((pos.x - imgX) / imgW).coerceIn(0f, 1f)

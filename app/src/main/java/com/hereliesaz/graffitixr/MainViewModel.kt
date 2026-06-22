@@ -30,6 +30,9 @@ data class MainUiState(
     val isTouchLocked: Boolean = false,
     val showUnlockInstructions: Boolean = false,
     val isCapturingTarget: Boolean = false,
+    // True when the current project already has a saved target fingerprint. Drives whether AR entry
+    // auto-selects the Target button (no target yet) or drops the user straight into layer editing.
+    val hasExistingTarget: Boolean = false,
     val captureStep: CaptureStep = CaptureStep.NONE,
     // Phase 4: True while the user is in "tap your painted marks" mode.
     val isWaitingForTap: Boolean = false,
@@ -67,6 +70,16 @@ class MainViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+
+    init {
+        // Track whether the loaded project already has a saved target so AR entry knows whether to
+        // pre-select the Target button. Updated on confirm via the repository's project re-load.
+        viewModelScope.launch {
+            projectRepository.currentProject.collect { project ->
+                _uiState.update { it.copy(hasExistingTarget = project?.fingerprint != null) }
+            }
+        }
+    }
 
     val completedTutorials: StateFlow<Set<String>> = settingsRepository.completedTutorials
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
