@@ -105,7 +105,7 @@ class EditorViewModel @Inject constructor(
 
     /**
      * Persist a host item's expanded/collapsed state into the project record so it survives reopen.
-     * Wire this to AzNavRail's per-host `onExpandedChange` when the library exposes it (expected 10.11).
+     * Wired to AzNavRail's per-host `onExpandedChange` (10.11), which fires on manual toggles only.
      */
     fun onRailHostExpansionChanged(hostId: String, expanded: Boolean) {
         viewModelScope.launch(dispatchers.io) {

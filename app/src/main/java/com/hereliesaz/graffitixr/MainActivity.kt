@@ -1367,9 +1367,8 @@ class MainActivity : ComponentActivity() {
         if (!showLibrary) {
             val isDesignMode = editorUiState.editorMode == EditorMode.DESIGN
             // railExpansion (param) is the per-host expansion restored from the project so the rail reopens
-            // as the user left it. Empty until onRailHostExpansionChanged populates it (once AzNavRail
-            // exposes a per-host onExpandedChange — expected 10.11); until then initiallyExpanded/expandWhen
-            // drive expansion.
+            // as the user left it. Seeded into initiallyExpanded below; captured by onExpandedChange (manual
+            // toggles only). The expandWhen rules still drive reactive (a)/(b) expansion.
 
             // 1. DESIGN FOLDER (TOP)
             azRailHostItem(
@@ -1384,7 +1383,9 @@ class MainActivity : ComponentActivity() {
                 // Read editorMode directly in the lambda (not the captured isDesignMode snapshot) so the
                 // evaluator subscribes to the state and re-fires on mode changes.
                 expandWhen = { editorUiState.editorMode == EditorMode.DESIGN },
-                // TODO(AzNavRail 10.11): onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.design", it) },
+                // Persist only genuine user intent: onExpandedChange fires on manual toggles, not on
+                // expandWhen/initiallyExpanded programmatic changes.
+                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.design", it) },
                 onClick = {
                     // From a Mode, tapping Design navigates to the dedicated Design screen. In Design it
                     // just expands the design tools below (this onClick is a no-op there).
@@ -1420,8 +1421,8 @@ class MainActivity : ComponentActivity() {
                         color = navItemColor, shape = AzButtonShape.RECTANGLE,
                         // Restore the user's last expansion on reopen; default expanded when layers exist.
                         initiallyExpanded = railExpansion["design.layers"] ?: true,
-                        expandWhen = { editorUiState.layers.isNotEmpty() && editorUiState.editorMode == EditorMode.DESIGN }
-                        // TODO(AzNavRail 10.11): onExpandedChange = { editorViewModel.onRailHostExpansionChanged("design.layers", it) }
+                        expandWhen = { editorUiState.layers.isNotEmpty() && editorUiState.editorMode == EditorMode.DESIGN },
+                        onExpandedChange = { editorViewModel.onRailHostExpansionChanged("design.layers", it) }
                     )
                 }
                 editorUiState.layers.reversed().forEach { layer ->
