@@ -1,6 +1,0 @@
-- [ ] Fix unresolved reference `getPerspectiveTransform` in `ImageProcessor.kt`
-- [ ] Clean `:opencv` module native build
-- [ ] Verify build
-    - [ ] Run `:core:common:compileReleaseKotlin`
-    - [ ] Run `:opencv:assembleRelease`
-    - [ ] Run `:app:assembleDebug`

@@ -1,7 +1,7 @@
 # Task Flow & Contribution
 
 ## 1. Pick a Task
-Check `TODO.md`. Look for "High Priority".
+Check `BACKLOG.md` (repo root). Look for "High Priority".
 
 ## 2. Create a Branch
 Format: `feature/your-feature-name` or `fix/issue-description`.
