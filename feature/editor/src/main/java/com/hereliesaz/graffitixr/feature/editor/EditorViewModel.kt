@@ -31,6 +31,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -82,6 +86,32 @@ class EditorViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState = _uiState.asStateFlow()
+
+    /**
+     * Per-host AzNavRail expansion state (host id -> expanded), surfaced from the current project so the
+     * rail can restore exactly as the user left it on reopen. Empty until [onRailHostExpansionChanged]
+     * populates it (which happens once AzNavRail exposes a per-host onExpandedChange — expected 10.11).
+     */
+    val railExpansion: StateFlow<Map<String, Boolean>> =
+        projectRepository.currentProject
+            .map { it?.railExpansion ?: emptyMap() }
+            // Seed synchronously from the loaded project: initiallyExpanded is one-shot, so if the first
+            // composition saw an empty map the restored state would be ignored when it arrived a frame later.
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                projectRepository.currentProject.value?.railExpansion ?: emptyMap()
+            )
+
+    /**
+     * Persist a host item's expanded/collapsed state into the project record so it survives reopen.
+     * Wired to AzNavRail's per-host `onExpandedChange` (10.11), which fires on manual toggles only.
+     */
+    fun onRailHostExpansionChanged(hostId: String, expanded: Boolean) {
+        viewModelScope.launch(dispatchers.io) {
+            projectRepository.updateProject { it.copy(railExpansion = it.railExpansion + (hostId to expanded)) }
+        }
+    }
 
     private val history = EditHistory()
 
