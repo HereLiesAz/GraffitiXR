@@ -57,4 +57,4 @@ Cause: Incorrect rotation code in JNI.
 Fix: Ensure `ArRenderer` is passing the correct `cvRotateCode` to both color and depth feeds.
 
 ---
-*Documentation updated on 2026-04-24 during Persistent Voxel Memory and Pocket-Ready recovery implementation.*
+*Documentation updated on 2026-06-22 during the SLAM right-size and documentation-accuracy pass.*

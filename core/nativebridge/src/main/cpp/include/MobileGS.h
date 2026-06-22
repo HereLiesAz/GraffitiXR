@@ -120,8 +120,6 @@ public:
 
 private:
     void mapThreadFunc();
-    void optimizeThreadFunc();
-    void sortThreadFunc();
 
     struct FrameData {
         cv::Mat depth;
@@ -140,19 +138,11 @@ private:
     std::vector<FrameData> mFrameQueue;
     std::atomic<bool> mMapRunning{false};
 
-    std::thread mOptimizeThread;
-    std::atomic<bool> mOptimizeRunning{false};
-
-    std::thread mSortThread;
-    std::atomic<bool> mSortRunning{false};
-
     void relocThreadFunc();
-    void runPnPMatch(const cv::Mat& frame);
     // Teleological self-grow (gatekeeper stage): measure how much of the registered artwork base is now
     // corroborated by real wall content in the clean camera frame -> mPaintingProgress. Read-only on the
     // reloc fingerprint; the promotion step (adding validated new marks) is staged separately.
     void tryUpdateFingerprint(const cv::Mat& grayClean);
-    void interpolateAnchorStep();
     // Plane-guided rectification: homography (current-image <-> fingerprint-image) from the wall plane
     // and the VIO baseline between the current and fingerprint-capture views, plus the viewing
     // obliquity in degrees. False if no fingerprint view is stored or the geometry is degenerate.

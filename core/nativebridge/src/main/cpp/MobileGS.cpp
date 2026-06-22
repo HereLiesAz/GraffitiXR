@@ -100,10 +100,6 @@ void MobileGS::initialize(int width, int height) {
         mMapRunning = true;
         mMapThread = std::thread(&MobileGS::mapThreadFunc, this);
     }
-    if (!mOptimizeRunning) {
-        mOptimizeRunning = true;
-        mOptimizeThread = std::thread(&MobileGS::optimizeThreadFunc, this);
-    }
 }
 
 void MobileGS::initGl() {
@@ -144,7 +140,6 @@ void MobileGS::resetGlContext() {
 
 void MobileGS::draw(bool debugTint) {
     std::lock_guard<std::mutex> lock(mMutex);
-    interpolateAnchorStep();
     if (!mCameraReady) return;
 
     glm::mat4 V = glm::make_mat4(mViewMatrix);
@@ -166,7 +161,6 @@ void MobileGS::draw(bool debugTint) {
 
 void MobileGS::drawDebugLayers(bool voxels, bool mesh) {
     std::lock_guard<std::mutex> lock(mMutex);
-    interpolateAnchorStep();
     if (!mCameraReady) return;
     glm::mat4 V = glm::make_mat4(mViewMatrix);
     glm::mat4 P = glm::make_mat4(mProjMatrix);
@@ -181,7 +175,6 @@ void MobileGS::drawDebugLayers(bool voxels, bool mesh) {
 
 void MobileGS::drawCoverage() {
     std::lock_guard<std::mutex> lock(mMutex);
-    interpolateAnchorStep();
     if (!mCameraReady) return;
     glm::mat4 V = glm::make_mat4(mViewMatrix);
     glm::mat4 P = glm::make_mat4(mProjMatrix);
@@ -552,8 +545,6 @@ void MobileGS::relocThreadFunc() {
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
 }
-void MobileGS::runPnPMatch(const cv::Mat& frame) {}
-
 bool MobileGS::computeRectifyHomography(const float* viewCur16, cv::Mat& Hcur_fp,
                                         cv::Mat& Hfp_cur, double& obliquityDeg) {
     glm::mat4 viewCur = glm::make_mat4(viewCur16);
@@ -724,43 +715,18 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean) {
     }
     LOGI("Teleological self-grow: promoted %zu marks (wall now %zu)", newPts.size(), mWallKeypoints3D.size());
 }
-void MobileGS::interpolateAnchorStep() {}
 void MobileGS::setArCoreTrackingState(bool t) { mIsArCoreTracking.store(t, std::memory_order_relaxed); }
-
-void MobileGS::optimizeThreadFunc() {
-    setpriority(PRIO_PROCESS, 0, 19);
-    JniThreadAttacher attacher;
-    while (mOptimizeRunning) {
-        FrameData latestFrame;
-        bool hasFrame = false;
-        {
-            std::lock_guard<std::mutex> lock(mQueueMutex);
-            if (!mFrameQueue.empty()) { latestFrame = mFrameQueue.back(); hasFrame = true; }
-        }
-        if (hasFrame) {
-            cv::Mat colorRGB;
-            if (latestFrame.isYuv) cv::cvtColor(latestFrame.color, colorRGB, cv::COLOR_YUV2RGB_NV21);
-            else colorRGB = latestFrame.color;
-            mVoxelHash.optimize(latestFrame.depth, colorRGB, latestFrame.viewMatrix, latestFrame.projMatrix);
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-}
 
 void MobileGS::destroy() {
     mMapRunning = false;
-    mOptimizeRunning = false;
     mRelocRunning = false;
-    mSortRunning = false;
     mQueueCv.notify_all();
     {
         std::lock_guard<std::mutex> lock(mRelocMutex);
         mRelocCv.notify_all();
     }
     if (mMapThread.joinable()) mMapThread.join();
-    if (mOptimizeThread.joinable()) mOptimizeThread.join();
     if (mRelocThread.joinable()) mRelocThread.join();
-    if (mSortThread.joinable()) mSortThread.join();
 }
 
 void MobileGS::saveModel(const std::string& p) {
@@ -1153,8 +1119,6 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
 
     return fd;
 }
-void MobileGS::sortThreadFunc() {}
-
 void MobileGS::getStageTimingsAndReset(float* out) {
     for (int i = 0; i < kStageCount; ++i) {
         uint64_t n = mStageSamples[i].exchange(0, std::memory_order_relaxed);
