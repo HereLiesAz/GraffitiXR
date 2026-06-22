@@ -14,7 +14,6 @@
 #include <cstring>
 #include <cstdint>
 #include "include/MobileGS.h"
-#include "include/SurfaceUnroller.h"
 #include "include/StereoProcessor.h"
 #include "include/ImageWarper.h"
 
@@ -256,20 +255,9 @@ extern "C" {
 JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetAnchorCandidates(
         JNIEnv* env, jobject thiz, jfloat threshold, jint maxCount) {
-    if (!gSlamEngine) return nullptr;
-    std::vector<Splat> candidates;
-    gSlamEngine->getAnchorCandidates(candidates, threshold, maxCount);
-    if (candidates.empty()) return nullptr;
-
-    jfloatArray result = env->NewFloatArray((jsize)(candidates.size() * 3));
-    if (!result) return nullptr;
-    std::vector<float> flat;
-    flat.reserve(candidates.size() * 3);
-    for (const auto& s : candidates) {
-        flat.push_back(s.x); flat.push_back(s.y); flat.push_back(s.z);
-    }
-    env->SetFloatArrayRegion(result, 0, (jsize)flat.size(), flat.data());
-    return result;
+    // Voxel/splat map deleted: no splat-based anchor candidates. Callers handle null.
+    (void) env; (void) thiz; (void) threshold; (void) maxCount;
+    return nullptr;
 }
 
 JNIEXPORT jfloat JNICALL
@@ -1107,20 +1095,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPersistentMesh(
 
 extern "C" JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUnrollMesh(JNIEnv* env, jobject, jfloatArray vertices) {
-    jsize len = env->GetArrayLength(vertices);
-    std::vector<float> v(len);
-    env->GetFloatArrayRegion(vertices, 0, len, v.data());
-
-    SurfaceUnroller unroller(32); // Default dim
-    auto uv = unroller.unroll(v);
-
-    jfloatArray result = env->NewFloatArray((jsize)(uv.size() * 2));
-    if (!result) return nullptr;
-    std::vector<float> flatUv;
-    flatUv.reserve(uv.size() * 2);
-    for (const auto& p : uv) { flatUv.push_back(p.x); flatUv.push_back(p.y); }
-    env->SetFloatArrayRegion(result, 0, (jsize)flatUv.size(), flatUv.data());
-    return result;
+    // Voxel/splat map deleted: SurfaceMesh / unroller removed. Return an empty (non-null) UV array.
+    (void) vertices;
+    return env->NewFloatArray(0);
 }
 
 JNIEXPORT jbyteArray JNICALL

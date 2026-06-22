@@ -532,9 +532,9 @@ class ArRenderer(
             if (showPoints) {
                 pointCloudRenderer.draw(viewMatrix, projMatrix)
             }
-            if (showVoxels || showMesh) {
-                slamManager.drawDebugLayers(voxels = showVoxels, mesh = showMesh)
-            }
+            // A1 (voxel-map removal): voxel/mesh debug draw retired — the dense map is being removed
+            // (A3 deletes the native subsystem). ARCore-based perception layers above (feature points,
+            // plane grids, accumulated cloud points) remain as the cheap "what am I seeing" indicators.
             if (frameCount % 120 == 0) {
                 // Decides "no data" vs "drawn but invisible" from the diag log alone.
                 val planeCount = activeSession.getAllTrackables(com.google.ar.core.Plane::class.java)
@@ -680,9 +680,13 @@ class ArRenderer(
             // at full brightness/colour only where it has been mapped — so the user literally sees
             // what hasn't been scanned yet (it stays dark). Mutually exclusive with the halftone scan
             // indicator (which stays for the other mural methods).
-            val voxelRevealMaskActive = !anchorEstablished && scanMode == ArScanMode.MURAL &&
-                muralMethod == MuralMethod.VOXEL_HASH &&
-                frame.camera.trackingState == TrackingState.TRACKING
+            // A1 (voxel-map removal): the dense voxel map is being retired — it never fed pose
+            // (relocalization rides the fingerprint + PnP), and was scan-reveal visualization only.
+            // Forcing the reveal mask off disables drawCoverage() and the camera dimming; the halftone
+            // scan indicator takes over for VOXEL_HASH mode (same as the other mural methods). Reversible:
+            // restore the !anchorEstablished/VOXEL_HASH predicate to re-enable. Native map processing is
+            // untouched here (A3 removes it).
+            val voxelRevealMaskActive = false
             if (scanActive) backgroundRenderer.updateScanMask(visitedSectorsMask)
             lastStep = "bgDraw"
             // Always draw the camera in full colour (the B&W path is retired); the dimming + reveal
@@ -870,7 +874,10 @@ class ArRenderer(
                     vCurrent = viewMatrix,
                     reloc = slamManager.getRelocResult(),
                     fpAnchor = slamManager.getFingerprintAnchor(),
-                    confGlobal = slamManager.getGlobalConfidenceAvg(),
+                    // Map retirement: confGlobal came from the (now-neutralized) voxel map's global
+                    // confidence, which is always 0 once the map stops building. Decouple PoseFusion
+                    // from it — pass full trust so smooth correction keeps working on the inlier ratio.
+                    confGlobal = 1f,
                 )
             } else backbone
 
@@ -1301,10 +1308,9 @@ class ArRenderer(
             }
 
             lastStep = "mesh"
-            val hasMeshData = if (scanMode == ArScanMode.MURAL && muralMethod == MuralMethod.SURFACE_MESH) {
-                slamManager.getPersistentMesh(meshVerticesBuffer, meshWeightsBuffer)
-                true
-            } else false
+            // Voxel/splat map retirement: the SURFACE_MESH overlay-warp is dropped — always render the
+            // overlay flat on the anchor (the dense map that fed the warp is being neutralized/removed).
+            val hasMeshData = false
 
             lastStep = "overlayDraw"
             overlayRenderer.draw(viewMatrix, projMatrix, anchorMatrix, 

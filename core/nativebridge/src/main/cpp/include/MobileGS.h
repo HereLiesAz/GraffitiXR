@@ -15,8 +15,6 @@
 #include <condition_variable>
 #include <GLES3/gl3.h>
 
-#include "VoxelHash.h"
-#include "SurfaceMesh.h"
 #include "NativeUtil.h"
 
 class MobileGS {
@@ -91,10 +89,9 @@ public:
     void setParallaxMinDegrees(float deg);
     void setMappingPaused(bool paused) { mMappingPaused = paused; }
 
-    int getSplatCount() const { return mVoxelHash.getSplatCount(); }
-    int getImmutableSplatCount() const { return mVoxelHash.getImmutableSplatCount(); }
+    int getSplatCount() const { return 0; }            // voxel/splat map deleted
+    int getImmutableSplatCount() const { return 0; }   // voxel/splat map deleted
     void getConfidenceAvgs(float& outVisible, float& outGlobal) const;
-    void getAnchorCandidates(std::vector<Splat>& out, float threshold, int maxCount) const { mVoxelHash.getAnchorCandidates(out, threshold, maxCount); }
     void setSplatsVisible(bool visible) { mSplatsVisible = visible; }
     float getPaintingProgress() const { return mPaintingProgress.load(std::memory_order_relaxed); }
 
@@ -164,9 +161,6 @@ private:
     cv::Mat mArtworkDescriptors;
     std::vector<cv::Point3f> mArtworkKeypoints3D;
     std::atomic<float> mPaintingProgress{0.0f};
-
-    VoxelHash   mVoxelHash;
-    SurfaceMesh mSurfaceMesh;
 
     float mAnchorMatrix[16];
 

@@ -187,10 +187,6 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.compose.ui.text.google.fonts)
 
-    implementation(libs.mwdat.core)
-    implementation(libs.mwdat.camera)
-    implementation(libs.mwdat.mockdevice)
-
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)

@@ -4,7 +4,7 @@ activityCompose = "1.13.0"
 agp = "9.2.1"
 appcompat = "1.7.1"
 arcore = "1.54.0"
-azNavRail = "10.8"
+azNavRail = "10.9"
 camerax = "1.6.1"
 coil = "2.7.0"
 constraintlayout = "2.2.1"
@@ -38,7 +38,6 @@ datastore = "1.2.1"
 material3 = "1.4.0"
 roomExternalAntlr = "2.8.4"
 inkBrush = "1.0.0"
-mwdat = "0.6.0"
 retrofit = "3.0.0"
 okhttp = "5.4.0"
 zxingCore = "3.5.4"
@@ -106,9 +105,6 @@ timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 androidx-room-external-antlr = { group = "androidx.room", name = "room-external-antlr", version.ref = "roomExternalAntlr" }
 androidx-ink-brush = { group = "androidx.ink", name = "ink-brush", version.ref = "inkBrush" }
-mwdat-core = { group = "com.meta.wearable", name = "mwdat-core", version.ref = "mwdat" }
-mwdat-camera = { group = "com.meta.wearable", name = "mwdat-camera", version.ref = "mwdat" }
-mwdat-mockdevice = { group = "com.meta.wearable", name = "mwdat-mockdevice", version.ref = "mwdat" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxingCore" }
 zxing-android-embedded = { group = "com.journeyapps", name = "zxing-android-embedded", version.ref = "zxingAndroidEmbedded" }
 
