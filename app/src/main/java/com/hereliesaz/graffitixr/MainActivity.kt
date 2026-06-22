@@ -297,7 +297,18 @@ class MainActivity : ComponentActivity() {
 
                 LaunchedEffect(currentTempCapture, currentCaptureStep, isWaitingForTap) {
                     if (currentTempCapture != null) {
-                        if (currentCaptureStep == CaptureStep.NONE && isWaitingForTap) {
+                        val tapPath = currentCaptureStep == CaptureStep.NONE && isWaitingForTap
+                        // Depth-off (single-capture) target creation back-projects onto the green
+                        // ARCore wall plane, so it needs one. Gate BEFORE the review step: if the tap
+                        // wasn't on a green wall, discard the frame and let the artist re-aim/re-tap,
+                        // rather than letting them erase marks on a capture we'd reject at confirm.
+                        val depthOff = arUiState.targetDepthBuffer == null
+                        val plane = arUiState.targetWallPlane
+                        val onGreenWall = plane != null && plane.size >= 6
+                        if (tapPath && depthOff && !onGreenWall) {
+                            arViewModel.clearCaptureForRetry()
+                            mainViewModel.notifyTargetNotOnWall()
+                        } else if (tapPath) {
                             mainViewModel.setCaptureStep(CaptureStep.REVIEW)
                         } else if (currentCaptureStep == CaptureStep.CAPTURE) {
                             mainViewModel.setCaptureStep(CaptureStep.REVIEW)
