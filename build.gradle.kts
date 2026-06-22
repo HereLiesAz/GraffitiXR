@@ -18,7 +18,13 @@ buildscript {
         // bcpkix — all first patched in 1.84. The bcprov/bcpkix/bcutil versions must match.
         "org.bouncycastle:bcprov-jdk18on:1.84",
         "org.bouncycastle:bcpkix-jdk18on:1.84",
-        "org.bouncycastle:bcutil-jdk18on:1.84"
+        "org.bouncycastle:bcutil-jdk18on:1.84",
+        // Kotlin 2.4.0 emits class metadata version 2.4.0, but Hilt/Dagger 2.59.2 bundles a
+        // kotlin-metadata-jvm that only reads up to 2.3.0 — its KSP processor fails the build with
+        // "Provided Metadata instance has version 2.4.0, while maximum supported version is 2.3.0".
+        // Force the matching 2.4.0 reader onto every classpath (incl. the KSP processor) so Hilt
+        // can parse 2.4.0 metadata. Keep this version in lockstep with `kotlin` in libs.versions.toml.
+        "org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.0"
     )
 
     val protobufModules = listOf(
