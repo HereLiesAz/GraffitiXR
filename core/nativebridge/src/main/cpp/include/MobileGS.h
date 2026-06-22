@@ -54,6 +54,9 @@ public:
                                const float* anchorMatrix16, const float* intrinsics4);
     void clearWallFeatureMap();
     int getMapPointCount() const { std::lock_guard<std::mutex> lock(mMutex); return (int)mMapPoints3D.size(); }
+    // Phase 3b: pack the live feature map (points/descriptors/confidence/obs + co-registration) into a
+    // self-describing little-endian blob for .gxr persistence; empty if there's no map. Race-free (one lock).
+    std::vector<uint8_t> exportWallFeatureMap() const;
     // Phase 2b: gate live map-matching in relocThreadFunc. Default OFF — ships inert until validated.
     void setMapRelocEnabled(bool e) { mMapRelocEnabled.store(e, std::memory_order_relaxed); }
     // Phase 3: passively grow the feature map from reloc-locked frames. Default OFF, and independent of

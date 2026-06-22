@@ -1111,7 +1111,8 @@ class ArViewModel @Inject constructor(
         // Save both native engine state (Voxel + Mesh) and ARCore Point Cloud
         slamManager.saveModel(mapPath)
         renderer?.saveCloudPoints(cloudPath)
-        
+        saveWallFeatureMap() // Phase 3b: persist the passive feature map into the project record
+
         lastSavedSplatCount.set(slamManager.getSplatCount())
         Timber.d("Atomic persistence complete: Saved all mapping components for $projectId")
     }
@@ -1129,6 +1130,23 @@ class ArViewModel @Inject constructor(
                 Timber.e(e, "Background map save failed")
             } finally {
                 isSaving.set(false)
+            }
+        }
+    }
+
+    /**
+     * Phase 3b: persist the in-session passive feature map into the project record (.gxr), preserving the
+     * rest of the current project. No-op when building is off / the map is empty. Async + best-effort.
+     */
+    private fun saveWallFeatureMap() {
+        val project = projectRepository.currentProject.value ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val map = slamManager.getWallFeatureMap() ?: return@launch
+                if (map.pointCount <= 0) return@launch
+                projectManager.saveProject(appContext, project.copy(wallFeatureMap = map))
+            } catch (e: Exception) {
+                Timber.e(e, "Wall feature map save failed")
             }
         }
     }

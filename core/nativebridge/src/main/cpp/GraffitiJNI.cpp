@@ -851,6 +851,17 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMapBuildEnabled
     if (gSlamEngine) gSlamEngine->setMapBuildEnabled(enabled == JNI_TRUE);
 }
 
+JNIEXPORT jbyteArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportWallFeatureMap(JNIEnv* env, jobject) {
+    if (!gSlamEngine) return nullptr;
+    std::vector<uint8_t> blob = gSlamEngine->exportWallFeatureMap();
+    if (blob.empty()) return nullptr;
+    jbyteArray arr = env->NewByteArray((jsize)blob.size());
+    if (!arr) return nullptr;
+    env->SetByteArrayRegion(arr, 0, (jsize)blob.size(), reinterpret_cast<const jbyte*>(blob.data()));
+    return arr;
+}
+
 jobject buildFingerprintObject(JNIEnv* env, const MobileGS::FingerprintData& fd) {
     if (fd.descriptors.empty()) return nullptr;
 

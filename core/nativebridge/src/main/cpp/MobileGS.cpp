@@ -558,6 +558,32 @@ bool MobileGS::computeRectifyHomography(const float* viewCur16, cv::Mat& Hcur_fp
     return true;
 }
 
+std::vector<uint8_t> MobileGS::exportWallFeatureMap() const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (mMapPoints3D.empty() || mMapDescriptors.empty()) return {};
+    cv::Mat dm = mMapDescriptors.isContinuous() ? mMapDescriptors : mMapDescriptors.clone();
+    const int32_t n = (int32_t)mMapPoints3D.size();
+    const int32_t descRows = dm.rows, descCols = dm.cols, descType = dm.type();
+    std::vector<float> conf = mMapConfidence; conf.resize(n, 1.0f);                 // defensive align
+    std::vector<int32_t> obs(mMapObs.begin(), mMapObs.end()); obs.resize(n, 1);
+    const size_t descBytes = dm.total() * dm.elemSize();
+    const size_t total = 4 * sizeof(int32_t) + (size_t)n * 3 * sizeof(float)
+                       + (size_t)n * sizeof(float) + (size_t)n * sizeof(int32_t)
+                       + 16 * sizeof(float) + 4 * sizeof(float) + descBytes;
+    std::vector<uint8_t> out(total);
+    uint8_t* p = out.data();
+    auto put = [&](const void* src, size_t len){ memcpy(p, src, len); p += len; };
+    put(&n, sizeof(int32_t)); put(&descRows, sizeof(int32_t));
+    put(&descCols, sizeof(int32_t)); put(&descType, sizeof(int32_t));
+    put(mMapPoints3D.data(), (size_t)n * 3 * sizeof(float)); // cv::Point3f = 3 contiguous floats
+    put(conf.data(), (size_t)n * sizeof(float));
+    put(obs.data(), (size_t)n * sizeof(int32_t));
+    put(mMapAnchorMatrix, 16 * sizeof(float));
+    put(mMapIntrinsics, 4 * sizeof(float));
+    if (descBytes) put(dm.data, descBytes);
+    return out;
+}
+
 void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv::KeyPoint>& kps,
                                 const cv::Mat& descs, double fx, double fy, double cx, double cy) {
     if (descs.empty() || kps.empty() || (int)kps.size() != descs.rows) return;
@@ -570,6 +596,21 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
     // path below would desync them from mMapPoints3D and corrupt per-point confidence.
     if (mMapConfidence.size() != mMapPoints3D.size()) mMapConfidence.resize(mMapPoints3D.size(), 1.0f);
     if (mMapObs.size() != mMapPoints3D.size()) mMapObs.resize(mMapPoints3D.size(), 1);
+
+    // Confidence-prune when at capacity so the map keeps refreshing within the cap (drop points that
+    // never earned a re-observation). Compacts all four parallel arrays + the descriptor matrix.
+    const size_t kMapCap = 5000;
+    if (mMapPoints3D.size() >= kMapCap) {
+        std::vector<cv::Point3f> np; std::vector<float> nc; std::vector<int> no; cv::Mat nd;
+        np.reserve(mMapPoints3D.size());
+        for (size_t i = 0; i < mMapPoints3D.size(); ++i) {
+            if (mMapConfidence[i] >= 0.2f) {
+                np.push_back(mMapPoints3D[i]); nc.push_back(mMapConfidence[i]); no.push_back(mMapObs[i]);
+                nd.push_back(mMapDescriptors.row((int)i));
+            }
+        }
+        mMapPoints3D.swap(np); mMapConfidence.swap(nc); mMapObs.swap(no); mMapDescriptors = nd;
+    }
 
     // Fit the wall plane (centroid + normal) from the fingerprint's 3D points (in the fingerprint frame).
     cv::Point3f c(0.f, 0.f, 0.f);
@@ -609,7 +650,6 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
     glm::mat4 fpFromCam = glm::inverse(camFromFp);
     glm::vec3 camCenter(fpFromCam[3][0], fpFromCam[3][1], fpFromCam[3][2]);
     glm::mat3 R = glm::mat3(fpFromCam);
-    const size_t kMapCap = 5000;
     int added = 0;
     for (size_t i = 0; i < kps.size(); ++i) {
         if (matched[i]) continue;
