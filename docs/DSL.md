@@ -71,4 +71,4 @@ We extend the Rail with Content {} blocks to render the Vertical Slider directly
 
 
 ---
-*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*
+*Documentation updated on 2026-03-17 during website redesign and Stencil generation integration phase.*

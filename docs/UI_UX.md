@@ -40,4 +40,4 @@ A projected grid line overlay that snaps to the dominant plane found in the conf
 * **Behavior:** It is "Lazy"—it smooths out jitter. If tracking glitches, the grid floats gently rather than snapping violently.
 
 ---
-*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*
+*Documentation updated on 2026-03-17 during website redesign and Stencil generation integration phase.*

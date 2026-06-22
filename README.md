@@ -29,6 +29,8 @@ And then, there's a decent suite of pertinent design tools, with support for mul
 *   **AR Mural:** The core precision instrument for anchoring digital concepts to physical surfaces using confidence-based voxel mapping.
 *   **Mockup Mode:** Fast tools for visualizing layers and blend modes on top of static wall photos.
 *   **Trace (Lightbox):** Full-brightness surface for copying onto paper with touch-lock and four-tap exit.
+*   **Overlay:** Non-AR image tracing — your reference image overlaid on the live camera (CameraX) with adjustable opacity, no spatial anchoring (the classic tracing-app workflow).
+*   **Design:** Multi-layer image composition and editing — layers, blend modes, and GPU-accelerated Liquify — for preparing the artwork.
 
 ## Tools
 *   **Stencil generation:** A layer-level tool (not a mode) — automated multi-layer printable stencils (1-3 colors) with tiled PDF export.

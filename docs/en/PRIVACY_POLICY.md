@@ -57,4 +57,4 @@ If you have any questions or suggestions about our Privacy Policy, do not hesita
 
 
 ---
-*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*
+*Documentation updated on 2026-03-17 during website redesign and Stencil generation integration phase.*

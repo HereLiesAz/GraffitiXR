@@ -21,4 +21,4 @@ Format: `feature/your-feature-name` or `fix/issue-description`.
 * Squash and Merge.
 
 ---
-*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*
+*Documentation updated on 2026-03-17 during website redesign and Stencil generation integration phase.*

@@ -32,4 +32,4 @@ All AI agents working on this project must read and understand the project docum
 4.  **Atomic Functions:** Adhere to the Single Responsibility Principle. Refactor large functions into smaller, testable units.
 
 ---
-*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*
+*Documentation updated on 2026-03-17 during website redesign and Stencil generation integration phase.*
