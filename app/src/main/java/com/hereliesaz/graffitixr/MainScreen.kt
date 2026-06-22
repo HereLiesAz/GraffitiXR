@@ -138,8 +138,10 @@ fun MainScreen(
                     // Enter AR with the Target button pre-selected when no target exists yet, so the
                     // first screen tap (once tracking allows) creates the target without a detour to
                     // the rail. If a target was already created, stay in normal layer-editing mode.
-                    LaunchedEffect(Unit) {
-                        if (!mainUiState.hasExistingTarget && !mainUiState.isCapturingTarget) {
+                    LaunchedEffect(mainUiState.hasExistingTarget) {
+                        // Only act once the project state is resolved (non-null). `== false` means a
+                        // loaded project with no saved target, so pre-select the Target button.
+                        if (mainUiState.hasExistingTarget == false && !mainUiState.isCapturingTarget) {
                             mainViewModel.startTargetCapture()
                         }
                     }

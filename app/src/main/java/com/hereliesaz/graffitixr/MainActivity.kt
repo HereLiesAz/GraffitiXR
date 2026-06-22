@@ -564,6 +564,7 @@ class MainActivity : ComponentActivity() {
                             tutorialModeActive = mainUiState.tutorialModeActive,
                             coopState = coopState,
                             isTouchLocked = mainUiState.isTouchLocked,
+                            isWaitingForTap = mainUiState.isWaitingForTap,
                             onShowJoinScanner = { showJoinScanner = true },
                             onWallPhoto = {
                                 if (hasCameraPermission) {
@@ -1370,6 +1371,7 @@ class MainActivity : ComponentActivity() {
         tutorialModeActive: Boolean = false,
         coopState: CoopSessionState = CoopSessionState.Idle,
         isTouchLocked: Boolean,
+        isWaitingForTap: Boolean = false,
         onShowJoinScanner: () -> Unit = {},
         onWallPhoto: () -> Unit = {},
         onOpenModeAdjust: (EditorMode) -> Unit = {}
@@ -1943,10 +1945,10 @@ class MainActivity : ComponentActivity() {
                         id = "target.create",
                         hostId = "mode.ar",
                         text = navStrings.grid,
-                        color = if (mainUiState.isWaitingForTap) Cyan else navItemColor,
+                        color = if (isWaitingForTap) Cyan else navItemColor,
                         shape = AzButtonShape.RECTANGLE
                     ) {
-                        if (mainUiState.isWaitingForTap) {
+                        if (isWaitingForTap) {
                             mainViewModel.cancelTapMode()
                         } else if (hasCameraPermission) {
                             mainViewModel.startTargetCapture()

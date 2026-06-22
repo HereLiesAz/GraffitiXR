@@ -188,13 +188,16 @@ fun Bitmap.eraseColorBlob(nx: Float, ny: Float): Bitmap {
         var found = false
         var sy = minY
         while (sy <= maxY) {
-            val rowBase = sy * w
             val ddy = sy - y
+            val ddySq = ddy * ddy
+            // Whole row is already farther (vertically) than the best hit — skip it.
+            if (ddySq >= bestDistSq) { sy++; continue }
+            val rowBase = sy * w
             var sx = minX
             while (sx <= maxX) {
                 if (pixels[rowBase + sx] != 0) {
                     val ddx = sx - x
-                    val d = ddx * ddx + ddy * ddy
+                    val d = ddx * ddx + ddySq
                     if (d <= radiusSq && d < bestDistSq) {
                         bestDistSq = d
                         seedX = sx

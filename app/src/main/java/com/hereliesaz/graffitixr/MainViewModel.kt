@@ -30,9 +30,10 @@ data class MainUiState(
     val isTouchLocked: Boolean = false,
     val showUnlockInstructions: Boolean = false,
     val isCapturingTarget: Boolean = false,
-    // True when the current project already has a saved target fingerprint. Drives whether AR entry
-    // auto-selects the Target button (no target yet) or drops the user straight into layer editing.
-    val hasExistingTarget: Boolean = false,
+    // Whether the current project already has a saved target fingerprint. null = not yet resolved
+    // (project still loading) so AR entry can wait instead of racing; true/false drives whether AR
+    // entry auto-selects the Target button (no target yet) or drops straight into layer editing.
+    val hasExistingTarget: Boolean? = null,
     val captureStep: CaptureStep = CaptureStep.NONE,
     // Phase 4: True while the user is in "tap your painted marks" mode.
     val isWaitingForTap: Boolean = false,
@@ -76,7 +77,11 @@ class MainViewModel @Inject constructor(
         // pre-select the Target button. Updated on confirm via the repository's project re-load.
         viewModelScope.launch {
             projectRepository.currentProject.collect { project ->
-                _uiState.update { it.copy(hasExistingTarget = project?.fingerprint != null) }
+                // Only resolve once a real project arrives; leave it null while loading so the UI
+                // doesn't briefly see "no target" and auto-start target capture by mistake.
+                if (project != null) {
+                    _uiState.update { it.copy(hasExistingTarget = project.fingerprint != null) }
+                }
             }
         }
     }
