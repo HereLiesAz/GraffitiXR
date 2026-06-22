@@ -41,7 +41,6 @@ public:
     void addKeyframe(const VoxelFrame& kf);
     // colorMode: 0 = normal opaque albedo, 1 = debug confidence ramp, 2 = coverage (alpha=confidence)
     void draw(const glm::mat4& mvp, const glm::mat4& view, float focalY, int screenHeight, int colorMode = 0);
-    void sort(const glm::vec3& camPos);
     void clear();
     void prune(float threshold);
     /** Minimum angular baseline (degrees) before a re-observation counts as a parallax check. */
@@ -52,7 +51,6 @@ public:
     int getSplatCount() const;
     int getImmutableSplatCount() const;
     void getAnchorCandidates(std::vector<Splat>& out, float threshold, int maxCount) const;
-    void optimize(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat);
     float getVisibleConfidenceAvg(const glm::mat4& mvp) const;
     float getGlobalConfidenceAvg() const;
 
