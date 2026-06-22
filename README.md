@@ -36,10 +36,12 @@ Strictly decoupled multi-module Clean Architecture:
 *   `:app` — Navigation, camera orchestration, and Hilt dependency injection.
 *   `:feature:ar` — ARCore session management, `ArRenderer`, and SLAM data processing.
 *   `:feature:editor` — Multi-layer image manipulation and GPU-accelerated Liquify.
+*   `:feature:dashboard` — Project library, onboarding, and settings.
 *   `:core:nativebridge` — Native C++ engine (`MobileGS`), JNI bridge, and relocalization threads.
 *   `:android_collaboration_module` — Peer-to-peer networking and project sync.
 *   `:opencv` — Static OpenCV SDK for computer vision tasks.
 *   `:core:data` / `:core:domain` / `:core:common` — Unified data layer and wearable abstraction.
+*   `:core:design` — Shared Compose design system (reusable controls and overlays).
 
 ## Documentation
 - [Architecture Overview](docs/ARCHITECTURE.md)
@@ -54,4 +56,4 @@ Strictly decoupled multi-module Clean Architecture:
 - [Release & Google Play Delivery](docs/RELEASE.md)
 
 ---
-*Documentation updated on 2026-04-26 during multi-glass integration and co-op robustness phase.*
+*Documentation updated on 2026-06-22 during the SLAM right-size and documentation-accuracy pass.*

@@ -61,4 +61,4 @@ camera.getViewMatrix/ProjectionMatrix ───────► updateCamera()
 The engine uses a dedicated background thread (`relocThreadFunc`) to continuously match the current camera frame against stored wall fingerprints. On a high-confidence PnP match, the engine automatically corrects global drift, enabling the mural to "snap back" instantly when the user resumes from a screen-off event.
 
 ---
-*Documentation updated on 2026-04-24 during Persistent Voxel Memory and Pocket-Ready recovery implementation.*
+*Documentation updated on 2026-06-22 during the SLAM right-size and documentation-accuracy pass.*

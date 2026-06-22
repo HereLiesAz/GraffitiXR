@@ -54,4 +54,4 @@ A single OpenGL ES 3.0 render path runs inside `ArRenderer`:
 | `draw()` | OpenGL ES render — called by `ArRenderer` each frame. |
 
 ---
-*Documentation updated on 2026-04-24 during Persistent Voxel Memory and Pocket-Ready recovery implementation.*
+*Documentation updated on 2026-06-22 during the SLAM right-size and documentation-accuracy pass.*
