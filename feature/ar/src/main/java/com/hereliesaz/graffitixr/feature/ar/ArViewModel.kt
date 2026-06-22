@@ -1111,7 +1111,8 @@ class ArViewModel @Inject constructor(
         // Save both native engine state (Voxel + Mesh) and ARCore Point Cloud
         slamManager.saveModel(mapPath)
         renderer?.saveCloudPoints(cloudPath)
-        
+        saveWallFeatureMap() // Phase 3b: persist the passive feature map into the project record
+
         lastSavedSplatCount.set(slamManager.getSplatCount())
         Timber.d("Atomic persistence complete: Saved all mapping components for $projectId")
     }
@@ -1129,6 +1130,23 @@ class ArViewModel @Inject constructor(
                 Timber.e(e, "Background map save failed")
             } finally {
                 isSaving.set(false)
+            }
+        }
+    }
+
+    /**
+     * Phase 3b: persist the in-session passive feature map into the project record (.gxr), preserving the
+     * rest of the current project. No-op when building is off / the map is empty. Async + best-effort.
+     */
+    private fun saveWallFeatureMap() {
+        val project = projectRepository.currentProject.value ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val map = slamManager.getWallFeatureMap() ?: return@launch
+                if (map.pointCount <= 0) return@launch
+                projectManager.saveProject(appContext, project.copy(wallFeatureMap = map))
+            } catch (e: Exception) {
+                Timber.e(e, "Wall feature map save failed")
             }
         }
     }
@@ -1168,6 +1186,16 @@ class ArViewModel @Inject constructor(
                     val s = kotlin.math.sqrt(fp.patchData.size.toDouble()).toInt()
                     if (s * s == fp.patchData.size) slamManager.setWallPatchBytes(fp.patchData, s)
                 }
+            }
+            // Restore the persistent wall feature map (Phase 2a: stored in native; matched in Phase 2b).
+            // Independent of the marks fingerprint above and co-registered to the same anchor. Null on
+            // every current project until the passive builder (Phase 3) starts producing one.
+            val map = project.wallFeatureMap
+            if (map != null && map.pointCount > 0) {
+                slamManager.restoreWallFeatureMap(map)
+            } else {
+                // No map on this project: clear any map left in native from a previously loaded project.
+                slamManager.clearWallFeatureMap()
             }
         }
     }

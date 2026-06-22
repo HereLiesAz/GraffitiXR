@@ -15,8 +15,6 @@
 #include <condition_variable>
 #include <GLES3/gl3.h>
 
-#include "VoxelHash.h"
-#include "SurfaceMesh.h"
 #include "NativeUtil.h"
 
 class MobileGS {
@@ -48,6 +46,22 @@ public:
     // fingerprint anchor pose and the intrinsics the reloc PnP should use.
     void restoreWallFingerprintMetric(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d,
                                       const float* anchorMatrix16, const float* intrinsics4);
+    // Persistent wall *feature* map (lean reloc backbone; docs/RELOC_MAP_DESIGN.md), co-registered to
+    // the fingerprint anchor. Restore replaces the stored map (confidence/obs optional). Phase 2a stores
+    // it only; reloc matching against it (Phase 2b) is gated separately.
+    void restoreWallFeatureMap(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d,
+                               const std::vector<float>& confidence, const std::vector<int>& obs,
+                               const float* anchorMatrix16, const float* intrinsics4);
+    void clearWallFeatureMap();
+    int getMapPointCount() const { std::lock_guard<std::mutex> lock(mMutex); return (int)mMapPoints3D.size(); }
+    // Phase 3b: pack the live feature map (points/descriptors/confidence/obs + co-registration) into a
+    // self-describing little-endian blob for .gxr persistence; empty if there's no map. Race-free (one lock).
+    std::vector<uint8_t> exportWallFeatureMap() const;
+    // Phase 2b: gate live map-matching in relocThreadFunc. Default OFF — ships inert until validated.
+    void setMapRelocEnabled(bool e) { mMapRelocEnabled.store(e, std::memory_order_relaxed); }
+    // Phase 3: passively grow the feature map from reloc-locked frames. Default OFF, and independent of
+    // the match flag (accumulate without matching, or match a persisted map without growing).
+    void setMapBuildEnabled(bool e) { mMapBuildEnabled.store(e, std::memory_order_relaxed); }
     void scheduleRelocCheck(const cv::Mat& colorFrame);
     void getAnchorTransform(float* outMat16) const;
     void getRelocResult(float* out19) const;       // [0..15]=pnpMat,16=inliers,17=matches,18=seq
@@ -94,10 +108,9 @@ public:
     void setParallaxMinDegrees(float deg);
     void setMappingPaused(bool paused) { mMappingPaused = paused; }
 
-    int getSplatCount() const { return mVoxelHash.getSplatCount(); }
-    int getImmutableSplatCount() const { return mVoxelHash.getImmutableSplatCount(); }
+    int getSplatCount() const { return 0; }            // voxel/splat map deleted
+    int getImmutableSplatCount() const { return 0; }   // voxel/splat map deleted
     void getConfidenceAvgs(float& outVisible, float& outGlobal) const;
-    void getAnchorCandidates(std::vector<Splat>& out, float threshold, int maxCount) const { mVoxelHash.getAnchorCandidates(out, threshold, maxCount); }
     void setSplatsVisible(bool visible) { mSplatsVisible = visible; }
     float getPaintingProgress() const { return mPaintingProgress.load(std::memory_order_relaxed); }
 
@@ -150,6 +163,11 @@ private:
     // and the VIO baseline between the current and fingerprint-capture views, plus the viewing
     // obliquity in degrees. False if no fingerprint view is stored or the geometry is degenerate.
     bool computeRectifyHomography(const float* viewCur16, cv::Mat& Hcur_fp, cv::Mat& Hfp_cur, double& obliquityDeg);
+    // Phase 3 passive builder: on a reloc lock, back-project the frame's features onto the wall plane
+    // (fit from the fingerprint points) to get 3D points in the fingerprint frame, associate to the map
+    // by descriptor (bump confidence) or add new (capped). Co-registers the map to the fingerprint anchor.
+    void growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv::KeyPoint>& kps,
+                          const cv::Mat& descs, double fx, double fy, double cx, double cy);
 
     mutable std::mutex mMutex;
     std::atomic<bool> mIsArCoreTracking{false};
@@ -168,8 +186,19 @@ private:
     std::vector<cv::Point3f> mArtworkKeypoints3D;
     std::atomic<float> mPaintingProgress{0.0f};
 
-    VoxelHash   mVoxelHash;
-    SurfaceMesh mSurfaceMesh;
+    // --- Persistent wall feature map (lean reloc backbone; docs/RELOC_MAP_DESIGN.md) ---
+    // Co-registered to the fingerprint anchor. Phase 2a stores it; reloc matching (Phase 2b) is gated
+    // separately, so today this is inert state with no effect on relocalization.
+    cv::Mat mMapDescriptors;
+    std::vector<cv::Point3f> mMapPoints3D;
+    std::vector<float> mMapConfidence;
+    std::vector<int> mMapObs;
+    float mMapAnchorMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    float mMapIntrinsics[4] = {0,0,0,0};
+    // Phase 2b flag: when true, relocThreadFunc also matches the frustum-gated map and merges those
+    // correspondences into PnP. Default OFF so the map has zero effect on reloc until device-validated.
+    std::atomic<bool> mMapRelocEnabled{false};
+    std::atomic<bool> mMapBuildEnabled{false};
 
     float mAnchorMatrix[16];
 

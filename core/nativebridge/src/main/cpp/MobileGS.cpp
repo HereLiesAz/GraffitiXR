@@ -102,131 +102,29 @@ void MobileGS::initialize(int width, int height) {
     }
 }
 
-void MobileGS::initGl() {
-    LOGI("MobileGS::initGl voxel begin");
-    mVoxelHash.initGl();
-    LOGI("MobileGS::initGl voxel ok, mesh begin");
-    mSurfaceMesh.initGl();
-    LOGI("MobileGS::initGl mesh ok");
-}
-
-void MobileGS::initVoxelGl() {
-    LOGI("MobileGS::initVoxelGl begin");
-    mVoxelHash.initGl();
-    LOGI("MobileGS::initVoxelGl ok");
-}
-
-void MobileGS::initVoxelGlProgram() {
-    LOGI("MobileGS::initVoxelGlProgram begin");
-    mVoxelHash.initGlProgram();
-    LOGI("MobileGS::initVoxelGlProgram ok");
-}
-
-void MobileGS::initVoxelGlBuffer() {
-    LOGI("MobileGS::initVoxelGlBuffer begin");
-    mVoxelHash.initGlBuffer();
-    LOGI("MobileGS::initVoxelGlBuffer ok");
-}
-
-void MobileGS::initMeshGl() {
-    LOGI("MobileGS::initMeshGl begin");
-    mSurfaceMesh.initGl();
-    LOGI("MobileGS::initMeshGl ok");
-}
+// Voxel/splat map deleted: GL-init stubs retained for the JNI/Kotlin surface (no map to init).
+void MobileGS::initGl() {}
+void MobileGS::initVoxelGl() {}
+void MobileGS::initVoxelGlProgram() {}
+void MobileGS::initVoxelGlBuffer() {}
+void MobileGS::initMeshGl() {}
 
 void MobileGS::resetGlContext() {
     initGl();
 }
 
-void MobileGS::draw(bool debugTint) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    if (!mCameraReady) return;
+// Voxel/splat map deleted: render stubs retained for the JNI/Kotlin surface.
+void MobileGS::draw(bool debugTint) {}
 
-    glm::mat4 V = glm::make_mat4(mViewMatrix);
-    glm::mat4 P = glm::make_mat4(mProjMatrix);
-    glm::mat4 mvp = P * V;
+void MobileGS::drawDebugLayers(bool voxels, bool mesh) {}
 
-    if (mSplatsVisible) {
-        StageTimer _t(&mStageAccumMs[3], &mStageSamples[3]);
-        int mode = debugTint ? 1 : 0;
-        if (mMuralMethod == 0) { // VOXEL_HASH
-            mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight, mode);
-        } else if (mMuralMethod == 1) { // SURFACE_MESH
-            mSurfaceMesh.draw(mvp);
-        } else if (mMuralMethod == 2) { // CLOUD_OFFSET
-            mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight, mode);
-        }
-    }
-}
+void MobileGS::drawCoverage() {}
 
-void MobileGS::drawDebugLayers(bool voxels, bool mesh) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    if (!mCameraReady) return;
-    glm::mat4 V = glm::make_mat4(mViewMatrix);
-    glm::mat4 P = glm::make_mat4(mProjMatrix);
-    glm::mat4 mvp = P * V;
-    StageTimer _t(&mStageAccumMs[3], &mStageSamples[3]);
-    // Explicit, latch-free: an abandoned capture clears mSplatsVisible process-wide, and
-    // muralMethod would otherwise hide whichever representation isn't the active method. The
-    // debug view's contract is "show exactly the layers the user enabled, whatever the engine holds".
-    if (voxels) mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight, 1);
-    if (mesh) mSurfaceMesh.draw(mvp);
-}
+void MobileGS::pushPointCloud(const std::vector<float>& points) {}
 
-void MobileGS::drawCoverage() {
-    std::lock_guard<std::mutex> lock(mMutex);
-    if (!mCameraReady) return;
-    glm::mat4 V = glm::make_mat4(mViewMatrix);
-    glm::mat4 P = glm::make_mat4(mProjMatrix);
-    glm::mat4 mvp = P * V;
-    // Coverage colour-mask: real albedo, alpha = confidence, blended over the grayscale camera.
-    mVoxelHash.draw(mvp, V, std::abs(mProjMatrix[5]) * (mScreenHeight / 2.0f), mScreenHeight, 2);
-}
-
-void MobileGS::pushPointCloud(const std::vector<float>& points) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    if (!mCameraReady) return;
-    mVoxelHash.addSparsePoints(points, mViewMatrix, mProjMatrix, 0.4f);
-}
-
-void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence) {
-    bool isTrackingState = false;
-    {
-        std::lock_guard<std::mutex> lock(mMutex);
-        if (depth.empty() || color.empty() || !mCameraReady || mMappingPaused) return;
-        isTrackingState = mIsArCoreTracking;
-    }
-    if (!isTrackingState) return;
-
-    cv::Mat colorRGB;
-    if (isYuv) cv::cvtColor(color, colorRGB, cv::COLOR_YUV2RGB_NV21);
-    else colorRGB = color;
-
-    // Universal Ingestion: Build the Voxel Map in ALL modes to enable Snap-Back relocalization.
-    { StageTimer _t(&mStageAccumMs[0], &mStageSamples[0]);
-      mVoxelHash.update(depth, colorRGB, viewMat, projMat, mVoxelSize, confidence); }
-
-    if (mScanMode == 0) return; // Canvas mode only needs the voxel map for background recovery.
-
-    mFrameCounter++;
-    if (mMuralMethod == 0) { // VOXEL_HASH
-        if (mStageEnabled[1].load(std::memory_order_relaxed) && mFrameCounter % 30 == 0) {
-            StageTimer _t(&mStageAccumMs[1], &mStageSamples[1]);
-            VoxelFrame kf;
-            kf.depth = depth.clone(); kf.color = colorRGB.clone();
-            memcpy(kf.viewMatrix, viewMat, 16 * sizeof(float));
-            memcpy(kf.projMatrix, projMat, 16 * sizeof(float));
-            mVoxelHash.addKeyframe(kf);
-        }
-    } else if (mMuralMethod == 1) { // SURFACE_MESH
-        if (mStageEnabled[2].load(std::memory_order_relaxed)) {
-            StageTimer _t(&mStageAccumMs[2], &mStageSamples[2]);
-            mSurfaceMesh.update(depth, colorRGB, viewMat, projMat, mAnchorMatrix, mLightLevel);
-        }
-    } else if (mMuralMethod == 2) { // CLOUD_OFFSET
-        // Cloud Offset mode leverages the mVoxelHash map updated above.
-    }
-}
+// Voxel/splat map deleted: depth integration removed. The relocalizer uses color frames via
+// scheduleRelocCheck, not this path. Stub retained so mapThreadFunc / pushFrame still compile.
+void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence) {}
 
 void MobileGS::mapThreadFunc() {
     setpriority(PRIO_PROCESS, 0, 15);
@@ -245,33 +143,17 @@ void MobileGS::mapThreadFunc() {
     }
 }
 
-void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence) {
-    if (!mMapRunning) return;
-    std::lock_guard<std::mutex> lock(mQueueMutex);
-    if (mFrameQueue.size() >= 1) mFrameQueue.erase(mFrameQueue.begin()); // Low-latency queue
-    FrameData data;
-    data.depth = depth.clone(); data.color = color.clone(); data.isYuv = isYuv; data.confidence = confidence;
-    memcpy(data.viewMatrix, viewMat, 16 * sizeof(float));
-    memcpy(data.projMatrix, projMat, 16 * sizeof(float));
-    if (intrinsics) { memcpy(data.intrinsics, intrinsics, 4 * sizeof(float)); data.hasIntrinsics = true; }
-    else data.hasIntrinsics = false;
-    mFrameQueue.push_back(std::move(data));
-    mQueueCv.notify_one();
-}
+// Voxel/splat map deleted: depth frames are no longer cloned/queued (the queue was only
+// drained-and-discarded). This removes the per-frame cv::Mat::clone() cost on the sensor thread.
+// The idle map thread parks on mQueueCv and exits cleanly on destroy (mMapRunning=false + notify).
+void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence) {}
 
-void MobileGS::clearMap() {
-    std::lock_guard<std::mutex> lock(mMutex);
-    mVoxelHash.clear();
-    mSurfaceMesh.clear();
-}
-
-void MobileGS::pruneByConfidence(float threshold) {
-    mVoxelHash.prune(threshold);
-}
+void MobileGS::clearMap() {}                            // voxel/splat map deleted
+void MobileGS::pruneByConfidence(float threshold) {}   // voxel/splat map deleted
 
 void MobileGS::setArScanMode(int mode) { mScanMode = mode; }
 void MobileGS::setMuralMethod(int method) { mMuralMethod = method; }
-void MobileGS::setParallaxMinDegrees(float deg) { mVoxelHash.setParallaxMinDegrees(deg); }
+void MobileGS::setParallaxMinDegrees(float deg) {}   // voxel/splat map deleted
 void MobileGS::setVoxelSize(float size) { mVoxelSize = size; }
 
 void MobileGS::updateCamera(float* viewMat, float* projMat) {
@@ -309,20 +191,14 @@ void MobileGS::getAnchorTransform(float* outMat16) const {
 }
 
 void MobileGS::getConfidenceAvgs(float& outVisible, float& outGlobal) const {
-    std::lock_guard<std::mutex> lock(mMutex);
-    glm::mat4 view = glm::make_mat4(mViewMatrix);
-    glm::mat4 proj = glm::make_mat4(mProjMatrix);
-    outVisible = mVoxelHash.getVisibleConfidenceAvg(proj * view);
-    outGlobal = mVoxelHash.getGlobalConfidenceAvg();
+    // Voxel/splat map deleted; reloc no longer depends on this (Kotlin confGlobal is decoupled).
+    outVisible = 0.0f;
+    outGlobal = 0.0f;
 }
 
-void MobileGS::updatePersistentMesh(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat) {
-    mSurfaceMesh.update(depth, color, viewMat, projMat, mAnchorMatrix, mLightLevel);
-}
-
-void MobileGS::getPersistentMesh(std::vector<float>& outVertices, std::vector<float>& outWeights) {
-    mSurfaceMesh.getMesh(outVertices, outWeights);
-}
+// Voxel/splat map deleted: SurfaceMesh removed.
+void MobileGS::updatePersistentMesh(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat) {}
+void MobileGS::getPersistentMesh(std::vector<float>& outVertices, std::vector<float>& outWeights) {}
 
 void MobileGS::relocThreadFunc() {
     setpriority(PRIO_PROCESS, 0, 10); // Standard background priority
@@ -344,6 +220,13 @@ void MobileGS::relocThreadFunc() {
         cv::Mat wallPatch;
         float fpIntrinsics[4];
         bool hasFpView = false;
+        // Phase 2b snapshot: the persistent feature map + the last reloc pose, used (when the flag is on)
+        // as the frustum-gate prior. The map is co-registered to the fingerprint anchor, so its points
+        // share wallKps3d's frame and the prior pose (camera_from_fpWorld) projects them directly.
+        cv::Mat mapDescs;
+        std::vector<cv::Point3f> mapKps3d;
+        float mapPriorPose[16];
+        long mapPriorSeq = 0;
         {
             std::lock_guard<std::mutex> lock(mMutex);
             wallDescs = mWallDescriptors.clone();
@@ -351,6 +234,10 @@ void MobileGS::relocThreadFunc() {
             wallPatch = mWallPatch.clone();
             memcpy(fpIntrinsics, mFingerprintIntrinsics, 4 * sizeof(float));
             hasFpView = mHasFingerprintView;
+            mapDescs = mMapDescriptors.clone();
+            mapKps3d = mMapPoints3D;
+            memcpy(mapPriorPose, mPnpCamFromFpWorld, 16 * sizeof(float));
+            mapPriorSeq = mPnpResultSeq.load(std::memory_order_relaxed);
         }
 
         if (frame.empty() || wallDescs.empty() || wallKps3d.empty() || !mRelocEnabled) continue;
@@ -373,12 +260,27 @@ void MobileGS::relocThreadFunc() {
         // the matched keypoints are mapped through it (rectified frame -> current image) before being
         // stored, so the returned 2D points are ALWAYS in the current camera image — exactly what the
         // PnP below expects.
-        auto buildCorr = [&](const cv::Mat& g, const cv::Mat& Hback,
-                             std::vector<cv::Point2f>& outImg, std::vector<cv::Point3f>& outObj) {
-            std::vector<cv::KeyPoint> kps; cv::Mat descs;
+        // Detect base-frame features ONCE and reuse them: SuperPoint is an ONNX model, so detecting the
+        // same gray twice (plain pass + map matching) would roughly double per-reloc cost. The scaled and
+        // rectified passes run on different images, so buildCorr still detects internally for those.
+        std::vector<cv::KeyPoint> baseKps; cv::Mat baseDescs;
+        {
             bool sp = spOk;
-            if (sp && !mSuperPoint.detect(g, kps, descs)) sp = false;
-            if (!sp) mFeatureDetector->detectAndCompute(g, cv::noArray(), kps, descs);
+            if (sp && !mSuperPoint.detect(gray, baseKps, baseDescs)) sp = false;
+            if (!sp) mFeatureDetector->detectAndCompute(gray, cv::noArray(), baseKps, baseDescs);
+        }
+
+        auto buildCorr = [&](const cv::Mat& g, const cv::Mat& Hback,
+                             std::vector<cv::Point2f>& outImg, std::vector<cv::Point3f>& outObj,
+                             const std::vector<cv::KeyPoint>* preKps = nullptr, const cv::Mat* preDescs = nullptr) {
+            std::vector<cv::KeyPoint> localKps; cv::Mat localDescs;
+            if (!(preKps && preDescs)) {
+                bool sp = spOk;
+                if (sp && !mSuperPoint.detect(g, localKps, localDescs)) sp = false;
+                if (!sp) mFeatureDetector->detectAndCompute(g, cv::noArray(), localKps, localDescs);
+            }
+            const std::vector<cv::KeyPoint>& kps = (preKps && preDescs) ? *preKps : localKps;
+            const cv::Mat& descs = (preKps && preDescs) ? *preDescs : localDescs;
             if (descs.empty() || wallDescs.empty()) return;
             if (descs.type() != wallDescs.type()) return;
 
@@ -402,7 +304,7 @@ void MobileGS::relocThreadFunc() {
 
         std::vector<cv::Point2f> imgPts;
         std::vector<cv::Point3f> objPts;
-        buildCorr(gray, cv::Mat(), imgPts, objPts);
+        buildCorr(gray, cv::Mat(), imgPts, objPts, &baseKps, &baseDescs);
 
         // Multi-scale matching (distance robustness). SuperPoint isn't scale-invariant, and the marks
         // shrink in the frame from far away and grow up close, so also match the frame DOWN- and
@@ -432,6 +334,54 @@ void MobileGS::relocThreadFunc() {
                 if (imgPts.size() > before)
                     LOGI("Reloc: rectified (obliquity %.0f deg) added %zu corr (total %zu)",
                          obliqDeg, imgPts.size() - before, imgPts.size());
+            }
+        }
+
+        // --- Persistent feature-map matching (Phase 2b; default OFF via mMapRelocEnabled) ---
+        // When the overlay is larger than the marks, the marks leave frame; the map carries features
+        // across the whole wall so reloc still locks. Hard constraint: NEVER brute-force the whole map —
+        // frustum-gate to the subset the last reloc pose says is in view, then match only those and
+        // APPEND the correspondences (same fingerprint frame + intrinsics) so PnP solves over both.
+        // Requires a prior pose (mapPriorSeq>0, i.e. the fingerprint has locked at least once) and a
+        // matching descriptor type. Default-off, so this is inert until device-validated.
+        if (mMapRelocEnabled.load(std::memory_order_relaxed) && !mapDescs.empty() && mapPriorSeq > 0
+                && mapDescs.type() == wallDescs.type() && mapKps3d.size() == (size_t)mapDescs.rows) {
+            glm::mat4 camFromFp = glm::make_mat4(mapPriorPose);
+            double gfx = (fpIntrinsics[0] > 0.f) ? (double)fpIntrinsics[0] : 1000.0;
+            double gfy = (fpIntrinsics[1] > 0.f) ? (double)fpIntrinsics[1] : 1000.0;
+            double gcx = (fpIntrinsics[0] > 0.f) ? (double)fpIntrinsics[2] : gray.cols * 0.5;
+            double gcy = (fpIntrinsics[1] > 0.f) ? (double)fpIntrinsics[3] : gray.rows * 0.5;
+            std::vector<int> visible;
+            visible.reserve(mapKps3d.size());
+            for (int i = 0; i < (int)mapKps3d.size(); ++i) {
+                glm::vec4 pc = camFromFp * glm::vec4(mapKps3d[i].x, mapKps3d[i].y, mapKps3d[i].z, 1.0f);
+                if (pc.z <= 0.05f) continue; // behind / too close to the camera
+                float u = (float)(gfx * pc.x / pc.z + gcx);
+                float v = (float)(gfy * pc.y / pc.z + gcy);
+                if (u >= 0.f && u < gray.cols && v >= 0.f && v < gray.rows) visible.push_back(i);
+            }
+            if (visible.size() >= 8) {
+                // Preallocate the gated descriptor block with the right size+type and copy rows
+                // (cv::Mat has no usable reserve() on an empty/typeless matrix). Reuse the base detection.
+                cv::Mat gatedDescs((int)visible.size(), mapDescs.cols, mapDescs.type());
+                for (size_t i = 0; i < visible.size(); ++i)
+                    mapDescs.row(visible[i]).copyTo(gatedDescs.row((int)i));
+                if (!baseDescs.empty() && baseDescs.type() == gatedDescs.type()) {
+                    cv::Ptr<cv::DescriptorMatcher>& matcher = (baseDescs.type() == CV_32F) ? mL2Matcher : mMatcher;
+                    std::vector<std::vector<cv::DMatch>> matches;
+                    matcher->knnMatch(baseDescs, gatedDescs, matches, 2);
+                    size_t before = imgPts.size();
+                    for (auto& m : matches) {
+                        if (m.size() < 2) continue;
+                        if (m[0].distance < 0.75f * m[1].distance) {
+                            imgPts.push_back(baseKps[m[0].queryIdx].pt);
+                            objPts.push_back(mapKps3d[visible[m[0].trainIdx]]);
+                        }
+                    }
+                    if (imgPts.size() > before)
+                        LOGI("Reloc map: gated %zu/%zu pts, added %zu corr (total %zu)",
+                             visible.size(), mapKps3d.size(), imgPts.size() - before, imgPts.size());
+                }
             }
         }
 
@@ -534,6 +484,9 @@ void MobileGS::relocThreadFunc() {
                     mPnpMatchCount.store((int)imgPts.size(), std::memory_order_relaxed);
                     mPnpResultSeq.fetch_add(1, std::memory_order_relaxed);
                     LOGI("Relocalization: PnP match published (%zu/%zu inliers)", inliers.size(), imgPts.size());
+                    // Phase 3 passive build: grow the feature map from this locked frame (default OFF).
+                    if (mMapBuildEnabled.load(std::memory_order_relaxed))
+                        growMapFromReloc(pnpMat, baseKps, baseDescs, fx, fy, cx, cy);
                 }
             }
         }
@@ -603,6 +556,132 @@ bool MobileGS::computeRectifyHomography(const float* viewCur16, cv::Mat& Hcur_fp
     Hcur_fp = cv::Mat(Hc);
     Hfp_cur = Hcur_fp.inv();
     return true;
+}
+
+std::vector<uint8_t> MobileGS::exportWallFeatureMap() const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (mMapPoints3D.empty() || mMapDescriptors.empty() ||
+        mMapPoints3D.size() != (size_t)mMapDescriptors.rows) return {};  // never export an inconsistent map
+    cv::Mat dm = mMapDescriptors.isContinuous() ? mMapDescriptors : mMapDescriptors.clone();
+    const int32_t n = (int32_t)mMapPoints3D.size();
+    const int32_t descRows = dm.rows, descCols = dm.cols, descType = dm.type();
+    std::vector<float> conf = mMapConfidence; conf.resize(n, 1.0f);                 // defensive align
+    std::vector<int32_t> obs(mMapObs.begin(), mMapObs.end()); obs.resize(n, 1);
+    const size_t descBytes = dm.total() * dm.elemSize();
+    const size_t total = 4 * sizeof(int32_t) + (size_t)n * 3 * sizeof(float)
+                       + (size_t)n * sizeof(float) + (size_t)n * sizeof(int32_t)
+                       + 16 * sizeof(float) + 4 * sizeof(float) + descBytes;
+    std::vector<uint8_t> out(total);
+    uint8_t* p = out.data();
+    auto put = [&](const void* src, size_t len){ memcpy(p, src, len); p += len; };
+    put(&n, sizeof(int32_t)); put(&descRows, sizeof(int32_t));
+    put(&descCols, sizeof(int32_t)); put(&descType, sizeof(int32_t));
+    put(mMapPoints3D.data(), (size_t)n * 3 * sizeof(float)); // cv::Point3f = 3 contiguous floats
+    put(conf.data(), (size_t)n * sizeof(float));
+    put(obs.data(), (size_t)n * sizeof(int32_t));
+    put(mMapAnchorMatrix, 16 * sizeof(float));
+    put(mMapIntrinsics, 4 * sizeof(float));
+    if (descBytes) put(dm.data, descBytes);
+    return out;
+}
+
+void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv::KeyPoint>& kps,
+                                const cv::Mat& descs, double fx, double fy, double cx, double cy) {
+    if (descs.empty() || kps.empty() || (int)kps.size() != descs.rows) return;
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (mWallKeypoints3D.size() < 8) return;                                   // need the fingerprint plane
+    if (!mMapDescriptors.empty() && mMapDescriptors.type() != descs.type()) return;
+    if (mMapPoints3D.size() != (size_t)mMapDescriptors.rows) return;  // corrupted map: bail rather than crash
+
+    // Keep the parallel arrays aligned with the points: a restored map may have carried points +
+    // descriptors but empty confidence/obs (both optional in WallFeatureMap). Without this, the add
+    // path below would desync them from mMapPoints3D and corrupt per-point confidence.
+    if (mMapConfidence.size() != mMapPoints3D.size()) mMapConfidence.resize(mMapPoints3D.size(), 1.0f);
+    if (mMapObs.size() != mMapPoints3D.size()) mMapObs.resize(mMapPoints3D.size(), 1);
+
+    // Confidence-prune when at capacity so the map keeps refreshing within the cap (drop points that
+    // never earned a re-observation). Compacts all four parallel arrays + the descriptor matrix.
+    const size_t kMapCap = 5000;
+    if (mMapPoints3D.size() >= kMapCap) {
+        std::vector<size_t> kept;
+        kept.reserve(mMapPoints3D.size());
+        for (size_t i = 0; i < mMapPoints3D.size(); ++i)
+            if (mMapConfidence[i] >= 0.2f) kept.push_back(i);
+        std::vector<cv::Point3f> np; np.reserve(kept.size());
+        std::vector<float> nc; nc.reserve(kept.size());
+        std::vector<int> no; no.reserve(kept.size());
+        cv::Mat nd;
+        if (!kept.empty()) {
+            nd.create((int)kept.size(), mMapDescriptors.cols, mMapDescriptors.type());
+            for (size_t idx = 0; idx < kept.size(); ++idx) {
+                size_t i = kept[idx];
+                np.push_back(mMapPoints3D[i]); nc.push_back(mMapConfidence[i]); no.push_back(mMapObs[i]);
+                mMapDescriptors.row((int)i).copyTo(nd.row((int)idx));
+            }
+        }
+        mMapPoints3D.swap(np); mMapConfidence.swap(nc); mMapObs.swap(no); mMapDescriptors = nd;
+    }
+
+    // Fit the wall plane (centroid + normal) from the fingerprint's 3D points (in the fingerprint frame).
+    cv::Point3f c(0.f, 0.f, 0.f);
+    for (const auto& p : mWallKeypoints3D) c += p;
+    c *= 1.0f / (float)mWallKeypoints3D.size();
+    double cov[6] = {0,0,0,0,0,0}; // xx,xy,xz,yy,yz,zz
+    for (const auto& p : mWallKeypoints3D) {
+        double dx = p.x - c.x, dy = p.y - c.y, dz = p.z - c.z;
+        cov[0]+=dx*dx; cov[1]+=dx*dy; cov[2]+=dx*dz; cov[3]+=dy*dy; cov[4]+=dy*dz; cov[5]+=dz*dz;
+    }
+    cv::Matx33d C(cov[0],cov[1],cov[2], cov[1],cov[3],cov[4], cov[2],cov[4],cov[5]);
+    cv::Vec3d eval; cv::Matx33d evec;
+    if (!cv::eigen(C, eval, evec)) return;
+    glm::vec3 n((float)evec(2,0), (float)evec(2,1), (float)evec(2,2));   // smallest-eigenvalue eigenvector
+    glm::vec3 cc(c.x, c.y, c.z);
+
+    // Associate detected features to the existing map by descriptor; bump confidence on re-observation.
+    std::vector<char> matched(kps.size(), 0);
+    if (mMapDescriptors.rows >= 2) {   // knnMatch(k=2) needs >=2 candidates for the Lowe ratio
+        cv::Ptr<cv::DescriptorMatcher>& matcher = (descs.type() == CV_32F) ? mL2Matcher : mMatcher;
+        std::vector<std::vector<cv::DMatch>> matches;
+        matcher->knnMatch(descs, mMapDescriptors, matches, 2);
+        for (auto& m : matches) {
+            if (m.size() < 2) continue;
+            if (m[0].distance < 0.75f * m[1].distance) {
+                int ti = m[0].trainIdx, qi = m[0].queryIdx;
+                if (ti >= 0 && ti < (int)mMapConfidence.size() && qi >= 0 && qi < (int)matched.size()) {
+                    mMapConfidence[ti] = std::min(1.0f, mMapConfidence[ti] + 0.1f);
+                    mMapObs[ti] += 1;
+                    matched[qi] = 1;
+                }
+            }
+        }
+    }
+
+    // Back-project unmatched features onto the wall plane and add them, up to the cap.
+    glm::mat4 fpFromCam = glm::inverse(camFromFp);
+    glm::vec3 camCenter(fpFromCam[3][0], fpFromCam[3][1], fpFromCam[3][2]);
+    glm::mat3 R = glm::mat3(fpFromCam);
+    int added = 0;
+    for (size_t i = 0; i < kps.size(); ++i) {
+        if (matched[i]) continue;
+        if (mMapPoints3D.size() >= kMapCap) break;
+        glm::vec3 dir = R * glm::vec3((float)((kps[i].pt.x - cx) / fx),
+                                      (float)((kps[i].pt.y - cy) / fy), 1.0f);
+        float denom = glm::dot(n, dir);
+        if (std::fabs(denom) < 1e-6f) continue;
+        float t = glm::dot(n, cc - camCenter) / denom;
+        if (t <= 0.f) continue;            // plane intersection behind the camera
+        glm::vec3 P = camCenter + t * dir;
+        mMapPoints3D.push_back(cv::Point3f(P.x, P.y, P.z));
+        mMapConfidence.push_back(0.1f);
+        mMapObs.push_back(1);
+        mMapDescriptors.push_back(descs.row((int)i));
+        ++added;
+    }
+
+    // Co-register the map to the fingerprint anchor + intrinsics (same frame as the points above).
+    memcpy(mMapAnchorMatrix, mFingerprintAnchorMatrix, 16 * sizeof(float));
+    mMapIntrinsics[0]=(float)fx; mMapIntrinsics[1]=(float)fy; mMapIntrinsics[2]=(float)cx; mMapIntrinsics[3]=(float)cy;
+    if (added > 0) LOGI("Map build: +%d pts (map now %zu)", added, mMapPoints3D.size());
 }
 
 void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean) {
@@ -729,14 +808,9 @@ void MobileGS::destroy() {
     if (mRelocThread.joinable()) mRelocThread.join();
 }
 
-void MobileGS::saveModel(const std::string& p) {
-    mVoxelHash.save(p);
-    mSurfaceMesh.save(p + ".mesh");
-}
-void MobileGS::loadModel(const std::string& p) {
-    mVoxelHash.load(p);
-    mSurfaceMesh.load(p + ".mesh");
-}
+// Voxel/splat map deleted: .gxr keeps the fingerprint; old model.map files are ignored.
+void MobileGS::saveModel(const std::string& p) {}
+void MobileGS::loadModel(const std::string& p) {}
 bool MobileGS::importModel3D(const std::string& p) { return false; }
 void MobileGS::setViewportSize(int w, int h) { mScreenWidth = w; mScreenHeight = h; }
 void MobileGS::setRelocEnabled(bool e) { mRelocEnabled = e; }
@@ -752,6 +826,34 @@ void MobileGS::restoreWallFingerprintMetric(const cv::Mat& d, const std::vector<
     mWallKeypoints3D = p;
     if (anchorMatrix16) memcpy(mFingerprintAnchorMatrix, anchorMatrix16, 16 * sizeof(float));
     if (intrinsics4)    memcpy(mFingerprintIntrinsics, intrinsics4, 4 * sizeof(float));
+}
+
+void MobileGS::restoreWallFeatureMap(const cv::Mat& d, const std::vector<cv::Point3f>& p,
+                                     const std::vector<float>& conf, const std::vector<int>& obs,
+                                     const float* anchorMatrix16, const float* intrinsics4) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mMapDescriptors = d.clone();
+    mMapPoints3D = p;
+    mMapConfidence = conf;
+    mMapObs = obs;
+    // Reset (not leave stale) when a map omits co-registration, so it can't inherit a previous
+    // project's anchor/intrinsics.
+    static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    memcpy(mMapAnchorMatrix, anchorMatrix16 ? anchorMatrix16 : kIdentity16, 16 * sizeof(float));
+    if (intrinsics4) memcpy(mMapIntrinsics, intrinsics4, 4 * sizeof(float));
+    else             memset(mMapIntrinsics, 0, 4 * sizeof(float));
+}
+
+void MobileGS::clearWallFeatureMap() {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mMapDescriptors.release();
+    mMapPoints3D.clear();
+    mMapConfidence.clear();
+    mMapObs.clear();
+    // Also drop stale co-registration so a later project can't inherit it.
+    static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    memcpy(mMapAnchorMatrix, kIdentity16, 16 * sizeof(float));
+    memset(mMapIntrinsics, 0, 4 * sizeof(float));
 }
 
 std::vector<uint8_t> MobileGS::exportFingerprint() {

@@ -5,12 +5,14 @@ import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.util.Log
 import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.WallFeatureMap
 import com.hereliesaz.graffitixr.common.sensor.CameraFrame
 import com.hereliesaz.graffitixr.common.sensor.ImuSample
 import com.hereliesaz.graffitixr.common.sensor.PixelFormat
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.common.wearable.WearableManager
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
@@ -96,6 +98,49 @@ class SlamManager @Inject constructor(
         points3d: FloatArray, anchorMatrix: FloatArray, intrinsics: FloatArray,
     ) {
         nativeRestoreWallFingerprintMetric(descriptorsData, rows, cols, type, points3d, anchorMatrix, intrinsics)
+    }
+
+    /** Restore the persistent wall feature map into native (Phase 2a: stored; matched in Phase 2b). */
+    fun restoreWallFeatureMap(map: WallFeatureMap) {
+        nativeRestoreWallFeatureMap(
+            map.descriptorsData, map.descriptorsRows, map.descriptorsCols, map.descriptorsType,
+            map.points3d, map.confidence, map.obsCount, map.anchor, map.intrinsics,
+        )
+    }
+    /** Drop the in-native wall feature map. */
+    fun clearWallFeatureMap() = nativeClearWallFeatureMap()
+    /** Live wall-feature-map point count — diagnostic. */
+    fun getMapPointCount(): Int = nativeGetMapPointCount()
+    /** Phase 2b: enable live map-matching in reloc. Default OFF — experimental until device-validated. */
+    fun setMapRelocEnabled(enabled: Boolean) = nativeSetMapRelocEnabled(enabled)
+    /** Phase 3: passively grow the feature map from reloc-locked frames. Default OFF; independent of matching. */
+    fun setMapBuildEnabled(enabled: Boolean) = nativeSetMapBuildEnabled(enabled)
+
+    /**
+     * Phase 3b: read the in-native feature map back as a [WallFeatureMap] for .gxr persistence, or null
+     * when empty. Unpacks the native little-endian blob: [n, rows, cols, type][points][conf][obs][anchor16]
+     * [intrinsics4][descriptors]. Returns null (skip this save) if a concurrent grow left it inconsistent.
+     */
+    fun getWallFeatureMap(): WallFeatureMap? {
+        val blob = nativeExportWallFeatureMap() ?: return null
+        if (blob.size < 16) return null
+        val bb = ByteBuffer.wrap(blob).order(ByteOrder.LITTLE_ENDIAN)
+        val n = bb.int; val rows = bb.int; val cols = bb.int; val type = bb.int
+        if (n < 0 || rows < 0 || cols < 0) return null
+        // Bail before reading if the blob can't even hold the fixed-size fields (header + points/conf/obs
+        // + anchor + intrinsics = 96 + n*20 bytes), rather than catching a BufferUnderflowException.
+        if (blob.size < 96 + n * 20) return null
+        return try {
+            val points = FloatArray(n * 3) { bb.float }
+            val conf = FloatArray(n) { bb.float }
+            val obs = IntArray(n) { bb.int }
+            val anchor = FloatArray(16) { bb.float }
+            val intrinsics = FloatArray(4) { bb.float }
+            val desc = ByteArray(blob.size - bb.position()).also { bb.get(it) }
+            WallFeatureMap(points, desc, rows, cols, type, conf, obs, anchor, intrinsics)
+        } catch (e: Exception) {
+            null
+        }
     }
 
     fun setArtworkFingerprint(
@@ -489,6 +534,16 @@ class SlamManager @Inject constructor(
         descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,
         points3d: FloatArray, anchorMatrix: FloatArray, intrinsics: FloatArray
     )
+    private external fun nativeRestoreWallFeatureMap(
+        descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,
+        points3d: FloatArray, confidence: FloatArray, obsCount: IntArray,
+        anchor: FloatArray, intrinsics: FloatArray
+    )
+    private external fun nativeClearWallFeatureMap()
+    private external fun nativeGetMapPointCount(): Int
+    private external fun nativeSetMapRelocEnabled(enabled: Boolean)
+    private external fun nativeSetMapBuildEnabled(enabled: Boolean)
+    private external fun nativeExportWallFeatureMap(): ByteArray?
     private external fun nativeSetArtworkFingerprint(
         bitmap: Bitmap, depthBuffer: ByteBuffer?,
         depthW: Int, depthH: Int, depthStride: Int,

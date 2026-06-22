@@ -174,7 +174,6 @@ class MainActivity : ComponentActivity() {
     var showPosterDialog by mutableStateOf(false)
     var posterSourceLayerId by mutableStateOf<String?>(null)
     var hasCameraPermission by mutableStateOf(false)
-    var hasBluetoothPermission by mutableStateOf(false)
     var showWallSourceDialog by mutableStateOf(false)
     var isExporting by mutableStateOf(false)
     // Crash report captured on the previous run (native SIGSEGV and/or JVM), shown on launch.
@@ -182,19 +181,6 @@ class MainActivity : ComponentActivity() {
 
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p ->
         hasCameraPermission = p[Manifest.permission.CAMERA] ?: false
-        hasBluetoothPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            p[Manifest.permission.BLUETOOTH_CONNECT] ?: false
-        } else {
-            true
-        }
-        if (hasBluetoothPermission) {
-            checkAndInitializeWearables()
-        }
-    }
-
-    private fun checkAndInitializeWearables() {
-        // Meta Wearables DAT SDK removed (the mwdat dependency was dropped). The smart-glasses
-        // provider abstraction (WearableManager/SmartGlassProvider) remains for Xreal; no Meta init.
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -203,14 +189,6 @@ class MainActivity : ComponentActivity() {
         hasCameraPermission = ContextCompat.checkSelfPermission(
             this, Manifest.permission.CAMERA
         ) == PackageManager.PERMISSION_GRANTED
-
-        hasBluetoothPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            ContextCompat.checkSelfPermission(
-                this, Manifest.permission.BLUETOOTH_CONNECT
-            ) == PackageManager.PERMISSION_GRANTED
-        } else {
-            true
-        }
 
         // Surface any crash captured on the previous run: native backtrace (signal handler) and/or
         // the JVM CrashReporter dump. Read + delete so it shows exactly once.
@@ -236,7 +214,6 @@ class MainActivity : ComponentActivity() {
 
         securityProviderManager.installAsync(this)
         slamManager.ensureInitialized()
-        checkAndInitializeWearables()
 
         lifecycleScope.launch {
             securityProviderManager.securityProviderState.collect { state ->
@@ -292,6 +269,7 @@ class MainActivity : ComponentActivity() {
 
 
                 val editorUiState by editorViewModel.uiState.collectAsState()
+                val railExpansion by editorViewModel.railExpansion.collectAsState()
                 val mainUiState by mainViewModel.uiState.collectAsState()
                 val arUiState by arViewModel.uiState.collectAsState()
                 val coopState = arUiState.coopSessionState
@@ -561,7 +539,7 @@ class MainActivity : ComponentActivity() {
                     if (isRailVisible) {
                         ConfigureRailItems(
                             mainViewModel, editorViewModel, arViewModel, dashboardViewModel, context,
-                            overlayImagePicker, backgroundImagePicker, editorUiState, arUiState, strings,
+                            overlayImagePicker, backgroundImagePicker, editorUiState, railExpansion, arUiState, strings,
                             navItemColor = navItemColor,
                             onShowFontPicker = { layerId -> fontPickerLayerId = layerId; showFontPicker = true },
                             layerMenusOpen = layerMenusOpen,
@@ -1364,6 +1342,7 @@ class MainActivity : ComponentActivity() {
         overlayPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>,
         backgroundPicker: androidx.activity.compose.ManagedActivityResultLauncher<PickVisualMediaRequest, android.net.Uri?>,
         editorUiState: EditorUiState,
+        railExpansion: Map<String, Boolean>,
         arUiState: ArUiState,
         strings: AppStrings,
         navItemColor: Color = Color.White,
@@ -1380,10 +1359,6 @@ class MainActivity : ComponentActivity() {
         val navStrings = strings.nav
         val requestPermissions = {
             val perms = mutableListOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                perms.add(Manifest.permission.BLUETOOTH_CONNECT)
-                perms.add(Manifest.permission.BLUETOOTH_SCAN)
-            }
             permissionLauncher.launch(perms.toTypedArray())
         }
 
@@ -1391,13 +1366,26 @@ class MainActivity : ComponentActivity() {
 
         if (!showLibrary) {
             val isDesignMode = editorUiState.editorMode == EditorMode.DESIGN
+            // railExpansion (param) is the per-host expansion restored from the project so the rail reopens
+            // as the user left it. Seeded into initiallyExpanded below; captured by onExpandedChange (manual
+            // toggles only). The expandWhen rules still drive reactive (a)/(b) expansion.
 
             // 1. DESIGN FOLDER (TOP)
             azRailHostItem(
                 id = "host.design",
                 text = navStrings.design,
                 color = if (isDesignMode) Cyan else navItemColor,
-                initiallyExpanded = isDesignMode,
+                // Expand Design whenever we enter Design mode (new project opens straight into it, and
+                // re-entering Design from a Mode). expandWhen re-fires on the false->true edge; the user
+                // can still collapse it manually. initiallyExpanded seeds the very first render.
+                // Restore the user's last expansion for this host on reopen; fall back to the in-mode default.
+                initiallyExpanded = railExpansion["host.design"] ?: isDesignMode,
+                // Read editorMode directly in the lambda (not the captured isDesignMode snapshot) so the
+                // evaluator subscribes to the state and re-fires on mode changes.
+                expandWhen = { editorUiState.editorMode == EditorMode.DESIGN },
+                // Persist only genuine user intent: onExpandedChange fires on manual toggles, not on
+                // expandWhen/initiallyExpanded programmatic changes.
+                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.design", it) },
                 onClick = {
                     // From a Mode, tapping Design navigates to the dedicated Design screen. In Design it
                     // just expands the design tools below (this onClick is a no-op there).
@@ -1426,7 +1414,16 @@ class MainActivity : ComponentActivity() {
                 // editing tools (edit/size/font/color/blend/invert/paint/retouch/etc.). The hidden
                 // menu carries link/duplicate/copy/flatten/delete.
                 if (editorUiState.layers.isNotEmpty()) {
-                    azRailSubHostItem(id = "design.layers", hostId = "host.design", text = "Layers", color = navItemColor, shape = AzButtonShape.RECTANGLE, initiallyExpanded = true)
+                    // Keep Layers expanded whenever there are layers and we're in Design mode (reactive,
+                    // so re-entering Design with existing layers re-expands it — not just first render).
+                    azRailSubHostItem(
+                        id = "design.layers", hostId = "host.design", text = "Layers",
+                        color = navItemColor, shape = AzButtonShape.RECTANGLE,
+                        // Restore the user's last expansion on reopen; default expanded when layers exist.
+                        initiallyExpanded = railExpansion["design.layers"] ?: true,
+                        expandWhen = { editorUiState.layers.isNotEmpty() && editorUiState.editorMode == EditorMode.DESIGN },
+                        onExpandedChange = { editorViewModel.onRailHostExpansionChanged("design.layers", it) }
+                    )
                 }
                 editorUiState.layers.reversed().forEach { layer ->
                     val activeTool = editorUiState.activeTool

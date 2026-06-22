@@ -14,7 +14,6 @@
 #include <cstring>
 #include <cstdint>
 #include "include/MobileGS.h"
-#include "include/SurfaceUnroller.h"
 #include "include/StereoProcessor.h"
 #include "include/ImageWarper.h"
 
@@ -256,20 +255,9 @@ extern "C" {
 JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetAnchorCandidates(
         JNIEnv* env, jobject thiz, jfloat threshold, jint maxCount) {
-    if (!gSlamEngine) return nullptr;
-    std::vector<Splat> candidates;
-    gSlamEngine->getAnchorCandidates(candidates, threshold, maxCount);
-    if (candidates.empty()) return nullptr;
-
-    jfloatArray result = env->NewFloatArray((jsize)(candidates.size() * 3));
-    if (!result) return nullptr;
-    std::vector<float> flat;
-    flat.reserve(candidates.size() * 3);
-    for (const auto& s : candidates) {
-        flat.push_back(s.x); flat.push_back(s.y); flat.push_back(s.z);
-    }
-    env->SetFloatArrayRegion(result, 0, (jsize)flat.size(), flat.data());
-    return result;
+    // Voxel/splat map deleted: no splat-based anchor candidates. Callers handle null.
+    (void) env; (void) thiz; (void) threshold; (void) maxCount;
+    return nullptr;
 }
 
 JNIEXPORT jfloat JNICALL
@@ -790,6 +778,90 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
     env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
 }
 
+// Persistent wall feature map (Phase 2a: store only). Mirrors the metric-fingerprint restore but
+// adds parallel per-point confidence (jfloatArray) + obs (jintArray); anchor/intrinsics are
+// passed through only when correctly sized (16 / 4), else left at their native defaults.
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFeatureMap(
+        JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type,
+        jfloatArray ptsArray, jfloatArray confArray, jintArray obsArray,
+        jfloatArray anchorArray, jfloatArray intrArray) {
+    // Defensive validation (a malformed/old .gxr must never crash native): null refs, a descriptor
+    // blob big enough for rows*cols*elemSize, and parallel arrays of matching length.
+    if (!gSlamEngine || !descArray || !ptsArray) return;
+    if (rows < 0 || cols < 0) return;
+    jsize descLen = env->GetArrayLength(descArray);
+    if (descLen < (jsize)(rows * cols * CV_ELEM_SIZE(type))) return;
+    jsize ptsLen = env->GetArrayLength(ptsArray);
+    if (ptsLen != rows * 3) return;
+    jsize confLen = confArray ? env->GetArrayLength(confArray) : 0;
+    if (confLen > 0 && confLen != rows) return;
+    jsize obsLen = obsArray ? env->GetArrayLength(obsArray) : 0;
+    if (obsLen > 0 && obsLen != rows) return;
+
+    jbyte* descData = env->GetByteArrayElements(descArray, nullptr);
+    cv::Mat descriptors(rows, cols, type, descData);
+    jfloat* ptsData = env->GetFloatArrayElements(ptsArray, nullptr);
+    std::vector<cv::Point3f> points3d;
+    points3d.reserve(rows);
+    for (int i = 0; i + 2 < ptsLen; i += 3)
+        points3d.push_back(cv::Point3f(ptsData[i], ptsData[i+1], ptsData[i+2]));
+
+    std::vector<float> conf;
+    if (confLen > 0) {
+        jfloat* c = env->GetFloatArrayElements(confArray, nullptr);
+        conf.assign(c, c + confLen);
+        env->ReleaseFloatArrayElements(confArray, c, JNI_ABORT);
+    }
+    std::vector<int> obs;
+    if (obsLen > 0) {
+        jint* o = env->GetIntArrayElements(obsArray, nullptr);
+        obs.assign(o, o + obsLen);
+        env->ReleaseIntArrayElements(obsArray, o, JNI_ABORT);
+    }
+
+    jfloat* anchor = (anchorArray && env->GetArrayLength(anchorArray) == 16) ? env->GetFloatArrayElements(anchorArray, nullptr) : nullptr;
+    jfloat* intr   = (intrArray && env->GetArrayLength(intrArray) == 4)    ? env->GetFloatArrayElements(intrArray, nullptr)   : nullptr;
+
+    gSlamEngine->restoreWallFeatureMap(descriptors, points3d, conf, obs, anchor, intr);
+
+    env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
+    env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
+    if (anchor) env->ReleaseFloatArrayElements(anchorArray, anchor, JNI_ABORT);
+    if (intr)   env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearWallFeatureMap(JNIEnv*, jobject) {
+    if (gSlamEngine) gSlamEngine->clearWallFeatureMap();
+}
+
+JNIEXPORT jint JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetMapPointCount(JNIEnv*, jobject) {
+    return gSlamEngine ? gSlamEngine->getMapPointCount() : 0;
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMapRelocEnabled(JNIEnv*, jobject, jboolean enabled) {
+    if (gSlamEngine) gSlamEngine->setMapRelocEnabled(enabled == JNI_TRUE);
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMapBuildEnabled(JNIEnv*, jobject, jboolean enabled) {
+    if (gSlamEngine) gSlamEngine->setMapBuildEnabled(enabled == JNI_TRUE);
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportWallFeatureMap(JNIEnv* env, jobject) {
+    if (!gSlamEngine) return nullptr;
+    std::vector<uint8_t> blob = gSlamEngine->exportWallFeatureMap();
+    if (blob.empty()) return nullptr;
+    jbyteArray arr = env->NewByteArray((jsize)blob.size());
+    if (!arr) return nullptr;
+    env->SetByteArrayRegion(arr, 0, (jsize)blob.size(), reinterpret_cast<const jbyte*>(blob.data()));
+    return arr;
+}
+
 jobject buildFingerprintObject(JNIEnv* env, const MobileGS::FingerprintData& fd) {
     if (fd.descriptors.empty()) return nullptr;
 
@@ -1107,20 +1179,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPersistentMesh(
 
 extern "C" JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUnrollMesh(JNIEnv* env, jobject, jfloatArray vertices) {
-    jsize len = env->GetArrayLength(vertices);
-    std::vector<float> v(len);
-    env->GetFloatArrayRegion(vertices, 0, len, v.data());
-
-    SurfaceUnroller unroller(32); // Default dim
-    auto uv = unroller.unroll(v);
-
-    jfloatArray result = env->NewFloatArray((jsize)(uv.size() * 2));
-    if (!result) return nullptr;
-    std::vector<float> flatUv;
-    flatUv.reserve(uv.size() * 2);
-    for (const auto& p : uv) { flatUv.push_back(p.x); flatUv.push_back(p.y); }
-    env->SetFloatArrayRegion(result, 0, (jsize)flatUv.size(), flatUv.data());
-    return result;
+    // Voxel/splat map deleted: SurfaceMesh / unroller removed. Return an empty (non-null) UV array.
+    (void) vertices;
+    return env->NewFloatArray(0);
 }
 
 JNIEXPORT jbyteArray JNICALL
