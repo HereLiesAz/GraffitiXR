@@ -204,6 +204,8 @@ class ArRenderer(
     @Volatile var driftCostProbe: com.hereliesaz.graffitixr.feature.ar.eval.DriftCostProbe? = null
     // Scratch holder for the mark-PnP "truth" pose read from the native anchor transform.
     private val truthPoseScratch = FloatArray(16)
+    // Scratch for the lay-flat overlay anchor (anchorMatrix rotated so the quad lies on the wall).
+    private val flatAnchorScratch = FloatArray(16)
     // Visible-confidence threshold above which mark-PnP is treated as truth for eval.
     private val markVisibleConf = 0.5f
 
@@ -293,6 +295,11 @@ class ArRenderer(
     @Volatile var isCapturingTarget: Boolean = false
     @Volatile var isInPlaneRealignment: Boolean = false
     @Volatile var pendingAnchorEstablishment: Boolean = false
+    // True when the primary anchor was established on a real wall plane. The artwork quad lives in
+    // the anchor's local XY plane (its surface normal is local +Z), but an ARCore plane pose has +Y
+    // along the wall normal — so when this is set, the overlay is rotated -90° about X at draw time
+    // to lay FLAT against the wall instead of standing perpendicular to it.
+    @Volatile private var anchorOnWallPlane: Boolean = false
 
     @Volatile var exportRequested: Boolean = false
     var onExportCaptured: ((Bitmap) -> Unit)? = null
@@ -741,6 +748,7 @@ class ArRenderer(
                     if (chosen == null) chosen = hits.firstOrNull()
 
                     var anchor: com.google.ar.core.Anchor? = null
+                    var onWallPlane = false
                     if (chosen != null) {
                         val pose = chosen.hitPose
                         val camPose = camera.pose
@@ -753,6 +761,9 @@ class ArRenderer(
                             // Anchor to the hit's trackable so ARCore keeps it pinned to the wall as the
                             // artist moves, instead of a free world point at a guessed depth.
                             anchor = chosen.createAnchor()
+                            // Remember whether we landed on an actual plane so the overlay can be laid
+                            // flat against it at draw time (plane pose +Y = wall normal).
+                            onWallPlane = chosen.trackable is com.google.ar.core.Plane
                         }
                     }
                     if (anchor == null) {
@@ -763,10 +774,12 @@ class ArRenderer(
                                 floatArrayOf(0f, 0f, 0f, 1f)
                             )
                         )
+                        onWallPlane = false
                     }
 
+                    anchorOnWallPlane = onWallPlane
                     slamManager.updateAnchorTransform(anchorModelMatrix)
-                    setPrimaryAnchor(anchor!!) // non-null: the fallback branch always creates one
+                    setPrimaryAnchor(anchor) // non-null: the fallback branch always creates one
                     anchorEstablished = true
                     hideVisualization = true
                     onAnchorEstablished()
@@ -1340,7 +1353,15 @@ class ArRenderer(
             val hasMeshData = false
 
             lastStep = "overlayDraw"
-            overlayRenderer.draw(viewMatrix, projMatrix, anchorMatrix, 
+            // Lay the artwork FLAT on the wall: the quad's surface normal is its local +Z, but a
+            // plane anchor's +Y is the wall normal, so rotate the anchor frame -90° about X before
+            // drawing. Only when the anchor sits on a real plane; a free/fallback anchor draws as-is.
+            val overlayAnchorMatrix = if (anchorOnWallPlane) {
+                System.arraycopy(anchorMatrix, 0, flatAnchorScratch, 0, 16)
+                android.opengl.Matrix.rotateM(flatAnchorScratch, 0, -90f, 1f, 0f, 0f)
+                flatAnchorScratch
+            } else anchorMatrix
+            overlayRenderer.draw(viewMatrix, projMatrix, overlayAnchorMatrix,
                 if (hasMeshData) meshVerticesBuffer else null,
                 if (hasMeshData) meshWeightsBuffer else null
             )

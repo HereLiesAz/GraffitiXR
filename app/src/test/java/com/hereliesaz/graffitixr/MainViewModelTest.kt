@@ -10,6 +10,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -35,6 +36,9 @@ class MainViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         every { settingsRepository.completedTutorials } returns flowOf(emptySet<String>())
+        // MainViewModel's init collects currentProject; a relaxed mock can't satisfy StateFlow.collect
+        // (return type Nothing), so provide a real flow.
+        every { projectRepository.currentProject } returns MutableStateFlow(null)
         viewModel = MainViewModel(projectRepository, slamManager, projectManager, settingsRepository, context)
         // The do-it-to-advance walkthrough tests below were written against a tutorial-mode-OFF
         // start and toggle it on themselves. Production now defaults the mode ON (so the coach

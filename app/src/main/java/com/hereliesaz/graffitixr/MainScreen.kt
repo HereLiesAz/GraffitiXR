@@ -135,6 +135,17 @@ fun MainScreen(
                         }
                     }
 
+                    // Enter AR with the Target button pre-selected when no target exists yet, so the
+                    // first screen tap (once tracking allows) creates the target without a detour to
+                    // the rail. If a target was already created, stay in normal layer-editing mode.
+                    LaunchedEffect(mainUiState.hasExistingTarget) {
+                        // Only act once the project state is resolved (non-null). `== false` means a
+                        // loaded project with no saved target, so pre-select the Target button.
+                        if (mainUiState.hasExistingTarget == false && !mainUiState.isCapturingTarget) {
+                            mainViewModel.startTargetCapture()
+                        }
+                    }
+
                     // Method-aware layer defaults: on AR entry and whenever the mural method
                     // changes, the matching representation defaults on and the other two off.
                     // Keyed on the method, so a user who manually enables another layer keeps it
@@ -418,15 +429,11 @@ fun MainScreen(
                             if (uiState.activeTool == Tool.NONE) {
                                 detectTapGestures(
                                     onDoubleTap = { editorViewModel.onCycleRotationAxis() },
-                                    onTap = { offset ->
-                                        editorViewModel.onDismissPanel()
-                                        if (uiState.editorMode == EditorMode.AR && !mainUiState.isCapturingTarget) {
-                                            mainViewModel.startTargetCapture()
-                                            val nx = offset.x / size.width
-                                            val ny = offset.y / size.height
-                                            arViewModel.onScreenTap(nx, ny)
-                                        }
-                                    }
+                                    // A plain tap no longer creates an AR target. Target creation only
+                                    // happens while the Target button is selected (isWaitingForTap):
+                                    // once a target is accepted the user must re-select that button to
+                                    // make another, and the active layer takes over screen gestures.
+                                    onTap = { editorViewModel.onDismissPanel() }
                                 )
                             }
                         }
