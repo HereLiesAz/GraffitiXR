@@ -439,5 +439,3 @@ void VoxelHash::prune(float threshold) {
         mDataDirty = true;
     }
 }
-void VoxelHash::optimize(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat) {}
-void VoxelHash::sort(const glm::vec3& camPos) {}
