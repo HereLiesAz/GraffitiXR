@@ -139,6 +139,8 @@ void MobileGS::resetGlContext() {
 }
 
 void MobileGS::draw(bool debugTint) {
+    // NEUTRALIZED (voxel/splat map retirement): no map rendering. Body kept for the deletion pass.
+    return;
     std::lock_guard<std::mutex> lock(mMutex);
     if (!mCameraReady) return;
 
@@ -160,6 +162,8 @@ void MobileGS::draw(bool debugTint) {
 }
 
 void MobileGS::drawDebugLayers(bool voxels, bool mesh) {
+    // NEUTRALIZED (voxel/splat map retirement): no map/mesh debug rendering. Body kept for deletion pass.
+    return;
     std::lock_guard<std::mutex> lock(mMutex);
     if (!mCameraReady) return;
     glm::mat4 V = glm::make_mat4(mViewMatrix);
@@ -174,6 +178,8 @@ void MobileGS::drawDebugLayers(bool voxels, bool mesh) {
 }
 
 void MobileGS::drawCoverage() {
+    // NEUTRALIZED (voxel/splat map retirement): no coverage/reveal rendering. Body kept for deletion pass.
+    return;
     std::lock_guard<std::mutex> lock(mMutex);
     if (!mCameraReady) return;
     glm::mat4 V = glm::make_mat4(mViewMatrix);
@@ -190,6 +196,11 @@ void MobileGS::pushPointCloud(const std::vector<float>& points) {
 }
 
 void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence) {
+    // NEUTRALIZED (voxel/splat map retirement): skip all map integration. mVoxelHash/mSurfaceMesh are
+    // never read by the relocalization path (relocThreadFunc uses the fingerprint + PnP, verified), so
+    // skipping the build is safe and reclaims the per-frame depth-integration cost. The "Snap-Back
+    // relocalization" comment below is stale — snap-back rides the fingerprint. Body kept for deletion pass.
+    return;
     bool isTrackingState = false;
     {
         std::lock_guard<std::mutex> lock(mMutex);
@@ -730,10 +741,16 @@ void MobileGS::destroy() {
 }
 
 void MobileGS::saveModel(const std::string& p) {
+    // NEUTRALIZED (voxel/splat map retirement): no model.map persistence. The .gxr keeps the
+    // fingerprint (the load-bearing reloc payload); the dense map is no longer written. Kept for deletion.
+    return;
     mVoxelHash.save(p);
     mSurfaceMesh.save(p + ".mesh");
 }
 void MobileGS::loadModel(const std::string& p) {
+    // NEUTRALIZED (voxel/splat map retirement): no model.map load. Older .gxr files with a saved map are
+    // ignored; relocalization restores from the fingerprint. Kept for the deletion pass.
+    return;
     mVoxelHash.load(p);
     mSurfaceMesh.load(p + ".mesh");
 }

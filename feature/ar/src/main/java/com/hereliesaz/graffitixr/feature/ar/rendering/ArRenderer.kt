@@ -874,7 +874,10 @@ class ArRenderer(
                     vCurrent = viewMatrix,
                     reloc = slamManager.getRelocResult(),
                     fpAnchor = slamManager.getFingerprintAnchor(),
-                    confGlobal = slamManager.getGlobalConfidenceAvg(),
+                    // Map retirement: confGlobal came from the (now-neutralized) voxel map's global
+                    // confidence, which is always 0 once the map stops building. Decouple PoseFusion
+                    // from it — pass full trust so smooth correction keeps working on the inlier ratio.
+                    confGlobal = 1f,
                 )
             } else backbone
 
@@ -1305,10 +1308,9 @@ class ArRenderer(
             }
 
             lastStep = "mesh"
-            val hasMeshData = if (scanMode == ArScanMode.MURAL && muralMethod == MuralMethod.SURFACE_MESH) {
-                slamManager.getPersistentMesh(meshVerticesBuffer, meshWeightsBuffer)
-                true
-            } else false
+            // Voxel/splat map retirement: the SURFACE_MESH overlay-warp is dropped — always render the
+            // overlay flat on the anchor (the dense map that fed the warp is being neutralized/removed).
+            val hasMeshData = false
 
             lastStep = "overlayDraw"
             overlayRenderer.draw(viewMatrix, projMatrix, anchorMatrix, 
