@@ -1001,7 +1001,8 @@ class MainActivity : ComponentActivity() {
                                             arUiState.targetDepthBufferHeight,
                                             arUiState.targetDepthStride,
                                             arUiState.targetIntrinsics,
-                                            arUiState.targetCaptureViewMatrix
+                                            arUiState.targetCaptureViewMatrix,
+                                            arUiState.targetWallPlane
                                         )
                                     },
                                     onRetake = {

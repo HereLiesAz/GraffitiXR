@@ -55,21 +55,26 @@ object PlaneMarks {
         val n = transformNormal(cvView, planeNormalWorld[0], planeNormalWorld[1], planeNormalWorld[2])
         val nDotP = n[0] * p[0] + n[1] * p[1] + n[2] * p[2]
 
-        val kept = ArrayList<Int>(pixels.size)
-        val pts = ArrayList<Float>(pixels.size * 3)
-        for ((i, px) in pixels.withIndex()) {
-            // Camera ray in the CV frame: camera at origin looking +Z.
+        // Primitive arrays (no boxing) sized to the worst case, then trimmed to the kept count.
+        val maxCount = pixels.size
+        val keptIndices = IntArray(maxCount)
+        val ptsCam = FloatArray(maxCount * 3)
+        var count = 0
+        for (i in 0 until maxCount) {
+            val px = pixels[i]
+            // Camera ray in the CV frame: camera at origin looking +Z (dz = 1, so X.z == t).
             val dx = (px.u - cx) / fx
             val dy = (px.v - cy) / fy
-            val dz = 1f
-            val nDotD = n[0] * dx + n[1] * dy + n[2] * dz
+            val nDotD = n[0] * dx + n[1] * dy + n[2]
             if (kotlin.math.abs(nDotD) < eps) continue       // ray parallel to plane → no hit
             val t = nDotP / nDotD
             if (t < minDepthM || t > maxDepthM) continue     // behind camera or out of trusted range
-            kept.add(i)
-            pts.add(t * dx); pts.add(t * dy); pts.add(t * dz) // X = t * d, in camera CV frame (z = t > 0)
+            keptIndices[count] = i
+            val o = count * 3
+            ptsCam[o] = t * dx; ptsCam[o + 1] = t * dy; ptsCam[o + 2] = t
+            count++
         }
-        return Result(kept.toIntArray(), pts.toFloatArray())
+        return Result(keptIndices.copyOf(count), ptsCam.copyOf(count * 3))
     }
 
     /** Apply a column-major 4x4 to a point (w=1). */

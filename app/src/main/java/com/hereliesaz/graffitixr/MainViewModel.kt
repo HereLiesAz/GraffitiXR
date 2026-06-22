@@ -232,15 +232,17 @@ class MainViewModel @Inject constructor(
         depthH: Int = 0,
         depthStride: Int = 0,
         intrinsics: FloatArray? = null,
-        viewMatrix: FloatArray? = null
+        viewMatrix: FloatArray? = null,
+        wallPlane: FloatArray? = null
     ) {
         if (bitmap == null || intrinsics == null || viewMatrix == null) { resetCaptureUi(); return }
         val safeIntr = intrinsics
         val safeView = viewMatrix
 
         if (depthBuffer == null) {
-            // No depth source: build the wall fingerprint from two keyframes via triangulation.
-            handleMetricCapture(bitmap, safeIntr, safeView)
+            // No depth source: build the wall fingerprint from a SINGLE capture by back-projecting
+            // features onto the green ARCore wall plane (whose metric pose ARCore already solved).
+            handleSingleCapture(bitmap, safeIntr, safeView, wallPlane)
             return
         }
         resetCaptureUi()
@@ -332,51 +334,37 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private class MetricKf0(
-        val bitmap: Bitmap, val view: FloatArray, val intr: FloatArray, val anchor: FloatArray
-    )
-    private var pendingMetricKf0: MetricKf0? = null
-
-    override fun onCleared() {
-        super.onCleared()
-        pendingMetricKf0 = null
-    }
-
     /**
-     * Depth-off target creation: capture two keyframes a side-step apart and triangulate. The first
-     * tap stores keyframe 0 and re-enters capture; the second tap supplies keyframe 1 and builds.
+     * Depth-off, SINGLE-capture target creation. The tap must land on a green (parallel, in-range)
+     * ARCore wall plane — ARCore has already solved that plane's metric pose, so we back-project the
+     * captured features onto it ([MetricFingerprintBuilder.buildSingle]) instead of triangulating a
+     * second view. No green plane → refuse and guide the artist to face a wall.
      */
-    private fun handleMetricCapture(bitmap: Bitmap, intr: FloatArray, view: FloatArray) {
-        val kf0 = pendingMetricKf0
-        if (kf0 == null) {
-            pendingMetricKf0 = MetricKf0(bitmap, view.copyOf(), intr.copyOf(), slamManager.getAnchorTransform())
-            // Re-enter tap-capture so the next tap supplies the second view.
-            _uiState.update {
-                it.copy(isCapturingTarget = true, captureStep = CaptureStep.NONE,
-                    isWaitingForTap = true, captureOriginatedFromTap = true)
-            }
+    private fun handleSingleCapture(bitmap: Bitmap, intr: FloatArray, view: FloatArray, wallPlane: FloatArray?) {
+        if (wallPlane == null || wallPlane.size < 6) {
+            resetCaptureUi()
             Toast.makeText(context,
-                "First view captured. Step ~20 cm to the side and tap your marks again.",
+                "Aim at a wall shown in green (face it straight-on, within ~3 m), then tap your marks.",
                 Toast.LENGTH_LONG).show()
             return
         }
-        pendingMetricKf0 = null
         resetCaptureUi()
+        val planePoint = floatArrayOf(wallPlane[0], wallPlane[1], wallPlane[2])
+        val planeNormal = floatArrayOf(wallPlane[3], wallPlane[4], wallPlane[5])
+        val anchor = slamManager.getAnchorTransform()
         viewModelScope.launch(Dispatchers.IO) {
             val currentProject = projectRepository.currentProject.value ?: return@launch
-            val fp = MetricFingerprintBuilder.build(
-                slamManager, kf0.bitmap, kf0.view, kf0.intr, bitmap, view, intr, kf0.anchor
+            val fp = MetricFingerprintBuilder.buildSingle(
+                slamManager, bitmap, view, intr, planePoint, planeNormal, anchor
             )
             if (fp == null) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context,
-                        "Not enough overlap between the two views. Try again with a smaller side-step.",
+                        "Not enough texture on the wall to lock a target. Try a more detailed area.",
                         Toast.LENGTH_LONG).show()
                 }
                 return@launch
             }
-            // (Teleological artwork base is registered from the live design composite via
-            // ArViewModel.updatePaintingGuide — see the depth path above.)
 
             // Canonical patch (keyframe of the marks) for the distortion head — fed live AND persisted.
             val patch = grayPatchBytes(bitmap)
@@ -386,10 +374,10 @@ class MainViewModel @Inject constructor(
                 context = context,
                 projectData = currentProject.copy(
                     fingerprint = fp.copy(patchData = patch),
-                    // Persist keyframe-0's intrinsics + anchor — the exact values just fed to
+                    // Persist the capture's intrinsics + anchor — the exact values just fed to
                     // restoreWallFingerprintMetric — so reload relocalizes with the true intrinsics.
-                    fingerprintIntrinsics = kf0.intr.toList(),
-                    fingerprintAnchor = kf0.anchor.toList(),
+                    fingerprintIntrinsics = intr.toList(),
+                    fingerprintAnchor = anchor.toList(),
                 ),
                 targetImages = listOf(bitmap)
             )
@@ -401,7 +389,6 @@ class MainViewModel @Inject constructor(
     }
 
     fun onCancelCaptureClicked() {
-        pendingMetricKf0 = null
         _uiState.update {
             it.copy(
                 isCapturingTarget = false,

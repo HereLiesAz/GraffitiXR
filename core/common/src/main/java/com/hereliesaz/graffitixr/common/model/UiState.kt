@@ -41,6 +41,10 @@ data class ArUiState(
     val targetDepthWidth: Int = 0,
     val targetDepthHeight: Int = 0,
     val targetIntrinsics: FloatArray? = null,
+    // The green (parallel, in-range) ARCore wall plane under the capture tap, as 6 floats
+    // [pointX,pointY,pointZ, normalX,normalY,normalZ] in world space. Null when the tap wasn't on a
+    // qualifying (MATCH/green) plane — single-capture target creation requires one (back-projection).
+    val targetWallPlane: FloatArray? = null,
     val capturedTargetUris: List<Uri> = emptyList(),
     val capturedTargetImages: List<Bitmap> = emptyList(),
     val gpsData: GpsData? = null,
