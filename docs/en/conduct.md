@@ -11,4 +11,4 @@
 * **Safety:** Do not use the AR mode while walking near traffic. The "Confidence Engine" is mesmerizing, but a bus is real.
 
 ---
-*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*
+*Documentation updated on 2026-03-17 during website redesign and Stencil generation integration phase.*

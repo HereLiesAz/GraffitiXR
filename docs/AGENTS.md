@@ -12,7 +12,6 @@ All AI agents working on this project must read and understand the project docum
 * `docs/contributing.md` - Contribution guidelines.
 * `docs/data_layer.md` - Persistence, serialization, and state management strategies.
 * `docs/DSL.md` - UI Domain Specific Language configurations.
-* `docs/fauxpas.md` - Common development errors to avoid.
 * `docs/file_descriptions.md` - Directory structure and file purpose registry.
 * `docs/misc.md` - Miscellaneous implementation notes.
 * `docs/performance.md` - Optimization targets and constraints.
@@ -21,7 +20,7 @@ All AI agents working on this project must read and understand the project docum
 * `docs/SLAM_SETUP.md` - SLAM engine mathematics and configuration.
 * `docs/task_flow.md` - Detailed user task flows.
 * `docs/testing.md` - Testing protocols (Unit, UI, Integration).
-* `docs/TODO.md` - Current backlog and known issues.
+* `BACKLOG.md` - Current backlog and known issues (repo root).
 * `docs/UI_UX.md` - Design system and UX specifications.
 * `docs/workflow.md` - CI/CD and version control workflows.
 
@@ -32,4 +31,4 @@ All AI agents working on this project must read and understand the project docum
 4.  **Atomic Functions:** Adhere to the Single Responsibility Principle. Refactor large functions into smaller, testable units.
 
 ---
-*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*
+*Documentation updated on 2026-03-17 during website redesign and Stencil generation integration phase.*

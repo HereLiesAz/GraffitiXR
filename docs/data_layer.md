@@ -74,12 +74,12 @@ GraffitiXR projects are saved as compressed ZIP archives with the extension `.gx
 ```text
 project.gxr
 ├── meta.json          // Metadata (GPS, Heading, Image Transforms)
-├── model.map          // Binary Gaussian Splat data
+├── model.map          // Binary Persistent Voxel Memory (opaque surfel) map
 ├── target.fingerprint // OpenCV ORB descriptors (for re-localization)
 └── reference.png      // The artist's source image
 
 model.map Specification
-A binary dump of the std::vector<SplatGaussian>.
+A binary dump of the `std::vector<Splat>` (opaque voxel-hash surfels).
 {
 "version": 1,
 "created_at": 1715420000,
@@ -101,4 +101,4 @@ Byte Offset,Type,Description
 ...,...,Splat[N]
 
 ---
-*Documentation updated on 2026-03-17 during website redesign and Stencil Mode integration phase.*
+*Documentation updated on 2026-03-17 during website redesign and Stencil generation integration phase.*
