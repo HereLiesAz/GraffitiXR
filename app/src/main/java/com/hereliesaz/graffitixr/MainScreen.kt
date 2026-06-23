@@ -535,10 +535,18 @@ internal fun compositeLayersForAr(layers: List<Layer>): AndroidBitmap {
         val bmp = layer.bitmap ?: continue
         val halfW = bmp.width / 2f * layer.scale
         val halfH = bmp.height / 2f * layer.scale
-        val left = layer.offset.x - halfW
-        val top = layer.offset.y - halfH
-        val right = layer.offset.x + halfW
-        val bottom = layer.offset.y + halfH
+        // The layer is drawn rotated about its center, so the composite must be sized to the ROTATED
+        // bounding box. Using the unrotated half-extents here undersized the canvas and clipped the
+        // corners of any rotated layer.
+        val rad = Math.toRadians(layer.rotationZ.toDouble())
+        val cos = kotlin.math.abs(kotlin.math.cos(rad)).toFloat()
+        val sin = kotlin.math.abs(kotlin.math.sin(rad)).toFloat()
+        val rotHalfW = halfW * cos + halfH * sin
+        val rotHalfH = halfW * sin + halfH * cos
+        val left = layer.offset.x - rotHalfW
+        val top = layer.offset.y - rotHalfH
+        val right = layer.offset.x + rotHalfW
+        val bottom = layer.offset.y + rotHalfH
 
         if (left < minX) minX = left
         if (top < minY) minY = top
