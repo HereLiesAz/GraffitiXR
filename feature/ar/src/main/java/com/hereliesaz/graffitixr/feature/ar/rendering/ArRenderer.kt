@@ -1390,9 +1390,12 @@ class ArRenderer(
             // Compute the in-plane (overlay-local) offset from the anchor to the marks ONCE per target
             // and then ride the (drift-tracked) anchor with that fixed offset applied.
             val markCenter = slamManager.overlayMarkCenterWorld
-            if (markCenter == null || markCenter.size < 3) {
+            // Also reset when the anchor is lost: a re-establish (e.g. plane realignment) lands at a
+            // new pose, so the offset must be recomputed against it. Without clearing appliedMarkCenter
+            // here, the unchanged markCenter would skip recomputation and leave the overlay misaligned.
+            if (markCenter == null || markCenter.size < 3 || !anchorEstablished) {
                 appliedMarkCenter = null; markOffsetX = 0f; markOffsetY = 0f
-            } else if (markCenter !== appliedMarkCenter && anchorEstablished) {
+            } else if (markCenter !== appliedMarkCenter) {
                 val dx = markCenter[0] - overlayBaseScratch[12]
                 val dy = markCenter[1] - overlayBaseScratch[13]
                 val dz = markCenter[2] - overlayBaseScratch[14]
