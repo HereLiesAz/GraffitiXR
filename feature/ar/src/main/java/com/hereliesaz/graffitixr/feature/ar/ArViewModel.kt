@@ -673,6 +673,9 @@ class ArViewModel @Inject constructor(
         isInArMode = false
         isDestroying = true
         lastMappingPausedCmd = null
+        // Drop the marks-centering override so a later AR re-entry (or a different project) doesn't
+        // center the overlay on a stale target's marks before a new one is built.
+        slamManager.overlayMarkCenterWorld = null
         // Cancel any in-flight session update (including a running stereo probe) so it stops pumping
         // the camera and releases the session mutex before cleanup tries to acquire it.
         sessionUpdateJob?.cancel()

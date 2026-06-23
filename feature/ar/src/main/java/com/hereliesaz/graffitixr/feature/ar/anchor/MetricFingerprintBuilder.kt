@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
 import android.graphics.Bitmap
+import android.opengl.Matrix
 import com.hereliesaz.graffitixr.common.model.Fingerprint
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import org.opencv.android.Utils
@@ -65,6 +66,9 @@ object MetricFingerprintBuilder {
             val cv1 = MetricMarks.glViewToCv(glView1)
             val tri = MetricMarks.triangulate(matched.corrs, cv0, cv1, intr0[0], intr0[1], intr0[2], intr0[3])
             if (tri.count < minPoints) return null
+
+            // Center the AR overlay on the marks (their world centroid), not the screen-center anchor.
+            slam.overlayMarkCenterWorld = marksCentroidWorld(tri.pointsCam0, cv0)
 
             // Keep the rows of frame-0's descriptors (and the frame-0 keypoints) whose match survived.
             val keptDesc = Mat(tri.count, matched.descriptors.cols(), matched.descriptors.type())
@@ -198,6 +202,9 @@ object MetricFingerprintBuilder {
         )
         if (res.count < minPoints) return null
 
+        // Center the AR overlay on the marks (their world centroid), not the screen-center anchor.
+        slam.overlayMarkCenterWorld = marksCentroidWorld(res.pointsCam, cvView)
+
         val keptDesc = Mat(res.count, descAll.cols(), descAll.type())
         val keypoints = ArrayList<KeyPoint>(res.count)
         for ((dst, src) in res.kept.withIndex()) {
@@ -263,6 +270,25 @@ object MetricFingerprintBuilder {
         val descs = Mat(n, d, org.opencv.core.CvType.CV_32F)
         descs.put(0, 0, raw.copyOfRange(2 + 2 * n, 2 + 2 * n + n * d))
         return Pair(pos, descs)
+    }
+
+    /**
+     * World-space (ARCore/GL frame) centroid of the kept 3D marks, used to center the AR overlay on
+     * the marks rather than the screen-center anchor. [pointsCam] are in the capture's CV camera
+     * frame (flat [x,y,z,...]); inverting the CV world→camera view brings their mean into world
+     * space. Returns null if there are no points or the view isn't invertible.
+     */
+    private fun marksCentroidWorld(pointsCam: FloatArray, cvView: FloatArray): FloatArray? {
+        val n = pointsCam.size / 3
+        if (n == 0) return null
+        var sx = 0f; var sy = 0f; var sz = 0f
+        for (i in 0 until n) { sx += pointsCam[i * 3]; sy += pointsCam[i * 3 + 1]; sz += pointsCam[i * 3 + 2] }
+        val cam = floatArrayOf(sx / n, sy / n, sz / n, 1f)
+        val inv = FloatArray(16)
+        if (!Matrix.invertM(inv, 0, cvView, 0)) return null
+        val world = FloatArray(4)
+        Matrix.multiplyMV(world, 0, inv, 0, cam, 0)
+        return floatArrayOf(world[0], world[1], world[2])
     }
 
     private fun toGray(bitmap: Bitmap): Mat {
