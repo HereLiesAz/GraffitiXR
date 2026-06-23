@@ -180,6 +180,19 @@ fun MainScreen(
 
                     val visibleLayers = uiState.layers.filter { it.isVisible && it.bitmap != null }
 
+                    // Push the AR whole-design adjustment (set via the rail's "Layer" item) to the
+                    // renderer, which applies it as an in-plane move/scale/rotate of the overlay along
+                    // the wall plane. Offsets are stored in world meters (converted at the gesture site).
+                    val arOverlayAdj = uiState.modeAdjustments[EditorMode.AR]
+                    LaunchedEffect(arOverlayAdj, rendererRef.value) {
+                        rendererRef.value?.let { r ->
+                            r.overlayPanX = arOverlayAdj?.offsetX ?: 0f
+                            r.overlayPanY = arOverlayAdj?.offsetY ?: 0f
+                            r.overlayScale = arOverlayAdj?.scale ?: 1f
+                            r.overlayRotationDeg = arOverlayAdj?.rotation ?: 0f
+                        }
+                    }
+
                     LaunchedEffect(visibleLayers, arUiState.isAnchorEstablished) {
                         if (!arUiState.isAnchorEstablished || visibleLayers.isEmpty()) {
                             rendererRef.value?.updateOverlayBitmap(null)
@@ -442,7 +455,9 @@ fun MainScreen(
                         // While editing the whole design as a unit for this mode, transform gestures
                         // drive the mode adjustment instead of the active layer.
                         val editingMode = uiState.editingModeLayer && uiState.editorMode != EditorMode.DESIGN
-                        if (!isTouchLocked && !isImageLocked && (activeLayer != null || editingMode) && !isWaitingForTap) {
+                        // editingMode edits the whole design, so it isn't gated by the active layer's
+                        // image lock (the mode has its own Lock via isTransformLocked, in the reducer).
+                        if (!isTouchLocked && !isWaitingForTap && (editingMode || (!isImageLocked && activeLayer != null))) {
                             if (uiState.activeTool == Tool.NONE) {
                                 detectSmartOverlayGestures(
                                     getValidBounds = { androidx.compose.ui.geometry.Rect(0f, 0f, size.width.toFloat(), size.height.toFloat()) },
@@ -450,7 +465,14 @@ fun MainScreen(
                                     onGestureEnd = { editorViewModel.onGestureEnd() },
                                     onGesture = { _, pan, zoom, rotation ->
                                         if (editingMode) {
-                                            editorViewModel.onModeTransformGesture(uiState.editorMode, pan, zoom, rotation)
+                                            // In AR the overlay lives on the wall in meters, so convert
+                                            // the screen-pixel drag to in-plane meters (screen Y is down,
+                                            // plane local Y is up → flip Y). Other modes stay in pixels.
+                                            val adjustedPan = if (uiState.editorMode == EditorMode.AR) {
+                                                val mpp = rendererRef.value?.currentMetersPerPixel ?: 0f
+                                                androidx.compose.ui.geometry.Offset(pan.x * mpp, -pan.y * mpp)
+                                            } else pan
+                                            editorViewModel.onModeTransformGesture(uiState.editorMode, adjustedPan, zoom, rotation)
                                         } else {
                                             editorViewModel.onTransformGesture(pan, zoom, rotation)
                                         }

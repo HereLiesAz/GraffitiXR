@@ -20,6 +20,10 @@ data class Fingerprint(
     // Canonical 256x256 raw-gray patch of the marks (row-major) for the distortion head. Empty when
     // the head isn't in use. Defaulted so older saved projects deserialize unchanged.
     val patchData: ByteArray = ByteArray(0),
+    // Marks centroid [x,y,z] in the fingerprint anchor's local frame, so the AR overlay can re-center
+    // on the marks after a project reload (when the builder doesn't run). Empty when unavailable;
+    // defaulted so older saved projects deserialize unchanged.
+    val markCenterLocal: List<Float> = emptyList(),
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -35,6 +39,7 @@ data class Fingerprint(
         if (descriptorsCols != other.descriptorsCols) return false
         if (descriptorsType != other.descriptorsType) return false
         if (!patchData.contentEquals(other.patchData)) return false
+        if (markCenterLocal != other.markCenterLocal) return false
         return true
     }
 
@@ -46,6 +51,7 @@ data class Fingerprint(
         result = 31 * result + descriptorsCols
         result = 31 * result + descriptorsType
         result = 31 * result + patchData.contentHashCode()
+        result = 31 * result + markCenterLocal.hashCode()
         return result
     }
 }

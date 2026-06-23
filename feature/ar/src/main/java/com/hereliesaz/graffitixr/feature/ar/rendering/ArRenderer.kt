@@ -209,8 +209,6 @@ class ArRenderer(
     @Volatile var driftCostProbe: com.hereliesaz.graffitixr.feature.ar.eval.DriftCostProbe? = null
     // Scratch holder for the mark-PnP "truth" pose read from the native anchor transform.
     private val truthPoseScratch = FloatArray(16)
-    // Scratch for the lay-flat overlay anchor (anchorMatrix rotated so the quad lies on the wall).
-    private val flatAnchorScratch = FloatArray(16)
     // Visible-confidence threshold above which mark-PnP is treated as truth for eval.
     private val markVisibleConf = 0.5f
 
@@ -312,6 +310,28 @@ class ArRenderer(
     // Pre-allocated buffers for Surface Mesh updates (32x32 grid)
     private val meshVerticesBuffer = FloatArray(32 * 32 * 3)
     private val meshWeightsBuffer = FloatArray(32 * 32)
+
+    // --- Whole-design AR overlay transform (the "Layer" item in AR) ---
+    // In-plane translation (meters along the overlay's local X/Y), uniform scale, and rotation about
+    // the wall normal, applied to the artwork overlay ON TOP of the tracked anchor. Driven by the
+    // persisted per-mode adjustment (modeAdjustments[AR]); pushed from MainScreen.
+    @Volatile var overlayPanX: Float = 0f
+    @Volatile var overlayPanY: Float = 0f
+    @Volatile var overlayScale: Float = 1f
+    @Volatile var overlayRotationDeg: Float = 0f
+    // Meters-per-pixel at the overlay's depth this frame, so the UI can convert a screen-pixel drag
+    // into an in-plane translation in meters. 0 until the overlay has been positioned.
+    @Volatile var currentMetersPerPixel: Float = 0f
+    // In-plane offset (overlay-local meters) that shifts the overlay center from the tracked anchor
+    // onto the matched-marks centroid. Recomputed each frame from SlamManager.overlayMarkCenterLocal
+    // (the marks centroid in the fingerprint anchor's frame) against the live anchor, so it tracks
+    // drift and survives anchor re-establishment and project reload.
+    private var markOffsetX: Float = 0f
+    private var markOffsetY: Float = 0f
+    // Scratch for composing the overlay matrix (anchor frame * in-plane transform).
+    private val overlayBaseScratch = FloatArray(16)
+    private val overlayLocalScratch = FloatArray(16)
+    private val overlayComposedScratch = FloatArray(16)
 
     fun attachSession(session: Session?) {
         sessionLock.withLock {
@@ -1358,15 +1378,55 @@ class ArRenderer(
             val hasMeshData = false
 
             lastStep = "overlayDraw"
-            // Lay the artwork FLAT on the wall: the quad's surface normal is its local +Z, but a
-            // plane anchor's +Y is the wall normal, so rotate the anchor frame -90° about X before
-            // drawing. Only when the anchor sits on a real plane; a free/fallback anchor draws as-is.
-            val overlayAnchorMatrix = if (anchorOnWallPlane) {
-                System.arraycopy(anchorMatrix, 0, flatAnchorScratch, 0, 16)
-                android.opengl.Matrix.rotateM(flatAnchorScratch, 0, -90f, 1f, 0f, 0f)
-                flatAnchorScratch
-            } else anchorMatrix
-            overlayRenderer.draw(viewMatrix, projMatrix, overlayAnchorMatrix,
+            // Base overlay frame = the tracked anchor. Lay the artwork FLAT on the wall: the quad's
+            // surface normal is its local +Z, but a plane anchor's +Y is the wall normal, so rotate
+            // the anchor frame -90° about X. Only on a real plane; a free/fallback anchor draws as-is.
+            System.arraycopy(anchorMatrix, 0, overlayBaseScratch, 0, 16)
+            if (anchorOnWallPlane) {
+                android.opengl.Matrix.rotateM(overlayBaseScratch, 0, -90f, 1f, 0f, 0f)
+            }
+
+            // Center the overlay on the matched-marks centroid instead of the screen-center anchor.
+            // overlayMarkCenterLocal is the centroid in the fingerprint anchor's frame; reconstruct
+            // its world position from the live (drift-tracked, reloc-fused) anchor, then project the
+            // delta from the anchor onto the overlay-local in-plane axes. Recomputed every frame, so
+            // it follows drift and recovers automatically after anchor re-establishment / reload.
+            val markLocal = slamManager.overlayMarkCenterLocal
+            if (markLocal == null || markLocal.size < 3 || !anchorEstablished) {
+                markOffsetX = 0f; markOffsetY = 0f
+            } else {
+                val cwX = anchorMatrix[0] * markLocal[0] + anchorMatrix[4] * markLocal[1] + anchorMatrix[8] * markLocal[2] + anchorMatrix[12]
+                val cwY = anchorMatrix[1] * markLocal[0] + anchorMatrix[5] * markLocal[1] + anchorMatrix[9] * markLocal[2] + anchorMatrix[13]
+                val cwZ = anchorMatrix[2] * markLocal[0] + anchorMatrix[6] * markLocal[1] + anchorMatrix[10] * markLocal[2] + anchorMatrix[14]
+                val dx = cwX - overlayBaseScratch[12]
+                val dy = cwY - overlayBaseScratch[13]
+                val dz = cwZ - overlayBaseScratch[14]
+                // Project the world delta onto the overlay-local in-plane axes (columns 0 and 1).
+                markOffsetX = overlayBaseScratch[0] * dx + overlayBaseScratch[1] * dy + overlayBaseScratch[2] * dz
+                markOffsetY = overlayBaseScratch[4] * dx + overlayBaseScratch[5] * dy + overlayBaseScratch[6] * dz
+            }
+
+            // Meters-per-pixel at the overlay depth, so the UI can convert a screen drag (px) into an
+            // in-plane translation (m). projMatrix[5] = cot(fovY/2), so tan(fovY/2) = 1/projMatrix[5].
+            val ovz = viewMatrix[2] * overlayBaseScratch[12] + viewMatrix[6] * overlayBaseScratch[13] +
+                viewMatrix[10] * overlayBaseScratch[14] + viewMatrix[14]
+            val tanHalfFovY = if (projMatrix[5] != 0f) 1f / projMatrix[5] else 0f
+            currentMetersPerPixel =
+                if (surfaceHeight > 0) kotlin.math.abs(ovz) * 2f * tanHalfFovY / surfaceHeight else 0f
+
+            // User whole-design transform (AR "Layer" item) + marks-centering offset, in the overlay's
+            // local (in-plane) frame: translate along the plane, rotate about the normal, scale.
+            android.opengl.Matrix.setIdentityM(overlayLocalScratch, 0)
+            android.opengl.Matrix.translateM(
+                overlayLocalScratch, 0, markOffsetX + overlayPanX, markOffsetY + overlayPanY, 0f
+            )
+            android.opengl.Matrix.rotateM(overlayLocalScratch, 0, overlayRotationDeg, 0f, 0f, 1f)
+            android.opengl.Matrix.scaleM(overlayLocalScratch, 0, overlayScale, overlayScale, 1f)
+            android.opengl.Matrix.multiplyMM(
+                overlayComposedScratch, 0, overlayBaseScratch, 0, overlayLocalScratch, 0
+            )
+
+            overlayRenderer.draw(viewMatrix, projMatrix, overlayComposedScratch,
                 if (hasMeshData) meshVerticesBuffer else null,
                 if (hasMeshData) meshWeightsBuffer else null
             )

@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
 import android.graphics.Bitmap
+import android.opengl.Matrix
 import com.hereliesaz.graffitixr.common.model.Fingerprint
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import org.opencv.android.Utils
@@ -66,6 +67,10 @@ object MetricFingerprintBuilder {
             val tri = MetricMarks.triangulate(matched.corrs, cv0, cv1, intr0[0], intr0[1], intr0[2], intr0[3])
             if (tri.count < minPoints) return null
 
+            // Center the AR overlay on the marks (their centroid), not the screen-center anchor.
+            val markCenterLocal = marksCentroidLocal(tri.pointsCam0, cv0, anchorModel)
+            slam.overlayMarkCenterLocal = markCenterLocal
+
             // Keep the rows of frame-0's descriptors (and the frame-0 keypoints) whose match survived.
             val keptDesc = Mat(tri.count, matched.descriptors.cols(), matched.descriptors.type())
             val keypoints = ArrayList<KeyPoint>(tri.count)
@@ -92,7 +97,10 @@ object MetricFingerprintBuilder {
             slam.restoreWallFingerprintMetric(
                 bytes, rows, cols, type, tri.pointsCam0, anchorModel, intr0,
             )
-            return Fingerprint(keypoints, tri.pointsCam0.toList(), bytes, rows, cols, type)
+            return Fingerprint(
+                keypoints, tri.pointsCam0.toList(), bytes, rows, cols, type,
+                markCenterLocal = markCenterLocal?.toList() ?: emptyList(),
+            )
         } finally {
             matched.descriptors.release()
         }
@@ -198,6 +206,10 @@ object MetricFingerprintBuilder {
         )
         if (res.count < minPoints) return null
 
+        // Center the AR overlay on the marks (their centroid), not the screen-center anchor.
+        val markCenterLocal = marksCentroidLocal(res.pointsCam, cvView, anchorModel)
+        slam.overlayMarkCenterLocal = markCenterLocal
+
         val keptDesc = Mat(res.count, descAll.cols(), descAll.type())
         val keypoints = ArrayList<KeyPoint>(res.count)
         for ((dst, src) in res.kept.withIndex()) {
@@ -221,7 +233,10 @@ object MetricFingerprintBuilder {
         keptDesc.release()
 
         slam.restoreWallFingerprintMetric(bytes, rows, cols, type, res.pointsCam, anchorModel, intr)
-        return Fingerprint(keypoints, res.pointsCam.toList(), bytes, rows, cols, type)
+        return Fingerprint(
+            keypoints, res.pointsCam.toList(), bytes, rows, cols, type,
+            markCenterLocal = markCenterLocal?.toList() ?: emptyList(),
+        )
     }
 
     /** SuperPoint detect (native, CLAHE'd) on both views + L2 ratio match → Matched (CV_32F descs). */
@@ -263,6 +278,31 @@ object MetricFingerprintBuilder {
         val descs = Mat(n, d, org.opencv.core.CvType.CV_32F)
         descs.put(0, 0, raw.copyOfRange(2 + 2 * n, 2 + 2 * n + n * d))
         return Pair(pos, descs)
+    }
+
+    /**
+     * Centroid [x,y,z] of the kept 3D marks expressed in the FINGERPRINT ANCHOR's local frame, used
+     * to center the AR overlay on the marks rather than the screen-center anchor. [pointsCam] are in
+     * the capture's CV camera frame (flat [x,y,z,...]): invert the CV world→camera view to get their
+     * mean in world space, then invert [anchorModel] (the anchor's world pose) to express it in the
+     * anchor's frame — which survives a reload into a new ARCore session. Returns null if there are
+     * no points or either matrix isn't invertible.
+     */
+    private fun marksCentroidLocal(pointsCam: FloatArray, cvView: FloatArray, anchorModel: FloatArray): FloatArray? {
+        val n = pointsCam.size / 3
+        if (n == 0) return null
+        var sx = 0f; var sy = 0f; var sz = 0f
+        for (i in 0 until n) { sx += pointsCam[i * 3]; sy += pointsCam[i * 3 + 1]; sz += pointsCam[i * 3 + 2] }
+        val cam = floatArrayOf(sx / n, sy / n, sz / n, 1f)
+        val invView = FloatArray(16)
+        if (!Matrix.invertM(invView, 0, cvView, 0)) return null
+        val world = FloatArray(4)
+        Matrix.multiplyMV(world, 0, invView, 0, cam, 0)
+        val invAnchor = FloatArray(16)
+        if (!Matrix.invertM(invAnchor, 0, anchorModel, 0)) return null
+        val local = FloatArray(4)
+        Matrix.multiplyMV(local, 0, invAnchor, 0, world, 0)
+        return floatArrayOf(local[0], local[1], local[2])
     }
 
     private fun toGray(bitmap: Bitmap): Mat {
