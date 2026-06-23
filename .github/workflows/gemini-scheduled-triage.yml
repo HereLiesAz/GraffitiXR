@@ -95,6 +95,9 @@ jobs:
           ${{ steps.find_issues.outputs.issues_to_triage != '[]' }}
         uses: 'google-github-actions/run-gemini-cli@v0' # ratchet:exclude
         env:
+          # Trust the CI checkout so the headless CLI doesn't refuse to run with
+          # "not running in a trusted directory" (it can't prompt in automation).
+          GEMINI_CLI_TRUST_WORKSPACE: 'true'
           GH_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
           ISSUES_TO_TRIAGE: '${{ steps.find_issues.outputs.issues_to_triage }}'
           REPOSITORY: '${{ github.repository }}'
