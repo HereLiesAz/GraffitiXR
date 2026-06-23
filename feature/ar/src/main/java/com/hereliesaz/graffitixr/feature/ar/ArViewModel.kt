@@ -674,8 +674,8 @@ class ArViewModel @Inject constructor(
         isDestroying = true
         lastMappingPausedCmd = null
         // Drop the marks-centering override so a later AR re-entry (or a different project) doesn't
-        // center the overlay on a stale target's marks before a new one is built.
-        slamManager.overlayMarkCenterWorld = null
+        // center the overlay on a stale target's marks before a new one is built/restored.
+        slamManager.overlayMarkCenterLocal = null
         // Cancel any in-flight session update (including a running stereo probe) so it stops pumping
         // the camera and releases the session mutex before cleanup tries to acquire it.
         sessionUpdateJob?.cancel()
@@ -1189,6 +1189,10 @@ class ArViewModel @Inject constructor(
                     val s = kotlin.math.sqrt(fp.patchData.size.toDouble()).toInt()
                     if (s * s == fp.patchData.size) slamManager.setWallPatchBytes(fp.patchData, s)
                 }
+                // Re-publish the marks centroid (anchor-local) so the overlay re-centers on the marks
+                // after reload, even though the builder doesn't run on a restored fingerprint.
+                slamManager.overlayMarkCenterLocal =
+                    if (fp.markCenterLocal.size >= 3) fp.markCenterLocal.toFloatArray() else null
             }
             // Restore the persistent wall feature map (Phase 2a: stored in native; matched in Phase 2b).
             // Independent of the marks fingerprint above and co-registered to the same anchor. Null on

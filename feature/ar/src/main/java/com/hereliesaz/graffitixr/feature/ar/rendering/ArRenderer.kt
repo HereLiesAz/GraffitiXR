@@ -322,10 +322,10 @@ class ArRenderer(
     // Meters-per-pixel at the overlay's depth this frame, so the UI can convert a screen-pixel drag
     // into an in-plane translation in meters. 0 until the overlay has been positioned.
     @Volatile var currentMetersPerPixel: Float = 0f
-    // Frozen in-plane offset (overlay-local meters) that shifts the overlay center from the tracked
-    // anchor onto the matched-marks centroid (SlamManager.overlayMarkCenterWorld). Computed once per
-    // target so the overlay still rides the drift-tracked anchor instead of pinning to a fixed point.
-    private var appliedMarkCenter: FloatArray? = null
+    // In-plane offset (overlay-local meters) that shifts the overlay center from the tracked anchor
+    // onto the matched-marks centroid. Recomputed each frame from SlamManager.overlayMarkCenterLocal
+    // (the marks centroid in the fingerprint anchor's frame) against the live anchor, so it tracks
+    // drift and survives anchor re-establishment and project reload.
     private var markOffsetX: Float = 0f
     private var markOffsetY: Float = 0f
     // Scratch for composing the overlay matrix (anchor frame * in-plane transform).
@@ -1387,22 +1387,23 @@ class ArRenderer(
             }
 
             // Center the overlay on the matched-marks centroid instead of the screen-center anchor.
-            // Compute the in-plane (overlay-local) offset from the anchor to the marks ONCE per target
-            // and then ride the (drift-tracked) anchor with that fixed offset applied.
-            val markCenter = slamManager.overlayMarkCenterWorld
-            // Also reset when the anchor is lost: a re-establish (e.g. plane realignment) lands at a
-            // new pose, so the offset must be recomputed against it. Without clearing appliedMarkCenter
-            // here, the unchanged markCenter would skip recomputation and leave the overlay misaligned.
-            if (markCenter == null || markCenter.size < 3 || !anchorEstablished) {
-                appliedMarkCenter = null; markOffsetX = 0f; markOffsetY = 0f
-            } else if (markCenter !== appliedMarkCenter) {
-                val dx = markCenter[0] - overlayBaseScratch[12]
-                val dy = markCenter[1] - overlayBaseScratch[13]
-                val dz = markCenter[2] - overlayBaseScratch[14]
+            // overlayMarkCenterLocal is the centroid in the fingerprint anchor's frame; reconstruct
+            // its world position from the live (drift-tracked, reloc-fused) anchor, then project the
+            // delta from the anchor onto the overlay-local in-plane axes. Recomputed every frame, so
+            // it follows drift and recovers automatically after anchor re-establishment / reload.
+            val markLocal = slamManager.overlayMarkCenterLocal
+            if (markLocal == null || markLocal.size < 3 || !anchorEstablished) {
+                markOffsetX = 0f; markOffsetY = 0f
+            } else {
+                val cwX = anchorMatrix[0] * markLocal[0] + anchorMatrix[4] * markLocal[1] + anchorMatrix[8] * markLocal[2] + anchorMatrix[12]
+                val cwY = anchorMatrix[1] * markLocal[0] + anchorMatrix[5] * markLocal[1] + anchorMatrix[9] * markLocal[2] + anchorMatrix[13]
+                val cwZ = anchorMatrix[2] * markLocal[0] + anchorMatrix[6] * markLocal[1] + anchorMatrix[10] * markLocal[2] + anchorMatrix[14]
+                val dx = cwX - overlayBaseScratch[12]
+                val dy = cwY - overlayBaseScratch[13]
+                val dz = cwZ - overlayBaseScratch[14]
                 // Project the world delta onto the overlay-local in-plane axes (columns 0 and 1).
                 markOffsetX = overlayBaseScratch[0] * dx + overlayBaseScratch[1] * dy + overlayBaseScratch[2] * dz
                 markOffsetY = overlayBaseScratch[4] * dx + overlayBaseScratch[5] * dy + overlayBaseScratch[6] * dz
-                appliedMarkCenter = markCenter
             }
 
             // Meters-per-pixel at the overlay depth, so the UI can convert a screen drag (px) into an

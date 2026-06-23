@@ -65,13 +65,15 @@ class SlamManager @Inject constructor(
     fun updateAnchorTransform(transform: FloatArray) = nativeUpdateAnchorTransform(transform)
 
     /**
-     * World-space (ARCore/GL frame) centroid of the matched fingerprint marks for the current
-     * target, or null to fall back to the tracked anchor's own position. Set by the AR fingerprint
-     * builder when a target is built; read by the AR renderer to center the artwork overlay on the
-     * marks instead of the screen-center anchor. Plain Kotlin state (not native) shared across the
-     * view models and the GL thread, hence @Volatile.
+     * Centroid of the matched fingerprint marks, expressed in the FINGERPRINT ANCHOR's local frame
+     * (the anchor PoseFusion converges the live render anchor toward), or null to fall back to the
+     * anchor's own position. Anchor-local (not world) so it survives a project reload into a new
+     * ARCore session: the renderer reconstructs the world point from the live anchor each frame. Set
+     * by the AR fingerprint builder on capture and re-published on project load; read by the AR
+     * renderer to center the artwork overlay on the marks instead of the screen-center anchor. Plain
+     * Kotlin state (not native) shared across the view models and the GL thread, hence @Volatile.
      */
-    @Volatile var overlayMarkCenterWorld: FloatArray? = null
+    @Volatile var overlayMarkCenterLocal: FloatArray? = null
 
     fun updateDeviceMotion(angularVel: FloatArray, linearVel: FloatArray) {
         nativeUpdateDeviceMotion(angularVel, linearVel)

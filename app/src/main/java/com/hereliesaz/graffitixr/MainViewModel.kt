@@ -369,7 +369,7 @@ class MainViewModel @Inject constructor(
         val planeNormal = floatArrayOf(wallPlane[3], wallPlane[4], wallPlane[5])
         val anchor = slamManager.getAnchorTransform()
         // Clear any prior marks-centering override; the builder re-publishes it on a successful build.
-        slamManager.overlayMarkCenterWorld = null
+        slamManager.overlayMarkCenterLocal = null
         viewModelScope.launch(Dispatchers.IO) {
             val currentProject = projectRepository.currentProject.value ?: return@launch
             val fp = MetricFingerprintBuilder.buildSingle(
