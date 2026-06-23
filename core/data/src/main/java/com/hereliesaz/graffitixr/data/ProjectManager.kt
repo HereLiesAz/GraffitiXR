@@ -85,6 +85,33 @@ class ProjectManager @Inject constructor(
         val root = File(context.filesDir, "projects/${projectData.id}")
         if (!root.exists()) root.mkdirs()
 
+        // The target fingerprint must survive EVERY routine save (layer edits, autosave, re-entering
+        // AR, etc.) and change only when the user creates a NEW target — which is the one path that
+        // passes a non-null fingerprint. So when the incoming project carries no fingerprint, carry
+        // over whatever is already persisted instead of nulling it. This makes it impossible for any
+        // other writer (or a stale-snapshot race) to wipe the saved target.
+        val incoming = if (projectData.fingerprint == null) {
+            val existing = try {
+                val f = File(root, "project.json")
+                if (f.exists()) json.decodeFromString<GraffitiProject>(f.readText()) else null
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e // never swallow cancellation
+            } catch (e: Exception) {
+                null
+            }
+            if (existing != null) {
+                projectData.copy(
+                    fingerprint = existing.fingerprint,
+                    fingerprintIntrinsics = existing.fingerprintIntrinsics,
+                    fingerprintAnchor = existing.fingerprintAnchor,
+                    // Preserve the legacy target-fingerprint references too, so no save without them
+                    // can wipe an existing target.
+                    targetFingerprint = projectData.targetFingerprint ?: existing.targetFingerprint,
+                    targetFingerprintPath = projectData.targetFingerprintPath ?: existing.targetFingerprintPath,
+                )
+            } else projectData
+        } else projectData
+
         val thumbnailUri = if (thumbnail != null) {
             val file = File(root, "thumbnail.png")
             FileOutputStream(file).use { out ->
@@ -92,7 +119,7 @@ class ProjectManager @Inject constructor(
             }
             uriProvider.getUriForFile(file)
         } else {
-            projectData.thumbnailUri ?: run {
+            incoming.thumbnailUri ?: run {
                 val file = File(root, "thumbnail.png")
                 if (file.exists()) uriProvider.getUriForFile(file) else null
             }
@@ -100,7 +127,7 @@ class ProjectManager @Inject constructor(
 
         // Properly append new targets to the existing list
         val savedTargetUris = if (targetImages != null) {
-            val existingCount = projectData.targetImageUris.size
+            val existingCount = incoming.targetImageUris.size
             val newUris = targetImages.mapIndexed { index, bitmap ->
                 val file = File(root, "target_${existingCount + index}.png")
                 FileOutputStream(file).use { out ->
@@ -108,12 +135,12 @@ class ProjectManager @Inject constructor(
                 }
                 uriProvider.getUriForFile(file)
             }
-            projectData.targetImageUris + newUris
+            incoming.targetImageUris + newUris
         } else {
-            projectData.targetImageUris
+            incoming.targetImageUris
         }
 
-        val updatedGraffitiProject = projectData.copy(
+        val updatedGraffitiProject = incoming.copy(
             thumbnailUri = thumbnailUri,
             targetImageUris = savedTargetUris,
             lastModified = System.currentTimeMillis()
