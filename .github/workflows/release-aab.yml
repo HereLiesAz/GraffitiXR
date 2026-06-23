@@ -113,7 +113,18 @@ jobs:
           # upload is always accepted, while still increasing by 1 per commit.
           VERSION_CODE=$(( $(git rev-list --count HEAD) + 10000 ))
           echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
-          echo "Package: $PKG  versionCode: $VERSION_CODE"
+
+          # versionName patch = commits since the last minor bump, so the human-readable version
+          # advances per commit and resets to 0 each time versionMinor is bumped in version.properties.
+          # Mirrors release-apk.yml; falls back to the file's versionPatch if blame can't resolve it.
+          MINOR_COMMIT=$(git blame -L '/versionMinor=/',+1 version.properties | awk '{print $1}' | tr -d '^')
+          if [ -n "$MINOR_COMMIT" ]; then
+            VERSION_PATCH=$(git rev-list --count "$MINOR_COMMIT"..HEAD)
+          else
+            VERSION_PATCH=$(grep 'versionPatch=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          fi
+          echo "version_patch=$VERSION_PATCH" >> "$GITHUB_OUTPUT"
+          echo "Package: $PKG  versionCode: $VERSION_CODE  versionPatch: $VERSION_PATCH"
 
       - name: Build Release AAB (signed)
         env:
@@ -125,7 +136,7 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          ./gradlew bundleRelease -PversionBuild=${{ steps.meta.outputs.version_code }}
+          ./gradlew bundleRelease -PversionBuild=${{ steps.meta.outputs.version_code }} -PversionPatch=${{ steps.meta.outputs.version_patch }}
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v7
