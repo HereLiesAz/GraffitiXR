@@ -91,15 +91,23 @@ class ProjectManager @Inject constructor(
         // over whatever is already persisted instead of nulling it. This makes it impossible for any
         // other writer (or a stale-snapshot race) to wipe the saved target.
         val incoming = if (projectData.fingerprint == null) {
-            val existing = runCatching {
+            val existing = try {
                 val f = File(root, "project.json")
                 if (f.exists()) json.decodeFromString<GraffitiProject>(f.readText()) else null
-            }.getOrNull()
-            if (existing?.fingerprint != null) {
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e // never swallow cancellation
+            } catch (e: Exception) {
+                null
+            }
+            if (existing != null) {
                 projectData.copy(
                     fingerprint = existing.fingerprint,
                     fingerprintIntrinsics = existing.fingerprintIntrinsics,
                     fingerprintAnchor = existing.fingerprintAnchor,
+                    // Preserve the legacy target-fingerprint references too, so no save without them
+                    // can wipe an existing target.
+                    targetFingerprint = projectData.targetFingerprint ?: existing.targetFingerprint,
+                    targetFingerprintPath = projectData.targetFingerprintPath ?: existing.targetFingerprintPath,
                 )
             } else projectData
         } else projectData
