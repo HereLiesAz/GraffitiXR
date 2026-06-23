@@ -14,9 +14,11 @@ const val MARK_HIGHLIGHT_COLOR: Int = 0xFF00E5FF.toInt() // bright cyan
 
 // Connected mark components smaller than max(this floor, area / NOISE_AREA_DIVISOR) pixels are
 // treated as sensor/texture noise and dropped, so the user never sees meaningless "dots" — only
-// whole marks survive. Tunable; deliberately conservative so thin real strokes are kept.
-private const val MIN_MARK_PIXELS_FLOOR = 12
-private const val NOISE_AREA_DIVISOR = 40000
+// whole marks survive. Raised the floor and tightened the area ratio (~4x) so small specks are
+// never highlighted as potential markings in the first place; still keeps genuine thin strokes.
+// On a ~2 MP capture the area term dominates: n/10000 ≈ 200 px.
+private const val MIN_MARK_PIXELS_FLOOR = 48
+private const val NOISE_AREA_DIVISOR = 10000
 
 // How forgiving the erase touch is. A tap that misses every mark pixel snaps to the nearest mark
 // within this fraction of the larger image dimension (floored at the px constant so it stays a
