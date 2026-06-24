@@ -1447,7 +1447,7 @@ class ArRenderer(
             lastStep = "debugView"
             // Throttled perception: refresh the world-locked layers (coverage, scan grids, feature
             // points, plane grids, point cloud, voxel splats, mesh) into the FBO only when the pose
-            // moved or the map grew, capped at the selected rate (floored to 15 fps under thermal /
+            // moved or the map grew, capped at the selected rate (floored to 30 fps under thermal /
             // battery / lag), then composite every frame. Camera + overlay + gestures stay full-rate.
             // FBO-unavailable fallback: draw straight to the screen every frame so perception is never
             // blank. Relocating coverage + scan grids here moves them from under the artwork overlay to
@@ -1646,8 +1646,8 @@ class ArRenderer(
     }
 
     private companion object {
-        const val PERCEPTION_FULL_FPS = 30
-        const val PERCEPTION_FLOOR_FPS = 15
+        const val PERCEPTION_FULL_FPS = 60
+        const val PERCEPTION_FLOOR_FPS = 30
         // Rolling-average perception-refresh cost (ms) above which the lag trigger floors the rate.
         const val PERCEPTION_LAG_MS = 16f
         // Per-element view-matrix delta below which the pose is treated as unchanged (skip redraw).

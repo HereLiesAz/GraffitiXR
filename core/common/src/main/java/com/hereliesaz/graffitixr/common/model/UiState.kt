@@ -110,7 +110,7 @@ data class ArUiState(
     val cameraTargetFps: Int = 60,
     /**
      * Perception-throttle triggers. When enabled and active, each drops the world-locked perception
-     * redraw rate from 30 to 15 fps to save power; camera + overlay + gestures stay full-rate.
+     * redraw rate from 60 to 30 fps to save power; camera + overlay + gestures stay full-rate.
      */
     val throttleOnThermal: Boolean = true,
     val throttleOnPowerSave: Boolean = true,
@@ -125,7 +125,7 @@ data class ArUiState(
      */
     val adaptiveRateEnabled: Boolean = true,
     /** Heavy-work cadence (fps) while idle. Tightened under battery/thermal pressure. */
-    val idleRateCeilingFps: Int = 12,
+    val idleRateCeilingFps: Int = 30,
     /** Heavy-work cadence cap (fps) while active; 0 = uncapped. Set >0 only under battery pressure. */
     val activeRateCeilingFps: Int = 0,
     /** Battery pressure tier: 0 = normal, 1 = medium (≤30%), 2 = low (≤15%). Drives degradation. */

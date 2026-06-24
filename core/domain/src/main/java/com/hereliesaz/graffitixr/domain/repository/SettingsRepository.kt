@@ -83,7 +83,7 @@ interface SettingsRepository {
     val cameraTargetFps: Flow<Int>
     suspend fun setCameraTargetFps(fps: Int)
 
-    /** Perception-throttle triggers: each, when on, drops perception to 15fps while active. Default on. */
+    /** Perception-throttle triggers: each, when on, drops perception to 30fps while active. Default on. */
     val throttleOnThermal: Flow<Boolean>
     suspend fun setThrottleOnThermal(on: Boolean)
     val throttleOnPowerSave: Flow<Boolean>

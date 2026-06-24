@@ -1879,7 +1879,7 @@ class ArViewModel @Inject constructor(
 
     // --- Adaptive perception throttle: device-stress signals -----------------------------------
     // Thermal pressure, power-save mode, and low battery each float perceptionSystemThrottle, which
-    // MainScreen pushes to the renderer to floor perception redraws at 15 fps. The renderer also
+    // MainScreen pushes to the renderer to floor perception redraws at 30 fps. The renderer also
     // self-throttles on measured frame lag; this covers the system-level signals it can't see.
     private val powerManager by lazy {
         appContext.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
@@ -1898,10 +1898,10 @@ class ArViewModel @Inject constructor(
     private val BATTERY_TIER_LOW = 15
 
     /**
-     * Folds device-stress signals into the AR rate policy. The existing perception floor (15fps via
+     * Folds device-stress signals into the AR rate policy. The existing perception floor (30fps via
      * perceptionSystemThrottle) is the "super battery saver" and is left exactly as-is — thermal,
      * OS power-save mode, and the coarse low-battery warning. The battery *level* tiers added here do
-     * NOT touch that floor: a merely low level keeps perception at the full 30fps and only tightens
+     * NOT touch that floor: a merely low level keeps perception at the full 60fps and only tightens
      * the adaptive idle/active rate ceilings (and caps the camera to 30fps on the next AR entry).
      */
     private fun recomputeSystemThrottle() {
@@ -1915,13 +1915,16 @@ class ArViewModel @Inject constructor(
                 batteryPct <= BATTERY_TIER_MED -> 1
                 else -> 0
             }
-            // Unchanged super-saver floor (15fps). The battery-level tier is intentionally NOT a
+            // Super-saver perception floor (30fps). The battery-level tier is intentionally NOT a
             // trigger here — it only drives the rate ceilings below.
             val throttle = (s.throttleOnThermal && thermalHot) ||
                 (s.throttleOnPowerSave && saver) ||
                 (s.throttleOnLowBattery && batteryLow)
-            val idleCeiling = when (tier) { 2 -> 8; 1 -> 10; else -> 12 }
-            val activeCeiling = when (tier) { 2 -> 24; 1 -> 30; else -> 0 }
+            // Heavy-work cadence ceilings. Raised now that the app is trimmed down: normal use (tier 0)
+            // runs the idle gate at 30fps and active uncapped; the battery tiers still throttle, just
+            // less aggressively than before (idle was 12/10/8, active 0/30/24).
+            val idleCeiling = when (tier) { 2 -> 15; 1 -> 20; else -> 30 }
+            val activeCeiling = when (tier) { 2 -> 30; 1 -> 45; else -> 0 }
             s.copy(
                 perceptionSystemThrottle = throttle,
                 batteryTier = tier,
