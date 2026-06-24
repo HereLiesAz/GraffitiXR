@@ -286,7 +286,7 @@ fun SettingsScreen(
                                     onCameraTargetFpsChanged(if (cameraTargetFps == 30) 60 else 30)
                                 }
                             )
-                            // Perception throttle triggers: each drops perception 30→15 fps to save
+                            // Perception throttle triggers: each drops perception 60→30 fps to save
                             // power while active. Default on. Lower = laggier perception but less drain.
                             SettingsItem(
                                 label = "Throttle: heat",
