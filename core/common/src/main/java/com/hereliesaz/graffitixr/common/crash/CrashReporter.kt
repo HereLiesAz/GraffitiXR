@@ -33,7 +33,8 @@ class CrashReporter(private val context: Context) : Thread.UncaughtExceptionHand
         // delegating to the default handler simply restores plain-JVM "only that thread dies" semantics.
         if (thread !== Looper.getMainLooper().thread && isRecoverableArCameraCrash(throwable)) {
             try {
-                saveReport(buildReport(throwable))
+                // fatal = false so CrashUploadWorker files it as a recovered event, not a force-close.
+                saveReport(buildReport(throwable, fatal = false))
             } catch (e: Exception) {
                 Log.e("CrashReporter", "Failed to save crash report", e)
             }
@@ -41,7 +42,7 @@ class CrashReporter(private val context: Context) : Thread.UncaughtExceptionHand
             return
         }
         try {
-            val report = buildReport(throwable)
+            val report = buildReport(throwable, fatal = true)
             saveReport(report)
         } catch (e: Exception) {
             Log.e("CrashReporter", "Failed to save crash report", e)
@@ -50,12 +51,16 @@ class CrashReporter(private val context: Context) : Thread.UncaughtExceptionHand
         }
     }
 
-    private fun buildReport(throwable: Throwable): String {
+    private fun buildReport(throwable: Throwable, fatal: Boolean): String {
         val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
         val stackTrace = Log.getStackTraceString(throwable)
         val logcat = collectLogcat()
 
+        // FATAL must be the first line so consumers (CrashUploadWorker) can classify the report
+        // cheaply: true = the process was killed, false = the exception was caught and the app kept
+        // running.
         return """
+            FATAL: $fatal
             TIMESTAMP: $timestamp
             DEVICE: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL} (Android ${android.os.Build.VERSION.RELEASE})
             VERSION: ${context.packageManager.getPackageInfo(context.packageName, 0).versionName}
@@ -90,11 +95,11 @@ class CrashReporter(private val context: Context) : Thread.UncaughtExceptionHand
 
     companion object {
         // Substrings that uniquely identify ARCore's camera-pipe "the camera device vanished while we
-        // were still using it" failure. Matched (case-insensitively) against every message in the
-        // throwable's cause + suppressed chain.
+        // were still using it" failure. Stored lowercase so matching only has to lowercase the
+        // message; checked against every message in the throwable's cause + suppressed chain.
         private val CAMERA_PIPE_MESSAGE_SIGNATURES = listOf(
-            "Failed to load metadata for CameraId",
-            "Unable to retrieve camera characteristics",
+            "failed to load metadata for cameraid",
+            "unable to retrieve camera characteristics",
         )
 
         /**
@@ -114,7 +119,7 @@ class CrashReporter(private val context: Context) : Thread.UncaughtExceptionHand
                 val message = t.message
                 if (message != null) {
                     val lower = message.lowercase(Locale.US)
-                    if (CAMERA_PIPE_MESSAGE_SIGNATURES.any { lower.contains(it.lowercase(Locale.US)) }) {
+                    if (CAMERA_PIPE_MESSAGE_SIGNATURES.any { lower.contains(it) }) {
                         matchedMessage = true
                     }
                 }

@@ -39,9 +39,17 @@ class CrashUploadWorker(private val context: Context) {
                 .build()
 
             val service = retrofit.create(GitHubCrashService::class.java)
+            // The report's first line is "FATAL: true|false" (see CrashReporter.buildReport). A
+            // recovered (non-fatal) report — e.g. a swallowed ARCore camera-pipe teardown crash — must
+            // not masquerade as a force-close in the issue tracker.
+            val recovered = report.lineSequence().firstOrNull()?.trim() == "FATAL: false"
             val issue = GitHubIssue(
-                title = "Auto-Report: App Crash",
-                body = "A force close occurred. Details below:\n\n```\n$report\n```"
+                title = if (recovered) "Auto-Report: Recovered Crash (non-fatal)" else "Auto-Report: App Crash",
+                body = if (recovered) {
+                    "A non-fatal exception was caught and the app kept running. Details below:\n\n```\n$report\n```"
+                } else {
+                    "A force close occurred. Details below:\n\n```\n$report\n```"
+                }
             )
 
             val response = service.createIssue(
