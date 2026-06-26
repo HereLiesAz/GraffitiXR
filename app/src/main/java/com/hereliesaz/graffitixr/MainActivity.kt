@@ -1864,13 +1864,16 @@ class MainActivity : ComponentActivity() {
             azRailHostItem(
                 id = "host.modes",
                 text = navStrings.modes,
-                color = navItemColor
+                color = navItemColor,
+                initiallyExpanded = railExpansion["host.modes"] ?: !isDesignMode,
+                expandWhen = { editorUiState.editorMode != EditorMode.DESIGN },
+                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.modes", it) },
             )
 
             val showArModeEntry = !arUiState.isArCoreAvailabilityResolved || arUiState.isArCoreAvailable
             if (showArModeEntry) {
                 // AR is a sub-host: it navigates to AR mode and contains its tools.
-                azRailSubHostItem(id = "mode.ar", hostId = "host.modes", text = navStrings.arMode, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE)
+                azRailSubHostItem(id = "mode.ar", hostId = "host.modes", text = navStrings.arMode, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.RECTANGLE)
                 // Target capture — only meaningful while in AR mode.
                 if (editorUiState.editorMode == EditorMode.AR) {
                     // Target button is a toggle: selected (cyan) means screen taps create the target;
@@ -1881,7 +1884,7 @@ class MainActivity : ComponentActivity() {
                         hostId = "mode.ar",
                         text = navStrings.grid,
                         color = if (isWaitingForTap) Cyan else navItemColor,
-                        shape = AzButtonShape.RECTANGLE
+                        shape = AzButtonShape.NONE
                     ) {
                         if (isWaitingForTap) {
                             mainViewModel.cancelTapMode()
@@ -1925,7 +1928,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            azRailSubHostItem(id = "mode.overlay", hostId = "host.modes", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE)
+            azRailSubHostItem(id = "mode.overlay", hostId = "host.modes", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.RECTANGLE)
             // Flashlight — illuminate the wall in low light while overlaying.
             if (editorUiState.editorMode == EditorMode.OVERLAY) {
                 azRailSubItem(id = "mode.overlay.light", hostId = "mode.overlay", text = navStrings.light, color = if (arUiState.isFlashlightOn) Cyan else navItemColor, shape = AzButtonShape.NONE) {
@@ -1934,7 +1937,7 @@ class MainActivity : ComponentActivity() {
             }
 
             // Mockup ▸ Wall ▸ { Photo (take a photo), File (pick an image) }
-            azRailSubHostItem(id = "mode.mockup", hostId = "host.modes", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE)
+            azRailSubHostItem(id = "mode.mockup", hostId = "host.modes", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.RECTANGLE)
             azRailSubHostItem(id = "mockup.wall", hostId = "mode.mockup", text = navStrings.wall, color = navItemColor, shape = AzButtonShape.NONE)
             azRailSubItem(id = "wall.photo", hostId = "mockup.wall", text = navStrings.photo, color = navItemColor, shape = AzButtonShape.NONE) {
                 onWallPhoto()
@@ -1950,7 +1953,7 @@ class MainActivity : ComponentActivity() {
             }
 
             // Trace ▸ Freeze
-            azRailSubHostItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE)
+            azRailSubHostItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.RECTANGLE)
             azRailSubItem(id = "mode.trace.freeze", hostId = "mode.trace", text = "Freeze", color = navItemColor, shape = AzButtonShape.NONE) {
                 mainViewModel.setTouchLocked(!isTouchLocked)
             }
