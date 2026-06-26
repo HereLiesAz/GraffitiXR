@@ -9,6 +9,7 @@ import com.hereliesaz.graffitixr.common.crash.CrashReporter
 import com.hereliesaz.graffitixr.common.crash.CrashUploadWorker
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import dagger.hilt.android.HiltAndroidApp
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -51,7 +52,13 @@ class GraffitiApplication : Application() {
 
         // 1.2. Setup Crash Reporting
         CrashReporter(this).initialize()
-        MainScope().launch {
+        // CoroutineExceptionHandler so a failure in the startup crash-upload can never escape this
+        // launch and force-close the app on launch (checkAndUpload is also self-guarded). Belt and
+        // suspenders: the crash-reporting path must never itself crash the app.
+        val crashUploadErrorHandler = CoroutineExceptionHandler { _, e ->
+            Log.e("GraffitiApplication", "Crash upload failed at startup; ignored", e)
+        }
+        MainScope().launch(crashUploadErrorHandler) {
             CrashUploadWorker(this@GraffitiApplication).checkAndUpload(BuildConfig.GH_TOKEN)
         }
 

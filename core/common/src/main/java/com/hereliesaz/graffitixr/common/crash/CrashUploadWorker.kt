@@ -14,15 +14,24 @@ import java.io.File
 class CrashUploadWorker(private val context: Context) {
 
     suspend fun checkAndUpload(token: String) = withContext(Dispatchers.IO) {
-        val file = File(context.cacheDir, "last_crash.txt")
-        if (!file.exists()) return@withContext
+        // This runs at startup (Application.onCreate). It must NEVER throw: an uncaught exception here
+        // propagates out of the launching coroutine and force-closes the app ON LAUNCH — and it only
+        // runs when a previous crash left last_crash.txt, so the failure would be an occasional
+        // launch crash that compounds the very crash it was trying to report. Reading/deleting the
+        // file (file IO) and the upload are all wrapped so a crash reporter can never crash the app.
+        try {
+            val file = File(context.cacheDir, "last_crash.txt")
+            if (!file.exists()) return@withContext
 
-        val report = file.readText()
-        val success = uploadToGitHub(report, token)
-        
-        if (success) {
-            file.delete()
-            Log.i("CrashUploadWorker", "Crash report uploaded and deleted.")
+            val report = file.readText()
+            val success = uploadToGitHub(report, token)
+
+            if (success) {
+                file.delete()
+                Log.i("CrashUploadWorker", "Crash report uploaded and deleted.")
+            }
+        } catch (e: Throwable) {
+            Log.e("CrashUploadWorker", "checkAndUpload failed; ignoring so startup isn't interrupted", e)
         }
     }
 
