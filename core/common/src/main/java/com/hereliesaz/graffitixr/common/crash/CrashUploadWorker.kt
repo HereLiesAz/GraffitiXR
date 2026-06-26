@@ -6,56 +6,37 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import java.io.File
 
 /**
- * Checks for saved crash reports and uploads them to GitHub.
+ * Uploads captured crash reports to GitHub as issues.
+ *
+ * The report CONTENT is captured by the caller (GraffitiApplication) synchronously at startup, before
+ * MainActivity reads + deletes the crash files for its on-screen dialog — otherwise the upload would
+ * race that delete (same startup transaction) and usually find nothing. This class only performs the
+ * network upload, and never throws (a crash reporter must not crash the app).
  */
 class CrashUploadWorker(private val context: Context) {
 
-    suspend fun checkAndUpload(token: String) {
-        // No token (the common case for local/dev builds) -> nothing can be uploaded, so skip the
-        // IO-dispatcher switch and the disk read entirely. The report stays on disk for MainActivity
-        // to surface on next launch.
-        if (token.isBlank()) {
-            Log.i("CrashUploadWorker", "No GH_TOKEN; skipping crash upload.")
-            return
-        }
+    /**
+     * Upload one captured crash [report]. Returns true only on a successful upload. [baseTitle] is the
+     * issue title for a fatal crash; a JVM report whose first line is "FATAL: false" (a swallowed /
+     * recovered exception) is retitled so it isn't mistaken for a force-close.
+     */
+    suspend fun uploadCaptured(token: String, baseTitle: String, report: String): Boolean =
         withContext(Dispatchers.IO) {
-            // This runs at startup (Application.onCreate). It must NEVER throw: an uncaught exception
-            // here propagates out of the launching coroutine and force-closes the app ON LAUNCH — and
-            // it only runs when a previous crash left last_crash.txt, so the failure would be an
-            // occasional launch crash that compounds the very crash it was trying to report.
-            // Reading/deleting the file (file IO) and the upload are all wrapped so a crash reporter
-            // can never crash the app.
+            if (token.isBlank()) {
+                Log.i("CrashUploadWorker", "No GH_TOKEN; skipping crash upload.")
+                return@withContext false
+            }
             try {
-                val file = File(context.cacheDir, "last_crash.txt")
-                if (!file.exists()) return@withContext
-
-                val report = file.readText()
-                val success = uploadToGitHub(report, token)
-
-                if (success) {
-                    // If the delete fails the report is re-uploaded next launch (a duplicate issue);
-                    // log it so that's diagnosable rather than silent.
-                    if (file.delete()) {
-                        Log.i("CrashUploadWorker", "Crash report uploaded and deleted.")
-                    } else {
-                        Log.w("CrashUploadWorker", "Uploaded crash report but failed to delete it; may re-upload next launch.")
-                    }
-                }
+                uploadToGitHub(report, token, baseTitle)
             } catch (e: Throwable) {
-                Log.e("CrashUploadWorker", "checkAndUpload failed; ignoring so startup isn't interrupted", e)
+                Log.e("CrashUploadWorker", "Crash upload failed; ignored so startup isn't interrupted", e)
+                false
             }
         }
-    }
 
-    private suspend fun uploadToGitHub(report: String, token: String): Boolean {
-        if (token.isEmpty()) {
-            Log.e("CrashUploadWorker", "GH_TOKEN is empty, skipping upload.")
-            return false
-        }
-
+    private suspend fun uploadToGitHub(report: String, token: String, baseTitle: String): Boolean {
         return try {
             val retrofit = Retrofit.Builder()
                 .baseUrl("https://api.github.com/")
@@ -63,17 +44,19 @@ class CrashUploadWorker(private val context: Context) {
                 .build()
 
             val service = retrofit.create(GitHubCrashService::class.java)
-            // The report's first line is "FATAL: true|false" (see CrashReporter.buildReport). A
-            // recovered (non-fatal) report — e.g. a swallowed ARCore camera-pipe teardown crash — must
-            // not masquerade as a force-close in the issue tracker.
+            // JVM reports start with "FATAL: true|false" (see CrashReporter.buildReport). A recovered
+            // (non-fatal) report must not masquerade as a force-close. Native reports have no such
+            // line, so they keep their baseTitle ("Native Crash").
             val recovered = report.lineSequence().firstOrNull()?.trim() == "FATAL: false"
+            val title = if (recovered) "Auto-Report: Recovered Crash (non-fatal)" else baseTitle
+            val intro = if (recovered) {
+                "A non-fatal exception was caught and the app kept running. Details below:"
+            } else {
+                "A crash occurred. Details below:"
+            }
             val issue = GitHubIssue(
-                title = if (recovered) "Auto-Report: Recovered Crash (non-fatal)" else "Auto-Report: App Crash",
-                body = if (recovered) {
-                    "A non-fatal exception was caught and the app kept running. Details below:\n\n```\n$report\n```"
-                } else {
-                    "A force close occurred. Details below:\n\n```\n$report\n```"
-                }
+                title = title,
+                body = "$intro\n\n```\n$report\n```"
             )
 
             val response = service.createIssue(
