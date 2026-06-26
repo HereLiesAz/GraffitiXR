@@ -319,10 +319,12 @@ class ArRenderer(
     @Volatile var overlayPanX: Float = 0f
     @Volatile var overlayPanY: Float = 0f
     @Volatile var overlayScale: Float = 1f
-    // Rotation of the whole design about the overlay's OWN local axes (degrees): Z = spin in the
-    // surface plane (about the normal), X/Y = tilt off the surface about the width/height axes. The
-    // double-tap axis cycle picks which one a rotate gesture drives; all three are applied at draw.
+    // Rotation of the whole design about the overlay's normal (Z-axis, degrees): spins the
+    // artwork in the surface plane. Driven by the persisted per-mode adjustment.
     @Volatile var overlayRotationDeg: Float = 0f
+    // Content-level perspective rotation (degrees) matching Compose's graphicsLayer rotationX/Y.
+    // Applied as a 2D perspective transform on the texture content — the GL quad stays flat on the
+    // wall while the artwork appears tilted, consistent with Overlay/Mockup/Trace modes.
     @Volatile var overlayRotationX: Float = 0f
     @Volatile var overlayRotationY: Float = 0f
     // Meters-per-pixel at the overlay's depth this frame, so the UI can convert a screen-pixel drag
@@ -338,6 +340,48 @@ class ArRenderer(
     private val overlayBaseScratch = FloatArray(16)
     private val overlayLocalScratch = FloatArray(16)
     private val overlayComposedScratch = FloatArray(16)
+    // Scratch for the 2D perspective content rotation matrix (X/Y axes).
+    private val contentRotationScratch = FloatArray(16)
+    private val contentRotationTemp = FloatArray(16)
+    private val contentRotationMul = FloatArray(16)
+
+    /**
+     * Builds a 4×4 column-major matrix that applies 2D perspective rotation for the given X/Y
+     * angles (degrees), matching Compose's `graphicsLayer { rotationX; rotationY }`.
+     * The matrix warps vertex positions in the overlay's local XY plane (Z stays 0, W encodes
+     * perspective) so the shader can divide by W and feed standard W=1 vertices to the MVP pipeline.
+     * Returns null when both angles are zero (identity — the shader uses its own identity fallback).
+     */
+    private fun buildContentRotation(rx: Float, ry: Float): FloatArray? {
+        if (rx == 0f && ry == 0f) return null
+        // Camera distance relative to the overlay's half-extent. Higher = subtler perspective.
+        val d = OverlayRenderer.QUAD_HALF_EXTENT * CONTENT_PERSPECTIVE_FACTOR
+
+        // Build Y perspective matrix: foreshortens left/right edges.
+        // Column-major: [cosY,0,0,sinY/d, 0,1,0,0, 0,0,1,0, 0,0,0,1]
+        android.opengl.Matrix.setIdentityM(contentRotationScratch, 0)
+        if (ry != 0f) {
+            val rad = Math.toRadians(ry.toDouble())
+            contentRotationScratch[0] = kotlin.math.cos(rad).toFloat()
+            contentRotationScratch[3] = kotlin.math.sin(rad).toFloat() / d
+        }
+
+        if (rx != 0f) {
+            val rad = Math.toRadians(rx.toDouble())
+            // Build X perspective matrix: foreshortens top/bottom edges.
+            // Column-major: [1,0,0,0, 0,cosX,0,sinX/d, 0,0,1,0, 0,0,0,1]
+            android.opengl.Matrix.setIdentityM(contentRotationTemp, 0)
+            contentRotationTemp[5] = kotlin.math.cos(rad).toFloat()
+            contentRotationTemp[7] = kotlin.math.sin(rad).toFloat() / d
+            // Compose: result = Y * X (X applied first to vertices, then Y).
+            android.opengl.Matrix.multiplyMM(
+                contentRotationMul, 0, contentRotationScratch, 0, contentRotationTemp, 0
+            )
+            System.arraycopy(contentRotationMul, 0, contentRotationScratch, 0, 16)
+        }
+
+        return contentRotationScratch
+    }
 
     fun attachSession(session: Session?) {
         sessionLock.withLock {
@@ -1502,29 +1546,27 @@ class ArRenderer(
                 if (surfaceHeight > 0) kotlin.math.abs(ovz) * 2f * tanHalfFovY / surfaceHeight else 0f
 
             // User whole-design transform (AR "Layer" item) + marks-centering offset, in the overlay's
-            // local frame: translate along the plane, rotate about the overlay's OWN axes, scale.
-            // Rotations are post-multiplied onto the translate and overlayLocal is then multiplied by
-            // overlayBaseScratch, so each rotateM turns the artwork about its own width (X) / height (Y)
-            // / normal (Z) through its center: Z spins it in-plane, X/Y tilt it off the surface.
+            // local frame: translate along the plane, Z-rotate (in-plane spin), and scale.
             android.opengl.Matrix.setIdentityM(overlayLocalScratch, 0)
             android.opengl.Matrix.translateM(
                 overlayLocalScratch, 0, markOffsetX + overlayPanX, markOffsetY + overlayPanY, 0f
             )
-            // rotateM post-multiplies, so vertices see these in reverse call order: Z (spin in the
-            // local plane) first, then Y, then X (tilt off the surface). That spins the artwork cleanly
-            // in its own plane before tilting, instead of spinning the already-tilted quad about the
-            // wall normal (which would wobble).
-            android.opengl.Matrix.rotateM(overlayLocalScratch, 0, overlayRotationX, 1f, 0f, 0f)
-            android.opengl.Matrix.rotateM(overlayLocalScratch, 0, overlayRotationY, 0f, 1f, 0f)
+            // Spin the artwork in its own plane (Z-axis rotation about the wall normal).
             android.opengl.Matrix.rotateM(overlayLocalScratch, 0, overlayRotationDeg, 0f, 0f, 1f)
             android.opengl.Matrix.scaleM(overlayLocalScratch, 0, overlayScale, overlayScale, 1f)
             android.opengl.Matrix.multiplyMM(
                 overlayComposedScratch, 0, overlayBaseScratch, 0, overlayLocalScratch, 0
             )
 
+            // Build the 2D perspective content rotation matrix for X/Y, matching Compose's
+            // graphicsLayer rotationX/Y. The quad stays flat on the wall; only the content
+            // appearance tilts. Camera distance scales with half-extent for consistent feel.
+            val contentRot = buildContentRotation(overlayRotationX, overlayRotationY)
+
             overlayRenderer.draw(viewMatrix, projMatrix, overlayComposedScratch,
                 if (hasMeshData) meshVerticesBuffer else null,
-                if (hasMeshData) meshWeightsBuffer else null
+                if (hasMeshData) meshWeightsBuffer else null,
+                contentRot
             )
 
             val showBorder = !anchorEstablished && !isCapturingTarget &&
@@ -1742,6 +1784,12 @@ class ArRenderer(
     }
 
     private companion object {
+        // Multiplier for the overlay half-extent to derive the camera distance used in the
+        // 2D perspective content rotation (matching Compose's graphicsLayer rotationX/Y).
+        // Higher values → subtler perspective; lower → more dramatic. 3.0 gives a moderate
+        // effect visible at 20-30° and dramatic at 45°+.
+        const val CONTENT_PERSPECTIVE_FACTOR = 3.0f
+
         const val PERCEPTION_FULL_FPS = 60
         const val PERCEPTION_FLOOR_FPS = 30
         // Rolling-average perception-refresh cost (ms) above which the lag trigger floors the rate.

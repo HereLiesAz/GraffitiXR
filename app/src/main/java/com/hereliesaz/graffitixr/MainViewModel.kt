@@ -34,6 +34,9 @@ data class MainUiState(
     // (project still loading) so AR entry can wait instead of racing; true/false drives whether AR
     // entry auto-selects the Target button (no target yet) or drops straight into layer editing.
     val hasExistingTarget: Boolean? = null,
+    // True once the user has successfully created a target in this app session.
+    // Prevents auto-starting target capture on AR re-entry within the same process.
+    val targetCapturedThisSession: Boolean = false,
     val captureStep: CaptureStep = CaptureStep.NONE,
     // Phase 4: True while the user is in "tap your painted marks" mode.
     val isWaitingForTap: Boolean = false,
@@ -315,6 +318,7 @@ class MainViewModel @Inject constructor(
             )
 
             projectRepository.loadProject(currentProject.id)
+            _uiState.update { it.copy(targetCapturedThisSession = true) }
 
             withContext(Dispatchers.Main) {
                 Toast.makeText(context, "Target Saved & Locked", Toast.LENGTH_SHORT).show()
@@ -400,6 +404,7 @@ class MainViewModel @Inject constructor(
                 targetImages = listOf(bitmap)
             )
             projectRepository.loadProject(currentProject.id)
+            _uiState.update { it.copy(targetCapturedThisSession = true) }
             withContext(Dispatchers.Main) {
                 Toast.makeText(context, "Target Saved & Locked", Toast.LENGTH_SHORT).show()
             }

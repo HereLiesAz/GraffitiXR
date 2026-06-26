@@ -23,6 +23,7 @@ class OverlayRenderer(private val context: Context) : GlReleasable {
     private var texCoordHandle = 0
     private var weightHandle = 0
     private var mvpMatrixHandle = 0
+    private var contentRotationHandle = 0
     private var textureHandle = 0
 
     private var borderProgram = 0
@@ -65,6 +66,7 @@ class OverlayRenderer(private val context: Context) : GlReleasable {
         texCoordHandle = GLES30.glGetAttribLocation(program, "a_TexCoord")
         weightHandle = GLES30.glGetAttribLocation(program, "a_Weight")
         mvpMatrixHandle = GLES30.glGetUniformLocation(program, "u_MvpMatrix")
+        contentRotationHandle = GLES30.glGetUniformLocation(program, "u_ContentRotation")
         textureHandle = GLES30.glGetUniformLocation(program, "u_Texture")
 
         GLES30.glGenTextures(1, textureIds, 0)
@@ -166,12 +168,14 @@ class OverlayRenderer(private val context: Context) : GlReleasable {
     }
 
     /**
-     * @param meshVertices Optional warped vertices (x,y,z) from SlamManager.
+     * @param meshVertices Optional warped vertices (x,y,z) from SlamManager. Null = flat quad.
      * @param meshWeights Optional vertex confidence weights (0..1).
-     * If null, renders a flat quad.
+     * @param contentRotation 4x4 column-major matrix for 2D perspective rotation of the overlay
+     *   content (matching Compose's graphicsLayer rotationX/Y). Null = identity (no rotation).
      */
-    fun draw(viewMatrix: FloatArray, projMatrix: FloatArray, anchorMatrix: FloatArray, 
-             meshVertices: FloatArray? = null, meshWeights: FloatArray? = null) {
+    fun draw(viewMatrix: FloatArray, projMatrix: FloatArray, anchorMatrix: FloatArray,
+             meshVertices: FloatArray? = null, meshWeights: FloatArray? = null,
+             contentRotation: FloatArray? = null) {
         if (!hasTexture || program == 0 || vboId == 0) return
 
         if (meshDirty || meshVertices != null) {
@@ -184,6 +188,8 @@ class OverlayRenderer(private val context: Context) : GlReleasable {
 
         GLES30.glUseProgram(program)
         GLES30.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0)
+        GLES30.glUniformMatrix4fv(contentRotationHandle, 1, false,
+            contentRotation ?: IDENTITY_MATRIX, 0)
 
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, textureIds[0])
@@ -334,15 +340,25 @@ class OverlayRenderer(private val context: Context) : GlReleasable {
             }
         """
 
+        private val IDENTITY_MATRIX = FloatArray(16).also { Matrix.setIdentityM(it, 0) }
+
         private const val VERTEX_SHADER = """#version 300 es
             uniform mat4 u_MvpMatrix;
+            uniform mat4 u_ContentRotation;
             in vec3 a_Position;
             in vec2 a_TexCoord;
             in float a_Weight;
             out vec2 v_TexCoord;
             out float v_Weight;
             void main() {
-                gl_Position = u_MvpMatrix * vec4(a_Position, 1.0);
+                // Apply 2D perspective rotation to the content (matching Compose's
+                // graphicsLayer rotationX/Y), then normalize W so the MVP pipeline
+                // sees standard W=1 vertices. The quad stays flat on the wall while
+                // the content appears perspectively tilted.
+                vec4 rotated = u_ContentRotation * vec4(a_Position, 1.0);
+                rotated.xyz /= rotated.w;
+                rotated.w = 1.0;
+                gl_Position = u_MvpMatrix * rotated;
                 v_TexCoord = a_TexCoord;
                 v_Weight = a_Weight;
             }

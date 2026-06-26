@@ -133,6 +133,9 @@ fun MainScreen(
                             // devices comes back as a black/uninitialised camera. exitArMode() tears
                             // it down so the next AR entry creates a fresh session.
                             arViewModel.exitArMode()
+                            // Reset in-flight capture state so stale isWaitingForTap doesn't
+                            // block gestures on AR re-entry.
+                            mainViewModel.cancelTapMode()
                         }
                     }
 
@@ -142,7 +145,10 @@ fun MainScreen(
                     LaunchedEffect(mainUiState.hasExistingTarget) {
                         // Only act once the project state is resolved (non-null). `== false` means a
                         // loaded project with no saved target, so pre-select the Target button.
-                        if (mainUiState.hasExistingTarget == false && !mainUiState.isCapturingTarget) {
+                        // Skip if a target was already created this session (survives AR exit/re-entry).
+                        if (mainUiState.hasExistingTarget == false
+                            && !mainUiState.isCapturingTarget
+                            && !mainUiState.targetCapturedThisSession) {
                             mainViewModel.startTargetCapture()
                         }
                     }

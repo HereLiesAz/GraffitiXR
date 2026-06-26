@@ -452,15 +452,20 @@ class MainActivity : ComponentActivity() {
 
                 var showDesignInstructionsDialog by remember { mutableStateOf(false) }
 
+                // Auto-activate the first layer as soon as one exists — don't wait for
+                // AR anchor establishment. Drawing tools, stroke input, and gesture
+                // feedback all require an active layer; delaying activation forces the
+                // user through a needless intermediate state.
+                LaunchedEffect(editorUiState.layers, editorUiState.activeLayerId) {
+                    if (editorUiState.layers.isNotEmpty() && editorUiState.activeLayerId == null) {
+                        editorViewModel.onLayerActivated(editorUiState.layers.first().id)
+                    }
+                }
+
+                // Show design instructions when anchor is established with no layers.
                 LaunchedEffect(arUiState.isAnchorEstablished) {
-                    if (arUiState.isAnchorEstablished) {
-                        if (editorUiState.layers.isEmpty()) {
-                            showDesignInstructionsDialog = true
-                        } else if (editorUiState.activeLayerId == null) {
-                            // Target is locked in — hand screen gestures to a layer so the user can
-                            // place artwork immediately instead of being stuck in target mode.
-                            editorViewModel.onLayerActivated(editorUiState.layers.first().id)
-                        }
+                    if (arUiState.isAnchorEstablished && editorUiState.layers.isEmpty()) {
+                        showDesignInstructionsDialog = true
                     }
                 }
 
