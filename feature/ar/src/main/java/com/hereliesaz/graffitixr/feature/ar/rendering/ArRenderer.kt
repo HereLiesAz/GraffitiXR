@@ -298,11 +298,12 @@ class ArRenderer(
     @Volatile var isCapturingTarget: Boolean = false
     @Volatile var isInPlaneRealignment: Boolean = false
     @Volatile var pendingAnchorEstablishment: Boolean = false
-    // True when the primary anchor was established on a real wall plane. The artwork quad lives in
-    // the anchor's local XY plane (its surface normal is local +Z), but an ARCore plane pose has +Y
-    // along the wall normal — so when this is set, the overlay is rotated -90° about X at draw time
-    // to lay FLAT against the wall instead of standing perpendicular to it.
-    @Volatile private var anchorOnWallPlane: Boolean = false
+    // World-space surface normal captured at anchor establishment, always oriented to point toward the
+    // camera/user. The artwork is ALWAYS laid flat against the selected surface and facing the user by
+    // rebuilding the overlay base frame each draw so its local +Z = this normal (see overlayDraw),
+    // regardless of whether the anchor landed on a real plane, a depth/feature point, or the fallback.
+    // (x,y,z); zero-length until an anchor is established, in which case the raw anchor frame is used.
+    private val anchorSurfaceNormal = FloatArray(3)
 
     @Volatile var exportRequested: Boolean = false
     var onExportCaptured: ((Bitmap) -> Unit)? = null
@@ -772,23 +773,37 @@ class ArRenderer(
                     }
                     if (chosen == null) chosen = hits.firstOrNull()
 
+                    val camPose = camera.pose
+                    val camPosX = camPose.tx(); val camPosY = camPose.ty(); val camPosZ = camPose.tz()
+
                     var anchor: com.google.ar.core.Anchor? = null
-                    var onWallPlane = false
+                    // Surface normal (world space) for laying the artwork flat & facing the user. Filled
+                    // below from the chosen surface; left as the anchor→camera direction by default.
+                    var nrmX = 0f; var nrmY = 0f; var nrmZ = 0f
+                    var haveNormal = false
                     if (chosen != null) {
                         val pose = chosen.hitPose
-                        val camPose = camera.pose
-                        val dx = pose.tx() - camPose.tx()
-                        val dy = pose.ty() - camPose.ty()
-                        val dz = pose.tz() - camPose.tz()
+                        val dx = pose.tx() - camPosX
+                        val dy = pose.ty() - camPosY
+                        val dz = pose.tz() - camPosZ
                         val dist = Math.sqrt((dx * dx + dy * dy + dz * dz).toDouble())
                         if (dist in 0.1..10.0) {
                             pose.toMatrix(anchorModelMatrix, 0) // full surface pose (position + normal)
                             // Anchor to the hit's trackable so ARCore keeps it pinned to the wall as the
                             // artist moves, instead of a free world point at a guessed depth.
                             anchor = chosen.createAnchor()
-                            // Remember whether we landed on an actual plane so the overlay can be laid
-                            // flat against it at draw time (plane pose +Y = wall normal).
-                            onWallPlane = chosen.trackable is com.google.ar.core.Plane
+                            // Capture the surface normal so the overlay can be laid flat & facing the
+                            // user. A plane pose's local +Y is the wall normal; a depth/feature point
+                            // has no reliable orientation, so use the anchor→camera direction (a surface
+                            // the user chose to paint on faces the user).
+                            if (chosen.trackable is com.google.ar.core.Plane) {
+                                val axis = FloatArray(3)
+                                pose.getTransformedAxis(1, 1f, axis, 0) // local +Y = plane normal
+                                nrmX = axis[0]; nrmY = axis[1]; nrmZ = axis[2]
+                            } else {
+                                nrmX = -dx; nrmY = -dy; nrmZ = -dz // toward the camera
+                            }
+                            haveNormal = true
                         }
                     }
                     if (anchor == null) {
@@ -799,10 +814,34 @@ class ArRenderer(
                                 floatArrayOf(0f, 0f, 0f, 1f)
                             )
                         )
-                        onWallPlane = false
+                        // Free/fallback anchor: face the user directly (anchor→camera).
+                        nrmX = camPosX - anchorModelMatrix[12]
+                        nrmY = camPosY - anchorModelMatrix[13]
+                        nrmZ = camPosZ - anchorModelMatrix[14]
+                        haveNormal = true
                     }
 
-                    anchorOnWallPlane = onWallPlane
+                    // Orient the normal toward the camera (so the artwork faces the user) and store it
+                    // normalized; a degenerate/zero normal leaves anchorSurfaceNormal zeroed, which the
+                    // draw path reads as "use the raw anchor frame".
+                    if (haveNormal) {
+                        val toCamX = camPosX - anchorModelMatrix[12]
+                        val toCamY = camPosY - anchorModelMatrix[13]
+                        val toCamZ = camPosZ - anchorModelMatrix[14]
+                        if (nrmX * toCamX + nrmY * toCamY + nrmZ * toCamZ < 0f) {
+                            nrmX = -nrmX; nrmY = -nrmY; nrmZ = -nrmZ
+                        }
+                        val len = Math.sqrt((nrmX * nrmX + nrmY * nrmY + nrmZ * nrmZ).toDouble()).toFloat()
+                        if (len > 1e-4f) {
+                            anchorSurfaceNormal[0] = nrmX / len
+                            anchorSurfaceNormal[1] = nrmY / len
+                            anchorSurfaceNormal[2] = nrmZ / len
+                        } else {
+                            anchorSurfaceNormal[0] = 0f; anchorSurfaceNormal[1] = 0f; anchorSurfaceNormal[2] = 0f
+                        }
+                    } else {
+                        anchorSurfaceNormal[0] = 0f; anchorSurfaceNormal[1] = 0f; anchorSurfaceNormal[2] = 0f
+                    }
                     slamManager.updateAnchorTransform(anchorModelMatrix)
                     setPrimaryAnchor(anchor) // non-null: the fallback branch always creates one
                     anchorEstablished = true
@@ -1378,12 +1417,55 @@ class ArRenderer(
             val hasMeshData = false
 
             lastStep = "overlayDraw"
-            // Base overlay frame = the tracked anchor. Lay the artwork FLAT on the wall: the quad's
-            // surface normal is its local +Z, but a plane anchor's +Y is the wall normal, so rotate
-            // the anchor frame -90° about X. Only on a real plane; a free/fallback anchor draws as-is.
+            // Base overlay frame: ALWAYS lay the artwork FLAT against the selected surface and facing
+            // the user, for every anchor type. The quad's surface normal is its local +Z, so build an
+            // orthonormal frame at the live anchor position whose +Z = the captured surface normal
+            // (already oriented toward the camera). +Y = world-up projected ⟂ to +Z so the artwork is
+            // upright; +X = +Y × +Z (= width, horizontal). If the surface is near-horizontal (normal
+            // ≈ world-up, e.g. floor/ceiling) world-up is degenerate, so fall back to the camera's up.
+            // A zero stored normal (no anchor yet) leaves the raw anchor frame.
             System.arraycopy(anchorMatrix, 0, overlayBaseScratch, 0, 16)
-            if (anchorOnWallPlane) {
-                android.opengl.Matrix.rotateM(overlayBaseScratch, 0, -90f, 1f, 0f, 0f)
+            run {
+                // Clear any stale normal on the GL thread once the anchor is gone (reset/rescan), so a
+                // later preview/draw can't reuse the previous anchor's orientation. A zero normal makes
+                // the block below fall through to the raw anchor frame.
+                if (!anchorEstablished) {
+                    anchorSurfaceNormal[0] = 0f; anchorSurfaceNormal[1] = 0f; anchorSurfaceNormal[2] = 0f
+                }
+                val nx = anchorSurfaceNormal[0]; val ny = anchorSurfaceNormal[1]; val nz = anchorSurfaceNormal[2]
+                if (nx != 0f || ny != 0f || nz != 0f) {
+                    // Pick an up reference that isn't parallel to the normal.
+                    var upX = 0f; var upY = 1f; var upZ = 0f
+                    if (kotlin.math.abs(ny) > 0.95f) {
+                        // Surface ≈ horizontal: world-up ∥ normal is unusable. Use the camera's up
+                        // (viewMatrix row 1 is the camera up axis in world space).
+                        upX = viewMatrix[1]; upY = viewMatrix[5]; upZ = viewMatrix[9]
+                    }
+                    // +Y = up projected onto the plane ⟂ to the normal, normalized.
+                    val dot = upX * nx + upY * ny + upZ * nz
+                    var yX = upX - dot * nx; var yY = upY - dot * ny; var yZ = upZ - dot * nz
+                    var yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
+                    if (yLen <= 1e-4f) {
+                        // Up reference parallel to the normal (e.g. a level camera edge-on to a
+                        // horizontal surface): fall back to the camera's forward axis (viewMatrix row 2)
+                        // so the in-plane frame is still well-defined instead of reverting to raw.
+                        upX = viewMatrix[2]; upY = viewMatrix[6]; upZ = viewMatrix[10]
+                        val dot2 = upX * nx + upY * ny + upZ * nz
+                        yX = upX - dot2 * nx; yY = upY - dot2 * ny; yZ = upZ - dot2 * nz
+                        yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
+                    }
+                    if (yLen > 1e-4f) {
+                        yX /= yLen; yY /= yLen; yZ /= yLen
+                        // +X = +Y × +Z (right-handed: width axis, horizontal across the surface).
+                        val xX = yY * nz - yZ * ny
+                        val xY = yZ * nx - yX * nz
+                        val xZ = yX * ny - yY * nx
+                        overlayBaseScratch[0] = xX; overlayBaseScratch[1] = xY; overlayBaseScratch[2] = xZ;  overlayBaseScratch[3] = 0f
+                        overlayBaseScratch[4] = yX; overlayBaseScratch[5] = yY; overlayBaseScratch[6] = yZ;  overlayBaseScratch[7] = 0f
+                        overlayBaseScratch[8] = nx; overlayBaseScratch[9] = ny; overlayBaseScratch[10] = nz; overlayBaseScratch[11] = 0f
+                        // Translation stays the live anchor position (cols 12-14 already copied above).
+                    }
+                }
             }
 
             // Center the overlay on the matched-marks centroid instead of the screen-center anchor.
