@@ -52,14 +52,38 @@ class GraffitiApplication : Application() {
 
         // 1.2. Setup Crash Reporting
         CrashReporter(this).initialize()
-        // CoroutineExceptionHandler so a failure in the startup crash-upload can never escape this
-        // launch and force-close the app on launch (checkAndUpload is also self-guarded). Belt and
-        // suspenders: the crash-reporting path must never itself crash the app.
+        // Auto-report the previous run's crash(es) as a GitHub issue. CAPTURE the file contents NOW,
+        // synchronously, before MainActivity.onCreate reads + deletes them for its on-screen dialog
+        // (same startup transaction) — otherwise the async upload races that delete and finds nothing.
+        // Then upload off the main thread and delete each file on success. Covers both the JVM crash
+        // dump and the native (SIGSEGV/SIGABRT) backtrace. The benign isolated ":probe" native crash is
+        // intentionally NOT reported. Empty GH_TOKEN (local/dev builds) -> uploadCaptured no-ops.
+        // CoroutineExceptionHandler is belt-and-suspenders: the crash-reporting path must never itself
+        // crash the app on launch.
         val crashUploadErrorHandler = CoroutineExceptionHandler { _, e ->
             Log.e("GraffitiApplication", "Crash upload failed at startup; ignored", e)
         }
-        MainScope().launch(crashUploadErrorHandler) {
-            CrashUploadWorker(this@GraffitiApplication).checkAndUpload(BuildConfig.GH_TOKEN)
+        val crashToken = BuildConfig.GH_TOKEN
+        if (crashToken.isNotBlank()) {
+            val capturedCrashes = listOf(
+                "last_crash.txt" to "Auto-Report: App Crash",
+                "last_native_crash.txt" to "Auto-Report: Native Crash"
+            ).mapNotNull { (name, title) ->
+                runCatching {
+                    val f = java.io.File(cacheDir, name)
+                    if (f.exists()) Triple(f, title, f.readText()) else null
+                }.getOrNull()
+            }
+            if (capturedCrashes.isNotEmpty()) {
+                MainScope().launch(crashUploadErrorHandler) {
+                    val worker = CrashUploadWorker(this@GraffitiApplication)
+                    capturedCrashes.forEach { (file, title, report) ->
+                        if (worker.uploadCaptured(crashToken, title, report)) {
+                            runCatching { file.delete() }
+                        }
+                    }
+                }
+            }
         }
 
         // 2. Update Security Provider (Fix for SSLHandshakeException)

@@ -101,11 +101,21 @@ android {
             }
         }
 
-        // Do NOT bake a GitHub token into the shipped APK — a PAT embedded in a distributed app can
-        // be extracted from BuildConfig. CrashUploadWorker reads this and already no-ops when empty,
-        // so crash-log upload via an embedded token is intentionally disabled. (The GitHub Packages
-        // maven repo still authenticates at build time via the GH_TOKEN env var in settings.gradle.kts.)
-        buildConfigField("String", "GH_TOKEN", "\"\"")
+        // Crash auto-reporting: CrashUploadWorker files a GitHub issue containing the crash log, using
+        // this token. It is read at BUILD time from the GH_TOKEN env var (the same one
+        // settings.gradle.kts uses for the GitHub Packages maven repo), with a gradle-property
+        // fallback. When neither is present (typical local dev) it stays empty and CrashUploadWorker
+        // no-ops — so nothing breaks locally and no token is ever committed to Git.
+        //
+        // SECURITY: a non-empty token here is embedded in the shipped APK's BuildConfig and CAN be
+        // extracted by anyone who decompiles the app. Use a FINE-GRAINED token scoped to ONLY
+        // "Issues: write" on this single repo (HereLiesAz/GraffitiXR) — never a broad/classic PAT —
+        // so that a leaked token can, at worst, open issues on this one repo.
+        // GitHub tokens are [A-Za-z0-9_] only (ghp_* / github_pat_*), so no string escaping is needed.
+        val crashReportToken = System.getenv("GH_TOKEN")
+            ?: (project.findProperty("GH_TOKEN") as String?)
+            ?: ""
+        buildConfigField("String", "GH_TOKEN", "\"$crashReportToken\"")
     }
 
     // Release signing is a property of the project, not of each CI invocation. The keystore and
