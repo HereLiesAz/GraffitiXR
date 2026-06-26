@@ -274,9 +274,6 @@ class MainActivity : ComponentActivity() {
                 val arUiState by arViewModel.uiState.collectAsState()
                 val coopState = arUiState.coopSessionState
                 var showJoinScanner by remember { mutableStateOf(false) }
-                // Which mode's whole-design adjustment panel is open (null = closed). Driven by the
-                // mode Layer "Adjust" rail item.
-                var modeAdjustTarget by remember { mutableStateOf<EditorMode?>(null) }
                 val hostQr by arViewModel.hostQrPayload.collectAsState()
                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
                 val dashboardNavigation by dashboardViewModel.navigationTrigger.collectAsState()
@@ -576,7 +573,6 @@ class MainActivity : ComponentActivity() {
                                     permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
                                 }
                             },
-                            onOpenModeAdjust = { modeAdjustTarget = it }
                         )
                     }
 
@@ -1233,18 +1229,6 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            modeAdjustTarget?.let { mode ->
-                                ModeAdjustPanel(
-                                    mode = mode,
-                                    adjustment = editorUiState.modeAdjustments[mode]
-                                        ?: com.hereliesaz.graffitixr.common.model.ModeAdjustment(),
-                                    onChange = { editorViewModel.onModeAdjustmentChanged(mode, it) },
-                                    onReset = { editorViewModel.onModeLayerReset(mode) },
-                                    onDismiss = { modeAdjustTarget = null },
-                                    modifier = Modifier.align(Alignment.CenterEnd),
-                                )
-                            }
-
                             val glassesState by arViewModel.glassesSessionState.collectAsState()
                             when (val s = glassesState) {
                                 is com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.PairingPrompt -> {
@@ -1315,43 +1299,6 @@ class MainActivity : ComponentActivity() {
         if (isFinishing) slamManager.destroy()
     }
 
-    /**
-     * Adds a "Layer" sub-host under a mode that lets the user edit the whole design as a unit for
-     * that mode: tapping it selects whole-design editing (transform gestures move/scale/rotate the
-     * mural), "Adjust" opens the tone panel, and "Reset" clears the mode's adjustment. These edits
-     * persist per mode; Design-mode layer edits stay global.
-     */
-    private fun AzNavHostScope.modeLayerSubHost(
-        modeId: String,
-        mode: EditorMode,
-        editorUiState: EditorUiState,
-        editorViewModel: EditorViewModel,
-        navStrings: NavStrings,
-        navItemColor: Color,
-        onOpenModeAdjust: (EditorMode) -> Unit
-    ) {
-        val active = editorUiState.editingModeLayer && editorUiState.editorMode == mode
-        azRailSubHostItem(
-            id = "$modeId.layer",
-            hostId = modeId,
-            text = "Layer",
-            color = if (active) Cyan else navItemColor,
-            shape = AzButtonShape.RECTANGLE,
-            onClick = { editorViewModel.onModeLayerSelected(mode) }
-        )
-        azRailSubItem(id = "$modeId.layer.adjust", hostId = "$modeId.layer", text = navStrings.adjust, color = navItemColor, shape = AzButtonShape.NONE) {
-            editorViewModel.onModeLayerSelected(mode)
-            onOpenModeAdjust(mode)
-        }
-        val locked = editorUiState.modeAdjustments[mode]?.isTransformLocked == true
-        azRailSubItem(id = "$modeId.layer.lock", hostId = "$modeId.layer", text = if (locked) "Unlock" else "Lock", color = if (locked) Cyan else navItemColor, shape = AzButtonShape.NONE) {
-            editorViewModel.onToggleModeTransformLocked(mode)
-        }
-        azRailSubItem(id = "$modeId.layer.reset", hostId = "$modeId.layer", text = "Reset", color = navItemColor, shape = AzButtonShape.NONE) {
-            editorViewModel.onModeLayerReset(mode)
-        }
-    }
-
     private fun AzNavHostScope.ConfigureRailItems(
         mainViewModel: MainViewModel,
         editorViewModel: EditorViewModel,
@@ -1374,7 +1321,6 @@ class MainActivity : ComponentActivity() {
         isWaitingForTap: Boolean = false,
         onShowJoinScanner: () -> Unit = {},
         onWallPhoto: () -> Unit = {},
-        onOpenModeAdjust: (EditorMode) -> Unit = {}
     ) {
         val navStrings = strings.nav
         val requestPermissions = {
@@ -1988,7 +1934,6 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-                modeLayerSubHost("mode.ar", EditorMode.AR, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
             }
 
             azRailSubHostItem(id = "mode.overlay", hostId = "host.modes", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE)
@@ -1998,7 +1943,6 @@ class MainActivity : ComponentActivity() {
                     arViewModel.toggleFlashlight()
                 }
             }
-            modeLayerSubHost("mode.overlay", EditorMode.OVERLAY, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
 
             // Mockup ▸ Wall ▸ { Photo (take a photo), File (pick an image) }
             azRailSubHostItem(id = "mode.mockup", hostId = "host.modes", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE)
@@ -2015,14 +1959,12 @@ class MainActivity : ComponentActivity() {
                     editorViewModel.clearBackgroundImage()
                 }
             }
-            modeLayerSubHost("mode.mockup", EditorMode.MOCKUP, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
 
-            // Trace ▸ Freeze (+ Layer)
+            // Trace ▸ Freeze
             azRailSubHostItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE)
             azRailSubItem(id = "mode.trace.freeze", hostId = "mode.trace", text = "Freeze", color = navItemColor, shape = AzButtonShape.NONE) {
                 mainViewModel.setTouchLocked(!isTouchLocked)
             }
-            modeLayerSubHost("mode.trace", EditorMode.TRACE, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
 
             // 4. PROJECT FOLDER
             azRailHostItem(

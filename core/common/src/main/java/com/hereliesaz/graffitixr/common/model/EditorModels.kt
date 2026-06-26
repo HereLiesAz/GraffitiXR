@@ -126,7 +126,13 @@ data class ModeAdjustment(
     val offsetX: Float = 0f,
     val offsetY: Float = 0f,
     val scale: Float = 1f,
+    // rotation = rotation about the layer's normal (Z). rotationX/rotationY tilt the layer about its
+    // own width (X) / height (Y) axes — used in AR so a double-tap can switch the active rotation axis
+    // and the artwork tilts in 3D about its own axes (not just spin in-plane). Default 0 keeps old
+    // projects identity on deserialize.
     val rotation: Float = 0f,
+    val rotationX: Float = 0f,
+    val rotationY: Float = 0f,
     val brightness: Float = 0f,
     val contrast: Float = 1f,
     val saturation: Float = 1f,
@@ -138,7 +144,8 @@ data class ModeAdjustment(
     val isTransformLocked: Boolean = false,
 ) {
     val isIdentity: Boolean
-        get() = offsetX == 0f && offsetY == 0f && scale == 1f && rotation == 0f &&
+        get() = offsetX == 0f && offsetY == 0f && scale == 1f &&
+            rotation == 0f && rotationX == 0f && rotationY == 0f &&
             brightness == 0f && contrast == 1f && saturation == 1f && opacity == 1f && !isInverted
 }
 

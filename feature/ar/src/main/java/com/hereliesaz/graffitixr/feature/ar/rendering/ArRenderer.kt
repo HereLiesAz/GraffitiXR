@@ -319,7 +319,12 @@ class ArRenderer(
     @Volatile var overlayPanX: Float = 0f
     @Volatile var overlayPanY: Float = 0f
     @Volatile var overlayScale: Float = 1f
+    // Rotation of the whole design about the overlay's OWN local axes (degrees): Z = spin in the
+    // surface plane (about the normal), X/Y = tilt off the surface about the width/height axes. The
+    // double-tap axis cycle picks which one a rotate gesture drives; all three are applied at draw.
     @Volatile var overlayRotationDeg: Float = 0f
+    @Volatile var overlayRotationX: Float = 0f
+    @Volatile var overlayRotationY: Float = 0f
     // Meters-per-pixel at the overlay's depth this frame, so the UI can convert a screen-pixel drag
     // into an in-plane translation in meters. 0 until the overlay has been positioned.
     @Volatile var currentMetersPerPixel: Float = 0f
@@ -1497,12 +1502,17 @@ class ArRenderer(
                 if (surfaceHeight > 0) kotlin.math.abs(ovz) * 2f * tanHalfFovY / surfaceHeight else 0f
 
             // User whole-design transform (AR "Layer" item) + marks-centering offset, in the overlay's
-            // local (in-plane) frame: translate along the plane, rotate about the normal, scale.
+            // local frame: translate along the plane, rotate about the overlay's OWN axes, scale.
+            // Rotations are post-multiplied onto the translate and overlayLocal is then multiplied by
+            // overlayBaseScratch, so each rotateM turns the artwork about its own width (X) / height (Y)
+            // / normal (Z) through its center: Z spins it in-plane, X/Y tilt it off the surface.
             android.opengl.Matrix.setIdentityM(overlayLocalScratch, 0)
             android.opengl.Matrix.translateM(
                 overlayLocalScratch, 0, markOffsetX + overlayPanX, markOffsetY + overlayPanY, 0f
             )
             android.opengl.Matrix.rotateM(overlayLocalScratch, 0, overlayRotationDeg, 0f, 0f, 1f)
+            android.opengl.Matrix.rotateM(overlayLocalScratch, 0, overlayRotationY, 0f, 1f, 0f)
+            android.opengl.Matrix.rotateM(overlayLocalScratch, 0, overlayRotationX, 1f, 0f, 0f)
             android.opengl.Matrix.scaleM(overlayLocalScratch, 0, overlayScale, overlayScale, 1f)
             android.opengl.Matrix.multiplyMM(
                 overlayComposedScratch, 0, overlayBaseScratch, 0, overlayLocalScratch, 0
