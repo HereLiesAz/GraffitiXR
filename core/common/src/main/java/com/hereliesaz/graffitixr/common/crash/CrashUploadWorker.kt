@@ -13,16 +13,40 @@ import java.io.File
  */
 class CrashUploadWorker(private val context: Context) {
 
-    suspend fun checkAndUpload(token: String) = withContext(Dispatchers.IO) {
-        val file = File(context.cacheDir, "last_crash.txt")
-        if (!file.exists()) return@withContext
+    suspend fun checkAndUpload(token: String) {
+        // No token (the common case for local/dev builds) -> nothing can be uploaded, so skip the
+        // IO-dispatcher switch and the disk read entirely. The report stays on disk for MainActivity
+        // to surface on next launch.
+        if (token.isBlank()) {
+            Log.i("CrashUploadWorker", "No GH_TOKEN; skipping crash upload.")
+            return
+        }
+        withContext(Dispatchers.IO) {
+            // This runs at startup (Application.onCreate). It must NEVER throw: an uncaught exception
+            // here propagates out of the launching coroutine and force-closes the app ON LAUNCH — and
+            // it only runs when a previous crash left last_crash.txt, so the failure would be an
+            // occasional launch crash that compounds the very crash it was trying to report.
+            // Reading/deleting the file (file IO) and the upload are all wrapped so a crash reporter
+            // can never crash the app.
+            try {
+                val file = File(context.cacheDir, "last_crash.txt")
+                if (!file.exists()) return@withContext
 
-        val report = file.readText()
-        val success = uploadToGitHub(report, token)
-        
-        if (success) {
-            file.delete()
-            Log.i("CrashUploadWorker", "Crash report uploaded and deleted.")
+                val report = file.readText()
+                val success = uploadToGitHub(report, token)
+
+                if (success) {
+                    // If the delete fails the report is re-uploaded next launch (a duplicate issue);
+                    // log it so that's diagnosable rather than silent.
+                    if (file.delete()) {
+                        Log.i("CrashUploadWorker", "Crash report uploaded and deleted.")
+                    } else {
+                        Log.w("CrashUploadWorker", "Uploaded crash report but failed to delete it; may re-upload next launch.")
+                    }
+                }
+            } catch (e: Throwable) {
+                Log.e("CrashUploadWorker", "checkAndUpload failed; ignoring so startup isn't interrupted", e)
+            }
         }
     }
 
