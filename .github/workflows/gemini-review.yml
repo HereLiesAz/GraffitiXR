@@ -48,6 +48,12 @@ jobs:
       - name: 'Run Gemini pull request review'
         uses: 'google-github-actions/run-gemini-cli@v0' # ratchet:exclude
         id: 'gemini_pr_review'
+        # The Gemini review is advisory. When the backing service is unavailable
+        # (e.g. the Gemini API is disabled/quota-exhausted for the GCP project, which
+        # surfaces as a 403 PERMISSION_DENIED), the CLI exits non-zero. That must not
+        # red-X the PR and gate a human's merge on an external-integration outage, so
+        # the step is allowed to fail without failing the job.
+        continue-on-error: true
         env:
           # Trust the CI checkout so the headless CLI doesn't refuse to run with
           # "not running in a trusted directory" (it can't prompt in automation).

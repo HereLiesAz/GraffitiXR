@@ -178,6 +178,36 @@ fun MainScreen(
                         rendererRef.value?.updateFlashlight(arUiState.isFlashlightOn)
                     }
 
+                    // Dead-camera watchdog. On some devices (e.g. Samsung SM-A236U) the camera HAL
+                    // never feeds ARCore — the session opens but no frame ever lands (frame.timestamp
+                    // stays 0). Left alone, ARCore's internal camera pipe keeps thrashing the device
+                    // through ERROR_CAMERA_DEVICE/reopen cycles, which can end in an uncatchable
+                    // teardown crash. If no frame has arrived after the timeout, leave AR: switching
+                    // editorMode off AR disposes this branch, whose onDispose calls exitArMode() for a
+                    // clean teardown. Keyed on the renderer so it (re)starts with each AR session and
+                    // is cancelled the moment we leave AR.
+                    LaunchedEffect(rendererRef.value) {
+                        val r = rendererRef.value ?: return@LaunchedEffect
+                        val startMs = android.os.SystemClock.elapsedRealtime()
+                        while (true) {
+                            kotlinx.coroutines.delay(1000)
+                            // Read via a :feature:ar helper that returns a Long — :app can't access
+                            // ARCore's Frame type (it's an implementation dep of :feature:ar).
+                            val ts = com.hereliesaz.graffitixr.feature.ar.lastArFrameTimestampNs(r)
+                            if (ts > 0L) break // camera is streaming — healthy, stop watching
+                            val elapsed = android.os.SystemClock.elapsedRealtime() - startMs
+                            if (com.hereliesaz.graffitixr.feature.ar.ArCameraHealth.isCameraDead(elapsed, ts)) {
+                                Toast.makeText(
+                                    context,
+                                    "Camera isn't delivering frames — leaving AR. Reopen AR to try again.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                editorViewModel.setEditorMode(EditorMode.DESIGN)
+                                break
+                            }
+                        }
+                    }
+
                     val visibleLayers = uiState.layers.filter { it.isVisible && it.bitmap != null }
 
                     // Push the AR whole-design adjustment (set via the rail's "Layer" item) to the
