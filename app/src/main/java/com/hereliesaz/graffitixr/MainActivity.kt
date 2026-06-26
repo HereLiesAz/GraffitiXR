@@ -274,9 +274,6 @@ class MainActivity : ComponentActivity() {
                 val arUiState by arViewModel.uiState.collectAsState()
                 val coopState = arUiState.coopSessionState
                 var showJoinScanner by remember { mutableStateOf(false) }
-                // Which mode's whole-design adjustment panel is open (null = closed). Driven by the
-                // mode Layer "Adjust" rail item.
-                var modeAdjustTarget by remember { mutableStateOf<EditorMode?>(null) }
                 val hostQr by arViewModel.hostQrPayload.collectAsState()
                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
                 val dashboardNavigation by dashboardViewModel.navigationTrigger.collectAsState()
@@ -576,7 +573,6 @@ class MainActivity : ComponentActivity() {
                                     permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
                                 }
                             },
-                            onOpenModeAdjust = { modeAdjustTarget = it }
                         )
                     }
 
@@ -793,24 +789,8 @@ class MainActivity : ComponentActivity() {
                                 UnlockInstructionsPopup(visible = showUnlockInstructions)
                             }
 
-                            val isScanningPhase = editorUiState.editorMode == EditorMode.AR
-                                    && arUiState.arScanMode == ArScanMode.MURAL
-                                    && arUiState.scanPhase != ScanPhase.COMPLETE
-                            if (isScanningPhase && !mainUiState.isCapturingTarget && !showLibrary && !showSettings) {
-                                ScanCoachingOverlay(
-                                    splatCount = arUiState.splatCount,
-                                    immutableCount = arUiState.immutableSplatCount,
-                                    hint = arUiState.scanHint,
-                                    scanPhase = arUiState.scanPhase,
-                                    ambientSectorsCovered = arUiState.ambientSectorsCovered,
-                                    worldMappingProgress = arUiState.worldMappingProgress,
-                                    visitedSectorsMask = arUiState.visitedSectorsMask,
-                                    muralMethod = arUiState.muralMethod,
-                                    modifier = Modifier
-                                        .align(Alignment.BottomCenter)
-                                        .padding(bottom = 96.dp)
-                                )
-                            }
+                            // Scan coaching overlay removed: scanning still runs, but the on-screen
+                            // progress/hint UI is gone (it crowded the bottom adjustment controls).
 
                             // Depth-unsupported devices auto-fall-back to Canvas (handled in
                             // ArViewModel), so the old "switch to Canvas in Settings" banner is gone.
@@ -1233,18 +1213,6 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            modeAdjustTarget?.let { mode ->
-                                ModeAdjustPanel(
-                                    mode = mode,
-                                    adjustment = editorUiState.modeAdjustments[mode]
-                                        ?: com.hereliesaz.graffitixr.common.model.ModeAdjustment(),
-                                    onChange = { editorViewModel.onModeAdjustmentChanged(mode, it) },
-                                    onReset = { editorViewModel.onModeLayerReset(mode) },
-                                    onDismiss = { modeAdjustTarget = null },
-                                    modifier = Modifier.align(Alignment.CenterEnd),
-                                )
-                            }
-
                             val glassesState by arViewModel.glassesSessionState.collectAsState()
                             when (val s = glassesState) {
                                 is com.hereliesaz.graffitixr.feature.ar.GlassesSessionState.PairingPrompt -> {
@@ -1315,43 +1283,6 @@ class MainActivity : ComponentActivity() {
         if (isFinishing) slamManager.destroy()
     }
 
-    /**
-     * Adds a "Layer" sub-host under a mode that lets the user edit the whole design as a unit for
-     * that mode: tapping it selects whole-design editing (transform gestures move/scale/rotate the
-     * mural), "Adjust" opens the tone panel, and "Reset" clears the mode's adjustment. These edits
-     * persist per mode; Design-mode layer edits stay global.
-     */
-    private fun AzNavHostScope.modeLayerSubHost(
-        modeId: String,
-        mode: EditorMode,
-        editorUiState: EditorUiState,
-        editorViewModel: EditorViewModel,
-        navStrings: NavStrings,
-        navItemColor: Color,
-        onOpenModeAdjust: (EditorMode) -> Unit
-    ) {
-        val active = editorUiState.editingModeLayer && editorUiState.editorMode == mode
-        azRailSubHostItem(
-            id = "$modeId.layer",
-            hostId = modeId,
-            text = "Layer",
-            color = if (active) Cyan else navItemColor,
-            shape = AzButtonShape.RECTANGLE,
-            onClick = { editorViewModel.onModeLayerSelected(mode) }
-        )
-        azRailSubItem(id = "$modeId.layer.adjust", hostId = "$modeId.layer", text = navStrings.adjust, color = navItemColor, shape = AzButtonShape.NONE) {
-            editorViewModel.onModeLayerSelected(mode)
-            onOpenModeAdjust(mode)
-        }
-        val locked = editorUiState.modeAdjustments[mode]?.isTransformLocked == true
-        azRailSubItem(id = "$modeId.layer.lock", hostId = "$modeId.layer", text = if (locked) "Unlock" else "Lock", color = if (locked) Cyan else navItemColor, shape = AzButtonShape.NONE) {
-            editorViewModel.onToggleModeTransformLocked(mode)
-        }
-        azRailSubItem(id = "$modeId.layer.reset", hostId = "$modeId.layer", text = "Reset", color = navItemColor, shape = AzButtonShape.NONE) {
-            editorViewModel.onModeLayerReset(mode)
-        }
-    }
-
     private fun AzNavHostScope.ConfigureRailItems(
         mainViewModel: MainViewModel,
         editorViewModel: EditorViewModel,
@@ -1374,7 +1305,6 @@ class MainActivity : ComponentActivity() {
         isWaitingForTap: Boolean = false,
         onShowJoinScanner: () -> Unit = {},
         onWallPhoto: () -> Unit = {},
-        onOpenModeAdjust: (EditorMode) -> Unit = {}
     ) {
         val navStrings = strings.nav
         val requestPermissions = {
@@ -1988,7 +1918,6 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-                modeLayerSubHost("mode.ar", EditorMode.AR, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
             }
 
             azRailSubHostItem(id = "mode.overlay", hostId = "host.modes", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE)
@@ -1998,7 +1927,6 @@ class MainActivity : ComponentActivity() {
                     arViewModel.toggleFlashlight()
                 }
             }
-            modeLayerSubHost("mode.overlay", EditorMode.OVERLAY, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
 
             // Mockup ▸ Wall ▸ { Photo (take a photo), File (pick an image) }
             azRailSubHostItem(id = "mode.mockup", hostId = "host.modes", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE)
@@ -2015,14 +1943,12 @@ class MainActivity : ComponentActivity() {
                     editorViewModel.clearBackgroundImage()
                 }
             }
-            modeLayerSubHost("mode.mockup", EditorMode.MOCKUP, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
 
-            // Trace ▸ Freeze (+ Layer)
+            // Trace ▸ Freeze
             azRailSubHostItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE)
             azRailSubItem(id = "mode.trace.freeze", hostId = "mode.trace", text = "Freeze", color = navItemColor, shape = AzButtonShape.NONE) {
                 mainViewModel.setTouchLocked(!isTouchLocked)
             }
-            modeLayerSubHost("mode.trace", EditorMode.TRACE, editorUiState, editorViewModel, navStrings, navItemColor, onOpenModeAdjust)
 
             // 4. PROJECT FOLDER
             azRailHostItem(
@@ -2292,138 +2218,6 @@ private fun DiagPopup(
                 text = diagLog ?: strings.ar.diagWaiting,
                 color = Color.White,
                 fontFamily = FontFamily.Monospace,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ScanCoachingOverlay(
-    splatCount: Int,
-    immutableCount: Int,
-    hint: String?,
-    modifier: Modifier = Modifier,
-    scanPhase: ScanPhase = ScanPhase.AMBIENT,
-    ambientSectorsCovered: Int = 0,
-    worldMappingProgress: Float = 0f,
-    visitedSectorsMask: Long = 0L,
-    muralMethod: MuralMethod = MuralMethod.VOXEL_HASH
-) {
-    val phaseLabel = when (scanPhase) {
-        ScanPhase.AMBIENT -> stringResource(DesignR.string.scan_step_1)
-        ScanPhase.WALL -> stringResource(DesignR.string.scan_step_2)
-        ScanPhase.COMPLETE -> null
-    }
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        AnimatedVisibility(
-            visible = hint != null,
-            enter = fadeIn() + slideInVertically { it / 2 },
-            exit  = fadeOut() + slideOutVertically { it / 2 }
-        ) {
-            AnimatedContent(
-                targetState = hint ?: "",
-                transitionSpec = {
-                    (fadeIn() + slideInVertically { -it / 3 })
-                        .togetherWith(fadeOut() + slideOutVertically { it / 3 })
-                },
-                label = "scan_hint"
-            ) { text ->
-                Box(
-                    modifier = Modifier
-                        .background(
-                            Color(0xCC000000),
-                            RoundedCornerShape(20.dp)
-                        )
-                        .padding(horizontal = 16.dp, vertical = 7.dp)
-                ) {
-                    Text(
-                        text = text,
-                        color = Color.White,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .background(Color(0xCC000000), RoundedCornerShape(20.dp))
-                .padding(horizontal = 14.dp, vertical = 6.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                if (phaseLabel != null) {
-                    Text(
-                        text = phaseLabel,
-                        color = Color.Cyan,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (scanPhase == ScanPhase.AMBIENT) {
-                        SectorRingIndicator(visitedSectorsMask = visitedSectorsMask)
-
-                        Text(
-                            text = "${(worldMappingProgress * 100).toInt()}%",
-                            color = Color.Cyan,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "360° MAPPED",
-                            color = Color.LightGray,
-                            fontSize = 12.sp
-                        )
-                    } else {
-                        LinearProgressIndicator(
-                            progress = { (splatCount / 50_000f).coerceIn(0f, 1f) },
-                            modifier = Modifier.width(100.dp),
-                            color = Color.Cyan,
-                            trackColor = Color.White.copy(alpha = 0.2f)
-                        )
-                        val displayTotal = splatCount / 1000
-                        val displayImmutable = immutableCount / 1000
-                        Text(
-                            text = "${displayTotal}k (${displayImmutable}k locked) / 50k",
-                            color = Color.LightGray,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SectorRingIndicator(visitedSectorsMask: Long, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier.size(40.dp)) {
-        val ringRadius = size.minDimension / 2f * 0.70f
-        val strokeW    = size.minDimension / 2f * 0.45f
-        val gapDeg     = 3f
-        val sweepDeg   = 360f / 36f - gapDeg
-        for (i in 0..35) {
-            val startAngle = -90f + i * (360f / 36f) + gapDeg / 2f
-            val isVisited  = (visitedSectorsMask ushr i) and 1L != 0L
-            drawArc(
-                color      = if (isVisited) Color.Cyan else Color.White.copy(alpha = 0.18f),
-                startAngle = startAngle,
-                sweepAngle = sweepDeg,
-                useCenter  = false,
-                topLeft    = androidx.compose.ui.geometry.Offset(center.x - ringRadius, center.y - ringRadius),
-                size       = androidx.compose.ui.geometry.Size(ringRadius * 2, ringRadius * 2),
-                style      = androidx.compose.ui.graphics.drawscope.Stroke(
-                    width = strokeW,
-                    cap   = androidx.compose.ui.graphics.StrokeCap.Butt
-                )
             )
         }
     }

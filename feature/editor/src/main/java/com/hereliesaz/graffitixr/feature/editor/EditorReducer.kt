@@ -84,11 +84,19 @@ internal object EditorReducer {
             // Locked: the user pinned this mode's whole-design position, so ignore transform gestures.
             if (cur.isTransformLocked) state
             else {
-                val updated = cur.copy(
-                    offsetX = cur.offsetX + intent.pan.x,
-                    offsetY = cur.offsetY + intent.pan.y,
-                    scale = (cur.scale * intent.zoom).coerceIn(0.1f, 10f),
-                    rotation = cur.rotation + intent.rotation,
+                // Rotation goes to the axis selected by the double-tap cycle (activeRotationAxis): X/Y
+                // tilt the whole design about its own width/height, Z spins it in-plane. Available in
+                // every non-Design mode (AR/Overlay/Mockup/Trace), which all render the tilt. Pan/scale
+                // always apply.
+                val rotated = when (state.activeRotationAxis) {
+                    RotationAxis.X -> cur.copy(rotationX = cur.rotationX + intent.rotation)
+                    RotationAxis.Y -> cur.copy(rotationY = cur.rotationY + intent.rotation)
+                    RotationAxis.Z -> cur.copy(rotation = cur.rotation + intent.rotation)
+                }
+                val updated = rotated.copy(
+                    offsetX = rotated.offsetX + intent.pan.x,
+                    offsetY = rotated.offsetY + intent.pan.y,
+                    scale = (rotated.scale * intent.zoom).coerceIn(0.1f, 10f),
                 )
                 state.copy(modeAdjustments = state.modeAdjustments + (intent.mode to updated))
             }

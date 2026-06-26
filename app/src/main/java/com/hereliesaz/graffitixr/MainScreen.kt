@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.ui.Alignment
@@ -220,6 +221,8 @@ fun MainScreen(
                             r.overlayPanY = arOverlayAdj?.offsetY ?: 0f
                             r.overlayScale = arOverlayAdj?.scale ?: 1f
                             r.overlayRotationDeg = arOverlayAdj?.rotation ?: 0f
+                            r.overlayRotationX = arOverlayAdj?.rotationX ?: 0f
+                            r.overlayRotationY = arOverlayAdj?.rotationY ?: 0f
                         }
                     }
 
@@ -354,6 +357,20 @@ fun MainScreen(
             )
         }
 
+        // Camera modes: which rotation axis the last double-tap selected. Shown for every non-Design
+        // mode (AR/Overlay/Mockup/Trace) where the axis cycle applies; Design has its own indicator.
+        // visible drives RotationAxisFeedback's own enter/exit + auto-dismiss (onFeedbackShown).
+        if (uiState.editorMode != EditorMode.DESIGN && uiState.editorMode != EditorMode.STENCIL) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                com.hereliesaz.graffitixr.design.components.RotationAxisFeedback(
+                    axis = uiState.activeRotationAxis,
+                    visible = uiState.showRotationAxisFeedback,
+                    onFeedbackShown = { editorViewModel.onFeedbackShown() },
+                    modifier = Modifier.padding(top = 48.dp)
+                )
+            }
+        }
+
         uiState.backgroundBitmap?.takeIf { uiState.editorMode == EditorMode.MOCKUP }
             ?.let { bmp ->
                 Image(
@@ -381,6 +398,10 @@ fun MainScreen(
                         translationY = modeAdj.offsetY
                         scaleX = modeAdj.scale
                         scaleY = modeAdj.scale
+                        // Tilt the whole design about its own width/height (X/Y) and spin about its
+                        // normal (Z), so the double-tap axis cycle works in Overlay/Mockup/Trace too.
+                        rotationX = modeAdj.rotationX
+                        rotationY = modeAdj.rotationY
                         rotationZ = modeAdj.rotation
                         alpha = modeAdj.opacity
                         transformOrigin = TransformOrigin.Center
@@ -459,16 +480,21 @@ fun MainScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isWaitingForTap, isTouchLocked, isGuest) {
+                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isWaitingForTap, isTouchLocked, isGuest, uiState.editorMode) {
                         if (isGuest) return@pointerInput // Block ALL guest interaction with layers
 
+                        // Outside Design there is only ONE layer (the whole design), so transform
+                        // gestures always edit the mode adjustment — no "Layer" toggle. This isn't gated
+                        // by the active layer's image lock, so double-tap to cycle the rotation axis works
+                        // even while the artwork is locked for painting.
+                        val editingMode = uiState.editorMode != EditorMode.DESIGN
                         if (isWaitingForTap) {
                             detectTapGestures { offset ->
                                 val nx = offset.x / size.width
                                 val ny = offset.y / size.height
                                 arViewModel.onScreenTap(nx, ny)
                             }
-                        } else if (!isTouchLocked && !isImageLocked) {
+                        } else if (!isTouchLocked && (editingMode || !isImageLocked)) {
                             if (uiState.activeTool == Tool.NONE) {
                                 detectTapGestures(
                                     onDoubleTap = { editorViewModel.onCycleRotationAxis() },
@@ -481,10 +507,10 @@ fun MainScreen(
                             }
                         }
                     }
-                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isWaitingForTap, isTouchLocked, uiState.editingModeLayer) {
-                        // While editing the whole design as a unit for this mode, transform gestures
-                        // drive the mode adjustment instead of the active layer.
-                        val editingMode = uiState.editingModeLayer && uiState.editorMode != EditorMode.DESIGN
+                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isWaitingForTap, isTouchLocked, uiState.editorMode) {
+                        // Outside Design the whole design is the single layer, so transform gestures
+                        // always drive the mode adjustment instead of a per-layer transform.
+                        val editingMode = uiState.editorMode != EditorMode.DESIGN
                         // editingMode edits the whole design, so it isn't gated by the active layer's
                         // image lock (the mode has its own Lock via isTransformLocked, in the reducer).
                         if (!isTouchLocked && !isWaitingForTap && (editingMode || (!isImageLocked && activeLayer != null))) {
@@ -496,11 +522,13 @@ fun MainScreen(
                                     onGesture = { _, pan, zoom, rotation ->
                                         if (editingMode) {
                                             // In AR the overlay lives on the wall in meters, so convert
-                                            // the screen-pixel drag to in-plane meters (screen Y is down,
-                                            // plane local Y is up → flip Y). Other modes stay in pixels.
+                                            // the screen-pixel drag to in-plane meters. The overlay's
+                                            // world frame runs opposite the screen on both axes here, so
+                                            // negate both so the artwork follows the finger. Other modes
+                                            // stay in pixels.
                                             val adjustedPan = if (uiState.editorMode == EditorMode.AR) {
                                                 val mpp = rendererRef.value?.currentMetersPerPixel ?: 0f
-                                                androidx.compose.ui.geometry.Offset(pan.x * mpp, -pan.y * mpp)
+                                                androidx.compose.ui.geometry.Offset(-pan.x * mpp, pan.y * mpp)
                                             } else pan
                                             editorViewModel.onModeTransformGesture(uiState.editorMode, adjustedPan, zoom, rotation)
                                         } else {
