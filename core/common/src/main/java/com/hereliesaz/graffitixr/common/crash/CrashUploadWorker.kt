@@ -17,6 +17,17 @@ import retrofit2.converter.gson.GsonConverterFactory
  */
 class CrashUploadWorker(private val context: Context) {
 
+    // Built once and reused: recreating Retrofit/OkHttp per upload accumulates thread + connection
+    // pools (wasteful, and worse when uploading several crash files in a row). `by lazy` defers
+    // creation to the first upload, which runs on Dispatchers.IO — so no work at construction time.
+    private val githubService: GitHubCrashService by lazy {
+        Retrofit.Builder()
+            .baseUrl("https://api.github.com/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(GitHubCrashService::class.java)
+    }
+
     /**
      * Upload one captured crash [report]. Returns true only on a successful upload. [baseTitle] is the
      * issue title for a fatal crash; a JVM report whose first line is "FATAL: false" (a swallowed /
@@ -38,12 +49,7 @@ class CrashUploadWorker(private val context: Context) {
 
     private suspend fun uploadToGitHub(report: String, token: String, baseTitle: String): Boolean {
         return try {
-            val retrofit = Retrofit.Builder()
-                .baseUrl("https://api.github.com/")
-                .addConverterFactory(GsonConverterFactory.create())
-                .build()
-
-            val service = retrofit.create(GitHubCrashService::class.java)
+            val service = githubService
             // JVM reports start with "FATAL: true|false" (see CrashReporter.buildReport). A recovered
             // (non-fatal) report must not masquerade as a force-close. Native reports have no such
             // line, so they keep their baseTitle ("Native Crash").
