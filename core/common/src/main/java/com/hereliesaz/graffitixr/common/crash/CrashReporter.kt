@@ -100,6 +100,10 @@ class CrashReporter(private val context: Context) : Thread.UncaughtExceptionHand
         private val CAMERA_PIPE_MESSAGE_SIGNATURES = listOf(
             "failed to load metadata for cameraid",
             "unable to retrieve camera characteristics",
+            // CameraX fires this SecurityException on its own worker thread when ARCore evicts it
+            // mid-capture: "Attempt to use camera from a different process than original client".
+            // The faulting CameraX thread is already dying; no foreground state is broken.
+            "attempt to use camera from a different process",
         )
 
         /**
@@ -124,8 +128,15 @@ class CrashReporter(private val context: Context) : Thread.UncaughtExceptionHand
                     }
                 }
                 if (t.stackTrace.any {
-                        it.className == "android.hardware.camera2.CameraManager" &&
-                            it.methodName == "getCameraCharacteristics"
+                        (it.className == "android.hardware.camera2.CameraManager" &&
+                            it.methodName == "getCameraCharacteristics") ||
+                        // CameraX capture-session teardown path — the SecurityException variant
+                        // surfaces from Camera2's CaptureSession or CameraDeviceImpl when ARCore
+                        // evicts CameraX mid-pipeline.
+                        (it.className.startsWith("android.hardware.camera2.") &&
+                            (it.methodName == "submitCaptureRequest" ||
+                             it.methodName == "close" ||
+                             it.methodName == "checkIfCameraClosedOrInError"))
                     }) {
                     matchedFrame = true
                 }
@@ -134,8 +145,8 @@ class CrashReporter(private val context: Context) : Thread.UncaughtExceptionHand
             }
 
             visit(throwable)
-            // Require BOTH the camera-metadata message AND the getCameraCharacteristics frame so an
-            // unrelated crash that merely mentions one of these strings is never silently swallowed.
+            // Require BOTH a camera-pipe message AND a camera2 stack frame so an unrelated crash
+            // that merely mentions one of these strings is never silently swallowed.
             return matchedMessage && matchedFrame
         }
     }

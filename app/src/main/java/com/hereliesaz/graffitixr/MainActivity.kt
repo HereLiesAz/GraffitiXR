@@ -1368,18 +1368,15 @@ class MainActivity : ComponentActivity() {
                 // Each layer is a relocItem (drag to reorder); tapping it opens its nested rail of
                 // editing tools (edit/size/font/color/blend/invert/paint/retouch/etc.). The hidden
                 // menu carries link/duplicate/copy/flatten/delete.
-                if (editorUiState.layers.isNotEmpty()) {
-                    // Keep Layers expanded whenever there are layers and we're in Design mode (reactive,
-                    // so re-entering Design with existing layers re-expands it — not just first render).
-                    azRailSubHostItem(
-                        id = "design.layers", hostId = "host.design", text = "Layers",
-                        color = navItemColor, shape = AzButtonShape.RECTANGLE,
-                        // Restore the user's last expansion on reopen; default expanded when layers exist.
-                        initiallyExpanded = railExpansion["design.layers"] ?: true,
-                        expandWhen = { editorUiState.layers.isNotEmpty() && editorUiState.editorMode == EditorMode.DESIGN },
-                        onExpandedChange = { editorViewModel.onRailHostExpansionChanged("design.layers", it) }
-                    )
-                }
+                // Keep Layers expanded whenever there are layers and we're in Design mode (reactive,
+                // so adding the first layer or re-entering Design auto-expands it).
+                azRailSubHostItem(
+                    id = "design.layers", hostId = "host.design", text = "Layers",
+                    color = navItemColor, shape = AzButtonShape.RECTANGLE,
+                    initiallyExpanded = railExpansion["design.layers"] ?: editorUiState.layers.isNotEmpty(),
+                    expandWhen = { editorUiState.layers.isNotEmpty() && editorUiState.editorMode == EditorMode.DESIGN },
+                    onExpandedChange = { editorViewModel.onRailHostExpansionChanged("design.layers", it) }
+                )
                 editorUiState.layers.reversed().forEach { layer ->
                     val activeTool = editorUiState.activeTool
                     val forceOpenHiddenMenu = layerMenusOpen[layer.id] ?: false
