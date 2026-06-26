@@ -1510,9 +1510,13 @@ class ArRenderer(
             android.opengl.Matrix.translateM(
                 overlayLocalScratch, 0, markOffsetX + overlayPanX, markOffsetY + overlayPanY, 0f
             )
-            android.opengl.Matrix.rotateM(overlayLocalScratch, 0, overlayRotationDeg, 0f, 0f, 1f)
-            android.opengl.Matrix.rotateM(overlayLocalScratch, 0, overlayRotationY, 0f, 1f, 0f)
+            // rotateM post-multiplies, so vertices see these in reverse call order: Z (spin in the
+            // local plane) first, then Y, then X (tilt off the surface). That spins the artwork cleanly
+            // in its own plane before tilting, instead of spinning the already-tilted quad about the
+            // wall normal (which would wobble).
             android.opengl.Matrix.rotateM(overlayLocalScratch, 0, overlayRotationX, 1f, 0f, 0f)
+            android.opengl.Matrix.rotateM(overlayLocalScratch, 0, overlayRotationY, 0f, 1f, 0f)
+            android.opengl.Matrix.rotateM(overlayLocalScratch, 0, overlayRotationDeg, 0f, 0f, 1f)
             android.opengl.Matrix.scaleM(overlayLocalScratch, 0, overlayScale, overlayScale, 1f)
             android.opengl.Matrix.multiplyMM(
                 overlayComposedScratch, 0, overlayBaseScratch, 0, overlayLocalScratch, 0

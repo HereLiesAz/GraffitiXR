@@ -92,9 +92,10 @@ fun TargetCreationUi(
                             strings = strings,
                             onCancel = onCancel,
                             onNext = null,
+                            // Top of screen so it clears the bottom adjustment + undo/redo controls.
                             modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = 32.dp)
+                                .align(Alignment.TopCenter)
+                                .padding(top = 32.dp)
                         )
                     }
                 }

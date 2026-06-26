@@ -357,10 +357,10 @@ fun MainScreen(
             )
         }
 
-        // AR: which rotation axis the last double-tap selected. The editor screen shows this via
-        // GestureFeedback, but AR doesn't render the editor UI, so surface the same indicator here.
+        // Camera modes: which rotation axis the last double-tap selected. Shown for every non-Design
+        // mode (AR/Overlay/Mockup/Trace) where the axis cycle applies; Design has its own indicator.
         // visible drives RotationAxisFeedback's own enter/exit + auto-dismiss (onFeedbackShown).
-        if (uiState.editorMode == EditorMode.AR) {
+        if (uiState.editorMode != EditorMode.DESIGN && uiState.editorMode != EditorMode.STENCIL) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                 com.hereliesaz.graffitixr.design.components.RotationAxisFeedback(
                     axis = uiState.activeRotationAxis,
@@ -398,6 +398,10 @@ fun MainScreen(
                         translationY = modeAdj.offsetY
                         scaleX = modeAdj.scale
                         scaleY = modeAdj.scale
+                        // Tilt the whole design about its own width/height (X/Y) and spin about its
+                        // normal (Z), so the double-tap axis cycle works in Overlay/Mockup/Trace too.
+                        rotationX = modeAdj.rotationX
+                        rotationY = modeAdj.rotationY
                         rotationZ = modeAdj.rotation
                         alpha = modeAdj.opacity
                         transformOrigin = TransformOrigin.Center

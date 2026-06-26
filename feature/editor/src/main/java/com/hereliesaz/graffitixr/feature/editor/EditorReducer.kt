@@ -84,9 +84,10 @@ internal object EditorReducer {
             // Locked: the user pinned this mode's whole-design position, so ignore transform gestures.
             if (cur.isTransformLocked) state
             else {
-                // Rotation goes to the axis selected by the double-tap cycle (activeRotationAxis), so
-                // the AR overlay tilts about its own X/Y axes or spins about its Z (normal), matching
-                // Design mode. Pan/scale always apply.
+                // Rotation goes to the axis selected by the double-tap cycle (activeRotationAxis): X/Y
+                // tilt the whole design about its own width/height, Z spins it in-plane. Available in
+                // every non-Design mode (AR/Overlay/Mockup/Trace), which all render the tilt. Pan/scale
+                // always apply.
                 val rotated = when (state.activeRotationAxis) {
                     RotationAxis.X -> cur.copy(rotationX = cur.rotationX + intent.rotation)
                     RotationAxis.Y -> cur.copy(rotationY = cur.rotationY + intent.rotation)
