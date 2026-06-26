@@ -788,6 +788,15 @@ class ArViewModel @Inject constructor(
             cm.registerAvailabilityCallback(cb, Handler(Looper.getMainLooper()))
             return try {
                 val freed = kotlinx.coroutines.withTimeoutOrNull(timeoutMs) { available.await() } != null
+                if (freed) {
+                    // The HAL reports the camera device closed, but CameraX's internal capture-session
+                    // teardown (running on its own executor) may still have in-flight requests draining.
+                    // Opening ARCore's Session immediately races those stragglers: CameraX fires
+                    // ERROR_CAMERA_DEVICE on its dying pipeline, and an uncaught SecurityException from
+                    // getCameraCharacteristics on an ARCore worker thread hard-crashes the process. A
+                    // short settling delay lets CameraX's executor drain before ARCore takes the device.
+                    kotlinx.coroutines.delay(300)
+                }
                 appendDiag("camera handoff: ${if (freed) "available" else "TIMEOUT after ${timeoutMs}ms"}")
                 freed
             } finally {

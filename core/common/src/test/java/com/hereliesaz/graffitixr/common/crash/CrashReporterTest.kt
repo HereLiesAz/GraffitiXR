@@ -58,6 +58,44 @@ class CrashReporterTest {
     }
 
     @Test
+    fun `recognises CameraX SecurityException eviction crash`() {
+        // When ARCore evicts CameraX mid-pipeline, CameraX throws a SecurityException with
+        // "Attempt to use camera from a different process" from submitCaptureRequest.
+        val crash = SecurityException(
+            "Attempt to use camera from a different process than original client",
+        ).apply {
+            stackTrace = arrayOf(
+                StackTraceElement(
+                    "android.hardware.camera2.impl.CameraDeviceImpl",
+                    "submitCaptureRequest",
+                    "CameraDeviceImpl.java",
+                    1024,
+                ),
+            )
+        }
+
+        assertTrue(CrashReporter.isRecoverableArCameraCrash(crash))
+    }
+
+    @Test
+    fun `recognises checkIfCameraClosedOrInError frame`() {
+        val crash = IllegalStateException(
+            "Attempt to use camera from a different process than original client",
+        ).apply {
+            stackTrace = arrayOf(
+                StackTraceElement(
+                    "android.hardware.camera2.impl.CameraDeviceImpl",
+                    "checkIfCameraClosedOrInError",
+                    "CameraDeviceImpl.java",
+                    2100,
+                ),
+            )
+        }
+
+        assertTrue(CrashReporter.isRecoverableArCameraCrash(crash))
+    }
+
+    @Test
     fun `does not match an ordinary app crash`() {
         val crash = NullPointerException("Attempt to invoke method on a null object reference")
 
