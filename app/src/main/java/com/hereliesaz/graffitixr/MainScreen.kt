@@ -191,7 +191,9 @@ fun MainScreen(
                         val startMs = android.os.SystemClock.elapsedRealtime()
                         while (true) {
                             kotlinx.coroutines.delay(1000)
-                            val ts = r.latestFrame.get()?.timestamp ?: 0L
+                            // Read via a :feature:ar helper that returns a Long — :app can't access
+                            // ARCore's Frame type (it's an implementation dep of :feature:ar).
+                            val ts = com.hereliesaz.graffitixr.feature.ar.lastArFrameTimestampNs(r)
                             if (ts > 0L) break // camera is streaming — healthy, stop watching
                             val elapsed = android.os.SystemClock.elapsedRealtime() - startMs
                             if (com.hereliesaz.graffitixr.feature.ar.ArCameraHealth.isCameraDead(elapsed, ts)) {
