@@ -1426,6 +1426,12 @@ class ArRenderer(
             // A zero stored normal (no anchor yet) leaves the raw anchor frame.
             System.arraycopy(anchorMatrix, 0, overlayBaseScratch, 0, 16)
             run {
+                // Clear any stale normal on the GL thread once the anchor is gone (reset/rescan), so a
+                // later preview/draw can't reuse the previous anchor's orientation. A zero normal makes
+                // the block below fall through to the raw anchor frame.
+                if (!anchorEstablished) {
+                    anchorSurfaceNormal[0] = 0f; anchorSurfaceNormal[1] = 0f; anchorSurfaceNormal[2] = 0f
+                }
                 val nx = anchorSurfaceNormal[0]; val ny = anchorSurfaceNormal[1]; val nz = anchorSurfaceNormal[2]
                 if (nx != 0f || ny != 0f || nz != 0f) {
                     // Pick an up reference that isn't parallel to the normal.
@@ -1438,7 +1444,16 @@ class ArRenderer(
                     // +Y = up projected onto the plane ⟂ to the normal, normalized.
                     val dot = upX * nx + upY * ny + upZ * nz
                     var yX = upX - dot * nx; var yY = upY - dot * ny; var yZ = upZ - dot * nz
-                    val yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
+                    var yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
+                    if (yLen <= 1e-4f) {
+                        // Up reference parallel to the normal (e.g. a level camera edge-on to a
+                        // horizontal surface): fall back to the camera's forward axis (viewMatrix row 2)
+                        // so the in-plane frame is still well-defined instead of reverting to raw.
+                        upX = viewMatrix[2]; upY = viewMatrix[6]; upZ = viewMatrix[10]
+                        val dot2 = upX * nx + upY * ny + upZ * nz
+                        yX = upX - dot2 * nx; yY = upY - dot2 * ny; yZ = upZ - dot2 * nz
+                        yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
+                    }
                     if (yLen > 1e-4f) {
                         yX /= yLen; yY /= yLen; yZ /= yLen
                         // +X = +Y × +Z (right-handed: width axis, horizontal across the surface).
