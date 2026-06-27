@@ -66,7 +66,6 @@ fun rememberCoachStep(editor: EditorUiState, ar: ArUiState): CoachStep? {
         }
 
         val design = arr(DesignR.array.onboarding_design)
-        val designLayers = arr(DesignR.array.onboarding_design_layers)
         val arLines = arr(DesignR.array.onboarding_ar)
         val overlay = arr(DesignR.array.onboarding_overlay)
         val mockup = arr(DesignR.array.onboarding_mockup)
@@ -74,21 +73,15 @@ fun rememberCoachStep(editor: EditorUiState, ar: ArUiState): CoachStep? {
 
         when (editor.editorMode) {
             EditorMode.DESIGN -> when {
-                // Intro on 'Design', then — once the user presses it open — walk the pointer across
-                // the layer sources (Open / Sketch / Text), explaining each in turn before they pick.
-                // Falls back to the plain 2-line step if the per-source copy is missing (e.g. an
-                // incomplete localization) so the card never shows a blank line.
+                // Point at 'Design' with a single "open Design and add a layer" line. Once Design is
+                // expanded, Open / Sketch / Text speak for themselves; dismissal happens automatically
+                // the moment the first layer appears and the next step (select) takes over.
                 !hasLayers -> {
-                    val intro = design.getOrNull(0)
-                    if (intro != null && designLayers.isNotEmpty()) {
-                        CoachStep(
-                            key = "coach.design.add",
-                            targetId = "host.design",
-                            lines = listOf(intro) + designLayers,
-                            lineTargets = listOf("host.design", "design.addImg", "design.addDraw", "design.addText"),
-                        )
+                    val addLine = design.getOrNull(1) ?: design.getOrNull(0)
+                    if (addLine != null) {
+                        CoachStep("coach.design.add", "host.design", listOf(addLine))
                     } else {
-                        CoachStep("coach.design.add", "host.design", lines(design, 0, 1))
+                        CoachStep("coach.design.add", "host.design", lines(design, 0))
                     }
                 }
                 activeLayer == null -> CoachStep("coach.design.select", firstLayerTarget, lines(design, 2))
@@ -124,9 +117,10 @@ fun rememberCoachStep(editor: EditorUiState, ar: ArUiState): CoachStep? {
                 else -> CoachStep("coach.trace.freeze", "mode.trace.freeze", lines(trace, 2))
             }
             EditorMode.AR -> when {
-                // Capture itself is modal-gated, so the coach is hidden during it; this points the
-                // user at starting the capture in the first place.
-                !hasTarget -> CoachStep("coach.ar.target", "target.create", lines(arLines, 0, 1, 2, 4))
+                // Pre-capture only: intro, "scan the wall" and the texture tip. The "just tap the
+                // screen" instruction belongs *inside* the capture modal — the coach is suppressed
+                // there, so that line is rendered as a separate hint by the capture UI itself.
+                !hasTarget -> CoachStep("coach.ar.target", "target.create", lines(arLines, 0, 1, 4))
                 !hasLayers -> CoachStep("coach.ar.add", "host.design", lines(arLines, 3))
                 else -> null
             }
