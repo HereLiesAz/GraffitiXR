@@ -25,7 +25,7 @@ class HelpItemsBuilderTest {
         // convention changed; this pins the present contract and catches removals.
         listOf(
             "host.modes", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace",
-            "target.create", "mode.mockup.wall",
+            "target.create", "mockup.wall",
             "host.design", "design.addImg", "design.addDraw", "design.addText", "mode.trace.freeze",
             "sub.design.tools", "grp.paint", "tool.brush", "tool.eraser",
             "grp.retouch", "tool.blur", "tool.liquify",

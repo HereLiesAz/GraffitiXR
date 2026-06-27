@@ -78,6 +78,7 @@ import com.google.android.gms.common.GoogleApiAvailability
 import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.*
 import com.hereliesaz.aznavrail.HiddenMenuScope
+import com.hereliesaz.aznavrail.tutorial.rememberAzGuidanceController
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.CaptureStep
@@ -487,40 +488,20 @@ class MainActivity : ComponentActivity() {
                     buildHelpItems(strings, editorUiState.layers)
                 }
 
-                // Scope tutorials to the same keys present in `allHelpItems` so the
-                // HelpOverlay's filter (info OR helpList OR tutorial) doesn't
-                // surface cards for items the user isn't looking at — e.g.
-                // host sub-items that are inline expansions, not "rail" items.
-                val rawTutorials = getTutorials(editorUiState.layers, strings)
-                val tutorials = remember(rawTutorials, allHelpItems) {
-                    rawTutorials.filterKeys { it in allHelpItems }
-                }
                 if (BuildConfig.DEBUG) {
                     RailIntegrityCheck.verify(
                         layers = editorUiState.layers,
                         mode = editorUiState.editorMode,
                         helpList = allHelpItems,
-                        tutorials = tutorials,
+                        guidanceHighlightIds = GUIDANCE_HIGHLIGHT_IDS,
                     )
                 }
 
-                // Window-space bounds of each rail item, reported by AzNavRail's
-                // onItemGloballyPositioned. Drives the tutorial pointer that aims at the item the
-                // current walkthrough step is asking the user to interact with.
-                val railItemBounds = remember { androidx.compose.runtime.mutableStateMapOf<String, androidx.compose.ui.geometry.Rect>() }
-
-                // Coach state is hoisted here (above azAdvanced) so the rail's onInteraction callback
-                // can advance the walkthrough when the user taps the very item it points at. The rail
-                // consumes its own taps, so they never reach the coach overlay's screen-tap observer —
-                // onInteraction is the supported "the user used the rail" signal, and it fires for the
-                // Design host and the Open/Sketch/Text sub-items alike.
-                val coachStep = rememberCoachStep(editorUiState, arUiState)
-                var coachLineIdx by androidx.compose.runtime.saveable.rememberSaveable(coachStep?.key) {
-                    mutableStateOf(0)
-                }
-                // True only while the coach overlay is actually on screen — gates rail-tap advancement
-                // so a startup/selection sync can't skip the first ("tap Design") line.
-                var coachVisible by remember { mutableStateOf(false) }
+                // The reactive guidance controller (AzNavRail 10.18) is created and provided by
+                // AzHostActivityLayout. It isn't in scope inside the host lambda where the rail's Help
+                // button is declared, so the onscreen block below stashes it here (via
+                // rememberAzGuidanceController) and Help reads it to enable / replay the guided tour.
+                val guidanceHolder = remember { mutableStateOf<com.hereliesaz.aznavrail.tutorial.AzGuidanceController?>(null) }
 
                 AzHostActivityLayout(navController = navController, currentDestination = currentRoute, initiallyExpanded = false) {
                     azTheme(
@@ -537,23 +518,12 @@ class MainActivity : ComponentActivity() {
                     azAdvanced(
                         helpEnabled = true,
                         helpList = allHelpItems,
-                        tutorials = tutorials,
-                        // Single, reliable advancement signal: AzNavRail reports every rail
-                        // interaction (tap, toggle, cycler, nested-rail open, reloc drag) here, so
-                        // the do-it-to-advance walkthrough advances when the user performs the
-                        // targeted action. Replaces the scattered per-item onRailTap calls.
-                        onInteraction = { id, _ ->
-                            mainViewModel.onRailInteraction(id)
-                            // Advance the adaptive coach when the user taps the item it's pointing at
-                            // (Design → Open → Sketch → Text). Rail taps don't reach the overlay's
-                            // own tap observer, so this is what moves the coach forward on the rail.
-                            // Gated on coachVisible so a startup sync can't skip the first line.
-                            val cs = coachStep
-                            if (cs != null && coachVisible && id == cs.targetForLine(coachLineIdx)) coachLineIdx++
-                        },
-                        // Window-space bounds per item, so the walkthrough can point at its target.
-                        onItemGloballyPositioned = { id, rect -> railItemBounds[id] = rect }
                     )
+
+                    // Reactive status-driven guidance (replaces the old adaptive coach and the removed
+                    // scripted-tutorial API): milestone statuses, edges that reuse the existing
+                    // onboarding text, and per-mode goals that self-activate on mode entry.
+                    ConfigureGuidance(editorUiState, arUiState, context, strings)
 
                     if (isRailVisible) {
                         ConfigureRailItems(
@@ -563,7 +533,13 @@ class MainActivity : ComponentActivity() {
                             onShowFontPicker = { layerId -> fontPickerLayerId = layerId; showFontPicker = true },
                             layerMenusOpen = layerMenusOpen,
                             showLibrary = showLibrary,
-                            tutorialModeActive = mainUiState.tutorialModeActive,
+                            guidanceEnabled = guidanceHolder.value?.enabled != false,
+                            onToggleGuidance = {
+                                guidanceHolder.value?.let { gc ->
+                                    if (gc.enabled) gc.disable()
+                                    else { gc.enable(); GUIDANCE_GOAL_IDS.forEach(gc::activate) }
+                                }
+                            },
                             coopState = coopState,
                             isTouchLocked = mainUiState.isTouchLocked,
                             isWaitingForTap = mainUiState.isWaitingForTap,
@@ -625,38 +601,12 @@ class MainActivity : ComponentActivity() {
 
                         val completedTutorials by mainViewModel.completedTutorials.collectAsState()
 
-                        // Adaptive onboarding coach. A single step is derived from the *current* app
-                        // state (mode, layers, active layer, wall photo, AR target) — the coach adapts
-                        // to the user instead of forcing a fixed path: performing the action changes
-                        // the state, which moves the coach to the next step on its own. It shows only
-                        // when the user is idle (never over a modal, never mid-gesture), reveals a
-                        // step's lines one at a time (screen tap or idle timer), and remembers each
-                        // step as shown so it never nags. Tapping Help (tutorialModeActive) replays
-                        // coaching for the session, ignoring the persisted "already seen" set.
-                        // coachStep / coachLineIdx are hoisted above azAdvanced so rail taps can drive
-                        // them; the overlay below is the canvas-tap driver for the same line index.
-                        val replayCoaching = mainUiState.tutorialModeActive
-                        val coachSeenThisSession =
-                            remember(replayCoaching) { androidx.compose.runtime.mutableStateListOf<String>() }
-                        if (!anyModalActive && coachStep != null) {
-                            val key = coachStep.key
-                            val suppressed = key in coachSeenThisSession ||
-                                (!replayCoaching && key in completedTutorials)
-                            if (!suppressed) {
-                                OnboardingCoachOverlay(
-                                    step = coachStep,
-                                    gestureInProgress = editorUiState.gestureInProgress,
-                                    lineIdx = coachLineIdx,
-                                    boundsFor = { railItemBounds[it] },
-                                    onAdvance = { coachLineIdx++ },
-                                    onSeen = {
-                                        coachSeenThisSession.add(key)
-                                        if (!replayCoaching) mainViewModel.markTutorialCompletePersistent(key)
-                                    },
-                                    onVisibilityChanged = { coachVisible = it },
-                                )
-                            }
-                        }
+                        // The reactive guidance overlay is rendered automatically by
+                        // AzHostActivityLayout; we only grab the controller it provides so the rail's
+                        // Help button can enable / replay the guided tour. The guidance graph itself
+                        // (statuses, edges, goals) is declared in ConfigureGuidance above.
+                        val guidance = rememberAzGuidanceController()
+                        SideEffect { guidanceHolder.value = guidance }
 
                         // First-launch explainer for devices where ARCore is
                         // unavailable. Modal-gated identically to the per-mode
@@ -988,6 +938,31 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
+                            // In-capture hint: shows the "just tap the screen" line (onboarding_ar[2])
+                            // *inside* the capture modal, exactly when it applies. The guidance overlay
+                            // is suppressed here by anyModalActive, so this line would otherwise never
+                            // reach the user at the moment they need it. Dismissed when the anchor lands.
+                            val showCaptureHint = mainUiState.isCapturingTarget
+                                && mainUiState.isWaitingForTap
+                                && !arUiState.isAnchorEstablished
+                            if (showCaptureHint) {
+                                val captureHintText = remember {
+                                    context.resources.getStringArray(DesignR.array.onboarding_ar)
+                                        .getOrNull(2).orEmpty()
+                                }
+                                if (captureHintText.isNotEmpty()) {
+                                    Text(
+                                        text = captureHintText,
+                                        color = Color.White,
+                                        modifier = Modifier
+                                            .align(Alignment.TopCenter)
+                                            .padding(top = 24.dp, start = 24.dp, end = 24.dp)
+                                            .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
+                                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                                    )
+                                }
+                            }
+
                             if (mainUiState.isCapturingTarget) {
                                 TargetCreationUi(
                                     uiState = arUiState,
@@ -1304,7 +1279,8 @@ class MainActivity : ComponentActivity() {
         onShowFontPicker: (String) -> Unit = {},
         layerMenusOpen: MutableMap<String, Boolean>,
         showLibrary: Boolean,
-        tutorialModeActive: Boolean = false,
+        guidanceEnabled: Boolean = true,
+        onToggleGuidance: () -> Unit = {},
         coopState: CoopSessionState = CoopSessionState.Idle,
         isTouchLocked: Boolean,
         isWaitingForTap: Boolean = false,
@@ -1368,14 +1344,13 @@ class MainActivity : ComponentActivity() {
                 // Each layer is a relocItem (drag to reorder); tapping it opens its nested rail of
                 // editing tools (edit/size/font/color/blend/invert/paint/retouch/etc.). The hidden
                 // menu carries link/duplicate/copy/flatten/delete.
-                // Keep Layers expanded whenever there are layers and we're in Design mode (reactive,
-                // so adding the first layer or re-entering Design auto-expands it).
+                // Layers is data-driven: any layer at all means open. No persisted user-collapse —
+                // expandWhen is edge-triggered so a once-collapsed host would otherwise stick.
                 azRailSubHostItem(
                     id = "design.layers", hostId = "host.design", text = "Layers",
                     color = navItemColor, shape = AzButtonShape.RECTANGLE,
-                    initiallyExpanded = railExpansion["design.layers"] ?: editorUiState.layers.isNotEmpty(),
-                    expandWhen = { editorUiState.layers.isNotEmpty() && editorUiState.editorMode == EditorMode.DESIGN },
-                    onExpandedChange = { editorViewModel.onRailHostExpansionChanged("design.layers", it) }
+                    initiallyExpanded = editorUiState.layers.isNotEmpty(),
+                    expandWhen = { editorUiState.layers.isNotEmpty() && editorUiState.editorMode == EditorMode.DESIGN }
                 )
                 editorUiState.layers.reversed().forEach { layer ->
                     val activeTool = editorUiState.activeTool
@@ -1978,8 +1953,8 @@ class MainActivity : ComponentActivity() {
             azRailItem(
                 id = "item.help",
                 text = navStrings.help,
-                color = if (tutorialModeActive) Cyan else navItemColor,
-                onClick = { mainViewModel.toggleTutorialMode() }
+                color = if (guidanceEnabled) Cyan else navItemColor,
+                onClick = onToggleGuidance
             )
         }
     }
