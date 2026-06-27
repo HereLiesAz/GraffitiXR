@@ -1,7 +1,6 @@
 package com.hereliesaz.graffitixr
 
 import android.util.Log
-import com.hereliesaz.aznavrail.tutorial.AzTutorial
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.Layer
 
@@ -12,8 +11,10 @@ import com.hereliesaz.graffitixr.common.model.Layer
  * (1) All registered IDs are unique.
  * (2) Every sub-item's hostId matches a registered host (FATAL).
  * (3) Every helpList key matches a registered rail-item ID (WARN).
- * (4) Every tutorial key matches a registered rail-item ID, a mode firstRun
- *     key, or a layer-help key (WARN).
+ * (4) Every static guidance highlight id matches a registered rail-item ID (WARN) — catches the
+ *     class of bug where an edge points at a renamed/removed item (e.g. the old `mode.mockup.wall`,
+ *     whose real id is `mockup.wall`). Runtime guidance highlights (AZ_ITEM_ACTIVE / dynamic
+ *     selectors) are resolved at render time and are not checked here.
  */
 internal object RailIntegrityCheck {
 
@@ -23,7 +24,7 @@ internal object RailIntegrityCheck {
         layers: List<Layer>,
         mode: EditorMode,
         helpList: Map<String, Any>,
-        tutorials: Map<String, AzTutorial>,
+        guidanceHighlightIds: Set<String>,
     ) {
         val railIds = enumerateRailItemIds(layers, mode)
 
@@ -46,13 +47,11 @@ internal object RailIntegrityCheck {
             }
         }
 
-        // (4) tutorial anchors — verify every tutorial key is either a
-        //     rail-item ID or a layer-help key.
-        tutorials.keys.forEach { key ->
-            val isRailId = key in railIds
-            val isLayerHelp = key.endsWith(".help") && key.removeSuffix(".help") in railIds
-            if (!isRailId && !isLayerHelp) {
-                Log.w(TAG, "tutorial key '$key' has no matching rail item")
+        // (4) guidance highlight orphans — every static highlightItemId an edge points at must be a
+        //     real rail item, else the callout's spotlight aims at nothing.
+        guidanceHighlightIds.forEach { id ->
+            if (id !in railIds) {
+                Log.w(TAG, "guidance highlight id '$id' has no matching rail item")
             }
         }
     }
