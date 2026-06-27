@@ -78,7 +78,7 @@ import com.google.android.gms.common.GoogleApiAvailability
 import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.*
 import com.hereliesaz.aznavrail.HiddenMenuScope
-import com.hereliesaz.aznavrail.tutorial.rememberAzGuidanceController
+import com.hereliesaz.aznavrail.tutorial.LocalAzGuidanceController
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.CaptureStep
@@ -497,10 +497,11 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                // The reactive guidance controller (AzNavRail 10.18) is created and provided by
-                // AzHostActivityLayout. It isn't in scope inside the host lambda where the rail's Help
-                // button is declared, so the onscreen block below stashes it here (via
-                // rememberAzGuidanceController) and Help reads it to enable / replay the guided tour.
+                // The reactive guidance controller (AzNavRail 10.18) is created by AzHostActivityLayout
+                // and provided to its subtree via LocalAzGuidanceController. It isn't in scope inside
+                // the (non-composable) host lambda where the rail's Help button is declared, so the
+                // onscreen block below reads it from that composition local and stashes it here for
+                // Help to enable / replay the guided tour.
                 val guidanceHolder = remember { mutableStateOf<com.hereliesaz.aznavrail.tutorial.AzGuidanceController?>(null) }
 
                 AzHostActivityLayout(navController = navController, currentDestination = currentRoute, initiallyExpanded = false) {
@@ -602,10 +603,12 @@ class MainActivity : ComponentActivity() {
                         val completedTutorials by mainViewModel.completedTutorials.collectAsState()
 
                         // The reactive guidance overlay is rendered automatically by
-                        // AzHostActivityLayout; we only grab the controller it provides so the rail's
-                        // Help button can enable / replay the guided tour. The guidance graph itself
-                        // (statuses, edges, goals) is declared in ConfigureGuidance above.
-                        val guidance = rememberAzGuidanceController()
+                        // AzHostActivityLayout; we only need the controller it created so the rail's
+                        // Help button can enable / replay the guided tour. Read it from the composition
+                        // local the host provides — NOT rememberAzGuidanceController(), which would
+                        // remember a *separate* controller that doesn't drive the rendered overlay. The
+                        // guidance graph itself (statuses, edges, goals) is declared in ConfigureGuidance.
+                        val guidance = LocalAzGuidanceController.current
                         SideEffect { guidanceHolder.value = guidance }
 
                         // First-launch explainer for devices where ARCore is
