@@ -528,13 +528,13 @@ fun MainScreen(
                                     onGesture = { _, pan, zoom, rotation ->
                                         if (editingMode) {
                                             // In AR the overlay lives on the wall in meters, so convert
-                                            // the screen-pixel drag to in-plane meters. The overlay's
-                                            // world frame runs opposite the screen on both axes here, so
-                                            // negate both so the artwork follows the finger. Other modes
-                                            // stay in pixels.
+                                            // the screen-pixel drag to in-plane meters. Local +X on the
+                                            // wall is camera-right (matches screen +X), local +Y is
+                                            // wall-up (opposite screen +Y), so x passes through and y
+                                            // is negated so the artwork follows the finger.
                                             val adjustedPan = if (uiState.editorMode == EditorMode.AR) {
                                                 val mpp = rendererRef.value?.currentMetersPerPixel ?: 0f
-                                                androidx.compose.ui.geometry.Offset(-pan.x * mpp, pan.y * mpp)
+                                                androidx.compose.ui.geometry.Offset(pan.x * mpp, -pan.y * mpp)
                                             } else pan
                                             editorViewModel.onModeTransformGesture(uiState.editorMode, adjustedPan, zoom, rotation)
                                         } else {
