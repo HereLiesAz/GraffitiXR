@@ -24,11 +24,13 @@ import androidx.compose.ui.unit.dp
 /**
  * One-shot explainer shown on first launch when ArCoreApk reports that ARCore
  * is not supported on this device. Tap-to-advance, dismissed automatically
- * after the last line. Visually matches [ModeOnboardingOverlay].
+ * after the last line.
  *
- * MUST only be composed when no other modal is open (library / settings /
- * export / capture). Caller is responsible for that gating, mirroring the
- * pattern used for [ModeOnboardingOverlay].
+ * This is deliberately NOT part of the reactive rail guidance graph: it fires
+ * before any rail interaction, on devices with no ARCore. It is gated only by
+ * its own one-shot persistence (the `ar_unavailable_explainer` key) and MUST
+ * only be composed when no other modal is open (library / settings / export /
+ * capture); the caller is responsible for that gating.
  */
 @Composable
 fun ArUnavailableOverlay(

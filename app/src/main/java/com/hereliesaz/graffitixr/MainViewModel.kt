@@ -44,24 +44,7 @@ data class MainUiState(
     val isInPlaneRealignment: Boolean = false,
     // True when the current capture was initiated via the tap-to-target path (Phase 4).
     val captureOriginatedFromTap: Boolean = false,
-    val tutorialCompleted: Map<String, Boolean> = emptyMap(),
-    // Drives the adaptive onboarding coach in "replay" mode: when true the coach surfaces every
-    // session, ignoring the persisted "already seen" set. Enabled by default so the tutorial is on
-    // automatically at launch; the Help button toggles it off (and the do-it-to-advance walkthrough,
-    // which also reads this flag, follows the same switch).
-    val tutorialModeActive: Boolean = true,
-    // The ordered walkthrough for the current mode/layers. Each step targets one rail item id and
-    // carries its instruction lines. Fed by the composable via [setTutorialSequence]; empty when no
-    // tour is active. Reaching the end clears this but leaves [tutorialModeActive] on.
-    val tutorialSteps: List<TutorialStep> = emptyList(),
-    // Index of the current step within [tutorialSteps] (which rail item the card points at).
-    val tutorialStepIndex: Int = 0,
-    // Line index within the current step (mode-onboarding steps have several lines; most have one).
-    val tutorialLineIndex: Int = 0
 )
-
-/** One step of the do-it-to-advance walkthrough: perform an interaction on [targetId] to advance. */
-data class TutorialStep(val targetId: String, val lines: List<String>)
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -94,93 +77,6 @@ class MainViewModel @Inject constructor(
 
     fun markTutorialCompletePersistent(key: String) {
         viewModelScope.launch { settingsRepository.markTutorialComplete(key) }
-    }
-
-    /**
-     * Toggle the do-it-to-advance walkthrough. Turning it on resets progress (the composable feeds
-     * the step sequence via [setTutorialSequence]); turning it off clears the tour entirely.
-     */
-    fun toggleTutorialMode() {
-        _uiState.update {
-            val turningOn = !it.tutorialModeActive
-            it.copy(
-                tutorialModeActive = turningOn,
-                tutorialSteps = if (turningOn) it.tutorialSteps else emptyList(),
-                tutorialStepIndex = 0,
-                tutorialLineIndex = 0
-            )
-        }
-    }
-
-    /**
-     * Install/refresh the ordered walkthrough for the current mode and layers. Called from the
-     * composable whenever the derived sequence changes (mode switch, layer add/remove). If the
-     * step the user is currently on still exists in the new sequence, position is preserved (line
-     * clamped); otherwise the tour restarts at step 0 for predictability. No-op while the mode is
-     * off or when the sequence is unchanged.
-     */
-    fun setTutorialSequence(steps: List<TutorialStep>) {
-        _uiState.update { st ->
-            if (!st.tutorialModeActive || steps == st.tutorialSteps) return@update st
-            val currentTarget = st.tutorialSteps.getOrNull(st.tutorialStepIndex)?.targetId
-            val keepIdx = currentTarget?.let { t -> steps.indexOfFirst { it.targetId == t } } ?: -1
-            if (keepIdx >= 0) {
-                val maxLine = steps[keepIdx].lines.lastIndex.coerceAtLeast(0)
-                st.copy(
-                    tutorialSteps = steps,
-                    tutorialStepIndex = keepIdx,
-                    tutorialLineIndex = st.tutorialLineIndex.coerceIn(0, maxLine)
-                )
-            } else {
-                st.copy(tutorialSteps = steps, tutorialStepIndex = 0, tutorialLineIndex = 0)
-            }
-        }
-    }
-
-    /**
-     * The interaction gate. AzNavRail reports *every* rail interaction here via azAdvanced's
-     * onInteraction. Advancement happens only when the interacted [id] matches the step the card is
-     * currently pointing at — that's what makes it a do-it-to-advance tour. Interacting with any
-     * other item is ignored (its own action still runs at the rail). No-op while the mode is off.
-     */
-    fun onRailInteraction(id: String) {
-        val st = _uiState.value
-        if (!st.tutorialModeActive) return
-        val current = st.tutorialSteps.getOrNull(st.tutorialStepIndex) ?: return
-        if (id == current.targetId) advanceInternal()
-    }
-
-    /**
-     * Idle/skip advancement — the per-step timer safety-net and the non-consuming screen tap call
-     * this so a stuck user is never trapped. Same forward motion as a matching interaction, minus
-     * the id check.
-     */
-    fun advanceTutorialIdle() {
-        if (!_uiState.value.tutorialModeActive) return
-        advanceInternal()
-    }
-
-    /**
-     * Walk the current step's lines, then move to the next step; running past the last step ends
-     * the tour (clears the sequence) while leaving the mode on so it re-derives on the next mode
-     * change or re-toggle.
-     */
-    private fun advanceInternal() {
-        _uiState.update { st ->
-            val current = st.tutorialSteps.getOrNull(st.tutorialStepIndex) ?: return@update st
-            if (st.tutorialLineIndex < current.lines.lastIndex) {
-                st.copy(tutorialLineIndex = st.tutorialLineIndex + 1)
-            } else if (st.tutorialStepIndex < st.tutorialSteps.lastIndex) {
-                st.copy(tutorialStepIndex = st.tutorialStepIndex + 1, tutorialLineIndex = 0)
-            } else {
-                st.copy(tutorialSteps = emptyList(), tutorialStepIndex = 0, tutorialLineIndex = 0)
-            }
-        }
-    }
-
-    /** End the current walkthrough (e.g. the overlay reported no remaining text). Mode stays on. */
-    fun dismissCurrentTutorial() {
-        _uiState.update { it.copy(tutorialSteps = emptyList(), tutorialStepIndex = 0, tutorialLineIndex = 0) }
     }
 
     fun setTouchLocked(locked: Boolean) {
@@ -433,14 +329,6 @@ class MainViewModel @Inject constructor(
                 captureStep = CaptureStep.NONE,
                 isWaitingForTap = false,
                 captureOriginatedFromTap = false
-            )
-        }
-    }
-
-    fun markTutorialCompleted(tutorialId: String) {
-        _uiState.update { currentState ->
-            currentState.copy(
-                tutorialCompleted = currentState.tutorialCompleted + (tutorialId to true)
             )
         }
     }

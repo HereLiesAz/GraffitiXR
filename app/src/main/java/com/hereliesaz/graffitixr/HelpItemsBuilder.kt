@@ -26,7 +26,7 @@ internal fun buildHelpItems(strings: AppStrings, layers: List<Layer>): Map<Strin
         "target.create" to strings.help.create,
         "mode.ar.light" to strings.help.flashlight,
         "mode.overlay.light" to strings.help.flashlight,
-        "mode.mockup.wall" to strings.help.wall,
+        "mockup.wall" to strings.help.wall,
 
         // Design menu
         "host.design" to strings.help.designHost,
