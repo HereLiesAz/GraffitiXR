@@ -1126,10 +1126,31 @@ class EditorViewModel @Inject constructor(
         saveProject()
         emitActiveLayerProps()
     }
-    override fun onOpacityChanged(v: Float) = dispatch(EditorIntent.SetOpacity(v))
-    override fun onBrightnessChanged(v: Float) = dispatch(EditorIntent.SetBrightness(v))
-    override fun onContrastChanged(v: Float) = dispatch(EditorIntent.SetContrast(v))
-    override fun onSaturationChanged(v: Float) = dispatch(EditorIntent.SetSaturation(v))
+    /**
+     * Opacity / brightness / contrast / saturation knobs. In Design they adjust the active layer; in
+     * a Mode (AR/Overlay/Mockup/Trace) they adjust the whole-design [ModeAdjustment] for that mode,
+     * which always exists — so the knob works even when no layer is selected and tones the entire
+     * projected design (what the user expects in a Mode). Returns true when handled as a mode adjust.
+     */
+    private fun dispatchModeAdjustIfInMode(field: (ModeAdjustment) -> ModeAdjustment): Boolean {
+        val st = _uiState.value
+        if (st.editorMode == EditorMode.DESIGN) return false
+        val cur = st.modeAdjustments[st.editorMode] ?: ModeAdjustment()
+        dispatch(EditorIntent.SetModeAdjustment(st.editorMode, field(cur)))
+        return true
+    }
+    override fun onOpacityChanged(v: Float) {
+        if (!dispatchModeAdjustIfInMode { it.copy(opacity = v) }) dispatch(EditorIntent.SetOpacity(v))
+    }
+    override fun onBrightnessChanged(v: Float) {
+        if (!dispatchModeAdjustIfInMode { it.copy(brightness = v) }) dispatch(EditorIntent.SetBrightness(v))
+    }
+    override fun onContrastChanged(v: Float) {
+        if (!dispatchModeAdjustIfInMode { it.copy(contrast = v) }) dispatch(EditorIntent.SetContrast(v))
+    }
+    override fun onSaturationChanged(v: Float) {
+        if (!dispatchModeAdjustIfInMode { it.copy(saturation = v) }) dispatch(EditorIntent.SetSaturation(v))
+    }
     override fun onColorBalanceRChanged(v: Float) = dispatch(EditorIntent.SetColorBalanceR(v))
     override fun onColorBalanceGChanged(v: Float) = dispatch(EditorIntent.SetColorBalanceG(v))
     override fun onColorBalanceBChanged(v: Float) = dispatch(EditorIntent.SetColorBalanceB(v))
