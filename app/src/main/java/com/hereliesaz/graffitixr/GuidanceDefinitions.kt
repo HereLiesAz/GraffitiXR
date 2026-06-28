@@ -23,7 +23,7 @@ internal val GUIDANCE_GOAL_IDS = listOf("gx.design", "gx.overlay", "gx.mockup", 
  * nowhere — the bug that made the old coach aim at the non-existent `mode.mockup.wall`.
  */
 internal val GUIDANCE_HIGHLIGHT_IDS =
-    setOf("host.design", "host.modes", "mockup.wall", "mode.trace.freeze", "target.create")
+    setOf("host.design", "mockup.wall", "target.create")
 
 /**
  * Declares the reactive status-driven guidance graph (AzNavRail 10.18) that replaces the old
