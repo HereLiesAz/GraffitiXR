@@ -874,7 +874,14 @@ class ArViewModel @Inject constructor(
             // a black camera. So we only select stereo when the one-time worker-thread probe has proven
             // this device's dual lenses actually triangulate depth (stereoCapable == true) and it hasn't
             // since been marked unstable. Everything else stays on the safe mono 30 FPS back config.
-            val useStereo = stereoCapable == true && !forcedStereoUnstable && !forceSafeCameraConfig
+            // Snapshot the @Volatile decision inputs once: this runs on Dispatchers.Default while the
+            // settings collectors and the dead-camera watchdog flip these flags on the main thread, so
+            // reading each member at multiple points could see them change mid-init. One snapshot keeps
+            // the whole session-build decision self-consistent (it's a per-session decision anyway).
+            val safeConfigForced = forceSafeCameraConfig
+            val stereoUnstable = forcedStereoUnstable
+            val isStereoCapable = stereoCapable
+            val useStereo = isStereoCapable == true && !stereoUnstable && !safeConfigForced
             var stereoActive = false
             if (useStereo) {
                 val stereoConfigs = try {
@@ -903,7 +910,7 @@ class ArViewModel @Inject constructor(
                 // If no same-cameraId fps variant exists, we leave the default untouched. After a
                 // dead-camera stall we skip the swap entirely (safe mode) — even that minimal swap is
                 // suspect on HALs that open a config but never feed it.
-                if (forceSafeCameraConfig) {
+                if (safeConfigForced) {
                     // A previous AR entry this process never streamed a frame (dead-camera watchdog).
                     // Don't touch ARCore's default config at all — not even the same-cameraId fps swap,
                     // which is the prime suspect for a config the HAL opens but never feeds. The pure
@@ -935,7 +942,7 @@ class ArViewModel @Inject constructor(
                     } else {
                         appendDiag("camera fps: no ${_uiState.value.cameraTargetFps} match for default cfg — using default")
                     }
-                    Timber.i("ARDIAG dual-lens: mono config cam=${s.cameraConfig.cameraId} fps=${_uiState.value.cameraTargetFps} (stereoCapable=$stereoCapable)")
+                    Timber.i("ARDIAG dual-lens: mono config cam=${s.cameraConfig.cameraId} fps=${_uiState.value.cameraTargetFps} (stereoCapable=$isStereoCapable)")
                 }
             }
 
@@ -955,7 +962,7 @@ class ArViewModel @Inject constructor(
             // Surface the camera-config decision ON SCREEN (not just logcat) so a black-camera report
             // tells us whether the live session is on stereo or mono — the difference between a
             // forced-stereo fault and a deeper camera-feeding fault.
-            appendDiag("AR session: ${if (stereoActive) "STEREO" else "mono"} cam=${s.cameraConfig.cameraId} cap=$stereoCapable unstable=$forcedStereoUnstable")
+            appendDiag("AR session: ${if (stereoActive) "STEREO" else "mono"} cam=${s.cameraConfig.cameraId} cap=$isStereoCapable unstable=$stereoUnstable")
             Timber.i("ARDIAG initArSessionLocked: session created OK (stereoActive=$stereoActive rendererAttached=${renderer != null})")
 
             // Critical: if the renderer is already attached, update it with the new session

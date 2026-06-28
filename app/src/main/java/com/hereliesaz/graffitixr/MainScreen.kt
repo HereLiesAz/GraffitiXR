@@ -211,7 +211,7 @@ fun MainScreen(
                                 arViewModel.onCameraStreamStalled()
                                 Toast.makeText(
                                     context,
-                                    "Camera isn't delivering frames — leaving AR. Reopen AR to retry with a safer camera mode.",
+                                    context.getString(DesignR.string.camera_stalled_error),
                                     Toast.LENGTH_LONG
                                 ).show()
                                 editorViewModel.setEditorMode(EditorMode.DESIGN)

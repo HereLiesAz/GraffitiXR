@@ -338,6 +338,8 @@
 
     <!-- Message shown when camera permission is denied. -->
     <string name="camera_permission_required">Camera permission is required for AR mode.</string>
+    <!-- Shown when the camera never delivers frames to AR (dead-camera watchdog); reopening AR retries with a safer camera config. -->
+    <string name="camera_stalled_error">Camera isn\'t delivering frames — leaving AR. Reopen AR to retry with a safer camera mode.</string>
     <!-- Action to open system settings. -->
     <string name="open_settings">Open Settings</string>
 
