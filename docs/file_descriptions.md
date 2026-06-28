@@ -13,9 +13,12 @@ This document lists key files in the repository and their purposes.
 *   `setup_libs.sh`: Script to download OpenCV and GLM native libraries.
 
 ## Application (`:app`)
-*   `MainActivity.kt`: Entry point. Holds `ArViewModel by viewModels()` for `onResume/onPause` ARCore lifecycle. Configures the AzNavRail via `azConfig()`, `azTheme()`, `azAdvanced(helpEnabled = true)`, and `azHelpRailItem()`. Passes `arViewModel` and `onRendererCreated` into `MainScreen`.
+*   `MainActivity.kt`: Entry point. Holds `ArViewModel by viewModels()` for `onResume/onPause` ARCore lifecycle. Configures the AzNavRail (10.18) via `azTheme()`, `azConfig()`, `azAdvanced(helpEnabled = true, helpList = …)`, registers the rail items (`ConfigureRailItems`), and the reactive guidance graph (`ConfigureGuidance`). Captures the host-provided `AzGuidanceController` from `LocalAzGuidanceController.current` so the Help item can replay the tour. Passes `arViewModel` and `onRendererCreated` into `MainScreen`.
 *   `MainScreen.kt`: `ArViewport` composable. Manages mode-based rendering (AR = `GLSurfaceView` — `ArRenderer` handles both camera feed and SLAM splats, Overlay = CameraX, Mockup/Trace = static). Shows live tracking state chip in AR mode.
-*   `MainViewModel.kt`: Cross-cutting state — touch lock, `CaptureStep` wizard for target creation.
+*   `MainViewModel.kt`: Cross-cutting state — touch lock, `CaptureStep` wizard for target creation, and the persisted first-run flag for the AR-unavailable explainer.
+*   `GuidanceDefinitions.kt`: The reactive status-driven guidance graph (AzNavRail 10.18) that replaced the old scripted-tutorial API and the hand-built onboarding coach. Declares `azStatus`/`azEdge`/`azGoal`/`azSuppressGuide` reusing the existing `onboarding_*` strings; per-mode goals self-activate on mode entry and persist completion.
+*   `HelpItemsBuilder.kt`: Builds the `helpList` map for the rail's help overlay (rail-item id → help text).
+*   `RailIntegrityCheck.kt`: Debug-only invariants — validates helpList keys and guidance highlight ids against the registered rail items.
 
 ## Core Modules
 

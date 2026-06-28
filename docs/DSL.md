@@ -1,4 +1,4 @@
-# AzNavRail DSL Configuration (v7.62)
+# AzNavRail DSL Configuration (v10.18)
 
 GraffitiXR configures the rail in `MainActivity.kt` using the DSL split across three config functions.
 
@@ -6,7 +6,7 @@ GraffitiXR configures the rail in `MainActivity.kt` using the DSL split across t
 
 ## Configuration Functions
 
-The v7.62 API splits settings across three dedicated functions:
+The API splits settings across three dedicated functions:
 
 | Function | Purpose |
 |---|---|
@@ -69,6 +69,16 @@ Backgrounds: Use the background(weight) DSL to place full-screen content behind 
 ## Custom Components
 We extend the Rail with Content {} blocks to render the Vertical Slider directly inside the flyout. This is crucial for opacity control without leaving the context of the rail.
 
+## Reactive Guidance (the in-app tutorial)
+
+As of AzNavRail 10.18 the onboarding tutorial is a **reactive, status-driven guidance graph**, not a scripted walkthrough and not a hand-built coach overlay. GraffitiXR declares the graph in `app/.../GuidanceDefinitions.kt` (`ConfigureGuidance`), called inside the same `AzHostActivityLayout { }` lambda as the rail items:
+
+* `azStatus(id) { predicate }` — milestone nodes derived from app state (`gx.hasLayers`, `gx.hasActiveLayer`, `gx.hasWallPhoto`, `gx.hasTarget`, …).
+* `azEdge(from, to, …)` — transitions carrying the existing localized onboarding text; multi-line steps use `AzInstructionStep` with `advanceWhen`, and `AZ_ITEM_ACTIVE` / `highlightSelector` to point at the active layer.
+* `azGoal(id, target, label, autoStartWhen = "az.screen.<MODE>")` — per-mode goals that self-activate on mode entry and complete (persisted by the library under `az_navrail_completed_goals`) once their milestone is reached.
+* `azSuppressGuide(700) { gestureInProgress }` keeps callouts hidden during gestures.
+
+The instruction overlay is mounted automatically by `AzHostActivityLayout`. The Help rail item (`item.help`) reads the host's controller via `LocalAzGuidanceController.current` to enable / replay the tour. See `docs/AZNAVRAIL_COMPLETE_GUIDE.md` §9 for the full API.
 
 ---
-*Documentation updated on 2026-03-17 during website redesign and Stencil generation integration phase.*
+*Documentation updated on 2026-06-28 for AzNavRail 10.18 and the reactive guidance framework.*
