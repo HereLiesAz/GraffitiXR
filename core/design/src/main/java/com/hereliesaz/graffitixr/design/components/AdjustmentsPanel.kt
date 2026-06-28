@@ -76,6 +76,12 @@ fun AdjustmentsPanel(
     onSegmentationInfluenceChange: (Float) -> Unit = {},
     onSegmentationDismiss: () -> Unit = {},
     onSegmentationCancel: () -> Unit = {},
+    // When non-null (i.e. in a Mode), the knobs reflect the whole-design mode adjustment instead of
+    // the active layer's values.
+    modeOpacity: Float? = null,
+    modeBrightness: Float? = null,
+    modeContrast: Float? = null,
+    modeSaturation: Float? = null,
     modifier: Modifier = Modifier
 ) {
     // Hide entirely during capture or if touch is locked
@@ -98,10 +104,10 @@ fun AdjustmentsPanel(
 
     // Resolve active layer properties
     val activeLayer = state.activeLayer
-    val opacity = activeLayer?.opacity ?: 1f
-    val brightness = activeLayer?.brightness ?: 0f
-    val contrast = activeLayer?.contrast ?: 1f
-    val saturation = activeLayer?.saturation ?: 1f
+    val opacity = modeOpacity ?: activeLayer?.opacity ?: 1f
+    val brightness = modeBrightness ?: activeLayer?.brightness ?: 0f
+    val contrast = modeContrast ?: activeLayer?.contrast ?: 1f
+    val saturation = modeSaturation ?: activeLayer?.saturation ?: 1f
     val colorBalanceR = activeLayer?.colorBalanceR ?: 1f
     val colorBalanceG = activeLayer?.colorBalanceG ?: 1f
     val colorBalanceB = activeLayer?.colorBalanceB ?: 1f
