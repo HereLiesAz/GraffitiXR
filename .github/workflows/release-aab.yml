@@ -7,6 +7,7 @@ name: Build & Publish AAB (Play)
 # Publishing to Play happens ONLY when `publish` is set to true, and defaults
 # to the internal track with draft status.
 on:
+  push:
   workflow_dispatch:
     inputs:
       track:
@@ -21,14 +22,14 @@ on:
       status:
         description: "Release status on the chosen track"
         type: choice
-        default: draft
+        default: completed
         options:
           - draft
           - completed
       publish:
         description: "Publish to Play? (off = build + upload .aab artifact only)"
         type: boolean
-        default: false
+        default: true
 
 # Least-privilege default token; jobs needing more declare their own permissions block.
 permissions:
