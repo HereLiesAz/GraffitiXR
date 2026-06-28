@@ -96,6 +96,9 @@ fun EditorUi(
             // Modes (anything but the Design screen) show the finished design with off-rail adjustment
             // knobs; undo/redo sit beneath those knobs here too, so every mode keeps history controls.
             val inMode = uiState.editorMode != EditorMode.DESIGN
+            // In a Mode the adjust knobs drive the whole-design mode adjustment (which always exists),
+            // not the active layer — so they work without a selected layer and tone the whole design.
+            val modeAdj = if (inMode) uiState.modeAdjustments[uiState.editorMode] ?: ModeAdjustment() else null
             AdjustmentsPanel(
                 state = AdjustmentsState(
                     hideUiForCapture = uiState.hideUiForCapture,
@@ -134,7 +137,11 @@ fun EditorUi(
                 segmentationInfluence = uiState.segmentationInfluence,
                 onSegmentationInfluenceChange = { actions.setSegmentationInfluence(it) },
                 onSegmentationDismiss = { actions.onConfirmSegmentation() },
-                onSegmentationCancel = { actions.onCancelSegmentation() }
+                onSegmentationCancel = { actions.onCancelSegmentation() },
+                modeOpacity = modeAdj?.opacity,
+                modeBrightness = modeAdj?.brightness,
+                modeContrast = modeAdj?.contrast,
+                modeSaturation = modeAdj?.saturation,
             )
         }
     }

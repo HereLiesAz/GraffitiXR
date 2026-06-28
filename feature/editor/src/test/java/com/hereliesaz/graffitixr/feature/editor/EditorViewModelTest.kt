@@ -508,8 +508,9 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `characterize onOpacityChanged updates only the active layer`() = runTest {
+    fun `onOpacityChanged in Design updates only the active layer`() = runTest {
         testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.setEditorMode(EditorMode.DESIGN)
         viewModel.setLayers(listOf(lyr("a"), lyr("b")))
         viewModel.onLayerActivated("a")
         testDispatcher.scheduler.advanceUntilIdle()
@@ -518,6 +519,21 @@ class EditorViewModelTest {
         val layers = viewModel.uiState.value.layers
         assertEquals(0.25f, layers.first { it.id == "a" }.opacity)
         assertEquals(1.0f, layers.first { it.id == "b" }.opacity)
+    }
+
+    @Test
+    fun `onOpacityChanged in a Mode updates the mode adjustment, not the layer`() = runTest {
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.setEditorMode(EditorMode.OVERLAY)
+        viewModel.setLayers(listOf(lyr("a")))
+        viewModel.onLayerActivated("a")
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.onOpacityChanged(0.4f)
+        testDispatcher.scheduler.advanceUntilIdle()
+        val st = viewModel.uiState.value
+        // Whole-design mode opacity is updated; the active layer's own opacity is untouched.
+        assertEquals(0.4f, st.modeAdjustments[EditorMode.OVERLAY]?.opacity)
+        assertEquals(1.0f, st.layers.first { it.id == "a" }.opacity)
     }
 
     @Test
