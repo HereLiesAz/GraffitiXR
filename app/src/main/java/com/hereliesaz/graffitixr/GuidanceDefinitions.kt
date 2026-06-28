@@ -2,7 +2,6 @@ package com.hereliesaz.graffitixr
 
 import android.content.Context
 import com.hereliesaz.aznavrail.AzNavHostScope
-import com.hereliesaz.aznavrail.tutorial.AZ_ITEM_ACTIVE
 import com.hereliesaz.aznavrail.tutorial.AzInstructionStep
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.EditorMode
@@ -11,13 +10,14 @@ import com.hereliesaz.graffitixr.design.theme.AppStrings
 import com.hereliesaz.graffitixr.design.R as DesignR
 
 /**
- * Per-mode guidance goal ids. Each self-activates on entering its mode (via `autoStartWhen`) and
- * is the set the Help button re-activates to replay the tour.
+ * Per-mode guidance goal ids. Guidance is OFF by default: the Help rail item activates all of these
+ * (turning the tour on) and deactivates them (turning it off). While active, the engine shows only
+ * the goal whose mode the user is currently in. Nothing here self-activates.
  */
 internal val GUIDANCE_GOAL_IDS = listOf("gx.design", "gx.overlay", "gx.mockup", "gx.trace", "gx.ar")
 
 /**
- * Static rail-item ids the guidance edges point at (excludes the runtime [AZ_ITEM_ACTIVE] token and
+ * Static rail-item ids the guidance edges point at (excludes runtime tokens and
  * the dynamic `highlightSelector`s, which resolve at render time). Validated against the real rail
  * by [RailIntegrityCheck] so a renamed/removed item is caught in debug instead of silently pointing
  * nowhere — the bug that made the old coach aim at the non-existent `mode.mockup.wall`.
@@ -32,14 +32,13 @@ internal val GUIDANCE_HIGHLIGHT_IDS =
  *   - the same milestone predicates become [azStatus] nodes,
  *   - the same per-mode hints become [azEdge] instructions — text reused verbatim from the existing,
  *     already-localized `onboarding_*` string arrays (no new copy is authored), and
- *   - a per-mode [azGoal] self-activates on mode entry and, once its milestone is reached, completes
- *     and is remembered by the library (SharedPreferences `az_navrail_completed_goals`) so it never
- *     re-fires — the new equivalent of the old "seen" set.
+ *   - a per-mode [azGoal] that is activated/deactivated by the Help rail item (it does NOT auto-start
+ *     on mode entry); while active it routes from the current screen to that mode's milestone and
+ *     completes once the milestone is reached.
  *
  * Multi-line steps use [AzInstructionStep] with `advanceWhen` so the callout pages itself forward as
- * the user's state changes, and `highlightSelector` / [AZ_ITEM_ACTIVE] to point at runtime layer
- * items. The instruction overlay is rendered automatically by `AzHostActivityLayout`; nothing is
- * mounted here.
+ * the user's state changes, and `highlightSelector` to point at runtime layer items. The instruction
+ * overlay is rendered automatically by `AzHostActivityLayout`; nothing is mounted here.
  *
  * Called inside the `AzHostActivityLayout { }` content lambda, the same scope as ConfigureRailItems.
  */
@@ -72,19 +71,8 @@ internal fun AzNavHostScope.ConfigureGuidance(
     azStatus("gx.hasActiveLayer") { editorUiState.layers.any { it.id == editorUiState.activeLayerId } }
     azStatus("gx.hasWallPhoto") { editorUiState.backgroundBitmap != null }
     azStatus("gx.hasTarget") { arUiState.isAnchorEstablished }
-    // Mode-scoped terminal nudges, so a "now use it" hint only shows in its own mode.
-    azStatus("gx.design.choose") {
-        editorUiState.editorMode == EditorMode.DESIGN &&
-            editorUiState.layers.any { it.id == editorUiState.activeLayerId }
-    }
-    azStatus("gx.overlay.place") {
-        editorUiState.editorMode == EditorMode.OVERLAY && editorUiState.layers.isNotEmpty()
-    }
-    azStatus("gx.trace.freeze") {
-        editorUiState.editorMode == EditorMode.TRACE && editorUiState.layers.isNotEmpty()
-    }
 
-    // --- DESIGN: add a layer, then tap it to open its tools; then an ambient "use it" hint. ---
+    // --- DESIGN: add a layer, then tap it to open its tools. ---
     azEdge(
         from = design0,
         to = "gx.hasActiveLayer",
@@ -98,9 +86,8 @@ internal fun AzNavHostScope.ConfigureGuidance(
             ),
         ),
     )
-    azEdge(from = "gx.design.choose", text = ln(design, 3), highlightItemId = "host.modes")
 
-    // --- OVERLAY: add a layer, then place it. ---
+    // --- OVERLAY: add a layer. ---
     azEdge(
         from = overlay0,
         to = "gx.hasLayers",
@@ -110,7 +97,6 @@ internal fun AzNavHostScope.ConfigureGuidance(
             AzInstructionStep(text = ln(overlay, 1), highlightItemId = "host.design", advanceWhen = "gx.hasLayers"),
         ),
     )
-    azEdge(from = "gx.overlay.place", text = ln(overlay, 2), highlightItemId = AZ_ITEM_ACTIVE)
 
     // --- MOCKUP: pick a wall photo first, then add layers on top. ---
     azEdge(
@@ -124,7 +110,7 @@ internal fun AzNavHostScope.ConfigureGuidance(
     )
     azEdge(from = "gx.hasWallPhoto", to = "gx.hasLayers", text = ln(mockup, 2), highlightItemId = "host.design")
 
-    // --- TRACE: add a layer, then freeze into a lightbox. ---
+    // --- TRACE: add a layer. ---
     azEdge(
         from = trace0,
         to = "gx.hasLayers",
@@ -134,7 +120,6 @@ internal fun AzNavHostScope.ConfigureGuidance(
             AzInstructionStep(text = ln(trace, 1), highlightItemId = "host.design", advanceWhen = "gx.hasLayers"),
         ),
     )
-    azEdge(from = "gx.trace.freeze", text = ln(trace, 2), highlightItemId = "mode.trace.freeze")
 
     // --- AR: scan & lock a wall target, then add layers. The "just tap the screen" line (ar[2]) is
     // shown by the in-capture hint in MainActivity, where the guidance overlay is suppressed. ---
@@ -150,10 +135,11 @@ internal fun AzNavHostScope.ConfigureGuidance(
     )
     azEdge(from = "gx.hasTarget", to = "gx.hasLayers", text = ln(ar, 3), highlightItemId = "host.design")
 
-    // --- Per-mode goals: self-activate on mode entry, complete (persisted) at the milestone. ---
-    azGoal(id = "gx.design", target = "gx.hasActiveLayer", label = nav.design, autoStartWhen = design0)
-    azGoal(id = "gx.overlay", target = "gx.hasLayers", label = nav.overlay, autoStartWhen = overlay0)
-    azGoal(id = "gx.mockup", target = "gx.hasLayers", label = nav.mockup, autoStartWhen = mockup0)
-    azGoal(id = "gx.trace", target = "gx.hasLayers", label = nav.trace, autoStartWhen = trace0)
-    azGoal(id = "gx.ar", target = "gx.hasTarget", label = nav.arMode, autoStartWhen = ar0)
+    // --- Per-mode goals: NOT auto-started. The Help rail item activates/deactivates them; while a
+    // goal is active the engine routes from the current screen to that mode's milestone. ---
+    azGoal(id = "gx.design", target = "gx.hasActiveLayer", label = nav.design)
+    azGoal(id = "gx.overlay", target = "gx.hasLayers", label = nav.overlay)
+    azGoal(id = "gx.mockup", target = "gx.hasLayers", label = nav.mockup)
+    azGoal(id = "gx.trace", target = "gx.hasLayers", label = nav.trace)
+    azGoal(id = "gx.ar", target = "gx.hasTarget", label = nav.arMode)
 }

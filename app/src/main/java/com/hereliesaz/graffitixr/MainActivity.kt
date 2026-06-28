@@ -534,11 +534,22 @@ class MainActivity : ComponentActivity() {
                             onShowFontPicker = { layerId -> fontPickerLayerId = layerId; showFontPicker = true },
                             layerMenusOpen = layerMenusOpen,
                             showLibrary = showLibrary,
-                            guidanceEnabled = guidanceHolder.value?.enabled != false,
+                            // Guidance is OFF by default; the tour is "on" only while a guidance goal is
+                            // active. The Help item toggles it: on -> enable + activate every goal;
+                            // off -> deactivate every goal AND disable, so it is immediately and
+                            // completely cancelled (no lingering callout).
+                            guidanceEnabled = guidanceHolder.value
+                                ?.let { gc -> GUIDANCE_GOAL_IDS.any { it in gc.activeGoals } } == true,
                             onToggleGuidance = {
                                 guidanceHolder.value?.let { gc ->
-                                    if (gc.enabled) gc.disable()
-                                    else { gc.enable(); GUIDANCE_GOAL_IDS.forEach(gc::activate) }
+                                    val on = GUIDANCE_GOAL_IDS.any { it in gc.activeGoals }
+                                    if (on) {
+                                        GUIDANCE_GOAL_IDS.forEach(gc::deactivate)
+                                        gc.disable()
+                                    } else {
+                                        gc.enable()
+                                        GUIDANCE_GOAL_IDS.forEach(gc::activate)
+                                    }
                                 }
                             },
                             coopState = coopState,
