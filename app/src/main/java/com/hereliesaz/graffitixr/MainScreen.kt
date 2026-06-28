@@ -204,9 +204,14 @@ fun MainScreen(
                             if (ts > 0L) break // camera is streaming — healthy, stop watching
                             val elapsed = android.os.SystemClock.elapsedRealtime() - startMs
                             if (com.hereliesaz.graffitixr.feature.ar.ArCameraHealth.isCameraDead(elapsed, ts)) {
+                                // Tell AR the HAL never streamed: the next AR entry this process drops
+                                // to ARCore's safest default camera config (skips the fps-variant swap),
+                                // a best-effort recovery for budget HALs (e.g. Galaxy A26) that open a
+                                // config but never feed it.
+                                arViewModel.onCameraStreamStalled()
                                 Toast.makeText(
                                     context,
-                                    "Camera isn't delivering frames — leaving AR. Reopen AR to try again.",
+                                    "Camera isn't delivering frames — leaving AR. Reopen AR to retry with a safer camera mode.",
                                     Toast.LENGTH_LONG
                                 ).show()
                                 editorViewModel.setEditorMode(EditorMode.DESIGN)
