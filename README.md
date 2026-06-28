@@ -22,7 +22,7 @@ And then, there's a decent suite of pertinent design tools, with support for mul
 *   **Dual-Lens Aware:** Auto-selects hardware stereo depth on devices that expose it; falls back to single-camera tracking with motion-based (VIO-baseline) depth elsewhere.
 *   **AI Glasses Support:** Integrated support for **Meta Ray-Bans** and **Xreal Air/Ultra** via a provider-based abstraction layer.
 *   **Co-op Mode:** Robust peer-to-peer AR synchronization for collaborative painting.
-*   **AzNavRail UI:** Thumb-driven, one-handed navigation designed for artists holding a spray can.
+*   **AzNavRail UI:** Thumb-driven, one-handed navigation designed for artists holding a spray can, with a reactive, status-driven in-app guide that adapts to what you're doing.
 
 ## Modes
 *   **AR Mural:** The core precision instrument for anchoring digital concepts to physical surfaces using confidence-based voxel mapping.
@@ -59,4 +59,4 @@ Strictly decoupled multi-module Clean Architecture:
 - [Release & Google Play Delivery](docs/RELEASE.md)
 
 ---
-*Documentation updated on 2026-06-22 during the SLAM right-size and documentation-accuracy pass.*
+*Documentation updated on 2026-06-28 for AzNavRail 10.18 and the reactive guidance framework.*

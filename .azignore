@@ -1,0 +1,37 @@
+# Docs hidden from the AzNavRail in-app About overlay.
+# The About overlay lists Markdown from the repo root and top-level docs/.
+# These are developer / internal / process / engineering docs that are not
+# meant for end users in the in-app About (footer) section. User-facing docs
+# (README, Privacy Policy, Code of Conduct, UI/UX & Stencils guides) are kept.
+
+# Root
+BACKLOG.md
+CLAUDE.md
+
+# Internal / process
+docs/AGENTS.md
+docs/contributing.md
+docs/workflow.md
+docs/task_flow.md
+docs/release-checklist.md
+docs/RELEASE.md
+docs/testing.md
+docs/file_descriptions.md
+docs/misc.md
+
+# Developer / engineering reference
+docs/API_REFERENCE.md
+docs/ARCHITECTURE.md
+docs/AZNAVRAIL_COMPLETE_GUIDE.md
+docs/BLUEPRINT.md
+docs/DSL.md
+docs/NATIVE_ENGINE.md
+docs/DISTORTION_HEAD.md
+docs/SLAM_SETUP.md
+docs/TELEOLOGICAL_SLAM.md
+docs/RELOC_MAP_DESIGN.md
+docs/SELF_GROWING_FINGERPRINT.md
+docs/data_formats.md
+docs/data_layer.md
+docs/auth.md
+docs/performance.md

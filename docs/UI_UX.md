@@ -6,9 +6,9 @@ GraffitiXR is designed for one-handed use while holding a spray can or a ladder.
 
 * **Position:** Vertical strip on the right side (configurable for left-handed use in Settings).
 * **Philosophy:** "Thumb Range Only." If you have to reach for the top of the screen, the UI failed.
-* **Hierarchy:**
-    * **Primary Modes:** (Scan, Project, Trace) are top-level Rail Items.
-    * **Context Actions:** (Opacity, Grid Toggle, Save) appear as expanding "Flyouts" from the active Rail Item.
+* **Hierarchy:** three top-level accordion hosts — **Modes** (AR, Overlay, Mockup, Trace), **Design** (layers and per-layer tools), and **Project** (new, save, load, export, settings) — plus a **Help** item.
+    * **Context Actions:** per-layer tools and mode options appear as expanding sub-items / nested rails from the active host.
+* **Reactive guide:** an in-app onboarding guide (AzNavRail 10.18's status-driven guidance) points a callout at the next thing to do based on your current mode and state. It auto-starts per mode, completes once you act, and is replayed by tapping **Help**; it suppresses itself during gestures.
 
 ## 2. The Viewport & Gestures
 
@@ -40,4 +40,4 @@ A projected grid line overlay that snaps to the dominant plane found in the conf
 * **Behavior:** It is "Lazy"—it smooths out jitter. If tracking glitches, the grid floats gently rather than snapping violently.
 
 ---
-*Documentation updated on 2026-03-17 during website redesign and Stencil generation integration phase.*
+*Documentation updated on 2026-06-28 for AzNavRail 10.18 and the reactive guidance framework.*
