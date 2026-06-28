@@ -553,6 +553,14 @@ class ArViewModel @Inject constructor(
     // disparity fails / VIO never tracks). Persisted; once set, sessions skip the stereo config.
     @Volatile private var forcedStereoUnstable: Boolean = false
 
+    // Set when the dead-camera watchdog reports the HAL never streamed a frame (e.g. Galaxy A26
+    // budget HAL). Makes the NEXT AR entry (same process) skip the fps-variant swap and run ARCore's
+    // pure default camera config — the most broadly compatible. Process-scoped (NOT persisted): if
+    // the safe config also fails the cause is below the config layer, and a fresh launch should retry
+    // the normal path once (the watchdog re-catches it) rather than be permanently pinned to a config
+    // that may not work either.
+    @Volatile private var forceSafeCameraConfig: Boolean = false
+
     // One-time dual-lens depth-triangulation probe result: null = not yet probed, true = the lenses
     // produce a real depth map (adopt the stereo config), false = no usable depth / thrashes / never
     // tracks (stay mono). Persisted via SettingsRepository.stereoCapability so it runs once per install.
@@ -632,6 +640,16 @@ class ArViewModel @Inject constructor(
     fun onActivityPaused() {
         isActivityResumed = false
         updateSessionStateLocked()
+    }
+
+    /**
+     * Called by the dead-camera watchdog when the camera HAL never delivered a frame to ARCore.
+     * Pins the safest ARCore default camera config for the next AR entry this process (no fps-variant
+     * swap, no hardware stereo). Idempotent; process-scoped so a fresh launch retries normally.
+     */
+    fun onCameraStreamStalled() {
+        forceSafeCameraConfig = true
+        Timber.w("ARDIAG onCameraStreamStalled: next AR entry will use ARCore default camera config (safe mode)")
     }
 
     fun setArMode(enabled: Boolean, context: Context) {
@@ -856,7 +874,14 @@ class ArViewModel @Inject constructor(
             // a black camera. So we only select stereo when the one-time worker-thread probe has proven
             // this device's dual lenses actually triangulate depth (stereoCapable == true) and it hasn't
             // since been marked unstable. Everything else stays on the safe mono 30 FPS back config.
-            val useStereo = stereoCapable == true && !forcedStereoUnstable
+            // Snapshot the @Volatile decision inputs once: this runs on Dispatchers.Default while the
+            // settings collectors and the dead-camera watchdog flip these flags on the main thread, so
+            // reading each member at multiple points could see them change mid-init. One snapshot keeps
+            // the whole session-build decision self-consistent (it's a per-session decision anyway).
+            val safeConfigForced = forceSafeCameraConfig
+            val stereoUnstable = forcedStereoUnstable
+            val isStereoCapable = stereoCapable
+            val useStereo = isStereoCapable == true && !stereoUnstable && !safeConfigForced
             var stereoActive = false
             if (useStereo) {
                 val stereoConfigs = try {
@@ -882,33 +907,43 @@ class ArViewModel @Inject constructor(
                 // compatible one — and only swap to a same-cameraId variant that differs in fps.
                 // (Matching cameraId keeps us on the camera/stream ARCore already validated; we don't
                 // also match resolution because CameraConfig doesn't expose it in this ARCore version.)
-                // If no same-cameraId fps variant exists, we leave the default untouched.
-                // Under battery pressure (tier ≥ medium) cap the camera to 30fps even if 60 was
-                // chosen. Done here at session build only — a mid-session CameraConfig swap resets
-                // tracking, which would be perceptible; the seamless mid-session levers are the
-                // render/SLAM rate ceilings instead.
-                val effectiveCameraFps =
-                    if (_uiState.value.adaptiveRateEnabled && _uiState.value.batteryTier >= 1) 30
-                    else _uiState.value.cameraTargetFps
-                val targetFps = if (effectiveCameraFps == 60)
-                    CameraConfig.TargetFps.TARGET_FPS_60 else CameraConfig.TargetFps.TARGET_FPS_30
-                val defaultCfg = s.cameraConfig
-                val fpsConfig = try {
-                    s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
-                        facingDirection = CameraConfig.FacingDirection.BACK
-                        this.targetFps = EnumSet.of(targetFps)
-                    }).firstOrNull { it.cameraId == defaultCfg.cameraId }
-                } catch (e: Exception) {
-                    Timber.w(e, "camera fps config query failed")
-                    null
-                }
-                if (fpsConfig != null) {
-                    s.cameraConfig = fpsConfig
-                    appendDiag("camera fps: pinned ${_uiState.value.cameraTargetFps} (matched default cfg)")
+                // If no same-cameraId fps variant exists, we leave the default untouched. After a
+                // dead-camera stall we skip the swap entirely (safe mode) — even that minimal swap is
+                // suspect on HALs that open a config but never feed it.
+                if (safeConfigForced) {
+                    // A previous AR entry this process never streamed a frame (dead-camera watchdog).
+                    // Don't touch ARCore's default config at all — not even the same-cameraId fps swap,
+                    // which is the prime suspect for a config the HAL opens but never feeds. The pure
+                    // default is the broadest-compatible config ARCore offers.
+                    appendDiag("camera: SAFE MODE — ARCore default config (stream stalled previously, no fps swap)")
+                    Timber.w("ARDIAG mono config: SAFE MODE default cam=${s.cameraConfig.cameraId} (forceSafeCameraConfig)")
                 } else {
-                    appendDiag("camera fps: no ${_uiState.value.cameraTargetFps} match for default cfg — using default")
+                    // Pin the camera frame rate (default 30, user-selectable 30/60). Under battery
+                    // pressure (tier ≥ medium) cap to 30fps even if 60 was chosen. Done here at session
+                    // build only — a mid-session CameraConfig swap resets tracking.
+                    val effectiveCameraFps =
+                        if (_uiState.value.adaptiveRateEnabled && _uiState.value.batteryTier >= 1) 30
+                        else _uiState.value.cameraTargetFps
+                    val targetFps = if (effectiveCameraFps == 60)
+                        CameraConfig.TargetFps.TARGET_FPS_60 else CameraConfig.TargetFps.TARGET_FPS_30
+                    val defaultCfg = s.cameraConfig
+                    val fpsConfig = try {
+                        s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
+                            facingDirection = CameraConfig.FacingDirection.BACK
+                            this.targetFps = EnumSet.of(targetFps)
+                        }).firstOrNull { it.cameraId == defaultCfg.cameraId }
+                    } catch (e: Exception) {
+                        Timber.w(e, "camera fps config query failed")
+                        null
+                    }
+                    if (fpsConfig != null) {
+                        s.cameraConfig = fpsConfig
+                        appendDiag("camera fps: pinned ${_uiState.value.cameraTargetFps} (matched default cfg)")
+                    } else {
+                        appendDiag("camera fps: no ${_uiState.value.cameraTargetFps} match for default cfg — using default")
+                    }
+                    Timber.i("ARDIAG dual-lens: mono config cam=${s.cameraConfig.cameraId} fps=${_uiState.value.cameraTargetFps} (stereoCapable=$isStereoCapable)")
                 }
-                Timber.i("ARDIAG dual-lens: mono config cam=${s.cameraConfig.cameraId} fps=${_uiState.value.cameraTargetFps} (stereoCapable=$stereoCapable)")
             }
 
             // isDualLensActive / isHardwareStereoActive just reflect the camera config for the diag
@@ -927,7 +962,7 @@ class ArViewModel @Inject constructor(
             // Surface the camera-config decision ON SCREEN (not just logcat) so a black-camera report
             // tells us whether the live session is on stereo or mono — the difference between a
             // forced-stereo fault and a deeper camera-feeding fault.
-            appendDiag("AR session: ${if (stereoActive) "STEREO" else "mono"} cam=${s.cameraConfig.cameraId} cap=$stereoCapable unstable=$forcedStereoUnstable")
+            appendDiag("AR session: ${if (stereoActive) "STEREO" else "mono"} cam=${s.cameraConfig.cameraId} cap=$isStereoCapable unstable=$stereoUnstable")
             Timber.i("ARDIAG initArSessionLocked: session created OK (stereoActive=$stereoActive rendererAttached=${renderer != null})")
 
             // Critical: if the renderer is already attached, update it with the new session
