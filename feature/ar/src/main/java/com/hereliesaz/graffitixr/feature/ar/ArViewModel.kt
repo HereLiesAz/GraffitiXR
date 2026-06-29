@@ -1933,9 +1933,9 @@ class ArViewModel @Inject constructor(
     // touch at any point in construction. getSystemService returns the same cached service singleton,
     // so listener add/remove identity is preserved and the per-call cost is negligible.
     private val powerManager: android.os.PowerManager?
-        get() = appContext.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+        get() = appContext.getSystemService(android.os.PowerManager::class.java)
     private val batteryManager: android.os.BatteryManager?
-        get() = appContext.getSystemService(Context.BATTERY_SERVICE) as? android.os.BatteryManager
+        get() = appContext.getSystemService(android.os.BatteryManager::class.java)
     private var thermalListener: android.os.PowerManager.OnThermalStatusChangedListener? = null
     private var powerReceiver: android.content.BroadcastReceiver? = null
     @Volatile private var thermalHot = false
