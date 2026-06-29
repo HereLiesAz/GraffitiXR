@@ -1925,12 +1925,17 @@ class ArViewModel @Inject constructor(
     // Thermal pressure, power-save mode, and low battery each float perceptionSystemThrottle, which
     // MainScreen pushes to the renderer to floor perception redraws at 30 fps. The renderer also
     // self-throttles on measured frame lag; this covers the system-level signals it can't see.
-    private val powerManager by lazy {
-        appContext.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
-    }
-    private val batteryManager by lazy {
-        appContext.getSystemService(Context.BATTERY_SERVICE) as? android.os.BatteryManager
-    }
+    // Computed getters, NOT `by lazy`: the throttle-settings collectors launched in init call
+    // recomputeSystemThrottle() (which reads powerManager) on their first emission, and DataStore can
+    // replay a cached value synchronously *during construction* — before a `by lazy` delegate field
+    // declared this far down the class is initialized, which NPE'd in the synthetic getter. A getter
+    // has no backing field and reads appContext (a constructor param, always set), so it is safe to
+    // touch at any point in construction. getSystemService returns the same cached service singleton,
+    // so listener add/remove identity is preserved and the per-call cost is negligible.
+    private val powerManager: android.os.PowerManager?
+        get() = appContext.getSystemService(android.os.PowerManager::class.java)
+    private val batteryManager: android.os.BatteryManager?
+        get() = appContext.getSystemService(android.os.BatteryManager::class.java)
     private var thermalListener: android.os.PowerManager.OnThermalStatusChangedListener? = null
     private var powerReceiver: android.content.BroadcastReceiver? = null
     @Volatile private var thermalHot = false

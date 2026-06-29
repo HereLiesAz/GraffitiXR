@@ -531,6 +531,13 @@ fun MainScreen(
                                     onGestureStart = { editorViewModel.onGestureStart() },
                                     onGestureEnd = { editorViewModel.onGestureEnd() },
                                     onGesture = { _, pan, zoom, rotation ->
+                                        // calculateRotation()'s sign is opposite our rotation
+                                        // convention, so the raw delta turns the design AGAINST the
+                                        // fingers on every axis (X/Y tilt and Z spin). Negate once here
+                                        // at the input boundary so it rotates WITH the fingers; the
+                                        // model keeps its own sign convention (positive delta → positive
+                                        // rotation), so reducers/tests are unaffected.
+                                        val turn = -rotation
                                         if (editingMode) {
                                             // In AR the overlay lives on the wall in meters, so convert
                                             // the screen-pixel drag to in-plane meters. Local +X on the
@@ -541,9 +548,9 @@ fun MainScreen(
                                                 val mpp = rendererRef.value?.currentMetersPerPixel ?: 0f
                                                 androidx.compose.ui.geometry.Offset(pan.x * mpp, -pan.y * mpp)
                                             } else pan
-                                            editorViewModel.onModeTransformGesture(uiState.editorMode, adjustedPan, zoom, rotation)
+                                            editorViewModel.onModeTransformGesture(uiState.editorMode, adjustedPan, zoom, turn)
                                         } else {
-                                            editorViewModel.onTransformGesture(pan, zoom, rotation)
+                                            editorViewModel.onTransformGesture(pan, zoom, turn)
                                         }
                                     }
                                 )
