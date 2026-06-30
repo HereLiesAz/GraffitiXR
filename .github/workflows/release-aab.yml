@@ -105,44 +105,12 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Resolve package name and bump versionCode (from version.properties)
+      - name: Resolve package name
         id: meta
         run: |
           # Read the applicationId straight from the build config (don't hardcode).
           PKG=$(grep -E 'applicationId\s*=' app/build.gradle.kts | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
           echo "package_name=$PKG" >> "$GITHUB_OUTPUT"
-
-          # versionBuild in version.properties IS the Android versionCode (single source of truth).
-          # Increment it here and, on a publish run, commit it back (see "Persist bumped versionCode")
-          # so every Play upload is strictly higher than the last. This replaces the old
-          # `git rev-list --count HEAD + 10000`, which was not unique per upload: a re-run, a second
-          # dispatch from the same HEAD, or building a non-tip commit all reproduced an already-used
-          # code (Play rejects with "Version code N has already been used").
-          CUR=$(grep -E '^versionBuild=' version.properties | cut -d'=' -f2 | tr -d '\r ')
-          VERSION_CODE=$(( CUR + 1 ))
-          sed -i -E "s/^versionBuild=.*/versionBuild=${VERSION_CODE}/" version.properties
-          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
-
-          # versionName patch also comes from version.properties.
-          VERSION_PATCH=$(grep -E '^versionPatch=' version.properties | cut -d'=' -f2 | tr -d '\r ')
-          echo "version_patch=$VERSION_PATCH" >> "$GITHUB_OUTPUT"
-          echo "Package: $PKG  versionCode: $VERSION_CODE  versionPatch: $VERSION_PATCH"
-
-      - name: Persist bumped versionCode
-        # Only on a real publish: commit the incremented version.properties back so the next upload is
-        # strictly higher. Done BEFORE the build/upload so a number is never re-used even if a later
-        # step fails (a skipped number is harmless; a duplicate is not). [skip ci] stops a re-trigger.
-        if: ${{ inputs.publish }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add version.properties
-          if git diff --cached --quiet; then
-            echo "version.properties unchanged — nothing to persist"
-          else
-            git commit -m "ci: bump versionBuild to ${{ steps.meta.outputs.version_code }} [skip ci]"
-            git push origin "HEAD:${{ github.ref_name }}"
-          fi
 
       - name: Build Release AAB (signed)
         env:
@@ -153,8 +121,26 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        # No -PversionBuild override: build.gradle.kts auto-increments versionBuild in
+        # version.properties on every build. The persist step below commits that bump back.
         run: |
-          ./gradlew bundleRelease -PversionBuild=${{ steps.meta.outputs.version_code }} -PversionPatch=${{ steps.meta.outputs.version_patch }}
+          ./gradlew bundleRelease
+
+      - name: Persist auto-incremented versionCode
+        # Commit the version.properties bump that the build just made, so the next release is strictly
+        # higher. Publish runs only; [skip ci] (and the push-trigger paths-ignore) stop a re-trigger.
+        if: ${{ inputs.publish }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add version.properties
+          if git diff --cached --quiet; then
+            echo "version.properties unchanged — nothing to persist"
+          else
+            NEW=$(grep -E '^versionBuild=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+            git commit -m "ci: versionBuild=${NEW} [skip ci]"
+            git push origin "HEAD:${{ github.ref_name }}"
+          fi
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v7

@@ -80,11 +80,9 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        # No -PversionBuild override: build.gradle.kts auto-increments versionBuild on every build.
         run: |
-          # versionCode comes from version.properties (versionBuild) — the single source of truth,
-          # bumped + persisted by the Play (AAB) workflow. This GitHub-release APK only reads it.
-          VERSION_BUILD=$(grep -E '^versionBuild=' version.properties | cut -d'=' -f2 | tr -d '\r ')
-          ./gradlew assembleRelease -PversionBuild=$VERSION_BUILD
+          ./gradlew assembleRelease
 
       - name: Prepare Release
         env:

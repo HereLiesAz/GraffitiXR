@@ -146,10 +146,9 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set +e
-          export BUILD_NUMBER=$(git rev-list --count HEAD)
 
           # Build the APK (signing comes from the env-driven signingConfigs.release in Gradle)
-          ./gradlew assembleDebug -PversionBuild=$BUILD_NUMBER --build-cache > build.log 2>&1
+          ./gradlew assembleDebug --build-cache > build.log 2>&1
 
           EXIT_CODE=$?
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
