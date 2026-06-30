@@ -34,14 +34,6 @@ val localProperties = Properties().apply {
 //   - versionPatch  -> the patch segment of the versionName. Increments each compile, but resets to
 //                      0 when versionMinor was bumped since the last build (a new minor starts at .0).
 //                      versionMinorLast tracks the minor we last built so that reset is automatic.
-// An explicit `-PversionBuild=<n>` override always wins (CI passes the incremented versionBuild read
-// from version.properties — see release-aab.yml, which also commits that value back so it persists);
-// when present we do NOT auto-increment or rewrite the file here, so the build uses exactly <n>.
-val versionBuildOverride = project.findProperty("versionBuild")?.toString()?.toIntOrNull()
-// Likewise `-PversionPatch=<n>` sets the versionName patch segment (CI passes version.properties'
-// versionPatch — see release-aab.yml). When EITHER override is present the file is left untouched.
-val versionPatchOverride = project.findProperty("versionPatch")?.toString()?.toIntOrNull()
-
 // True when the requested tasks actually compile/assemble the app — not a sync, `tasks`, `clean`,
 // a `--dry-run`, or a diagnostic like `buildEnvironment`/`buildHealth`. Build verbs are matched as a
 // prefix and the `build` lifecycle task exactly, so diagnostics that merely contain "build" don't trip it.
@@ -60,10 +52,10 @@ val verMinor = versionProps.getProperty("versionMinor", "0")
 val lastMinor = versionProps.getProperty("versionMinorLast", verMinor)
 val isMinorBumped = verMinor != lastMinor
 
-var currentVersionCode = versionBuildOverride ?: versionProps.getProperty("versionBuild", "1").toInt()
-var currentPatch = versionPatchOverride ?: if (isMinorBumped) 0 else versionProps.getProperty("versionPatch", "0").toInt()
+var currentVersionCode = versionProps.getProperty("versionBuild", "1").toInt()
+var currentPatch = if (isMinorBumped) 0 else versionProps.getProperty("versionPatch", "0").toInt()
 
-if (versionBuildOverride == null && versionPatchOverride == null && isBuilding) {
+if (isBuilding) {
     currentVersionCode++ // build never resets
     // A minor bump makes this build the new minor's .0; otherwise advance the patch.
     if (!isMinorBumped) currentPatch++
