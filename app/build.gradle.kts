@@ -34,13 +34,12 @@ val localProperties = Properties().apply {
 //   - versionPatch  -> the patch segment of the versionName. Increments each compile, but resets to
 //                      0 when versionMinor was bumped since the last build (a new minor starts at .0).
 //                      versionMinorLast tracks the minor we last built so that reset is automatic.
-// An explicit `-PversionBuild=<n>` override always wins (CI passes a monotonic value derived from the
-// git commit count — see release-aab.yml); when present we do NOT auto-increment or rewrite the file,
-// so the ephemeral CI checkout stays clean and Play receives exactly <n>.
+// An explicit `-PversionBuild=<n>` override always wins (CI passes the incremented versionBuild read
+// from version.properties — see release-aab.yml, which also commits that value back so it persists);
+// when present we do NOT auto-increment or rewrite the file here, so the build uses exactly <n>.
 val versionBuildOverride = project.findProperty("versionBuild")?.toString()?.toIntOrNull()
-// Likewise `-PversionPatch=<n>` sets the versionName patch segment (CI passes the commit count since
-// the last minor bump — see release-aab.yml) so the human-readable version advances per commit
-// without rewriting the file. When EITHER override is present the file is left untouched.
+// Likewise `-PversionPatch=<n>` sets the versionName patch segment (CI passes version.properties'
+// versionPatch — see release-aab.yml). When EITHER override is present the file is left untouched.
 val versionPatchOverride = project.findProperty("versionPatch")?.toString()?.toIntOrNull()
 
 // True when the requested tasks actually compile/assemble the app — not a sync, `tasks`, `clean`,

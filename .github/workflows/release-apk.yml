@@ -81,8 +81,10 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          export BUILD_NUMBER=$(git rev-list --count HEAD)
-          ./gradlew assembleRelease -PversionBuild=$BUILD_NUMBER
+          # versionCode comes from version.properties (versionBuild) — the single source of truth,
+          # bumped + persisted by the Play (AAB) workflow. This GitHub-release APK only reads it.
+          VERSION_BUILD=$(grep -E '^versionBuild=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          ./gradlew assembleRelease -PversionBuild=$VERSION_BUILD
 
       - name: Prepare Release
         env:
