@@ -189,6 +189,10 @@ void ImageWarper::applyLiquify(const std::vector<glm::vec2>& stroke, float brush
 
 void ImageWarper::draw(int viewportWidth, int viewportHeight) {
     std::lock_guard<std::mutex> lock(mMutex);
+    drawLocked(viewportWidth, viewportHeight);
+}
+
+void ImageWarper::drawLocked(int viewportWidth, int viewportHeight) {
     if (!mInitialized || !mTextureId) return;
 
     if (mMeshDirty) {
@@ -224,7 +228,9 @@ void ImageWarper::bakeToBitmap(uint8_t* outData) {
     if (!mFbo || !mOffscreenTexture) return;
 
     glBindFramebuffer(GL_FRAMEBUFFER, mFbo);
-    draw(mWidth, mHeight);
+    // drawLocked, not draw(): mMutex is already held and is non-recursive —
+    // calling the public draw() here deadlocked the GL thread on bake.
+    drawLocked(mWidth, mHeight);
 
     glReadPixels(0, 0, mWidth, mHeight, GL_RGBA, GL_UNSIGNED_BYTE, outData);
 

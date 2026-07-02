@@ -54,6 +54,45 @@ data class Fingerprint(
         result = 31 * result + markCenterLocal.hashCode()
         return result
     }
+
+    companion object {
+        /**
+         * FROZEN JNI ABI — `buildFingerprintObject` in GraffitiJNI.cpp constructs Fingerprints
+         * through [fromNative] by this exact name/descriptor. The raw constructor must never be
+         * used from JNI: Kotlin default parameters don't emit reduced-arity JVM overloads, so
+         * every field added to the data class silently broke the native lookup (twice now:
+         * patchData, then markCenterLocal) and setWallFingerprint returned null on every capture.
+         *
+         * Never change [fromNative]'s signature. Add new Fingerprint fields with defaults and,
+         * if native code must supply them, introduce a NEW factory with its own frozen descriptor.
+         * FingerprintJniContractTest asserts the descriptor below matches the compiled method.
+         */
+        const val JNI_FACTORY_NAME = "fromNative"
+        const val JNI_FACTORY_DESCRIPTOR =
+            "(Ljava/util/List;Ljava/util/List;[BIII[BLjava/util/List;)" +
+                "Lcom/hereliesaz/graffitixr/common/model/Fingerprint;"
+
+        @JvmStatic
+        fun fromNative(
+            keypoints: List<KeyPoint>,
+            points3d: List<Float>,
+            descriptorsData: ByteArray,
+            descriptorsRows: Int,
+            descriptorsCols: Int,
+            descriptorsType: Int,
+            patchData: ByteArray,
+            markCenterLocal: List<Float>,
+        ): Fingerprint = Fingerprint(
+            keypoints = keypoints,
+            points3d = points3d,
+            descriptorsData = descriptorsData,
+            descriptorsRows = descriptorsRows,
+            descriptorsCols = descriptorsCols,
+            descriptorsType = descriptorsType,
+            patchData = patchData,
+            markCenterLocal = markCenterLocal,
+        )
+    }
 }
 
 /** Value-equality for OpenCV KeyPoints (which compare by reference): all geometric fields match. */

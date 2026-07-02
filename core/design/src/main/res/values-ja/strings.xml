@@ -620,4 +620,7 @@
     <string name="tut_isolate_subject_text">AIを使用して自動的に背景を削除し、画像のメインの被写体のみを残します。</string>
     <string name="tut_best_results_title">最高の結果</string>
     <string name="tut_best_results_text">無地または対照的な背景に対して明確な被写体がある写真に最適です。背景が複雑なシーンでは、消しゴムを使用した手動のタッチアップが必要になる場合があります。</string>
+    <string name="settings_scan_mode_voxel_hash">ボクセルハッシュ</string>
+    <string name="settings_scan_mode_surface_mesh">サーフェスメッシュ</string>
+    <string name="settings_mural_method_label">ミューラルエンジン</string>
 </resources>

@@ -602,4 +602,7 @@
     <string name="tut_isolate_subject_text">Gebruikt AI om de achtergrond automatisch te verwijderen, waardoor alleen het hoofdonderwerp van de afbeelding overblijft.</string>
     <string name="tut_best_results_title">Beste resultaten</string>
     <string name="tut_best_results_text">Werkt het beste op foto\'s met een duidelijk onderwerp tegen een effen of contrasterende achtergrond. Complexe scènes met drukke achtergronden moeten mogelijk handmatig worden bijgewerkt met de gum.</string>
+    <string name="settings_scan_mode_voxel_hash">Voxel-hash</string>
+    <string name="settings_scan_mode_surface_mesh">Oppervlaktemesh</string>
+    <string name="settings_mural_method_label">Muurschildering-engine</string>
 </resources>

@@ -602,4 +602,7 @@
     <string name="tut_isolate_subject_text">A mesterséges intelligenciát használja a háttér automatikus eltávolítására, így csak a kép fő témája marad.</string>
     <string name="tut_best_results_title">Legjobb Eredmények</string>
     <string name="tut_best_results_text">A legjobban azokon a fotókon működik, amelyeken tiszta téma van sima vagy kontrasztos háttér előtt. A zsúfolt hátterű összetett jelenetek manuális javítást igényelhetnek a radírral.</string>
+    <string name="settings_scan_mode_voxel_hash">Voxel-hash</string>
+    <string name="settings_scan_mode_surface_mesh">Felületháló</string>
+    <string name="settings_mural_method_label">Falfestmény-motor</string>
 </resources>

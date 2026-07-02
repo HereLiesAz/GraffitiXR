@@ -602,4 +602,7 @@
     <string name="tut_isolate_subject_text">Använder AI för att automatiskt ta bort bakgrunden, vilket bara lämnar bildens huvudmotiv.</string>
     <string name="tut_best_results_title">Bästa resultat</string>
     <string name="tut_best_results_text">Fungerar bäst på foton med ett tydligt motiv mot en vanlig eller kontrasterande bakgrund. Komplexa scener med upptagen bakgrund kan behöva korrigeras manuellt med suddgummi.</string>
+    <string name="settings_scan_mode_voxel_hash">Voxel-hash</string>
+    <string name="settings_scan_mode_surface_mesh">Ytnät</string>
+    <string name="settings_mural_method_label">Väggmålningsmotor</string>
 </resources>

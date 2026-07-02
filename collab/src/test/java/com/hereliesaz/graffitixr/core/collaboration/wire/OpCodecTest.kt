@@ -10,8 +10,24 @@ class OpCodecTest {
 
     @Test
     fun `Hello round-trips`() {
-        val original = HelloPayload(token = "abc", clientVersion = 1, deviceName = "Pixel")
+        val original = HelloPayload(
+            guestNonce = ByteArray(16) { it.toByte() },
+            proof = ByteArray(32) { (it * 3).toByte() },
+            clientVersion = 2,
+            deviceName = "Pixel",
+        )
         assertEquals(original, OpCodec.decode<HelloPayload>(OpCodec.encode(original)))
+    }
+
+    @Test
+    fun `HelloOk round-trips`() {
+        val original = HelloOkPayload(
+            sessionId = "sid",
+            protocolVersion = 2,
+            hostNonce = ByteArray(16) { (it + 1).toByte() },
+            hostProof = ByteArray(32) { (it * 5).toByte() },
+        )
+        assertEquals(original, OpCodec.decode<HelloOkPayload>(OpCodec.encode(original)))
     }
 
     @Test

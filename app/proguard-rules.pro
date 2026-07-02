@@ -40,14 +40,17 @@
     native <methods>;
 }
 
-# Keep model classes constructed directly from native code via JNI NewObject.
-# R8 will otherwise strip primary constructors that have no Kotlin/Java
-# reachability — the native code calls them but R8 doesn't see those calls,
-# so it removes the constructor and `GetMethodID` returns null at runtime,
-# crashing with `JNI DETECTED ERROR IN APPLICATION: mid == null`.
+# Keep model classes constructed directly from native code via JNI.
+# R8 will otherwise strip members that have no Kotlin/Java reachability — the
+# native code calls them but R8 doesn't see those calls, so it removes them and
+# `GetMethodID`/`GetStaticMethodID` returns null at runtime, crashing with
+# `JNI DETECTED ERROR IN APPLICATION: mid == null`.
+# GraffitiJNI.cpp builds Fingerprints via the frozen static factory
+# Fingerprint.fromNative (see Fingerprint.JNI_FACTORY_DESCRIPTOR).
 -keep class com.hereliesaz.graffitixr.common.model.Fingerprint { *; }
 -keepclassmembers class com.hereliesaz.graffitixr.common.model.Fingerprint {
     <init>(...);
+    public static ** fromNative(...);
 }
 
 # General Safety for Native Methods

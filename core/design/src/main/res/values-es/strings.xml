@@ -602,4 +602,7 @@
     <string name="tut_isolate_subject_text">Utiliza IA para eliminar automáticamente el fondo, dejando solo el sujeto principal de la imagen.</string>
     <string name="tut_best_results_title">Mejores Resultados</string>
     <string name="tut_best_results_text">Funciona mejor en fotos con un sujeto claro sobre un fondo liso o contrastante. Las escenas complejas con fondos ocupados pueden necesitar retoques manuales con el borrador.</string>
+    <string name="settings_scan_mode_voxel_hash">Hash de vóxeles</string>
+    <string name="settings_scan_mode_surface_mesh">Malla de superficie</string>
+    <string name="settings_mural_method_label">Motor de mural</string>
 </resources>

@@ -620,4 +620,7 @@
     <string name="tut_isolate_subject_text">使用 AI 自动移除背景，仅保留图像的主要主体。</string>
     <string name="tut_best_results_title">最佳效果</string>
     <string name="tut_best_results_text">在具有清晰主体和纯色或对比色背景的照片上效果最佳。背景杂乱的复杂场景可能需要使用橡皮擦进行手动修饰。</string>
+    <string name="settings_scan_mode_voxel_hash">体素哈希</string>
+    <string name="settings_scan_mode_surface_mesh">表面网格</string>
+    <string name="settings_mural_method_label">壁画引擎</string>
 </resources>

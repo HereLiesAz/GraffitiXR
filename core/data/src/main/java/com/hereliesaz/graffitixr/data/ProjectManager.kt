@@ -49,6 +49,15 @@ class ProjectManager @Inject constructor(
         encodeDefaults = true
     }
 
+    companion object {
+        /**
+         * Cap on total decompressed bytes accepted from an imported/peer-received `.gxr` archive.
+         * Both sources are untrusted (a shared file, or the co-op wire), so a zip bomb must not
+         * be able to fill the app sandbox. Generous vs. real projects (multi-layer PNGs).
+         */
+        private const val MAX_IMPORT_BYTES = 512L * 1024 * 1024
+    }
+
     fun getProjectList(context: Context): List<String> {
         val projectsDir = File(context.filesDir, "projects")
         if (!projectsDir.exists()) return emptyList()
@@ -175,7 +184,13 @@ class ProjectManager @Inject constructor(
 
         return@withContext try {
             val jsonString = projectFile.readText()
-            val projectData = migrateIfNeeded(context, json.decodeFromString<GraffitiProject>(jsonString))
+            val decoded = json.decodeFromString<GraffitiProject>(jsonString)
+            val projectData = migrateInMemory(decoded)
+            if (projectData !== decoded) {
+                // Persist the migration only on a full load — loadProjectMetadata stays read-only.
+                saveProject(context, projectData)
+                Log.i("ProjectManager", "Migrated legacyVisuals for project ${projectData.id}")
+            }
 
             val targetBitmaps = projectData.targetImageUris.mapNotNull { uri ->
                 ImageUtils.loadBitmapSync(context, uri)
@@ -196,14 +211,21 @@ class ProjectManager @Inject constructor(
         return@withContext try {
             val jsonString = projectFile.readText()
             val project = json.decodeFromString<GraffitiProject>(jsonString)
-            migrateIfNeeded(context, project)
+            // In-memory migration only: this is a read path (dashboard listing) and must not
+            // write to disk — the persisted migration happens in loadProject.
+            migrateInMemory(project)
         } catch (e: Exception) {
             Log.e("ProjectManager", "Failed to load project metadata", e)
             null
         }
     }
 
-    private suspend fun migrateIfNeeded(context: Context, project: GraffitiProject): GraffitiProject {
+    /**
+     * Applies the legacyVisuals→layers migration purely in memory. Returns [project] itself
+     * (same reference) when no migration is needed, so callers can detect change by identity
+     * and decide whether to persist.
+     */
+    private fun migrateInMemory(project: GraffitiProject): GraffitiProject {
         val lv = project.legacyVisuals
         val defaults = LegacyVisuals()
         if (lv == defaults) return project
@@ -252,10 +274,7 @@ class ProjectManager @Inject constructor(
             else -> project.layers
         }
 
-        val migrated = project.copy(layers = migratedLayers, legacyVisuals = defaults)
-        saveProject(context, migrated)
-        Log.i("ProjectManager", "Migrated legacyVisuals for project ${project.id}")
-        return migrated
+        return project.copy(layers = migratedLayers, legacyVisuals = defaults)
     }
 
     private fun OverlayLayer.hasDefaultVisuals(): Boolean {
@@ -281,11 +300,14 @@ class ProjectManager @Inject constructor(
     }
 
     suspend fun importProjectFromUri(context: Context, uri: Uri): GraffitiProject? = withContext(Dispatchers.IO) {
+        var extractedFiles: Map<String, File> = emptyMap()
         return@withContext try {
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
                 ZipInputStream(inputStream).use { zis ->
                     var projectData: GraffitiProject? = null
-                    val extractedFiles = mutableMapOf<String, File>()
+                    val extracted = mutableMapOf<String, File>()
+                    extractedFiles = extracted
+                    var totalBytes = 0L
 
                     var entry = zis.nextEntry
                     while (entry != null) {
@@ -294,6 +316,11 @@ class ProjectManager @Inject constructor(
 
                         if (!entry.isDirectory && relativeName.isNotEmpty()) {
                             val bytes = zis.readBytes()
+                            totalBytes += bytes.size
+                            if (totalBytes > MAX_IMPORT_BYTES) {
+                                Log.e("ProjectManager", "Import aborted: archive exceeds $MAX_IMPORT_BYTES bytes")
+                                return@use null
+                            }
                             if (relativeName == "project.json") {
                                 try {
                                     projectData = json.decodeFromString<GraffitiProject>(bytes.decodeToString())
@@ -301,7 +328,7 @@ class ProjectManager @Inject constructor(
                                     Log.e("ProjectManager", "Failed to parse project.json", e)
                                 }
                             }
-                            extractedFiles[relativeName] = File.createTempFile("gxr_", null, context.cacheDir).also {
+                            extracted[relativeName] = File.createTempFile("gxr_", null, context.cacheDir).also {
                                 it.writeBytes(bytes)
                             }
                         }
@@ -310,10 +337,22 @@ class ProjectManager @Inject constructor(
                     }
 
                     val project = projectData ?: return@use null
+                    // project.id comes from the (untrusted) archive and becomes a path segment.
+                    if (!isSafeProjectId(project.id)) {
+                        Log.e("ProjectManager", "Import rejected: unsafe project id")
+                        return@use null
+                    }
                     val destDir = File(context.filesDir, "projects/${project.id}").also { it.mkdirs() }
 
-                    for ((name, tmpFile) in extractedFiles) {
-                        val dest = File(destDir, name)
+                    for ((name, tmpFile) in extracted) {
+                        // Zip-Slip guard: entry names are attacker-controlled and may contain
+                        // ".." components that escape destDir.
+                        val dest = resolveInside(destDir, name)
+                        if (dest == null) {
+                            Log.w("ProjectManager", "Skipping zip entry escaping project dir: $name")
+                            tmpFile.delete()
+                            continue
+                        }
                         dest.parentFile?.mkdirs()
                         // renameTo can silently fail across filesystems (cache vs files dir) or when
                         // the destination exists — fall back to an explicit copy so an imported
@@ -331,8 +370,28 @@ class ProjectManager @Inject constructor(
         } catch (e: Exception) {
             Log.e("ProjectManager", "Import failed", e)
             null
+        } finally {
+            // Temp files are only renamed away on the success path; clear any stragglers.
+            extractedFiles.values.forEach { if (it.exists()) it.delete() }
         }
     }
+
+    /**
+     * Resolves [entryName] to a file under [destDir], or null if the name (via ".." components,
+     * absolute paths, etc.) would escape it — the Zip-Slip attack. Canonical-path prefix check.
+     */
+    private fun resolveInside(destDir: File, entryName: String): File? {
+        val candidate = File(destDir, entryName)
+        val canonical = candidate.canonicalPath
+        return if (canonical.startsWith(destDir.canonicalPath + File.separator)) candidate else null
+    }
+
+    /**
+     * Project ids become a path segment under filesDir/projects; ids parsed out of imported or
+     * peer-received archives must not be able to traverse out of it.
+     */
+    private fun isSafeProjectId(id: String): Boolean =
+        id.isNotEmpty() && id.length <= 128 && id.all { it.isLetterOrDigit() || it == '_' || it == '-' }
 
     private fun ComposeBlendMode.toModelBlendMode(): ModelBlendMode = when (this) {
         ComposeBlendMode.Multiply   -> ModelBlendMode.Multiply
@@ -400,12 +459,18 @@ class ProjectManager @Inject constructor(
                 ZipInputStream(bytes.inputStream()).use { zis ->
                     var projectData: GraffitiProject? = null
                     val extractedFiles = mutableMapOf<String, ByteArray>()
+                    var totalBytes = 0L
 
                     var entry = zis.nextEntry
                     while (entry != null) {
                         val name = entry.name
                         if (!entry.isDirectory && name.isNotEmpty()) {
                             val fileBytes = zis.readBytes()
+                            totalBytes += fileBytes.size
+                            if (totalBytes > MAX_IMPORT_BYTES) {
+                                Log.e("ProjectManager", "Spectator load aborted: archive exceeds $MAX_IMPORT_BYTES bytes")
+                                return@use
+                            }
                             if (name == "project.json") {
                                 projectData = json.decodeFromString<GraffitiProject>(fileBytes.decodeToString())
                             }
@@ -416,10 +481,19 @@ class ProjectManager @Inject constructor(
                     }
 
                     val project = projectData ?: return@use
+                    // The archive arrived over the co-op wire — id and entry names are untrusted.
+                    if (!isSafeProjectId(project.id)) {
+                        Log.e("ProjectManager", "Spectator load rejected: unsafe project id")
+                        return@use
+                    }
                     val destDir = File(context.filesDir, "projects/${project.id}").also { it.mkdirs() }
 
                     for ((name, fileBytes) in extractedFiles) {
-                        val dest = File(destDir, name)
+                        val dest = resolveInside(destDir, name)
+                        if (dest == null) {
+                            Log.w("ProjectManager", "Skipping zip entry escaping project dir: $name")
+                            continue
+                        }
                         dest.parentFile?.mkdirs()
                         dest.writeBytes(fileBytes)
                     }

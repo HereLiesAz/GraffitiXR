@@ -13,7 +13,12 @@ internal enum class FrameType(val code: Byte) {
     DELTA_ACK(0x31),
     PING(0x40),
     PONG(0x41),
-    BYE(0x50);
+    BYE(0x50),
+
+    // Encrypted envelope. After the handshake, every frame in both directions is an ENC frame
+    // whose payload is an AES-256-GCM sealed inner frame (see SessionCrypto). The plaintext
+    // handshake frames above (HELLO / HELLO_OK / HELLO_REJECTED) are the only exceptions.
+    ENC(0x60);
 
     companion object {
         private val byCode = entries.associateBy { it.code }

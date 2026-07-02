@@ -127,7 +127,12 @@ jobs:
           FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
           cache-read-only: false
-          dependency-graph: true
+          # The unit-tests job already generates, submits and uploads the dependency graph for
+          # this commit; keep it disabled here so the build job doesn't submit a duplicate.
+          # 'true' is not a valid value for setup-gradle@v6 (enum: disabled / generate /
+          # generate-and-submit / generate-submit-and-upload / generate-and-upload /
+          # download-and-submit), which failed the action before the build could start.
+          dependency-graph: disabled
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew

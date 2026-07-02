@@ -602,4 +602,7 @@
     <string name="tut_isolate_subject_text">Использует искусственный интеллект для автоматического удаления фона, оставляя только основной объект изображения.</string>
     <string name="tut_best_results_title">Лучшие результаты</string>
     <string name="tut_best_results_text">Лучше всего работает на фотографиях с четким объектом на однотонном или контрастном фоне. </string>
+    <string name="settings_scan_mode_voxel_hash">Воксельный хеш</string>
+    <string name="settings_scan_mode_surface_mesh">Поверхностная сетка</string>
+    <string name="settings_mural_method_label">Движок мурала</string>
 </resources>

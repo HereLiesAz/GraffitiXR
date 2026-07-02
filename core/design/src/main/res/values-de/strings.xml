@@ -602,4 +602,7 @@
     <string name="tut_isolate_subject_text">Verwendet KI, um den Hintergrund automatisch zu entfernen und nur das Hauptmotiv des Bildes zu hinterlassen.</string>
     <string name="tut_best_results_title">Beste Ergebnisse</string>
     <string name="tut_best_results_text">Funktioniert am besten bei Fotos mit einem klaren Motiv vor einem einfachen oder kontrastierenden Hintergrund. Komplexe Szenen mit unruhigen Hintergründen erfordern möglicherweise manuelle Nachbesserungen mit dem Radiergummi.</string>
+    <string name="settings_scan_mode_voxel_hash">Voxel-Hash</string>
+    <string name="settings_scan_mode_surface_mesh">Oberflächennetz</string>
+    <string name="settings_mural_method_label">Mural-Engine</string>
 </resources>
