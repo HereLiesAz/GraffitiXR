@@ -436,7 +436,8 @@ class MainActivity : ComponentActivity() {
                 }
 
                 LaunchedEffect(arViewModel, editorViewModel) {
-                    arViewModel.spectatorOpHandler = { op -> editorViewModel.applySpectatorOp(op) }
+                    // Also flushes, in order, any spectator ops that arrived before this effect ran.
+                    arViewModel.setSpectatorOpHandler { op -> editorViewModel.applySpectatorOp(op) }
                 }
 
                 val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->

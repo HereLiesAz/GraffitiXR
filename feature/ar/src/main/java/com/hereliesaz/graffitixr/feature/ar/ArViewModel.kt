@@ -95,11 +95,46 @@ class ArViewModel @Inject constructor(
     val hostQrPayload: StateFlow<String?> = _hostQrPayload
 
     /**
-     * Set by MainActivity to route incoming spectator Ops to EditorViewModel
-     * without ArViewModel knowing about the editor module. Avoids the
-     * ViewModel-of-ViewModel anti-pattern.
+     * Routes incoming spectator Ops to EditorViewModel without ArViewModel knowing about the
+     * editor module (avoids the ViewModel-of-ViewModel anti-pattern). Set by MainActivity via
+     * [setSpectatorOpHandler].
+     *
+     * Ops that arrive before the handler is wired (the host can start emitting deltas the moment
+     * the guest connects, while the handler is assigned from a Compose LaunchedEffect) are held
+     * in [pendingSpectatorOps] and replayed in order once the handler lands — they used to be
+     * logged and permanently dropped, silently desyncing the guest canvas.
      */
-    @Volatile var spectatorOpHandler: ((com.hereliesaz.graffitixr.common.model.Op) -> Unit)? = null
+    @Volatile private var spectatorOpHandler: ((com.hereliesaz.graffitixr.common.model.Op) -> Unit)? = null
+
+    // Guarded by synchronized(pendingSpectatorOps). Bounded so early LayerBitmapReplace payloads
+    // can't pin unbounded memory if the handler never arrives.
+    private val pendingSpectatorOps = ArrayDeque<com.hereliesaz.graffitixr.common.model.Op>()
+    private val MAX_PENDING_SPECTATOR_OPS = 128
+
+    fun setSpectatorOpHandler(handler: (com.hereliesaz.graffitixr.common.model.Op) -> Unit) {
+        val backlog: List<com.hereliesaz.graffitixr.common.model.Op>
+        synchronized(pendingSpectatorOps) {
+            spectatorOpHandler = handler
+            backlog = pendingSpectatorOps.toList()
+            pendingSpectatorOps.clear()
+        }
+        backlog.forEach(handler)
+    }
+
+    /** Invokes the handler, or buffers the op (drop-oldest past the cap) until one is wired. */
+    private fun dispatchSpectatorOp(op: com.hereliesaz.graffitixr.common.model.Op) {
+        val handler = synchronized(pendingSpectatorOps) {
+            spectatorOpHandler ?: run {
+                if (pendingSpectatorOps.size >= MAX_PENDING_SPECTATOR_OPS) {
+                    pendingSpectatorOps.removeFirst()
+                    android.util.Log.w("ArViewModel", "Pending spectator op buffer full — dropping oldest")
+                }
+                pendingSpectatorOps.addLast(op)
+                null
+            }
+        }
+        handler?.invoke(op)
+    }
 
     // ── Glasses session state ─────────────────────────────────────────────────
     private val _glassesSessionState: MutableStateFlow<GlassesSessionState> =
@@ -173,11 +208,7 @@ class ArViewModel @Inject constructor(
                         slamManager.alignToPeer(fingerprint)
                         projectManager.loadAsSpectator(project)
                     },
-                    onOp = { op ->
-                        val handler = spectatorOpHandler
-                        if (handler != null) handler(op)
-                        else android.util.Log.w("ArViewModel", "Spectator op dropped — handler not wired yet: $op")
-                    },
+                    onOp = { op -> dispatchSpectatorOp(op) },
                 )
                 _uiState.update { it.copy(coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) }
                 observeCoopState()

@@ -13,6 +13,7 @@ import com.hereliesaz.graffitixr.core.collaboration.wire.FrameType
 import com.hereliesaz.graffitixr.core.collaboration.wire.HelloOkPayload
 import com.hereliesaz.graffitixr.core.collaboration.wire.HelloPayload
 import com.hereliesaz.graffitixr.core.collaboration.wire.HelloRejectedPayload
+import com.hereliesaz.graffitixr.core.collaboration.wire.Limits
 import com.hereliesaz.graffitixr.core.collaboration.wire.OpCodec
 import com.hereliesaz.graffitixr.core.collaboration.wire.PingPayload
 import kotlinx.coroutines.CoroutineScope
@@ -21,7 +22,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -46,16 +46,36 @@ internal class HostSession(
     private val projectBytes: ByteArray,
     private val projectId: String,
     private val layerCount: Int,
-    private val opSizeEstimator: (Op) -> Int = { 256 }, // heuristic for DeltaBuffer accounting
 ) : Session() {
 
+    init {
+        // The guest rejects bulk transfers above this cap with a bare require() that surfaces as
+        // an unexplained NetworkLost on its side; failing fast here turns an oversized project
+        // into an immediate, attributable hosting error instead.
+        require(projectBytes.size <= Limits.MAX_BULK_BYTES && fingerprintBytes.size <= Limits.MAX_BULK_BYTES) {
+            "project too large to host: ${projectBytes.size}B project / ${fingerprintBytes.size}B fingerprint " +
+                "(cap ${Limits.MAX_BULK_BYTES}B)"
+        }
+    }
+
+    /** An op with its sequence number and wire encoding, fixed at enqueue time. */
+    private class EncodedDelta(val seq: Long, val bytes: ByteArray)
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    // Bounded so a stalled guest can't make the host buffer ops without limit (OOM) — important now
-    // that LayerBitmapReplace ops can be large. On sustained overflow the oldest unsent ops are
-    // dropped (the guest can rejoin for a fresh snapshot) rather than exhausting memory.
-    private val outQueue: Channel<Op> = Channel(capacity = 128, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    // Unbounded channel, but NOT unbounded memory: every element is appended to deltaBuffer
+    // first (real encoded size), whose 5 MB / 1000-op cap ends the session on overflow. The
+    // previous design (bounded 128 + DROP_OLDEST, seq assigned at send time) silently discarded
+    // ops that overflowed during a reconnect window before they ever reached the DeltaBuffer,
+    // so the guest's canvas diverged with no signal.
+    private val outQueue: Channel<EncodedDelta> = Channel(capacity = Channel.UNLIMITED)
     private val deltaBuffer = DeltaBuffer()
     private val seqCounter = AtomicLong(0L)
+    // Orders seq assignment with channel insertion so send order always matches seq order.
+    private val enqueueLock = Any()
+    // Guards the check-then-set phase transition in enterReconnecting(): outbound, inbound and
+    // heartbeat loops can all fail at once, and without the lock each would pass the phase check
+    // and launch its own 30s reconnect watcher.
+    private val phaseLock = Any()
 
     private val sessionId: String = UUID.randomUUID().toString()
 
@@ -93,9 +113,30 @@ internal class HostSession(
         ss.localPort
     }
 
-    /** Enqueue an Op to be sent to the connected guest. No-op if no guest. */
+    /**
+     * Enqueue an Op to be sent to the guest. Seq assignment, wire encoding and DeltaBuffer
+     * accounting all happen here, atomically, so every accepted op is replayable after a
+     * reconnect — nothing can be dropped between enqueue and send anymore. On DeltaBuffer
+     * overflow (guest too far behind / no guest draining) the session ends explicitly rather
+     * than diverging silently.
+     *
+     * Encoding runs on the caller's thread; ops carrying large payloads (LayerBitmapReplace)
+     * should be enqueued from a background dispatcher, which OpEmitterImpl's editor call sites
+     * already do.
+     */
     fun enqueueOp(op: Op) {
-        outQueue.trySend(op)
+        if (phase == Phase.Ended) return
+        synchronized(enqueueLock) {
+            val seq = seqCounter.incrementAndGet()
+            val bytes = OpCodec.encode(DeltaPayload(seq, op))
+            if (!deltaBuffer.append(seq, op, bytes.size)) {
+                // Cap exceeded: a future reconnect could not replay without a gap, so end the
+                // session per DeltaBuffer's contract rather than diverge silently.
+                scope.launch { close(CoopSessionState.EndReason.NetworkLost) }
+                return
+            }
+            outQueue.trySend(EncodedDelta(seq, bytes))
+        }
     }
 
     private suspend fun acceptLoop(ss: ServerSocket) {
@@ -107,11 +148,24 @@ internal class HostSession(
                 _state.value = CoopSessionState.Ended(CoopSessionState.EndReason.NetworkLost)
                 return
             }
-            handleConnection(socket)
+            // A failed handshake (peer vanished mid-HELLO, garbage payload, write error) must
+            // never kill this loop: before this guard, a single flaky or hostile client
+            // permanently disabled hosting and leaked its socket.
+            try {
+                handleConnection(socket)
+            } catch (e: Exception) {
+                if (clientSocket !== socket) {
+                    try { socket.close() } catch (_: Exception) {}
+                }
+            }
         }
     }
 
     private suspend fun handleConnection(socket: Socket) {
+        // Bound every read on this connection (handshake and live). Guests ack every 1s and
+        // answer PINGs sent every 5s, so 15s of silence means a dead/half-open peer — without
+        // this, Frame.read blocks forever and a vanished guest is never detected.
+        socket.soTimeout = READ_TIMEOUT_MS
         val input = socket.getInputStream()
         val output = socket.getOutputStream()
 
@@ -122,7 +176,9 @@ internal class HostSession(
         }
         val hello = OpCodec.decode<HelloPayload>(helloFrame.payload)
 
-        if (hello.token != token) {
+        // Constant-time comparison: String.equals short-circuits on the first differing byte,
+        // which leaks token prefix length as a timing side channel.
+        if (!java.security.MessageDigest.isEqual(hello.token.toByteArray(), token.toByteArray())) {
             Frame.write(
                 output,
                 FrameType.HELLO_REJECTED,
@@ -164,7 +220,10 @@ internal class HostSession(
         lastAppliedSeq = hello.lastAppliedSeq
 
         if (isReconnect) {
-            // Replay buffered deltas after lastAppliedSeq.
+            // Replay buffered deltas after lastAppliedSeq. Since seqs are assigned at enqueue,
+            // this may overlap ops still sitting unsent in outQueue; the guest's monotonic
+            // `seq > lastAppliedSeq` filter makes the duplicates harmless, and this replay
+            // completes before the live outbound loop starts, so ordering holds.
             deltaBuffer.opsAfter(lastAppliedSeq).forEach { (seq, op) ->
                 Frame.write(
                     output,
@@ -224,19 +283,14 @@ internal class HostSession(
     }
 
     private suspend fun outboundLoop(output: OutputStream) {
-        for (op in outQueue) {
-            val seq = seqCounter.incrementAndGet()
-            val payload = OpCodec.encode(DeltaPayload(seq, op))
-            if (!deltaBuffer.append(seq, op, opSizeEstimator(op))) {
-                // Buffer cap exceeded: a future reconnect could not replay without a gap,
-                // so end the session per DeltaBuffer's contract rather than diverge silently.
-                close(CoopSessionState.EndReason.NetworkLost)
-                return
-            }
+        // Seq/encoding/DeltaBuffer accounting all happened in enqueueOp; this loop only ships
+        // the pre-encoded frames.
+        for (delta in outQueue) {
             try {
-                writeFrame(output, FrameType.DELTA, payload)
+                writeFrame(output, FrameType.DELTA, delta.bytes)
             } catch (e: Exception) {
-                // Connection broken; enter reconnecting.
+                // Connection broken; enter reconnecting. The op stays in deltaBuffer and is
+                // replayed to the reconnecting guest from there.
                 enterReconnecting()
                 return
             }
@@ -284,8 +338,12 @@ internal class HostSession(
     }
 
     private fun enterReconnecting() {
-        if (phase == Phase.Reconnecting || phase == Phase.Ended) return
-        phase = Phase.Reconnecting
+        // Atomic check-then-set: concurrent failures in the outbound/inbound/heartbeat loops
+        // must collapse into a single transition (and a single 30s timeout watcher below).
+        synchronized(phaseLock) {
+            if (phase == Phase.Reconnecting || phase == Phase.Ended) return
+            phase = Phase.Reconnecting
+        }
         _state.value = CoopSessionState.Reconnecting
         val old = clientSocket
         clientSocket = null
@@ -311,6 +369,13 @@ internal class HostSession(
             Frame.write(output, FrameType.BYE, OpCodec.encode(ByePayload(reason)))
             output.flush()
         } catch (_: Exception) { /* socket may already be closed */ }
+    }
+
+    private companion object {
+        // Guests ack every 1s and answer 5s PINGs, so 15s of read silence means a dead or
+        // half-open peer. Also bounds handshake reads in handleConnection, so a stalled
+        // client can block the accept loop for at most this long.
+        const val READ_TIMEOUT_MS = 15_000
     }
 
     override suspend fun close(reason: CoopSessionState.EndReason) {

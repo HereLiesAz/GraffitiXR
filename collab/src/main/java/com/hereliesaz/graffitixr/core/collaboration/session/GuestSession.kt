@@ -27,9 +27,13 @@ internal class GuestSession(
 ) : Session() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var sessionId: String? = null
+    @Volatile private var sessionId: String? = null
     @Volatile private var lastAppliedSeq: Long = 0L
     private var socket: Socket? = null
+    // Guards the check-then-set phase transition in attemptReconnect(): the inbound loop and a
+    // failed PONG write can race into it, and without the lock each would run its own full
+    // reconnect loop against the same host.
+    private val phaseLock = Any()
 
     // Serializes writes to the host: the inbound loop (PONG) and the periodic DELTA_ACK loop
     // both write to the same OutputStream, so without this lock their frames interleave.
@@ -65,6 +69,10 @@ internal class GuestSession(
             // the local would leak one FD per failed attempt across the reconnect loop.
             socket = s
             s.connect(java.net.InetSocketAddress(host, port), 5000)
+            // Bound every read (handshake, bulk, live). The host sends PING every 5s, so 15s of
+            // silence means a dead/half-open host — without this, Frame.read blocks forever and
+            // the reconnect path never triggers.
+            s.soTimeout = READ_TIMEOUT_MS
             val input = s.getInputStream()
             val output = s.getOutputStream()
 
@@ -87,6 +95,18 @@ internal class GuestSession(
             when (response.type) {
                 FrameType.HELLO_OK -> {
                     val helloOk = OpCodec.decode<HelloOkPayload>(response.payload)
+                    if (isReconnect && sessionId != null && helloOk.sessionId != sessionId) {
+                        // The host restarted with a fresh session (new seq space and empty
+                        // DeltaBuffer): resuming with our lastAppliedSeq would make the host
+                        // replay nothing and leave this guest silently desynced. Reset local
+                        // resume state and fail this attempt — the reconnect loop retries as a
+                        // fresh join (lastAppliedSeq == 0), which triggers a full bulk re-sync.
+                        sessionId = null
+                        lastAppliedSeq = 0L
+                        try { s.close() } catch (_: Exception) {}
+                        socket = null
+                        return false
+                    }
                     sessionId = helloOk.sessionId
                     if (!isReconnect) {
                         receiveBulk(input, output)
@@ -140,17 +160,23 @@ internal class GuestSession(
 
     private fun receiveChunked(input: InputStream, expectedType: FrameType, totalBytes: Int): ByteArray {
         // totalBytes is peer-declared: reject negative/absurd sizes before allocating
-        // (NegativeArraySize / OOM), and never copy past the declared end even if a chunk
-        // overshoots (ArrayIndexOutOfBounds).
-        require(totalBytes in 0..MAX_BULK_BYTES) { "invalid bulk size $totalBytes" }
+        // (NegativeArraySize / OOM).
+        require(totalBytes in 0..Limits.MAX_BULK_BYTES) { "invalid bulk size $totalBytes" }
         val buffer = ByteArray(totalBytes)
         var offset = 0
         while (offset < totalBytes) {
             val frame = Frame.read(input) ?: error("EOF mid-bulk")
             require(frame.type == expectedType) { "expected $expectedType, got ${frame.type}" }
-            val len = minOf(frame.payload.size, totalBytes - offset)
-            System.arraycopy(frame.payload, 0, buffer, offset, len)
-            offset += len
+            // A chunk running past the declared size means the stream is misaligned with the
+            // BULK_BEGIN header; silently truncating (the old minOf clamp) would desync every
+            // subsequent frame boundary. Fail the transfer instead.
+            if (frame.payload.size > totalBytes - offset) {
+                throw java.io.IOException(
+                    "bulk chunk overruns declared size: ${frame.payload.size} > ${totalBytes - offset} remaining",
+                )
+            }
+            System.arraycopy(frame.payload, 0, buffer, offset, frame.payload.size)
+            offset += frame.payload.size
         }
         return buffer
     }
@@ -204,8 +230,12 @@ internal class GuestSession(
     }
 
     private suspend fun attemptReconnect() {
-        if (phase == Phase.Ended) return
-        phase = Phase.Reconnecting
+        // Atomic check-then-set: the inbound loop and a failed PONG write can both land here;
+        // only the first caller may run the reconnect loop.
+        synchronized(phaseLock) {
+            if (phase == Phase.Reconnecting || phase == Phase.Ended) return
+            phase = Phase.Reconnecting
+        }
         _state.value = CoopSessionState.Reconnecting
         try { socket?.close() } catch (_: Exception) {}
         socket = null
@@ -214,8 +244,9 @@ internal class GuestSession(
             delay(reconnectIntervalMs)
             // connectLoop returns true only once the live phase is running again. (It no longer
             // throws, so the previous single-shot try/return bug — which gave up after one
-            // attempt — is gone.)
-            if (connectLoop(isReconnect = true)) return
+            // attempt — is gone.) isReconnect follows lastAppliedSeq so that a sessionId-mismatch
+            // reset (see connectLoop) downgrades the next attempt to a fresh full join.
+            if (connectLoop(isReconnect = lastAppliedSeq > 0L)) return
             // A terminal rejection during reconnect already closed the session.
             if (phase == Phase.Ended) return
         }
@@ -230,7 +261,8 @@ internal class GuestSession(
     }
 
     private companion object {
-        // Generous cap on a full project bulk transfer; rejects malformed/hostile declared sizes.
-        const val MAX_BULK_BYTES = 256 * 1024 * 1024
+        // The host sends PING every 5s (plus deltas), so 15s of read silence means a dead or
+        // half-open host. Mirrors HostSession.READ_TIMEOUT_MS.
+        const val READ_TIMEOUT_MS = 15_000
     }
 }
