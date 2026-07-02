@@ -602,4 +602,7 @@
     <string name="tut_isolate_subject_text">利用AI自動去除背景，只留下影像的主要主體。</string>
     <string name="tut_best_results_title">最佳結果</string>
     <string name="tut_best_results_text">最適合拍攝主題清晰、背景簡單或對比鮮明的照片。背景複雜的複雜場景可能需要使用橡皮擦進行手動修飾。</string>
+    <string name="settings_scan_mode_voxel_hash">體素雜湊</string>
+    <string name="settings_scan_mode_surface_mesh">表面網格</string>
+    <string name="settings_mural_method_label">壁畫引擎</string>
 </resources>

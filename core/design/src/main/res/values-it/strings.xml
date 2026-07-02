@@ -602,4 +602,7 @@
     <string name="tut_isolate_subject_text">Usa l\'IA per rimuovere automaticamente lo sfondo, lasciando solo il soggetto principale dell\'immagine.</string>
     <string name="tut_best_results_title">Migliori Risultati</string>
     <string name="tut_best_results_text">Funziona meglio su foto con un soggetto chiaro su uno sfondo liscio o contrastante. Scene complesse con sfondi disordinati potrebbero richiedere ritocchi manuali con la gomma.</string>
+    <string name="settings_scan_mode_voxel_hash">Voxel hash</string>
+    <string name="settings_scan_mode_surface_mesh">Mesh di superficie</string>
+    <string name="settings_mural_method_label">Motore murale</string>
 </resources>

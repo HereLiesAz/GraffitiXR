@@ -35,7 +35,8 @@ buildscript {
     )
 
     // Protobuf is intentionally pinned to TWO different versions: the buildscript classpath needs
-    // 3.25.5 for AGP 9.0.1, while the application runtime needs the 4.x line for security fixes.
+    // 3.25.5 for the current AGP (see gradle/libs.versions.toml), while the application runtime
+    // needs the 4.x line for security fixes.
     // These are named (not inline literals) so the split is explicit in one place and a future edit
     // can't silently collide them. See the resolutionStrategy blocks below and in allprojects.
     val protobufBuildscriptVersion = "3.25.5"
@@ -58,7 +59,7 @@ buildscript {
         resolutionStrategy {
             // Force common dependencies
             commonForcedDependencies.forEach { force(it) }
-            // AGP 9.0.1 requires Protobuf 3.25.5 in the buildscript classpath
+            // The current AGP requires Protobuf 3.25.5 in the buildscript classpath
             protobufModules.forEach { force("$it:$protobufBuildscriptVersion") }
         }
     }

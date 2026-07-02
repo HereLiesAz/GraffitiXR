@@ -602,4 +602,7 @@
     <string name="tut_isolate_subject_text">Bruker AI for automatisk å fjerne bakgrunnen, og etterlater bare hovedmotivet i bildet.</string>
     <string name="tut_best_results_title">Beste resultater</string>
     <string name="tut_best_results_text">Fungerer best på bilder med et klart motiv mot en vanlig eller kontrastfylt bakgrunn. Komplekse scener med opptatt bakgrunn kan trenge manuelle bearbeiding med viskelæret.</string>
+    <string name="settings_scan_mode_voxel_hash">Voxel-hash</string>
+    <string name="settings_scan_mode_surface_mesh">Overflatenett</string>
+    <string name="settings_mural_method_label">Veggmaleri-motor</string>
 </resources>

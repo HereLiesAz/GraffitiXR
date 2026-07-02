@@ -106,4 +106,7 @@
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Maquette d\'arrière-plan</string>
     <string name="desc_segmentation_preview">Aperçu de la segmentation</string>
+    <string name="settings_scan_mode_voxel_hash">Hachage de voxels</string>
+    <string name="settings_scan_mode_surface_mesh">Maillage de surface</string>
+    <string name="settings_mural_method_label">Moteur de fresque</string>
 </resources>

@@ -602,4 +602,7 @@
     <string name="tut_isolate_subject_text">Usa IA para remover automaticamente o fundo, deixando apenas o objeto principal da imagem.</string>
     <string name="tut_best_results_title">Melhores Resultados</string>
     <string name="tut_best_results_text">Funciona melhor em fotos com um objeto nítido em um fundo liso ou contrastante. Cenas complexas com fundos muito detalhados podem precisar de retoques manuais com a borracha.</string>
+    <string name="settings_scan_mode_voxel_hash">Hash de voxels</string>
+    <string name="settings_scan_mode_surface_mesh">Malha de superfície</string>
+    <string name="settings_mural_method_label">Motor de mural</string>
 </resources>
