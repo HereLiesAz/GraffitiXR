@@ -893,8 +893,10 @@ jobject buildFingerprintObject(JNIEnv* env, const MobileGS::FingerprintData& fd)
     jmethodID kpCtor = env->GetMethodID(kpClass, "<init>", "(FFFFFII)V");
     if (!kpCtor) return bail("KeyPoint ctor");
     jobject kpList = env->NewObject(listClass, listCtor, (jint)fd.keypoints.size());
+    if (!kpList) return bail("keypoint list alloc");
     for (const auto& kp : fd.keypoints) {
         jobject jkp = env->NewObject(kpClass, kpCtor, kp.pt.x, kp.pt.y, kp.size, kp.angle, kp.response, (jint)kp.octave, (jint)kp.class_id);
+        if (!jkp) return bail("KeyPoint alloc");
         env->CallBooleanMethod(kpList, addMethod, jkp);
         env->DeleteLocalRef(jkp);
     }
@@ -905,8 +907,10 @@ jobject buildFingerprintObject(JNIEnv* env, const MobileGS::FingerprintData& fd)
     jmethodID floatCtor = env->GetMethodID(floatClass, "<init>", "(F)V");
     if (!floatCtor) return bail("Float(f) ctor");
     jobject ptsList = env->NewObject(listClass, listCtor, (jint)fd.points3d.size());
+    if (!ptsList) return bail("points3d list alloc");
     for (float f : fd.points3d) {
         jobject jf = env->NewObject(floatClass, floatCtor, f);
+        if (!jf) return bail("Float alloc");
         env->CallBooleanMethod(ptsList, addMethod, jf);
         env->DeleteLocalRef(jf);
     }
@@ -914,25 +918,35 @@ jobject buildFingerprintObject(JNIEnv* env, const MobileGS::FingerprintData& fd)
     // DescriptorsData: byte[]
     jsize descSize = fd.descriptors.total() * fd.descriptors.elemSize();
     jbyteArray descArray = env->NewByteArray(descSize);
+    if (!descArray) return bail("descriptor array alloc");
     env->SetByteArrayRegion(descArray, 0, descSize, (const jbyte*)fd.descriptors.data);
+    if (env->ExceptionCheck()) return bail("descriptor array copy");
 
     jclass fpClass = env->FindClass("com/hereliesaz/graffitixr/common/model/Fingerprint");
     if (!fpClass) return bail("Fingerprint class");
-    // Fingerprint's Kotlin primary constructor takes 7 params:
-    //   (List keypoints, List points3d, byte[] descriptorsData, int rows, int cols, int type,
-    //    byte[] patchData)
-    // The two params with defaults (points3d, patchData) do NOT produce a 6-arg JVM overload, so
-    // the descriptor MUST include the trailing [B. The old 6-arg lookup never matched, GetMethodID
-    // returned null, and setWallFingerprint silently produced null on every call.
-    jmethodID fpCtor = env->GetMethodID(fpClass, "<init>", "(Ljava/util/List;Ljava/util/List;[BIII[B)V");
-    if (!fpCtor) return bail("Fingerprint(List,List,[B,I,I,I,[B) ctor");
+    // FROZEN JNI ABI: construct via the static factory Fingerprint.fromNative, never the raw
+    // constructor. Kotlin default parameters don't emit reduced-arity JVM overloads, so every
+    // field added to the data class changed the constructor descriptor and broke this lookup
+    // (twice: patchData, then markCenterLocal), making setWallFingerprint return null on every
+    // capture. The factory signature is frozen — mirrored by Fingerprint.JNI_FACTORY_DESCRIPTOR
+    // and asserted by FingerprintJniContractTest — so new Kotlin fields can't break it again.
+    jmethodID fpFactory = env->GetStaticMethodID(
+            fpClass, "fromNative",
+            "(Ljava/util/List;Ljava/util/List;[BIII[BLjava/util/List;)Lcom/hereliesaz/graffitixr/common/model/Fingerprint;");
+    if (!fpFactory) return bail("Fingerprint.fromNative factory");
 
     // patchData (the distortion-head patch): this native path produces none — FingerprintData has
     // no patch field — so pass an empty array, matching the Kotlin default `patchData = ByteArray(0)`.
     jbyteArray patchArray = env->NewByteArray(0);
     if (!patchArray) return bail("patchArray alloc");
-    jobject fpObj = env->NewObject(fpClass, fpCtor, kpList, ptsList, descArray,
-                                   fd.descriptors.rows, fd.descriptors.cols, fd.descriptors.type(), patchArray);
+    // markCenterLocal: FingerprintData carries no marks centroid (it is computed Kotlin-side by
+    // MetricFingerprintBuilder), so pass an empty list, matching the Kotlin default.
+    jobject centerList = env->NewObject(listClass, listCtor, (jint)0);
+    if (!centerList) return bail("markCenterLocal list alloc");
+    jobject fpObj = env->CallStaticObjectMethod(fpClass, fpFactory, kpList, ptsList, descArray,
+                                                fd.descriptors.rows, fd.descriptors.cols, fd.descriptors.type(),
+                                                patchArray, centerList);
+    if (env->ExceptionCheck() || !fpObj) return bail("Fingerprint.fromNative call");
 
     return fpObj;
 }

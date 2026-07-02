@@ -18,7 +18,9 @@ public:
     void reset();
 
 private:
-    void updateMesh();
+    // Body of draw(); caller must hold mMutex (which is non-recursive, so
+    // bakeToBitmap can't call the public draw() while holding the lock).
+    void drawLocked(int viewportWidth, int viewportHeight);
     void initShaders();
 
     int mWidth = 0;

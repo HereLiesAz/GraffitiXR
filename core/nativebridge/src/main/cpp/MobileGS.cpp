@@ -919,7 +919,13 @@ void MobileGS::scheduleRelocCheck(const cv::Mat& f) {
     // live-camera PnP relocalization never ran. Throttles to the reloc thread's consume rate: while a
     // request is still pending we skip, so we only copy a frame when the worker is ready for the next.
     if (f.empty() || !mRelocEnabled) return;
-    if (mWallDescriptors.empty()) return; // nothing to match against yet
+    {
+        // mWallDescriptors is reassigned under mMutex (generateFingerprint / restore paths /
+        // self-grow); an unlocked empty() probe races those cv::Mat header writes. Scoped so it
+        // never nests with mRelocMutex below.
+        std::lock_guard<std::mutex> lock(mMutex);
+        if (mWallDescriptors.empty()) return; // nothing to match against yet
+    }
     {
         std::lock_guard<std::mutex> lock(mRelocMutex);
         if (mRelocRequested) return;
