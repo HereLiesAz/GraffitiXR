@@ -12,6 +12,7 @@ import com.hereliesaz.graffitixr.core.collaboration.wire.FrameType
 import com.hereliesaz.graffitixr.core.collaboration.wire.HelloOkPayload
 import com.hereliesaz.graffitixr.core.collaboration.wire.HelloPayload
 import com.hereliesaz.graffitixr.core.collaboration.wire.OpCodec
+import com.hereliesaz.graffitixr.core.collaboration.wire.SessionCrypto
 import java.net.ServerSocket
 import java.net.Socket
 import kotlinx.coroutines.delay
@@ -149,8 +150,11 @@ class SessionRobustnessTest {
         val helloSeqs = mutableListOf<Long>()
         var bulkCount = 0
 
+        val token = "tok"
+
         // Hand-rolled wire-speaking host: same port across "restarts", new sessionId after the
-        // first connection — the shape of a host app relaunch reusing a QR.
+        // first connection — the shape of a host app relaunch reusing a QR. Speaks the full v2
+        // handshake (nonce/proof) and encrypts post-handshake frames, like a real host.
         fun serveOnce(sessionId: String, sendDeltaAndDie: Boolean) {
             val sock = server.accept()
             sock.soTimeout = 10_000
@@ -162,29 +166,35 @@ class SessionRobustnessTest {
             val payload = OpCodec.decode<HelloPayload>(hello.payload)
             synchronized(helloSeqs) { helloSeqs.add(payload.lastAppliedSeq) }
 
-            Frame.write(output, FrameType.HELLO_OK, OpCodec.encode(HelloOkPayload(sessionId, 1)))
+            val prk = SessionCrypto.prk(token)
+            val hostNonce = ByteArray(16) { it.toByte() }
+            val hostProof = SessionCrypto.helloOkProof(prk, hostNonce, payload.guestNonce)
+            Frame.write(
+                output,
+                FrameType.HELLO_OK,
+                OpCodec.encode(HelloOkPayload(sessionId, 1, hostNonce, hostProof)),
+            )
             output.flush()
+            val crypto = SessionCrypto.forHost(token, sessionId, payload.guestNonce, hostNonce)
+
+            fun writeEnc(type: FrameType, p: ByteArray) {
+                Frame.write(output, FrameType.ENC, crypto.seal(type, p)); output.flush()
+            }
+            fun readEnc(): Frame.FrameRead = crypto.open((Frame.read(input) ?: error("EOF")).payload)
 
             if (payload.lastAppliedSeq == 0L) {
-                Frame.write(
-                    output,
-                    FrameType.BULK_BEGIN,
-                    OpCodec.encode(BulkBeginPayload("p1", 0, 0, 0)),
-                )
-                Frame.write(output, FrameType.BULK_END, ByteArray(0))
-                output.flush()
-                val ack = Frame.read(input) ?: error("no BULK_ACK")
+                writeEnc(FrameType.BULK_BEGIN, OpCodec.encode(BulkBeginPayload("p1", 0, 0, 0)))
+                writeEnc(FrameType.BULK_END, ByteArray(0))
+                val ack = readEnc()
                 assertEquals(FrameType.BULK_ACK, ack.type)
             }
 
             if (sendDeltaAndDie) {
                 // Give the guest a nonzero lastAppliedSeq so its next attempt is a resume.
-                Frame.write(
-                    output,
+                writeEnc(
                     FrameType.DELTA,
                     OpCodec.encode(DeltaPayload(1L, Op.LayerAdd(Layer(id = "X", name = "x")))),
                 )
-                output.flush()
                 Thread.sleep(300)
             }
             sock.close()

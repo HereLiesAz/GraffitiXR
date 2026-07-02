@@ -16,6 +16,7 @@ import com.hereliesaz.graffitixr.core.collaboration.wire.HelloRejectedPayload
 import com.hereliesaz.graffitixr.core.collaboration.wire.Limits
 import com.hereliesaz.graffitixr.core.collaboration.wire.OpCodec
 import com.hereliesaz.graffitixr.core.collaboration.wire.PingPayload
+import com.hereliesaz.graffitixr.core.collaboration.wire.SessionCrypto
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -81,6 +82,8 @@ internal class HostSession(
 
     @Volatile private var serverSocket: ServerSocket? = null
     @Volatile private var clientSocket: Socket? = null
+    // Crypto for the current live connection, so close()/BYE can seal on the active channel.
+    @Volatile private var activeCrypto: SessionCrypto? = null
     @Volatile private var lastAppliedSeq: Long = 0L
     private var liveJob: Job? = null
 
@@ -90,11 +93,20 @@ internal class HostSession(
     // corrupt the wire framing.
     private val writeMutex = Mutex()
 
-    private suspend fun writeFrame(output: OutputStream, type: FrameType, payload: ByteArray) {
+    // Seal-then-write every post-handshake frame under the write lock. The lock also serializes
+    // access to crypto's send counter (each of the outbound/inbound/heartbeat loops writes here).
+    private suspend fun writeSecure(output: OutputStream, crypto: SessionCrypto, type: FrameType, payload: ByteArray) {
         writeMutex.withLock {
-            Frame.write(output, type, payload)
+            Frame.write(output, FrameType.ENC, crypto.seal(type, payload))
             output.flush()
         }
+    }
+
+    // Read one post-handshake frame: it must be an ENC envelope; open it to the inner frame.
+    private fun readSecure(input: java.io.InputStream, crypto: SessionCrypto): Frame.FrameRead? {
+        val frame = Frame.read(input) ?: return null
+        if (frame.type != FrameType.ENC) throw java.io.IOException("expected ENC frame, got ${frame.type}")
+        return crypto.open(frame.payload)
     }
 
     fun port(): Int = serverSocket?.localPort
@@ -171,14 +183,16 @@ internal class HostSession(
 
         val helloFrame = Frame.read(input) ?: return socket.close()
         if (helloFrame.type != FrameType.HELLO) {
-            sendBye(output, CoopSessionState.EndReason.ProtocolError)
+            sendBye(output, CoopSessionState.EndReason.ProtocolError, crypto = null)
             socket.close(); return
         }
         val hello = OpCodec.decode<HelloPayload>(helloFrame.payload)
 
-        // Constant-time comparison: String.equals short-circuits on the first differing byte,
-        // which leaks token prefix length as a timing side channel.
-        if (!java.security.MessageDigest.isEqual(hello.token.toByteArray(), token.toByteArray())) {
+        // Verify the guest's proof of token knowledge (constant-time). The token itself is never
+        // transmitted; proof = HMAC(prk(token), "gxr/hello" || guestNonce).
+        val prk = SessionCrypto.prk(token)
+        val expectedProof = SessionCrypto.helloProof(prk, hello.guestNonce)
+        if (!java.security.MessageDigest.isEqual(hello.proof, expectedProof)) {
             Frame.write(
                 output,
                 FrameType.HELLO_REJECTED,
@@ -207,11 +221,23 @@ internal class HostSession(
             output.flush(); socket.close(); return
         }
 
-        // Accept.
+        // Accept. Build the per-connection crypto from token + both nonces (fresh keys every
+        // connection) and prove host identity to the guest before any bulk data.
+        val hostNonce = randomNonce()
+        val hostProof = SessionCrypto.helloOkProof(prk, hostNonce, hello.guestNonce)
+        val crypto = SessionCrypto.forHost(token, sessionId, hello.guestNonce, hostNonce)
+        activeCrypto = crypto
         Frame.write(
             output,
             FrameType.HELLO_OK,
-            OpCodec.encode(HelloOkPayload(sessionId = sessionId, protocolVersion = protocolVersion)),
+            OpCodec.encode(
+                HelloOkPayload(
+                    sessionId = sessionId,
+                    protocolVersion = protocolVersion,
+                    hostNonce = hostNonce,
+                    hostProof = hostProof,
+                )
+            ),
         )
         output.flush()
 
@@ -225,16 +251,11 @@ internal class HostSession(
             // `seq > lastAppliedSeq` filter makes the duplicates harmless, and this replay
             // completes before the live outbound loop starts, so ordering holds.
             deltaBuffer.opsAfter(lastAppliedSeq).forEach { (seq, op) ->
-                Frame.write(
-                    output,
-                    FrameType.DELTA,
-                    OpCodec.encode(DeltaPayload(seq, op)),
-                )
+                writeSecure(output, crypto, FrameType.DELTA, OpCodec.encode(DeltaPayload(seq, op)))
             }
-            output.flush()
         } else {
             // Bulk transfer.
-            sendBulk(output)
+            sendBulk(output, crypto)
         }
 
         _state.value = CoopSessionState.Connected(peerName = hello.deviceName)
@@ -245,17 +266,18 @@ internal class HostSession(
         liveJob?.cancelAndJoin()
         liveJob = scope.launch {
             coroutineScope {
-                launch { outboundLoop(output) }
-                launch { inboundLoop(input, output) }
-                launch { heartbeatLoop(output) }
+                launch { outboundLoop(output, crypto) }
+                launch { inboundLoop(input, output, crypto) }
+                launch { heartbeatLoop(output, crypto) }
             }
         }
     }
 
-    private suspend fun sendBulk(output: OutputStream) {
-        Frame.write(
-            output,
-            FrameType.BULK_BEGIN,
+    private fun randomNonce(): ByteArray = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
+
+    private suspend fun sendBulk(output: OutputStream, crypto: SessionCrypto) {
+        writeSecure(
+            output, crypto, FrameType.BULK_BEGIN,
             OpCodec.encode(
                 BulkBeginPayload(
                     projectId = projectId,
@@ -266,28 +288,27 @@ internal class HostSession(
             ),
         )
         // Chunk payload into 64KB frames.
-        chunkAndWrite(output, FrameType.BULK_FINGERPRINT, fingerprintBytes)
-        chunkAndWrite(output, FrameType.BULK_PROJECT, projectBytes)
-        Frame.write(output, FrameType.BULK_END, ByteArray(0))
-        output.flush()
+        chunkAndWrite(output, crypto, FrameType.BULK_FINGERPRINT, fingerprintBytes)
+        chunkAndWrite(output, crypto, FrameType.BULK_PROJECT, projectBytes)
+        writeSecure(output, crypto, FrameType.BULK_END, ByteArray(0))
     }
 
-    private fun chunkAndWrite(output: OutputStream, type: FrameType, bytes: ByteArray) {
+    private suspend fun chunkAndWrite(output: OutputStream, crypto: SessionCrypto, type: FrameType, bytes: ByteArray) {
         val chunkSize = 64 * 1024
         var offset = 0
         while (offset < bytes.size) {
             val end = (offset + chunkSize).coerceAtMost(bytes.size)
-            Frame.write(output, type, bytes.copyOfRange(offset, end))
+            writeSecure(output, crypto, type, bytes.copyOfRange(offset, end))
             offset = end
         }
     }
 
-    private suspend fun outboundLoop(output: OutputStream) {
+    private suspend fun outboundLoop(output: OutputStream, crypto: SessionCrypto) {
         // Seq/encoding/DeltaBuffer accounting all happened in enqueueOp; this loop only ships
-        // the pre-encoded frames.
+        // the pre-encoded delta payloads, sealed here.
         for (delta in outQueue) {
             try {
-                writeFrame(output, FrameType.DELTA, delta.bytes)
+                writeSecure(output, crypto, FrameType.DELTA, delta.bytes)
             } catch (e: Exception) {
                 // Connection broken; enter reconnecting. The op stays in deltaBuffer and is
                 // replayed to the reconnecting guest from there.
@@ -297,10 +318,10 @@ internal class HostSession(
         }
     }
 
-    private suspend fun inboundLoop(input: java.io.InputStream, output: OutputStream) {
+    private suspend fun inboundLoop(input: java.io.InputStream, output: OutputStream, crypto: SessionCrypto) {
         while (scope.isActive) {
             val frame = try {
-                Frame.read(input) ?: run { enterReconnecting(); return }
+                readSecure(input, crypto) ?: run { enterReconnecting(); return }
             } catch (e: Exception) {
                 enterReconnecting(); return
             }
@@ -312,7 +333,7 @@ internal class HostSession(
                 FrameType.PING -> {
                     val ping = OpCodec.decode<PingPayload>(frame.payload)
                     try {
-                        writeFrame(output, FrameType.PONG, OpCodec.encode(ping))
+                        writeSecure(output, crypto, FrameType.PONG, OpCodec.encode(ping))
                     } catch (e: Exception) {
                         enterReconnecting(); return
                     }
@@ -326,11 +347,11 @@ internal class HostSession(
         }
     }
 
-    private suspend fun heartbeatLoop(output: OutputStream) {
+    private suspend fun heartbeatLoop(output: OutputStream, crypto: SessionCrypto) {
         while (scope.isActive) {
             delay(5_000)
             try {
-                writeFrame(output, FrameType.PING, OpCodec.encode(PingPayload(System.currentTimeMillis())))
+                writeSecure(output, crypto, FrameType.PING, OpCodec.encode(PingPayload(System.currentTimeMillis())))
             } catch (e: Exception) {
                 enterReconnecting(); return
             }
@@ -347,6 +368,9 @@ internal class HostSession(
         _state.value = CoopSessionState.Reconnecting
         val old = clientSocket
         clientSocket = null
+        // The old channel's keys/counters die with the connection; the next handshake mints fresh
+        // ones. handleConnection sets activeCrypto again before the new live loops start.
+        activeCrypto = null
         try { old?.close() } catch (_: Exception) {}
         // Stop the current live loops so the suspended outbound loop stops consuming outQueue
         // during the reconnect window; queued ops wait for the next connection's outbound loop.
@@ -364,9 +388,19 @@ internal class HostSession(
         }
     }
 
-    private fun sendBye(output: OutputStream, reason: CoopSessionState.EndReason) {
+    /**
+     * Send a BYE. Before the handshake completes (rejection paths) [crypto] is null and the BYE
+     * is plaintext; once a live connection exists it is sealed like every other frame so the
+     * guest, which only accepts ENC frames post-handshake, can act on the reason.
+     */
+    private fun sendBye(output: OutputStream, reason: CoopSessionState.EndReason, crypto: SessionCrypto?) {
         try {
-            Frame.write(output, FrameType.BYE, OpCodec.encode(ByePayload(reason)))
+            val payload = OpCodec.encode(ByePayload(reason))
+            if (crypto != null) {
+                Frame.write(output, FrameType.ENC, crypto.seal(FrameType.BYE, payload))
+            } else {
+                Frame.write(output, FrameType.BYE, payload)
+            }
             output.flush()
         } catch (_: Exception) { /* socket may already be closed */ }
     }
@@ -385,11 +419,12 @@ internal class HostSession(
             clientSocket?.let { sock ->
                 // getOutputStream() can throw if the socket is already closed; that must not
                 // skip the serverSocket/queue/scope teardown below (which would leak the port).
-                try { sendBye(sock.getOutputStream(), reason) } catch (_: Exception) {}
+                try { sendBye(sock.getOutputStream(), reason, activeCrypto) } catch (_: Exception) {}
                 try { sock.close() } catch (_: Exception) {}
             }
         } finally {
             clientSocket = null
+            activeCrypto = null
             try { serverSocket?.close() } catch (_: Exception) {}
             outQueue.close()
             deltaBuffer.clear()

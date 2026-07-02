@@ -4,6 +4,7 @@ import com.hereliesaz.graffitixr.common.model.CoopSessionState
 import com.hereliesaz.graffitixr.common.model.Op
 import com.hereliesaz.graffitixr.core.collaboration.session.GuestSession
 import com.hereliesaz.graffitixr.core.collaboration.session.HostSession
+import com.hereliesaz.graffitixr.core.collaboration.wire.ProtocolVersion
 import com.hereliesaz.graffitixr.core.collaboration.wire.QrPayload
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -38,7 +39,7 @@ class CollaborationManager @Inject constructor() {
         fingerprintBytes: ByteArray,
         projectBytes: ByteArray,
         localDeviceName: String,
-        protocolVersion: Int = 1,
+        protocolVersion: Int = ProtocolVersion.CURRENT,
     ): String {
         check(hostSession == null && guestSession == null) { "already in a session" }
         val token = QrPayload.newToken()
