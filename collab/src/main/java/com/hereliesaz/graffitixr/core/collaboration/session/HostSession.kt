@@ -137,8 +137,11 @@ internal class HostSession(
      * already do.
      */
     fun enqueueOp(op: Op) {
-        if (phase == Phase.Ended) return
         synchronized(enqueueLock) {
+            // Check inside the lock: close() clears deltaBuffer under the same lock, so an append
+            // can never land after the buffer is cleared (which would leak an entry for an ended
+            // session).
+            if (phase == Phase.Ended) return
             val seq = seqCounter.incrementAndGet()
             val bytes = OpCodec.encode(DeltaPayload(seq, op))
             if (!deltaBuffer.append(seq, op, bytes.size)) {
@@ -166,9 +169,16 @@ internal class HostSession(
             try {
                 handleConnection(socket)
             } catch (e: Exception) {
-                if (clientSocket !== socket) {
-                    try { socket.close() } catch (_: Exception) {}
+                // handleConnection only throws before the live loops start (loop failures are
+                // caught inside the loops and route to enterReconnecting). If it adopted this
+                // socket (clientSocket === socket) but then threw — e.g. a write failed during
+                // bulk/replay — reset host state too, or the host stays wedged pointing at a dead
+                // socket, rejecting new guests as AlreadyHosting with no reconnect watcher running.
+                if (clientSocket === socket) {
+                    clientSocket = null
+                    activeCrypto = null
                 }
+                try { socket.close() } catch (_: Exception) {}
             }
         }
     }
@@ -426,8 +436,12 @@ internal class HostSession(
             clientSocket = null
             activeCrypto = null
             try { serverSocket?.close() } catch (_: Exception) {}
-            outQueue.close()
-            deltaBuffer.clear()
+            // Under enqueueLock so a concurrent enqueueOp (which checks phase and appends under
+            // the same lock) can't append to deltaBuffer or send after this cleanup.
+            synchronized(enqueueLock) {
+                outQueue.close()
+                deltaBuffer.clear()
+            }
             scope.cancel()
         }
     }

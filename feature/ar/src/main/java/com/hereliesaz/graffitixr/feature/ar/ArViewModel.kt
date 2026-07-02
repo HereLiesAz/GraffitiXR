@@ -112,13 +112,21 @@ class ArViewModel @Inject constructor(
     private val MAX_PENDING_SPECTATOR_OPS = 128
 
     fun setSpectatorOpHandler(handler: (com.hereliesaz.graffitixr.common.model.Op) -> Unit) {
-        val backlog: List<com.hereliesaz.graffitixr.common.model.Op>
-        synchronized(pendingSpectatorOps) {
-            spectatorOpHandler = handler
-            backlog = pendingSpectatorOps.toList()
-            pendingSpectatorOps.clear()
+        // Drain the backlog fully *before* publishing the handler. If we published first and then
+        // drained, an op arriving on the network thread mid-drain would see a non-null handler and
+        // run ahead of the still-queued backlog ops, desyncing the canvas. Publishing only once the
+        // queue is empty keeps strict FIFO: anything arriving during the drain is appended (handler
+        // still null) and picked up by the loop.
+        while (true) {
+            val op = synchronized(pendingSpectatorOps) {
+                if (pendingSpectatorOps.isEmpty()) {
+                    spectatorOpHandler = handler
+                    return
+                }
+                pendingSpectatorOps.removeFirst()
+            }
+            handler(op)
         }
-        backlog.forEach(handler)
     }
 
     /** Invokes the handler, or buffers the op (drop-oldest past the cap) until one is wired. */
