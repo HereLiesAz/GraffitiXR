@@ -133,8 +133,9 @@ jobs:
         # opens one edit, uploads the AAB once, creates four releases (one per track, each
         # with its own status), and commits.
         #
-        # id + outcome is checked by the persist step below so a failed publish does NOT
-        # advance versionBuild in main.
+        # `id: play-upload` is only used by the fail-loudly step below to distinguish a real
+        # failure from a skipped run. The persist step no longer gates on this — versionBuild
+        # advances unconditionally so the number stream doesn't stall on a bad Play upload.
         id: play-upload
         if: ${{ github.event_name == 'push' || inputs.publish }}
         env:
@@ -148,11 +149,11 @@ jobs:
 
       - name: Persist auto-incremented versionCode
         # Commit the version.properties bump that the build just made, so the next release is
-        # strictly higher (Play rejects a duplicate versionCode). Gated on the Play upload
-        # succeeding — otherwise a failed upload would still advance versionBuild in main,
-        # orphaning the number and hiding the failure (main looks like a release shipped when
-        # nothing actually did). [skip ci] (and the push-trigger paths-ignore) stop a re-trigger.
-        if: ${{ steps.play-upload.outcome == 'success' && (github.event_name == 'push' || inputs.publish) }}
+        # strictly higher (Play rejects a duplicate versionCode). Runs unconditionally on every
+        # build so main's versionBuild never falls behind the numbers the build has already
+        # burned — a failed Play upload does NOT stall the version stream. [skip ci] (and the
+        # push-trigger paths-ignore) stop a re-trigger.
+        if: ${{ always() && (github.event_name == 'push' || inputs.publish) }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
