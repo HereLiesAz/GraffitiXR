@@ -246,8 +246,16 @@ fun MainScreen(
                     // fields in the key list; the geometric fields (offset/scale/rotation) do NOT
                     // affect the bitmap contents (the renderer applies them on the quad), so
                     // omitting them avoids a full re-composite on every pan/zoom gesture.
-                    val arToneKey = arOverlayAdj?.let {
-                        listOf(it.brightness, it.contrast, it.saturation, it.opacity, it.isInverted)
+                    // remember() keyed on the primitive tone fields so the list + 5 boxes are only
+                    // allocated when a slider actually moves — MainScreen recomposes at tracking
+                    // rate (~15fps), so a per-frame allocation storm here shows up in GC.
+                    val arToneKey = remember(
+                        arOverlayAdj?.brightness, arOverlayAdj?.contrast, arOverlayAdj?.saturation,
+                        arOverlayAdj?.opacity, arOverlayAdj?.isInverted,
+                    ) {
+                        arOverlayAdj?.let {
+                            listOf(it.brightness, it.contrast, it.saturation, it.opacity, it.isInverted)
+                        }
                     }
                     LaunchedEffect(visibleLayers, arUiState.isAnchorEstablished, arToneKey) {
                         if (!arUiState.isAnchorEstablished || visibleLayers.isEmpty()) {
@@ -704,6 +712,11 @@ internal fun compositeLayersForAr(layers: List<Layer>, modeAdj: ModeAdjustment? 
 
     for (layer in layers) {
         val bmp = layer.bitmap ?: continue
+        // This composite runs on Dispatchers.Default; a layer bitmap could be recycled on the
+        // main thread (delete-layer, mode transition) after we captured our reference but before
+        // the draw. Skip a recycled bitmap instead of crashing with
+        // "Canvas: trying to use a recycled bitmap".
+        if (bmp.isRecycled) continue
         // Whole-design opacity multiplies the per-layer alpha, matching Design's outer
         // `graphicsLayer { alpha = modeAdj.opacity }` wrapping the per-Image `alpha = layer.opacity`.
         val combinedAlpha = (layer.opacity * modeOpacity).coerceIn(0f, 1f)
