@@ -1716,23 +1716,6 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    fun applyEraseToMask(nx: Float, ny: Float, radius: Float) {
-        val currentMask = _uiState.value.annotatedCaptureBitmap ?: return
-        viewModelScope.launch(dispatchers.default) {
-            val copy = currentMask.copy(Bitmap.Config.ARGB_8888, true)
-            val canvas = android.graphics.Canvas(copy)
-            val paint = android.graphics.Paint().apply {
-                xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.CLEAR)
-                isAntiAlias = true
-            }
-            canvas.drawCircle(nx * copy.width, ny * copy.height, radius * copy.width, paint)
-            _uiState.update { it.copy(annotatedCaptureBitmap = copy) }
-            // Reflect the erase in the keypoint overlay: re-detect within the updated mask so dots in
-            // erased regions disappear. Debounced so a drag (many erase calls) recomputes once it pauses.
-            scheduleKeypointRecompute()
-        }
-    }
-
     private var keypointRecomputeJob: kotlinx.coroutines.Job? = null
     private fun scheduleKeypointRecompute() {
         keypointRecomputeJob?.cancel()
@@ -1877,10 +1860,6 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(unwarpPoints = points) }
     }
 
-    fun updateMaskPath(path: Path) {
-        _uiState.update { it.copy(maskPath = path) }
-    }
-
     fun toggleFlashlight() {
         _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) }
     }
@@ -1950,10 +1929,6 @@ class ArViewModel @Inject constructor(
 
     fun retriggerPlaneDetection() {
         renderer?.isInPlaneRealignment = true
-    }
-
-    fun setPlaneConfirmationBorder(show: Boolean) {
-        renderer?.showBorderForConfirmation = show
     }
 
     fun setVisualizationHidden(hidden: Boolean) {

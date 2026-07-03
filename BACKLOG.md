@@ -16,6 +16,21 @@
 - **Voxel Memory — Frustum Culling.** Implemented true NDC-based visible splat confidence calculation in `VoxelHash`.
 - **Relocalization — Thread Safety.** Added mutex locking to `mWallDescriptors` and `mWallKeypoints3D` in `MobileGS` to prevent races between JNI updates and the background PnP thread.
 
+#### Dead-features clearance pass
+
+The audit's "Dead / unreachable features" section is closed. Actions:
+
+- **Deleted** (~700 LOC): `CrashHandler` + `CrashActivity` (unregistered), the empty placeholder `MockupScreen`/`OverlayScreen`/`TraceScreen` (real rendering is in `MainScreen`), `MaskingScreen` + `ArViewModel.updateMaskPath` + `UiState.maskPath` (unrouted), `ArViewModel.setPlaneConfirmationBorder` + the renderer flag (dead), `ArViewModel.applyEraseToMask` (redundant with `TargetCreationFlow.eraseColorBlob`), `CollaborationManager.stopHosting()` (`leaveSession` is a strict superset), the `Tool.LIQUIFY` branch + `applyLiquifyNative` stub in `ImageProcessor` (unreachable — `DrawingEngine.composite` routes LIQUIFY through `SlamManager.applyLiquify`), Kotlin `WarpableImage`/`VirtualCamera`/`SurfaceUnroller` research code, Vulkan `splat.{vert,frag}[.spv]` assets (Vulkan backend removed), and the four unused transform-lock companion helpers in `EditorViewModel`.
+- **Deleted enum:** `EditorMode.STENCIL` — auto-bounced to MOCKUP and had no route; per-layer stencil generation (`onGenerateStencil`) is untouched.
+- **Wired up:** AR tap-to-distance UI now gates on `(isDualLensActive || currentCenterDepth > 0f)` instead of the deliberately-disabled ARCore Depth API — the reticle + distance chips light up on capable devices. Per-mode transform-lock toggle: a **Lock** rail sub-item under each non-Design mode folder (AR/OVERLAY/MOCKUP/TRACE), turning cyan when engaged — the reducer already respected `isTransformLocked`.
+- **Fixed:** `LocalIp.discover()` now picks the source address of the default route via the UDP-connect trick, so QR pairing advertises a LAN-reachable IP on multi-interface (cellular + Wi-Fi, VPN) devices.
+
+Still open, not touched this pass:
+
+- **Glasses AR session** — ~640 LOC of overlays + calibration exists, but `glassesWorldHitForTimestamp` hit-tests the same phone screen point for src/dst so Procrustes always returns identity. A real fix needs a glasses-side world lookup — substantial new native/SDK integration. Left as WIP.
+- **AR freeze-preview** — `onFreezeRequested`/`FreezePreviewScreen`/`unfreezeRequested` chain is complete but nothing calls `onFreezeRequested`. Held pending a UX decision vs. the new transform-lock (which covers a similar "hold the design still" intent for many use cases).
+- **`ImageProcessingUtils.convertYuvToRgbaDirect`** — the "zero-copy JNI" comment is inaccurate; the function round-trips through a Bitmap and JPEG encode/decode. Called per-frame from `ArRenderer.kt` (~1099, 1226) — hot path. Needs a real JNI YUV→RGBA converter (~50-100 LOC C++ + binding); scoped as a follow-up PR.
+
 ### Todo
 
 - **CodeQL #3/#4/#5 — Inclusion of functionality from untrusted source** (`docs/index.html:8–10`). Three `<script src="https://cdnjs.cloudflare.com/...">` tags (rellax 1.12.0, gsap 3.12.2, ScrollTrigger 3.12.2) load without integrity checks.
@@ -25,16 +40,6 @@
 
   (The Bouncy Castle advisories #23/#24/#25 previously listed here are resolved — see the `1.84` force in the Done section above.)
 
-## Dead / unreachable features (audited, deliberately left as-is — decide per feature)
+(Dead-features section cleared — see the "Dead-features clearance pass" note under **Done** above. Remaining open items are listed there.)
 
-A codebase audit found these fully-built-but-unreachable or non-functional features. They were **not** changed in the bug-squash pass (only outright bugs were), and are catalogued here for a future product decision (wire up vs. remove):
-
-- **Glasses AR session** — no entry point invokes `ArViewModel.startGlassesSession()` from `Idle` (only the post-`Active` reconnect banner does), and calibration (`ArViewModel.glassesWorldHitForTimestamp`, ~`:388`) hit-tests the same screen point for `src`/`dst`, so `Procrustes.solve` always returns identity.
-- **AR tap-to-distance UI** — reticle + per-mark distance chips are gated on `arUiState.isDepthApiSupported`, but the ARCore Depth API is deliberately disabled (`useArCoreDepthApi = false`, `ArViewModel` ~`:859`) because it starved VIO on the target hardware. The UI never renders. (Re-gating on the VIO/stereo depth that *is* available would revive it.)
-- **AR freeze-preview** — `ArViewModel.onFreezeRequested()` is never called, so `FreezePreviewScreen` and the unfreeze→`toggleImageLock` chain are dead.
-- **Per-mode transform lock** — `EditorViewModel.onToggleModeTransformLocked` and four siblings are never called from UI; `ModeAdjustment.isTransformLocked` is always false.
-- **`EditorMode.STENCIL`** — `MainActivity` immediately bounces STENCIL→MOCKUP and no route targets it; stencil generation is reachable only via the per-layer action.
-- **Empty placeholder screens** — `MockupScreen`/`OverlayScreen`/`TraceScreen` ignore all params (real rendering is in `MainScreen`).
-- **Unwired functions / dead classes** — `ArViewModel.requestExport`/`updateMaskPath`/`setPlaneConfirmationBorder`/`applyEraseToMask`; `CrashHandler` + unregistered `CrashActivity`; `WarpableImage`/`VirtualCamera`/`SurfaceUnroller`; `CollaborationManager.stopHosting()`; the dead `Tool.LIQUIFY` branch in `ImageProcessor.applyToolToBitmap`.
-- **Orphaned Vulkan splat shaders** — `core/nativebridge/src/main/assets/shaders/splat.{vert,frag}` are `#version 450` Vulkan GLSL; the Vulkan backend was removed and nothing loads them (dead APK weight).
-- **Minor** — `LocalIp` naively picks the first non-loopback IPv4 (can advertise an unreachable VPN/cellular address); `ImageProcessingUtils.convertYuvToRgbaDirect` round-trips through a Bitmap despite advertising zero-copy.
+- **`ArViewModel.requestExport`** — still unwired; deferred alongside the freeze-preview UX decision (both concern capturing the live AR view). Delete as redundant when `onFreezeRequested` gets a wire-up decision.

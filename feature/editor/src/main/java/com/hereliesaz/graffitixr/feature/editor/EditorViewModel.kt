@@ -1065,26 +1065,9 @@ class EditorViewModel @Inject constructor(
     }
 
     // ── Per-mode whole-design adjustments ─────────────────────────────────────
-    /** Enter "edit the whole design as a unit for this mode" — transform gestures now drive the
-     *  mode adjustment rather than the active layer. */
-    fun onModeLayerSelected(mode: EditorMode) {
-        dispatch(EditorIntent.SetActiveTool(Tool.NONE))
-        dispatch(EditorIntent.SetEditingModeLayer(true))
-    }
-    fun onModeLayerDeselected() = dispatch(EditorIntent.SetEditingModeLayer(false))
 
     fun onModeTransformGesture(mode: EditorMode, pan: Offset, zoom: Float, rotationDelta: Float) {
         dispatch(EditorIntent.ApplyModeTransformGesture(mode, pan, zoom, rotationDelta))
-    }
-
-    fun onModeAdjustmentChanged(mode: EditorMode, adjustment: ModeAdjustment) {
-        dispatch(EditorIntent.SetModeAdjustment(mode, adjustment))
-        saveProject()
-    }
-
-    fun onModeLayerReset(mode: EditorMode) {
-        dispatch(EditorIntent.SetModeAdjustment(mode, ModeAdjustment()))
-        saveProject()
     }
 
     /** Toggle the per-mode transform lock — pins/unpins the whole-design position for [mode]. */

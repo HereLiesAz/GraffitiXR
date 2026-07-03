@@ -75,7 +75,6 @@ internal object EditorReducer {
         is EditorIntent.SetGestureInProgress -> state.copy(gestureInProgress = intent.inProgress)
         is EditorIntent.SetEditorMode -> reduceEditorMode(state, intent.mode)
 
-        is EditorIntent.SetEditingModeLayer -> state.copy(editingModeLayer = intent.editing)
         is EditorIntent.SetModeAdjustment ->
             state.copy(modeAdjustments = state.modeAdjustments + (intent.mode to intent.adjustment))
         is EditorIntent.SetAllModeAdjustments -> state.copy(modeAdjustments = intent.adjustments)

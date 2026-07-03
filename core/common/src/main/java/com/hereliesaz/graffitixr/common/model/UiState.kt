@@ -54,7 +54,6 @@ data class ArUiState(
     // Real fingerprint feature positions (normalized 0..1 in the captured target image) shown on the
     // refinement screen so the user can see and erase exactly what will anchor the fingerprint.
     val targetKeypoints: List<Offset> = emptyList(),
-    val maskPath: androidx.compose.ui.graphics.Path? = null,
     val isCaptureRequested: Boolean = false,
     val isAnchorEstablishmentRequested: Boolean = false,
 
