@@ -906,8 +906,14 @@ class MainActivity : ComponentActivity() {
                             )
 
                             // Tap-to-distance (Sub-project C): live center reticle + a distance chip
-                            // pinned at each tapped wall mark. Only when depth is available in AR mode.
-                            if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && arUiState.isDepthApiSupported) {
+                            // pinned at each tapped wall mark. `isDepthApiSupported` is hardcoded
+                            // false (the ARCore Depth API starved VIO on target hardware, see
+                            // ArViewModel.initArSessionLocked comment). Depth is still available
+                            // from hardware stereo (isDualLensActive) and from VIO-baseline
+                            // triangulation (currentCenterDepth > 0f populated in ArRenderer),
+                            // both of which reach ArUiState, so gate on those instead.
+                            val hasDepth = arUiState.isDualLensActive || arUiState.currentCenterDepth > 0f
+                            if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && hasDepth) {
                                 androidx.compose.material3.Text(
                                     text = com.hereliesaz.graffitixr.feature.ar.eval.DistanceFormat.format(
                                         arUiState.currentCenterDepth, arUiState.isImperialUnits
