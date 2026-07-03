@@ -54,34 +54,48 @@ def main() -> None:
     )
     svc = build("androidpublisher", "v3", credentials=creds, cache_discovery=False)
 
-    edit = svc.edits().insert(packageName=pkg, body={}).execute()
-    edit_id = edit["id"]
-    print(f"::notice::Opened Play edit {edit_id}")
+    # Play's concurrent-active-edits quota is small — if we fail between insert and commit,
+    # the open edit sits on the quota until Play garbage-collects it. Delete it on any
+    # exception so repeated failures don't lock us out.
+    edit_id = None
+    try:
+        edit = svc.edits().insert(packageName=pkg, body={}).execute()
+        edit_id = edit["id"]
+        print(f"::notice::Opened Play edit {edit_id}")
 
-    media = MediaFileUpload(aab, mimetype="application/octet-stream", resumable=True)
-    bundle = svc.edits().bundles().upload(
-        packageName=pkg, editId=edit_id, media_body=media,
-    ).execute()
-    version_code = bundle["versionCode"]
-    print(f"::notice::Uploaded AAB versionCode={version_code} ({aab})")
-
-    for track, status in TARGETS:
-        svc.edits().tracks().update(
-            packageName=pkg,
-            editId=edit_id,
-            track=track,
-            body={
-                "track": track,
-                "releases": [{
-                    "status": status,
-                    "versionCodes": [str(version_code)],
-                }],
-            },
+        media = MediaFileUpload(aab, mimetype="application/octet-stream", resumable=True)
+        bundle = svc.edits().bundles().upload(
+            packageName=pkg, editId=edit_id, media_body=media,
         ).execute()
-        print(f"::notice::Assigned versionCode={version_code} to '{track}' as {status}")
+        version_code = bundle["versionCode"]
+        print(f"::notice::Uploaded AAB versionCode={version_code} ({aab})")
 
-    svc.edits().commit(packageName=pkg, editId=edit_id).execute()
-    print(f"::notice::Committed edit {edit_id} — versionCode={version_code} live on internal, draft on the rest")
+        for track, status in TARGETS:
+            svc.edits().tracks().update(
+                packageName=pkg,
+                editId=edit_id,
+                track=track,
+                body={
+                    "track": track,
+                    "releases": [{
+                        "status": status,
+                        "versionCodes": [str(version_code)],
+                    }],
+                },
+            ).execute()
+            print(f"::notice::Assigned versionCode={version_code} to '{track}' as {status}")
+
+        svc.edits().commit(packageName=pkg, editId=edit_id).execute()
+        print(f"::notice::Committed edit {edit_id} — versionCode={version_code} live on internal, draft on the rest")
+    except BaseException:
+        if edit_id is not None:
+            try:
+                svc.edits().delete(packageName=pkg, editId=edit_id).execute()
+                print(f"::warning::Deleted uncommitted Play edit {edit_id} after failure", file=sys.stderr)
+            except Exception as cleanup_err:
+                # Best-effort — don't mask the original failure by raising from the cleanup path.
+                print(f"::warning::Could not delete edit {edit_id}: {cleanup_err}", file=sys.stderr)
+        raise
 
 
 if __name__ == "__main__":
