@@ -23,6 +23,10 @@ local.properties
 *.apk
 *.aab
 
+# Python bytecode cache (e.g. from py_compile on .github/scripts/)
+__pycache__/
+*.pyc
+
 # Log files
 *.log
 
