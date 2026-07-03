@@ -14,7 +14,7 @@ import com.google.ar.core.exceptions.SessionPausedException
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.ScanPhase
-import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
+import com.hereliesaz.graffitixr.nativebridge.YuvConverter
 import com.hereliesaz.graffitixr.feature.ar.DisplayRotationHelper
 import com.hereliesaz.graffitixr.feature.ar.anchor.AnchorOrchestrator
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
@@ -1095,9 +1095,11 @@ class ArRenderer(
                 captureRequested = false
                 try {
                     frame.acquireCameraImage().use { image ->
-                        val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(image)
                         val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
-                        bitmap.copyPixelsFromBuffer(rgbaBuffer)
+                        // Real native YUV→RGBA (OpenCV NEON on ARM). Replaces the fake "direct"
+                        // path that went via YuvImage.compressToJpeg + BitmapFactory.decodeByteArray
+                        // and cost 100–300 ms per capture.
+                        YuvConverter.yuvToRgbaBitmap(image, bitmap)
 
                         val displayDegrees = displayRotationHelper.getRotation() * 90
                         val rotationNeeded = (sensorOrientation - displayDegrees + 360) % 360
@@ -1221,25 +1223,38 @@ class ArRenderer(
             if (exportRequested) {
                 exportRequested = false
                 try {
-                    frame.acquireCameraImage().use { image ->
-                        val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(image)
-                        val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
-                        bitmap.copyPixelsFromBuffer(rgbaBuffer)
+                    // Read the composited GL framebuffer instead of the raw camera image. By this
+                    // point in onDrawFrame the camera texture and the wall-anchored overlay quad
+                    // (with its true perspective/lean) are already drawn, so the readback matches
+                    // exactly what the user sees on-screen minus the Compose UI overlays (rail,
+                    // settings, reticle chips, distance labels) — those live in a separate Compose
+                    // window that never touches this framebuffer, so they naturally aren't
+                    // captured. Camera-sensor rotation is baked in by ARCore's camera-texture draw
+                    // (background renderer applies the display transform), so no post-rotate is
+                    // needed here — unlike the raw-image path that had to correct sensor orientation.
+                    // Snapshot the callback so a concurrent clear doesn't strand the readback
+                    // in a bitmap nobody owns. Also short-circuits the whole allocate/draw block
+                    // if nothing is listening — treat requestExport being unset here as a spurious
+                    // flag flip rather than doing work for nothing.
+                    val callback = onExportCaptured
+                    val w = surfaceWidth
+                    val h = surfaceHeight
+                    if (callback != null && w > 0 && h > 0) {
+                        val buf = ByteBuffer.allocateDirect(w * h * 4).order(java.nio.ByteOrder.nativeOrder())
+                        GLES30.glReadPixels(0, 0, w, h, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, buf)
+                        buf.rewind()
+                        val flipped = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                        // GL origin is bottom-left; Bitmap is top-left. Wrap the readback in an
+                        // upside-down source Bitmap, then draw it into `flipped` with a vertical
+                        // scale of -1 so the final Bitmap has natural (top-left) orientation.
+                        val source = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                        source.copyPixelsFromBuffer(buf)
+                        val canvas = android.graphics.Canvas(flipped)
+                        val matrix = android.graphics.Matrix().apply { postScale(1f, -1f, w / 2f, h / 2f) }
+                        canvas.drawBitmap(source, matrix, null)
+                        source.recycle()
 
-                        val displayDegrees = displayRotationHelper.getRotation() * 90
-                        val rotationNeeded = (sensorOrientation - displayDegrees + 360) % 360
-
-                        val rotatedBitmap = if (rotationNeeded != 0) {
-                            val matrix = android.graphics.Matrix()
-                            matrix.postRotate(rotationNeeded.toFloat())
-                            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true).also {
-                                bitmap.recycle()
-                            }
-                        } else {
-                            bitmap
-                        }
-
-                        onExportCaptured?.invoke(rotatedBitmap)
+                        callback(flipped)
                         onExportCaptured = null
                     }
                 } catch (e: Exception) {

@@ -111,6 +111,7 @@ import com.hereliesaz.graffitixr.ui.coop.CoopJoinQrScannerOverlay
 import com.hereliesaz.graffitixr.ui.coop.CoopSpectatorBanner
 import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
 import com.hereliesaz.graffitixr.feature.ar.rememberCameraController
+import com.hereliesaz.graffitixr.feature.ar.takePictureAsBitmap
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
 import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.feature.dashboard.SaveProjectDialog
@@ -262,6 +263,10 @@ class MainActivity : ComponentActivity() {
                 val dashboardViewModel: DashboardViewModel = hiltViewModel()
                 val settingsViewModel: SettingsViewModel = hiltViewModel()
                 val cameraController = rememberCameraController()
+                // Scope for suspending export captures (Overlay's ImageCapture.takePictureAsBitmap).
+                // Bound to the composable so it cancels with the screen if the user backs out
+                // mid-capture; the editor's own coroutines handle everything after the capture.
+                val exportDispatchScope = rememberCoroutineScope()
 
                 var cameraUri by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -556,6 +561,39 @@ class MainActivity : ComponentActivity() {
                                     takePictureLauncher.launch(uri)
                                 } else {
                                     permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
+                                }
+                            },
+                            onExportRequested = {
+                                // Mode-aware dispatch of the Export rail button. The spec is
+                                // "screenshot of the mode's content minus the rail/settings" — nothing
+                                // here touches the Compose window, so no UI overlays leak in:
+                                //   - AR: ArRenderer already reads its GL framebuffer (camera + wall
+                                //     overlay quad). skipLayerComposite=true because the layers are
+                                //     already baked into the readback as the wall quad.
+                                //   - Overlay: CameraX ImageCapture yields the sensor still; the
+                                //     editor composites layers on top at screen positions.
+                                //   - Mockup / Trace / Design: no camera capture, editor composites
+                                //     against per-mode background (backgroundBitmap / transparent).
+                                when (editorUiState.editorMode) {
+                                    EditorMode.AR -> {
+                                        arViewModel.requestExport { bmp ->
+                                            editorViewModel.exportImage(backgroundBitmap = bmp, skipLayerComposite = true)
+                                        }
+                                    }
+                                    EditorMode.OVERLAY -> {
+                                        exportDispatchScope.launch {
+                                            try {
+                                                val bmp = cameraController.takePictureAsBitmap(context)
+                                                editorViewModel.exportImage(backgroundBitmap = bmp)
+                                            } catch (t: Throwable) {
+                                                // Fall back to a layers-only export so the user
+                                                // still gets something rather than a silent failure.
+                                                android.util.Log.w("MainActivity", "Overlay capture failed; exporting layers only", t)
+                                                editorViewModel.exportImage()
+                                            }
+                                        }
+                                    }
+                                    else -> editorViewModel.exportImage()
                                 }
                             },
                         )
@@ -1297,6 +1335,7 @@ class MainActivity : ComponentActivity() {
         isWaitingForTap: Boolean = false,
         onShowJoinScanner: () -> Unit = {},
         onWallPhoto: () -> Unit = {},
+        onExportRequested: () -> Unit,
     ) {
         val navStrings = strings.nav
         val requestPermissions = {
@@ -1969,7 +2008,10 @@ class MainActivity : ComponentActivity() {
             azRailSubItem(id = "proj.save", hostId = "host.project", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE) {                showSaveDialog = true
             }
             azRailSubItem(id = "proj.export", hostId = "host.project", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE) {
-                editorViewModel.exportImage()
+                // Export is mode-dispatched by the caller so it has access to the CameraX
+                // controller (Overlay stills) and a coroutine scope (AR/Overlay both suspend on
+                // asynchronous captures). This handler just tells the caller "user pressed Export".
+                onExportRequested()
             }
             azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {                navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
             }
