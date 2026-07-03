@@ -87,7 +87,7 @@ def main() -> None:
 
         svc.edits().commit(packageName=pkg, editId=edit_id).execute()
         print(f"::notice::Committed edit {edit_id} — versionCode={version_code} live on internal, draft on the rest")
-    except BaseException:
+    except Exception:
         if edit_id is not None:
             try:
                 svc.edits().delete(packageName=pkg, editId=edit_id).execute()
