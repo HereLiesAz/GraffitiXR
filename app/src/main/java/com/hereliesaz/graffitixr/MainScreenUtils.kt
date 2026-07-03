@@ -24,6 +24,22 @@ import com.hereliesaz.graffitixr.design.theme.HotPink
 import com.hereliesaz.graffitixr.design.theme.Cyan
 import kotlin.math.atan2
 
+/**
+ * Angle in degrees to rotate an up-pointing arrow so it points from the screen centre toward a
+ * target at ([dx], [dy]) in screen coordinates (y-down). Compass-convention: 0° = up,
+ * CW-positive, matching `Modifier.rotate`.
+ */
+internal fun screenSpaceArrowAngleDeg(dx: Float, dy: Float): Float =
+    Math.toDegrees(atan2(dx.toDouble(), -dy.toDouble())).toFloat()
+
+/**
+ * Angle in degrees to rotate an up-pointing arrow so it points from the screen centre toward a
+ * target at view-space direction ([lx], [ly]) (camera-right / camera-up, y-up). Compass-convention:
+ * 0° = up, CW-positive, matching `Modifier.rotate`.
+ */
+internal fun viewSpaceArrowAngleDeg(lx: Float, ly: Float): Float =
+    Math.toDegrees(atan2(lx.toDouble(), ly.toDouble())).toFloat()
+
 @Composable
 fun OffscreenIndicators(
     uiState: EditorUiState,
@@ -44,7 +60,7 @@ fun OffscreenIndicators(
         
         if (layerCenterX < 0 || layerCenterX > screenSize.width || layerCenterY < 0 || layerCenterY > screenSize.height) {
             DirectionalIndicator(
-                angle = Math.toDegrees(atan2((layerCenterY - centerY).toDouble(), (layerCenterX - centerX).toDouble())).toFloat(),
+                angle = screenSpaceArrowAngleDeg(layerCenterX - centerX, layerCenterY - centerY),
                 label = "Active Layer",
                 color = HotPink,
                 modifier = modifier
@@ -65,10 +81,9 @@ fun OffscreenIndicators(
             val isOffscreen = lz > 0 || Math.abs(lx) > 0.8f || Math.abs(ly) > 0.8f
             
             if (isOffscreen) {
-                // localY is UP, so we negate it for screen-space (down is positive)
-                val angle = Math.toDegrees(atan2(-ly.toDouble(), lx.toDouble())).toFloat()
+                // relDir is in view space: +x = camera-right, +y = up, +z = behind the camera.
                 DirectionalIndicator(
-                    angle = angle,
+                    angle = viewSpaceArrowAngleDeg(lx, ly),
                     label = "Wall Target",
                     color = Cyan,
                     modifier = modifier,

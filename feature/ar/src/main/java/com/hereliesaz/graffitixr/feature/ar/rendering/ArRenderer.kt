@@ -1067,13 +1067,23 @@ class ArRenderer(
                         val len = kotlin.math.sqrt((dx * dx + dy * dy + dz * dz).toDouble()).toFloat()
 
                         if (len > 0.01f) {
-                            val localX = dx * viewMatrix[0] + dy * viewMatrix[1] + dz * viewMatrix[2]
-                            val localY = dx * viewMatrix[4] + dy * viewMatrix[5] + dz * viewMatrix[6]
-                            val localZ = dx * viewMatrix[8] + dy * viewMatrix[9] + dz * viewMatrix[10]
+                            // android.opengl.Matrix is column-major: index [col * 4 + row]. Rotating
+                            // a world-space delta into view space is R · delta, where R takes rows
+                            // from R (columns of the view matrix's 3×3 rotation), i.e. strides of 4,
+                            // not 1. The old stride-1 indexing computed R^T · delta — correct only
+                            // when the camera is world-aligned; as soon as the phone yaws it maps
+                            // the target vector onto the wrong axis and the indicator points off.
+                            val localX = dx * viewMatrix[0] + dy * viewMatrix[4] + dz * viewMatrix[8]
+                            val localY = dx * viewMatrix[1] + dy * viewMatrix[5] + dz * viewMatrix[9]
+                            val localZ = dx * viewMatrix[2] + dy * viewMatrix[6] + dz * viewMatrix[10]
                             relDir = Triple(localX / len, localY / len, localZ / len)
                         }
 
-                        val fwdDot = dx * (-viewMatrix[8]) + dy * (-viewMatrix[9]) + dz * (-viewMatrix[10])
+                        // Forward is -Z in the view frame; the third row of R (view-matrix column 2)
+                        // is the world-space direction the camera looks along, so dot(delta, -row2)
+                        // is positive iff the anchor is in front of the camera. Same column-major
+                        // stride fix as above.
+                        val fwdDot = dx * (-viewMatrix[2]) + dy * (-viewMatrix[6]) + dz * (-viewMatrix[10])
                         if (len > 0.01f && fwdDot > 0f) len else -1f
                     }
 
