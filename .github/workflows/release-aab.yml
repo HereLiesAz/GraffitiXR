@@ -130,12 +130,40 @@ jobs:
         run: |
           ./gradlew bundleRelease
 
-      - name: Persist auto-incremented versionCode
-        # Commit the version.properties bump that the build just made, so the next release is strictly
-        # higher (Play rejects a duplicate versionCode). Runs whenever we're about to publish —
-        # every push to main, and any manual dispatch with publish=true. [skip ci] (and the
-        # push-trigger paths-ignore) stop a re-trigger.
+      - name: Upload AAB artifact
+        # Always upload the artifact — even on a failed Play upload the user can grab the file
+        # from workflow artifacts and upload manually. Runs before the Play step so the artifact
+        # exists no matter what happens next.
+        uses: actions/upload-artifact@v7
+        with:
+          name: graffitixr-release-aab
+          path: app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+
+      - name: Publish to Google Play
+        # Auto-publish on push to main (internal / completed); manual dispatch respects the
+        # publish flag and its own track/status inputs. `inputs.X || 'default'` falls through
+        # on push events where inputs.* are null.
+        #
+        # id + outcome is checked by the persist step below so a failed upload does NOT advance
+        # versionBuild in main.
+        id: play-upload
         if: ${{ github.event_name == 'push' || inputs.publish }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ steps.meta.outputs.package_name }}
+          releaseFiles: app/build/outputs/bundle/release/*.aab
+          track: ${{ inputs.track || 'internal' }}
+          status: ${{ inputs.status || 'completed' }}
+
+      - name: Persist auto-incremented versionCode
+        # Commit the version.properties bump that the build just made, so the next release is
+        # strictly higher (Play rejects a duplicate versionCode). Gated on the Play upload
+        # succeeding — otherwise a failed upload would still advance versionBuild in main,
+        # orphaning the number and hiding the failure (main looks like a release shipped when
+        # nothing actually did). [skip ci] (and the push-trigger paths-ignore) stop a re-trigger.
+        if: ${{ steps.play-upload.outcome == 'success' && (github.event_name == 'push' || inputs.publish) }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -148,22 +176,13 @@ jobs:
             git push origin "HEAD:${{ github.ref_name }}"
           fi
 
-      - name: Upload AAB artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: graffitixr-release-aab
-          path: app/build/outputs/bundle/release/*.aab
-          if-no-files-found: error
-
-      - name: Publish to Google Play
-        # Auto-publish on push to main (internal / completed); manual dispatch respects the
-        # publish flag and its own track/status inputs. `inputs.X || 'default'` falls through
-        # on push events where inputs.* are null.
-        if: ${{ github.event_name == 'push' || inputs.publish }}
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: ${{ steps.meta.outputs.package_name }}
-          releaseFiles: app/build/outputs/bundle/release/*.aab
-          track: ${{ inputs.track || 'internal' }}
-          status: ${{ inputs.status || 'completed' }}
+      - name: Fail loudly if Play upload didn't succeed
+        # r0adkll fails the job on API errors, but the ::error:: annotation surfaces the reason
+        # in the Actions summary — no digging through the r0adkll step's output required. The
+        # exit 1 is redundant with r0adkll's own failure but keeps the "failed run" reading
+        # unambiguous even if a future edit accidentally weakens the upload step's semantics.
+        # Skipped runs (publish=false on manual dispatch) don't trip this.
+        if: ${{ always() && steps.play-upload.outcome != 'success' && steps.play-upload.outcome != 'skipped' }}
+        run: |
+          echo "::error title=Play upload failed::AAB did not land on the '${{ inputs.track || 'internal' }}' track. Workflow is FAILED — versionBuild in main was NOT advanced. Re-run after fixing the upload." >&2
+          exit 1
