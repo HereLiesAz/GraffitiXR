@@ -1887,6 +1887,13 @@ class MainActivity : ComponentActivity() {
                     azRailSubItem(id = "mode.ar.light", hostId = "mode.ar", text = navStrings.light, color = if (arUiState.isFlashlightOn) Cyan else navItemColor, shape = AzButtonShape.NONE) {
                         arViewModel.toggleFlashlight()
                     }
+                    // Lock — pin the whole-design position for this mode. The reducer already
+                    // ignores pan/zoom/rotate gestures when isTransformLocked is true; this button
+                    // is the toggle. Cyan when engaged (matches Freeze / Light).
+                    val arLocked = editorUiState.modeAdjustments[EditorMode.AR]?.isTransformLocked == true
+                    azRailSubItem(id = "mode.ar.lock", hostId = "mode.ar", text = "Lock", color = if (arLocked) Cyan else navItemColor, shape = AzButtonShape.NONE) {
+                        editorViewModel.onToggleModeTransformLocked(EditorMode.AR)
+                    }
                     // Co-op ▸ { Host, Join, Leave } — share this AR coordinate system with a nearby peer.
                     azRailSubHostItem(id = "coop", hostId = "mode.ar", text = navStrings.coop, color = navItemColor, shape = AzButtonShape.NONE)
                     val canHost = arUiState.isAnchorEstablished && arUiState.splatCount > 0
@@ -1923,6 +1930,10 @@ class MainActivity : ComponentActivity() {
                 azRailSubItem(id = "mode.overlay.light", hostId = "mode.overlay", text = navStrings.light, color = if (arUiState.isFlashlightOn) Cyan else navItemColor, shape = AzButtonShape.NONE) {
                     arViewModel.toggleFlashlight()
                 }
+                val overlayLocked = editorUiState.modeAdjustments[EditorMode.OVERLAY]?.isTransformLocked == true
+                azRailSubItem(id = "mode.overlay.lock", hostId = "mode.overlay", text = "Lock", color = if (overlayLocked) Cyan else navItemColor, shape = AzButtonShape.NONE) {
+                    editorViewModel.onToggleModeTransformLocked(EditorMode.OVERLAY)
+                }
             }
 
             // Mockup ▸ Wall ▸ { Photo (take a photo), File (pick an image) }
@@ -1940,11 +1951,19 @@ class MainActivity : ComponentActivity() {
                     editorViewModel.clearBackgroundImage()
                 }
             }
+            val mockupLocked = editorUiState.modeAdjustments[EditorMode.MOCKUP]?.isTransformLocked == true
+            azRailSubItem(id = "mode.mockup.lock", hostId = "mode.mockup", text = "Lock", color = if (mockupLocked) Cyan else navItemColor, shape = AzButtonShape.NONE) {
+                editorViewModel.onToggleModeTransformLocked(EditorMode.MOCKUP)
+            }
 
             // Trace ▸ Freeze
             azRailSubHostItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.RECTANGLE)
             azRailSubItem(id = "mode.trace.freeze", hostId = "mode.trace", text = "Freeze", color = navItemColor, shape = AzButtonShape.NONE) {
                 mainViewModel.setTouchLocked(!isTouchLocked)
+            }
+            val traceLocked = editorUiState.modeAdjustments[EditorMode.TRACE]?.isTransformLocked == true
+            azRailSubItem(id = "mode.trace.lock", hostId = "mode.trace", text = "Lock", color = if (traceLocked) Cyan else navItemColor, shape = AzButtonShape.NONE) {
+                editorViewModel.onToggleModeTransformLocked(EditorMode.TRACE)
             }
 
             // 4. PROJECT FOLDER
