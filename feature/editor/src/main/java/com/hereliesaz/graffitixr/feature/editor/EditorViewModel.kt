@@ -675,28 +675,43 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    fun exportImage(backgroundBitmap: Bitmap? = null) {
+    /**
+     * Export the current design as a PNG saved to the gallery.
+     *
+     * @param backgroundBitmap When non-null, used as the export's background (Overlay: the CameraX
+     *   still; AR: the composited GL framebuffer readback that already includes the wall-anchored
+     *   overlay). When null, per-mode default applies: Mockup reads uiState.backgroundBitmap;
+     *   Overlay/AR paths without a captured frame fall back to transparent (only reachable if
+     *   the caller neglected to supply one); Trace/Design have no background.
+     * @param skipLayerComposite When true, the [backgroundBitmap] IS the export — no layers are
+     *   drawn on top. Set by the AR path because the GL readback already contains the layers as
+     *   the wall-anchored quad; drawing them again would double-draw.
+     */
+    fun exportImage(backgroundBitmap: Bitmap? = null, skipLayerComposite: Boolean = false) {
         viewModelScope.launch(dispatchers.default) {
             dispatch(EditorIntent.SetLoading(true))
             try {
-                val metrics = context.resources.displayMetrics
-                val bgBmp = backgroundBitmap ?: if (_uiState.value.editorMode == EditorMode.MOCKUP) _uiState.value.backgroundBitmap else null
-                val bgColor = if (_uiState.value.editorMode == EditorMode.TRACE) {
-                    val c = _uiState.value.canvasBackground
-                    android.graphics.Color.argb((c.alpha * 255).toInt(), (c.red * 255).toInt(), (c.green * 255).toInt(), (c.blue * 255).toInt())
+                val exportBitmap = if (skipLayerComposite && backgroundBitmap != null) {
+                    // AR path: GL readback already contains camera + wall-anchored overlay.
+                    // Save as-is; drawing the flat editor layers on top would double-draw them.
+                    backgroundBitmap
                 } else {
-                    android.graphics.Color.TRANSPARENT
+                    val metrics = context.resources.displayMetrics
+                    val bgBmp = backgroundBitmap
+                        ?: if (_uiState.value.editorMode == EditorMode.MOCKUP) _uiState.value.backgroundBitmap else null
+                    // Trace previously baked canvasBackground colour into the export. Spec is
+                    // "overlay layers only, no background", so use TRANSPARENT unconditionally —
+                    // the PNG writer (saveBitmapToGallery uses CompressFormat.PNG) preserves alpha.
+                    exportManager.compositeLayers(
+                        _uiState.value.layers,
+                        metrics.widthPixels,
+                        metrics.heightPixels,
+                        backgroundBitmap = bgBmp,
+                        backgroundColor = android.graphics.Color.TRANSPARENT,
+                    )
                 }
 
-                val compositeBitmap = exportManager.compositeLayers(
-                    _uiState.value.layers,
-                    metrics.widthPixels,
-                    metrics.heightPixels,
-                    backgroundBitmap = bgBmp,
-                    backgroundColor = bgColor
-                )
-
-                val success = saveBitmapToGallery(context, compositeBitmap)
+                val success = saveBitmapToGallery(context, exportBitmap)
 
                 withContext(dispatchers.main) {
                     dispatch(EditorIntent.SetLoading(false))
