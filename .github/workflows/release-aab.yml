@@ -1,11 +1,14 @@
 name: Build & Publish AAB (Play)
 
-# Manually-triggered workflow that builds a SIGNED Android App Bundle and,
-# optionally, publishes it to Google Play via the Play Developer API.
-#
-# Safe by default: it builds + uploads the .aab as a workflow artifact only.
-# Publishing to Play happens ONLY when `publish` is set to true, and defaults
-# to the internal track with draft status.
+# Builds a SIGNED Android App Bundle and, when publishing is on, fans the same AAB out to
+# every Play track in one edit transaction:
+#     internal   → completed  (auto-rolled out, same as before)
+#     alpha      → draft      (closed testing, staged for manual promotion)
+#     beta       → draft      (open testing,   staged for manual promotion)
+#     production → draft      (production,     staged for manual promotion)
+# The track fan-out is hardcoded in .github/scripts/play_multitrack_publish.py — the
+# workflow just decides whether to run it. `publish=false` on manual dispatch skips the
+# Play step entirely (build + artifact only).
 on:
   push:
     # Auto-publish on merges to main only. Feature-branch pushes would otherwise trigger a
@@ -18,22 +21,6 @@ on:
       - version.properties
   workflow_dispatch:
     inputs:
-      track:
-        description: "Play track to publish to"
-        type: choice
-        default: internal
-        options:
-          - internal
-          - alpha
-          - beta
-          - production
-      status:
-        description: "Release status on the chosen track"
-        type: choice
-        default: completed
-        options:
-          - draft
-          - completed
       publish:
         description: "Publish to Play? (off = build + upload .aab artifact only)"
         type: boolean
@@ -140,22 +127,24 @@ jobs:
           path: app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
 
-      - name: Publish to Google Play
-        # Auto-publish on push to main (internal / completed); manual dispatch respects the
-        # publish flag and its own track/status inputs. `inputs.X || 'default'` falls through
-        # on push events where inputs.* are null.
+      - name: Publish to Google Play (internal completed + alpha/beta/prod draft)
+        # r0adkll/upload-google-play@v1 forces a single status per call, so it can't do the
+        # mixed internal=completed + others=draft fan-out we want in one Play edit. The script
+        # opens one edit, uploads the AAB once, creates four releases (one per track, each
+        # with its own status), and commits.
         #
-        # id + outcome is checked by the persist step below so a failed upload does NOT advance
-        # versionBuild in main.
+        # id + outcome is checked by the persist step below so a failed publish does NOT
+        # advance versionBuild in main.
         id: play-upload
         if: ${{ github.event_name == 'push' || inputs.publish }}
-        uses: r0adkll/upload-google-play@v1
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: ${{ steps.meta.outputs.package_name }}
-          releaseFiles: app/build/outputs/bundle/release/*.aab
-          track: ${{ inputs.track || 'internal' }}
-          status: ${{ inputs.status || 'completed' }}
+        env:
+          PACKAGE_NAME: ${{ steps.meta.outputs.package_name }}
+          AAB_GLOB: app/build/outputs/bundle/release/*.aab
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          # Python 3 is preinstalled on ubuntu-latest; just pull the two client libs.
+          pip install --quiet google-api-python-client google-auth
+          python .github/scripts/play_multitrack_publish.py
 
       - name: Persist auto-incremented versionCode
         # Commit the version.properties bump that the build just made, so the next release is
@@ -177,12 +166,12 @@ jobs:
           fi
 
       - name: Fail loudly if Play upload didn't succeed
-        # r0adkll fails the job on API errors, but the ::error:: annotation surfaces the reason
-        # in the Actions summary — no digging through the r0adkll step's output required. The
-        # exit 1 is redundant with r0adkll's own failure but keeps the "failed run" reading
-        # unambiguous even if a future edit accidentally weakens the upload step's semantics.
-        # Skipped runs (publish=false on manual dispatch) don't trip this.
+        # The script fails the job on any API error, but the ::error:: annotation surfaces the
+        # reason in the Actions summary — no digging through the upload step's output required.
+        # The exit 1 is redundant with the script's own failure but keeps the "failed run"
+        # reading unambiguous even if a future edit accidentally weakens the upload step's
+        # semantics. Skipped runs (publish=false on manual dispatch) don't trip this.
         if: ${{ always() && steps.play-upload.outcome != 'success' && steps.play-upload.outcome != 'skipped' }}
         run: |
-          echo "::error title=Play upload failed::AAB did not land on the '${{ inputs.track || 'internal' }}' track. Workflow is FAILED — versionBuild in main was NOT advanced. Re-run after fixing the upload." >&2
+          echo "::error title=Play upload failed::AAB did not land on all target tracks. Workflow is FAILED — versionBuild in main was NOT advanced. Re-run after fixing the upload." >&2
           exit 1
