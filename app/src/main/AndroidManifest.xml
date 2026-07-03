@@ -89,6 +89,20 @@
             </intent-filter>
         </activity>
 
+        <!--
+            ZXing's zxing-android-embedded ships a CaptureActivity declared with
+            android:screenOrientation="sensorLandscape". From Android 16 the platform
+            ignores orientation restrictions on large-screen devices (foldables, tablets),
+            which Play Console flagged on release 14142. Both scanner invocations in the
+            app already pass setOrientationLocked(false), so we can safely widen the
+            merged entry to fullUser — respects the user's system rotation-lock setting
+            on all form factors and satisfies the large-screen rule.
+        -->
+        <activity
+            android:name="com.journeyapps.barcodescanner.CaptureActivity"
+            android:screenOrientation="fullUser"
+            tools:replace="android:screenOrientation" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

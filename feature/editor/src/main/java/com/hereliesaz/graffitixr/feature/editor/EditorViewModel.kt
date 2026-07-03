@@ -21,6 +21,7 @@ import com.hereliesaz.graffitixr.common.DispatcherProvider
 import com.hereliesaz.graffitixr.common.coop.OpEmitter
 import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.common.util.ImageUtils
+import com.hereliesaz.graffitixr.common.util.decodeBoundedBitmap
 import com.hereliesaz.graffitixr.common.util.saveBitmapToGallery
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
@@ -2079,10 +2080,28 @@ class EditorViewModel @Inject constructor(
                 val layerId = op.layerId
                 if (_uiState.value.layers.none { it.id == layerId }) return
                 viewModelScope.launch(dispatchers.default) {
-                    val decoded = android.graphics.BitmapFactory.decodeByteArray(op.png, 0, op.png.size)
-                        ?: return@launch
+                    // Cap the decoded bitmap at 2x the longest screen edge — plenty for any layer
+                    // that reasonably rasterises to a screen quad, and prevents a peer accidentally
+                    // shipping a giant PNG from OOMing the guest. Log-and-skip on decode failure
+                    // rather than throwing across the op-apply.
+                    val metrics = context.resources.displayMetrics
+                    val maxDim = maxOf(metrics.widthPixels, metrics.heightPixels) * 2
+                    val decoded = decodeBoundedBitmap(op.png, maxDim) ?: run {
+                        android.util.Log.w(
+                            "EditorViewModel",
+                            "LayerBitmapReplace: skipping op for layer $layerId (decode returned null; bytes=${op.png.size})"
+                        )
+                        return@launch
+                    }
                     val base = decoded.copy(Bitmap.Config.ARGB_8888, false)
                     if (base != decoded) decoded.recycle()
+                    // Re-check the layer still exists — it can be removed while we were decoding
+                    // off-thread. Without this, `putBase` on a stale layerId would leak the base
+                    // pixel memory (nothing takes ownership of it).
+                    if (_uiState.value.layers.none { it.id == layerId }) {
+                        base.recycle()
+                        return@launch
+                    }
                     // The png is the full baked layer; replace base and drop local stroke history.
                     layerStore.putBase(layerId, base)
                     layerStore.initStrokes(layerId)
