@@ -65,14 +65,6 @@ class CollaborationManager @Inject constructor() {
         return payload.encode()
     }
 
-    suspend fun stopHosting() {
-        observeJob?.cancel()
-        observeJob = null
-        hostSession?.close(CoopSessionState.EndReason.UserLeft)
-        hostSession = null
-        _state.value = CoopSessionState.Idle
-    }
-
     suspend fun joinFromQr(
         qr: String,
         localDeviceName: String,

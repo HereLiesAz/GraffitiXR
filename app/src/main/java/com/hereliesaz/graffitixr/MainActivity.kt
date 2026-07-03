@@ -118,9 +118,6 @@ import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
 import com.hereliesaz.graffitixr.feature.dashboard.SettingsViewModel
 import com.hereliesaz.graffitixr.feature.editor.EditorUi
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
-import com.hereliesaz.graffitixr.feature.editor.MockupScreen
-import com.hereliesaz.graffitixr.feature.editor.OverlayScreen
-import com.hereliesaz.graffitixr.feature.editor.TraceScreen
 import com.hereliesaz.graffitixr.feature.editor.util.ImageProcessor as EditorImageProcessor
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.common.model.RelocState
@@ -727,15 +724,14 @@ class MainActivity : ComponentActivity() {
                                     EditorOverlay(editorViewModel, mainUiState, strings)
                                 }
                                 composable(EditorMode.OVERLAY.name) {
-                                    OverlayScreen(editorViewModel, showLibrary, arUiState)
+                                    // Rendering lives in MainScreen; only the editing overlay draws
+                                    // in the nav route (matches DESIGN below).
                                     EditorOverlay(editorViewModel, mainUiState, strings)
                                 }
                                 composable(EditorMode.MOCKUP.name) {
-                                    MockupScreen(editorViewModel, showLibrary, arUiState)
                                     EditorOverlay(editorViewModel, mainUiState, strings)
                                 }
                                 composable(EditorMode.TRACE.name) {
-                                    TraceScreen(editorViewModel, showLibrary, arUiState)
                                     EditorOverlay(editorViewModel, mainUiState, strings)
                                 }
                                 composable(EditorMode.DESIGN.name) {

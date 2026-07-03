@@ -203,7 +203,4 @@ data class EditorUiState(
     // Per-mode whole-design adjustments (transform + tone). Applied to the composited design in
     // that mode only; Design-mode layer edits stay global across all modes.
     val modeAdjustments: Map<EditorMode, ModeAdjustment> = emptyMap(),
-    // True while the user is editing the whole design as a unit (via a mode's "Layer" item), so
-    // transform gestures drive the mode adjustment instead of the active layer.
-    val editingModeLayer: Boolean = false,
 )

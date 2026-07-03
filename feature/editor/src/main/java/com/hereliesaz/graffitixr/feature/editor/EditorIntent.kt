@@ -60,7 +60,6 @@ internal sealed interface EditorIntent {
     data class SetEditorMode(val mode: EditorMode) : EditorIntent
 
     // ── Per-mode whole-design adjustments ─────────────────────────────────────
-    data class SetEditingModeLayer(val editing: Boolean) : EditorIntent
     data class SetModeAdjustment(val mode: EditorMode, val adjustment: ModeAdjustment) : EditorIntent
     data class SetAllModeAdjustments(val adjustments: Map<EditorMode, ModeAdjustment>) : EditorIntent
     data class ApplyModeTransformGesture(val mode: EditorMode, val pan: Offset, val zoom: Float, val rotation: Float) : EditorIntent

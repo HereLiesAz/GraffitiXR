@@ -213,7 +213,6 @@ class ArRenderer(
     private val markVisibleConf = 0.5f
 
     @Volatile var showAnchorBoundary: Boolean = false
-    @Volatile var showBorderForConfirmation: Boolean = false
     @Volatile var anchorEstablished: Boolean = false
         set(value) {
             field = value
@@ -1579,8 +1578,7 @@ class ArRenderer(
                 contentRot
             )
 
-            val showBorder = !anchorEstablished && !isCapturingTarget &&
-                (showAnchorBoundary || (showBorderForConfirmation && !overlayRenderer.hasTexture))
+            val showBorder = !anchorEstablished && !isCapturingTarget && showAnchorBoundary
             if (showBorder) {
                 overlayRenderer.drawAnchorBorder(viewMatrix, projMatrix, anchorMatrix)
             }

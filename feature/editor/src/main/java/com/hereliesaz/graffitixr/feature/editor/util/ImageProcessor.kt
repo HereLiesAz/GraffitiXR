@@ -172,10 +172,6 @@ object ImageProcessor {
                                                                                                                     drawStroke(canvas, stroke, paint)
                                                                                 }
 
-                                                                                            Tool.LIQUIFY -> {
-                                                                                                                applyLiquifyNative(resultBitmap, stroke, brushSize, intensity)
-                                                                                            }
-
                                                                                                         Tool.HEAL -> {
                                                                                                                             val paint = Paint().apply {
                                                                                                                                                     color = brushColor
@@ -233,11 +229,6 @@ object ImageProcessor {
                                                     }
                                                             canvas.drawPath(path, paint)
                 }
-
-                    private fun applyLiquifyNative(bitmap: Bitmap, stroke: List<Offset>, brushSize: Float, intensity: Float) {
-                        // This is now handled by SlamManager's native ImageWarper
-                        // This method is called at the end of the stroke to bake the results.
-                    }
 
             /**
              * Applies Canny Edge Detection to the entire bitmap and returns a new transparent bitmap
