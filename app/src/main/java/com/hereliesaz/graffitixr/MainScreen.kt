@@ -231,20 +231,32 @@ fun MainScreen(
                             r.overlayPanX = arOverlayAdj?.offsetX ?: 0f
                             r.overlayPanY = arOverlayAdj?.offsetY ?: 0f
                             r.overlayScale = arOverlayAdj?.scale ?: 1f
-                            r.overlayRotationDeg = arOverlayAdj?.rotation ?: 0f
+                            // Model stores rotationZ CW+ (Compose/y-down convention). The AR
+                            // renderer rotates around a camera-facing wall-local +Z, which is
+                            // CCW+ under the right-hand rule — negate here so a CW slider drag
+                            // and a CW gesture both rotate the overlay CW on the wall.
+                            r.overlayRotationDeg = -(arOverlayAdj?.rotation ?: 0f)
                             r.overlayRotationX = arOverlayAdj?.rotationX ?: 0f
                             r.overlayRotationY = arOverlayAdj?.rotationY ?: 0f
                         }
                     }
 
-                    LaunchedEffect(visibleLayers, arUiState.isAnchorEstablished) {
+                    // Tone/opacity/invert live on modeAdjustments[AR], not on the renderer, so a
+                    // slider change has to re-composite the wall texture. Include the tone-only
+                    // fields in the key list; the geometric fields (offset/scale/rotation) do NOT
+                    // affect the bitmap contents (the renderer applies them on the quad), so
+                    // omitting them avoids a full re-composite on every pan/zoom gesture.
+                    val arToneKey = arOverlayAdj?.let {
+                        listOf(it.brightness, it.contrast, it.saturation, it.opacity, it.isInverted)
+                    }
+                    LaunchedEffect(visibleLayers, arUiState.isAnchorEstablished, arToneKey) {
                         if (!arUiState.isAnchorEstablished || visibleLayers.isEmpty()) {
                             rendererRef.value?.updateOverlayBitmap(null)
                             return@LaunchedEffect
                         }
 
                         val composite = withContext(Dispatchers.Default) {
-                            compositeLayersForAr(visibleLayers)
+                            compositeLayersForAr(visibleLayers, arOverlayAdj)
                         }
                         rendererRef.value?.updateOverlayBitmap(composite)
                         arViewModel.updatePaintingGuide(composite)
@@ -531,13 +543,16 @@ fun MainScreen(
                                     onGestureStart = { editorViewModel.onGestureStart() },
                                     onGestureEnd = { editorViewModel.onGestureEnd() },
                                     onGesture = { _, pan, zoom, rotation ->
-                                        // calculateRotation()'s sign is opposite our rotation
-                                        // convention, so the raw delta turns the design AGAINST the
-                                        // fingers on every axis (X/Y tilt and Z spin). Negate once here
-                                        // at the input boundary so it rotates WITH the fingers; the
-                                        // model keeps its own sign convention (positive delta → positive
-                                        // rotation), so reducers/tests are unaffected.
-                                        val turn = -rotation
+                                        // Model convention: positive rotationZ is clockwise in
+                                        // screen coordinates, matching Compose's graphicsLayer
+                                        // (y-down, CW+) and calculateRotation()'s return value.
+                                        // Pass the delta through unchanged so both slider and
+                                        // gesture yield the same visual direction in Design/Mockup/
+                                        // Overlay/Trace. The AR renderer alone rotates around a
+                                        // camera-facing +Z (CCW+ in OpenGL/right-handed convention),
+                                        // so the sign flip lives there (see the LaunchedEffect that
+                                        // pushes overlayRotationDeg to the renderer).
+                                        val turn = rotation
                                         if (editingMode) {
                                             // In AR the overlay lives on the wall in meters, so convert
                                             // the screen-pixel drag to in-plane meters. Local +X on the
@@ -619,7 +634,17 @@ fun MainScreen(
     }
 }
 
-internal fun compositeLayersForAr(layers: List<Layer>): AndroidBitmap {
+/**
+ * Composites the visible layers into the AR wall texture.
+ *
+ * [modeAdj] is the whole-design ModeAdjustment for AR (from `uiState.modeAdjustments[EditorMode.AR]`).
+ * Its geometric fields (offset/scale/rotation) are applied by the renderer on the quad, so this
+ * function only consumes its tone fields — brightness / contrast / saturation / opacity / isInverted
+ * — and folds them into the per-layer ColorMatrix and paint alpha exactly the way the Design/Overlay/
+ * Mockup/Trace paths do it (see the `graphicsLayer{alpha}` + per-Image ColorFilter block above).
+ * Passing null means "no whole-design tone" (Design mode baseline).
+ */
+internal fun compositeLayersForAr(layers: List<Layer>, modeAdj: ModeAdjustment? = null): AndroidBitmap {
     if (layers.isEmpty()) return createBitmap(1, 1, AndroidBitmap.Config.ARGB_8888)
 
     var minX = Float.MAX_VALUE
@@ -669,17 +694,31 @@ internal fun compositeLayersForAr(layers: List<Layer>): AndroidBitmap {
     canvas.scale(downscale, downscale)
     val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
+    // Whole-design tone/opacity. Defaults leave the layer's own values untouched (multiply-by-1,
+    // add-0, XOR-false) so a null modeAdj degrades cleanly to the original per-layer behaviour.
+    val modeSaturation = modeAdj?.saturation ?: 1f
+    val modeContrast = modeAdj?.contrast ?: 1f
+    val modeBrightness = modeAdj?.brightness ?: 0f
+    val modeOpacity = modeAdj?.opacity ?: 1f
+    val modeInvert = modeAdj?.isInverted ?: false
+
     for (layer in layers) {
         val bmp = layer.bitmap ?: continue
-        paint.alpha = (layer.opacity.coerceIn(0f, 1f) * 255).toInt()
+        // Whole-design opacity multiplies the per-layer alpha, matching Design's outer
+        // `graphicsLayer { alpha = modeAdj.opacity }` wrapping the per-Image `alpha = layer.opacity`.
+        val combinedAlpha = (layer.opacity * modeOpacity).coerceIn(0f, 1f)
+        paint.alpha = (combinedAlpha * 255).toInt()
         val cm = createColorMatrix(
-            saturation = layer.saturation,
-            contrast = layer.contrast,
-            brightness = layer.brightness,
+            // Design mode composes per-layer × whole-design for sat/contrast (multiplicative),
+            // brightness (additive), invert (XOR). Mirror that exactly, so the wall texture matches
+            // what the user sees in Design mode.
+            saturation = layer.saturation * modeSaturation,
+            contrast = layer.contrast * modeContrast,
+            brightness = layer.brightness + modeBrightness,
             colorBalanceR = layer.colorBalanceR,
             colorBalanceG = layer.colorBalanceG,
             colorBalanceB = layer.colorBalanceB,
-            isInverted = layer.isInverted
+            isInverted = layer.isInverted != modeInvert
         )
         paint.colorFilter = android.graphics.ColorMatrixColorFilter(
             android.graphics.ColorMatrix(cm.values)
