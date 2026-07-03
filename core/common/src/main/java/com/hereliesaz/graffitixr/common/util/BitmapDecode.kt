@@ -36,9 +36,15 @@ fun decodeBoundedBitmap(bytes: ByteArray, maxDimPx: Int): Bitmap? {
 /**
  * Smallest power of two that shrinks a [w] x [h] source so the longest edge fits within [maxDimPx].
  * Returns 1 when the source already fits (no over-sampling of a small image).
+ *
+ * Guarded against a runaway loop on malformed metadata: caps at `1 shl 30` so `sample *= 2` never
+ * overflows past `Int.MAX_VALUE` (which would either wrap negative → undefined BitmapFactory
+ * behaviour, or wrap through zero → division-by-zero on the next iteration).
  */
 internal fun computeSampleSize(w: Int, h: Int, maxDimPx: Int): Int {
     var sample = 1
-    while (w / sample > maxDimPx || h / sample > maxDimPx) sample *= 2
+    while ((w / sample > maxDimPx || h / sample > maxDimPx) && sample < (1 shl 30)) {
+        sample *= 2
+    }
     return sample
 }

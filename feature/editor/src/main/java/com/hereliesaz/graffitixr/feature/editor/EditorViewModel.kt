@@ -2095,6 +2095,13 @@ class EditorViewModel @Inject constructor(
                     }
                     val base = decoded.copy(Bitmap.Config.ARGB_8888, false)
                     if (base != decoded) decoded.recycle()
+                    // Re-check the layer still exists — it can be removed while we were decoding
+                    // off-thread. Without this, `putBase` on a stale layerId would leak the base
+                    // pixel memory (nothing takes ownership of it).
+                    if (_uiState.value.layers.none { it.id == layerId }) {
+                        base.recycle()
+                        return@launch
+                    }
                     // The png is the full baked layer; replace base and drop local stroke history.
                     layerStore.putBase(layerId, base)
                     layerStore.initStrokes(layerId)

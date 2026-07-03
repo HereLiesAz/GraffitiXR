@@ -44,4 +44,12 @@ class BitmapDecodeTest {
         // Tall: 400 x 8000 — same result.
         assertEquals(4, computeSampleSize(400, 8000, 2000))
     }
+
+    @Test
+    fun `pathological dimensions terminate at the overflow-guard cap`() {
+        // Malformed metadata claiming Int.MAX_VALUE dimensions would otherwise loop
+        // sample past Int.MAX_VALUE / 2 and wrap on the next doubling.
+        val result = computeSampleSize(Int.MAX_VALUE, Int.MAX_VALUE, 1)
+        assertEquals(1 shl 30, result)
+    }
 }
