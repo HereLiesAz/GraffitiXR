@@ -75,9 +75,12 @@ suspend fun LifecycleCameraController.takePictureAsBitmap(context: Context): Bit
                                 if (it !== raw) raw.recycle()
                             }
                         } else raw
-                        cont.resume(out)
+                        // suspendCancellableCoroutine ignores `resume` after cancellation, so the
+                        // decoded bitmap would leak (no caller to take ownership + recycle it).
+                        // Free the native pixel memory explicitly on the cancelled path.
+                        if (cont.isActive) cont.resume(out) else out.recycle()
                     } catch (t: Throwable) {
-                        cont.resumeWithException(t)
+                        if (cont.isActive) cont.resumeWithException(t)
                     } finally {
                         image.close()
                     }

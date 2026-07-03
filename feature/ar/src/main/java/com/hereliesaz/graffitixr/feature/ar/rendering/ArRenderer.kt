@@ -1232,9 +1232,14 @@ class ArRenderer(
                     // captured. Camera-sensor rotation is baked in by ARCore's camera-texture draw
                     // (background renderer applies the display transform), so no post-rotate is
                     // needed here — unlike the raw-image path that had to correct sensor orientation.
+                    // Snapshot the callback so a concurrent clear doesn't strand the readback
+                    // in a bitmap nobody owns. Also short-circuits the whole allocate/draw block
+                    // if nothing is listening — treat requestExport being unset here as a spurious
+                    // flag flip rather than doing work for nothing.
+                    val callback = onExportCaptured
                     val w = surfaceWidth
                     val h = surfaceHeight
-                    if (w > 0 && h > 0) {
+                    if (callback != null && w > 0 && h > 0) {
                         val buf = ByteBuffer.allocateDirect(w * h * 4).order(java.nio.ByteOrder.nativeOrder())
                         GLES30.glReadPixels(0, 0, w, h, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, buf)
                         buf.rewind()
@@ -1249,7 +1254,7 @@ class ArRenderer(
                         canvas.drawBitmap(source, matrix, null)
                         source.recycle()
 
-                        onExportCaptured?.invoke(flipped)
+                        callback(flipped)
                         onExportCaptured = null
                     }
                 } catch (e: Exception) {
