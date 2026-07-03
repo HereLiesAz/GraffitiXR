@@ -8,6 +8,10 @@ name: Build & Publish AAB (Play)
 # to the internal track with draft status.
 on:
   push:
+    # Auto-publish on merges to main only. Feature-branch pushes would otherwise trigger a
+    # release build (and, with the gate below open, a Play upload) for every commit — wasteful
+    # and unsafe. Manual dispatch (workflow_dispatch) still works from any branch.
+    branches: [ main ]
     # Don't re-trigger on the version-bump commit this workflow pushes back (it also carries
     # [skip ci], but ignoring the path is a clean belt-and-suspenders).
     paths-ignore:
@@ -128,8 +132,10 @@ jobs:
 
       - name: Persist auto-incremented versionCode
         # Commit the version.properties bump that the build just made, so the next release is strictly
-        # higher. Publish runs only; [skip ci] (and the push-trigger paths-ignore) stop a re-trigger.
-        if: ${{ inputs.publish }}
+        # higher (Play rejects a duplicate versionCode). Runs whenever we're about to publish —
+        # every push to main, and any manual dispatch with publish=true. [skip ci] (and the
+        # push-trigger paths-ignore) stop a re-trigger.
+        if: ${{ github.event_name == 'push' || inputs.publish }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -150,11 +156,14 @@ jobs:
           if-no-files-found: error
 
       - name: Publish to Google Play
-        if: ${{ inputs.publish }}
+        # Auto-publish on push to main (internal / completed); manual dispatch respects the
+        # publish flag and its own track/status inputs. `inputs.X || 'default'` falls through
+        # on push events where inputs.* are null.
+        if: ${{ github.event_name == 'push' || inputs.publish }}
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: ${{ steps.meta.outputs.package_name }}
           releaseFiles: app/build/outputs/bundle/release/*.aab
-          track: ${{ inputs.track }}
-          status: ${{ inputs.status }}
+          track: ${{ inputs.track || 'internal' }}
+          status: ${{ inputs.status || 'completed' }}
