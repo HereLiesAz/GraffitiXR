@@ -28,8 +28,13 @@ The audit's "Dead / unreachable features" section is closed. Actions:
 Still open, not touched this pass:
 
 - **Glasses AR session** — ~640 LOC of overlays + calibration exists, but `glassesWorldHitForTimestamp` hit-tests the same phone screen point for src/dst so Procrustes always returns identity. A real fix needs a glasses-side world lookup — substantial new native/SDK integration. Left as WIP.
-- **AR freeze-preview** — `onFreezeRequested`/`FreezePreviewScreen`/`unfreezeRequested` chain is complete but nothing calls `onFreezeRequested`. Held pending a UX decision vs. the new transform-lock (which covers a similar "hold the design still" intent for many use cases).
-- **`ImageProcessingUtils.convertYuvToRgbaDirect`** — the "zero-copy JNI" comment is inaccurate; the function round-trips through a Bitmap and JPEG encode/decode. Called per-frame from `ArRenderer.kt` (~1099, 1226) — hot path. Needs a real JNI YUV→RGBA converter (~50-100 LOC C++ + binding); scoped as a follow-up PR.
+- **AR freeze-preview** — `onFreezeRequested`/`FreezePreviewScreen`/`unfreezeRequested` chain is complete but nothing calls `onFreezeRequested`. Held pending a UX decision vs. the transform-lock (which covers a similar "hold the design still" intent for many use cases).
+
+#### Export & YUV clearance pass
+
+- **Export composition is now mode-aware.** The Export rail item dispatches per mode: AR reads the composited GL framebuffer via `glReadPixels` (camera + wall-anchored overlay, matches what the user sees minus the Compose UI); Overlay uses CameraX `ImageCapture.takePicture` for the sensor still and composites layers on top at screen positions; Mockup unchanged; Trace exports a transparent-background PNG (was a solid `canvasBackground` fill). See `EditorViewModel.exportImage(backgroundBitmap, skipLayerComposite)`, `ArRenderer.onDrawFrame`'s `exportRequested` block, and `MainActivity.kt`'s `onExportRequested` handler.
+- **Real JNI YUV→RGBA converter.** `ImageProcessingUtils.convertYuvToRgbaDirect` (the fake "zero-copy" path that JPEG-round-tripped every capture) is deleted. Replaced by `nativebridge.YuvConverter` — OpenCV `cvtColor(COLOR_YUV2RGBA_NV21)` on ARM NEON, written directly into a caller-owned `Bitmap`. Now only used by AR target capture (the export site went to `glReadPixels`). Contract test locks the JNI descriptor.
+- **`ArViewModel.requestExport` is finally wired.** The rail's Export in AR mode calls it; it stashes the callback on `renderer.onExportCaptured` and flips `exportRequested = true` (already-correct implementation was just unreachable).
 
 ### Todo
 
@@ -40,6 +45,4 @@ Still open, not touched this pass:
 
   (The Bouncy Castle advisories #23/#24/#25 previously listed here are resolved — see the `1.84` force in the Done section above.)
 
-(Dead-features section cleared — see the "Dead-features clearance pass" note under **Done** above. Remaining open items are listed there.)
-
-- **`ArViewModel.requestExport`** — still unwired; deferred alongside the freeze-preview UX decision (both concern capturing the live AR view). Delete as redundant when `onFreezeRequested` gets a wire-up decision.
+(Dead-features and export/YUV items cleared — see the notes under **Done** above. Remaining open items: Glasses AR session, AR freeze-preview.)
