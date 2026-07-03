@@ -112,7 +112,7 @@ fun MainScreen(
             }
         }
 
-        if (hasCameraPermission && isCameraActive && uiState.editorMode != EditorMode.TRACE && uiState.editorMode != EditorMode.STENCIL) {
+        if (hasCameraPermission && isCameraActive && uiState.editorMode != EditorMode.TRACE) {
             when (uiState.editorMode) {
                 EditorMode.AR -> {
                     var glView by remember { mutableStateOf<GLSurfaceView?>(null) }
@@ -391,7 +391,7 @@ fun MainScreen(
         // Camera modes: which rotation axis the last double-tap selected. Shown for every non-Design
         // mode (AR/Overlay/Mockup/Trace) where the axis cycle applies; Design has its own indicator.
         // visible drives RotationAxisFeedback's own enter/exit + auto-dismiss (onFeedbackShown).
-        if (uiState.editorMode != EditorMode.DESIGN && uiState.editorMode != EditorMode.STENCIL) {
+        if (uiState.editorMode != EditorMode.DESIGN) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                 com.hereliesaz.graffitixr.design.components.RotationAxisFeedback(
                     axis = uiState.activeRotationAxis,
@@ -413,7 +413,7 @@ fun MainScreen(
             }
 
 
-        if (uiState.editorMode != EditorMode.AR && uiState.editorMode != EditorMode.STENCIL) {
+        if (uiState.editorMode != EditorMode.AR) {
             // Per-mode whole-design adjustment: position/scale/rotate/fade and tone the entire
             // composited design as a unit for this mode (DESIGN mode is the global, unadjusted view).
             val modeAdj = if (uiState.editorMode != EditorMode.DESIGN) {
@@ -507,7 +507,7 @@ fun MainScreen(
 
         val isGuest = arUiState.coopRole == com.hereliesaz.graffitixr.common.model.CoopRole.GUEST
 
-        if (uiState.editorMode != EditorMode.STENCIL && isCameraActive) {
+        if (isCameraActive) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()

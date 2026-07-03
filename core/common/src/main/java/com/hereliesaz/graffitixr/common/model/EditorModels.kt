@@ -91,7 +91,6 @@ enum class EditorMode {
     MOCKUP,
     OVERLAY,
     AR,
-    STENCIL,
     DESIGN
 }
 

@@ -404,12 +404,6 @@ class MainActivity : ComponentActivity() {
                     arViewModel.setCameraPermission(hasCameraPermission)
                 }
 
-                LaunchedEffect(editorUiState.editorMode) {
-                    if (editorUiState.editorMode == EditorMode.STENCIL) {
-                        editorViewModel.setEditorMode(EditorMode.MOCKUP)
-                    }
-                }
-
                 // If a project (or restored state) puts the user in AR mode on a
                 // device where ARCore is unsupported, route them to OVERLAY —
                 // the closest non-AR experience, since both render artwork on
@@ -1309,8 +1303,6 @@ class MainActivity : ComponentActivity() {
             val perms = mutableListOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION)
             permissionLauncher.launch(perms.toTypedArray())
         }
-
-        if (editorUiState.editorMode == EditorMode.STENCIL) return
 
         if (!showLibrary) {
             val isDesignMode = editorUiState.editorMode == EditorMode.DESIGN
