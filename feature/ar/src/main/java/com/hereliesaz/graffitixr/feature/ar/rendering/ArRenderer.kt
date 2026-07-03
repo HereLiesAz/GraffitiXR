@@ -14,7 +14,7 @@ import com.google.ar.core.exceptions.SessionPausedException
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.ScanPhase
-import com.hereliesaz.graffitixr.common.util.ImageProcessingUtils
+import com.hereliesaz.graffitixr.nativebridge.YuvConverter
 import com.hereliesaz.graffitixr.feature.ar.DisplayRotationHelper
 import com.hereliesaz.graffitixr.feature.ar.anchor.AnchorOrchestrator
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
@@ -1095,9 +1095,11 @@ class ArRenderer(
                 captureRequested = false
                 try {
                     frame.acquireCameraImage().use { image ->
-                        val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(image)
                         val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
-                        bitmap.copyPixelsFromBuffer(rgbaBuffer)
+                        // Real native YUV→RGBA (OpenCV NEON on ARM). Replaces the fake "direct"
+                        // path that went via YuvImage.compressToJpeg + BitmapFactory.decodeByteArray
+                        // and cost 100–300 ms per capture.
+                        YuvConverter.yuvToRgbaBitmap(image, bitmap)
 
                         val displayDegrees = displayRotationHelper.getRotation() * 90
                         val rotationNeeded = (sensorOrientation - displayDegrees + 360) % 360
@@ -1222,9 +1224,12 @@ class ArRenderer(
                 exportRequested = false
                 try {
                     frame.acquireCameraImage().use { image ->
-                        val rgbaBuffer = ImageProcessingUtils.convertYuvToRgbaDirect(image)
                         val bitmap = Bitmap.createBitmap(image.width, image.height, Bitmap.Config.ARGB_8888)
-                        bitmap.copyPixelsFromBuffer(rgbaBuffer)
+                        // WP1: migrated off the fake ImageProcessingUtils path. WP2 replaces this
+                        // whole block with a GL framebuffer readback so the wall-anchored overlay
+                        // ends up in the exported image; leaving the YUV path here in the interim
+                        // so this commit is self-contained.
+                        YuvConverter.yuvToRgbaBitmap(image, bitmap)
 
                         val displayDegrees = displayRotationHelper.getRotation() * 90
                         val rotationNeeded = (sensorOrientation - displayDegrees + 360) % 360

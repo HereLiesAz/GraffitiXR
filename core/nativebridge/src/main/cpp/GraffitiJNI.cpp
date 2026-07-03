@@ -535,6 +535,72 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     }
 }
 
+// YuvConverter.nativeYuvToRgbaBitmap — decode a camera-frame YUV_420_888 into a caller-owned
+// ARGB_8888 Bitmap. Reuses the same plane-parsing structure as nativeFeedYuvFrame above (I420 vs
+// NV21/NV12 branch keyed on uvPixelStride) but writes into the bitmap instead of into
+// gLastColorFrame. Replaces the fake "zero-copy" ImageProcessingUtils path (JPEG round-trip).
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_YuvConverter_nativeYuvToRgbaBitmap(
+        JNIEnv* env, jobject thiz,
+        jobject yBuffer, jobject uBuffer, jobject vBuffer,
+        jint width, jint height,
+        jint yStride, jint uvRowStride, jint uvPixelStride,
+        jobject outBitmap) {
+
+    uint8_t* yData = static_cast<uint8_t*>(env->GetDirectBufferAddress(yBuffer));
+    uint8_t* uData = static_cast<uint8_t*>(env->GetDirectBufferAddress(uBuffer));
+    uint8_t* vData = static_cast<uint8_t*>(env->GetDirectBufferAddress(vBuffer));
+    if (!yData || !uData || !vData) return;
+
+    // Build the packed NV21 buffer OpenCV's cvtColor understands. This matches the NV21 layout
+    // camera frames from Camera2 / CameraX / ARCore ship in (Y plane, then interleaved V/U).
+    cv::Mat yMat(height, width, CV_8UC1, yData, yStride);
+    cv::Mat nv21(height + height / 2, width, CV_8UC1);
+    yMat.copyTo(nv21(cv::Rect(0, 0, width, height)));
+
+    if (uvPixelStride == 1) {
+        // I420 (planar U then V): pack into interleaved VU rows for NV21.
+        cv::Mat uMat(height / 2, width / 2, CV_8UC1, uData, uvRowStride);
+        cv::Mat vMat(height / 2, width / 2, CV_8UC1, vData, uvRowStride);
+        cv::Mat vuInterleaved(height / 2, width, CV_8UC1, nv21.ptr(height));
+        for (int r = 0; r < height / 2; ++r) {
+            uint8_t* row = vuInterleaved.ptr(r);
+            const uint8_t* uRow = uMat.ptr(r);
+            const uint8_t* vRow = vMat.ptr(r);
+            for (int c = 0; c < width / 2; ++c) {
+                row[2 * c]     = vRow[c];   // V first in NV21
+                row[2 * c + 1] = uRow[c];   // then U
+            }
+        }
+    } else if (uvPixelStride == 2) {
+        // NV21/NV12 semi-planar: the V plane's buffer already contains the interleaved VU (or UV)
+        // rows one byte apart. Copy row-by-row respecting uvRowStride which may be padded past
+        // width. Guard on vBuffer capacity in case of a truncated final row.
+        jlong vCap = env->GetDirectBufferCapacity(vBuffer);
+        size_t limit = (vCap > 0) ? (size_t)vCap : (size_t)((height / 2 - 1) * uvRowStride + width);
+        for (int r = 0; r < height / 2; ++r) {
+            size_t rowStart = r * uvRowStride;
+            size_t rowLen = std::min((size_t)width, (size_t)(limit > rowStart ? limit - rowStart : 0));
+            if (rowLen > 0) std::memcpy(nv21.ptr(height + r), vData + rowStart, rowLen);
+        }
+    } else {
+        // Unusual pixelStride (not 1 or 2). No sane camera exposes this; fill grayscale so the
+        // caller at least gets a visible frame instead of a crash.
+        cv::Mat gray;
+        cv::cvtColor(yMat, gray, cv::COLOR_GRAY2RGBA);
+        matToBitmap(env, gray, outBitmap);
+        return;
+    }
+
+    // NEON-optimised on ARM; runs in a couple ms for 1080p.
+    cv::Mat rgba;
+    cv::cvtColor(nv21, rgba, cv::COLOR_YUV2RGBA_NV21);
+
+    // matToBitmap locks the pixels, copies with cvtColor as needed, then unlocks. rgba is already
+    // CV_8UC4, so this becomes a direct memcpy of `width*height*4` bytes.
+    matToBitmap(env, rgba, outBitmap);
+}
+
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
         JNIEnv* env, jobject thiz, jobject colorBuffer, jint width, jint height, jlong timestampNs, jint cvRotateCode) {
