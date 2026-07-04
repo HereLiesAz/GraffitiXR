@@ -45,7 +45,7 @@ val localProperties = Properties().apply {
 val startParameter = gradle.startParameter
 val buildVerbs = listOf(
     "assemble", "bundle", "install", "package", "compile",
-    "test", "check", "lint", "verify", "connectedtest", "run",
+    "test", "check", "lint", "verify", "connected", "run",
 )
 val isBuilding = !startParameter.isDryRun && startParameter.taskNames.any { taskName ->
     val task = taskName.substringAfterLast(':').lowercase()
