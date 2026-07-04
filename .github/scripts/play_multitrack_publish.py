@@ -21,7 +21,9 @@ import json
 import os
 import sys
 
+import httplib2
 from google.oauth2 import service_account
+from google_auth_httplib2 import AuthorizedHttp
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
@@ -38,6 +40,19 @@ TARGETS = [
 
 SCOPES = ["https://www.googleapis.com/auth/androidpublisher"]
 
+# httplib2's default socket timeout is None (system default, often ~2 min), which trips the
+# TimeoutError we hit on release 14148 while Play digested a ~155MB AAB upload chunk. 10 min
+# is plenty for any single chunk read.
+HTTP_TIMEOUT_S = 600
+
+# Chunk-level retry count on transient upload failures (5xx, connection errors, timeouts).
+# googleapiclient's `.execute(num_retries=N)` retries with exponential backoff.
+UPLOAD_RETRIES = 5
+
+# Smaller chunks = shorter individual reads = smaller per-chunk timeout risk. Default is 100MB
+# which is too big when Play's edge is slow. 4MB is standard for resumable uploads.
+UPLOAD_CHUNK_SIZE = 4 * 1024 * 1024
+
 
 def main() -> None:
     pkg = os.environ["PACKAGE_NAME"]
@@ -52,7 +67,8 @@ def main() -> None:
     creds = service_account.Credentials.from_service_account_info(
         json.loads(creds_json), scopes=SCOPES,
     )
-    svc = build("androidpublisher", "v3", credentials=creds, cache_discovery=False)
+    authed_http = AuthorizedHttp(creds, http=httplib2.Http(timeout=HTTP_TIMEOUT_S))
+    svc = build("androidpublisher", "v3", http=authed_http, cache_discovery=False)
 
     # Play's concurrent-active-edits quota is small — if we fail between insert and commit,
     # the open edit sits on the quota until Play garbage-collects it. Delete it on any
@@ -63,10 +79,17 @@ def main() -> None:
         edit_id = edit["id"]
         print(f"::notice::Opened Play edit {edit_id}")
 
-        media = MediaFileUpload(aab, mimetype="application/octet-stream", resumable=True)
+        media = MediaFileUpload(
+            aab,
+            mimetype="application/octet-stream",
+            resumable=True,
+            chunksize=UPLOAD_CHUNK_SIZE,
+        )
+        # num_retries=N retries individual chunk uploads with exponential backoff on 5xx and
+        # transport errors — including the socket-read TimeoutError we hit on release 14148.
         bundle = svc.edits().bundles().upload(
             packageName=pkg, editId=edit_id, media_body=media,
-        ).execute()
+        ).execute(num_retries=UPLOAD_RETRIES)
         version_code = bundle["versionCode"]
         print(f"::notice::Uploaded AAB versionCode={version_code} ({aab})")
 
