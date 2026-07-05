@@ -143,8 +143,10 @@ jobs:
           AAB_GLOB: app/build/outputs/bundle/release/*.aab
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
         run: |
-          # Python 3 is preinstalled on ubuntu-latest; just pull the two client libs.
-          pip install --quiet google-api-python-client google-auth
+          # Python 3 is preinstalled on ubuntu-latest. google-auth-httplib2 and httplib2 are
+          # transitive deps of google-api-python-client but naming them keeps the intent clear
+          # (the script imports both directly to configure a longer socket timeout).
+          pip install --quiet google-api-python-client google-auth google-auth-httplib2 httplib2
           python .github/scripts/play_multitrack_publish.py
 
       - name: Persist auto-incremented versionCode
@@ -153,6 +155,10 @@ jobs:
         # build so main's versionBuild never falls behind the numbers the build has already
         # burned — a failed Play upload does NOT stall the version stream. [skip ci] (and the
         # push-trigger paths-ignore) stop a re-trigger.
+        #
+        # main can advance under us mid-run (another workflow, a merged PR). Retry loop
+        # rebases onto the fresh tip and re-pushes — version.properties only ever monotonically
+        # bumps and this workflow is the sole writer, so the rebase is always trivial.
         if: ${{ always() && (github.event_name == 'push' || inputs.publish) }}
         run: |
           git config user.name "github-actions[bot]"
@@ -160,11 +166,30 @@ jobs:
           git add version.properties
           if git diff --cached --quiet; then
             echo "version.properties unchanged — nothing to persist"
-          else
-            NEW=$(grep -E '^versionBuild=' version.properties | cut -d'=' -f2 | tr -d '\r ')
-            git commit -m "ci: versionBuild=${NEW} [skip ci]"
-            git push origin "HEAD:${{ github.ref_name }}"
+            exit 0
           fi
+          NEW=$(grep -E '^versionBuild=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          git commit -m "ci: versionBuild=${NEW} [skip ci]"
+          BRANCH="${{ github.ref_name }}"
+          for attempt in 1 2 3 4 5; do
+            if git push origin "HEAD:${BRANCH}"; then
+              echo "Pushed versionBuild=${NEW} on attempt ${attempt}"
+              exit 0
+            fi
+            echo "::warning::Push rejected on attempt ${attempt}; rebasing onto origin/${BRANCH} and retrying"
+            git fetch origin "${BRANCH}"
+            # Rebase our single commit onto the fresh tip. -X theirs keeps the incoming version
+            # if a concurrent bump got there first — since versionBuild is monotonically
+            # increasing and we've already burned this number locally, letting theirs win here
+            # is safe: the very next build will re-bump past both.
+            if ! git rebase -X theirs "origin/${BRANCH}"; then
+              git rebase --abort || true
+              echo "::error::Rebase failed on attempt ${attempt}"
+              exit 1
+            fi
+          done
+          echo "::error::Could not push versionBuild=${NEW} after 5 attempts"
+          exit 1
 
       - name: Fail loudly if Play upload didn't succeed
         # The script fails the job on any API error, but the ::error:: annotation surfaces the

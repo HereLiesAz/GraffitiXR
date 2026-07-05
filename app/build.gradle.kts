@@ -28,17 +28,25 @@ val localProperties = Properties().apply {
     }
 }
 
-// Version resolution. On EVERY compile (any build type, any machine) both the build number and the
-// patch are incremented:
+// Version resolution. On EVERY compile (any build type, any machine, any Gradle task that will
+// actually compile bytecode) both the build number and the patch are incremented:
 //   - versionBuild  -> the Android versionCode. Monotonic; NEVER resets.
 //   - versionPatch  -> the patch segment of the versionName. Increments each compile, but resets to
 //                      0 when versionMinor was bumped since the last build (a new minor starts at .0).
 //                      versionMinorLast tracks the minor we last built so that reset is automatic.
-// True when the requested tasks actually compile/assemble the app — not a sync, `tasks`, `clean`,
-// a `--dry-run`, or a diagnostic like `buildEnvironment`/`buildHealth`. Build verbs are matched as a
-// prefix and the `build` lifecycle task exactly, so diagnostics that merely contain "build" don't trip it.
+// True when the requested tasks will trigger real compilation — not a sync, `tasks`, `clean`,
+// a `--dry-run`, or a diagnostic like `buildEnvironment`/`buildHealth`. Build verbs cover every
+// entry point that transitively invokes a KotlinCompile / JavaCompile task on this project: the
+// full android build lifecycle (assemble/bundle/install/package), explicit compile invocations,
+// unit-test / instrumented-test / verification tasks (test/check/lint/verify/connectedTest — all
+// depend on compileDebugKotlin / compileReleaseKotlin), and `run` for library modules. Verbs are
+// matched as a prefix on the leaf task name and the `build` lifecycle task is matched exactly, so
+// diagnostics that merely contain "build" don't trip it.
 val startParameter = gradle.startParameter
-val buildVerbs = listOf("assemble", "bundle", "install", "package", "compile")
+val buildVerbs = listOf(
+    "assemble", "bundle", "install", "package", "compile",
+    "test", "check", "lint", "verify", "connected", "run",
+)
 val isBuilding = !startParameter.isDryRun && startParameter.taskNames.any { taskName ->
     val task = taskName.substringAfterLast(':').lowercase()
     task == "build" || buildVerbs.any { task.startsWith(it) }
