@@ -89,6 +89,25 @@ has to be built, not adopted.
   Self-hosting also fits an offline stance. This is the literal template for "MIT the API and let other
   apps run the same extensions."
 
+### 1.4b Canva — two marketplaces, external-payment baseline *(verified on Canva's own docs)*
+
+Canva runs both an app marketplace and an asset marketplace, both bigger-reach than Figma — but the useful
+correction is that Canva does **not** default to platform-billed monetization:
+
+- **Canva Apps** are JavaScript apps run inside Canva's host via the Apps SDK. Per Canva's own docs the SDK
+  **does not support in-app purchases** — the baseline is external payment links (the Figma model). The
+  usage-based, Canva-handles-billing model is the **Premium Apps Program**, a *selective* program you apply
+  into, plus **development grants** for building free apps.
+- **Canva Creators** (assets/templates) pays a **usage-driven royalty pool** — creators earn when their
+  content is used. Canva does **not** publish exact rates; the per-use and split figures that circulate
+  ($0.35/use, a 65/35 split, $0.50–2.00/template) are third-party estimates, **not** Canva figures, and are
+  treated here as unverified.
+
+Takeaways: (1) external payment is the real baseline in both Figma and Canva; platform-billed usage is the
+exception in both. (2) Canva seeds its ecosystem by *paying developers* (grants, adoption awards) — a
+scale/capital luxury a solo project can't match, which is why adopting open standards, not a checkbook, is
+the model. (3) Canva now also owns Affinity, so the asset/plugin worlds keep consolidating.
+
 ### 1.5 The white space, and what to adopt
 
 **White space:** no mobile paint/photo app has an open, portable, monetizable *code*-extension marketplace.
@@ -268,3 +287,7 @@ permissiveness is *why* the ecosystem exploded and why other editors run the sam
   FAQ.
 
 *Revenue and download figures are third-party estimates — order-of-magnitude, not audited.*
+
+***Standing rule:** treat any per-use rate or revenue-split figure as unverified unless it comes from the
+platform's own documentation. Several widely-cited Canva royalty numbers fail that test and are excluded
+above.*
