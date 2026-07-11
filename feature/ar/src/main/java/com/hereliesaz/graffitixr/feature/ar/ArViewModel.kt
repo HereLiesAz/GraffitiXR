@@ -1890,6 +1890,16 @@ class ArViewModel @Inject constructor(
         _uiState.update { if (it.planeDetected) it else it.copy(planeDetected = true) }
     }
 
+    /** Doodle demo (GL thread): report anchor-hold stability for the hold-steady indicator. */
+    fun onDoodleLockProgress(stability: Float) {
+        _uiState.update { it.copy(doodleLockStability = stability) }
+    }
+
+    /** Doodle demo (GL thread): the overlay has held one spot long enough — trigger the artwork swap. */
+    fun onDoodleLocked() {
+        _uiState.update { if (it.doodleLocked) it else it.copy(doodleLocked = true) }
+    }
+
     fun appendDiag(text: String) {
         _uiState.update { state ->
             val existing = state.diagLog?.lines() ?: emptyList()

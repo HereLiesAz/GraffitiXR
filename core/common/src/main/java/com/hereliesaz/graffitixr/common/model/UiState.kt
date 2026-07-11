@@ -37,6 +37,10 @@ data class ArUiState(
     // stage transitions (show movement guidance until a surface appears, etc.).
     val isArReady: Boolean = false,
     val planeDetected: Boolean = false,
+    // First-run doodle demo: 0..1 "how steadily is the scribble overlay holding" (drives a hold-steady
+    // indicator), and a latching flag set once it has held long enough to swap in the user's artwork.
+    val doodleLockStability: Float = 0f,
+    val doodleLocked: Boolean = false,
     val isFlashlightOn: Boolean = false,
     val lightLevel: Float = 1.0f,
     val tempCaptureBitmap: Bitmap? = null,
