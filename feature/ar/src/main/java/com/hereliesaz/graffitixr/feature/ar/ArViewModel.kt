@@ -20,6 +20,9 @@ import androidx.lifecycle.viewModelScope
 import com.google.ar.core.CameraConfig
 import com.google.ar.core.CameraConfigFilter
 import com.hereliesaz.graffitixr.common.DispatcherProvider
+import com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import com.google.ar.core.Config
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
@@ -1625,6 +1628,13 @@ class ArViewModel @Inject constructor(
         tapDistanceMeters: Float,
         wallPlane: FloatArray? = null
     ) {
+        // Doodle demo: a headless capture (no tap, no review) — build the fingerprint from the
+        // drawing and return before the normal capture/review flow runs.
+        if (doodlePhaseActive && !doodleFingerprintBuilt) {
+            buildDoodleFingerprint(bitmap, intrinsics, viewMatrix, displayRotation)
+            return
+        }
+
         val tapPos = pendingTapPosition
         val extent = computePhysicalExtent(depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics, depthBufStride)
 
@@ -1898,6 +1908,66 @@ class ArViewModel @Inject constructor(
     /** Doodle demo (GL thread): the overlay has held one spot long enough — trigger the artwork swap. */
     fun onDoodleLocked() {
         _uiState.update { if (it.doodleLocked) it else it.copy(doodleLocked = true) }
+    }
+
+    // --- Doodle demo: headless fingerprint build ---
+    private var doodlePhaseActive = false
+    private var doodleFingerprintBuilt = false
+    private var doodleCaptureJob: Job? = null
+
+    /**
+     * Host tells us when the first-run doodle overlay is up. While active we periodically capture the
+     * live frame (no tap) and try to build a wall fingerprint from whatever the user has drawn; the
+     * builder returns null until there's enough texture, so this self-times to "they've drawn enough".
+     * Once a fingerprint is set, native relocalization + self-grow run automatically and the renderer's
+     * inlier-gated lock can fire. Purist teleological path — the fingerprint IS the demo.
+     */
+    fun setDoodlePhase(active: Boolean) {
+        if (doodlePhaseActive == active) return
+        doodlePhaseActive = active
+        if (active) {
+            doodleFingerprintBuilt = false
+            slamManager.overlayMarkCenterLocal = null
+            doodleCaptureJob = viewModelScope.launch {
+                while (isActive && doodlePhaseActive && !doodleFingerprintBuilt) {
+                    delay(2500)
+                    if (_uiState.value.isAnchorEstablished && !doodleFingerprintBuilt &&
+                        renderer?.doodleWallPlane != null
+                    ) {
+                        requestCapture() // no onScreenTap → no tap; onTargetCaptured builds headlessly
+                    }
+                }
+            }
+        } else {
+            doodleCaptureJob?.cancel()
+            doodleCaptureJob = null
+        }
+    }
+
+    /** Build a fingerprint from a headless doodle capture; sets doodleFingerprintBuilt on success. */
+    private fun buildDoodleFingerprint(bitmap: Bitmap, intrinsics: FloatArray?, viewMatrix: FloatArray, displayRotation: Int) {
+        val plane = renderer?.doodleWallPlane
+        val intr = intrinsics
+        if (plane == null || plane.size < 6 || intr == null) {
+            slamManager.setMappingPaused(false)
+            return
+        }
+        val rotated = if (displayRotation != 0) {
+            val m = android.graphics.Matrix().apply { postRotate(displayRotation.toFloat()) }
+            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, m, true)
+        } else bitmap
+        val planePoint = floatArrayOf(plane[0], plane[1], plane[2])
+        val planeNormal = floatArrayOf(plane[3], plane[4], plane[5])
+        val anchor = slamManager.getAnchorTransform()
+        viewModelScope.launch(Dispatchers.IO) {
+            val fp = MetricFingerprintBuilder.buildSingle(
+                slamManager, rotated, viewMatrix, intr, planePoint, planeNormal, anchor
+            )
+            if (fp != null) doodleFingerprintBuilt = true
+            // Resume mapping that requestCapture paused, regardless of outcome.
+            slamManager.setMappingPaused(false)
+            slamManager.setSplatsVisible(true)
+        }
     }
 
     fun appendDiag(text: String) {

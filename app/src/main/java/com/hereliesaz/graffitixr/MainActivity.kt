@@ -500,6 +500,11 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // Drive the headless fingerprint-build orchestration in the AR VM with the phase.
+                LaunchedEffect(firstRunDoodleActive) {
+                    arViewModel.setDoodlePhase(firstRunDoodleActive)
+                }
+
                 // Lock reached: clear the doodle phase (normal composite resumes, swapping the scribble
                 // for the user's artwork) and never show onboarding again.
                 LaunchedEffect(arUiState.doodleLocked) {

@@ -275,15 +275,19 @@ class ArRenderer(
     private var planeDetectedReported = false
 
     // First-run doodle demo. doodleLockActive is set by the host while the onboarding overlay is up;
-    // when active the renderer auto-establishes a wall anchor (no capture/fingerprint), tracks how
-    // steadily it holds, and fires onDoodleLocked once it has held past DOODLE_MIN_DRAW_MS. The
-    // min-dwell exists because a fresh ARCore anchor is stable immediately — without it the lock would
-    // fire before the user has drawn. (Purist upgrade: gate on mark-relocalization pose stability.)
+    // when active the renderer auto-establishes a wall anchor, and (once the host has built a
+    // fingerprint from the user's drawing) tracks the fused mark-PnP pose, firing onDoodleLocked when
+    // it holds steady AND relocalization is confident (DOODLE_MIN_RELOC_INLIERS).
     var doodleLockActive = false
     private val anchorLockTracker = AnchorLockTracker()
-    private var doodleAnchorStartMs = 0L
     private var doodleLockReported = false
     private var doodleAutoAnchorRequested = false
+    // Wall plane the doodle anchor landed on: [px,py,pz, nx,ny,nz] in world space. Written on the GL
+    // thread at anchor establishment, read off-thread by ArViewModel to build the fingerprint from the
+    // user's drawing (no tap). Volatile for safe publication across threads.
+    @Volatile
+    var doodleWallPlane: FloatArray? = null
+        private set
     // Render-thread stall watchdog. The GL thread can block inside session.update() forever when the
     // camera never feeds ARCore; a side thread watches these markers and reports the stuck step on
     // screen (the blocked GL thread can't report for itself).
@@ -924,6 +928,14 @@ class ArRenderer(
                         anchorSurfaceNormal[0] = 0f; anchorSurfaceNormal[1] = 0f; anchorSurfaceNormal[2] = 0f
                     }
                     slamManager.updateAnchorTransform(anchorModelMatrix)
+                    // Doodle demo: publish the wall plane (anchor point + surface normal) so the
+                    // ViewModel can build a fingerprint from the drawing and relocalize against it.
+                    if (doodleLockActive) {
+                        doodleWallPlane = floatArrayOf(
+                            anchorModelMatrix[12], anchorModelMatrix[13], anchorModelMatrix[14],
+                            anchorSurfaceNormal[0], anchorSurfaceNormal[1], anchorSurfaceNormal[2],
+                        )
+                    }
                     setPrimaryAnchor(anchor) // non-null: the fallback branch always creates one
                     anchorEstablished = true
                     hideVisualization = true
@@ -1055,12 +1067,16 @@ class ArRenderer(
             // First-run doodle demo: feed the anchor's world translation to the lock tracker while the
             // overlay holds. Once it has held steady past the min-draw dwell, fire the swap once.
             if (doodleLockActive && anchorEstablished && !doodleLockReported) {
-                if (doodleAnchorStartMs == 0L) doodleAnchorStartMs = System.currentTimeMillis()
+                // anchorMatrix is the FUSED pose — once a fingerprint has been built from the user's
+                // drawing, poseFusion folds the mark-PnP relocalization correction into it, so the
+                // tracker is measuring relocalization stability, not raw ARCore anchor. Gate the swap
+                // on BOTH a still fused pose AND a confident relock (PnP inliers), so the lock only
+                // fires when the teleological SLAM has genuinely latched onto the drawn marks. On a
+                // blank wall relocalization stays weak until the user draws, so this self-times.
                 anchorLockTracker.update(anchorMatrix[12], anchorMatrix[13], anchorMatrix[14])
                 if (frameCount % 4 == 0) onDoodleLockProgress(anchorLockTracker.stability)
-                val heldLongEnough =
-                    System.currentTimeMillis() - doodleAnchorStartMs >= DOODLE_MIN_DRAW_MS
-                if (anchorLockTracker.locked && heldLongEnough) {
+                val relocInliers = slamManager.getRelocResult()[16].toInt()
+                if (anchorLockTracker.locked && relocInliers >= DOODLE_MIN_RELOC_INLIERS) {
                     doodleLockReported = true
                     onDoodleLocked()
                 }
@@ -1867,9 +1883,9 @@ class ArRenderer(
     }
 
     private companion object {
-        // Minimum time the doodle anchor must hold before the scribble->artwork swap can fire, so a
-        // freshly-created (already-stable) ARCore anchor doesn't lock before the user has drawn.
-        const val DOODLE_MIN_DRAW_MS = 3000L
+        // PnP inlier floor for the doodle swap — self-grow itself trusts a relock at >= 20 inliers
+        // (MobileGS), so the same bar means "relocalization has confidently latched onto the marks".
+        const val DOODLE_MIN_RELOC_INLIERS = 20
 
         // Multiplier for the overlay half-extent to derive the camera distance used in the
         // 2D perspective content rotation (matching Compose's graphicsLayer rotationX/Y).
