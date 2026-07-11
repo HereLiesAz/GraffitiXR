@@ -41,6 +41,10 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.compose.ui.geometry)
+    // ProjectManager persists layer BlendMode (androidx.compose.ui.graphics.BlendMode). This was
+    // previously reaching us transitively through core:common's api(az-nav-rail); the AzNavRail
+    // Android artifact no longer leaks Compose, so declare the dependency we actually use.
+    implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.kotlinx.coroutines.android)

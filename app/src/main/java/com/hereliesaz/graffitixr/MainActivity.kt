@@ -388,7 +388,17 @@ class MainActivity : ComponentActivity() {
                 // AzNavRail caches `isExpanded` in rememberSaveable; forcing
                 // noMenu on the library screen re-initialises it to false so
                 // its outer fillMaxSize Box never attaches tapOutsideToCollapse.
-                val railMenuDisabled = !isRailVisible || showLibrary
+                //
+                // Design mode disables the side drawer entirely (noMenu = true). The user
+                // asked for the rail to fold up when the app icon is pressed in Design mode
+                // with the menu disabled; AzNavRail 10.32 doesn't expose an onAppIconClick
+                // callback or a reactive `expanded` state, so we can't gate noMenu on the
+                // press itself — but disabling the drawer for the whole Design session is
+                // the closest match: the app-icon tap still folds/expands the rail by
+                // default, and the drawer never appears to distract the design flow.
+                val railMenuDisabled = !isRailVisible ||
+                        showLibrary ||
+                        editorUiState.editorMode == EditorMode.DESIGN
 
                 var permissionRequestedAtLeastOnce by remember { mutableStateOf(hasCameraPermission) }
 
@@ -1729,8 +1739,10 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                                 layer.isSketch -> {
-                                    azRailHostItem(id = layerId(layer, "grp.paint"), text = "Paint", color = navItemColor, shape = AzButtonShape.RECTANGLE)
-                                    azRailSubItem(id = layerId(layer, "eraser"), hostId = layerId(layer, "grp.paint"), text = navStrings.eraser, color = if (activeTool == Tool.ERASER) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
+                                    // Eraser is a top-level rail item — it used to sit under a "Paint"
+                                    // host folder that only ever contained this one child, which made
+                                    // the folder redundant and put the eraser two taps deep.
+                                    azRailItem(id = layerId(layer, "eraser"), text = navStrings.eraser, color = if (activeTool == Tool.ERASER) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
 
                                     azRailHostItem(id = layerId(layer, "grp.retouch"), text = "Retouch", color = navItemColor, shape = AzButtonShape.RECTANGLE)
                                     azRailSubItem(id = layerId(layer, "blur"), hostId = layerId(layer, "grp.retouch"), text = navStrings.blur, color = if (activeTool == Tool.BLUR) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
@@ -1782,8 +1794,10 @@ class MainActivity : ComponentActivity() {
                                     // Image-layer tools grouped into folders (host/sub) so the nested
                                     // rail isn't an overwhelming flat list. Size stays a standalone
                                     // widget (most-used control); all other tools live under a folder.
-                                    azRailHostItem(id = layerId(layer, "grp.paint"), text = "Paint", color = navItemColor, shape = AzButtonShape.RECTANGLE)
-                                    azRailSubItem(id = layerId(layer, "eraser"), hostId = layerId(layer, "grp.paint"), text = navStrings.eraser, color = if (activeTool == Tool.ERASER) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
+                                    // Eraser is a top-level rail item — it used to sit under a "Paint"
+                                    // host folder that only ever contained this one child, which made
+                                    // the folder redundant and put the eraser two taps deep.
+                                    azRailItem(id = layerId(layer, "eraser"), text = navStrings.eraser, color = if (activeTool == Tool.ERASER) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
 
                                     azRailHostItem(id = layerId(layer, "grp.retouch"), text = "Retouch", color = navItemColor, shape = AzButtonShape.RECTANGLE)
                                     azRailSubItem(id = layerId(layer, "blur"), hostId = layerId(layer, "grp.retouch"), text = navStrings.blur, color = if (activeTool == Tool.BLUR) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
