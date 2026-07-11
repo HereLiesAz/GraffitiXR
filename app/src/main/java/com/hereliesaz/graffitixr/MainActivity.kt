@@ -458,6 +458,57 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // --- First-run AR doodle onboarding coordinator ---
+                // Strictly contained: the whole flow is gated behind the tutorial key + ARCore
+                // availability + camera permission. If any condition fails it's a complete no-op and
+                // normal library startup is byte-for-byte unchanged. The tutorial key is marked
+                // complete only once the demo reaches its lock/swap.
+                val firstRunDoodleKey = "first_run_ar_doodle"
+                val firstRunCompletedTutorials by mainViewModel.completedTutorials.collectAsState()
+                var firstRunDoodleActive by remember { mutableStateOf(false) }
+                var firstRunTriggered by remember { mutableStateOf(false) }
+                val firstRunScribble = remember { com.hereliesaz.graffitixr.onboarding.ScribbleGenerator.generate() }
+                val firstRunScribbleBitmap = remember(firstRunScribble) {
+                    com.hereliesaz.graffitixr.onboarding.renderScribbleBitmap(firstRunScribble, 512)
+                }
+
+                val firstRunImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+                    if (uri != null) {
+                        editorViewModel.onAddLayer(uri)
+                        firstRunDoodleActive = true
+                        navController.navigate(EditorMode.AR.name) {
+                            popUpTo(LIBRARY_ROUTE) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    } else {
+                        // Cancelled the picker — abandon first-run silently, land on the library.
+                        firstRunTriggered = false
+                    }
+                }
+
+                LaunchedEffect(arUiState.isArCoreAvailabilityResolved, firstRunCompletedTutorials, hasCameraPermission, currentRoute) {
+                    if (!firstRunTriggered &&
+                        firstRunDoodleKey !in firstRunCompletedTutorials &&
+                        arUiState.isArCoreAvailabilityResolved &&
+                        arUiState.isArCoreAvailable &&
+                        hasCameraPermission &&
+                        currentRoute == LIBRARY_ROUTE
+                    ) {
+                        firstRunTriggered = true
+                        dashboardViewModel.createAndOpenProject()
+                        firstRunImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
+                }
+
+                // Lock reached: clear the doodle phase (normal composite resumes, swapping the scribble
+                // for the user's artwork) and never show onboarding again.
+                LaunchedEffect(arUiState.doodleLocked) {
+                    if (firstRunDoodleActive && arUiState.doodleLocked) {
+                        firstRunDoodleActive = false
+                        mainViewModel.markTutorialCompletePersistent(firstRunDoodleKey)
+                    }
+                }
+
                 var showDesignInstructionsDialog by remember { mutableStateOf(false) }
 
                 // Auto-activate the first layer as soon as one exists — don't wait for
@@ -623,7 +674,9 @@ class MainActivity : ComponentActivity() {
                             slamManager = slamManager,
                             hasCameraPermission = hasCameraPermission,
                             cameraController = cameraController,
-                            onRendererCreated = { _ -> }
+                            onRendererCreated = { _ -> },
+                            doodlePhaseActive = firstRunDoodleActive,
+                            doodleScribbleBitmap = firstRunScribbleBitmap
                         )
 
                     }
@@ -683,6 +736,20 @@ class MainActivity : ComponentActivity() {
                                     arExplainerDismissedThisSession = true
                                     mainViewModel.markTutorialCompletePersistent(arExplainerKey)
                                 }
+                            )
+                        }
+
+                        // First-run doodle coaching layer — over the AR camera feed while the demo runs.
+                        if (firstRunDoodleActive &&
+                            !showSettings &&
+                            editorUiState.editorMode == EditorMode.AR
+                        ) {
+                            com.hereliesaz.graffitixr.onboarding.FirstRunOnboardingOverlay(
+                                scribble = firstRunScribble,
+                                isArReady = arUiState.isArReady,
+                                planeDetected = arUiState.planeDetected,
+                                title = "Doodle this on your wall or canvas",
+                                movementHint = arUiState.scanHint ?: "Slowly move your device in a circle",
                             )
                         }
 

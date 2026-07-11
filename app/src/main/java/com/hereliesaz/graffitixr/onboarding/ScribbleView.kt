@@ -1,5 +1,7 @@
 package com.hereliesaz.graffitixr.onboarding
 
+import android.graphics.Bitmap
+import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
@@ -41,19 +43,47 @@ fun ScribbleView(
         val h = size.height
         val edge = min(w, h)
         drawIntoCanvas { canvas ->
-            val nc = canvas.nativeCanvas
-            scribble.glyphs.forEach { g ->
-                val px = g.cx * w
-                val py = g.cy * h
-                paint.textSize = g.sizeFrac * edge
-                paint.getFontMetrics(fontMetrics)
-                // Paint draws text on the baseline; offset so the glyph's visual middle sits at py.
-                val baselineY = py - (fontMetrics.ascent + fontMetrics.descent) / 2f
-                nc.save()
-                nc.rotate(g.rotationDeg, px, py)
-                nc.drawText(g.char.toString(), px, baselineY, paint)
-                nc.restore()
-            }
+            drawScribble(canvas.nativeCanvas, scribble, w, h, edge, paint, fontMetrics)
         }
+    }
+}
+
+/**
+ * Rasterizes a [Scribble] into a transparent square [Bitmap] of [sizePx] — used as the AR overlay
+ * texture during the first-run doodle demo. Same glyph layout/rotation as [ScribbleView]; drawn
+ * as filled white so it reads on the wall (the overlay renderer applies it as a texture).
+ */
+fun renderScribbleBitmap(scribble: Scribble, sizePx: Int, color: Color = Color.White): Bitmap {
+    val bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        this.color = color.toArgb()
+        textAlign = Paint.Align.CENTER
+        style = Paint.Style.FILL
+        isFakeBoldText = true
+    }
+    drawScribble(AndroidCanvas(bmp), scribble, sizePx.toFloat(), sizePx.toFloat(), sizePx.toFloat(), paint, Paint.FontMetrics())
+    return bmp
+}
+
+private fun drawScribble(
+    nc: AndroidCanvas,
+    scribble: Scribble,
+    w: Float,
+    h: Float,
+    edge: Float,
+    paint: Paint,
+    fontMetrics: Paint.FontMetrics,
+) {
+    scribble.glyphs.forEach { g ->
+        val px = g.cx * w
+        val py = g.cy * h
+        paint.textSize = g.sizeFrac * edge
+        paint.getFontMetrics(fontMetrics)
+        // Paint draws text on the baseline; offset so the glyph's visual middle sits at py.
+        val baselineY = py - (fontMetrics.ascent + fontMetrics.descent) / 2f
+        nc.save()
+        nc.rotate(g.rotationDeg, px, py)
+        nc.drawText(g.char.toString(), px, baselineY, paint)
+        nc.restore()
     }
 }
