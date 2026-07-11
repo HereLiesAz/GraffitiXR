@@ -61,7 +61,10 @@ fun FirstRunOnboardingOverlay(
     modifier: Modifier = Modifier,
 ) {
     var titleAtTop by remember { mutableStateOf(false) }
-    LaunchedEffectHold { titleAtTop = true }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        delay(TITLE_HOLD_MS)
+        titleAtTop = true
+    }
 
     // -1 = top, 0 = centre. The title starts centred, then rises to make room for the scribble.
     val titleBias by animateFloatAsState(
@@ -134,15 +137,6 @@ private fun MovementGuidance(hint: String) {
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center,
         )
-    }
-}
-
-/** Holds for [TITLE_HOLD_MS] then invokes [onElapsed] once. Extracted so the delay reads clearly. */
-@Composable
-private fun LaunchedEffectHold(onElapsed: () -> Unit) {
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        delay(TITLE_HOLD_MS)
-        onElapsed()
     }
 }
 

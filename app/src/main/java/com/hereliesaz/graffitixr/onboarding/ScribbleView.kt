@@ -32,6 +32,9 @@ fun ScribbleView(
             setShadowLayer(12f, 0f, 0f, android.graphics.Color.argb(200, 0, 0, 0))
         }
     }
+    // Reused across glyphs and frames — the `paint.fontMetrics` getter allocates a fresh object each
+    // call, which we don't want in a continuously-rendered overlay's draw loop.
+    val fontMetrics = remember { Paint.FontMetrics() }
 
     Canvas(modifier) {
         val w = size.width
@@ -43,9 +46,9 @@ fun ScribbleView(
                 val px = g.cx * w
                 val py = g.cy * h
                 paint.textSize = g.sizeFrac * edge
-                val fm = paint.fontMetrics
+                paint.getFontMetrics(fontMetrics)
                 // Paint draws text on the baseline; offset so the glyph's visual middle sits at py.
-                val baselineY = py - (fm.ascent + fm.descent) / 2f
+                val baselineY = py - (fontMetrics.ascent + fontMetrics.descent) / 2f
                 nc.save()
                 nc.rotate(g.rotationDeg, px, py)
                 nc.drawText(g.char.toString(), px, baselineY, paint)
