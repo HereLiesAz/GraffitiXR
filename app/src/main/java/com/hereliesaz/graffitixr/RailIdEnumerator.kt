@@ -67,7 +67,7 @@ internal fun enumerateRailItemIdRegistrations(layers: List<Layer>, mode: EditorM
     layers.forEach { layer ->
         ids += layerId(layer)
         ids += listOf(
-            "grp.text", "grp.paint", "grp.retouch", "grp.adjust", "grp.effects",
+            "grp.text", "grp.retouch", "grp.adjust", "grp.effects",
         ).map { layerId(layer, it) }
         ids += listOf(
             "editText", "font", "size.text", "color", "kern", "bold", "italic",

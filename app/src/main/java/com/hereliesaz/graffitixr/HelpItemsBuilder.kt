@@ -63,8 +63,9 @@ internal fun buildHelpItems(strings: AppStrings, layers: List<Layer>): Map<Strin
 
     layers.forEach { layer ->
         base[layerId(layer)] = strings.help.layer(layer.name)
-        // Tool category folders (host items) inside the per-layer nested rail.
-        base[layerId(layer, "grp.paint")] = strings.help.addDraw
+        // Tool category folders (host items) inside the per-layer nested rail. The former
+        // grp.paint folder was retired when Eraser was promoted to a top-level rail item —
+        // Eraser was the only child, so the folder was just an extra tap.
         base[layerId(layer, "grp.retouch")] = strings.help.blur
         base[layerId(layer, "grp.adjust")] = strings.help.adj
         base[layerId(layer, "grp.effects")] = strings.help.stencilGen

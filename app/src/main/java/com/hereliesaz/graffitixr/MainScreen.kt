@@ -585,23 +585,21 @@ fun MainScreen(
 
         if (!isTouchLocked && !isImageLocked && activeLayer != null && !isGuest) {
             if (uiState.activeTool != Tool.NONE) {
+                // No graphicsLayer here: the layer bitmap above already applies the layer transform
+                // to what the user sees. DrawingCanvas is a full-screen touch layer that captures
+                // pointer positions in true screen coordinates so EditorViewModel.onStrokePoint can
+                // pass them into ImageProcessor.mapScreenToBitmap, which is what undoes the layer
+                // transform and the ContentScale.Fit letterboxing to hit the correct bitmap pixel.
+                // A graphicsLayer here would make Compose inverse-transform the pointer position
+                // before delivery — then mapScreenToBitmap would inverse-transform it AGAIN, drifting
+                // the stored stroke away from where the finger actually is (worse the further the
+                // layer is panned/scaled/rotated).
                 DrawingCanvas(
                     activeTool = uiState.activeTool,
                     brushSize = uiState.brushSize,
                     activeColor = uiState.activeColor,
                     layerBitmapKey = activeLayer.bitmap,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            translationX = activeLayer.offset.x
-                            translationY = activeLayer.offset.y
-                            scaleX = activeLayer.scale
-                            scaleY = activeLayer.scale
-                            rotationX = activeLayer.rotationX
-                            rotationY = activeLayer.rotationY
-                            rotationZ = activeLayer.rotationZ
-                            transformOrigin = TransformOrigin.Center
-                        },
+                    modifier = Modifier.fillMaxSize(),
                     onStrokeStart = { offset, size -> editorViewModel.onStrokeStart(offset, size) },
                     onStrokePoint = { offset -> editorViewModel.onStrokePoint(offset) },
                     onStrokeEnd = { editorViewModel.onStrokeEnd() }
