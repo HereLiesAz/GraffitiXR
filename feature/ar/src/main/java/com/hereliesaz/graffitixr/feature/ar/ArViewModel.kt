@@ -1911,6 +1911,11 @@ class ArViewModel @Inject constructor(
     }
 
     // --- Doodle demo: headless fingerprint build ---
+    private companion object {
+        const val DOODLE_CAPTURE_INTERVAL_MS = 2500L
+        // After this long without a relocalization lock (featureless wall), place on the plain anchor.
+        const val DOODLE_LOCK_TIMEOUT_MS = 30_000L
+    }
     private var doodlePhaseActive = false
     private var doodleFingerprintBuilt = false
     private var doodleCaptureJob: Job? = null
@@ -1929,12 +1934,20 @@ class ArViewModel @Inject constructor(
             doodleFingerprintBuilt = false
             slamManager.overlayMarkCenterLocal = null
             doodleCaptureJob = viewModelScope.launch {
-                while (isActive && doodlePhaseActive && !doodleFingerprintBuilt) {
-                    delay(2500)
-                    if (_uiState.value.isAnchorEstablished && !doodleFingerprintBuilt &&
-                        renderer?.doodleWallPlane != null
-                    ) {
+                // Deadline starts once we actually have an anchor to build against.
+                var deadlineMs = 0L
+                while (isActive && doodlePhaseActive && !_uiState.value.doodleLocked) {
+                    delay(DOODLE_CAPTURE_INTERVAL_MS)
+                    if (!_uiState.value.isAnchorEstablished || renderer?.doodleWallPlane == null) continue
+                    if (deadlineMs == 0L) deadlineMs = System.currentTimeMillis() + DOODLE_LOCK_TIMEOUT_MS
+                    if (!doodleFingerprintBuilt) {
                         requestCapture() // no onScreenTap → no tap; onTargetCaptured builds headlessly
+                    }
+                    // Graceful fallback: on a featureless wall relocalization may never converge. Rather
+                    // than hang forever, after the timeout place the artwork on the plain anchor so the
+                    // user still ends up with art stuck to the wall.
+                    if (System.currentTimeMillis() >= deadlineMs && !_uiState.value.doodleLocked) {
+                        onDoodleLocked()
                     }
                 }
             }
@@ -1960,13 +1973,19 @@ class ArViewModel @Inject constructor(
         val planeNormal = floatArrayOf(plane[3], plane[4], plane[5])
         val anchor = slamManager.getAnchorTransform()
         viewModelScope.launch(Dispatchers.IO) {
-            val fp = MetricFingerprintBuilder.buildSingle(
-                slamManager, rotated, viewMatrix, intr, planePoint, planeNormal, anchor
-            )
-            if (fp != null) doodleFingerprintBuilt = true
-            // Resume mapping that requestCapture paused, regardless of outcome.
-            slamManager.setMappingPaused(false)
-            slamManager.setSplatsVisible(true)
+            try {
+                val fp = MetricFingerprintBuilder.buildSingle(
+                    slamManager, rotated, viewMatrix, intr, planePoint, planeNormal, anchor
+                )
+                if (fp != null) doodleFingerprintBuilt = true
+            } catch (t: Throwable) {
+                android.util.Log.w("ArViewModel", "Doodle fingerprint build failed", t)
+            } finally {
+                // Always resume the mapping that requestCapture paused — otherwise a throw would
+                // wedge SLAM with mapping paused for the rest of the session.
+                slamManager.setMappingPaused(false)
+                slamManager.setSplatsVisible(true)
+            }
         }
     }
 
