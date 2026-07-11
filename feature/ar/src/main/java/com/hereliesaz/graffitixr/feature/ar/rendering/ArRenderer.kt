@@ -278,7 +278,6 @@ class ArRenderer(
     // when active the renderer auto-establishes a wall anchor, and (once the host has built a
     // fingerprint from the user's drawing) tracks the fused mark-PnP pose, firing onDoodleLocked when
     // it holds steady AND relocalization is confident (DOODLE_MIN_RELOC_INLIERS).
-    var doodleLockActive = false
     private val anchorLockTracker = AnchorLockTracker()
     private var doodleLockReported = false
     private var doodleAutoAnchorRequested = false
@@ -288,6 +287,21 @@ class ArRenderer(
     @Volatile
     var doodleWallPlane: FloatArray? = null
         private set
+
+    // @Volatile: set on the UI thread (MainScreen update), read on the GL thread. Setting it true
+    // after it was false (a fresh onboarding on this renderer instance) clears the one-shot latches so
+    // the auto-anchor + lock can run again — otherwise a retried phase would be permanently disabled.
+    @Volatile
+    var doodleLockActive: Boolean = false
+        set(value) {
+            if (value && !field) {
+                doodleLockReported = false
+                doodleAutoAnchorRequested = false
+                doodleWallPlane = null
+                anchorLockTracker.reset()
+            }
+            field = value
+        }
     // Render-thread stall watchdog. The GL thread can block inside session.update() forever when the
     // camera never feeds ARCore; a side thread watches these markers and reports the stuck step on
     // screen (the blocked GL thread can't report for itself).

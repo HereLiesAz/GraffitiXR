@@ -41,6 +41,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -465,8 +466,15 @@ class MainActivity : ComponentActivity() {
                 // complete only once the demo reaches its lock/swap.
                 val firstRunDoodleKey = "first_run_ar_doodle"
                 val firstRunCompletedTutorials by mainViewModel.completedTutorials.collectAsState()
-                var firstRunDoodleActive by remember { mutableStateOf(false) }
-                var firstRunTriggered by remember { mutableStateOf(false) }
+                // rememberSaveable so a process/config event mid-flow doesn't reset the flags and
+                // re-trigger the gate.
+                var firstRunDoodleActive by rememberSaveable { mutableStateOf(false) }
+                // Latches true once the gate has fired this session (whether the user picks or cancels),
+                // so a later key change can't re-fire it and spawn a duplicate project. Not persisted —
+                // a fresh launch re-offers onboarding until it's actually completed.
+                var firstRunTriggered by rememberSaveable { mutableStateOf(false) }
+                // Set on a successful pick; the effect below adds the layer once the project id exists.
+                var firstRunPendingUri by rememberSaveable { mutableStateOf<Uri?>(null) }
                 val firstRunScribble = remember { com.hereliesaz.graffitixr.onboarding.ScribbleGenerator.generate() }
                 val firstRunScribbleBitmap = remember(firstRunScribble) {
                     com.hereliesaz.graffitixr.onboarding.renderScribbleBitmap(firstRunScribble, 512)
@@ -474,15 +482,28 @@ class MainActivity : ComponentActivity() {
 
                 val firstRunImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                     if (uri != null) {
-                        editorViewModel.onAddLayer(uri)
+                        // Create the project only now (on a real pick) so cancelling leaves no stray
+                        // untitled project. The layer is added by the effect below once the project id
+                        // has propagated — onAddLayer no-ops on a null projectId, so we can't add here.
+                        dashboardViewModel.createAndOpenProject()
+                        firstRunPendingUri = uri
                         firstRunDoodleActive = true
                         navController.navigate(EditorMode.AR.name) {
                             popUpTo(LIBRARY_ROUTE) { inclusive = true }
                             launchSingleTop = true
                         }
-                    } else {
-                        // Cancelled the picker — abandon first-run silently, land on the library.
-                        firstRunTriggered = false
+                    }
+                    // Cancel: firstRunTriggered stays true, so the gate won't re-fire this session; the
+                    // user lands on the library. No project was created.
+                }
+
+                // Add the picked layer once the auto-created project's id is live (avoids the
+                // create-vs-add race where onAddLayer would silently drop the layer).
+                LaunchedEffect(firstRunPendingUri, editorUiState.projectId) {
+                    val uri = firstRunPendingUri
+                    if (uri != null && editorUiState.projectId != null) {
+                        editorViewModel.onAddLayer(uri)
+                        firstRunPendingUri = null
                     }
                 }
 
@@ -495,7 +516,6 @@ class MainActivity : ComponentActivity() {
                         currentRoute == LIBRARY_ROUTE
                     ) {
                         firstRunTriggered = true
-                        dashboardViewModel.createAndOpenProject()
                         firstRunImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }
                 }

@@ -1629,8 +1629,10 @@ class ArViewModel @Inject constructor(
         wallPlane: FloatArray? = null
     ) {
         // Doodle demo: a headless capture (no tap, no review) — build the fingerprint from the
-        // drawing and return before the normal capture/review flow runs.
+        // drawing and return before the normal capture/review flow runs. Clear the capture-request
+        // flag ourselves (the normal paths below do this) so the renderer isn't re-armed every frame.
         if (doodlePhaseActive && !doodleFingerprintBuilt) {
+            onCaptureRequestHandled()
             buildDoodleFingerprint(bitmap, intrinsics, viewMatrix, displayRotation)
             return
         }
@@ -1916,8 +1918,12 @@ class ArViewModel @Inject constructor(
         // After this long without a relocalization lock (featureless wall), place on the plain anchor.
         const val DOODLE_LOCK_TIMEOUT_MS = 30_000L
     }
-    private var doodlePhaseActive = false
-    private var doodleFingerprintBuilt = false
+    // @Volatile: written on main (setDoodlePhase) / IO (build result) and read on the GL thread
+    // (onTargetCaptured), so the GL thread must observe the latest value.
+    @Volatile private var doodlePhaseActive = false
+    @Volatile private var doodleFingerprintBuilt = false
+    // Guards against re-entrant builds if captures arrive faster than a build completes.
+    @Volatile private var doodleBuildInFlight = false
     private var doodleCaptureJob: Job? = null
 
     /**
@@ -1959,12 +1965,15 @@ class ArViewModel @Inject constructor(
 
     /** Build a fingerprint from a headless doodle capture; sets doodleFingerprintBuilt on success. */
     private fun buildDoodleFingerprint(bitmap: Bitmap, intrinsics: FloatArray?, viewMatrix: FloatArray, displayRotation: Int) {
+        // Only one build in flight — captures can arrive faster than a native build completes.
+        if (doodleBuildInFlight) return
         val plane = renderer?.doodleWallPlane
         val intr = intrinsics
         if (plane == null || plane.size < 6 || intr == null) {
             slamManager.setMappingPaused(false)
             return
         }
+        doodleBuildInFlight = true
         val rotated = if (displayRotation != 0) {
             val m = android.graphics.Matrix().apply { postRotate(displayRotation.toFloat()) }
             Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, m, true)
@@ -1985,6 +1994,7 @@ class ArViewModel @Inject constructor(
                 // wedge SLAM with mapping paused for the rest of the session.
                 slamManager.setMappingPaused(false)
                 slamManager.setSplatsVisible(true)
+                doodleBuildInFlight = false
             }
         }
     }
