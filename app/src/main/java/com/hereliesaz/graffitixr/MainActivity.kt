@@ -530,6 +530,8 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(arUiState.doodleLocked) {
                     if (firstRunDoodleActive && arUiState.doodleLocked) {
                         firstRunDoodleActive = false
+                        // Pre-set the adjustment knobs to read well against the wall we captured.
+                        editorViewModel.autoTuneActiveLayer(arUiState.doodleWallStats)
                         mainViewModel.markTutorialCompletePersistent(firstRunDoodleKey)
                     }
                 }

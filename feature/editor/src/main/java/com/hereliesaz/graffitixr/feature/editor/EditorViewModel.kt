@@ -21,7 +21,9 @@ import com.hereliesaz.graffitixr.common.DispatcherProvider
 import com.hereliesaz.graffitixr.common.coop.OpEmitter
 import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.common.util.ImageUtils
+import com.hereliesaz.graffitixr.common.util.computeAutoTune
 import com.hereliesaz.graffitixr.common.util.decodeBoundedBitmap
+import com.hereliesaz.graffitixr.common.util.imageStats
 import com.hereliesaz.graffitixr.common.util.saveBitmapToGallery
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
@@ -1153,6 +1155,31 @@ class EditorViewModel @Inject constructor(
     override fun onColorBalanceRChanged(v: Float) = dispatch(EditorIntent.SetColorBalanceR(v))
     override fun onColorBalanceGChanged(v: Float) = dispatch(EditorIntent.SetColorBalanceG(v))
     override fun onColorBalanceBChanged(v: Float) = dispatch(EditorIntent.SetColorBalanceB(v))
+
+    /**
+     * First-run doodle demo: on the scribble->artwork swap, pre-set the adjustment knobs to values
+     * that read well against the wall. Combines [wall] (from the doodle capture) with the active
+     * layer's own colour/contrast and applies through the existing setters (which route the
+     * multiplicative/additive knobs to the AR mode-adjustment and colour balance to the layer, exactly
+     * as the AR composite consumes them). A starting point the user then fine-tunes — not a hard grade.
+     */
+    fun autoTuneActiveLayer(wall: com.hereliesaz.graffitixr.common.util.ImageStats?) {
+        if (wall == null) return
+        val bitmap = _uiState.value.layers.find { it.id == _uiState.value.activeLayerId }?.bitmap ?: return
+        viewModelScope.launch(dispatchers.default) {
+            val art = bitmap.imageStats()
+            val t = computeAutoTune(wall, art)
+            withContext(dispatchers.main) {
+                onOpacityChanged(t.opacity)
+                onBrightnessChanged(t.brightness)
+                onContrastChanged(t.contrast)
+                onSaturationChanged(t.saturation)
+                onColorBalanceRChanged(t.colorBalanceR)
+                onColorBalanceGChanged(t.colorBalanceG)
+                onColorBalanceBChanged(t.colorBalanceB)
+            }
+        }
+    }
     override fun onScaleChanged(s: Float) = dispatch(EditorIntent.SetScale(s))
     override fun onOffsetChanged(o: Offset) = dispatch(EditorIntent.AddOffset(o))
 

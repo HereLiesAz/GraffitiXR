@@ -41,6 +41,8 @@ data class ArUiState(
     // indicator), and a latching flag set once it has held long enough to swap in the user's artwork.
     val doodleLockStability: Float = 0f,
     val doodleLocked: Boolean = false,
+    // Wall stats from the doodle capture, used to auto-tune the artwork's adjustments on the swap.
+    val doodleWallStats: com.hereliesaz.graffitixr.common.util.ImageStats? = null,
     val isFlashlightOn: Boolean = false,
     val lightLevel: Float = 1.0f,
     val tempCaptureBitmap: Bitmap? = null,

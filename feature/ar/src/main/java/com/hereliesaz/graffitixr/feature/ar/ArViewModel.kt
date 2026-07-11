@@ -20,6 +20,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.ar.core.CameraConfig
 import com.google.ar.core.CameraConfigFilter
 import com.hereliesaz.graffitixr.common.DispatcherProvider
+import com.hereliesaz.graffitixr.common.util.imageStats
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
@@ -1983,6 +1984,11 @@ class ArViewModel @Inject constructor(
         val anchor = slamManager.getAnchorTransform()
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                // Capture the wall's colour/luminance so the artwork can be auto-tuned to it on the
+                // swap. Computed every attempt so it's fresh even on the timeout (no-fingerprint) path.
+                val wallStats = rotated.imageStats()
+                _uiState.update { it.copy(doodleWallStats = wallStats) }
+
                 val fp = MetricFingerprintBuilder.buildSingle(
                     slamManager, rotated, viewMatrix, intr, planePoint, planeNormal, anchor
                 )
