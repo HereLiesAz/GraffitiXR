@@ -41,6 +41,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -458,6 +459,83 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // --- First-run AR doodle onboarding coordinator ---
+                // Strictly contained: the whole flow is gated behind the tutorial key + ARCore
+                // availability + camera permission. If any condition fails it's a complete no-op and
+                // normal library startup is byte-for-byte unchanged. The tutorial key is marked
+                // complete only once the demo reaches its lock/swap.
+                val firstRunDoodleKey = "first_run_ar_doodle"
+                val firstRunCompletedTutorials by mainViewModel.completedTutorials.collectAsState()
+                // rememberSaveable so a process/config event mid-flow doesn't reset the flags and
+                // re-trigger the gate.
+                var firstRunDoodleActive by rememberSaveable { mutableStateOf(false) }
+                // Latches true once the gate has fired this session (whether the user picks or cancels),
+                // so a later key change can't re-fire it and spawn a duplicate project. Not persisted —
+                // a fresh launch re-offers onboarding until it's actually completed.
+                var firstRunTriggered by rememberSaveable { mutableStateOf(false) }
+                // Set on a successful pick; the effect below adds the layer once the project id exists.
+                var firstRunPendingUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+                val firstRunScribble = remember { com.hereliesaz.graffitixr.onboarding.ScribbleGenerator.generate() }
+                val firstRunScribbleBitmap = remember(firstRunScribble) {
+                    com.hereliesaz.graffitixr.onboarding.renderScribbleBitmap(firstRunScribble, 512)
+                }
+
+                val firstRunImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+                    if (uri != null) {
+                        // Create the project only now (on a real pick) so cancelling leaves no stray
+                        // untitled project. The layer is added by the effect below once the project id
+                        // has propagated — onAddLayer no-ops on a null projectId, so we can't add here.
+                        dashboardViewModel.createAndOpenProject()
+                        firstRunPendingUri = uri
+                        firstRunDoodleActive = true
+                        navController.navigate(EditorMode.AR.name) {
+                            popUpTo(LIBRARY_ROUTE) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                    // Cancel: firstRunTriggered stays true, so the gate won't re-fire this session; the
+                    // user lands on the library. No project was created.
+                }
+
+                // Add the picked layer once the auto-created project's id is live (avoids the
+                // create-vs-add race where onAddLayer would silently drop the layer).
+                LaunchedEffect(firstRunPendingUri, editorUiState.projectId) {
+                    val uri = firstRunPendingUri
+                    if (uri != null && editorUiState.projectId != null) {
+                        editorViewModel.onAddLayer(uri)
+                        firstRunPendingUri = null
+                    }
+                }
+
+                LaunchedEffect(arUiState.isArCoreAvailabilityResolved, firstRunCompletedTutorials, hasCameraPermission, currentRoute) {
+                    if (!firstRunTriggered &&
+                        firstRunDoodleKey !in firstRunCompletedTutorials &&
+                        arUiState.isArCoreAvailabilityResolved &&
+                        arUiState.isArCoreAvailable &&
+                        hasCameraPermission &&
+                        currentRoute == LIBRARY_ROUTE
+                    ) {
+                        firstRunTriggered = true
+                        firstRunImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    }
+                }
+
+                // Drive the headless fingerprint-build orchestration in the AR VM with the phase.
+                LaunchedEffect(firstRunDoodleActive) {
+                    arViewModel.setDoodlePhase(firstRunDoodleActive)
+                }
+
+                // Lock reached: clear the doodle phase (normal composite resumes, swapping the scribble
+                // for the user's artwork) and never show onboarding again.
+                LaunchedEffect(arUiState.doodleLocked) {
+                    if (firstRunDoodleActive && arUiState.doodleLocked) {
+                        firstRunDoodleActive = false
+                        // Pre-set the adjustment knobs to read well against the wall we captured.
+                        editorViewModel.autoTuneActiveLayer(arUiState.doodleWallStats)
+                        mainViewModel.markTutorialCompletePersistent(firstRunDoodleKey)
+                    }
+                }
+
                 var showDesignInstructionsDialog by remember { mutableStateOf(false) }
 
                 // Auto-activate the first layer as soon as one exists — don't wait for
@@ -623,7 +701,9 @@ class MainActivity : ComponentActivity() {
                             slamManager = slamManager,
                             hasCameraPermission = hasCameraPermission,
                             cameraController = cameraController,
-                            onRendererCreated = { _ -> }
+                            onRendererCreated = { _ -> },
+                            doodlePhaseActive = firstRunDoodleActive,
+                            doodleScribbleBitmap = firstRunScribbleBitmap
                         )
 
                     }
@@ -683,6 +763,20 @@ class MainActivity : ComponentActivity() {
                                     arExplainerDismissedThisSession = true
                                     mainViewModel.markTutorialCompletePersistent(arExplainerKey)
                                 }
+                            )
+                        }
+
+                        // First-run doodle coaching layer — over the AR camera feed while the demo runs.
+                        if (firstRunDoodleActive &&
+                            !showSettings &&
+                            editorUiState.editorMode == EditorMode.AR
+                        ) {
+                            com.hereliesaz.graffitixr.onboarding.FirstRunOnboardingOverlay(
+                                scribble = firstRunScribble,
+                                isArReady = arUiState.isArReady,
+                                planeDetected = arUiState.planeDetected,
+                                title = "Doodle this on your wall or canvas",
+                                movementHint = arUiState.scanHint ?: "Slowly move your device in a circle",
                             )
                         }
 

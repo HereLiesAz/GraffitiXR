@@ -20,6 +20,10 @@ import androidx.lifecycle.viewModelScope
 import com.google.ar.core.CameraConfig
 import com.google.ar.core.CameraConfigFilter
 import com.hereliesaz.graffitixr.common.DispatcherProvider
+import com.hereliesaz.graffitixr.common.util.imageStats
+import com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import com.google.ar.core.Config
 import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
@@ -1412,6 +1416,8 @@ class ArViewModel @Inject constructor(
             }
             state.copy(
                 isScanning = isTracking,
+                // Latches true on the first TRACKING frame — "ARCore has finished initializing".
+                isArReady = state.isArReady || isTracking,
                 splatCount = splatCount,
                 immutableSplatCount = immutableSplatCount,
                 isDepthApiSupported = isDepthApiSupported,
@@ -1623,6 +1629,15 @@ class ArViewModel @Inject constructor(
         tapDistanceMeters: Float,
         wallPlane: FloatArray? = null
     ) {
+        // Doodle demo: a headless capture (no tap, no review) — build the fingerprint from the
+        // drawing and return before the normal capture/review flow runs. Clear the capture-request
+        // flag ourselves (the normal paths below do this) so the renderer isn't re-armed every frame.
+        if (doodlePhaseActive && !doodleFingerprintBuilt) {
+            onCaptureRequestHandled()
+            buildDoodleFingerprint(bitmap, intrinsics, viewMatrix, displayRotation)
+            return
+        }
+
         val tapPos = pendingTapPosition
         val extent = computePhysicalExtent(depthBuffer, depthBufW, depthBufH, colorW, colorH, intrinsics, depthBufStride)
 
@@ -1877,6 +1892,117 @@ class ArViewModel @Inject constructor(
      */
     fun onPrimaryAnchorEstablished() {
         _uiState.update { it.copy(isAnchorEstablished = true) }
+    }
+
+    /**
+     * Fired once by the renderer (GL thread) when the first tracking plane appears. Latches
+     * [ArUiState.planeDetected] so the onboarding overlay can drop the "move your device" guidance.
+     * MutableStateFlow.update is thread-safe, matching onPrimaryAnchorEstablished above.
+     */
+    fun onFirstPlaneDetected() {
+        _uiState.update { if (it.planeDetected) it else it.copy(planeDetected = true) }
+    }
+
+    /** Doodle demo (GL thread): report anchor-hold stability for the hold-steady indicator. */
+    fun onDoodleLockProgress(stability: Float) {
+        _uiState.update { it.copy(doodleLockStability = stability) }
+    }
+
+    /** Doodle demo (GL thread): the overlay has held one spot long enough — trigger the artwork swap. */
+    fun onDoodleLocked() {
+        _uiState.update { if (it.doodleLocked) it else it.copy(doodleLocked = true) }
+    }
+
+    // --- Doodle demo: headless fingerprint build ---
+    private companion object {
+        const val DOODLE_CAPTURE_INTERVAL_MS = 2500L
+        // After this long without a relocalization lock (featureless wall), place on the plain anchor.
+        const val DOODLE_LOCK_TIMEOUT_MS = 30_000L
+    }
+    // @Volatile: written on main (setDoodlePhase) / IO (build result) and read on the GL thread
+    // (onTargetCaptured), so the GL thread must observe the latest value.
+    @Volatile private var doodlePhaseActive = false
+    @Volatile private var doodleFingerprintBuilt = false
+    // Guards against re-entrant builds if captures arrive faster than a build completes.
+    @Volatile private var doodleBuildInFlight = false
+    private var doodleCaptureJob: Job? = null
+
+    /**
+     * Host tells us when the first-run doodle overlay is up. While active we periodically capture the
+     * live frame (no tap) and try to build a wall fingerprint from whatever the user has drawn; the
+     * builder returns null until there's enough texture, so this self-times to "they've drawn enough".
+     * Once a fingerprint is set, native relocalization + self-grow run automatically and the renderer's
+     * inlier-gated lock can fire. Purist teleological path — the fingerprint IS the demo.
+     */
+    fun setDoodlePhase(active: Boolean) {
+        if (doodlePhaseActive == active) return
+        doodlePhaseActive = active
+        if (active) {
+            doodleFingerprintBuilt = false
+            slamManager.overlayMarkCenterLocal = null
+            doodleCaptureJob = viewModelScope.launch {
+                // Deadline starts once we actually have an anchor to build against.
+                var deadlineMs = 0L
+                while (isActive && doodlePhaseActive && !_uiState.value.doodleLocked) {
+                    delay(DOODLE_CAPTURE_INTERVAL_MS)
+                    if (!_uiState.value.isAnchorEstablished || renderer?.doodleWallPlane == null) continue
+                    if (deadlineMs == 0L) deadlineMs = System.currentTimeMillis() + DOODLE_LOCK_TIMEOUT_MS
+                    if (!doodleFingerprintBuilt) {
+                        requestCapture() // no onScreenTap → no tap; onTargetCaptured builds headlessly
+                    }
+                    // Graceful fallback: on a featureless wall relocalization may never converge. Rather
+                    // than hang forever, after the timeout place the artwork on the plain anchor so the
+                    // user still ends up with art stuck to the wall.
+                    if (System.currentTimeMillis() >= deadlineMs && !_uiState.value.doodleLocked) {
+                        onDoodleLocked()
+                    }
+                }
+            }
+        } else {
+            doodleCaptureJob?.cancel()
+            doodleCaptureJob = null
+        }
+    }
+
+    /** Build a fingerprint from a headless doodle capture; sets doodleFingerprintBuilt on success. */
+    private fun buildDoodleFingerprint(bitmap: Bitmap, intrinsics: FloatArray?, viewMatrix: FloatArray, displayRotation: Int) {
+        // Only one build in flight — captures can arrive faster than a native build completes.
+        if (doodleBuildInFlight) return
+        val plane = renderer?.doodleWallPlane
+        val intr = intrinsics
+        if (plane == null || plane.size < 6 || intr == null) {
+            slamManager.setMappingPaused(false)
+            return
+        }
+        doodleBuildInFlight = true
+        val rotated = if (displayRotation != 0) {
+            val m = android.graphics.Matrix().apply { postRotate(displayRotation.toFloat()) }
+            Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, m, true)
+        } else bitmap
+        val planePoint = floatArrayOf(plane[0], plane[1], plane[2])
+        val planeNormal = floatArrayOf(plane[3], plane[4], plane[5])
+        val anchor = slamManager.getAnchorTransform()
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // Capture the wall's colour/luminance so the artwork can be auto-tuned to it on the
+                // swap. Computed every attempt so it's fresh even on the timeout (no-fingerprint) path.
+                val wallStats = rotated.imageStats()
+                _uiState.update { it.copy(doodleWallStats = wallStats) }
+
+                val fp = MetricFingerprintBuilder.buildSingle(
+                    slamManager, rotated, viewMatrix, intr, planePoint, planeNormal, anchor
+                )
+                if (fp != null) doodleFingerprintBuilt = true
+            } catch (t: Throwable) {
+                android.util.Log.w("ArViewModel", "Doodle fingerprint build failed", t)
+            } finally {
+                // Always resume the mapping that requestCapture paused — otherwise a throw would
+                // wedge SLAM with mapping paused for the rest of the session.
+                slamManager.setMappingPaused(false)
+                slamManager.setSplatsVisible(true)
+                doodleBuildInFlight = false
+            }
+        }
     }
 
     fun appendDiag(text: String) {

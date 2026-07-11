@@ -70,7 +70,13 @@ fun MainScreen(
     hasCameraPermission: Boolean,
     cameraController: androidx.camera.view.LifecycleCameraController,
     onRendererCreated: (ArRenderer) -> Unit,
-    isExporting: Boolean = false
+    isExporting: Boolean = false,
+    // First-run doodle demo: while active, the AR overlay shows this scribble bitmap (the thing the
+    // user copies onto the wall) instead of the layer composite, and the renderer runs the
+    // auto-anchor + hold-lock. On lock the host clears the flag and the normal composite resumes,
+    // swapping the scribble for the user's artwork. Defaulted off — no effect on the normal path.
+    doodlePhaseActive: Boolean = false,
+    doodleScribbleBitmap: android.graphics.Bitmap? = null
 ) {
     val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
     val isImageLocked = activeLayer?.isImageLocked ?: false
@@ -257,7 +263,17 @@ fun MainScreen(
                             listOf(it.brightness, it.contrast, it.saturation, it.opacity, it.isInverted)
                         }
                     }
-                    LaunchedEffect(visibleLayers, arUiState.isAnchorEstablished, arToneKey) {
+                    LaunchedEffect(visibleLayers, arUiState.isAnchorEstablished, arToneKey, doodlePhaseActive, doodleScribbleBitmap) {
+                        // Doodle phase: the wall shows the scribble the user is copying, not their
+                        // artwork. Once the anchor exists, push the scribble and hold — the host swaps
+                        // to the artwork by clearing doodlePhaseActive (this effect then re-runs and
+                        // falls through to the normal composite below).
+                        if (doodlePhaseActive && doodleScribbleBitmap != null) {
+                            if (arUiState.isAnchorEstablished) {
+                                rendererRef.value?.updateOverlayBitmap(doodleScribbleBitmap)
+                            }
+                            return@LaunchedEffect
+                        }
                         if (!arUiState.isAnchorEstablished || visibleLayers.isEmpty()) {
                             rendererRef.value?.updateOverlayBitmap(null)
                             return@LaunchedEffect
@@ -298,6 +314,15 @@ fun MainScreen(
                                 },
                                 onAnchorEstablished = {
                                     arViewModel.onPrimaryAnchorEstablished()
+                                },
+                                onPlaneDetected = {
+                                    arViewModel.onFirstPlaneDetected()
+                                },
+                                onDoodleLockProgress = { stability ->
+                                    arViewModel.onDoodleLockProgress(stability)
+                                },
+                                onDoodleLocked = {
+                                    arViewModel.onDoodleLocked()
                                 }
                             )
                             renderer.hideVisualization = isExporting
@@ -324,6 +349,7 @@ fun MainScreen(
                                 r.hideVisualization = isExporting
                                 r.visitedSectorsMask = arUiState.visitedSectorsMask
                                 r.scanPhase = arUiState.scanPhase
+                                r.doodleLockActive = doodlePhaseActive
                                 // Independent in-world perception layers (Settings, default on).
                                 r.showFeaturePoints = uiState.showFeaturePoints
                                 r.showPlaneGrids = uiState.showPlaneGrids
