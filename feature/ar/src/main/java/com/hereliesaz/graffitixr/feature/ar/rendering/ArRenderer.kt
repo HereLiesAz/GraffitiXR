@@ -44,6 +44,10 @@ class ArRenderer(
     // created. The ViewModel uses this to flip ArUiState.isAnchorEstablished,
     // which in turn unlocks the Design rail and advances scanPhase to COMPLETE.
     private val onAnchorEstablished: () -> Unit = {},
+    // Fired once on the GL thread the first time a tracking plane is found. The
+    // ViewModel flips ArUiState.planeDetected so first-run onboarding can drop
+    // the "move your device" guidance once a surface exists.
+    private val onPlaneDetected: () -> Unit = {},
     // Fired from the GL thread when ARCore has been stuck not-tracking for a
     // sustained run of frames (true) or recovers (false). MainScreen uses this
     // to drop the GLSurfaceView render mode to WHEN_DIRTY so the saturated
@@ -261,6 +265,8 @@ class ArRenderer(
     // if no camera frame has arrived a few seconds after the session started driving.
     private var camStreamReported = false
     private var camStallWarned = false
+    // One-shot: true once the first tracking plane has been reported via onPlaneDetected.
+    private var planeDetectedReported = false
     // Render-thread stall watchdog. The GL thread can block inside session.update() forever when the
     // camera never feeds ARCore; a side thread watches these markers and reports the stuck step on
     // screen (the blocked GL thread can't report for itself).
@@ -936,6 +942,19 @@ class ArRenderer(
 
             lastStep = "slamCamera"
             val isTracking = camera.trackingState == TrackingState.TRACKING
+
+            // First-run onboarding: report the first tracking plane exactly once. getAllTrackables is
+            // not free, so only poll (throttled) until we've reported, then this is a single boolean
+            // check per frame forever after.
+            if (!planeDetectedReported && isTracking && frameCount % 30 == 0) {
+                val hasPlane = activeSession.getAllTrackables(com.google.ar.core.Plane::class.java)
+                    .any { it.trackingState == TrackingState.TRACKING && it.subsumedBy == null }
+                if (hasPlane) {
+                    planeDetectedReported = true
+                    onPlaneDetected()
+                }
+            }
+
             // Adaptive idle gating: skip the heavy native SLAM/VIO map integration on gated idle
             // frames (projection locked + phone still). session.update() above still ran, so ARCore's
             // pose keeps advancing and the first heavy frame after resume re-feeds a correct pose.

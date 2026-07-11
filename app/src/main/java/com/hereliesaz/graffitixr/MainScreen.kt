@@ -298,6 +298,9 @@ fun MainScreen(
                                 },
                                 onAnchorEstablished = {
                                     arViewModel.onPrimaryAnchorEstablished()
+                                },
+                                onPlaneDetected = {
+                                    arViewModel.onFirstPlaneDetected()
                                 }
                             )
                             renderer.hideVisualization = isExporting

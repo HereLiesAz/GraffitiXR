@@ -31,6 +31,12 @@ data class ArUiState(
     // True once a target fingerprint has been saved to the current project.
     // Controls whether artwork is rendered in AR space (via OverlayRenderer).
     val isAnchorEstablished: Boolean = false,
+    // First-run onboarding signals. isArReady flips true the first frame ARCore reports TRACKING
+    // (ARCore has finished initializing); planeDetected flips true the first time a tracking plane
+    // is found. Both are latching (never reset within a session) and drive the onboarding overlay's
+    // stage transitions (show movement guidance until a surface appears, etc.).
+    val isArReady: Boolean = false,
+    val planeDetected: Boolean = false,
     val isFlashlightOn: Boolean = false,
     val lightLevel: Float = 1.0f,
     val tempCaptureBitmap: Bitmap? = null,

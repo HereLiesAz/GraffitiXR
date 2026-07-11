@@ -1412,6 +1412,8 @@ class ArViewModel @Inject constructor(
             }
             state.copy(
                 isScanning = isTracking,
+                // Latches true on the first TRACKING frame — "ARCore has finished initializing".
+                isArReady = state.isArReady || isTracking,
                 splatCount = splatCount,
                 immutableSplatCount = immutableSplatCount,
                 isDepthApiSupported = isDepthApiSupported,
@@ -1877,6 +1879,15 @@ class ArViewModel @Inject constructor(
      */
     fun onPrimaryAnchorEstablished() {
         _uiState.update { it.copy(isAnchorEstablished = true) }
+    }
+
+    /**
+     * Fired once by the renderer (GL thread) when the first tracking plane appears. Latches
+     * [ArUiState.planeDetected] so the onboarding overlay can drop the "move your device" guidance.
+     * MutableStateFlow.update is thread-safe, matching onPrimaryAnchorEstablished above.
+     */
+    fun onFirstPlaneDetected() {
+        _uiState.update { if (it.planeDetected) it else it.copy(planeDetected = true) }
     }
 
     fun appendDiag(text: String) {
