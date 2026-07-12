@@ -33,6 +33,10 @@ And then, there's a decent suite of pertinent design tools, with support for mul
 
 ## Tools
 *   **Stencil generation:** A layer-level tool (not a mode) — automated multi-layer printable stencils (1-3 colors) with tiled PDF export.
+*   **Extensions (azphalt marketplace):** Browse and install `.azp` extensions from the Project → Extensions menu. Packages are SHA-256-verified and path-traversal-safe on install; installed `.cube` 3D-LUT grades apply straight to the active layer. GraffitiXR is the [azphalt](https://github.com/HereLiesAz/azphalt) standard's first conforming host.
+
+## Licensing
+GraffitiXR is **source-available, not open source.** The app, the `core:*` modules, and the AR / SLAM / teleological engine are licensed under **PolyForm Noncommercial 1.0.0** ([`/LICENSE`](LICENSE)); the declared extension API surface and asset importers are **MIT** ([`docs/licenses/MIT.txt`](docs/licenses/MIT.txt)). The **compiled app is free for anyone to use, including paid commissions** — the noncommercial term binds re-use of the *source*, not muralists doing paid work. See [`docs/LICENSING.md`](docs/LICENSING.md) for the authoritative, path-by-path layout and precedence. Bundled third parties (OpenCV, ML Kit, …) keep their own upstream licenses.
 
 ## Architecture
 Strictly decoupled multi-module Clean Architecture:
@@ -59,4 +63,4 @@ Strictly decoupled multi-module Clean Architecture:
 - [Release & Google Play Delivery](docs/RELEASE.md)
 
 ---
-*Documentation updated on 2026-06-28 for AzNavRail 10.18 and the reactive guidance framework.*
+*Documentation updated on 2026-07-12 for AzNavRail 11.0, the azphalt extensions marketplace, and the PolyForm/MIT licensing layout.*
