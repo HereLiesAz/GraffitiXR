@@ -23,6 +23,7 @@ import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.common.util.ImageUtils
 import com.hereliesaz.graffitixr.common.util.computeAutoTune
 import com.hereliesaz.graffitixr.common.util.decodeBoundedBitmap
+import com.hereliesaz.graffitixr.common.azphalt.applyCubeLut
 import com.hereliesaz.graffitixr.common.util.imageStats
 import com.hereliesaz.graffitixr.common.util.saveBitmapToGallery
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
@@ -85,6 +86,7 @@ class EditorViewModel @Inject constructor(
     internal val slamManager: SlamManager,
     private val dispatchers: DispatcherProvider,
     private val opEmitter: OpEmitter,
+    private val extensionRepository: com.hereliesaz.graffitixr.data.azphalt.ExtensionRepository,
 ) : ViewModel(), EditorActions {
 
     private val _uiState = MutableStateFlow(EditorUiState())
@@ -1155,6 +1157,33 @@ class EditorViewModel @Inject constructor(
     override fun onColorBalanceRChanged(v: Float) = dispatch(EditorIntent.SetColorBalanceR(v))
     override fun onColorBalanceGChanged(v: Float) = dispatch(EditorIntent.SetColorBalanceG(v))
     override fun onColorBalanceBChanged(v: Float) = dispatch(EditorIntent.SetColorBalanceB(v))
+
+    /**
+     * Apply an installed azphalt LUT extension to the active layer — the "use a marketplace plugin"
+     * payoff. Grades the layer's current bitmap through the extension's `.cube` 3D LUT (a transform a
+     * ColorMatrix can't express) and replaces the base, pushing undo history first.
+     */
+    fun applyInstalledLut(extensionId: String) {
+        val layerId = _uiState.value.activeLayerId ?: return
+        val layer = _uiState.value.layers.find { it.id == layerId } ?: return
+        val bitmap = layer.bitmap ?: return
+        pushHistory()
+        dispatch(EditorIntent.SetLoading(true))
+        viewModelScope.launch(dispatchers.default) {
+            val lut = extensionRepository.loadLut(extensionId)
+            if (lut == null) {
+                dispatch(EditorIntent.SetLoading(false))
+                return@launch
+            }
+            val graded = bitmap.applyCubeLut(lut)
+            val base = graded.copy(Bitmap.Config.ARGB_8888, false)
+            if (base != graded) graded.recycle()
+            layerStore.putBase(layerId, base)
+            layerStore.initStrokes(layerId)
+            rebuildLayerBitmap(layerId, emitOp = true)
+            dispatch(EditorIntent.SetLoading(false))
+        }
+    }
 
     /**
      * First-run doodle demo: on the scribble->artwork swap, pre-set the adjustment knobs to values

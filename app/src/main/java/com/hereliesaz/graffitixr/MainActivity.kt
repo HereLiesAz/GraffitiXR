@@ -114,6 +114,8 @@ import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
 import com.hereliesaz.graffitixr.feature.ar.rememberCameraController
 import com.hereliesaz.graffitixr.feature.ar.takePictureAsBitmap
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
+import com.hereliesaz.graffitixr.feature.dashboard.MarketplaceScreen
+import com.hereliesaz.graffitixr.feature.dashboard.MarketplaceViewModel
 import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.feature.dashboard.SaveProjectDialog
 import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
@@ -171,6 +173,7 @@ class MainActivity : ComponentActivity() {
 
     var showSaveDialog by mutableStateOf(false)
     var showSettings by mutableStateOf(false)
+    var showMarketplace by mutableStateOf(false)
     var showPosterDialog by mutableStateOf(false)
     var posterSourceLayerId by mutableStateOf<String?>(null)
     var hasCameraPermission by mutableStateOf(false)
@@ -263,6 +266,7 @@ class MainActivity : ComponentActivity() {
                 val editorViewModel: EditorViewModel = hiltViewModel()
                 val dashboardViewModel: DashboardViewModel = hiltViewModel()
                 val settingsViewModel: SettingsViewModel = hiltViewModel()
+                val marketplaceViewModel: MarketplaceViewModel = hiltViewModel()
                 val cameraController = rememberCameraController()
                 // Scope for suspending export captures (Overlay's ImageCapture.takePictureAsBitmap).
                 // Bound to the composable so it cancels with the screen if the user backs out
@@ -369,6 +373,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 BackHandler(enabled = showSettings) { showSettings = false }
+                BackHandler(enabled = showMarketplace) { showMarketplace = false }
                 BackHandler(enabled = mainUiState.isInPlaneRealignment) {
                     mainViewModel.endPlaneRealignment()
                 }
@@ -384,6 +389,7 @@ class MainActivity : ComponentActivity() {
                         !mainUiState.isTouchLocked &&
                         !mainUiState.isCapturingTarget &&
                         !showSettings &&
+                        !showMarketplace &&
                         !isExporting
 
                 // AzNavRail caches `isExpanded` in rememberSaveable; forcing
@@ -715,7 +721,7 @@ class MainActivity : ComponentActivity() {
                         // is that auto overlays (onboarding, AR-unavailable explainer) must
                         // early-return on EVERY modal, not just one — collapsing the repeated
                         // boolean chains here prevents a future overlay from forgetting one.
-                        val anyModalActive = showLibrary || showSettings || isExporting ||
+                        val anyModalActive = showLibrary || showSettings || showMarketplace || isExporting ||
                             mainUiState.isCapturingTarget || showSaveDialog ||
                             dashboardUiState.showNewProjectDialog
 
@@ -1318,6 +1324,17 @@ class MainActivity : ComponentActivity() {
                                     onResetTutorials = { settingsViewModel.resetCompletedTutorials() },
                                     onClose = { showSettings = false },
                                     strings = strings
+                                )
+                            }
+
+                            if (showMarketplace) {
+                                MarketplaceScreen(
+                                    viewModel = marketplaceViewModel,
+                                    onApplyLut = { extensionId ->
+                                        editorViewModel.applyInstalledLut(extensionId)
+                                        showMarketplace = false
+                                    },
+                                    onClose = { showMarketplace = false },
                                 )
                             }
 
@@ -2124,6 +2141,8 @@ class MainActivity : ComponentActivity() {
             azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {                navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
             }
             azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE) {                showSettings = true
+            }
+            azRailSubItem(id = "proj.extensions", hostId = "host.project", text = "Extensions", color = navItemColor, shape = AzButtonShape.NONE) {                showMarketplace = true
             }
 
             azDivider()
