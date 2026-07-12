@@ -115,6 +115,24 @@ class AzpInstallerTest {
     }
 
     @Test
+    fun `unlisted file is not unpacked`() {
+        val lut = "grade".toByteArray()
+        val payload = mapOf("assets/grade.cube" to lut)
+        // A stowaway file the manifest does not declare — it passed no digest check, so it must
+        // never land on disk.
+        val bytes = zip(payload + mapOf(
+            "manifest.json" to manifest("com.test.grade", payload),
+            "assets/stowaway.js" to "alert(1)".toByteArray(),
+        ))
+
+        val installer = AzpInstaller(tmp.newFolder("extensions"))
+        val installed = installer.install(ByteArrayInputStream(bytes), nowMs = 0L)
+
+        assertTrue(java.io.File(installed.filePath("assets/grade.cube")).exists())
+        assertFalse(java.io.File(installed.filePath("assets/stowaway.js")).exists())
+    }
+
+    @Test
     fun `package without manifest is rejected`() {
         val bytes = zip(mapOf("assets/grade.cube" to "x".toByteArray()))
         val installer = AzpInstaller(tmp.newFolder("extensions"))

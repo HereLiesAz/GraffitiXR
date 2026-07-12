@@ -54,8 +54,12 @@ class MarketplaceViewModel @Inject constructor(
     fun uninstall(id: String) {
         if (_busyId.value != null) return
         _busyId.value = id
+        _status.value = null
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { extensions.uninstall(id) }
+            val result = withContext(Dispatchers.IO) {
+                runCatching { extensions.uninstall(id) }
+            }
+            result.onFailure { _status.value = "Uninstall failed: ${it.message}" }
             _busyId.value = null
         }
     }

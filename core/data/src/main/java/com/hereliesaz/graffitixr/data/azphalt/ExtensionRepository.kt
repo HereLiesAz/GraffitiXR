@@ -27,6 +27,9 @@ class ExtensionRepository @Inject constructor(
     private val extensionsRoot = File(context.filesDir, "extensions")
     private val installer = AzpInstaller(extensionsRoot)
 
+    /** Serializes filesystem-mutating operations so concurrent install/uninstall can't interleave. */
+    private val lock = Any()
+
     private val _installed = MutableStateFlow(scanInstalled())
     val installed: StateFlow<List<InstalledExtension>> = _installed.asStateFlow()
 
@@ -39,15 +42,15 @@ class ExtensionRepository @Inject constructor(
      * Fetch, verify, and unpack the entry's `.azp`. Throws on any fetch/integrity/safety failure.
      * Runs blocking IO — call from a background dispatcher.
      */
-    fun install(entry: MarketplaceEntry, nowMs: Long): InstalledExtension {
+    fun install(entry: MarketplaceEntry, nowMs: Long): InstalledExtension = synchronized(lock) {
         val installed = openSource(entry.source).use { input ->
             installer.install(input, nowMs)
         }
         _installed.value = scanInstalled()
-        return installed
+        installed
     }
 
-    fun uninstall(id: String) {
+    fun uninstall(id: String) = synchronized(lock) {
         val ext = _installed.value.find { it.id == id } ?: return
         File(ext.dir).deleteRecursively()
         _installed.value = scanInstalled()

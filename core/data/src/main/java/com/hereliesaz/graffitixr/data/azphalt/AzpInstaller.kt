@@ -65,6 +65,9 @@ class AzpInstaller(private val extensionsRoot: File) {
         if (dir.exists()) dir.deleteRecursively()
         dir.mkdirs()
         for ((path, bytes) in entries) {
+            // Only unpack manifest.json and files the manifest declares (and which therefore passed
+            // the digest check above). An unlisted entry is an unverified payload — never write it.
+            if (path != "manifest.json" && !manifest.files.containsKey(path)) continue
             val target = File(dir, path)
             // Second-line defence: the resolved target must stay inside dir.
             if (!target.canonicalPath.startsWith(dir.canonicalPath + File.separator)) {

@@ -52,26 +52,29 @@ class CubeLut internal constructor(
         }
     }
 
-    /** Grade one packed ARGB pixel, preserving alpha. */
-    fun applyPixel(argb: Int): Int {
+    /**
+     * Grade one packed ARGB pixel, preserving alpha. [scratch] is a caller-supplied 3-float work
+     * buffer so a hot loop avoids per-pixel allocation; it is never read before it is written, so an
+     * uninitialised buffer is fine. Keeping it a parameter (not an instance field) means one [CubeLut]
+     * can be applied from multiple threads concurrently without corrupting shared state.
+     */
+    fun applyPixel(argb: Int, scratch: FloatArray = FloatArray(3)): Int {
         val a = (argb ushr 24) and 0xFF
         val r = ((argb ushr 16) and 0xFF) / 255f
         val g = ((argb ushr 8) and 0xFF) / 255f
         val b = (argb and 0xFF) / 255f
-        val out = scratch
-        sample(r, g, b, out)
-        val or = (out[0].coerceIn(0f, 1f) * 255f + 0.5f).toInt()
-        val og = (out[1].coerceIn(0f, 1f) * 255f + 0.5f).toInt()
-        val ob = (out[2].coerceIn(0f, 1f) * 255f + 0.5f).toInt()
+        sample(r, g, b, scratch)
+        val or = (scratch[0].coerceIn(0f, 1f) * 255f + 0.5f).toInt()
+        val og = (scratch[1].coerceIn(0f, 1f) * 255f + 0.5f).toInt()
+        val ob = (scratch[2].coerceIn(0f, 1f) * 255f + 0.5f).toInt()
         return (a shl 24) or (or shl 16) or (og shl 8) or ob
     }
 
     /** Grade an ARGB pixel array in place. */
     fun applyPixels(pixels: IntArray) {
-        for (i in pixels.indices) pixels[i] = applyPixel(pixels[i])
+        val scratch = FloatArray(3)
+        for (i in pixels.indices) pixels[i] = applyPixel(pixels[i], scratch)
     }
-
-    private val scratch = FloatArray(3)
 
     private fun rescale(v: Float, min: Float, max: Float): Float =
         if (max > min) ((v - min) / (max - min)) else v
@@ -95,15 +98,22 @@ fun parseCubeLut(text: String): CubeLut {
         when {
             upper.startsWith("TITLE") -> {}
             upper.startsWith("LUT_1D_SIZE") -> throw IllegalArgumentException("1D .cube LUTs are not supported")
-            upper.startsWith("LUT_3D_SIZE") -> size = line.substringAfter(' ').trim().toInt()
+            upper.startsWith("LUT_3D_SIZE") -> {
+                val sizeStr = line.substringAfter(' ').trim()
+                size = sizeStr.toIntOrNull()
+                    ?: throw IllegalArgumentException("Invalid LUT_3D_SIZE: $sizeStr")
+            }
             upper.startsWith("DOMAIN_MIN") -> readTriplet(line, domainMin)
             upper.startsWith("DOMAIN_MAX") -> readTriplet(line, domainMax)
             else -> {
                 val parts = line.split(Regex("\\s+"))
                 if (parts.size >= 3) {
-                    triples.add(parts[0].toFloat())
-                    triples.add(parts[1].toFloat())
-                    triples.add(parts[2].toFloat())
+                    triples.add(parts[0].toFloatOrNull()
+                        ?: throw IllegalArgumentException("Invalid LUT value: ${parts[0]}"))
+                    triples.add(parts[1].toFloatOrNull()
+                        ?: throw IllegalArgumentException("Invalid LUT value: ${parts[1]}"))
+                    triples.add(parts[2].toFloatOrNull()
+                        ?: throw IllegalArgumentException("Invalid LUT value: ${parts[2]}"))
                 }
             }
         }
@@ -117,5 +127,9 @@ fun parseCubeLut(text: String): CubeLut {
 private fun readTriplet(line: String, out: FloatArray) {
     val parts = line.split(Regex("\\s+"))
     // parts[0] is the keyword; the three numbers follow.
-    out[0] = parts[1].toFloat(); out[1] = parts[2].toFloat(); out[2] = parts[3].toFloat()
+    if (parts.size < 4) throw IllegalArgumentException("Malformed domain line: $line")
+    for (i in 0 until 3) {
+        out[i] = parts[i + 1].toFloatOrNull()
+            ?: throw IllegalArgumentException("Invalid float in domain line: ${parts[i + 1]}")
+    }
 }
