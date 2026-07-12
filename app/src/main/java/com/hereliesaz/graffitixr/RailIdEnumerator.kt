@@ -56,7 +56,7 @@ internal fun enumerateRailItemIdRegistrations(layers: List<Layer>, mode: EditorM
 
     // Project menu
     ids += listOf(
-        "host.project", "proj.new", "proj.save", "proj.export", "proj.load", "proj.settings"
+        "host.project", "proj.new", "proj.save", "proj.export", "proj.load", "proj.settings", "proj.extensions"
     )
 
     // Global tools

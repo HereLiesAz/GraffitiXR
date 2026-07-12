@@ -128,7 +128,7 @@ class EditorViewModelTest {
         viewModel = EditorViewModel(
             projectRepository, settingsRepository, projectManager, exportManager, context,
             subjectIsolator, stencilProcessor, stencilPrintEngine, slamManager,
-            testDispatcherProvider, opEmitter
+            testDispatcherProvider, opEmitter, mockk(relaxed = true)
         )
     }
 
