@@ -41,7 +41,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
-          # Full history so the commit count (versionCode) is correct.
+          # Full history so the persist step can rebase its version.properties bump onto the fresh
+          # tip. The versionCode is versionBuild from version.properties (the single source of truth),
+          # NOT the git commit count.
           fetch-depth: 0
 
       - name: Setup Dependencies

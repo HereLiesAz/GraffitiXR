@@ -1,0 +1,27 @@
+GNU AFFERO GENERAL PUBLIC LICENSE, Version 3 (AGPL-3.0)
+SPDX-License-Identifier: AGPL-3.0-only
+
+STATUS FOR GRAFFITIXR: RETAINED, NOT APPLIED.
+
+No part of GraffitiXR is currently licensed under the AGPL-3.0. This file is
+kept only as a reference, per `docs/LICENSING.md`, in case strong copyleft is
+ever wanted for an isolated part of the tree. The app's actual terms are:
+
+  - Root / engine / core:*  →  PolyForm Noncommercial 1.0.0  (see /LICENSE)
+  - Declared MIT surfaces   →  MIT  (see docs/licenses/MIT.txt)
+
+AGPL is intentionally not used for the app as a whole: it is incompatible with
+the sellable / cross-app extension ecosystem the project plans for.
+
+CANONICAL TEXT
+--------------
+The full, authoritative AGPL-3.0 text is published by the Free Software
+Foundation and is incorporated here by reference:
+
+  https://www.gnu.org/licenses/agpl-3.0.txt   (plain text)
+  https://www.gnu.org/licenses/agpl-3.0.html  (HTML)
+
+If this license is ever actually applied to any part of the project, replace
+this pointer with the complete verbatim FSF text fetched from the URL above,
+and add the standard per-file `SPDX-License-Identifier: AGPL-3.0-only` headers
+to the covered sources.

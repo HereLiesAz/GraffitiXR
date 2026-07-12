@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-04-07
 
-HereLiesAZ built the GraffitiXR app as an Open Source app. This SERVICE is provided by HereLiesAZ at no cost and is intended for use as is.
+HereLiesAZ built the GraffitiXR app as a source-available app (see the repository's LICENSE and docs/LICENSING.md for terms). This SERVICE is provided by HereLiesAZ at no cost and is intended for use as is.
 
 This page is used to inform visitors regarding our policies with the collection, use, and disclosure of Personal Information if anyone decided to use our Service.
 
