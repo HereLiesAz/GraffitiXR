@@ -1,0 +1,12 @@
+{
+  "controls": [
+    { "type": "slider", "key": "cellSize", "label": "Dot spacing", "min": 3, "max": 40, "step": 1, "default": 8 },
+    { "type": "slider", "key": "angle", "label": "Screen angle", "min": 0, "max": 90, "step": 1, "default": 45 },
+    { "type": "select", "key": "shape", "label": "Dot shape",
+      "options": [{ "value": "circle", "label": "Circle" }, { "value": "square", "label": "Square" }],
+      "default": "circle" },
+    { "type": "color", "key": "ink", "label": "Ink", "default": "#111111", "alpha": true },
+    { "type": "color", "key": "paper", "label": "Paper", "default": "#ffffff", "alpha": false },
+    { "type": "button", "key": "apply", "label": "Halftone", "action": "halftone" }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "controls": [
+    { "type": "slider", "key": "colors", "label": "Colours", "min": 2, "max": 4, "step": 1, "default": 2 },
+    { "type": "slider", "key": "contrast", "label": "Contrast", "min": 0, "max": 2, "step": 0.05, "default": 1 },
+    { "type": "toggle", "key": "invert", "label": "Invert", "default": false },
+    { "type": "button", "key": "apply", "label": "Separate", "action": "separate" }
+  ]
+}
