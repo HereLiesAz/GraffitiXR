@@ -58,3 +58,52 @@ list to relay.
    depend on its code (e.g., a LUT generated at runtime). If they can, an asset-only host can't safely
    use them; a manifest flag marking each asset `standalone: true` would let asset hosts pick only the
    assets they can honor.
+
+## Security / lifecycle
+
+9. **A revocation / kill-switch list.** If a signing key is compromised or a package turns out to be
+   malicious, a host that already installed it has no way to learn it should be disabled. **Ask:** a
+   well-known revocations feed (e.g. `GET /.well-known/azphalt-revocations.json`) listing revoked
+   package ids / versions / key ids, so a host can honor a takedown for already-installed extensions.
+
+10. **Update semantics in the registry.** `GET /packages/{id}` returns `versions[]` but no "latest"
+    pointer and no batch update-check. A host that has N extensions installed wants to show "update
+    available" without N round-trips. **Ask:** a `latest` field on the package plus a batch endpoint
+    (e.g. `POST /updates` with `[{id, version}]` → the ids with a newer version).
+
+## Registry metadata (round out the summary)
+
+11. **Download size.** Add `size` (bytes) to version metadata so a mobile host can show it and warn on
+    metered connections before downloading.
+
+12. **Localized `name` / `description`.** They're single-language today. GraffitiXR ships ~14 UI
+    locales; the catalog card should localize. **Ask:** an optional localized-strings map
+    (`{ "en": "...", "es": "..." }`) the host picks from.
+
+13. **A normative error response body.** The API defines status codes (401/402/404) but no error
+    payload. **Ask:** a standard `{ "error": { "code": "...", "message": "..." } }` shape so hosts can
+    show meaningful messages instead of a bare status.
+
+## ML model delivery (high interest for GraffitiXR)
+
+Model assets are already first-class in `spec/extension-manifest.md` — types `tflite` / `litert` /
+`onnx` / `sherpa-bundle`, an asset `role` (e.g. `"depth"`) for routing, and `byteSize`. GraffitiXR now
+parses all of these. Delivering updated segmentation / SuperPoint-descriptor / depth models over the
+marketplace **without an app release** is exactly what we want. The remaining asks are about closing
+gaps so a host can actually *run* a delivered model:
+
+14. **Sync the asset-host adoption guide with the manifest spec.** `docs/ADOPTION_ASSET_HOST.md` still
+    lists only `brush/lut/pattern/stamp/shader/transition` — it omits the model types (and `mesh`,
+    `material`, `hdri`, `motion`, `palette`, `image`, `video`, `font`, `audio`, `vector`) plus `role` /
+    `byteSize`. A host implementer reading the adoption guide alone would miss model support entirely.
+
+15. **Standardize the `role` vocabulary.** `role` is what lets a host route a generic model graph to
+    the right engine, but the identifiers are freeform. **Ask:** a normative (or registry-maintained)
+    role list — e.g. `depth`, `segmentation`, `feature-descriptor`, `style`, `upscale`, `matting` — so
+    a model tagged `role: "depth"` deterministically lands in GraffitiXR's depth engine.
+
+16. **Model runtime / compat metadata.** A `.tflite` may need a specific LiteRT/TFLite version, a
+    delegate (GPU/NNAPI), or an input resolution the on-device runtime must support. `compat` covers the
+    azphalt spec version, not the model runtime. **Ask:** per-model runtime requirements (e.g.
+    `params.runtimeVersion`, `params.delegates`, input/output tensor shapes + dtypes + quantization) so
+    a host refuses a model it cannot execute *before* downloading `byteSize` bytes onto a phone.
