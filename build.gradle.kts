@@ -16,9 +16,9 @@ buildscript {
         // Bouncy Castle: 1.79 (transitive, via the build + app classpaths) is vulnerable to
         // a covert timing channel (HIGH), LDAP injection, and a risky-crypto-algo issue in
         // bcpkix — all first patched in 1.84. The bcprov/bcpkix/bcutil versions must match.
-        "org.bouncycastle:bcprov-jdk18on:1.84",
-        "org.bouncycastle:bcpkix-jdk18on:1.84",
-        "org.bouncycastle:bcutil-jdk18on:1.84",
+        "org.bouncycastle:bcprov-jdk18on:1.85",
+        "org.bouncycastle:bcpkix-jdk18on:1.85",
+        "org.bouncycastle:bcutil-jdk18on:1.85",
         // Kotlin 2.4.0 emits class metadata version 2.4.0, but Hilt/Dagger 2.59.2 bundles a
         // kotlin-metadata-jvm that only reads up to 2.3.0 — its KSP processor fails the build with
         // "Provided Metadata instance has version 2.4.0, while maximum supported version is 2.3.0".
