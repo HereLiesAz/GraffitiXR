@@ -148,7 +148,7 @@ jobs:
           # Python 3 is preinstalled on ubuntu-latest. google-auth-httplib2 and httplib2 are
           # transitive deps of google-api-python-client but naming them keeps the intent clear
           # (the script imports both directly to configure a longer socket timeout).
-          pip install --quiet google-api-python-client google-auth google-auth-httplib2 httplib2
+          pip install --quiet google-api-python-client google-auth google-auth-httplib2 httplib2==0.15.0
           python .github/scripts/play_multitrack_publish.py
 
       - name: Persist auto-incremented versionCode
