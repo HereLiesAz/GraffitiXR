@@ -392,17 +392,16 @@ class MainActivity : ComponentActivity() {
                         !showMarketplace &&
                         !isExporting
 
-                // AzNavRail caches `isExpanded` in rememberSaveable; forcing
-                // noMenu on the library screen re-initialises it to false so
-                // its outer fillMaxSize Box never attaches tapOutsideToCollapse.
+                // noMenu (AzNavRail 11.0) removes the side drawer entirely — all entries become rail
+                // items — and makes the app-icon tap FOLD THE RAIL UP INTO THE ICON (the scope tracks
+                // this as `isFoldedUp`). That is exactly the Design-mode behaviour we want: the user
+                // asked for the rail to fold up when the app icon is pressed in Design mode with the
+                // menu disabled, and 11.0's noMenu delivers it natively (10.32 could not — it had no
+                // app-icon/expansion hook, so this used to be only an approximation).
                 //
-                // Design mode disables the side drawer entirely (noMenu = true). The user
-                // asked for the rail to fold up when the app icon is pressed in Design mode
-                // with the menu disabled; AzNavRail 10.32 doesn't expose an onAppIconClick
-                // callback or a reactive `expanded` state, so we can't gate noMenu on the
-                // press itself — but disabling the drawer for the whole Design session is
-                // the closest match: the app-icon tap still folds/expands the rail by
-                // default, and the drawer never appears to distract the design flow.
+                // We also assert noMenu while the rail is hidden or the library screen is up: forcing
+                // it there re-initialises AzNavRail's saved isExpanded to false so its outer
+                // fillMaxSize Box never attaches tapOutsideToCollapse over those screens.
                 val railMenuDisabled = !isRailVisible ||
                         showLibrary ||
                         editorUiState.editorMode == EditorMode.DESIGN
