@@ -4,10 +4,10 @@ buildscript {
     val commonForcedDependencies = listOf(
         "commons-beanutils:commons-beanutils:1.11.0",
         "org.jdom:jdom2:2.0.6.1",
-        "io.netty:netty-codec:4.2.15.Final",
-        "io.netty:netty-codec-http2:4.2.15.Final",
-        "io.netty:netty-handler:4.2.15.Final",
-        "io.netty:netty-handler-proxy:4.2.15.Final",
+        "io.netty:netty-codec:4.2.16.Final",
+        "io.netty:netty-codec-http2:4.2.16.Final",
+        "io.netty:netty-handler:4.2.16.Final",
+        "io.netty:netty-handler-proxy:4.2.16.Final",
         "org.bitbucket.b_c:jose4j:0.9.6",
         "org.apache.commons:commons-lang3:3.20.0",
         "org.apache.httpcomponents:httpclient:4.5.14",
@@ -16,9 +16,9 @@ buildscript {
         // Bouncy Castle: 1.79 (transitive, via the build + app classpaths) is vulnerable to
         // a covert timing channel (HIGH), LDAP injection, and a risky-crypto-algo issue in
         // bcpkix — all first patched in 1.84. The bcprov/bcpkix/bcutil versions must match.
-        "org.bouncycastle:bcprov-jdk18on:1.84",
-        "org.bouncycastle:bcpkix-jdk18on:1.84",
-        "org.bouncycastle:bcutil-jdk18on:1.84",
+        "org.bouncycastle:bcprov-jdk18on:1.85",
+        "org.bouncycastle:bcpkix-jdk18on:1.85",
+        "org.bouncycastle:bcutil-jdk18on:1.85",
         // Kotlin 2.4.0 emits class metadata version 2.4.0, but Hilt/Dagger 2.59.2 bundles a
         // kotlin-metadata-jvm that only reads up to 2.3.0 — its KSP processor fails the build with
         // "Provided Metadata instance has version 2.4.0, while maximum supported version is 2.3.0".
