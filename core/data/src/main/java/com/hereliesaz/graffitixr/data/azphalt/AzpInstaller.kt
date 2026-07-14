@@ -1,6 +1,9 @@
 package com.hereliesaz.graffitixr.data.azphalt
 
+import com.hereliesaz.graffitixr.common.azphalt.AZPHALT_SPEC_VERSION
 import com.hereliesaz.graffitixr.common.azphalt.AzphaltManifest
+import com.hereliesaz.graffitixr.common.azphalt.ExtensionKind
+import com.hereliesaz.graffitixr.common.azphalt.isCompatibleSpec
 import com.hereliesaz.graffitixr.common.azphalt.parseManifest
 import java.io.File
 import java.io.InputStream
@@ -49,6 +52,26 @@ class AzpInstaller(private val extensionsRoot: File) {
             parseManifest(manifestBytes.decodeToString())
         } catch (t: Throwable) {
             throw InstallException("Invalid manifest.json: ${t.message}")
+        }
+
+        // Asset-host policy (spec/ADOPTION_ASSET_HOST.md). GraffitiXR runs no extension code, so:
+        //  - reject `kind: "code"` outright;
+        //  - a `mixed` package installs, but only its assets are ever used (its entry/runtime are
+        //    ignored downstream — the repository only reads `manifest.assets`).
+        if (manifest.kind == ExtensionKind.CODE) {
+            throw InstallException("This host installs asset extensions only; '${manifest.id}' is kind=code")
+        }
+
+        // Conformance: validate the declared spec compatibility against what this host implements.
+        if (!isCompatibleSpec(manifest.compat)) {
+            throw InstallException(
+                "Package '${manifest.id}' needs azphalt ${manifest.compat}; host implements $AZPHALT_SPEC_VERSION"
+            )
+        }
+
+        // The package format requires a LICENSE file; refuse a package that omits it.
+        if (!entries.containsKey("LICENSE")) {
+            throw InstallException("Package '${manifest.id}' is missing the required LICENSE file")
         }
 
         // Integrity: every file the manifest lists must be present and match its digest.
