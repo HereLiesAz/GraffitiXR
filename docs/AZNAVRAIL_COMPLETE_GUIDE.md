@@ -78,10 +78,16 @@ Controls layout behavior and docking logic.
 azConfig(
     packButtons = packRailButtons,       // Boolean: Pack items tightly vs spaced
     dockingSide = AzDockingSide.LEFT,    // Enum: LEFT or RIGHT
-    noMenu = noMenu,                     // Boolean: Disable the side drawer entirely
+    noMenu = noMenu,                     // Boolean: Disable the side drawer; all items become rail items
     usePhysicalDocking = usePhysicalDocking // Boolean: Anchor to physical hardware edge vs visual left
 )
 ```
+
+**`noMenu` (11.0):** When `true`, the side drawer is removed — every entry is treated as a rail
+item — **and tapping the app icon folds the stationary rail up into the icon.** The scope exposes
+`var isFoldedUp: Boolean` to read/track that folded state. This is how GraffitiXR's Design mode gets
+its "tap the app icon to fold the rail away" behaviour (see `railMenuDisabled` in `MainActivity`);
+earlier releases (10.x) had no app-icon/expansion hook and could only approximate it.
 
 
 ### B. Theming (`azTheme`)

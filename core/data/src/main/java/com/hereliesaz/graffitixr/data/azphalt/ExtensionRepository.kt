@@ -33,8 +33,24 @@ class ExtensionRepository @Inject constructor(
     private val _installed = MutableStateFlow(scanInstalled())
     val installed: StateFlow<List<InstalledExtension>> = _installed.asStateFlow()
 
-    /** The catalog to browse. Bundled seed today; swap for the registry HTTP API when deployed. */
+    /** The offline catalog to browse. Bundled seed; use [catalogFromRegistry] for a live registry. */
     fun catalog(): List<MarketplaceEntry> = SEED_MARKETPLACE
+
+    /**
+     * Browse a live azphalt registry (spec/repository-api.md) instead of the bundled seed. Fetches one
+     * search page and maps each package to a catalog card whose [MarketplaceEntry.source] is its
+     * resolved `.azp` download URL — so the existing [install] path works unchanged. Blocking IO; call
+     * from a background dispatcher. [catalog] stays the offline default, so a registry outage never
+     * breaks browsing the bundled extensions.
+     */
+    fun catalogFromRegistry(
+        client: RepositoryClient,
+        query: String? = null,
+        page: Int = 1,
+    ): List<MarketplaceEntry> =
+        client.search(q = query, page = page).packages.map { pkg ->
+            pkg.toMarketplaceEntry(client.downloadUrl(pkg.id, pkg.version))
+        }
 
     fun isInstalled(id: String): Boolean = _installed.value.any { it.id == id }
 
