@@ -66,6 +66,39 @@ class AzphaltManifestTest {
     }
 
     @Test
+    fun `parses shader and transition assets with params and ui`() {
+        val m = parseManifest(
+            """
+            {
+              "azphalt": "0.1", "id": "com.fx.pack", "name": "FX", "version": "1.0.0",
+              "kind": "asset", "license": "MIT", "compat": ">=0.1",
+              "assets": [
+                { "type": "shader", "path": "assets/glow.fs", "params": { "format": "isf" }, "ui": "ui/glow.json" },
+                { "type": "transition", "path": "assets/wipe.glsl", "params": { "format": "gl-transition" } }
+              ],
+              "files": {}
+            }
+            """.trimIndent(),
+        )
+        assertEquals(AssetType.SHADER, m.assets[0].type)
+        assertEquals("ui/glow.json", m.assets[0].ui)
+        assertEquals("isf", m.assets[0].params?.get("format")?.let { it.toString().trim('"') })
+        assertEquals(AssetType.TRANSITION, m.assets[1].type)
+        assertNull(m.assets[1].ui)
+    }
+
+    @Test
+    fun `compat is validated against the implemented spec version`() {
+        assertTrue(isCompatibleSpec(">=0.1"))
+        assertTrue(isCompatibleSpec("0.1"))
+        assertTrue(isCompatibleSpec("^0.1"))
+        assertTrue(isCompatibleSpec("<0.2")) // lone upper bound → accepted (lenient)
+        assertEquals(false, isCompatibleSpec(">=0.2"))
+        assertEquals(false, isCompatibleSpec(">=1.0"))
+        assertEquals("0.1", AZPHALT_SPEC_VERSION)
+    }
+
+    @Test
     fun `carries file digests for integrity`() {
         val m = parseManifest(
             """

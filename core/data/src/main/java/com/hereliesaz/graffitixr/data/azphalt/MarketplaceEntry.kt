@@ -20,8 +20,12 @@ data class MarketplaceEntry(
     /** Where the .azp lives: "asset:marketplace/foo.azp" (bundled) or "https://…". */
     val source: String,
 ) {
-    /** True when GraffitiXR can install and use this today — asset LUTs. Code extensions need the JS/WASM sandbox (not yet). */
-    val installable: Boolean get() = kind == ExtensionKind.ASSET
+    /**
+     * True when GraffitiXR can install this today. As an asset-only host it takes `asset` and `mixed`
+     * packages (a mixed package installs, but only its asset contributions are used); pure `code`
+     * extensions need the JS/WASM sandbox, which isn't here yet.
+     */
+    val installable: Boolean get() = kind != ExtensionKind.CODE
 }
 
 /**
