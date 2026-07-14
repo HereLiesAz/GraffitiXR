@@ -1,5 +1,13 @@
 package com.hereliesaz.graffitixr.data.azphalt
 
+import com.hereliesaz.graffitixr.common.azphalt.SignatureStatus
+import com.hereliesaz.graffitixr.common.azphalt.TrustStore
+import com.hereliesaz.graffitixr.common.azphalt.TrustedKey
+import org.bouncycastle.crypto.generators.Ed25519KeyPairGenerator
+import org.bouncycastle.crypto.params.Ed25519KeyGenerationParameters
+import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters
+import org.bouncycastle.crypto.signers.Ed25519Signer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -10,6 +18,8 @@ import org.junit.rules.TemporaryFolder
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
+import java.security.SecureRandom
+import java.util.Base64
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -219,5 +229,100 @@ class AzpInstallerTest {
         } catch (e: AzpInstaller.InstallException) {
             assertTrue(e.message!!.contains("LICENSE"))
         }
+    }
+
+    // ── signature / provenance ───────────────────────────────────────────────────────────────────
+
+    private val lutBytes = "TITLE \"x\"\nLUT_3D_SIZE 2\n".toByteArray() +
+        "0 0 0\n1 0 0\n0 1 0\n1 1 0\n0 0 1\n1 0 1\n0 1 1\n1 1 1\n".toByteArray()
+
+    /** Build a `.azp` whose `signature.json` signs [manifestBytes] with [signedBytes] (default: the
+     *  manifest itself → a valid signature; pass different bytes to forge an invalid one). */
+    private fun signedPackage(
+        pub: Ed25519PublicKeyParameters,
+        priv: Ed25519PrivateKeyParameters,
+        id: String = "com.test.signed",
+        signedBytes: ByteArray? = null,
+    ): ByteArray {
+        val payload = mapOf("assets/grade.cube" to lutBytes, "LICENSE" to license)
+        val manifestBytes = manifest(id, payload)
+        val sig = Base64.getEncoder().encodeToString(sign(priv, signedBytes ?: manifestBytes))
+        val sigJson = """{"alg":"ed25519","publicKey":"${spkiB64(pub)}","signature":"$sig"}""".toByteArray()
+        return zip(payload + mapOf("manifest.json" to manifestBytes, "signature.json" to sigJson))
+    }
+
+    @Test
+    fun `valid signature installs as SIGNED_UNTRUSTED with an empty trust store`() {
+        val (priv, pub) = keyPair()
+        val bytes = signedPackage(pub, priv)
+
+        val installer = AzpInstaller(tmp.newFolder("extensions"))
+        val installed = installer.install(ByteArrayInputStream(bytes), nowMs = 0L)
+
+        assertEquals(SignatureStatus.SIGNED_UNTRUSTED, installed.signature)
+        // signature.json is preserved so provenance survives a rescan.
+        assertTrue(java.io.File(installed.filePath("signature.json")).exists())
+    }
+
+    @Test
+    fun `valid signature from a trusted key installs as SIGNED_TRUSTED`() {
+        val (priv, pub) = keyPair()
+        val bytes = signedPackage(pub, priv)
+
+        val store = TrustStore(listOf(TrustedKey(spkiB64(pub))))
+        val installer = AzpInstaller(tmp.newFolder("extensions"), store)
+        val installed = installer.install(ByteArrayInputStream(bytes), nowMs = 0L)
+
+        assertEquals(SignatureStatus.SIGNED_TRUSTED, installed.signature)
+    }
+
+    @Test
+    fun `invalid signature is rejected`() {
+        val (priv, pub) = keyPair()
+        // Sign bytes that are not the manifest → the signature won't verify over manifest.json.
+        val bytes = signedPackage(pub, priv, signedBytes = "not the manifest".toByteArray())
+
+        val installer = AzpInstaller(tmp.newFolder("extensions"))
+        try {
+            installer.install(ByteArrayInputStream(bytes), nowMs = 0L)
+            fail("Expected InstallException for an invalid signature")
+        } catch (e: AzpInstaller.InstallException) {
+            assertTrue(e.message!!.contains("invalid signature"))
+        }
+    }
+
+    @Test
+    fun `unsigned package installs as UNSIGNED`() {
+        val payload = mapOf("assets/grade.cube" to lutBytes, "LICENSE" to license)
+        val bytes = zip(payload + ("manifest.json" to manifest("com.test.unsigned", payload)))
+
+        val installer = AzpInstaller(tmp.newFolder("extensions"))
+        val installed = installer.install(ByteArrayInputStream(bytes), nowMs = 0L)
+
+        assertEquals(SignatureStatus.UNSIGNED, installed.signature)
+    }
+
+    // ── Ed25519 signing helpers (BouncyCastle) ───────────────────────────────────────────────────
+
+    /** Fixed 12-byte Ed25519 SPKI DER header; the raw 32-byte key follows (RFC 8410). */
+    private val ed25519SpkiPrefix =
+        intArrayOf(0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00)
+            .map { it.toByte() }.toByteArray()
+
+    private fun spkiB64(pub: Ed25519PublicKeyParameters): String =
+        Base64.getEncoder().encodeToString(ed25519SpkiPrefix + pub.encoded)
+
+    private fun keyPair(): Pair<Ed25519PrivateKeyParameters, Ed25519PublicKeyParameters> {
+        val gen = Ed25519KeyPairGenerator()
+        gen.init(Ed25519KeyGenerationParameters(SecureRandom()))
+        val kp = gen.generateKeyPair()
+        return (kp.private as Ed25519PrivateKeyParameters) to (kp.public as Ed25519PublicKeyParameters)
+    }
+
+    private fun sign(priv: Ed25519PrivateKeyParameters, msg: ByteArray): ByteArray {
+        val signer = Ed25519Signer()
+        signer.init(true, priv)
+        signer.update(msg, 0, msg.size)
+        return signer.generateSignature()
     }
 }

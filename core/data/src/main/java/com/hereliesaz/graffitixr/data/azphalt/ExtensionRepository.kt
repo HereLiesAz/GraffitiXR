@@ -2,7 +2,9 @@ package com.hereliesaz.graffitixr.data.azphalt
 
 import android.content.Context
 import com.hereliesaz.graffitixr.common.azphalt.AssetType
+import com.hereliesaz.graffitixr.common.azphalt.AzpSignatures
 import com.hereliesaz.graffitixr.common.azphalt.CubeLut
+import com.hereliesaz.graffitixr.common.azphalt.TrustStore
 import com.hereliesaz.graffitixr.common.azphalt.parseCubeLut
 import com.hereliesaz.graffitixr.common.azphalt.parseManifest
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -25,7 +27,12 @@ class ExtensionRepository @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
     private val extensionsRoot = File(context.filesDir, "extensions")
-    private val installer = AzpInstaller(extensionsRoot)
+
+    // The keys this host trusts. Empty for now — signed packages install as SIGNED_UNTRUSTED (valid
+    // signature, no established identity) until a trust store is seeded (e.g. a registry's key from
+    // .well-known). Wiring that source in is a follow-up; the verification path is already live.
+    private val trustStore = TrustStore.EMPTY
+    private val installer = AzpInstaller(extensionsRoot, trustStore)
 
     /** Serializes filesystem-mutating operations so concurrent install/uninstall can't interleave. */
     private val lock = Any()
@@ -99,10 +106,16 @@ class ExtensionRepository @Inject constructor(
             val manifestFile = File(dir, "manifest.json")
             if (!manifestFile.exists()) return@mapNotNull null
             runCatching {
+                // Re-derive provenance from the unpacked tree so it survives process death, using the
+                // verbatim manifest bytes and the detached signature.json (if the package carried one).
+                val manifestBytes = manifestFile.readBytes()
+                val sigFile = File(dir, "signature.json")
+                val signatureJson = if (sigFile.exists()) sigFile.readText() else null
                 InstalledExtension(
-                    manifest = parseManifest(manifestFile.readText()),
+                    manifest = parseManifest(manifestBytes.decodeToString()),
                     dir = dir.absolutePath,
                     installedAt = manifestFile.lastModified(),
+                    signature = AzpSignatures.evaluate(manifestBytes, signatureJson, trustStore),
                 )
             }.getOrNull()
         }.sortedBy { it.manifest.name }
