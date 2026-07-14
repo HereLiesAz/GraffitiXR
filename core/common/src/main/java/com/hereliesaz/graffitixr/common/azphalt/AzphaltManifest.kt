@@ -26,6 +26,8 @@ data class AzphaltManifest(
     val author: String? = null,
     val description: String? = null,
     val homepage: String? = null,
+    /** Apps this extension targets (spec/extension-manifest.md), by host app id. Empty = universal. */
+    val targetApps: List<String> = emptyList(),
     val entry: String? = null,
     val runtime: Runtime? = null,
     val capabilities: List<Capability> = emptyList(),
@@ -74,15 +76,59 @@ data class Contribution(
     val ui: String? = null,
 )
 
-@Serializable
-enum class AssetType {
-    @SerialName("brush") BRUSH,
-    @SerialName("lut") LUT,
-    @SerialName("pattern") PATTERN,
-    @SerialName("stamp") STAMP,
-    // Added in spec 0.1's asset-host guide: GLSL/ISF shaders and gl-transition transitions.
-    @SerialName("shader") SHADER,
-    @SerialName("transition") TRANSITION,
+/**
+ * Asset contribution types (spec 0.1: brush/lut/pattern/stamp/shader/transition). Deserialized through
+ * a custom serializer that maps any value this build doesn't recognise to [UNKNOWN] instead of
+ * throwing — so a package using a newer asset type (e.g. azphalt's normalized ML `model` assets, not
+ * yet in the asset-host spec) still parses, and a host simply ignores the contributions it can't apply.
+ */
+@Serializable(with = AssetType.Serializer::class)
+enum class AssetType(val wire: String) {
+    // Traditional assets (spec/extension-manifest.md).
+    BRUSH("brush"),
+    LUT("lut"),
+    PATTERN("pattern"),
+    STAMP("stamp"),
+    SHADER("shader"),
+    TRANSITION("transition"),
+    MESH("mesh"),
+    MATERIAL("material"),
+    HDRI("hdri"),
+    MOTION("motion"),
+    PALETTE("palette"),
+    IMAGE("image"),
+    VIDEO("video"),
+    FONT("font"),
+    AUDIO("audio"),
+    VECTOR("vector"),
+
+    // AI model assets. Paired with AssetContribution.role (e.g. "depth", "segmentation") so a host
+    // routes the model graph to the right on-device engine.
+    TFLITE("tflite"),
+    LITERT("litert"),
+    ONNX("onnx"),
+    SHERPA_BUNDLE("sherpa-bundle"),
+
+    /** A type this host build does not recognise; the contribution is retained but not applied. */
+    UNKNOWN("");
+
+    /** True for the AI-model asset types (spec/extension-manifest.md "AI Models"). */
+    val isModel: Boolean get() = this == TFLITE || this == LITERT || this == ONNX || this == SHERPA_BUNDLE;
+
+    internal object Serializer : kotlinx.serialization.KSerializer<AssetType> {
+        override val descriptor = kotlinx.serialization.descriptors.PrimitiveSerialDescriptor(
+            "com.hereliesaz.graffitixr.common.azphalt.AssetType",
+            kotlinx.serialization.descriptors.PrimitiveKind.STRING,
+        )
+
+        override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AssetType) =
+            encoder.encodeString(value.wire)
+
+        override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AssetType {
+            val raw = decoder.decodeString()
+            return entries.firstOrNull { it.wire == raw } ?: UNKNOWN
+        }
+    }
 }
 
 @Serializable
@@ -97,6 +143,13 @@ data class AssetContribution(
     val params: JsonObject? = null,
     /** Optional path to a native UI panel schema (spec/ui-schema.md), e.g. `"ui/grade.json"`. */
     val ui: String? = null,
+    /**
+     * Optional semantic role, chiefly for model assets — e.g. `type: "tflite", role: "depth"`. Lets a
+     * host route a generic model graph to the correct engine (depth, segmentation, feature-descriptor…).
+     */
+    val role: String? = null,
+    /** Optional payload size in bytes; helps a host allocate/report before downloading a large asset. */
+    val byteSize: Long? = null,
 )
 
 /** Shared lenient JSON — tolerates unknown/future manifest fields rather than failing to parse. */

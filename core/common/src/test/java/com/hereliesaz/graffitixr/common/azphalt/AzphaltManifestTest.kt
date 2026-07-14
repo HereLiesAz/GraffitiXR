@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.common.azphalt
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -85,6 +86,46 @@ class AzphaltManifestTest {
         assertEquals("isf", m.assets[0].params?.get("format")?.let { it.toString().trim('"') })
         assertEquals(AssetType.TRANSITION, m.assets[1].type)
         assertNull(m.assets[1].ui)
+    }
+
+    @Test
+    fun `parses AI model assets with role and byteSize`() {
+        val m = parseManifest(
+            """
+            {
+              "azphalt": "0.1", "id": "com.ai.seg", "name": "Segmenter", "version": "1.0.0",
+              "kind": "asset", "license": "MIT", "compat": ">=0.1",
+              "targetApps": ["com.hereliesaz.graffitixr"],
+              "assets": [
+                { "type": "tflite", "path": "models/seg.tflite", "role": "segmentation", "byteSize": 4194304 },
+                { "type": "lut", "path": "assets/grade.cube" }
+              ],
+              "files": {}
+            }
+            """.trimIndent(),
+        )
+        assertEquals(AssetType.TFLITE, m.assets[0].type)
+        assertTrue(m.assets[0].type.isModel)
+        assertEquals("segmentation", m.assets[0].role)
+        assertEquals(4194304L, m.assets[0].byteSize)
+        assertEquals(listOf("com.hereliesaz.graffitixr"), m.targetApps)
+        assertFalse(m.assets[1].type.isModel)
+    }
+
+    @Test
+    fun `unrecognized asset type parses as UNKNOWN instead of throwing`() {
+        // A type newer than this build knows about must not break the parse.
+        val m = parseManifest(
+            """
+            {
+              "azphalt": "0.1", "id": "com.x.y", "name": "N", "version": "1.0.0",
+              "kind": "asset", "license": "MIT", "compat": ">=0.1",
+              "assets": [{ "type": "quantum-brush", "path": "assets/q.bin" }],
+              "files": {}
+            }
+            """.trimIndent(),
+        )
+        assertEquals(AssetType.UNKNOWN, m.assets[0].type)
     }
 
     @Test
