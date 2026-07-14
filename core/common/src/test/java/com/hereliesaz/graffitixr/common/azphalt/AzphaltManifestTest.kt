@@ -129,14 +129,51 @@ class AzphaltManifestTest {
     }
 
     @Test
-    fun `compat is validated against the implemented spec version`() {
+    fun `compat is validated per the single-comparator 0_1 grammar`() {
+        // Host implements 0.1; comparator defaults to >=.
         assertTrue(isCompatibleSpec(">=0.1"))
-        assertTrue(isCompatibleSpec("0.1"))
-        assertTrue(isCompatibleSpec("^0.1"))
-        assertTrue(isCompatibleSpec("<0.2")) // lone upper bound → accepted (lenient)
-        assertEquals(false, isCompatibleSpec(">=0.2"))
-        assertEquals(false, isCompatibleSpec(">=1.0"))
+        assertTrue(isCompatibleSpec("0.1"))    // bare == ">="
+        assertTrue(isCompatibleSpec("0.0"))    // >=0.0
+        assertTrue(isCompatibleSpec("=0.1"))
+        assertTrue(isCompatibleSpec("<=0.1"))
+        assertTrue(isCompatibleSpec("<0.2"))   // host 0.1 is < 0.2
+        assertFalse(isCompatibleSpec(">=0.2"))
+        assertFalse(isCompatibleSpec(">=1.0"))
+        assertFalse(isCompatibleSpec(">0.1"))  // host is not strictly greater than 0.1
+        assertFalse(isCompatibleSpec("=0.2"))
+        assertFalse(isCompatibleSpec("<0.1"))  // host is not < 0.1
+        // Outside the 0.1 grammar → unparseable → fails closed (matches @azphalt/azp's compatSatisfies).
+        assertFalse(isCompatibleSpec("^0.1"))
+        assertFalse(isCompatibleSpec("~0.1"))
+        assertFalse(isCompatibleSpec(">=0.1 || <0.3"))
+        assertFalse(isCompatibleSpec("0.1.0-beta"))
+        assertFalse(isCompatibleSpec("latest"))
         assertEquals("0.1", AZPHALT_SPEC_VERSION)
+    }
+
+    @Test
+    fun `compatSatisfies mirrors the reference across host versions`() {
+        assertTrue(compatSatisfies("1.2.3", ">=1.0"))
+        assertTrue(compatSatisfies("1.0.0", ">=1"))       // omitted parts are 0
+        assertFalse(compatSatisfies("0.9.9", ">=1.0"))
+        assertTrue(compatSatisfies("2.0.0", ">1.9"))
+        assertTrue(compatSatisfies("1.4.0", "<=1.4"))
+        assertTrue(compatSatisfies("1.4.0", "=1.4"))
+        assertFalse(compatSatisfies("1.4.1", "=1.4"))     // 1.4 ≡ 1.4.0 ≠ 1.4.1
+        assertFalse(compatSatisfies("bogus", ">=0.1"))    // unparseable host → false
+        assertFalse(compatSatisfies("1.0.0", "not-a-compat"))
+    }
+
+    @Test
+    fun `parseCompat rejects grammar outside 0_1 and defaults the comparator`() {
+        assertNull(parseCompat("^1.0"))
+        assertNull(parseCompat("~1.0"))
+        assertNull(parseCompat("1.x"))
+        assertNull(parseCompat(">=1.0 <2.0"))
+        assertEquals(CompatOp.GE, parseCompat("1.2.3")?.op)   // default comparator
+        assertEquals(CompatOp.LT, parseCompat("<0.2")?.op)
+        val c = parseCompat(">=0.1")
+        assertEquals(0, c?.major); assertEquals(1, c?.minor); assertEquals(0, c?.patch)
     }
 
     @Test

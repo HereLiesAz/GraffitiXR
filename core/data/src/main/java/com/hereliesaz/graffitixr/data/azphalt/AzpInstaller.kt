@@ -2,7 +2,10 @@ package com.hereliesaz.graffitixr.data.azphalt
 
 import com.hereliesaz.graffitixr.common.azphalt.AZPHALT_SPEC_VERSION
 import com.hereliesaz.graffitixr.common.azphalt.AzphaltManifest
+import com.hereliesaz.graffitixr.common.azphalt.AzpSignatures
 import com.hereliesaz.graffitixr.common.azphalt.ExtensionKind
+import com.hereliesaz.graffitixr.common.azphalt.SignatureStatus
+import com.hereliesaz.graffitixr.common.azphalt.TrustStore
 import com.hereliesaz.graffitixr.common.azphalt.isCompatibleSpec
 import com.hereliesaz.graffitixr.common.azphalt.parseManifest
 import java.io.File
@@ -17,10 +20,15 @@ import java.util.zip.ZipInputStream
  *  - verify every payload file listed in the manifest's `files` map against its SHA-256 digest,
  *  - require a manifest.json.
  *
- * Signature (Ed25519) is treated as tamper-evidence, not identity — the trust model is explicitly
- * open in the spec — so the integrity digests are the enforced gate here.
+ * Signature (Ed25519 over the verbatim `manifest.json`) is verified when present: a package carrying
+ * an invalid signature is refused (tamper-evidence), while an unsigned or signed-but-untrusted package
+ * installs with its provenance recorded on [InstalledExtension.signature]. Trust (identity) is decided
+ * against [trustStore] — directly, or via a registry counter-signature (spec/package-format.md § Signing).
  */
-class AzpInstaller(private val extensionsRoot: File) {
+class AzpInstaller(
+    private val extensionsRoot: File,
+    private val trustStore: TrustStore = TrustStore.EMPTY,
+) {
 
     class InstallException(message: String) : Exception(message)
 
@@ -83,14 +91,24 @@ class AzpInstaller(private val extensionsRoot: File) {
             }
         }
 
+        // Provenance: verify the detached Ed25519 signature (if any) over the *verbatim* manifest.json
+        // bytes. A present-but-invalid signature is tamper-evidence — refuse it. An unsigned or
+        // signed-but-untrusted package installs, with its status recorded for the UI to warn on.
+        val signatureJson = entries["signature.json"]?.decodeToString()
+        val signatureStatus = AzpSignatures.evaluate(manifestBytes, signatureJson, trustStore)
+        if (signatureStatus == SignatureStatus.INVALID) {
+            throw InstallException("Package '${manifest.id}' has an invalid signature (tampered or corrupt)")
+        }
+
         // Unpack into <root>/<safe id>/, replacing any prior install.
         val dir = File(extensionsRoot, safeId(manifest.id))
         if (dir.exists()) dir.deleteRecursively()
         dir.mkdirs()
         for ((path, bytes) in entries) {
-            // Only unpack manifest.json and files the manifest declares (and which therefore passed
+            // Only unpack manifest.json, the detached signature.json (exempt from the files map, so
+            // provenance can be re-derived on rescan), and files the manifest declares (which passed
             // the digest check above). An unlisted entry is an unverified payload — never write it.
-            if (path != "manifest.json" && !manifest.files.containsKey(path)) continue
+            if (path != "manifest.json" && path != "signature.json" && !manifest.files.containsKey(path)) continue
             val target = File(dir, path)
             // Second-line defence: the resolved target must stay inside dir.
             if (!target.canonicalPath.startsWith(dir.canonicalPath + File.separator)) {
@@ -101,7 +119,12 @@ class AzpInstaller(private val extensionsRoot: File) {
             target.writeBytes(bytes)
         }
 
-        return InstalledExtension(manifest = manifest, dir = dir.absolutePath, installedAt = nowMs)
+        return InstalledExtension(
+            manifest = manifest,
+            dir = dir.absolutePath,
+            installedAt = nowMs,
+            signature = signatureStatus,
+        )
     }
 
     private fun isUnsafePath(name: String): Boolean {
