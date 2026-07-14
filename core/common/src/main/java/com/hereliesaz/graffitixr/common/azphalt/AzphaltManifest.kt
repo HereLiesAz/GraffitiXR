@@ -162,20 +162,73 @@ val AzphaltJson: Json = Json {
 fun parseManifest(json: String): AzphaltManifest = AzphaltJson.decodeFromString(json)
 
 /**
+ * The `compat` comparator (azphalt spec/extension-manifest.md § compat).
+ * `0.1` allows exactly one, optional, defaulting to `>=`.
+ */
+enum class CompatOp(val token: String) { GE(">="), LE("<="), GT(">"), LT("<"), EQ("=") }
+
+/** A parsed `compat` (or bare host version): one [CompatOp] over a `MAJOR.MINOR.PATCH` triple. */
+data class Compat(val op: CompatOp, val major: Int, val minor: Int, val patch: Int)
+
+// One comparator (optional, two-char forms first), then MAJOR[.MINOR[.PATCH]]. No ranges, unions,
+// hyphen ranges, ^/~, or prerelease tags — the deliberately small 0.1 subset.
+private val COMPAT_RE = Regex("""^\s*(>=|<=|>|<|=)?\s*(\d+)(?:\.(\d+))?(?:\.(\d+))?\s*$""")
+
+/**
+ * Parse a `compat` string (or a bare `MAJOR[.MINOR[.PATCH]]` host version) into its comparator and
+ * version, or `null` if it doesn't match the `0.1` grammar. Mirrors `@azphalt/azp`'s `parseCompat`,
+ * so this host parses exactly what the reference implementation does — including rejecting `^`/`~`,
+ * ranges, unions (`||`), and prerelease tags, which are **not** part of `0.1`.
+ */
+fun parseCompat(compat: String): Compat? {
+    val m = COMPAT_RE.matchEntire(compat) ?: return null
+    val op = when (m.groupValues[1]) {
+        "<=" -> CompatOp.LE
+        ">" -> CompatOp.GT
+        "<" -> CompatOp.LT
+        "=" -> CompatOp.EQ
+        else -> CompatOp.GE // ">=" or absent (defaults to >=)
+    }
+    return Compat(
+        op = op,
+        major = m.groupValues[2].toInt(),
+        minor = m.groupValues[3].ifEmpty { "0" }.toInt(),
+        patch = m.groupValues[4].ifEmpty { "0" }.toInt(),
+    )
+}
+
+private fun compareVersions(a: Compat, b: Compat): Int {
+    if (a.major != b.major) return a.major.compareTo(b.major)
+    if (a.minor != b.minor) return a.minor.compareTo(b.minor)
+    return a.patch.compareTo(b.patch)
+}
+
+/**
+ * Does a host advertising azphalt-API version [hostVersion] satisfy a package's [compat]? Mirrors
+ * `@azphalt/azp`'s `compatSatisfies`: `false` if either input is unparseable (fail closed), otherwise
+ * the host version, by semver precedence, must satisfy the single comparator.
+ */
+fun compatSatisfies(hostVersion: String, compat: String): Boolean {
+    val c = parseCompat(compat) ?: return false
+    val h = parseCompat(hostVersion) ?: return false
+    val d = compareVersions(h, c)
+    return when (c.op) {
+        CompatOp.GE -> d >= 0
+        CompatOp.GT -> d > 0
+        CompatOp.LE -> d <= 0
+        CompatOp.LT -> d < 0
+        CompatOp.EQ -> d == 0
+    }
+}
+
+/**
  * Whether a package declaring [compat] is compatible with the spec version this host implements
  * ([AZPHALT_SPEC_VERSION]). The asset-host conformance suite requires validating `compat`.
  *
- * We enforce only a lower bound written as `">=x.y"`, `"^x.y"`, `"~x.y"`, or a bare `"x.y"`: the
- * package is accepted when that minimum is ≤ our spec version. Anything we can't parse as a minimum
- * (e.g. a lone upper bound `"<0.2"`) is accepted — the payload digest check is the real integrity
- * gate, so `compat` errs toward leniency rather than rejecting a package we could actually use.
+ * This applies the normative `0.1` grammar (`spec/extension-manifest.md § compat`) via
+ * [compatSatisfies] rather than the earlier lenient lower-bound heuristic: a `compat` outside the
+ * grammar (e.g. `^0.1`, `~0.1`, a union) no longer slips through as "compatible" — it fails closed,
+ * exactly as the reference `compatSatisfies` does, so this host accepts precisely what other
+ * conforming hosts accept.
  */
-fun isCompatibleSpec(compat: String): Boolean {
-    val m = Regex("""^\s*(?:>=|\^|~)?\s*(\d+)\.(\d+)""").find(compat) ?: return true
-    val reqMajor = m.groupValues[1].toInt()
-    val reqMinor = m.groupValues[2].toInt()
-    val specParts = AZPHALT_SPEC_VERSION.split(".")
-    val specMajor = specParts[0].toInt()
-    val specMinor = specParts.getOrElse(1) { "0" }.toInt()
-    return reqMajor < specMajor || (reqMajor == specMajor && reqMinor <= specMinor)
-}
+fun isCompatibleSpec(compat: String): Boolean = compatSatisfies(AZPHALT_SPEC_VERSION, compat)
