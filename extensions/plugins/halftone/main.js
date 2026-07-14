@@ -5,11 +5,15 @@ import { defineFilter } from "@azphalt/sdk";
  * Monochrome (single ink over paper) — the classic print / stencil stipple. Straight-alpha RGBA.
  */
 export const halftone = defineFilter((ctx) => {
-  const cell = Math.max(2, ctx.params.number("cellSize"));
-  const angle = (ctx.params.number("angle") * Math.PI) / 180;
-  const square = ctx.params.string("shape") === "square";
-  const ink = ctx.params.color("ink");
-  const paper = ctx.params.color("paper");
+  // Defensive reads: fall back to the panel default if the host omits a param, returns NaN, or throws.
+  const num = (k, d) => { try { const v = ctx.params.number(k); return Number.isFinite(v) ? v : d; } catch { return d; } };
+  const str = (k, d) => { try { const v = ctx.params.string(k); return v == null ? d : String(v); } catch { return d; } };
+  const col = (k, d) => { try { const v = ctx.params.color(k); return v && Number.isFinite(v.r) ? v : d; } catch { return d; } };
+  const cell = Math.max(2, num("cellSize", 8));
+  const angle = (num("angle", 45) * Math.PI) / 180;
+  const square = str("shape", "circle") === "square";
+  const ink = col("ink", { r: 17, g: 17, b: 17, a: 255 });
+  const paper = col("paper", { r: 255, g: 255, b: 255, a: 255 });
   const bmp = ctx.bitmap.read(ctx.target);
   const { width: w, height: h } = bmp;
   const src = bmp.data;
@@ -51,6 +55,7 @@ export const halftone = defineFilter((ctx) => {
           out[i] = ink.r;
           out[i + 1] = ink.g;
           out[i + 2] = ink.b;
+          out[i + 3] = ink.a != null ? ink.a : 255; // ink is opaque even over transparent source
         }
       }
     }

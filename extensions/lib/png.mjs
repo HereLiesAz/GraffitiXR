@@ -1,7 +1,23 @@
 // A tiny, dependency-free 8-bit **grayscale** PNG encoder — enough to emit azphalt `brush` tips
-// (spec/package-format.md: brush tips are PNG, 8-bit gray or RGBA). Uses Node's built-in zlib,
-// including `crc32` (Node ≥ 22.2). The gray value IS the tip's coverage/alpha mask.
-import { deflateSync, crc32 } from "node:zlib";
+// (spec/package-format.md: brush tips are PNG, 8-bit gray or RGBA). Uses Node's built-in zlib for
+// DEFLATE; CRC-32 is table-based here so the encoder runs on any Node (zlib.crc32 is only ≥ 22.2).
+// The gray value IS the tip's coverage/alpha mask.
+import { deflateSync } from "node:zlib";
+
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(buf) {
+  let c = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
 
 function chunk(type, data) {
   const len = Buffer.alloc(4);
@@ -107,8 +123,11 @@ export function splatterTip(size, opts = {}) {
   const px = new Uint8Array(size * size);
   const rnd = mulberry32(seed);
   const stamp = (cx, cy, r, peak) => {
-    for (let y = Math.max(0, cy - r - 1); y < Math.min(size, cy + r + 1); y++) {
-      for (let x = Math.max(0, cx - r - 1); x < Math.min(size, cx + r + 1); x++) {
+    // cx/cy are integers; keep the bounds (and thus the loop vars / index `i`) integers too, or a
+    // fractional `i` silently no-ops every write into the typed array (the dots would vanish).
+    const r0 = Math.ceil(r);
+    for (let y = Math.max(0, cy - r0); y <= Math.min(size - 1, cy + r0); y++) {
+      for (let x = Math.max(0, cx - r0); x <= Math.min(size - 1, cx + r0); x++) {
         const d = Math.hypot(x - cx, y - cy) / r;
         const v = peak * Math.max(0, 1 - d * d);
         const i = y * size + x;
@@ -125,7 +144,7 @@ export function splatterTip(size, opts = {}) {
     const x = (rnd() * size) | 0;
     const y0 = (rnd() * size * 0.4) | 0;
     const len = size * (0.2 + rnd() * 0.4);
-    const w = 1 + rnd() * 2;
+    const w = (1 + rnd() * 2) | 0; // integer half-width → clean integer column iteration below
     for (let y = y0; y < Math.min(size, y0 + len); y++) {
       for (let dxi = -w; dxi <= w; dxi++) {
         const x2 = (x + dxi) | 0;

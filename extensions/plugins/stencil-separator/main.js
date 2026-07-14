@@ -6,9 +6,12 @@ import { defineFilter } from "@azphalt/sdk";
  * one pass. Straight-alpha RGBA, mutated in place; alpha is preserved so masks survive.
  */
 export const separate = defineFilter((ctx) => {
-  const colors = Math.max(2, Math.min(4, Math.round(ctx.params.number("colors"))));
-  const contrast = ctx.params.number("contrast"); // 0 (flat) … 2 (punchy), pivots around mid-grey
-  const invert = ctx.params.bool("invert");
+  // Defensive reads: fall back to the panel default if the host omits a param, returns NaN, or throws.
+  const num = (k, d) => { try { const v = ctx.params.number(k); return Number.isFinite(v) ? v : d; } catch { return d; } };
+  const bool = (k, d) => { try { const v = ctx.params.bool(k); return typeof v === "boolean" ? v : d; } catch { return d; } };
+  const colors = Math.max(2, Math.min(4, Math.round(num("colors", 2))));
+  const contrast = num("contrast", 1); // 0 (flat) … 2 (punchy), pivots around mid-grey
+  const invert = bool("invert", false);
   const bmp = ctx.bitmap.read(ctx.target);
   const d = bmp.data;
   const tone = (band) => Math.round((band / (colors - 1)) * 255);

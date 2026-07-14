@@ -7,7 +7,7 @@
       "kind": "code",
       "license": "MIT",
       "file": "plugin-stencil-separator.azp",
-      "bytes": 2108
+      "bytes": 2260
     },
     {
       "id": "com.hereliesaz.graffitixr.halftone",
@@ -15,7 +15,7 @@
       "kind": "code",
       "license": "MIT",
       "file": "plugin-halftone.azp",
-      "bytes": 2542
+      "bytes": 2789
     },
     {
       "id": "com.hereliesaz.graffitixr.grid-guide",
@@ -23,7 +23,7 @@
       "kind": "code",
       "license": "MIT",
       "file": "plugin-grid-guide.azp",
-      "bytes": 2339
+      "bytes": 2504
     },
     {
       "id": "com.hereliesaz.graffitixr.brush.spray-can",
@@ -31,7 +31,7 @@
       "kind": "asset",
       "license": "CC0-1.0",
       "file": "brush-spray-can.azp",
-      "bytes": 114222
+      "bytes": 116975
     },
     {
       "id": "com.hereliesaz.graffitixr.brush.marker",
@@ -63,7 +63,7 @@
       "kind": "asset",
       "license": "CC0-1.0",
       "file": "brush-splatter.azp",
-      "bytes": 6170
+      "bytes": 9938
     },
     {
       "id": "com.hereliesaz.graffitixr.lut.concrete-cool",

@@ -6,12 +6,15 @@ import { defineFilter } from "@azphalt/sdk";
  * subdivisions, alpha-blended in a chosen colour over the underlying art.
  */
 export const grid = defineFilter((ctx) => {
-  const cols = Math.max(1, Math.round(ctx.params.number("cols")));
-  const rows = Math.max(1, Math.round(ctx.params.number("rows")));
-  const sub = Math.max(0, Math.round(ctx.params.number("subdivisions")));
-  const thick = Math.max(1, Math.round(ctx.params.number("thickness")));
-  const line = ctx.params.color("color");
-  const opacity = Math.min(1, Math.max(0, ctx.params.number("opacity")));
+  // Defensive reads: fall back to the panel default if the host omits a param, returns NaN, or throws.
+  const num = (k, d) => { try { const v = ctx.params.number(k); return Number.isFinite(v) ? v : d; } catch { return d; } };
+  const col = (k, d) => { try { const v = ctx.params.color(k); return v && Number.isFinite(v.r) ? v : d; } catch { return d; } };
+  const cols = Math.max(1, Math.round(num("cols", 8)));
+  const rows = Math.max(1, Math.round(num("rows", 8)));
+  const sub = Math.max(0, Math.round(num("subdivisions", 0)));
+  const thick = Math.max(1, Math.round(num("thickness", 1)));
+  const line = col("color", { r: 0, g: 229, b: 255, a: 255 });
+  const opacity = Math.min(1, Math.max(0, num("opacity", 0.8)));
   const bmp = ctx.bitmap.read(ctx.target);
   const { width: w, height: h } = bmp;
   const d = bmp.data;
