@@ -1,0 +1,109 @@
+{
+  "generated": "azphalt-sdk build",
+  "packages": [
+    {
+      "id": "com.hereliesaz.graffitixr.stencil-separator",
+      "name": "Stencil Separator",
+      "kind": "code",
+      "license": "MIT",
+      "file": "plugin-stencil-separator.azp",
+      "bytes": 2260
+    },
+    {
+      "id": "com.hereliesaz.graffitixr.halftone",
+      "name": "Halftone",
+      "kind": "code",
+      "license": "MIT",
+      "file": "plugin-halftone.azp",
+      "bytes": 2789
+    },
+    {
+      "id": "com.hereliesaz.graffitixr.grid-guide",
+      "name": "Grid Guide",
+      "kind": "code",
+      "license": "MIT",
+      "file": "plugin-grid-guide.azp",
+      "bytes": 2504
+    },
+    {
+      "id": "com.hereliesaz.graffitixr.brush.spray-can",
+      "name": "Spray Can",
+      "kind": "asset",
+      "license": "CC0-1.0",
+      "file": "brush-spray-can.azp",
+      "bytes": 116975
+    },
+    {
+      "id": "com.hereliesaz.graffitixr.brush.marker",
+      "name": "Marker & Paint Pen",
+      "kind": "asset",
+      "license": "CC0-1.0",
+      "file": "brush-marker.azp",
+      "bytes": 25171
+    },
+    {
+      "id": "com.hereliesaz.graffitixr.brush.chalk",
+      "name": "Chalk & Pastel",
+      "kind": "asset",
+      "license": "CC0-1.0",
+      "file": "brush-chalk.azp",
+      "bytes": 78276
+    },
+    {
+      "id": "com.hereliesaz.graffitixr.brush.roller",
+      "name": "Roller & Fill",
+      "kind": "asset",
+      "license": "CC0-1.0",
+      "file": "brush-roller.azp",
+      "bytes": 40295
+    },
+    {
+      "id": "com.hereliesaz.graffitixr.brush.splatter",
+      "name": "Splatter & Drips",
+      "kind": "asset",
+      "license": "CC0-1.0",
+      "file": "brush-splatter.azp",
+      "bytes": 9938
+    },
+    {
+      "id": "com.hereliesaz.graffitixr.lut.concrete-cool",
+      "name": "Concrete Cool",
+      "kind": "asset",
+      "license": "CC0-1.0",
+      "file": "lut-concrete-cool.azp",
+      "bytes": 57801
+    },
+    {
+      "id": "com.hereliesaz.graffitixr.lut.brick-warm",
+      "name": "Brick Warm",
+      "kind": "asset",
+      "license": "CC0-1.0",
+      "file": "lut-brick-warm.azp",
+      "bytes": 51973
+    },
+    {
+      "id": "com.hereliesaz.graffitixr.lut.neon-night",
+      "name": "Neon Night",
+      "kind": "asset",
+      "license": "CC0-1.0",
+      "file": "lut-neon-night.azp",
+      "bytes": 44864
+    },
+    {
+      "id": "com.hereliesaz.graffitixr.lut.sun-bleached",
+      "name": "Sun Bleached",
+      "kind": "asset",
+      "license": "CC0-1.0",
+      "file": "lut-sun-bleached.azp",
+      "bytes": 57351
+    },
+    {
+      "id": "com.hereliesaz.graffitixr.lut.teal-orange-street",
+      "name": "Teal Orange Street",
+      "kind": "asset",
+      "license": "CC0-1.0",
+      "file": "lut-teal-orange-street.azp",
+      "bytes": 50616
+    }
+  ]
+}
