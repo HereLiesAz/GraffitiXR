@@ -8,6 +8,7 @@ import com.hereliesaz.graffitixr.common.azphalt.SignatureStatus
 import com.hereliesaz.graffitixr.common.azphalt.TrustStore
 import com.hereliesaz.graffitixr.common.azphalt.isCompatibleSpec
 import com.hereliesaz.graffitixr.common.azphalt.parseManifest
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
 import java.security.MessageDigest
@@ -32,22 +33,42 @@ class AzpInstaller(
 
     class InstallException(message: String) : Exception(message)
 
+    companion object {
+        /** Cumulative decompressed-size ceiling for a `.azp` — a zip-bomb guard on untrusted input.
+         *  Asset packages are small (bundled multi-GB models use `remoteUrl`, not the archive). */
+        const val MAX_PACKAGE_BYTES: Long = 64L * 1024 * 1024
+    }
+
     /**
      * Verify and unpack a `.azp` from [input] (a ZIP stream). Returns the [InstalledExtension].
      * Overwrites any prior install of the same id. Throws [InstallException] on any safety/integrity
      * failure, leaving no partial install for that id.
      */
     fun install(input: InputStream, nowMs: Long): InstalledExtension {
-        // Read the whole archive into memory first: we must parse the manifest to know the digests
-        // before we trust any file, and a .azp is small. Map of entry path → bytes.
+        // Read the whole archive into memory (we must parse the manifest to know the digests before we
+        // trust any file). The source can be an attacker-controlled URL, so bound the CUMULATIVE
+        // decompressed size while streaming and abort a zip bomb before it can OOM the app — never
+        // `readBytes()` an entry unbounded.
         val entries = LinkedHashMap<String, ByteArray>()
+        var totalBytes = 0L
+        val chunk = ByteArray(64 * 1024)
         ZipInputStream(input).use { zip ->
             var e = zip.nextEntry
             while (e != null) {
                 if (!e.isDirectory) {
                     val name = e.name
                     if (isUnsafePath(name)) throw InstallException("Unsafe path in package: $name")
-                    entries[name] = zip.readBytes()
+                    val out = ByteArrayOutputStream()
+                    while (true) {
+                        val n = zip.read(chunk)
+                        if (n < 0) break
+                        totalBytes += n
+                        if (totalBytes > MAX_PACKAGE_BYTES) {
+                            throw InstallException("Package exceeds the ${MAX_PACKAGE_BYTES / (1024 * 1024)} MB limit")
+                        }
+                        out.write(chunk, 0, n)
+                    }
+                    entries[name] = out.toByteArray()
                 }
                 zip.closeEntry()
                 e = zip.nextEntry
