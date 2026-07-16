@@ -26,6 +26,12 @@ class AnchorOrchestrator {
     // The master artwork pose in world space, set when the first anchor is established.
     private var masterArtworkPose: Pose? = null
 
+    // The last successfully-computed consensus matrix. Held during a (usually brief) tracking loss so
+    // the overlay stays put on the wall instead of teleporting to the world origin — this is exactly
+    // the "stays stuck even in your pocket" behaviour the app is built around.
+    private val lastGoodMatrix = FloatArray(16)
+    private var hasLastGood = false
+
     /**
      * Resets the orchestrator, typically on session clear or project load.
      */
@@ -33,6 +39,7 @@ class AnchorOrchestrator {
         consensusAnchors.forEach { it.anchor.detach() }
         consensusAnchors.clear()
         masterArtworkPose = null
+        hasLastGood = false
     }
 
     /**
@@ -70,7 +77,11 @@ class AnchorOrchestrator {
         val tracking = consensusAnchors.filter { it.anchor.trackingState == TrackingState.TRACKING }
         
         if (tracking.isEmpty()) {
-            Matrix.setIdentityM(outMatrix, 0)
+            // No anchor is tracking this frame. HOLD the last good world matrix rather than writing
+            // identity, which would snap the artwork overlay to the world origin on every dropped
+            // frame. Only fall back to identity before any consensus has ever been computed.
+            if (hasLastGood) System.arraycopy(lastGoodMatrix, 0, outMatrix, 0, 16)
+            else Matrix.setIdentityM(outMatrix, 0)
             return
         }
 
@@ -130,6 +141,9 @@ class AnchorOrchestrator {
 
         val finalPose = Pose(avgPos, avgQuat)
         finalPose.toMatrix(outMatrix, 0)
+        // Remember this good matrix so a subsequent tracking dropout holds here instead of the origin.
+        System.arraycopy(outMatrix, 0, lastGoodMatrix, 0, 16)
+        hasLastGood = true
     }
 
     fun getActiveAnchorCount(): Int = consensusAnchors.count { it.anchor.trackingState == TrackingState.TRACKING }
