@@ -7,11 +7,18 @@ import com.hereliesaz.graffitixr.common.azphalt.CubeLut
 import com.hereliesaz.graffitixr.common.azphalt.TrustStore
 import com.hereliesaz.graffitixr.common.azphalt.parseCubeLut
 import com.hereliesaz.graffitixr.common.azphalt.parseManifest
+import com.hereliesaz.graffitixr.common.DispatcherProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.io.File
+import java.io.InputStream
+import java.io.OutputStream
+import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,6 +32,7 @@ import javax.inject.Singleton
 @Singleton
 class ExtensionRepository @Inject constructor(
     @ApplicationContext private val context: Context,
+    dispatcherProvider: DispatcherProvider,
 ) {
     private val extensionsRoot = File(context.filesDir, "extensions")
 
@@ -37,8 +45,17 @@ class ExtensionRepository @Inject constructor(
     /** Serializes filesystem-mutating operations so concurrent install/uninstall can't interleave. */
     private val lock = Any()
 
-    private val _installed = MutableStateFlow(scanInstalled())
+    // App-lifetime scope for the one-shot initial scan off the injecting thread (see init below).
+    private val ioScope = CoroutineScope(SupervisorJob() + dispatcherProvider.io)
+
+    // Start empty and populate on IO — scanInstalled() does disk IO + manifest parse + signature
+    // evaluation, which must never run on whatever thread first injects this @Singleton.
+    private val _installed = MutableStateFlow<List<InstalledExtension>>(emptyList())
     val installed: StateFlow<List<InstalledExtension>> = _installed.asStateFlow()
+
+    init {
+        ioScope.launch { _installed.value = scanInstalled() }
+    }
 
     /** The offline catalog to browse. Bundled seed; use [catalogFromRegistry] for a live registry. */
     fun catalog(): List<MarketplaceEntry> = SEED_MARKETPLACE
@@ -65,12 +82,37 @@ class ExtensionRepository @Inject constructor(
      * Fetch, verify, and unpack the entry's `.azp`. Throws on any fetch/integrity/safety failure.
      * Runs blocking IO — call from a background dispatcher.
      */
-    fun install(entry: MarketplaceEntry, nowMs: Long): InstalledExtension = synchronized(lock) {
-        val installed = openSource(entry.source).use { input ->
-            installer.install(input, nowMs)
+    fun install(entry: MarketplaceEntry, nowMs: Long): InstalledExtension {
+        // Fetch OUTSIDE the lock so a slow/stalled download can't block uninstall or another install.
+        // Buffer to a bounded temp file, then serialize only the filesystem-mutating unpack + rescan.
+        val tempFile = File.createTempFile("azp_", ".azp", context.cacheDir)
+        try {
+            openSource(entry.source).use { input ->
+                tempFile.outputStream().use { out -> copyBounded(input, out, AzpInstaller.MAX_PACKAGE_BYTES) }
+            }
+            return synchronized(lock) {
+                val installed = tempFile.inputStream().use { installer.install(it, nowMs) }
+                _installed.value = scanInstalled()
+                installed
+            }
+        } finally {
+            tempFile.delete()
         }
-        _installed.value = scanInstalled()
-        installed
+    }
+
+    /** Copy [input] to [out], aborting if it exceeds [maxBytes] (a compressed-download zip-bomb guard). */
+    private fun copyBounded(input: InputStream, out: OutputStream, maxBytes: Long) {
+        val buf = ByteArray(64 * 1024)
+        var total = 0L
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            total += n
+            if (total > maxBytes) throw AzpInstaller.InstallException(
+                "Package download exceeds the ${maxBytes / (1024 * 1024)} MB limit"
+            )
+            out.write(buf, 0, n)
+        }
     }
 
     fun uninstall(id: String) = synchronized(lock) {
@@ -92,17 +134,28 @@ class ExtensionRepository @Inject constructor(
         return runCatching { parseCubeLut(file.readText()) }.getOrNull()
     }
 
-    private fun openSource(source: String) = when {
+    private fun openSource(source: String): InputStream = when {
         source.startsWith("asset:") -> context.assets.open(source.removePrefix("asset:"))
-        source.startsWith("http://") || source.startsWith("https://") ->
-            URL(source).openStream()
+        source.startsWith("https://") -> {
+            // https-only with finite timeouts — a cleartext or hung endpoint must not be trusted or
+            // block the install indefinitely. HttpURLConnection won't follow a cross-protocol
+            // (https→http) redirect, so a downgrade can't be forced.
+            val conn = (URL(source).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 15_000
+                readTimeout = 30_000
+            }
+            conn.inputStream
+        }
+        source.startsWith("http://") ->
+            throw AzpInstaller.InstallException("Refusing cleartext http source (https required): $source")
         else -> throw AzpInstaller.InstallException("Unsupported source: $source")
     }
 
     private fun scanInstalled(): List<InstalledExtension> {
         val root = extensionsRoot
         if (!root.isDirectory) return emptyList()
-        return root.listFiles { f -> f.isDirectory }.orEmpty().mapNotNull { dir ->
+        // Skip dot-prefixed dirs — those are AzpInstaller's in-flight staging dirs, not installs.
+        return root.listFiles { f -> f.isDirectory && !f.name.startsWith(".") }.orEmpty().mapNotNull { dir ->
             val manifestFile = File(dir, "manifest.json")
             if (!manifestFile.exists()) return@mapNotNull null
             runCatching {
