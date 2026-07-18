@@ -884,26 +884,42 @@ std::vector<uint8_t> MobileGS::exportFingerprint() {
 }
 
 void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
+    // Untrusted peer bytes. Validate every length in 64-bit arithmetic (Android ships 32-bit ABIs
+    // where numPoints * sizeof(Point3f) would wrap size_t) and BEFORE allocating any cv::Mat from
+    // peer-controlled dimensions. Bail on anything inconsistent rather than crash the co-op session.
     if (!data || size < sizeof(uint32_t) * 4) return;
 
     const uint8_t* ptr = data;
+    const uint8_t* end = data + size;
+
     uint32_t numPoints;
     memcpy(&numPoints, ptr, sizeof(uint32_t)); ptr += sizeof(uint32_t);
 
-    if (size < sizeof(uint32_t) * 4 + numPoints * sizeof(cv::Point3f)) return;
+    // The points block plus the 3 trailing header ints (descRows/descCols/descType) must fit.
+    uint64_t ptsBytes = static_cast<uint64_t>(numPoints) * sizeof(cv::Point3f);
+    if (static_cast<uint64_t>(end - ptr) < ptsBytes + sizeof(uint32_t) * 3) return;
 
     std::vector<cv::Point3f> points3d(numPoints);
-    memcpy(points3d.data(), ptr, numPoints * sizeof(cv::Point3f)); ptr += numPoints * sizeof(cv::Point3f);
+    if (numPoints > 0) memcpy(points3d.data(), ptr, static_cast<size_t>(ptsBytes));
+    ptr += ptsBytes;
 
     uint32_t descRows, descCols, descType;
     memcpy(&descRows, ptr, sizeof(uint32_t)); ptr += sizeof(uint32_t);
     memcpy(&descCols, ptr, sizeof(uint32_t)); ptr += sizeof(uint32_t);
     memcpy(&descType, ptr, sizeof(uint32_t)); ptr += sizeof(uint32_t);
 
-    cv::Mat descs(descRows, descCols, descType);
-    size_t descDataSize = descs.total() * descs.elemSize();
-    if (ptr + descDataSize > data + size) return;
-    memcpy(descs.data, ptr, descDataSize);
+    // Sanity-check the descriptor header before it reaches cv::Mat: a bogus type or absurd dims from a
+    // hostile peer would otherwise throw inside cv::Mat or attempt a multi-GB allocation.
+    int depth = CV_MAT_DEPTH(descType);
+    int channels = CV_MAT_CN(descType);
+    if (depth < 0 || depth > CV_64F || channels < 1 || channels > 4) return;
+    if (descRows == 0 || descCols == 0 || descRows > 100000 || descCols > 100000) return;
+
+    uint64_t descDataSize = static_cast<uint64_t>(descRows) * descCols * CV_ELEM_SIZE(descType);
+    if (static_cast<uint64_t>(end - ptr) < descDataSize) return;
+
+    cv::Mat descs(static_cast<int>(descRows), static_cast<int>(descCols), static_cast<int>(descType));
+    memcpy(descs.data, ptr, static_cast<size_t>(descDataSize));
 
     {
         std::lock_guard<std::mutex> lock(mMutex);

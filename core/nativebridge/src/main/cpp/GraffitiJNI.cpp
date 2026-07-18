@@ -806,26 +806,36 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadLowLightEnhanc
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerprint(
         JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type, jfloatArray ptsArray) {
-    if (gSlamEngine) {
-        jbyte* descData = env->GetByteArrayElements(descArray, nullptr);
-        cv::Mat descriptors(rows, cols, type, descData);
-        jsize ptsLen = env->GetArrayLength(ptsArray);
-        jfloat* ptsData = env->GetFloatArrayElements(ptsArray, nullptr);
-        std::vector<cv::Point3f> points3d;
-        for (int i = 0; i < ptsLen; i += 3) {
-            points3d.push_back(cv::Point3f(ptsData[i], ptsData[i+1], ptsData[i+2]));
-        }
-        gSlamEngine->restoreWallFingerprint(descriptors, points3d);
-        env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
-        env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
+    // Defensive validation (a malformed/old .gxr must never crash native): non-null refs and a
+    // descriptor blob at least rows*cols*elemSize before cv::Mat wraps it. Mirrors the guarded
+    // nativeRestoreWallFeatureMap path; the metric sibling below does the same.
+    if (!gSlamEngine || !descArray || !ptsArray) return;
+    if (rows < 0 || cols < 0) return;
+    if (env->GetArrayLength(descArray) < (jsize)(rows * cols * CV_ELEM_SIZE(type))) return;
+
+    jbyte* descData = env->GetByteArrayElements(descArray, nullptr);
+    cv::Mat descriptors(rows, cols, type, descData);
+    jsize ptsLen = env->GetArrayLength(ptsArray);
+    jfloat* ptsData = env->GetFloatArrayElements(ptsArray, nullptr);
+    std::vector<cv::Point3f> points3d;
+    for (int i = 0; i + 2 < ptsLen; i += 3) {
+        points3d.push_back(cv::Point3f(ptsData[i], ptsData[i+1], ptsData[i+2]));
     }
+    gSlamEngine->restoreWallFingerprint(descriptors, points3d);
+    env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
+    env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerprintMetric(
         JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type,
         jfloatArray ptsArray, jfloatArray anchorArray, jfloatArray intrArray) {
-    if (!gSlamEngine) return;
+    // Same defensive validation as the plain restore: reject a malformed/old .gxr before cv::Mat
+    // wraps the descriptor blob, and only pass anchor/intrinsics when correctly sized (native copies
+    // a fixed 16 / 4 floats and tolerates null), else leave the native defaults.
+    if (!gSlamEngine || !descArray || !ptsArray) return;
+    if (rows < 0 || cols < 0) return;
+    if (env->GetArrayLength(descArray) < (jsize)(rows * cols * CV_ELEM_SIZE(type))) return;
     jbyte* descData = env->GetByteArrayElements(descArray, nullptr);
     cv::Mat descriptors(rows, cols, type, descData);
     jsize ptsLen = env->GetArrayLength(ptsArray);
@@ -835,13 +845,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
     for (int i = 0; i + 2 < ptsLen; i += 3) {
         points3d.push_back(cv::Point3f(ptsData[i], ptsData[i+1], ptsData[i+2]));
     }
-    jfloat* anchor = env->GetFloatArrayElements(anchorArray, nullptr);
-    jfloat* intr = env->GetFloatArrayElements(intrArray, nullptr);
+    jfloat* anchor = (anchorArray && env->GetArrayLength(anchorArray) == 16) ? env->GetFloatArrayElements(anchorArray, nullptr) : nullptr;
+    jfloat* intr   = (intrArray && env->GetArrayLength(intrArray) == 4)    ? env->GetFloatArrayElements(intrArray, nullptr)   : nullptr;
     gSlamEngine->restoreWallFingerprintMetric(descriptors, points3d, anchor, intr);
     env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
     env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
-    env->ReleaseFloatArrayElements(anchorArray, anchor, JNI_ABORT);
-    env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
+    if (anchor) env->ReleaseFloatArrayElements(anchorArray, anchor, JNI_ABORT);
+    if (intr)   env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
 }
 
 // Persistent wall feature map (Phase 2a: store only). Mirrors the metric-fingerprint restore but
