@@ -1232,12 +1232,15 @@ class ArViewModel @Inject constructor(
      * rest of the current project. No-op when building is off / the map is empty. Async + best-effort.
      */
     private fun saveWallFeatureMap() {
-        val project = projectRepository.currentProject.value ?: return
+        if (projectRepository.currentProject.value == null) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val map = slamManager.getWallFeatureMap() ?: return@launch
                 if (map.pointCount <= 0) return@launch
-                projectManager.saveProject(appContext, project.copy(wallFeatureMap = map))
+                // Merge through the repository's atomic transform (not a full-object write via
+                // projectManager) so a concurrent editor layer-save can't clobber the wall map and
+                // vice-versa — both funnel through updateProject(transform). (docs/AUDIT.md save-race)
+                projectRepository.updateProject { it.copy(wallFeatureMap = map) }
             } catch (e: Exception) {
                 Timber.e(e, "Wall feature map save failed")
             }

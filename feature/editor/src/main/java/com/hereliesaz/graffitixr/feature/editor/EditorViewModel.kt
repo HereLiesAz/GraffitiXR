@@ -576,33 +576,39 @@ class EditorViewModel @Inject constructor(
             val updatedLayers = _uiState.value.layers.map { it.toOverlayLayer() }
             val modeAdjustments = _uiState.value.modeAdjustments.mapKeys { it.key.name }
 
-            val projectToSave = if (currentProject == null) {
-                GraffitiProject(name = name ?: "New Project", layers = updatedLayers, modeAdjustments = modeAdjustments)
-            } else {
-                currentProject.copy(
-                    name = name ?: currentProject.name,
-                    layers = updatedLayers,
-                    modeAdjustments = modeAdjustments,
-                    lastModified = System.currentTimeMillis()
-                )
-            }
-
-            val mapPath = projectManager.getMapPath(context, projectToSave.id)
-            val cloudPointsPath = projectManager.getCloudPointsPath(context, projectToSave.id)
-
-            // Persist SLAM world before writing the manifest so the paths are valid.
+            // Paths derive from the (immutable) project id. Persist the SLAM world first so they're valid.
+            val projectId = currentProject?.id ?: GraffitiProject(name = name ?: "New Project").id
+            val mapPath = projectManager.getMapPath(context, projectId)
+            val cloudPointsPath = projectManager.getCloudPointsPath(context, projectId)
             slamManager.saveModel(mapPath)
 
-            // Record the SLAM world paths in the .gxr manifest.
-            val manifestToSave = projectToSave.copy(
-                mapPath = mapPath,
-                cloudPointsPath = cloudPointsPath
-            )
-
+            val manifestToSave: GraffitiProject
             if (currentProject == null) {
+                manifestToSave = GraffitiProject(
+                    id = projectId,
+                    name = name ?: "New Project",
+                    layers = updatedLayers,
+                    modeAdjustments = modeAdjustments,
+                    mapPath = mapPath,
+                    cloudPointsPath = cloudPointsPath,
+                )
                 projectRepository.createProject(manifestToSave)
             } else {
-                projectRepository.updateProject(manifestToSave)
+                // Atomic read-modify-write: a concurrent AR wall-feature-map save merges into the SAME
+                // currentProject, so writing a full stale copy here would drop its wall map (and vice
+                // versa). The transform only touches the editor-owned fields. (docs/AUDIT.md save-race)
+                projectRepository.updateProject { current ->
+                    current.copy(
+                        name = name ?: current.name,
+                        layers = updatedLayers,
+                        modeAdjustments = modeAdjustments,
+                        lastModified = System.currentTimeMillis(),
+                        mapPath = mapPath,
+                        cloudPointsPath = cloudPointsPath,
+                    )
+                }
+                // Export the merged result the repository just persisted (includes any AR wall map).
+                manifestToSave = projectRepository.currentProject.value ?: return@launch
             }
 
             if (name != null) {
