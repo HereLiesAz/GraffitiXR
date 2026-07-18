@@ -1189,15 +1189,23 @@ class EditorViewModel @Inject constructor(
      * ColorMatrix can't express) and replaces the base, pushing undo history first.
      */
     fun applyInstalledLut(extensionId: String) {
-        val layerId = _uiState.value.activeLayerId ?: return
-        val layer = _uiState.value.layers.find { it.id == layerId } ?: return
-        val bitmap = layer.bitmap ?: return
+        val layerId = _uiState.value.activeLayerId
+        val layer = layerId?.let { id -> _uiState.value.layers.find { it.id == id } }
+        val bitmap = layer?.bitmap
+        if (layerId == null || bitmap == null) {
+            // The Marketplace closes on Apply, so a silent return read as "the button does nothing".
+            Toast.makeText(context, "Select a layer with an image before applying a filter", Toast.LENGTH_SHORT).show()
+            return
+        }
         pushHistory()
         dispatch(EditorIntent.SetLoading(true))
         viewModelScope.launch(dispatchers.default) {
             val lut = extensionRepository.loadLut(extensionId)
             if (lut == null) {
-                dispatch(EditorIntent.SetLoading(false))
+                withContext(dispatchers.main) {
+                    dispatch(EditorIntent.SetLoading(false))
+                    Toast.makeText(context, "Couldn't load that filter — it may be missing or corrupt", Toast.LENGTH_SHORT).show()
+                }
                 return@launch
             }
             val graded = bitmap.applyCubeLut(lut)
