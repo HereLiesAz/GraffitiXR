@@ -806,12 +806,17 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadLowLightEnhanc
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerprint(
         JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type, jfloatArray ptsArray) {
-    // Defensive validation (a malformed/old .gxr must never crash native): non-null refs and a
-    // descriptor blob at least rows*cols*elemSize before cv::Mat wraps it. Mirrors the guarded
-    // nativeRestoreWallFeatureMap path; the metric sibling below does the same.
+    // Defensive validation (a malformed/old .gxr must never crash native): non-null refs, a valid
+    // OpenCV type (a bogus one makes the cv::Mat ctor throw a cv::Exception → hard process crash,
+    // since JNI can't catch C++ exceptions), and a descriptor blob at least rows*cols*elemSize.
+    // The size product is computed in 64-bit so a hostile rows*cols can't overflow past the check.
+    // Mirrors the guarded nativeRestoreWallFeatureMap path; the metric sibling below does the same.
     if (!gSlamEngine || !descArray || !ptsArray) return;
     if (rows < 0 || cols < 0) return;
-    if (env->GetArrayLength(descArray) < (jsize)(rows * cols * CV_ELEM_SIZE(type))) return;
+    int depth = CV_MAT_DEPTH(type);
+    int channels = CV_MAT_CN(type);
+    if (depth < 0 || depth > CV_64F || channels < 1 || channels > 4) return;
+    if ((jlong)rows * (jlong)cols * (jlong)CV_ELEM_SIZE(type) > (jlong)env->GetArrayLength(descArray)) return;
 
     jbyte* descData = env->GetByteArrayElements(descArray, nullptr);
     cv::Mat descriptors(rows, cols, type, descData);
@@ -831,11 +836,15 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
         JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type,
         jfloatArray ptsArray, jfloatArray anchorArray, jfloatArray intrArray) {
     // Same defensive validation as the plain restore: reject a malformed/old .gxr before cv::Mat
-    // wraps the descriptor blob, and only pass anchor/intrinsics when correctly sized (native copies
-    // a fixed 16 / 4 floats and tolerates null), else leave the native defaults.
+    // wraps the descriptor blob (valid OpenCV type + 64-bit overflow-safe size check), and only pass
+    // anchor/intrinsics when correctly sized (native copies a fixed 16 / 4 floats and tolerates null),
+    // else leave the native defaults.
     if (!gSlamEngine || !descArray || !ptsArray) return;
     if (rows < 0 || cols < 0) return;
-    if (env->GetArrayLength(descArray) < (jsize)(rows * cols * CV_ELEM_SIZE(type))) return;
+    int depth = CV_MAT_DEPTH(type);
+    int channels = CV_MAT_CN(type);
+    if (depth < 0 || depth > CV_64F || channels < 1 || channels > 4) return;
+    if ((jlong)rows * (jlong)cols * (jlong)CV_ELEM_SIZE(type) > (jlong)env->GetArrayLength(descArray)) return;
     jbyte* descData = env->GetByteArrayElements(descArray, nullptr);
     cv::Mat descriptors(rows, cols, type, descData);
     jsize ptsLen = env->GetArrayLength(ptsArray);

@@ -159,8 +159,10 @@ class EditorViewModel @Inject constructor(
     // ConcurrentModificationException mid-stroke (uncaught in viewModelScope → crash).
     private var strokeCollectedPoints: MutableList<Offset> = mutableListOf()
 
-    private fun resetStrokePoints(vararg initial: Offset) = synchronized(strokeCollectedPointsLock) {
-        strokeCollectedPoints = initial.toMutableList()
+    private fun resetStrokePoints(initial: Offset? = null) = synchronized(strokeCollectedPointsLock) {
+        // `vararg Offset` is rejected by the compiler (Offset is a Compose value class), so take a
+        // single optional seed point — the only two call sites are reset-with-start and reset-empty.
+        strokeCollectedPoints = if (initial != null) mutableListOf(initial) else mutableListOf()
     }
 
     private fun addStrokePoint(point: Offset) = synchronized(strokeCollectedPointsLock) {
@@ -1579,8 +1581,10 @@ class EditorViewModel @Inject constructor(
                 // rasterize the whole stroke onto a fresh copy here. Committing `bitmap` unchanged (the
                 // old behaviour) silently dropped the stroke — it lived only in history, which isn't
                 // replayed on reload, so it vanished on screen and on disk.
+                // Bitmap.copy can return null under memory pressure — never construct a Canvas from it
+                // unchecked (NPE on the main thread). Fall back to the unmodified bitmap if the copy fails.
                 val target = bitmap.copy(Bitmap.Config.ARGB_8888, true)
-                if (points.isNotEmpty()) {
+                if (target != null && points.isNotEmpty()) {
                     val canvas = android.graphics.Canvas(target)
                     val brushScale = ImageProcessor.screenToBitmapScale(
                         canvasW, canvasH, target.width, target.height, capturedScale
@@ -1601,7 +1605,7 @@ class EditorViewModel @Inject constructor(
                         canvas.drawPath(seg, paint)
                     }
                 }
-                target
+                target ?: bitmap
             }
 
             val command = StrokeCommand(

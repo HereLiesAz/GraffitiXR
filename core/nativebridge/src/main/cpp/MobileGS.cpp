@@ -895,6 +895,11 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
     uint32_t numPoints;
     memcpy(&numPoints, ptr, sizeof(uint32_t)); ptr += sizeof(uint32_t);
 
+    // Cap up front: even though the bounds check below rejects a numPoints larger than the buffer,
+    // an explicit ceiling documents the intent and refuses an absurd count before std::vector tries
+    // to reserve it. A real wall fingerprint is a few thousand points.
+    if (numPoints > 100000) return;
+
     // The points block plus the 3 trailing header ints (descRows/descCols/descType) must fit.
     uint64_t ptsBytes = static_cast<uint64_t>(numPoints) * sizeof(cv::Point3f);
     if (static_cast<uint64_t>(end - ptr) < ptsBytes + sizeof(uint32_t) * 3) return;
