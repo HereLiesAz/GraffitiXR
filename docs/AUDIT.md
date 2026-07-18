@@ -39,9 +39,9 @@ markers exist — every item below is a *silent* stub, unwired path, or bug foun
 
 ## LOW — dead code / unwired / minor
 
-- [ ] `feature/ar/rendering/` — `FeaturePointRenderer` (empty stub), `GridRenderer`, `MiniMapRenderer`, `SimpleQuadRenderer`, `AugmentedImageRenderer` all never instantiated. Delete (or wire).
-- [ ] `feature/ar/util/MeshGenerator.kt:35` — never called + wrong depth mask (`0xFFFF` vs `0x1FFF`) + ignores rowStride. Delete or fix.
-- [ ] `feature/ar/sensor/PhoneCameraAdapter.kt`, `PhoneImuAdapter.kt` — `@Inject` classes never wired. Delete or wire.
+- [x] `feature/ar/rendering/` — `FeaturePointRenderer` (empty stub), `GridRenderer`, `MiniMapRenderer`, `SimpleQuadRenderer`, `AugmentedImageRenderer` all never instantiated. ✅ deleted (0 refs each).
+- [x] `feature/ar/util/MeshGenerator.kt:35` — never called + wrong depth mask (`0xFFFF` vs `0x1FFF`) + ignores rowStride. ✅ deleted (0 refs).
+- [x] `feature/ar/sensor/PhoneCameraAdapter.kt`, `PhoneImuAdapter.kt` — `@Inject` classes never wired. ✅ deleted (0 refs; not bound in any Hilt module).
 - [ ] `feature/ar/DisplayRotationHelper.kt:76` `getViewportAspectRatio()`; `feature/ar/rendering/ArRenderer.kt:659` retired showVoxels/showMesh toggles.
 - [ ] `feature/editor/` dead: `EditorViewModelExt.applyStrokeToActiveLayer`, `BackgroundRemover` (dup of ML-Kit `SubjectIsolator`), orphan dialogs (ColorBalance/AdjustmentSlider/SizePicker/DoubleTapHint), `MultiGestureDetector`/`RotationGestureDetector`, `StencilProcessor.processSingle`, `StencilPrintEngine.saveLayerPngs`, empty `onGeneratePoster`/`onDoubleTapHintDismissed`/`onOnboardingComplete`. Delete.
 - [x] `feature/editor/util/ImageProcessor.kt:102` — `ux = rx/layerScale` no zero-guard → possible Infinity coords. ✅ divides by a guarded scale (falls back to 1f when `|layerScale| ≤ 1e-4`).
