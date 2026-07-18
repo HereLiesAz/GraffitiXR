@@ -1189,7 +1189,9 @@ class MainActivity : ComponentActivity() {
                                     onDismissRequest = { showSaveDialog = false },
                                     onSaveRequest = { name ->
                                         lifecycleScope.launch {
-                                            arViewModel.saveMapBlocking()
+                                            // saveMapBlocking() does native SLAM/feature-map writes; keep it off the
+                                            // main thread (it was ANR-ing on large maps). UI-state updates stay on main.
+                                            withContext(Dispatchers.IO) { arViewModel.saveMapBlocking() }
                                             editorViewModel.saveProject(name)
                                             showSaveDialog = false
                                         }
