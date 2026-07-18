@@ -12,7 +12,6 @@ dependencyResolutionManagement {
 }
 rootProject.name = "GraffitiXR"
 include(":app")
-include(":graphixr")
 include(":core:common", ":core:domain", ":core:data", ":core:nativebridge", ":core:design")
 include(":feature:ar", ":feature:editor", ":feature:dashboard")
 

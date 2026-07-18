@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!--
-        A bare platform NoActionBar theme is enough: the UI is fully Compose-driven (MaterialTheme
-        supplies the real colors/typography). Uses the platform Material theme so no extra XML-theme
-        dependency is required for this skeleton module.
-    -->
-    <style name="Theme.GraphiXR" parent="android:Theme.Material.Light.NoActionBar" />
-</resources>
