@@ -159,18 +159,30 @@ object ImageProcessor {
                                                                                                         drawStroke(canvas, stroke, paint)
                                                                     }
 
-                                                                                Tool.BLUR -> {
-                                                                                                    val paint = Paint().apply {
-                                                                                                                            strokeWidth = brushSize
-                                                                                                                            style = Paint.Style.STROKE
-                                                                                                                            strokeCap = Paint.Cap.ROUND
-                                                                                                                            strokeJoin = Paint.Join.ROUND
-                                                                                                                            isAntiAlias = true
-                                                                                                                            maskFilter = BlurMaskFilter(brushSize * intensity.coerceAtLeast(0.1f), BlurMaskFilter.Blur.NORMAL)
-                                                                                                                                                alpha = 150
-                                                                                                    }
-                                                                                                                    drawStroke(canvas, stroke, paint)
-                                                                                }
+                                Tool.BLUR -> {
+                                    // Actually blur the pixels under the stroke: build a blurred copy of the layer
+                                    // and stamp it back only where the stroke draws (the stroke is used as an alpha
+                                    // mask). The old code set no Paint color, so Paint's default (black) was painted
+                                    // as a translucent line — smearing black instead of blurring.
+                                    val factor = (2 + (intensity.coerceIn(0f, 1f) * 12f)).toInt().coerceIn(2, 16)
+                                    val blurred = cheapBlur(resultBitmap, factor)
+                                    val maskBmp = Bitmap.createBitmap(resultBitmap.width, resultBitmap.height, Bitmap.Config.ARGB_8888)
+                                    val maskCanvas = Canvas(maskBmp)
+                                    val maskPaint = Paint().apply {
+                                        strokeWidth = brushSize
+                                        style = Paint.Style.STROKE
+                                        strokeCap = Paint.Cap.ROUND
+                                        strokeJoin = Paint.Join.ROUND
+                                        isAntiAlias = true
+                                        if (feathering > 0f) maskFilter = BlurMaskFilter(brushSize * feathering * 0.5f, BlurMaskFilter.Blur.NORMAL)
+                                    }
+                                    drawStroke(maskCanvas, stroke, maskPaint)
+                                    // Keep the blurred pixels only where the stroke drew, then composite onto the layer.
+                                    maskCanvas.drawBitmap(blurred, 0f, 0f, Paint().apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN) })
+                                    canvas.drawBitmap(maskBmp, 0f, 0f, null)
+                                    maskBmp.recycle()
+                                    blurred.recycle()
+                                }
 
                                                                                                         Tool.HEAL -> {
                                                                                                                             val paint = Paint().apply {
@@ -228,6 +240,20 @@ object ImageProcessor {
                                                                     path.lineTo(stroke[i].x, stroke[i].y)
                                                     }
                                                             canvas.drawPath(path, paint)
+                }
+
+                /**
+                 * A cheap separable-ish blur via downscale→upscale with bilinear filtering, scaled by
+                 * [factor] (larger = blurrier). Used by the BLUR tool to soften the region under a
+                 * stroke without RenderScript (removed in API 31) or a native dependency.
+                 */
+                private fun cheapBlur(src: Bitmap, factor: Int): Bitmap {
+                    val w = (src.width / factor).coerceAtLeast(1)
+                    val h = (src.height / factor).coerceAtLeast(1)
+                    val small = Bitmap.createScaledBitmap(src, w, h, true)
+                    val up = Bitmap.createScaledBitmap(small, src.width, src.height, true)
+                    if (small !== up) small.recycle()
+                    return up
                 }
 
             /**

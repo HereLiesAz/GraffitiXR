@@ -1572,6 +1572,65 @@ class EditorViewModel @Inject constructor(
         val capturedOffset = strokeLayerOffset
         val capturedRotationZ = strokeLayerRotationZ
 
+        if (state.activeTool == Tool.BLUR) {
+            // BLUR samples-and-blurs the pixels under the stroke, which a Paint can't do — so it has
+            // no live preview and commits on finger-up via ImageProcessor.applyToolToBitmap (a
+            // full-bitmap scale op, hence off the main thread).
+            val base = layer.bitmap ?: run { clearTransientStrokeState(); return }
+            val command = StrokeCommand(
+                path = points,
+                canvasSize = IntSize(canvasW, canvasH),
+                tool = Tool.BLUR,
+                brushSize = state.brushSize,
+                brushColor = state.activeColor.toArgb(),
+                intensity = 0.5f,
+                feathering = state.brushFeathering,
+                layerScale = capturedScale,
+                layerOffset = capturedOffset,
+                layerRotationZ = capturedRotationZ,
+            )
+            layerStore.addStroke(layerId, command)
+            history.pushDraw(layerId, command)
+            updateHistoryCounts()
+
+            val mapped = ImageProcessor.mapScreenToBitmap(
+                points, canvasW, canvasH, base.width, base.height,
+                capturedScale, capturedOffset, capturedRotationZ
+            )
+            val brushScale = ImageProcessor.screenToBitmapScale(canvasW, canvasH, base.width, base.height, capturedScale)
+            viewModelScope.launch(dispatchers.default) {
+                val blurred = ImageProcessor.applyToolToBitmap(
+                    base, mapped, Tool.BLUR, state.brushSize * brushScale,
+                    state.activeColor.toArgb(), 0.5f, false, state.brushFeathering
+                )
+                withContext(dispatchers.main) {
+                    _uiState.update { s ->
+                        s.copy(
+                            layers = s.layers.map { if (it.id == layerId) it.copy(bitmap = blurred) else it },
+                            liveStrokeLayerId = null,
+                            liveStrokeBitmap = null,
+                        )
+                    }
+                    scheduleDiskSave(layerId, blurred, layer.uri)
+                }
+            }
+            // Co-op: peers replay the same blur from the stroke command.
+            opEmitter.emit(
+                Op.StrokeComplete(
+                    layerId,
+                    BrushStroke(
+                        points = mapped.flatMap { listOf(it.x, it.y) },
+                        colorArgb = state.activeColor.toArgb().toLong() and 0xFFFFFFFFL,
+                        brushSize = state.brushSize,
+                        brushFeathering = state.brushFeathering,
+                        blendModeOrdinal = Tool.BLUR.ordinal,
+                    )
+                )
+            )
+            clearTransientStrokeState()
+            return
+        }
+
         if (state.activeTool == Tool.LIQUIFY || strokeWorkingBitmap == null) {
             // Liquify (or a stroke so fast the background copy hadn't finished):
             // fall back to the full whole-stroke approach.
@@ -1738,8 +1797,11 @@ class EditorViewModel @Inject constructor(
                     if (feathering > 0f) maskFilter = BlurMaskFilter(brushSize * feathering * 0.5f, BlurMaskFilter.Blur.NORMAL)
                 }
                 Tool.BLUR -> {
-                    maskFilter = BlurMaskFilter(brushSize * 0.5f, BlurMaskFilter.Blur.NORMAL)
-                    alpha = 150
+                    // No live paint: a plain Paint can't blur the underlying pixels (the old code
+                    // painted translucent BLACK — Paint's default color). The real region blur is
+                    // applied on finger-up in onStrokeEnd via ImageProcessor.applyToolToBitmap.
+                    color = android.graphics.Color.TRANSPARENT
+                    alpha = 0
                 }
                 Tool.BURN -> {
                     color = android.graphics.Color.BLACK

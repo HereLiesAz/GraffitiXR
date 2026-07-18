@@ -20,7 +20,7 @@ markers exist — every item below is a *silent* stub, unwired path, or bug foun
 
 ## MED — incorrect / incomplete behavior
 
-- [ ] `feature/editor/util/ImageProcessor.kt:162` — BLUR tool never sets Paint color → paints opaque BLACK instead of blurring. Fix: sample+blur the underlying region.
+- [x] `feature/editor/util/ImageProcessor.kt:162` — BLUR tool never sets Paint color → paints opaque BLACK instead of blurring. ✅ `applyToolToBitmap` (the authoritative composite/replay path) now builds a blurred copy (`cheapBlur` downscale→upscale) and stamps it back through the stroke as an alpha mask; the editor routes BLUR's commit through it (off-thread) and gives BLUR no black live-preview.
 - [ ] `core/design/rendering/ProjectedImageRenderer.kt:49` — `applyNativeTransform`/`applyNativeBlendMode` are empty bodies (comments claim JNI) → `updateLayerTransformation`/`setLayerBlendMode` are silent no-ops. Fix: implement or delete the renderer (it's also never instantiated).
 - [x] `feature/editor/EditorViewModel.kt:797` — `setSegmentationInfluence` launches an uncancelled Default coroutine per slider tick; stencil-preview reruns full K-means each tick → pile-up. ✅ added `segmentationInfluenceJob`, cancelled before each recompute.
 - [x] `feature/editor/stencil/StencilPrintEngine.kt:178` — last col/row `srcRect` extends past the bitmap → OOB sampling → garbage edge tiles in the printed PDF. ✅ clamps `srcRect` to the source bounds and shrinks `dstRect` by the same fraction (early-return + recycle for a fully off-edge tile).
