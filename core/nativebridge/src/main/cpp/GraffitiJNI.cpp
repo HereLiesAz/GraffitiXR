@@ -222,9 +222,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_NativeCrashHandler_nativeInstall(
 void bitmapToMat(JNIEnv * env, jobject bitmap, cv::Mat& dst) {
     AndroidBitmapInfo info;
     void* pixels = 0;
-    AndroidBitmap_getInfo(env, bitmap, &info);
-    AndroidBitmap_lockPixels(env, bitmap, &pixels);
-    cv::Mat tmp(info.height, info.width, CV_8UC4, pixels);
+    // Check every AndroidBitmap_* result: a failed getInfo/lockPixels leaves `pixels` null, and
+    // wrapping null in a cv::Mat then copying it is a guaranteed SIGSEGV. Also require RGBA_8888 and
+    // honor info.stride (rows may be padded, so it isn't necessarily width*4).
+    if (AndroidBitmap_getInfo(env, bitmap, &info) != ANDROID_BITMAP_RESULT_SUCCESS) return;
+    if (info.format != ANDROID_BITMAP_FORMAT_RGBA_8888) return;
+    if (AndroidBitmap_lockPixels(env, bitmap, &pixels) != ANDROID_BITMAP_RESULT_SUCCESS || !pixels) return;
+    cv::Mat tmp(info.height, info.width, CV_8UC4, pixels, info.stride);
     tmp.copyTo(dst);
     AndroidBitmap_unlockPixels(env, bitmap);
 }
@@ -232,9 +236,10 @@ void bitmapToMat(JNIEnv * env, jobject bitmap, cv::Mat& dst) {
 void matToBitmap(JNIEnv * env, cv::Mat& src, jobject bitmap) {
     AndroidBitmapInfo info;
     void* pixels = 0;
-    AndroidBitmap_getInfo(env, bitmap, &info);
-    AndroidBitmap_lockPixels(env, bitmap, &pixels);
-    cv::Mat tmp(info.height, info.width, CV_8UC4, pixels);
+    if (AndroidBitmap_getInfo(env, bitmap, &info) != ANDROID_BITMAP_RESULT_SUCCESS) return;
+    if (info.format != ANDROID_BITMAP_FORMAT_RGBA_8888) return;
+    if (AndroidBitmap_lockPixels(env, bitmap, &pixels) != ANDROID_BITMAP_RESULT_SUCCESS || !pixels) return;
+    cv::Mat tmp(info.height, info.width, CV_8UC4, pixels, info.stride);
     if(src.type() == CV_8UC4) {
         src.copyTo(tmp);
     } else if(src.type() == CV_8UC3) {
@@ -485,8 +490,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     gColorImageHeight = height;
 
     cv::Mat yMat(height, width, CV_8UC1, yData, yStride);
-    cv::Mat uMat(height / 2, width / 2, CV_8UC1, uData, uvStride);
-    cv::Mat vMat(height / 2, width / 2, CV_8UC1, vData, uvStride);
 
     if (gLastColorFrame.empty() || gLastColorFrame.cols != width || gLastColorFrame.rows != height) {
         gLastColorFrame = cv::Mat(height, width, CV_8UC3);
@@ -496,8 +499,22 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     yMat.copyTo(yuv(cv::Rect(0, 0, width, height)));
 
     if (uvPixelStride == 1) {
-        uMat.copyTo(yuv(cv::Rect(0, height, width / 2, height / 4)));
-        vMat.copyTo(yuv(cv::Rect(width / 2, height, width / 2, height / 4)));
+        // I420 planar (separate U and V planes) → NV21-style interleaved V,U so the reloc decode
+        // (COLOR_YUV2RGB_NV21 below) is correct. The old code copied each full height/2-row plane
+        // into a height/4-row ROI — a size mismatch that left half the chroma uninitialized and
+        // produced wrong colours. Build the VU block explicitly, bounded by the buffer capacities.
+        jlong uCap = env->GetDirectBufferCapacity(uBuffer);
+        jlong vCap = env->GetDirectBufferCapacity(vBuffer);
+        cv::Mat chroma = yuv(cv::Rect(0, height, width, height / 2));
+        for (int r = 0; r < height / 2; ++r) {
+            uint8_t* dst = chroma.ptr(r);
+            size_t rowOff = (size_t)r * uvStride;
+            for (int c = 0; c < width / 2; ++c) {
+                size_t idx = rowOff + c;
+                dst[2 * c]     = (vCap <= 0 || (jlong)idx < vCap) ? vData[idx] : 0; // V
+                dst[2 * c + 1] = (uCap <= 0 || (jlong)idx < uCap) ? uData[idx] : 0; // U
+            }
+        }
         // No conversion on GL thread; pass raw YUV to map thread
         gLastColorFrame = yuv.clone();
     } else if (uvPixelStride == 2) {
