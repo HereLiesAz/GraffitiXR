@@ -32,18 +32,8 @@ jobs:
       - name: Create libs directory
         run: mkdir -p libs
 
-      - name: Download OpenCV
-        env:
-          OPENCV_VERSION: 4.10.0 
-        run: |
-          echo "Downloading OpenCV ${OPENCV_VERSION}..."
-          rm -rf libs/opencv
-          mkdir -p libs/opencv
-          wget -q https://github.com/opencv/opencv/releases/download/${OPENCV_VERSION}/opencv-${OPENCV_VERSION}-android-sdk.zip -O opencv.zip
-          unzip -q opencv.zip
-          # Move the contents of 'sdk' to the root of our opencv lib folder
-          mv OpenCV-android-sdk/sdk/* libs/opencv/
-          rm -rf OpenCV-android-sdk opencv.zip
+      # OpenCV is no longer vendored here — it's imported from Maven Central (org.opencv:opencv,
+      # Java + native via Prefab). Bump its version in gradle/libs.versions.toml instead.
 
       - name: Download GLM
         env:
@@ -74,7 +64,7 @@ jobs:
           git add libs
           # Only commit if there are changes
           if ! git diff --cached --quiet; then
-            git commit -m "Update dependencies: OpenCV, GLM, LiteRT"
+            git commit -m "Update dependencies: GLM, LiteRT"
             git push origin dependencies
           else
             echo "No changes to commit."

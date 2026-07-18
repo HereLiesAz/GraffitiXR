@@ -10,7 +10,7 @@ This document lists key files in the repository and their purposes.
 *   `settings.gradle.kts`: Module inclusion settings.
 *   `gradle/libs.versions.toml`: Version catalog — all dependency versions are defined here.
 *   `version.properties`: App Major/Minor version; build number auto-increments from git commit count.
-*   `setup_libs.sh`: Script to download OpenCV and GLM native libraries.
+*   OpenCV (Java + native C++) is imported from Maven Central (`org.opencv:opencv`, native via its Prefab part); GLM headers are committed under `core/nativebridge/libs/glm`.
 
 ## Application (`:app`)
 *   `MainActivity.kt`: Entry point. Holds `ArViewModel by viewModels()` for `onResume/onPause` ARCore lifecycle. Configures the AzNavRail (10.18) via `azTheme()`, `azConfig()`, `azAdvanced(helpEnabled = true, helpList = …)`, registers the rail items (`ConfigureRailItems`), and the reactive guidance graph (`ConfigureGuidance`). Captures the host-provided `AzGuidanceController` from `LocalAzGuidanceController.current` so the Help item can replay the tour. Passes `arViewModel` and `onRendererCreated` into `MainScreen`.
