@@ -98,9 +98,10 @@ object ImageProcessor {
                         val rx = dx * cosA - dy * sinA
                         val ry = dx * sinA + dy * cosA
 
-                        // Step 3: Undo layer scale.
-                        val ux = rx / layerScale
-                        val uy = ry / layerScale
+                        // Step 3: Undo layer scale (guard a degenerate ~0 scale → avoid Infinity coords).
+                        val safeScale = if (kotlin.math.abs(layerScale) > 1e-4f) layerScale else 1f
+                        val ux = rx / safeScale
+                        val uy = ry / safeScale
 
                         // Step 4: Back to layout space, then undo ContentScale.Fit letterboxing.
                         val lx = ux + screenCx

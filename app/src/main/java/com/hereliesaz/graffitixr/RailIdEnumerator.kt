@@ -73,7 +73,7 @@ internal fun enumerateRailItemIdRegistrations(layers: List<Layer>, mode: EditorM
             "editText", "font", "size.text", "color", "kern", "bold", "italic",
             "outline", "shadow", "size.brush", "eraser", "blur", "liquify",
             "dodge", "burn", "adj", "balance", "blend", "invert", "stencil",
-            "iso", "line",
+            "iso", "line", "magic", "edges",
         ).map { layerId(layer, it) }
         ids += "${layerId(layer)}.help"
     }

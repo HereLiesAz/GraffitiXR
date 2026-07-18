@@ -157,9 +157,10 @@ class DashboardViewModel @Inject constructor(
 
     private suspend fun fetchLatestRelease(): GitHubRelease? {
         return withContext(Dispatchers.IO) {
+            var connection: HttpURLConnection? = null
             try {
                 val url = URL("https://api.github.com/repos/hereliesaz/GraffitiXR/releases/latest")
-                val connection = url.openConnection() as HttpURLConnection
+                connection = url.openConnection() as HttpURLConnection
                 connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
                 connection.connectTimeout = 10_000
                 connection.readTimeout = 10_000
@@ -167,10 +168,13 @@ class DashboardViewModel @Inject constructor(
                 if (connection.responseCode != 200) return@withContext null
 
                 val json = connection.inputStream.bufferedReader().readText()
-                connection.disconnect()
                 parseRelease(json)
             } catch (e: Exception) {
                 null
+            } finally {
+                // disconnect() was previously only reached on the 200 path — the early return and any
+                // exception leaked the connection. finally releases it on every path.
+                connection?.disconnect()
             }
         }
     }
