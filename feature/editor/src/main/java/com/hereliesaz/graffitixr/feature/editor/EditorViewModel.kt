@@ -153,7 +153,23 @@ class EditorViewModel @Inject constructor(
     private var strokeWorkingCanvas: Canvas? = null
     private var strokePaint: Paint? = null
     private var strokePrevBitmapPoint: Offset? = null
+    private val strokeCollectedPointsLock = Any()
+    // Touched from the main thread (add/reset) and background Default coroutines (snapshot). All access
+    // MUST go through the synchronized helpers below, or a concurrent add during toList() throws a
+    // ConcurrentModificationException mid-stroke (uncaught in viewModelScope → crash).
     private var strokeCollectedPoints: MutableList<Offset> = mutableListOf()
+
+    private fun resetStrokePoints(vararg initial: Offset) = synchronized(strokeCollectedPointsLock) {
+        strokeCollectedPoints = initial.toMutableList()
+    }
+
+    private fun addStrokePoint(point: Offset) = synchronized(strokeCollectedPointsLock) {
+        strokeCollectedPoints.add(point)
+    }
+
+    private fun snapshotStrokePoints(): List<Offset> = synchronized(strokeCollectedPointsLock) {
+        strokeCollectedPoints.toList()
+    }
     private var strokeLayerId: String? = null
     private var strokeCanvasW: Int = 0
     private var strokeCanvasH: Int = 0
@@ -1389,7 +1405,7 @@ class EditorViewModel @Inject constructor(
         val layer = state.layers.find { it.id == layerId } ?: return
         val originalBitmap = layer.bitmap ?: return
 
-        strokeCollectedPoints = mutableListOf(startPoint)
+        resetStrokePoints(startPoint)
         strokeLayerId = layerId
         strokeCanvasW = canvasSize.width
         strokeCanvasH = canvasSize.height
@@ -1430,7 +1446,7 @@ class EditorViewModel @Inject constructor(
 
             // Snapshot the collected points at this moment — may include points that arrived
             // during the bitmap-copy phase.
-            val catchUpPoints = strokeCollectedPoints.toList()
+            val catchUpPoints = snapshotStrokePoints()
             val mappedAll = ImageProcessor.mapScreenToBitmap(
                 catchUpPoints, canvasSize.width, canvasSize.height, workBitmap.width, workBitmap.height,
                 layerScale, layerOffset, layerRotationZ
@@ -1465,7 +1481,7 @@ class EditorViewModel @Inject constructor(
 
     /** Called for every drag update. Draws only the new segment onto the working bitmap. */
     fun onStrokePoint(currentPoint: Offset) {
-        strokeCollectedPoints.add(currentPoint)
+        addStrokePoint(currentPoint)
 
         // Liquify live preview: cancel any pending warp job and start a fresh one from the
         // original bitmap so each drag frame shows the full accumulated warp.
@@ -1475,7 +1491,7 @@ class EditorViewModel @Inject constructor(
             // below is still queued on the default dispatcher, and a fast tool switch can enter this
             // branch before onStrokeStart populated it. Bailing here is preferable to an NPE.
             val original = liquifyOriginalBitmap ?: return
-            val points = strokeCollectedPoints.toList()
+            val points = snapshotStrokePoints()
             val canvasW = strokeCanvasW
             val canvasH = strokeCanvasH
             val brushSize = _uiState.value.brushSize
@@ -1539,7 +1555,7 @@ class EditorViewModel @Inject constructor(
         val state = _uiState.value
         val layerId = strokeLayerId ?: return
         val layer = state.layers.find { it.id == layerId } ?: return
-        val points = strokeCollectedPoints.toList()
+        val points = snapshotStrokePoints()
         val canvasW = strokeCanvasW
         val canvasH = strokeCanvasH
 
@@ -1559,7 +1575,33 @@ class EditorViewModel @Inject constructor(
                 slamManager.bakeLiquify(baked)
                 baked
             } else {
-                bitmap // Should not happen for non-liquify if strokeWorkingBitmap is null but it's a safety
+                // Fast stroke: the background working-bitmap copy never finished before finger-up, so
+                // rasterize the whole stroke onto a fresh copy here. Committing `bitmap` unchanged (the
+                // old behaviour) silently dropped the stroke — it lived only in history, which isn't
+                // replayed on reload, so it vanished on screen and on disk.
+                val target = bitmap.copy(Bitmap.Config.ARGB_8888, true)
+                if (points.isNotEmpty()) {
+                    val canvas = android.graphics.Canvas(target)
+                    val brushScale = ImageProcessor.screenToBitmapScale(
+                        canvasW, canvasH, target.width, target.height, capturedScale
+                    )
+                    val paint = buildStrokePaint(
+                        state.activeTool, state.activeColor.toArgb(), state.brushSize * brushScale, state.brushFeathering
+                    )
+                    val mapped = ImageProcessor.mapScreenToBitmap(
+                        points, canvasW, canvasH, target.width, target.height,
+                        capturedScale, capturedOffset, capturedRotationZ
+                    )
+                    if (mapped.size == 1) {
+                        canvas.drawPoint(mapped[0].x, mapped[0].y, paint)
+                    } else if (mapped.size > 1) {
+                        val seg = android.graphics.Path()
+                        seg.moveTo(mapped[0].x, mapped[0].y)
+                        for (i in 1 until mapped.size) seg.lineTo(mapped[i].x, mapped[i].y)
+                        canvas.drawPath(seg, paint)
+                    }
+                }
+                target
             }
 
             val command = StrokeCommand(
@@ -1660,7 +1702,7 @@ class EditorViewModel @Inject constructor(
         strokeWorkingCanvas = null
         strokePaint = null
         strokePrevBitmapPoint = null
-        strokeCollectedPoints = mutableListOf()
+        resetStrokePoints()
         strokeLayerId = null
 
         liquifyJob?.cancel()
