@@ -180,6 +180,10 @@ class EditorViewModel @Inject constructor(
     private var strokeLayerOffset: Offset = Offset.Zero
     private var strokeLayerRotationZ: Float = 0f
 
+    // Cancels the previous segmentation-influence recompute so a slider drag doesn't pile up full
+    // K-means passes (one uncancelled Default coroutine per tick).
+    private var segmentationInfluenceJob: kotlinx.coroutines.Job? = null
+
     // Liquify live-preview state — valid only between onStrokeStart and onStrokeEnd for LIQUIFY.
     private var liquifyJob: kotlinx.coroutines.Job? = null
     private var liquifyOriginalBitmap: Bitmap? = null
@@ -820,7 +824,10 @@ class EditorViewModel @Inject constructor(
         val source = segmentationSourceBitmap ?: return
         val targetId = segmentationTargetLayerId
 
-        viewModelScope.launch(dispatchers.default) {
+        // Debounce: each slider tick reruns full K-means, so cancel the in-flight recompute before
+        // starting a fresh one — otherwise fast dragging piles up parallel passes on the Default pool.
+        segmentationInfluenceJob?.cancel()
+        segmentationInfluenceJob = viewModelScope.launch(dispatchers.default) {
             val newBitmap = subjectIsolator.applyConfidenceThreshold(source, confidence, clamped, 0.1f)
 
             val finalPreview = if (pendingStencilSourceLayerId != null) {

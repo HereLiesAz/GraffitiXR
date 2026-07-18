@@ -22,12 +22,12 @@ markers exist — every item below is a *silent* stub, unwired path, or bug foun
 
 - [ ] `feature/editor/util/ImageProcessor.kt:162` — BLUR tool never sets Paint color → paints opaque BLACK instead of blurring. Fix: sample+blur the underlying region.
 - [ ] `core/design/rendering/ProjectedImageRenderer.kt:49` — `applyNativeTransform`/`applyNativeBlendMode` are empty bodies (comments claim JNI) → `updateLayerTransformation`/`setLayerBlendMode` are silent no-ops. Fix: implement or delete the renderer (it's also never instantiated).
-- [ ] `feature/editor/EditorViewModel.kt:797` — `setSegmentationInfluence` launches an uncancelled Default coroutine per slider tick; stencil-preview reruns full K-means each tick → pile-up. Fix: cancel prior / debounce.
-- [ ] `feature/editor/stencil/StencilPrintEngine.kt:178` — last col/row `srcRect` extends past the bitmap → OOB sampling → garbage edge tiles in the printed PDF. Fix: clamp `srcRect`, shrink `dstRect`.
+- [x] `feature/editor/EditorViewModel.kt:797` — `setSegmentationInfluence` launches an uncancelled Default coroutine per slider tick; stencil-preview reruns full K-means each tick → pile-up. ✅ added `segmentationInfluenceJob`, cancelled before each recompute.
+- [x] `feature/editor/stencil/StencilPrintEngine.kt:178` — last col/row `srcRect` extends past the bitmap → OOB sampling → garbage edge tiles in the printed PDF. ✅ clamps `srcRect` to the source bounds and shrinks `dstRect` by the same fraction (early-return + recycle for a fully off-edge tile).
 - [ ] `feature/ar/rendering/ArRenderer.kt:1133` — per-frame coroutine calls `frame.acquireDepthImage16Bits()` off the GL thread, racing `session.update()` (latent; depth default off). Fix: read depth on the GL thread.
-- [ ] `feature/ar/ArViewModel.kt:674` — `setImperialUnits()` never persists via `settingsRepository` (unlike sibling setters). Fix: persist.
+- [x] `feature/ar/ArViewModel.kt:674` — `setImperialUnits()` never persists via `settingsRepository` (unlike sibling setters). ✅ now persists via `settingsRepository.setImperialUnits(...)` (keeps the optimistic state update).
 - [x] `core/common/model/Fingerprint.kt:11` — no `init{}` `require()` that `descriptorsData.size == rows*cols*elemSize` (unlike `WallFeatureMap`) → corrupt Fingerprint feeds the unguarded native restore. ✅ added an `init{}` mirroring `WallFeatureMap`: non-negative dims, `points3d` a multiple of 3, and the descriptor blob divides evenly into `rows` (and its row stride into `cols`).
-- [ ] `core/common/azphalt/AzpSignature.kt:74` — a present-but-malformed `signature.json` parses to null → `evaluate()` returns UNSIGNED instead of INVALID. Fix: unparseable present signature ⇒ INVALID.
+- [x] `core/common/azphalt/AzpSignature.kt:74` — a present-but-malformed `signature.json` parses to null → `evaluate()` returns UNSIGNED instead of INVALID. ✅ `evaluate()` now returns INVALID when `signatureJson` is non-blank but won't parse; UNSIGNED only when truly absent/blank.
 - [ ] `core/data/azphalt/ExtensionRepository.kt:97` — `openSource()` allows cleartext http, no timeouts, and `install()` fetches network under `synchronized(lock)`. Fix: https-only + timeouts + fetch outside the lock.
 - [ ] `core/data/azphalt/ExtensionRepository.kt:40` — `_installed` StateFlow init runs `scanInstalled()` (disk IO + parse + sig eval) in the `@Singleton` ctor on the injecting thread. Fix: init empty, populate on IO.
 - [ ] `core/data/azphalt/AzpInstaller.kt:104` — an IOException during unpack leaves a partial `<id>/` dir (contradicts the "no partial install" contract). Fix: temp dir + atomic rename, or cleanup in catch.
@@ -35,7 +35,7 @@ markers exist — every item below is a *silent* stub, unwired path, or bug foun
 - [ ] `core/nativebridge/cpp/GraffitiJNI.cpp:222` — `bitmapToMat`/`matToBitmap` ignore `AndroidBitmap_*` return codes (null pixels → SIGSEGV) and assume `stride==width*4`. Fix: check results, honor `info.stride`.
 - [ ] `app/MainActivity.kt:1332` — Marketplace "Apply" closes the panel then `applyInstalledLut` silently returns on no-layer/parse-fail → button "does nothing". Fix: surface a toast / keep panel open on failure.
 - [ ] `feature/dashboard/SettingsScreen.kt:126` — camera/storage permission captured in keyless `remember{}`, never rechecked on resume → stale after returning from App Settings. Fix: recompute on ON_RESUME.
-- [ ] `feature/editor/CurvesUtil.kt:11` — natural cubic spline documented as "monotone" (can overshoot). Fix: Fritsch–Carlson, or fix the doc.
+- [x] `feature/editor/CurvesUtil.kt:11` — natural cubic spline documented as "monotone" (can overshoot). ✅ replaced with a true Fritsch–Carlson monotone cubic Hermite (tangent clamping), so the tone curve can't overshoot/invert; the doc is now accurate.
 
 ## LOW — dead code / unwired / minor
 

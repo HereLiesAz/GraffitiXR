@@ -92,6 +92,21 @@ class AzpSignaturesTest {
     }
 
     @Test
+    fun `evaluate flags a present-but-unparseable signature as INVALID, not UNSIGNED`() {
+        // A signature.json that is present but corrupt/truncated is tamper-evidence — the host MUST
+        // refuse it. Returning UNSIGNED here would let a mangled signature install unnoticed.
+        assertEquals(
+            SignatureStatus.INVALID,
+            AzpSignatures.evaluate(vectorManifest, "{not valid json", TrustStore.EMPTY),
+        )
+        // A truly absent signature is still UNSIGNED (blank counts as absent).
+        assertEquals(
+            SignatureStatus.UNSIGNED,
+            AzpSignatures.evaluate(vectorManifest, "   ", TrustStore.EMPTY),
+        )
+    }
+
+    @Test
     fun `sign-then-verify round-trips with a freshly generated key`() {
         val (priv, pub) = genKeyPair()
         val msg = "manifest-bytes".toByteArray()

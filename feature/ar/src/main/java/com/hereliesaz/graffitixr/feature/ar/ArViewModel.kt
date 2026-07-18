@@ -672,7 +672,10 @@ class ArViewModel @Inject constructor(
     }
 
     fun setImperialUnits(imperial: Boolean) {
+        // Optimistic state update for a snappy toggle, plus persist so the choice survives a restart
+        // (the isImperialUnits collector re-applies the stored value). Previously state-only → lost.
         _uiState.update { it.copy(isImperialUnits = imperial) }
+        viewModelScope.launch { settingsRepository.setImperialUnits(imperial) }
     }
 
     fun onActivityResumed() {
