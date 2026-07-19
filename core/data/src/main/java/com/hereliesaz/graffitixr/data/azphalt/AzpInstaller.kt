@@ -121,23 +121,36 @@ class AzpInstaller(
             throw InstallException("Package '${manifest.id}' has an invalid signature (tampered or corrupt)")
         }
 
-        // Unpack into <root>/<safe id>/, replacing any prior install.
+        // Unpack into a dot-prefixed staging dir first, then atomically swap it into place — so an
+        // IOException mid-unpack (or a path-escape) can never leave a partial <id>/ install, honouring
+        // the "no partial install" contract. The staging name starts with '.' so a concurrent rescan
+        // skips it. (The rescan filter in ExtensionRepository ignores dot-prefixed dirs.)
         val dir = File(extensionsRoot, safeId(manifest.id))
-        if (dir.exists()) dir.deleteRecursively()
-        dir.mkdirs()
-        for ((path, bytes) in entries) {
-            // Only unpack manifest.json, the detached signature.json (exempt from the files map, so
-            // provenance can be re-derived on rescan), and files the manifest declares (which passed
-            // the digest check above). An unlisted entry is an unverified payload — never write it.
-            if (path != "manifest.json" && path != "signature.json" && !manifest.files.containsKey(path)) continue
-            val target = File(dir, path)
-            // Second-line defence: the resolved target must stay inside dir.
-            if (!target.canonicalPath.startsWith(dir.canonicalPath + File.separator)) {
-                dir.deleteRecursively()
-                throw InstallException("Path escapes extension dir: $path")
+        val staging = File(extensionsRoot, ".staging-${safeId(manifest.id)}-$nowMs")
+        if (staging.exists()) staging.deleteRecursively()
+        staging.mkdirs()
+        try {
+            for ((path, bytes) in entries) {
+                // Only unpack manifest.json, the detached signature.json (exempt from the files map, so
+                // provenance can be re-derived on rescan), and files the manifest declares (which passed
+                // the digest check above). An unlisted entry is an unverified payload — never write it.
+                if (path != "manifest.json" && path != "signature.json" && !manifest.files.containsKey(path)) continue
+                val target = File(staging, path)
+                // Second-line defence: the resolved target must stay inside the staging dir.
+                if (!target.canonicalPath.startsWith(staging.canonicalPath + File.separator)) {
+                    throw InstallException("Path escapes extension dir: $path")
+                }
+                target.parentFile?.mkdirs()
+                target.writeBytes(bytes)
             }
-            target.parentFile?.mkdirs()
-            target.writeBytes(bytes)
+            // Swap in: drop any prior install, then move staging into place.
+            if (dir.exists()) dir.deleteRecursively()
+            if (!staging.renameTo(dir)) {
+                throw InstallException("Failed to finalize install for '${manifest.id}'")
+            }
+        } catch (t: Throwable) {
+            staging.deleteRecursively()
+            throw t
         }
 
         return InstalledExtension(

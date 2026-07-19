@@ -310,11 +310,13 @@ class EditorViewModelTest {
         val uri = Uri.parse("content://test/image.png")
         viewModel.onAddLayer(uri)
         testDispatcher.scheduler.advanceUntilIdle()
-        
+
         viewModel.saveProject()
         testDispatcher.scheduler.advanceUntilIdle()
-        
-        coVerify { projectRepository.updateProject(any<GraffitiProject>()) }
+
+        // Updates now go through the atomic transform overload (read-modify-write) so a concurrent
+        // AR wall-map save can't clobber the layer edits — see the save-race fix.
+        coVerify { projectRepository.updateProject(any<(GraffitiProject) -> GraffitiProject>()) }
     }
 
     @Test

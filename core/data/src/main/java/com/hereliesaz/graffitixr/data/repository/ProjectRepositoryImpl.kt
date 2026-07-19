@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.updateAndGet
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
@@ -25,6 +27,10 @@ class ProjectRepositoryImpl @Inject constructor(
 
     private val _currentProject = MutableStateFlow<GraffitiProject?>(null)
     override val currentProject: StateFlow<GraffitiProject?> = _currentProject.asStateFlow()
+
+    // Serializes the disk write in [updateProject]'s transform overload so two concurrent transforms
+    // (the editor's layer save and AR's wall-feature-map save) always persist the latest merged state.
+    private val saveMutex = Mutex()
 
     // Backing state for the project list so observers see creates/deletes/imports,
     // as the ProjectRepository contract promises. A plain cold flow emitted once.
@@ -79,10 +85,16 @@ class ProjectRepositoryImpl @Inject constructor(
     }
 
     override suspend fun updateProject(transform: (GraffitiProject) -> GraffitiProject) {
-        // Apply the transform atomically against the live state so two concurrent
-        // callers can't both read the same base and clobber each other's mutation.
+        // Apply the transform atomically against the live state so two concurrent callers can't both
+        // read the same base and clobber each other's mutation.
         val updated = _currentProject.updateAndGet { current -> current?.let(transform) } ?: return
-        projectManager.saveProject(context, updated)
+        // Persist under a mutex and write the LATEST merged state (not this call's `updated` snapshot),
+        // so a concurrent transform's disk write can't overwrite the file with a staler in-memory
+        // value. This is what makes the editor's layer save and AR's wall-map save non-destructive
+        // when they run at the same time (docs/AUDIT.md save-race).
+        saveMutex.withLock {
+            projectManager.saveProject(context, _currentProject.value ?: updated)
+        }
         refreshProjects()
     }
 

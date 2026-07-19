@@ -56,8 +56,9 @@ dependencies {
     // Provider Installer (Fixes SSLHandshakeException)
     implementation(libs.play.services.base)
 
-    // OpenCV (Fixes Unresolved reference 'opencv', 'Mat', 'Imgproc')
-    api(project(":opencv"))
+    // OpenCV (Fixes Unresolved reference 'opencv', 'Mat', 'Imgproc') — imported from Maven Central,
+    // not vendored. `api` so downstream modules (data, feature:*) see org.opencv.* transitively.
+    api(libs.opencv)
 
     // AzNavRail (Fixes NoClassDefFoundError for AzOrientation)
     api(libs.az.nav.rail)

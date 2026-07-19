@@ -109,7 +109,13 @@ object AzpSignatures {
      * [SignatureStatus.INVALID]; the others are installable but carry differing provenance.
      */
     fun evaluate(manifestBytes: ByteArray, signatureJson: String?, store: TrustStore): SignatureStatus {
-        val sig = parse(signatureJson) ?: return SignatureStatus.UNSIGNED
+        val sig = parse(signatureJson)
+        if (sig == null) {
+            // Distinguish "no signature" from "a signature.json is present but won't parse". The
+            // latter is tamper-evidence (truncated/corrupt), which a host MUST refuse — returning
+            // UNSIGNED here would let a mangled signature install as if it were merely unsigned.
+            return if (signatureJson.isNullOrBlank()) SignatureStatus.UNSIGNED else SignatureStatus.INVALID
+        }
         if (!isManifestSignatureValid(manifestBytes, sig)) return SignatureStatus.INVALID
         return if (evaluateTrust(sig, store).trusted) SignatureStatus.SIGNED_TRUSTED
         else SignatureStatus.SIGNED_UNTRUSTED

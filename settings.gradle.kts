@@ -18,6 +18,7 @@ include(":feature:ar", ":feature:editor", ":feature:dashboard")
 include(":android_collaboration_module")
 project(":android_collaboration_module").projectDir = file("collab")
 
-include(":opencv")
-project(":opencv").projectDir = file("core/nativebridge/libs/opencv/sdk")
+// OpenCV (Java + native C++) is imported as a normal Maven Central dependency (org.opencv:opencv),
+// not vendored. Since 4.9.0 that artifact ships a Prefab part, so `find_package(OpenCV)` in native
+// code resolves against it too — nothing to host, fetch, or commit.
 

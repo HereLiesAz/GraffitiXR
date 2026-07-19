@@ -179,10 +179,22 @@ class StencilPrintEngine @Inject constructor() {
         val srcY = (row * STRIDE_V * (sourceH / outputH)).toInt()
         val srcW = (TILE_W * (sourceW / outputW)).toInt()
         val srcH = (TILE_H * (sourceH / outputH)).toInt()
-        
-        val srcRect = Rect(srcX, srcY, srcX + srcW, srcY + srcH)
-        val dstRect = Rect(0, 0, TILE_W, TILE_H)
-        
+
+        // The last column/row can extend past the source bitmap. Clamp the source rect to the bitmap
+        // and shrink the destination rect by the same fraction, so edge tiles sample real pixels 1:1
+        // instead of stretching out-of-bounds garbage across the full tile.
+        if (srcW <= 0 || srcH <= 0 || srcX >= source.width || srcY >= source.height) {
+            tileBmp.recycle()
+            return
+        }
+        val srcRight = (srcX + srcW).coerceAtMost(source.width)
+        val srcBottom = (srcY + srcH).coerceAtMost(source.height)
+        val dstRight = ((srcRight - srcX).toFloat() / srcW * TILE_W).toInt().coerceIn(1, TILE_W)
+        val dstBottom = ((srcBottom - srcY).toFloat() / srcH * TILE_H).toInt().coerceIn(1, TILE_H)
+
+        val srcRect = Rect(srcX, srcY, srcRight, srcBottom)
+        val dstRect = Rect(0, 0, dstRight, dstBottom)
+
         tileCanvas.drawBitmap(source, srcRect, dstRect, Paint(Paint.FILTER_BITMAP_FLAG))
         
         // Convert to OpenCV and find contours

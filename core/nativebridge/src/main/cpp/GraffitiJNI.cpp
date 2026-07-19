@@ -222,9 +222,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_NativeCrashHandler_nativeInstall(
 void bitmapToMat(JNIEnv * env, jobject bitmap, cv::Mat& dst) {
     AndroidBitmapInfo info;
     void* pixels = 0;
-    AndroidBitmap_getInfo(env, bitmap, &info);
-    AndroidBitmap_lockPixels(env, bitmap, &pixels);
-    cv::Mat tmp(info.height, info.width, CV_8UC4, pixels);
+    // Check every AndroidBitmap_* result: a failed getInfo/lockPixels leaves `pixels` null, and
+    // wrapping null in a cv::Mat then copying it is a guaranteed SIGSEGV. Also require RGBA_8888 and
+    // honor info.stride (rows may be padded, so it isn't necessarily width*4).
+    if (AndroidBitmap_getInfo(env, bitmap, &info) != ANDROID_BITMAP_RESULT_SUCCESS) return;
+    if (info.format != ANDROID_BITMAP_FORMAT_RGBA_8888) return;
+    if (AndroidBitmap_lockPixels(env, bitmap, &pixels) != ANDROID_BITMAP_RESULT_SUCCESS || !pixels) return;
+    cv::Mat tmp(info.height, info.width, CV_8UC4, pixels, info.stride);
     tmp.copyTo(dst);
     AndroidBitmap_unlockPixels(env, bitmap);
 }
@@ -232,9 +236,10 @@ void bitmapToMat(JNIEnv * env, jobject bitmap, cv::Mat& dst) {
 void matToBitmap(JNIEnv * env, cv::Mat& src, jobject bitmap) {
     AndroidBitmapInfo info;
     void* pixels = 0;
-    AndroidBitmap_getInfo(env, bitmap, &info);
-    AndroidBitmap_lockPixels(env, bitmap, &pixels);
-    cv::Mat tmp(info.height, info.width, CV_8UC4, pixels);
+    if (AndroidBitmap_getInfo(env, bitmap, &info) != ANDROID_BITMAP_RESULT_SUCCESS) return;
+    if (info.format != ANDROID_BITMAP_FORMAT_RGBA_8888) return;
+    if (AndroidBitmap_lockPixels(env, bitmap, &pixels) != ANDROID_BITMAP_RESULT_SUCCESS || !pixels) return;
+    cv::Mat tmp(info.height, info.width, CV_8UC4, pixels, info.stride);
     if(src.type() == CV_8UC4) {
         src.copyTo(tmp);
     } else if(src.type() == CV_8UC3) {
@@ -485,8 +490,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     gColorImageHeight = height;
 
     cv::Mat yMat(height, width, CV_8UC1, yData, yStride);
-    cv::Mat uMat(height / 2, width / 2, CV_8UC1, uData, uvStride);
-    cv::Mat vMat(height / 2, width / 2, CV_8UC1, vData, uvStride);
 
     if (gLastColorFrame.empty() || gLastColorFrame.cols != width || gLastColorFrame.rows != height) {
         gLastColorFrame = cv::Mat(height, width, CV_8UC3);
@@ -496,8 +499,22 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     yMat.copyTo(yuv(cv::Rect(0, 0, width, height)));
 
     if (uvPixelStride == 1) {
-        uMat.copyTo(yuv(cv::Rect(0, height, width / 2, height / 4)));
-        vMat.copyTo(yuv(cv::Rect(width / 2, height, width / 2, height / 4)));
+        // I420 planar (separate U and V planes) → NV21-style interleaved V,U so the reloc decode
+        // (COLOR_YUV2RGB_NV21 below) is correct. The old code copied each full height/2-row plane
+        // into a height/4-row ROI — a size mismatch that left half the chroma uninitialized and
+        // produced wrong colours. Build the VU block explicitly, bounded by the buffer capacities.
+        jlong uCap = env->GetDirectBufferCapacity(uBuffer);
+        jlong vCap = env->GetDirectBufferCapacity(vBuffer);
+        cv::Mat chroma = yuv(cv::Rect(0, height, width, height / 2));
+        for (int r = 0; r < height / 2; ++r) {
+            uint8_t* dst = chroma.ptr(r);
+            size_t rowOff = (size_t)r * uvStride;
+            for (int c = 0; c < width / 2; ++c) {
+                size_t idx = rowOff + c;
+                dst[2 * c]     = (vCap <= 0 || (jlong)idx < vCap) ? vData[idx] : 0; // V
+                dst[2 * c + 1] = (uCap <= 0 || (jlong)idx < uCap) ? uData[idx] : 0; // U
+            }
+        }
         // No conversion on GL thread; pass raw YUV to map thread
         gLastColorFrame = yuv.clone();
     } else if (uvPixelStride == 2) {
@@ -806,26 +823,45 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadLowLightEnhanc
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerprint(
         JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type, jfloatArray ptsArray) {
-    if (gSlamEngine) {
-        jbyte* descData = env->GetByteArrayElements(descArray, nullptr);
-        cv::Mat descriptors(rows, cols, type, descData);
-        jsize ptsLen = env->GetArrayLength(ptsArray);
-        jfloat* ptsData = env->GetFloatArrayElements(ptsArray, nullptr);
-        std::vector<cv::Point3f> points3d;
-        for (int i = 0; i < ptsLen; i += 3) {
-            points3d.push_back(cv::Point3f(ptsData[i], ptsData[i+1], ptsData[i+2]));
-        }
-        gSlamEngine->restoreWallFingerprint(descriptors, points3d);
-        env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
-        env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
+    // Defensive validation (a malformed/old .gxr must never crash native): non-null refs, a valid
+    // OpenCV type (a bogus one makes the cv::Mat ctor throw a cv::Exception → hard process crash,
+    // since JNI can't catch C++ exceptions), and a descriptor blob at least rows*cols*elemSize.
+    // The size product is computed in 64-bit so a hostile rows*cols can't overflow past the check.
+    // Mirrors the guarded nativeRestoreWallFeatureMap path; the metric sibling below does the same.
+    if (!gSlamEngine || !descArray || !ptsArray) return;
+    if (rows < 0 || cols < 0) return;
+    int depth = CV_MAT_DEPTH(type);
+    int channels = CV_MAT_CN(type);
+    if (depth < 0 || depth > CV_64F || channels < 1 || channels > 4) return;
+    if ((jlong)rows * (jlong)cols * (jlong)CV_ELEM_SIZE(type) > (jlong)env->GetArrayLength(descArray)) return;
+
+    jbyte* descData = env->GetByteArrayElements(descArray, nullptr);
+    cv::Mat descriptors(rows, cols, type, descData);
+    jsize ptsLen = env->GetArrayLength(ptsArray);
+    jfloat* ptsData = env->GetFloatArrayElements(ptsArray, nullptr);
+    std::vector<cv::Point3f> points3d;
+    for (int i = 0; i + 2 < ptsLen; i += 3) {
+        points3d.push_back(cv::Point3f(ptsData[i], ptsData[i+1], ptsData[i+2]));
     }
+    gSlamEngine->restoreWallFingerprint(descriptors, points3d);
+    env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
+    env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerprintMetric(
         JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type,
         jfloatArray ptsArray, jfloatArray anchorArray, jfloatArray intrArray) {
-    if (!gSlamEngine) return;
+    // Same defensive validation as the plain restore: reject a malformed/old .gxr before cv::Mat
+    // wraps the descriptor blob (valid OpenCV type + 64-bit overflow-safe size check), and only pass
+    // anchor/intrinsics when correctly sized (native copies a fixed 16 / 4 floats and tolerates null),
+    // else leave the native defaults.
+    if (!gSlamEngine || !descArray || !ptsArray) return;
+    if (rows < 0 || cols < 0) return;
+    int depth = CV_MAT_DEPTH(type);
+    int channels = CV_MAT_CN(type);
+    if (depth < 0 || depth > CV_64F || channels < 1 || channels > 4) return;
+    if ((jlong)rows * (jlong)cols * (jlong)CV_ELEM_SIZE(type) > (jlong)env->GetArrayLength(descArray)) return;
     jbyte* descData = env->GetByteArrayElements(descArray, nullptr);
     cv::Mat descriptors(rows, cols, type, descData);
     jsize ptsLen = env->GetArrayLength(ptsArray);
@@ -835,13 +871,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
     for (int i = 0; i + 2 < ptsLen; i += 3) {
         points3d.push_back(cv::Point3f(ptsData[i], ptsData[i+1], ptsData[i+2]));
     }
-    jfloat* anchor = env->GetFloatArrayElements(anchorArray, nullptr);
-    jfloat* intr = env->GetFloatArrayElements(intrArray, nullptr);
+    jfloat* anchor = (anchorArray && env->GetArrayLength(anchorArray) == 16) ? env->GetFloatArrayElements(anchorArray, nullptr) : nullptr;
+    jfloat* intr   = (intrArray && env->GetArrayLength(intrArray) == 4)    ? env->GetFloatArrayElements(intrArray, nullptr)   : nullptr;
     gSlamEngine->restoreWallFingerprintMetric(descriptors, points3d, anchor, intr);
     env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
     env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
-    env->ReleaseFloatArrayElements(anchorArray, anchor, JNI_ABORT);
-    env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
+    if (anchor) env->ReleaseFloatArrayElements(anchorArray, anchor, JNI_ABORT);
+    if (intr)   env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
 }
 
 // Persistent wall feature map (Phase 2a: store only). Mirrors the metric-fingerprint restore but

@@ -24,30 +24,31 @@ object CurvesUtil {
             val diff = x[i + 1] - x[i]
             if (diff <= 0f) 1e-5f else diff
         }
-        val alpha = FloatArray(n - 1) { i ->
-            if (i == 0) 0f else (3f / h[i]) * (a[i + 1] - a[i]) - (3f / h[i - 1]) * (a[i] - a[i - 1])
-        }
+        // Secant slopes between consecutive control points.
+        val delta = FloatArray(n - 1) { i -> (a[i + 1] - a[i]) / h[i] }
 
-        val l = FloatArray(n)
-        val mu = FloatArray(n)
-        val z = FloatArray(n)
-        l[0] = 1f; mu[0] = 0f; z[0] = 0f
-
+        // Fritsch–Carlson tangents: start from averaged secants, zero them at local extrema, then
+        // clamp each so no segment overshoots. This clamping is what makes the interpolation actually
+        // monotone — a plain natural cubic can bulge past the control points and invert tones.
+        val m = FloatArray(n)
+        m[0] = delta[0]
+        m[n - 1] = delta[n - 2]
         for (i in 1 until n - 1) {
-            l[i] = 2f * (x[i + 1] - x[i - 1]) - h[i - 1] * mu[i - 1]
-            mu[i] = h[i] / l[i]
-            z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i]
+            m[i] = if (delta[i - 1] * delta[i] <= 0f) 0f else (delta[i - 1] + delta[i]) / 2f
         }
-
-        l[n - 1] = 1f; z[n - 1] = 0f
-        val c = FloatArray(n)
-        val b = FloatArray(n)
-        val d = FloatArray(n)
-
-        for (j in n - 2 downTo 0) {
-            c[j] = z[j] - mu[j] * c[j + 1]
-            b[j] = (a[j + 1] - a[j]) / h[j] - h[j] * (c[j + 1] + 2f * c[j]) / 3f
-            d[j] = (c[j + 1] - c[j]) / (3f * h[j])
+        for (i in 0 until n - 1) {
+            if (delta[i] == 0f) {
+                m[i] = 0f; m[i + 1] = 0f
+            } else {
+                val alpha = m[i] / delta[i]
+                val beta = m[i + 1] / delta[i]
+                val s = alpha * alpha + beta * beta
+                if (s > 9f) {
+                    val tau = 3f / kotlin.math.sqrt(s)
+                    m[i] = tau * alpha * delta[i]
+                    m[i + 1] = tau * beta * delta[i]
+                }
+            }
         }
 
         for (i in 0..255) {
@@ -56,8 +57,15 @@ object CurvesUtil {
             if (idx < 0) idx = -idx - 2
             idx = idx.coerceIn(0, n - 2)
 
-            val dx = px - x[idx]
-            val py = a[idx] + b[idx] * dx + c[idx] * dx * dx + d[idx] * dx * dx * dx
+            // Cubic Hermite basis on the normalized segment parameter t ∈ [0,1].
+            val t = ((px - x[idx]) / h[idx]).coerceIn(0f, 1f)
+            val t2 = t * t
+            val t3 = t2 * t
+            val h00 = 2f * t3 - 3f * t2 + 1f
+            val h10 = t3 - 2f * t2 + t
+            val h01 = -2f * t3 + 3f * t2
+            val h11 = t3 - t2
+            val py = h00 * a[idx] + h10 * h[idx] * m[idx] + h01 * a[idx + 1] + h11 * h[idx] * m[idx + 1]
             lut[i] = (py * 255).toInt().coerceIn(0, 255)
         }
 
