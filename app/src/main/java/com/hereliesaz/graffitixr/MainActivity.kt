@@ -94,7 +94,6 @@ import com.hereliesaz.graffitixr.common.security.SecurityProviderState
 import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.design.components.InfoDialog
-import com.hereliesaz.graffitixr.design.components.PosterOptionsDialog
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
 import androidx.compose.ui.res.stringResource
@@ -114,8 +113,6 @@ import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
 import com.hereliesaz.graffitixr.feature.ar.rememberCameraController
 import com.hereliesaz.graffitixr.feature.ar.takePictureAsBitmap
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
-import com.hereliesaz.graffitixr.feature.dashboard.MarketplaceScreen
-import com.hereliesaz.graffitixr.feature.dashboard.MarketplaceViewModel
 import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.feature.dashboard.SaveProjectDialog
 import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
@@ -174,9 +171,6 @@ class MainActivity : ComponentActivity() {
 
     var showSaveDialog by mutableStateOf(false)
     var showSettings by mutableStateOf(false)
-    var showMarketplace by mutableStateOf(false)
-    var showPosterDialog by mutableStateOf(false)
-    var posterSourceLayerId by mutableStateOf<String?>(null)
     var hasCameraPermission by mutableStateOf(false)
     var showWallSourceDialog by mutableStateOf(false)
     var isExporting by mutableStateOf(false)
@@ -295,7 +289,6 @@ class MainActivity : ComponentActivity() {
                 val editorViewModel: EditorViewModel = hiltViewModel()
                 val dashboardViewModel: DashboardViewModel = hiltViewModel()
                 val settingsViewModel: SettingsViewModel = hiltViewModel()
-                val marketplaceViewModel: MarketplaceViewModel = hiltViewModel()
                 val cameraController = rememberCameraController()
                 // Scope for suspending export captures (Overlay's ImageCapture.takePictureAsBitmap).
                 // Bound to the composable so it cancels with the screen if the user backs out
@@ -412,7 +405,6 @@ class MainActivity : ComponentActivity() {
                 }
 
                 BackHandler(enabled = showSettings) { showSettings = false }
-                BackHandler(enabled = showMarketplace) { showMarketplace = false }
                 BackHandler(enabled = mainUiState.isInPlaneRealignment) {
                     mainViewModel.endPlaneRealignment()
                 }
@@ -428,7 +420,6 @@ class MainActivity : ComponentActivity() {
                         !mainUiState.isTouchLocked &&
                         !mainUiState.isCapturingTarget &&
                         !showSettings &&
-                        !showMarketplace &&
                         !isExporting
 
                 // noMenu (AzNavRail 11.0) removes the side drawer entirely — all entries become rail
@@ -601,9 +592,6 @@ class MainActivity : ComponentActivity() {
 
                 val strings = rememberAppStrings()
                 val navStrings = strings.nav
-                var showFontPicker by remember { mutableStateOf(false) }
-                var fontPickerLayerId by remember { mutableStateOf<String?>(null) }
-                val layerMenusOpen = remember { mutableStateMapOf<String, Boolean>() }
 
                 val context = LocalContext.current
                 // Interop: is the GraffiXR companion editor installed? Gates the "Edit in GraffiXR"
@@ -667,8 +655,6 @@ class MainActivity : ComponentActivity() {
                             mainViewModel, editorViewModel, arViewModel, dashboardViewModel, context,
                             overlayImagePicker, backgroundImagePicker, editorUiState, railExpansion, arUiState, strings,
                             navItemColor = navItemColor,
-                            onShowFontPicker = { layerId -> fontPickerLayerId = layerId; showFontPicker = true },
-                            layerMenusOpen = layerMenusOpen,
                             showLibrary = showLibrary,
                             // Guidance is OFF by default; the tour is "on" only while a guidance goal is
                             // active. The Help item toggles it: on -> enable + activate every goal;
@@ -789,21 +775,9 @@ class MainActivity : ComponentActivity() {
                         // is that auto overlays (onboarding, AR-unavailable explainer) must
                         // early-return on EVERY modal, not just one — collapsing the repeated
                         // boolean chains here prevents a future overlay from forgetting one.
-                        val anyModalActive = showLibrary || showSettings || showMarketplace || isExporting ||
+                        val anyModalActive = showLibrary || showSettings || isExporting ||
                             mainUiState.isCapturingTarget || showSaveDialog ||
                             dashboardUiState.showNewProjectDialog
-
-                        // Auto-open the edit-text box the instant a new text layer is created.
-                        // The new layer's rail item must compose first (with its hidden menu
-                        // closed) so flipping layerMenusOpen to true is a clean closed->open edge
-                        // the rail picks up; hence the brief delay.
-                        LaunchedEffect(editorUiState.autoEditTextLayerId) {
-                            val id = editorUiState.autoEditTextLayerId ?: return@LaunchedEffect
-                            editorViewModel.onLayerActivated(id)
-                            kotlinx.coroutines.delay(250)
-                            layerMenusOpen[id] = true
-                            editorViewModel.consumeAutoEditTextLayer()
-                        }
 
                         val completedTutorials by mainViewModel.completedTutorials.collectAsState()
 
@@ -1284,30 +1258,6 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            if (showFontPicker) {
-                                FontPickerDialog(
-                                    onFontSelected = { fontName ->
-                                        fontPickerLayerId?.let { editorViewModel.onTextFontChanged(it, fontName) }
-                                        showFontPicker = false
-                                    },
-                                    onDismiss = { showFontPicker = false },
-                                    strings = strings
-                                )
-                            }
-
-
-                            if (showPosterDialog && posterSourceLayerId != null) {
-                                PosterOptionsDialog(
-                                    sourceLayerId = posterSourceLayerId!!,
-                                    layers = editorUiState.layers,
-                                    onDismiss = { showPosterDialog = false },
-                                    onGenerate = { size, selectedIds ->
-                                        editorViewModel.generatePosterPdf(selectedIds, size)
-                                        showPosterDialog = false
-                                    },
-                                    strings = strings
-                                )
-                            }
 
                             if (showWallSourceDialog) {
                                 WallSourceDialog(
@@ -1394,17 +1344,6 @@ class MainActivity : ComponentActivity() {
                                     onResetTutorials = { settingsViewModel.resetCompletedTutorials() },
                                     onClose = { showSettings = false },
                                     strings = strings
-                                )
-                            }
-
-                            if (showMarketplace) {
-                                MarketplaceScreen(
-                                    viewModel = marketplaceViewModel,
-                                    onApplyLut = { extensionId ->
-                                        editorViewModel.applyInstalledLut(extensionId)
-                                        showMarketplace = false
-                                    },
-                                    onClose = { showMarketplace = false },
                                 )
                             }
 
@@ -1516,8 +1455,6 @@ class MainActivity : ComponentActivity() {
         arUiState: ArUiState,
         strings: AppStrings,
         navItemColor: Color = Color.White,
-        onShowFontPicker: (String) -> Unit = {},
-        layerMenusOpen: MutableMap<String, Boolean>,
         showLibrary: Boolean,
         guidanceEnabled: Boolean = true,
         onToggleGuidance: () -> Unit = {},
@@ -2481,48 +2418,3 @@ private fun PaintingProgressIndicator(
     }
 }
 
-private val AVAILABLE_FONTS = listOf(
-    "Roboto", "Oswald", "Bebas Neue", "Anton",
-    "Playfair Display", "Pacifico", "Dancing Script",
-    "Permanent Marker", "Rock Salt", "Bangers", "Righteous"
-)
-
-@Composable
-private fun FontPickerDialog(
-    onFontSelected: (String) -> Unit,
-    onDismiss: () -> Unit,
-    strings: AppStrings
-) {
-    val googleFontsProvider = remember {
-        androidx.compose.ui.text.googlefonts.GoogleFont.Provider(
-            providerAuthority = "com.google.android.gms.fonts",
-            providerPackage = "com.google.android.gms",
-            certificates = com.hereliesaz.graffitixr.R.array.com_google_android_gms_fonts_certs
-        )
-    }
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(strings.editor.chooseFont) },
-        text = {
-            LazyColumn {
-                items(AVAILABLE_FONTS) { fontName ->
-                    val googleFont = androidx.compose.ui.text.googlefonts.GoogleFont(fontName)
-                    val fontFamily = FontFamily(
-                        androidx.compose.ui.text.googlefonts.Font(googleFont, googleFontsProvider)
-                    )
-                    Text(
-                        text = "Aa  $fontName",
-                        fontFamily = fontFamily,
-                        fontSize = 20.sp,
-                        color = Color.White,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onFontSelected(fontName) }
-                            .padding(12.dp)
-                    )
-                }
-            }
-        },
-        confirmButton = {}
-    )
-}
