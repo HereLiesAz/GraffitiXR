@@ -148,6 +148,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.core.os.LocaleListCompat
 import androidx.core.net.toUri
+import androidx.core.content.IntentCompat
 import com.hereliesaz.graffitixr.design.theme.AppStrings
 import com.hereliesaz.graffitixr.design.theme.rememberAppStrings
 import com.hereliesaz.graffitixr.design.theme.rememberNavStrings
@@ -182,12 +183,40 @@ class MainActivity : ComponentActivity() {
     // Crash report captured on the previous run (native SIGSEGV and/or JVM), shown on launch.
     var pendingCrashReport by mutableStateOf<String?>(null)
 
+    // Interop: an image handed in via ACTION_SEND (e.g. an edited overlay returning from GraffiXR),
+    // consumed once by the editor as a new overlay layer. Set from the launch intent / onNewIntent.
+    private var incomingSharedImage by mutableStateOf<Uri?>(null)
+
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p ->
         hasCameraPermission = p[Manifest.permission.CAMERA] ?: false
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        incomingImageUri(intent)?.let { incomingSharedImage = it }
+    }
+
+    /**
+     * Extracts a single image [Uri] from an inbound share intent, or null if this launch isn't one.
+     * Handles ACTION_SEND (EXTRA_STREAM) and an image-typed ACTION_VIEW; the graffitixr VIEW callback
+     * (Meta AI redirect) is ignored via the image MIME guard. The sender grants read permission on
+     * the Uri, so the editor's ContentResolver load succeeds.
+     */
+    private fun incomingImageUri(intent: Intent?): Uri? {
+        if (intent == null || intent.type?.startsWith("image/") != true) return null
+        return when (intent.action) {
+            Intent.ACTION_SEND -> IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
+            Intent.ACTION_VIEW -> intent.data
+            else -> null
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Interop: capture an image handed in by ACTION_SEND on this cold start (consumed in setContent).
+        incomingSharedImage = incomingImageUri(intent)
 
         hasCameraPermission = ContextCompat.checkSelfPermission(
             this, Manifest.permission.CAMERA
@@ -291,6 +320,16 @@ class MainActivity : ComponentActivity() {
                     val appLocales = LocaleListCompat.forLanguageTags(language.code)
                     if (AppCompatDelegate.getApplicationLocales() != appLocales) {
                         AppCompatDelegate.setApplicationLocales(appLocales)
+                    }
+                }
+
+                // Interop: an image shared in via ACTION_SEND (e.g. an edited overlay returning from
+                // GraffiXR) becomes a new overlay layer, consumed once.
+                val sharedImage = incomingSharedImage
+                LaunchedEffect(sharedImage) {
+                    if (sharedImage != null) {
+                        editorViewModel.onAddLayer(sharedImage)
+                        incomingSharedImage = null
                     }
                 }
 

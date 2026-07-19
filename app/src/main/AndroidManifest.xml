@@ -87,6 +87,14 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="graffitixr" />
             </intent-filter>
+
+            <!-- Interop: receive an image shared from GraffiXR (e.g. an edited overlay returning from
+                 the rich editor) and open it as an AR overlay layer. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
         </activity>
 
         <!--
