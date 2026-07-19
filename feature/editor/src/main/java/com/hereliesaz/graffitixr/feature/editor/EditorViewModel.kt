@@ -763,6 +763,35 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Composites the current layers to a PNG in `cacheDir/shared` and returns a FileProvider
+     * `content://` Uri suitable for `ACTION_SEND` — the two-app interop hand-off (send the overlay to
+     * GraffiXR's rich editor, or any app). Returns null if there's nothing to share. The host fires
+     * the share intent; the Uri authority is `${applicationId}.fileprovider`, declared in the manifest.
+     */
+    suspend fun exportForShare(): Uri? = withContext(dispatchers.default) {
+        val layers = _uiState.value.layers
+        if (layers.isEmpty()) return@withContext null
+        val metrics = context.resources.displayMetrics
+        val composite = exportManager.compositeLayers(
+            layers,
+            metrics.widthPixels,
+            metrics.heightPixels,
+            backgroundColor = android.graphics.Color.TRANSPARENT,
+        )
+        val dir = java.io.File(context.cacheDir, "shared").apply { mkdirs() }
+        val file = java.io.File(dir, "graffitixr_share.png")
+        java.io.FileOutputStream(file).use { out ->
+            composite.compress(Bitmap.CompressFormat.PNG, 100, out)
+        }
+        composite.recycle()
+        androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file,
+        )
+    }
+
     fun toggleHandedness() = dispatch(EditorIntent.ToggleHandedness)
     fun toggleDiagOverlay() = dispatch(EditorIntent.ToggleDiagOverlay)
     fun toggleFeaturePoints() = dispatch(EditorIntent.ToggleFeaturePoints)
