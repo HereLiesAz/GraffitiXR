@@ -606,6 +606,13 @@ class MainActivity : ComponentActivity() {
                 val layerMenusOpen = remember { mutableStateMapOf<String, Boolean>() }
 
                 val context = LocalContext.current
+                // Interop: is the GraffiXR companion editor installed? Gates the "Edit in GraffiXR"
+                // hand-off rail item. Visibility works because the manifest <queries> declares the pkg.
+                val isGraffiXrInstalled = remember {
+                    runCatching {
+                        context.packageManager.getLaunchIntentForPackage("com.hereliesaz.graffixr") != null
+                    }.getOrDefault(false)
+                }
                 val canvasBg = editorUiState.canvasBackground
 
                 val navItemColor = remember(canvasBg) {
@@ -726,6 +733,29 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                     else -> editorViewModel.exportImage()
+                                }
+                            },
+                            isGraffiXrInstalled = isGraffiXrInstalled,
+                            onEditInGraffiXr = {
+                                // Hand off the current overlay to GraffiXR for rich editing: composite to
+                                // a content:// Uri and fire an explicit ACTION_SEND at the GraffiXR package.
+                                exportDispatchScope.launch {
+                                    val uri = editorViewModel.exportForShare() ?: return@launch
+                                    val send = Intent(Intent.ACTION_SEND).apply {
+                                        setPackage("com.hereliesaz.graffixr")
+                                        type = "image/png"
+                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    try {
+                                        context.startActivity(send)
+                                    } catch (t: Throwable) {
+                                        // GraffiXR became unresolvable between the check and the tap —
+                                        // fall back to a generic chooser so the image still goes somewhere.
+                                        context.startActivity(
+                                            Intent.createChooser(send.apply { setPackage(null) }, null)
+                                        )
+                                    }
                                 }
                             },
                         )
@@ -1497,6 +1527,8 @@ class MainActivity : ComponentActivity() {
         onShowJoinScanner: () -> Unit = {},
         onWallPhoto: () -> Unit = {},
         onExportRequested: () -> Unit,
+        isGraffiXrInstalled: Boolean = false,
+        onEditInGraffiXr: () -> Unit = {},
     ) {
         val navStrings = strings.nav
         val requestPermissions = {
@@ -1541,6 +1573,13 @@ class MainActivity : ComponentActivity() {
             if (isDesignMode) {
                 azRailSubItem(id = "design.addImg", hostId = "host.design", text = "Open", color = navItemColor, shape = AzButtonShape.NONE) {
                     overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
+                // Interop hand-off: only when the GraffiXR companion editor is installed. Sends the
+                // current overlay to GraffiXR for rich editing; the edited result can be shared back.
+                if (isGraffiXrInstalled) {
+                    azRailSubItem(id = "design.editInGraffixr", hostId = "host.design", text = "GraffiXR", color = navItemColor, shape = AzButtonShape.NONE) {
+                        onEditInGraffiXr()
+                    }
                 }
                 azRailSubItem(id = "design.addDraw", hostId = "host.design", text = "Sketch", color = navItemColor, shape = AzButtonShape.NONE) {
                     editorViewModel.onAddBlankLayer()
