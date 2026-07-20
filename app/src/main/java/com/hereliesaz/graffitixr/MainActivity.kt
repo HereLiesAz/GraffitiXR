@@ -594,11 +594,11 @@ class MainActivity : ComponentActivity() {
                 val navStrings = strings.nav
 
                 val context = LocalContext.current
-                // Interop: is the GraffiXR companion editor installed? Gates the "Edit in GraffiXR"
+                // Interop: is the Graffux companion editor installed? Gates the "Edit in Graffux"
                 // hand-off rail item. Visibility works because the manifest <queries> declares the pkg.
                 val isGraffiXrInstalled = remember {
                     runCatching {
-                        context.packageManager.getLaunchIntentForPackage("com.hereliesaz.graffixr") != null
+                        context.packageManager.getLaunchIntentForPackage("com.hereliesaz.graffux") != null
                     }.getOrDefault(false)
                 }
                 val canvasBg = editorUiState.canvasBackground
@@ -723,12 +723,12 @@ class MainActivity : ComponentActivity() {
                             },
                             isGraffiXrInstalled = isGraffiXrInstalled,
                             onEditInGraffiXr = {
-                                // Hand off the current overlay to GraffiXR for rich editing: composite to
-                                // a content:// Uri and fire an explicit ACTION_SEND at the GraffiXR package.
+                                // Hand off the current overlay to Graffux for rich editing: composite to
+                                // a content:// Uri and fire an explicit ACTION_SEND at the Graffux package.
                                 exportDispatchScope.launch {
                                     val uri = editorViewModel.exportForShare() ?: return@launch
                                     val send = Intent(Intent.ACTION_SEND).apply {
-                                        setPackage("com.hereliesaz.graffixr")
+                                        setPackage("com.hereliesaz.graffux")
                                         type = "image/png"
                                         putExtra(Intent.EXTRA_STREAM, uri)
                                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -736,7 +736,7 @@ class MainActivity : ComponentActivity() {
                                     try {
                                         context.startActivity(send)
                                     } catch (t: Throwable) {
-                                        // GraffiXR became unresolvable between the check and the tap —
+                                        // Graffux became unresolvable between the check and the tap —
                                         // fall back to a generic chooser so the image still goes somewhere.
                                         context.startActivity(
                                             Intent.createChooser(send.apply { setPackage(null) }, null)
@@ -1511,15 +1511,15 @@ class MainActivity : ComponentActivity() {
                 azRailSubItem(id = "design.addImg", hostId = "host.design", text = "Open", color = navItemColor, shape = AzButtonShape.NONE) {
                     overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
-                // Interop hand-off: only when the GraffiXR companion editor is installed. Sends the
-                // current overlay to GraffiXR for rich editing; the edited result can be shared back.
+                // Interop hand-off: only when the Graffux companion editor is installed. Sends the
+                // current overlay to Graffux for rich editing; the edited result can be shared back.
                 if (isGraffiXrInstalled) {
-                    azRailSubItem(id = "design.editInGraffixr", hostId = "host.design", text = "GraffiXR", color = navItemColor, shape = AzButtonShape.NONE) {
+                    azRailSubItem(id = "design.editInGraffixr", hostId = "host.design", text = "Graffux", color = navItemColor, shape = AzButtonShape.NONE) {
                         onEditInGraffiXr()
                     }
                 }
                 // Core tracing prep (GraffitiXR is core-only; rich multi-layer / paint / text /
-                // effects editing is GraffiXR's job, reached via the "GraffiXR" hand-off above).
+                // effects editing is Graffux's job, reached via the "Graffux" hand-off above).
                 // These act on the active overlay layer.
                 val overlay = editorUiState.layers.find { it.id == editorUiState.activeLayerId }
                 if (overlay != null) {
