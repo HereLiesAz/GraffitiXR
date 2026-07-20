@@ -24,7 +24,7 @@ buildscript {
         // "Provided Metadata instance has version 2.4.0, while maximum supported version is 2.3.0".
         // Force the matching 2.4.0 reader onto every classpath (incl. the KSP processor) so Hilt
         // can parse 2.4.0 metadata. Keep this version in lockstep with `kotlin` in libs.versions.toml.
-        "org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.0"
+        "org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.10"
     )
 
     val protobufModules = listOf(
