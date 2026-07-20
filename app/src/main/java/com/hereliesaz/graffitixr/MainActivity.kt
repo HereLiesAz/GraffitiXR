@@ -735,7 +735,7 @@ class MainActivity : ComponentActivity() {
                                         // grants against the intent's data/ClipData, not EXTRA_STREAM, so
                                         // an explicit (setPackage) hand-off can otherwise reach Graffux
                                         // without read access. The chooser fallback reuses this intent.
-                                        clipData = android.content.ClipData.newRawUri(null, uri)
+                                        clipData = ClipData.newRawUri(null, uri)
                                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                     }
                                     try {
