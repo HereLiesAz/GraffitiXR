@@ -52,6 +52,9 @@ fun MarketplaceScreen(
     val installed by viewModel.installed.collectAsState()
     val busyId by viewModel.busyId.collectAsState()
     val status by viewModel.status.collectAsState()
+    val catalog by viewModel.catalog.collectAsState()
+    val offline by viewModel.offline.collectAsState()
+    val loading by viewModel.loading.collectAsState()
 
     val installedLuts = remember(installed) {
         installed.filter { ext ->
@@ -122,13 +125,31 @@ fun MarketplaceScreen(
                         }
 
                         item {
-                            Text(
-                                text = "Browse",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "Browse",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                val note = when {
+                                    loading -> "Loading…"
+                                    offline -> "Offline · bundled extensions"
+                                    else -> null
+                                }
+                                note?.let {
+                                    Text(
+                                        text = it,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                    )
+                                }
+                            }
                         }
-                        items(viewModel.catalog, key = { it.id }) { entry ->
+                        items(catalog, key = { it.id }) { entry ->
                             CatalogRow(
                                 entry = entry,
                                 isInstalled = installed.any { it.id == entry.id },

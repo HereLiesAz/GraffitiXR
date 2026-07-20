@@ -23,6 +23,8 @@ import javax.inject.Singleton
 @Singleton
 class ExtensionRepository @Inject constructor(
     @ApplicationContext private val context: Context,
+    /** Points at the flagship storefront (azphalt.store) by default; see RegistryModule. */
+    private val registry: RepositoryClient,
 ) {
     private val extensionsRoot = File(context.filesDir, "extensions")
     private val installer = AzpInstaller(extensionsRoot)
@@ -33,8 +35,17 @@ class ExtensionRepository @Inject constructor(
     private val _installed = MutableStateFlow(scanInstalled())
     val installed: StateFlow<List<InstalledExtension>> = _installed.asStateFlow()
 
-    /** The offline catalog to browse. Bundled seed; use [catalogFromRegistry] for a live registry. */
+    /** The bundled seed catalog — the offline fallback. Prefer [browseCatalog] for live results. */
     fun catalog(): List<MarketplaceEntry> = SEED_MARKETPLACE
+
+    /**
+     * Browse the store: one page from the live azphalt registry ([registry], default azphalt.store),
+     * falling back to the bundled [SEED_MARKETPLACE] when the registry errors or returns nothing (see
+     * [resolveCatalog]). Blocking IO — call from a background dispatcher. This is the real "browse the
+     * store" path; [catalog] is just the offline seed it falls back to.
+     */
+    fun browseCatalog(query: String? = null, page: Int = 1): CatalogResult =
+        resolveCatalog(runCatching { catalogFromRegistry(registry, query, page) })
 
     /**
      * Browse a live azphalt registry (spec/repository-api.md) instead of the bundled seed. Fetches one
@@ -51,6 +62,27 @@ class ExtensionRepository @Inject constructor(
         client.search(q = query, page = page).packages.map { pkg ->
             pkg.toMarketplaceEntry(client.downloadUrl(pkg.id, pkg.version))
         }
+
+    /**
+     * Ask a live registry which installed extensions have a newer version (POST /updates). Returns the
+     * available updates; empty when nothing is installed or nothing is out of date. Blocking IO — call
+     * from a background dispatcher. Needs a [RepositoryClient] built with a POST transport.
+     */
+    fun checkForUpdates(client: RepositoryClient): List<UpdateAvailable> {
+        val refs = _installed.value.map { InstalledRef(it.id, it.manifest.version) }
+        if (refs.isEmpty()) return emptyList()
+        return client.updates(refs).updates
+    }
+
+    /**
+     * Cross-check installed extensions against the registry's advisory revocations feed (GET
+     * /revocations). Returns the installed extensions whose exact version has been pulled, so the UI
+     * can warn or offer to uninstall. Blocking IO — call from a background dispatcher.
+     */
+    fun revokedInstalled(client: RepositoryClient, since: String? = null): List<InstalledExtension> {
+        val feed = client.revocations(since)
+        return _installed.value.filter { feed.isRevoked(it.id, it.manifest.version) }
+    }
 
     fun isInstalled(id: String): Boolean = _installed.value.any { it.id == id }
 
