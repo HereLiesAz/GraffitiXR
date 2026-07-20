@@ -731,6 +731,11 @@ class MainActivity : ComponentActivity() {
                                         setPackage("com.hereliesaz.graffux")
                                         type = "image/png"
                                         putExtra(Intent.EXTRA_STREAM, uri)
+                                        // Carry the URI in ClipData too: FLAG_GRANT_READ_URI_PERMISSION
+                                        // grants against the intent's data/ClipData, not EXTRA_STREAM, so
+                                        // an explicit (setPackage) hand-off can otherwise reach Graffux
+                                        // without read access. The chooser fallback reuses this intent.
+                                        clipData = android.content.ClipData.newRawUri(null, uri)
                                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                     }
                                     try {
