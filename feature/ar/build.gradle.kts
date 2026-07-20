@@ -55,7 +55,7 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
 
     implementation(libs.arcore.client)
-    implementation(project(":opencv"))
+    implementation(libs.opencv)
 
     implementation(libs.az.nav.rail)
     implementation(libs.androidx.activity.compose)

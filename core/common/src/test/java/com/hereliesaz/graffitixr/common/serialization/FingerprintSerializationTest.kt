@@ -4,6 +4,7 @@ import com.hereliesaz.graffitixr.common.model.Fingerprint
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import org.opencv.core.KeyPoint
 
@@ -99,7 +100,7 @@ class FingerprintSerializationTest {
         // would be unequal — silently breaking any state-diffing/caching that relies on equality.
         fun make() = Fingerprint(
             keypoints = listOf(KeyPoint(1f, 2f, 3f, 10f, 0.5f, 0, 1)),
-            points3d = listOf(0.5f, 0.25f),
+            points3d = listOf(0.5f, 0.25f, 0.75f),
             descriptorsData = byteArrayOf(9, 8, 7),
             descriptorsRows = 1,
             descriptorsCols = 3,
@@ -109,5 +110,35 @@ class FingerprintSerializationTest {
         val b = make()
         assertEquals(a, b)
         assertEquals(a.hashCode().toLong(), b.hashCode().toLong())
+    }
+
+    @Test
+    fun `Fingerprint rejects a descriptor blob that disagrees with its declared dims`() {
+        // A corrupt/truncated .gxr must not construct a Fingerprint whose byte blob doesn't match its
+        // rows — the native restore wraps this in a cv::Mat and would read out of bounds.
+        assertThrows(IllegalArgumentException::class.java) {
+            Fingerprint(
+                keypoints = emptyList(),
+                points3d = emptyList(),
+                descriptorsData = byteArrayOf(1, 2, 3), // 3 bytes …
+                descriptorsRows = 2,                    // … doesn't divide evenly into 2 rows
+                descriptorsCols = 4,
+                descriptorsType = 0,
+            )
+        }
+    }
+
+    @Test
+    fun `Fingerprint rejects a points3d list that is not whole triplets`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            Fingerprint(
+                keypoints = emptyList(),
+                points3d = listOf(0.5f, 0.25f), // 2 floats — not a whole [x,y,z]
+                descriptorsData = ByteArray(0),
+                descriptorsRows = 0,
+                descriptorsCols = 0,
+                descriptorsType = 0,
+            )
+        }
     }
 }

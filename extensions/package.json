@@ -1,0 +1,16 @@
+{
+  "name": "graffitixr-extensions",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "azphalt code plugins, smart brush sets, and filter/effect packs for GraffitiXR — built with the azphalt SDK.",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@azphalt/azp": "^0.1.0"
+  },
+  "overrides": {
+    "@azphalt/sdk": "0.1.1"
+  }
+}

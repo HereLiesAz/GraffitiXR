@@ -153,7 +153,25 @@ class EditorViewModel @Inject constructor(
     private var strokeWorkingCanvas: Canvas? = null
     private var strokePaint: Paint? = null
     private var strokePrevBitmapPoint: Offset? = null
+    private val strokeCollectedPointsLock = Any()
+    // Touched from the main thread (add/reset) and background Default coroutines (snapshot). All access
+    // MUST go through the synchronized helpers below, or a concurrent add during toList() throws a
+    // ConcurrentModificationException mid-stroke (uncaught in viewModelScope → crash).
     private var strokeCollectedPoints: MutableList<Offset> = mutableListOf()
+
+    private fun resetStrokePoints(initial: Offset? = null) = synchronized(strokeCollectedPointsLock) {
+        // `vararg Offset` is rejected by the compiler (Offset is a Compose value class), so take a
+        // single optional seed point — the only two call sites are reset-with-start and reset-empty.
+        strokeCollectedPoints = if (initial != null) mutableListOf(initial) else mutableListOf()
+    }
+
+    private fun addStrokePoint(point: Offset) = synchronized(strokeCollectedPointsLock) {
+        strokeCollectedPoints.add(point)
+    }
+
+    private fun snapshotStrokePoints(): List<Offset> = synchronized(strokeCollectedPointsLock) {
+        strokeCollectedPoints.toList()
+    }
     private var strokeLayerId: String? = null
     private var strokeCanvasW: Int = 0
     private var strokeCanvasH: Int = 0
@@ -161,6 +179,10 @@ class EditorViewModel @Inject constructor(
     private var strokeLayerScale: Float = 1f
     private var strokeLayerOffset: Offset = Offset.Zero
     private var strokeLayerRotationZ: Float = 0f
+
+    // Cancels the previous segmentation-influence recompute so a slider drag doesn't pile up full
+    // K-means passes (one uncancelled Default coroutine per tick).
+    private var segmentationInfluenceJob: kotlinx.coroutines.Job? = null
 
     // Liquify live-preview state — valid only between onStrokeStart and onStrokeEnd for LIQUIFY.
     private var liquifyJob: kotlinx.coroutines.Job? = null
@@ -554,33 +576,39 @@ class EditorViewModel @Inject constructor(
             val updatedLayers = _uiState.value.layers.map { it.toOverlayLayer() }
             val modeAdjustments = _uiState.value.modeAdjustments.mapKeys { it.key.name }
 
-            val projectToSave = if (currentProject == null) {
-                GraffitiProject(name = name ?: "New Project", layers = updatedLayers, modeAdjustments = modeAdjustments)
-            } else {
-                currentProject.copy(
-                    name = name ?: currentProject.name,
-                    layers = updatedLayers,
-                    modeAdjustments = modeAdjustments,
-                    lastModified = System.currentTimeMillis()
-                )
-            }
-
-            val mapPath = projectManager.getMapPath(context, projectToSave.id)
-            val cloudPointsPath = projectManager.getCloudPointsPath(context, projectToSave.id)
-
-            // Persist SLAM world before writing the manifest so the paths are valid.
+            // Paths derive from the (immutable) project id. Persist the SLAM world first so they're valid.
+            val projectId = currentProject?.id ?: GraffitiProject(name = name ?: "New Project").id
+            val mapPath = projectManager.getMapPath(context, projectId)
+            val cloudPointsPath = projectManager.getCloudPointsPath(context, projectId)
             slamManager.saveModel(mapPath)
 
-            // Record the SLAM world paths in the .gxr manifest.
-            val manifestToSave = projectToSave.copy(
-                mapPath = mapPath,
-                cloudPointsPath = cloudPointsPath
-            )
-
+            val manifestToSave: GraffitiProject
             if (currentProject == null) {
+                manifestToSave = GraffitiProject(
+                    id = projectId,
+                    name = name ?: "New Project",
+                    layers = updatedLayers,
+                    modeAdjustments = modeAdjustments,
+                    mapPath = mapPath,
+                    cloudPointsPath = cloudPointsPath,
+                )
                 projectRepository.createProject(manifestToSave)
             } else {
-                projectRepository.updateProject(manifestToSave)
+                // Atomic read-modify-write: a concurrent AR wall-feature-map save merges into the SAME
+                // currentProject, so writing a full stale copy here would drop its wall map (and vice
+                // versa). The transform only touches the editor-owned fields. (docs/AUDIT.md save-race)
+                projectRepository.updateProject { current ->
+                    current.copy(
+                        name = name ?: current.name,
+                        layers = updatedLayers,
+                        modeAdjustments = modeAdjustments,
+                        lastModified = System.currentTimeMillis(),
+                        mapPath = mapPath,
+                        cloudPointsPath = cloudPointsPath,
+                    )
+                }
+                // Export the merged result the repository just persisted (includes any AR wall map).
+                manifestToSave = projectRepository.currentProject.value ?: return@launch
             }
 
             if (name != null) {
@@ -735,6 +763,35 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Composites the current layers to a PNG in `cacheDir/shared` and returns a FileProvider
+     * `content://` Uri suitable for `ACTION_SEND` — the two-app interop hand-off (send the overlay to
+     * GraffiXR's rich editor, or any app). Returns null if there's nothing to share. The host fires
+     * the share intent; the Uri authority is `${applicationId}.fileprovider`, declared in the manifest.
+     */
+    suspend fun exportForShare(): Uri? = withContext(dispatchers.default) {
+        val layers = _uiState.value.layers
+        if (layers.isEmpty()) return@withContext null
+        val metrics = context.resources.displayMetrics
+        val composite = exportManager.compositeLayers(
+            layers,
+            metrics.widthPixels,
+            metrics.heightPixels,
+            backgroundColor = android.graphics.Color.TRANSPARENT,
+        )
+        val dir = java.io.File(context.cacheDir, "shared").apply { mkdirs() }
+        val file = java.io.File(dir, "graffitixr_share.png")
+        java.io.FileOutputStream(file).use { out ->
+            composite.compress(Bitmap.CompressFormat.PNG, 100, out)
+        }
+        composite.recycle()
+        androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file,
+        )
+    }
+
     fun toggleHandedness() = dispatch(EditorIntent.ToggleHandedness)
     fun toggleDiagOverlay() = dispatch(EditorIntent.ToggleDiagOverlay)
     fun toggleFeaturePoints() = dispatch(EditorIntent.ToggleFeaturePoints)
@@ -802,7 +859,10 @@ class EditorViewModel @Inject constructor(
         val source = segmentationSourceBitmap ?: return
         val targetId = segmentationTargetLayerId
 
-        viewModelScope.launch(dispatchers.default) {
+        // Debounce: each slider tick reruns full K-means, so cancel the in-flight recompute before
+        // starting a fresh one — otherwise fast dragging piles up parallel passes on the Default pool.
+        segmentationInfluenceJob?.cancel()
+        segmentationInfluenceJob = viewModelScope.launch(dispatchers.default) {
             val newBitmap = subjectIsolator.applyConfidenceThreshold(source, confidence, clamped, 0.1f)
 
             val finalPreview = if (pendingStencilSourceLayerId != null) {
@@ -1164,15 +1224,23 @@ class EditorViewModel @Inject constructor(
      * ColorMatrix can't express) and replaces the base, pushing undo history first.
      */
     fun applyInstalledLut(extensionId: String) {
-        val layerId = _uiState.value.activeLayerId ?: return
-        val layer = _uiState.value.layers.find { it.id == layerId } ?: return
-        val bitmap = layer.bitmap ?: return
+        val layerId = _uiState.value.activeLayerId
+        val layer = layerId?.let { id -> _uiState.value.layers.find { it.id == id } }
+        val bitmap = layer?.bitmap
+        if (layerId == null || bitmap == null) {
+            // The Marketplace closes on Apply, so a silent return read as "the button does nothing".
+            Toast.makeText(context, "Select a layer with an image before applying a filter", Toast.LENGTH_SHORT).show()
+            return
+        }
         pushHistory()
         dispatch(EditorIntent.SetLoading(true))
         viewModelScope.launch(dispatchers.default) {
             val lut = extensionRepository.loadLut(extensionId)
             if (lut == null) {
-                dispatch(EditorIntent.SetLoading(false))
+                withContext(dispatchers.main) {
+                    dispatch(EditorIntent.SetLoading(false))
+                    Toast.makeText(context, "Couldn't load that filter — it may be missing or corrupt", Toast.LENGTH_SHORT).show()
+                }
                 return@launch
             }
             val graded = bitmap.applyCubeLut(lut)
@@ -1389,7 +1457,7 @@ class EditorViewModel @Inject constructor(
         val layer = state.layers.find { it.id == layerId } ?: return
         val originalBitmap = layer.bitmap ?: return
 
-        strokeCollectedPoints = mutableListOf(startPoint)
+        resetStrokePoints(startPoint)
         strokeLayerId = layerId
         strokeCanvasW = canvasSize.width
         strokeCanvasH = canvasSize.height
@@ -1430,7 +1498,7 @@ class EditorViewModel @Inject constructor(
 
             // Snapshot the collected points at this moment — may include points that arrived
             // during the bitmap-copy phase.
-            val catchUpPoints = strokeCollectedPoints.toList()
+            val catchUpPoints = snapshotStrokePoints()
             val mappedAll = ImageProcessor.mapScreenToBitmap(
                 catchUpPoints, canvasSize.width, canvasSize.height, workBitmap.width, workBitmap.height,
                 layerScale, layerOffset, layerRotationZ
@@ -1465,7 +1533,7 @@ class EditorViewModel @Inject constructor(
 
     /** Called for every drag update. Draws only the new segment onto the working bitmap. */
     fun onStrokePoint(currentPoint: Offset) {
-        strokeCollectedPoints.add(currentPoint)
+        addStrokePoint(currentPoint)
 
         // Liquify live preview: cancel any pending warp job and start a fresh one from the
         // original bitmap so each drag frame shows the full accumulated warp.
@@ -1475,7 +1543,7 @@ class EditorViewModel @Inject constructor(
             // below is still queued on the default dispatcher, and a fast tool switch can enter this
             // branch before onStrokeStart populated it. Bailing here is preferable to an NPE.
             val original = liquifyOriginalBitmap ?: return
-            val points = strokeCollectedPoints.toList()
+            val points = snapshotStrokePoints()
             val canvasW = strokeCanvasW
             val canvasH = strokeCanvasH
             val brushSize = _uiState.value.brushSize
@@ -1539,13 +1607,72 @@ class EditorViewModel @Inject constructor(
         val state = _uiState.value
         val layerId = strokeLayerId ?: return
         val layer = state.layers.find { it.id == layerId } ?: return
-        val points = strokeCollectedPoints.toList()
+        val points = snapshotStrokePoints()
         val canvasW = strokeCanvasW
         val canvasH = strokeCanvasH
 
         val capturedScale = strokeLayerScale
         val capturedOffset = strokeLayerOffset
         val capturedRotationZ = strokeLayerRotationZ
+
+        if (state.activeTool == Tool.BLUR) {
+            // BLUR samples-and-blurs the pixels under the stroke, which a Paint can't do — so it has
+            // no live preview and commits on finger-up via ImageProcessor.applyToolToBitmap (a
+            // full-bitmap scale op, hence off the main thread).
+            val base = layer.bitmap ?: run { clearTransientStrokeState(); return }
+            val command = StrokeCommand(
+                path = points,
+                canvasSize = IntSize(canvasW, canvasH),
+                tool = Tool.BLUR,
+                brushSize = state.brushSize,
+                brushColor = state.activeColor.toArgb(),
+                intensity = 0.5f,
+                feathering = state.brushFeathering,
+                layerScale = capturedScale,
+                layerOffset = capturedOffset,
+                layerRotationZ = capturedRotationZ,
+            )
+            layerStore.addStroke(layerId, command)
+            history.pushDraw(layerId, command)
+            updateHistoryCounts()
+
+            val mapped = ImageProcessor.mapScreenToBitmap(
+                points, canvasW, canvasH, base.width, base.height,
+                capturedScale, capturedOffset, capturedRotationZ
+            )
+            val brushScale = ImageProcessor.screenToBitmapScale(canvasW, canvasH, base.width, base.height, capturedScale)
+            viewModelScope.launch(dispatchers.default) {
+                val blurred = ImageProcessor.applyToolToBitmap(
+                    base, mapped, Tool.BLUR, state.brushSize * brushScale,
+                    state.activeColor.toArgb(), 0.5f, false, state.brushFeathering
+                )
+                withContext(dispatchers.main) {
+                    _uiState.update { s ->
+                        s.copy(
+                            layers = s.layers.map { if (it.id == layerId) it.copy(bitmap = blurred) else it },
+                            liveStrokeLayerId = null,
+                            liveStrokeBitmap = null,
+                        )
+                    }
+                    scheduleDiskSave(layerId, blurred, layer.uri)
+                }
+            }
+            // Co-op: peers replay the same blur from the stroke command.
+            opEmitter.emit(
+                Op.StrokeComplete(
+                    layerId,
+                    BrushStroke(
+                        points = mapped.flatMap { listOf(it.x, it.y) },
+                        colorArgb = state.activeColor.toArgb().toLong() and 0xFFFFFFFFL,
+                        brushSize = state.brushSize,
+                        brushFeathering = state.brushFeathering,
+                        blendModeOrdinal = Tool.BLUR.ordinal,
+                    )
+                )
+            )
+            clearTransientStrokeState()
+            return
+        }
 
         if (state.activeTool == Tool.LIQUIFY || strokeWorkingBitmap == null) {
             // Liquify (or a stroke so fast the background copy hadn't finished):
@@ -1559,7 +1686,35 @@ class EditorViewModel @Inject constructor(
                 slamManager.bakeLiquify(baked)
                 baked
             } else {
-                bitmap // Should not happen for non-liquify if strokeWorkingBitmap is null but it's a safety
+                // Fast stroke: the background working-bitmap copy never finished before finger-up, so
+                // rasterize the whole stroke onto a fresh copy here. Committing `bitmap` unchanged (the
+                // old behaviour) silently dropped the stroke — it lived only in history, which isn't
+                // replayed on reload, so it vanished on screen and on disk.
+                // Bitmap.copy can return null under memory pressure — never construct a Canvas from it
+                // unchecked (NPE on the main thread). Fall back to the unmodified bitmap if the copy fails.
+                val target = bitmap.copy(Bitmap.Config.ARGB_8888, true)
+                if (target != null && points.isNotEmpty()) {
+                    val canvas = android.graphics.Canvas(target)
+                    val brushScale = ImageProcessor.screenToBitmapScale(
+                        canvasW, canvasH, target.width, target.height, capturedScale
+                    )
+                    val paint = buildStrokePaint(
+                        state.activeTool, state.activeColor.toArgb(), state.brushSize * brushScale, state.brushFeathering
+                    )
+                    val mapped = ImageProcessor.mapScreenToBitmap(
+                        points, canvasW, canvasH, target.width, target.height,
+                        capturedScale, capturedOffset, capturedRotationZ
+                    )
+                    if (mapped.size == 1) {
+                        canvas.drawPoint(mapped[0].x, mapped[0].y, paint)
+                    } else if (mapped.size > 1) {
+                        val seg = android.graphics.Path()
+                        seg.moveTo(mapped[0].x, mapped[0].y)
+                        for (i in 1 until mapped.size) seg.lineTo(mapped[i].x, mapped[i].y)
+                        canvas.drawPath(seg, paint)
+                    }
+                }
+                target ?: bitmap
             }
 
             val command = StrokeCommand(
@@ -1660,7 +1815,7 @@ class EditorViewModel @Inject constructor(
         strokeWorkingCanvas = null
         strokePaint = null
         strokePrevBitmapPoint = null
-        strokeCollectedPoints = mutableListOf()
+        resetStrokePoints()
         strokeLayerId = null
 
         liquifyJob?.cancel()
@@ -1685,8 +1840,11 @@ class EditorViewModel @Inject constructor(
                     if (feathering > 0f) maskFilter = BlurMaskFilter(brushSize * feathering * 0.5f, BlurMaskFilter.Blur.NORMAL)
                 }
                 Tool.BLUR -> {
-                    maskFilter = BlurMaskFilter(brushSize * 0.5f, BlurMaskFilter.Blur.NORMAL)
-                    alpha = 150
+                    // No live paint: a plain Paint can't blur the underlying pixels (the old code
+                    // painted translucent BLACK — Paint's default color). The real region blur is
+                    // applied on finger-up in onStrokeEnd via ImageProcessor.applyToolToBitmap.
+                    color = android.graphics.Color.TRANSPARENT
+                    alpha = 0
                 }
                 Tool.BURN -> {
                     color = android.graphics.Color.BLACK

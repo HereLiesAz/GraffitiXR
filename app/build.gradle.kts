@@ -94,6 +94,12 @@ android {
             useSupportLibrary = true
         }
 
+        ndk {
+            // ARM only, matching :core:nativebridge. Keeps the OpenCV Prefab prebuilts (which ship
+            // all four ABIs) from packaging x86 .so files that would have no matching libgraffitixr.so.
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
+
         externalNativeBuild {
             cmake {
                 cppFlags += "-std=c++17"

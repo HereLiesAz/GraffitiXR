@@ -1117,6 +1117,26 @@ class ArRenderer(
                     )
                 }
 
+                // Read depth on the GL thread — Frame.acquireDepthImage16Bits() is only valid during
+                // onDrawFrame and races session.update() if touched from backgroundScope. Compute the
+                // smoothed value here and hand the snapshot to the background readout below.
+                if (depthApiEnabled) try {
+                    frame.acquireDepthImage16Bits().use { depthImage ->
+                        val plane = depthImage.planes[0]
+                        // Median of a 7x7 patch (radius 3) rejects per-pixel noise/holes; the
+                        // single-pixel read made the live distance flicker wildly.
+                        val raw = com.hereliesaz.graffitixr.feature.ar.eval.DepthLookup.depthMetersAtPatch(
+                            plane.buffer, plane.rowStride, depthImage.width, depthImage.height, 0.5f, 0.5f, radius = 3
+                        )
+                        if (raw > 0f) {
+                            smoothedCenterDepth = if (smoothedCenterDepth <= 0f) raw
+                                else 0.2f * raw + 0.8f * smoothedCenterDepth
+                        }
+                    }
+                } catch (e: Exception) { /* ignore */ }
+                // Snapshot the smoothed value (kept across invalid/dropped frames) for the readout.
+                val centerDepth = smoothedCenterDepth
+
                 backgroundScope.launch {
                     val (count, immutableCount) = if (currentScanMode == ArScanMode.CLOUD_POINTS) {
                         pointCloudRenderer.accumulatedPointCount to 0
@@ -1126,24 +1146,6 @@ class ArRenderer(
 
                     val visConf = slamManager.getVisibleConfidenceAvg()
                     val globConf = slamManager.getGlobalConfidenceAvg()
-
-                    // Keep last smoothed value across invalid/dropped frames so the readout is stable.
-                    var centerDepth = smoothedCenterDepth
-                    if (depthApiEnabled) try {
-                        frame.acquireDepthImage16Bits().use { depthImage ->
-                            val plane = depthImage.planes[0]
-                            // Median of a 7x7 patch (radius 3) rejects per-pixel noise/holes; the
-                            // single-pixel read made the live distance flicker wildly.
-                            val raw = com.hereliesaz.graffitixr.feature.ar.eval.DepthLookup.depthMetersAtPatch(
-                                plane.buffer, plane.rowStride, depthImage.width, depthImage.height, 0.5f, 0.5f, radius = 3
-                            )
-                            if (raw > 0f) {
-                                smoothedCenterDepth = if (smoothedCenterDepth <= 0f) raw
-                                    else 0.2f * raw + 0.8f * smoothedCenterDepth
-                                centerDepth = smoothedCenterDepth
-                            }
-                        }
-                    } catch (e: Exception) { /* ignore */ }
 
                     var relDir: Triple<Float, Float, Float>? = null
                     val distanceMeters = run {

@@ -299,6 +299,26 @@ class ProjectManager @Inject constructor(
         }
     }
 
+    /**
+     * Read the current ZIP entry, bounding the CUMULATIVE decompressed size: streams in chunks and
+     * aborts (returns null) the moment [runningTotal] + this entry would exceed [MAX_IMPORT_BYTES], so
+     * a zip bomb can't OOM the app before the cap is hit — never `readBytes()` an entry unbounded.
+     * Returns (entryBytes, newRunningTotal), or null once the cap is exceeded.
+     */
+    private fun readEntryBounded(zis: ZipInputStream, runningTotal: Long): Pair<ByteArray, Long>? {
+        val out = ByteArrayOutputStream()
+        val chunk = ByteArray(64 * 1024)
+        var total = runningTotal
+        while (true) {
+            val n = zis.read(chunk)
+            if (n < 0) break
+            total += n
+            if (total > MAX_IMPORT_BYTES) return null
+            out.write(chunk, 0, n)
+        }
+        return out.toByteArray() to total
+    }
+
     suspend fun importProjectFromUri(context: Context, uri: Uri): GraffitiProject? = withContext(Dispatchers.IO) {
         var extractedFiles: Map<String, File> = emptyMap()
         return@withContext try {
@@ -315,12 +335,13 @@ class ProjectManager @Inject constructor(
                         val relativeName = if (name.contains('/')) name.substringAfter('/') else name
 
                         if (!entry.isDirectory && relativeName.isNotEmpty()) {
-                            val bytes = zis.readBytes()
-                            totalBytes += bytes.size
-                            if (totalBytes > MAX_IMPORT_BYTES) {
+                            val read = readEntryBounded(zis, totalBytes)
+                            if (read == null) {
                                 Log.e("ProjectManager", "Import aborted: archive exceeds $MAX_IMPORT_BYTES bytes")
                                 return@use null
                             }
+                            val (bytes, newTotal) = read
+                            totalBytes = newTotal
                             if (relativeName == "project.json") {
                                 try {
                                     projectData = json.decodeFromString<GraffitiProject>(bytes.decodeToString())
@@ -465,12 +486,13 @@ class ProjectManager @Inject constructor(
                     while (entry != null) {
                         val name = entry.name
                         if (!entry.isDirectory && name.isNotEmpty()) {
-                            val fileBytes = zis.readBytes()
-                            totalBytes += fileBytes.size
-                            if (totalBytes > MAX_IMPORT_BYTES) {
+                            val read = readEntryBounded(zis, totalBytes)
+                            if (read == null) {
                                 Log.e("ProjectManager", "Spectator load aborted: archive exceeds $MAX_IMPORT_BYTES bytes")
                                 return@use
                             }
+                            val (fileBytes, newTotal) = read
+                            totalBytes = newTotal
                             if (name == "project.json") {
                                 projectData = json.decodeFromString<GraffitiProject>(fileBytes.decodeToString())
                             }

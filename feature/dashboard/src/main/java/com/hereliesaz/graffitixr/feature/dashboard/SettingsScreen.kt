@@ -60,9 +60,13 @@ import com.hereliesaz.graffitixr.common.model.AppLanguage
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.design.theme.AppStrings
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 @Composable
 fun SettingsScreen(
@@ -122,19 +126,31 @@ fun SettingsScreen(
         onCheckForUpdates()
     }
 
-    // Permissions State
-    val cameraPermission = remember {
-        ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-    }
-
     val storagePermissionName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         Manifest.permission.READ_MEDIA_IMAGES
     } else {
         Manifest.permission.READ_EXTERNAL_STORAGE
     }
 
-    val storagePermission = remember {
-        ContextCompat.checkSelfPermission(context, storagePermissionName) == PackageManager.PERMISSION_GRANTED
+    // Permissions State — recomputed on ON_RESUME so returning from App Settings (where the user may
+    // have just granted a permission via [openAppSettings]) reflects the new grant, instead of the
+    // stale value a keyless remember{} would freeze at first composition.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var cameraPermission by remember {
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+    }
+    var storagePermission by remember {
+        mutableStateOf(ContextCompat.checkSelfPermission(context, storagePermissionName) == PackageManager.PERMISSION_GRANTED)
+    }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                cameraPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                storagePermission = ContextCompat.checkSelfPermission(context, storagePermissionName) == PackageManager.PERMISSION_GRANTED
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val openAppSettings: () -> Unit = {

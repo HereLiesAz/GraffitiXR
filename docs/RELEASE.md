@@ -76,8 +76,9 @@ Inputs:
 What it does:
 
 1. Checks out with `fetch-depth: 0` (needed for the commit‑count versionCode).
-2. Runs `setup_libs.sh`, injects `google-services.json`, and materializes
-   `app/keystore.jks` from secrets (same steps as `release-apk.yml`).
+2. Injects `google-services.json` and materializes `app/keystore.jks` from
+   secrets (same steps as `release-apk.yml`). OpenCV needs no fetch step — it's
+   a Maven Central dependency (`org.opencv:opencv`, Java + native via Prefab).
 3. Sets up JDK 17 (Temurin) + Gradle.
 4. Reads `applicationId` from `app/build.gradle.kts` (not hardcoded) and computes
    the versionCode.

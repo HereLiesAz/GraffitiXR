@@ -28,6 +28,11 @@ android {
         }
     }
 
+    // Consume the OpenCV Maven artifact's Prefab part from CMake (find_package(OpenCV)).
+    buildFeatures {
+        prefab = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -55,7 +60,9 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:domain"))
     implementation(libs.arcore.client)
-    implementation(project(":opencv"))
+    // OpenCV from Maven Central. Its Prefab part exposes the native C++ world to CMake
+    // (find_package(OpenCV) → OpenCV::opencv_java5) and auto-packages libopencv_java5.so.
+    implementation(libs.opencv)
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
 }

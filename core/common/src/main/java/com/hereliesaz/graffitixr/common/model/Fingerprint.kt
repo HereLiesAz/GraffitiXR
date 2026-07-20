@@ -25,6 +25,27 @@ data class Fingerprint(
     // defaulted so older saved projects deserialize unchanged.
     val markCenterLocal: List<Float> = emptyList(),
 ) {
+    init {
+        // Defensive: a corrupt or truncated project file must never construct a Fingerprint whose
+        // descriptor blob disagrees with its declared dims — the native restore (GraffitiJNI) wraps
+        // this blob in a cv::Mat, so a short blob would read out of bounds. Mirrors WallFeatureMap's
+        // guards. Empty optional arrays (older projects, or a keypoint-only fingerprint) are allowed.
+        require(descriptorsRows >= 0 && descriptorsCols >= 0) { "descriptor dims must be non-negative" }
+        require(points3d.isEmpty() || points3d.size % 3 == 0) {
+            "points3d (${points3d.size}) must be a flat list of [x,y,z] triplets"
+        }
+        if (descriptorsRows > 0) {
+            require(descriptorsData.size % descriptorsRows == 0) {
+                "descriptorsData (${descriptorsData.size}) must divide evenly into $descriptorsRows rows"
+            }
+            if (descriptorsCols > 0) {
+                require((descriptorsData.size / descriptorsRows) % descriptorsCols == 0) {
+                    "descriptor row stride (${descriptorsData.size / descriptorsRows}) must be a multiple of descriptorsCols ($descriptorsCols)"
+                }
+            }
+        }
+    }
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false

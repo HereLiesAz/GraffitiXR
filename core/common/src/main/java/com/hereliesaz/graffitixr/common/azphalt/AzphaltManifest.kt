@@ -26,6 +26,8 @@ data class AzphaltManifest(
     val author: String? = null,
     val description: String? = null,
     val homepage: String? = null,
+    /** Apps this extension targets (spec/extension-manifest.md), by host app id. Empty = universal. */
+    val targetApps: List<String> = emptyList(),
     val entry: String? = null,
     val runtime: Runtime? = null,
     val capabilities: List<Capability> = emptyList(),
@@ -74,15 +76,59 @@ data class Contribution(
     val ui: String? = null,
 )
 
-@Serializable
-enum class AssetType {
-    @SerialName("brush") BRUSH,
-    @SerialName("lut") LUT,
-    @SerialName("pattern") PATTERN,
-    @SerialName("stamp") STAMP,
-    // Added in spec 0.1's asset-host guide: GLSL/ISF shaders and gl-transition transitions.
-    @SerialName("shader") SHADER,
-    @SerialName("transition") TRANSITION,
+/**
+ * Asset contribution types (spec 0.1: brush/lut/pattern/stamp/shader/transition). Deserialized through
+ * a custom serializer that maps any value this build doesn't recognise to [UNKNOWN] instead of
+ * throwing — so a package using a newer asset type (e.g. azphalt's normalized ML `model` assets, not
+ * yet in the asset-host spec) still parses, and a host simply ignores the contributions it can't apply.
+ */
+@Serializable(with = AssetType.Serializer::class)
+enum class AssetType(val wire: String) {
+    // Traditional assets (spec/extension-manifest.md).
+    BRUSH("brush"),
+    LUT("lut"),
+    PATTERN("pattern"),
+    STAMP("stamp"),
+    SHADER("shader"),
+    TRANSITION("transition"),
+    MESH("mesh"),
+    MATERIAL("material"),
+    HDRI("hdri"),
+    MOTION("motion"),
+    PALETTE("palette"),
+    IMAGE("image"),
+    VIDEO("video"),
+    FONT("font"),
+    AUDIO("audio"),
+    VECTOR("vector"),
+
+    // AI model assets. Paired with AssetContribution.role (e.g. "depth", "segmentation") so a host
+    // routes the model graph to the right on-device engine.
+    TFLITE("tflite"),
+    LITERT("litert"),
+    ONNX("onnx"),
+    SHERPA_BUNDLE("sherpa-bundle"),
+
+    /** A type this host build does not recognise; the contribution is retained but not applied. */
+    UNKNOWN("");
+
+    /** True for the AI-model asset types (spec/extension-manifest.md "AI Models"). */
+    val isModel: Boolean get() = this == TFLITE || this == LITERT || this == ONNX || this == SHERPA_BUNDLE;
+
+    internal object Serializer : kotlinx.serialization.KSerializer<AssetType> {
+        override val descriptor = kotlinx.serialization.descriptors.PrimitiveSerialDescriptor(
+            "com.hereliesaz.graffitixr.common.azphalt.AssetType",
+            kotlinx.serialization.descriptors.PrimitiveKind.STRING,
+        )
+
+        override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AssetType) =
+            encoder.encodeString(value.wire)
+
+        override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AssetType {
+            val raw = decoder.decodeString()
+            return entries.firstOrNull { it.wire == raw } ?: UNKNOWN
+        }
+    }
 }
 
 @Serializable
@@ -97,6 +143,13 @@ data class AssetContribution(
     val params: JsonObject? = null,
     /** Optional path to a native UI panel schema (spec/ui-schema.md), e.g. `"ui/grade.json"`. */
     val ui: String? = null,
+    /**
+     * Optional semantic role, chiefly for model assets — e.g. `type: "tflite", role: "depth"`. Lets a
+     * host route a generic model graph to the correct engine (depth, segmentation, feature-descriptor…).
+     */
+    val role: String? = null,
+    /** Optional payload size in bytes; helps a host allocate/report before downloading a large asset. */
+    val byteSize: Long? = null,
 )
 
 /** Shared lenient JSON — tolerates unknown/future manifest fields rather than failing to parse. */
@@ -109,20 +162,73 @@ val AzphaltJson: Json = Json {
 fun parseManifest(json: String): AzphaltManifest = AzphaltJson.decodeFromString(json)
 
 /**
+ * The `compat` comparator (azphalt spec/extension-manifest.md § compat).
+ * `0.1` allows exactly one, optional, defaulting to `>=`.
+ */
+enum class CompatOp(val token: String) { GE(">="), LE("<="), GT(">"), LT("<"), EQ("=") }
+
+/** A parsed `compat` (or bare host version): one [CompatOp] over a `MAJOR.MINOR.PATCH` triple. */
+data class Compat(val op: CompatOp, val major: Int, val minor: Int, val patch: Int)
+
+// One comparator (optional, two-char forms first), then MAJOR[.MINOR[.PATCH]]. No ranges, unions,
+// hyphen ranges, ^/~, or prerelease tags — the deliberately small 0.1 subset.
+private val COMPAT_RE = Regex("""^\s*(>=|<=|>|<|=)?\s*(\d+)(?:\.(\d+))?(?:\.(\d+))?\s*$""")
+
+/**
+ * Parse a `compat` string (or a bare `MAJOR[.MINOR[.PATCH]]` host version) into its comparator and
+ * version, or `null` if it doesn't match the `0.1` grammar. Mirrors `@azphalt/azp`'s `parseCompat`,
+ * so this host parses exactly what the reference implementation does — including rejecting `^`/`~`,
+ * ranges, unions (`||`), and prerelease tags, which are **not** part of `0.1`.
+ */
+fun parseCompat(compat: String): Compat? {
+    val m = COMPAT_RE.matchEntire(compat) ?: return null
+    val op = when (m.groupValues[1]) {
+        "<=" -> CompatOp.LE
+        ">" -> CompatOp.GT
+        "<" -> CompatOp.LT
+        "=" -> CompatOp.EQ
+        else -> CompatOp.GE // ">=" or absent (defaults to >=)
+    }
+    return Compat(
+        op = op,
+        major = m.groupValues[2].toInt(),
+        minor = m.groupValues[3].ifEmpty { "0" }.toInt(),
+        patch = m.groupValues[4].ifEmpty { "0" }.toInt(),
+    )
+}
+
+private fun compareVersions(a: Compat, b: Compat): Int {
+    if (a.major != b.major) return a.major.compareTo(b.major)
+    if (a.minor != b.minor) return a.minor.compareTo(b.minor)
+    return a.patch.compareTo(b.patch)
+}
+
+/**
+ * Does a host advertising azphalt-API version [hostVersion] satisfy a package's [compat]? Mirrors
+ * `@azphalt/azp`'s `compatSatisfies`: `false` if either input is unparseable (fail closed), otherwise
+ * the host version, by semver precedence, must satisfy the single comparator.
+ */
+fun compatSatisfies(hostVersion: String, compat: String): Boolean {
+    val c = parseCompat(compat) ?: return false
+    val h = parseCompat(hostVersion) ?: return false
+    val d = compareVersions(h, c)
+    return when (c.op) {
+        CompatOp.GE -> d >= 0
+        CompatOp.GT -> d > 0
+        CompatOp.LE -> d <= 0
+        CompatOp.LT -> d < 0
+        CompatOp.EQ -> d == 0
+    }
+}
+
+/**
  * Whether a package declaring [compat] is compatible with the spec version this host implements
  * ([AZPHALT_SPEC_VERSION]). The asset-host conformance suite requires validating `compat`.
  *
- * We enforce only a lower bound written as `">=x.y"`, `"^x.y"`, `"~x.y"`, or a bare `"x.y"`: the
- * package is accepted when that minimum is ≤ our spec version. Anything we can't parse as a minimum
- * (e.g. a lone upper bound `"<0.2"`) is accepted — the payload digest check is the real integrity
- * gate, so `compat` errs toward leniency rather than rejecting a package we could actually use.
+ * This applies the normative `0.1` grammar (`spec/extension-manifest.md § compat`) via
+ * [compatSatisfies] rather than the earlier lenient lower-bound heuristic: a `compat` outside the
+ * grammar (e.g. `^0.1`, `~0.1`, a union) no longer slips through as "compatible" — it fails closed,
+ * exactly as the reference `compatSatisfies` does, so this host accepts precisely what other
+ * conforming hosts accept.
  */
-fun isCompatibleSpec(compat: String): Boolean {
-    val m = Regex("""^\s*(?:>=|\^|~)?\s*(\d+)\.(\d+)""").find(compat) ?: return true
-    val reqMajor = m.groupValues[1].toInt()
-    val reqMinor = m.groupValues[2].toInt()
-    val specParts = AZPHALT_SPEC_VERSION.split(".")
-    val specMajor = specParts[0].toInt()
-    val specMinor = specParts.getOrElse(1) { "0" }.toInt()
-    return reqMajor < specMajor || (reqMajor == specMajor && reqMinor <= specMinor)
-}
+fun isCompatibleSpec(compat: String): Boolean = compatSatisfies(AZPHALT_SPEC_VERSION, compat)

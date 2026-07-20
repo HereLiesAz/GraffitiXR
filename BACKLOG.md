@@ -4,6 +4,7 @@
 
 ### Done
 
+- **CodeQL #3/#4/#5 — Inclusion of functionality from untrusted source** (`docs/index.html`). Added Subresource Integrity to the three cdnjs `<script>` tags (rellax 1.12.0, gsap 3.12.2, ScrollTrigger 3.12.2): `integrity="sha512-…"` + `crossorigin="anonymous"` (Action A). **Correction:** the rellax hash was wrong — the SRI mismatch silently blocked `rellax.min.js`, breaking the parallax effects. Recomputed the sha512 from the file the CDN actually serves and fixed it; gsap/ScrollTrigger hashes verified as already correct. The tailwind play-CDN (line 7) intentionally has no stable SRI and is not one of the flagged alerts, so it is left as-is.
 - **CodeQL #6 — Multiplication result converted to larger type** (`core/nativebridge/src/main/cpp/SurfaceUnroller.cpp:100`). `mCount * mCount` was computed as `int` and then widened to `size_t` for the `std::vector` ctor; overflows for `mCount ≥ 46341`. Fixed by casting both operands to `std::size_t` before multiplying.
 - **Dependabot #27 — Netty HTTP header injection in HttpProxyHandler** (`io.netty:netty-handler-proxy`). Fixed by forcing the netty family (incl. `netty-handler-proxy`) to `4.2.15.Final` in `build.gradle.kts` `commonForcedDependencies`. **Verified:** 4.2.15.Final addresses CVE-2025-67735 and subsequent regressions.
 
@@ -38,11 +39,6 @@ Still open, not touched this pass:
 
 ### Todo
 
-- **CodeQL #3/#4/#5 — Inclusion of functionality from untrusted source** (`docs/index.html:8–10`). Three `<script src="https://cdnjs.cloudflare.com/...">` tags (rellax 1.12.0, gsap 3.12.2, ScrollTrigger 3.12.2) load without integrity checks.
-  - **Action A (preferred):** add `integrity="sha384-…"` + `crossorigin="anonymous"` to each tag. Hashes are published on the cdnjs page for each library version.
-  - **Action B:** vendor the three files under `docs/vendor/` and reference local paths. Eliminates the alert and removes a runtime CDN dependency.
-  - **Note:** line 7 (`https://cdn.tailwindcss.com`) is the tailwind play-CDN, which intentionally has no stable SRI hash. If it shows up as an alert, prefer Action B (vendor a built Tailwind CSS) since SRI is impractical here.
-
-  (The Bouncy Castle advisories #23/#24/#25 previously listed here are resolved — see the `1.84` force in the Done section above.)
+- _No open security alerts._ (CodeQL #3/#4/#5 SRI and the Bouncy Castle advisories #23/#24/#25 are resolved — see the Done section above.)
 
 (Dead-features and export/YUV items cleared — see the notes under **Done** above. Remaining open items: Glasses AR session, AR freeze-preview.)

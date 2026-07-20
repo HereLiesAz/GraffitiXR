@@ -94,7 +94,6 @@ import com.hereliesaz.graffitixr.common.security.SecurityProviderState
 import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.design.components.InfoDialog
-import com.hereliesaz.graffitixr.design.components.PosterOptionsDialog
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
 import androidx.compose.ui.res.stringResource
@@ -114,8 +113,6 @@ import com.hereliesaz.graffitixr.feature.ar.TargetCreationUi
 import com.hereliesaz.graffitixr.feature.ar.rememberCameraController
 import com.hereliesaz.graffitixr.feature.ar.takePictureAsBitmap
 import com.hereliesaz.graffitixr.feature.dashboard.DashboardViewModel
-import com.hereliesaz.graffitixr.feature.dashboard.MarketplaceScreen
-import com.hereliesaz.graffitixr.feature.dashboard.MarketplaceViewModel
 import com.hereliesaz.graffitixr.feature.dashboard.ProjectLibraryScreen
 import com.hereliesaz.graffitixr.feature.dashboard.SaveProjectDialog
 import com.hereliesaz.graffitixr.feature.dashboard.SettingsScreen
@@ -148,6 +145,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.core.os.LocaleListCompat
 import androidx.core.net.toUri
+import androidx.core.content.IntentCompat
 import com.hereliesaz.graffitixr.design.theme.AppStrings
 import com.hereliesaz.graffitixr.design.theme.rememberAppStrings
 import com.hereliesaz.graffitixr.design.theme.rememberNavStrings
@@ -173,21 +171,46 @@ class MainActivity : ComponentActivity() {
 
     var showSaveDialog by mutableStateOf(false)
     var showSettings by mutableStateOf(false)
-    var showMarketplace by mutableStateOf(false)
-    var showPosterDialog by mutableStateOf(false)
-    var posterSourceLayerId by mutableStateOf<String?>(null)
     var hasCameraPermission by mutableStateOf(false)
     var showWallSourceDialog by mutableStateOf(false)
     var isExporting by mutableStateOf(false)
     // Crash report captured on the previous run (native SIGSEGV and/or JVM), shown on launch.
     var pendingCrashReport by mutableStateOf<String?>(null)
 
+    // Interop: an image handed in via ACTION_SEND (e.g. an edited overlay returning from GraffiXR),
+    // consumed once by the editor as a new overlay layer. Set from the launch intent / onNewIntent.
+    private var incomingSharedImage by mutableStateOf<Uri?>(null)
+
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p ->
         hasCameraPermission = p[Manifest.permission.CAMERA] ?: false
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        incomingImageUri(intent)?.let { incomingSharedImage = it }
+    }
+
+    /**
+     * Extracts a single image [Uri] from an inbound share intent, or null if this launch isn't one.
+     * Handles ACTION_SEND (EXTRA_STREAM) and an image-typed ACTION_VIEW; the graffitixr VIEW callback
+     * (Meta AI redirect) is ignored via the image MIME guard. The sender grants read permission on
+     * the Uri, so the editor's ContentResolver load succeeds.
+     */
+    private fun incomingImageUri(intent: Intent?): Uri? {
+        if (intent == null || intent.type?.startsWith("image/") != true) return null
+        return when (intent.action) {
+            Intent.ACTION_SEND -> IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
+            Intent.ACTION_VIEW -> intent.data
+            else -> null
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Interop: capture an image handed in by ACTION_SEND on this cold start (consumed in setContent).
+        incomingSharedImage = incomingImageUri(intent)
 
         hasCameraPermission = ContextCompat.checkSelfPermission(
             this, Manifest.permission.CAMERA
@@ -266,7 +289,6 @@ class MainActivity : ComponentActivity() {
                 val editorViewModel: EditorViewModel = hiltViewModel()
                 val dashboardViewModel: DashboardViewModel = hiltViewModel()
                 val settingsViewModel: SettingsViewModel = hiltViewModel()
-                val marketplaceViewModel: MarketplaceViewModel = hiltViewModel()
                 val cameraController = rememberCameraController()
                 // Scope for suspending export captures (Overlay's ImageCapture.takePictureAsBitmap).
                 // Bound to the composable so it cancels with the screen if the user backs out
@@ -291,6 +313,16 @@ class MainActivity : ComponentActivity() {
                     val appLocales = LocaleListCompat.forLanguageTags(language.code)
                     if (AppCompatDelegate.getApplicationLocales() != appLocales) {
                         AppCompatDelegate.setApplicationLocales(appLocales)
+                    }
+                }
+
+                // Interop: an image shared in via ACTION_SEND (e.g. an edited overlay returning from
+                // GraffiXR) becomes a new overlay layer, consumed once.
+                val sharedImage = incomingSharedImage
+                LaunchedEffect(sharedImage) {
+                    if (sharedImage != null) {
+                        editorViewModel.onAddLayer(sharedImage)
+                        incomingSharedImage = null
                     }
                 }
 
@@ -373,7 +405,6 @@ class MainActivity : ComponentActivity() {
                 }
 
                 BackHandler(enabled = showSettings) { showSettings = false }
-                BackHandler(enabled = showMarketplace) { showMarketplace = false }
                 BackHandler(enabled = mainUiState.isInPlaneRealignment) {
                     mainViewModel.endPlaneRealignment()
                 }
@@ -389,7 +420,6 @@ class MainActivity : ComponentActivity() {
                         !mainUiState.isTouchLocked &&
                         !mainUiState.isCapturingTarget &&
                         !showSettings &&
-                        !showMarketplace &&
                         !isExporting
 
                 // noMenu (AzNavRail 11.0) removes the side drawer entirely — all entries become rail
@@ -562,11 +592,15 @@ class MainActivity : ComponentActivity() {
 
                 val strings = rememberAppStrings()
                 val navStrings = strings.nav
-                var showFontPicker by remember { mutableStateOf(false) }
-                var fontPickerLayerId by remember { mutableStateOf<String?>(null) }
-                val layerMenusOpen = remember { mutableStateMapOf<String, Boolean>() }
 
                 val context = LocalContext.current
+                // Interop: is the GraffiXR companion editor installed? Gates the "Edit in GraffiXR"
+                // hand-off rail item. Visibility works because the manifest <queries> declares the pkg.
+                val isGraffiXrInstalled = remember {
+                    runCatching {
+                        context.packageManager.getLaunchIntentForPackage("com.hereliesaz.graffixr") != null
+                    }.getOrDefault(false)
+                }
                 val canvasBg = editorUiState.canvasBackground
 
                 val navItemColor = remember(canvasBg) {
@@ -621,8 +655,6 @@ class MainActivity : ComponentActivity() {
                             mainViewModel, editorViewModel, arViewModel, dashboardViewModel, context,
                             overlayImagePicker, backgroundImagePicker, editorUiState, railExpansion, arUiState, strings,
                             navItemColor = navItemColor,
-                            onShowFontPicker = { layerId -> fontPickerLayerId = layerId; showFontPicker = true },
-                            layerMenusOpen = layerMenusOpen,
                             showLibrary = showLibrary,
                             // Guidance is OFF by default; the tour is "on" only while a guidance goal is
                             // active. The Help item toggles it: on -> enable + activate every goal;
@@ -689,6 +721,29 @@ class MainActivity : ComponentActivity() {
                                     else -> editorViewModel.exportImage()
                                 }
                             },
+                            isGraffiXrInstalled = isGraffiXrInstalled,
+                            onEditInGraffiXr = {
+                                // Hand off the current overlay to GraffiXR for rich editing: composite to
+                                // a content:// Uri and fire an explicit ACTION_SEND at the GraffiXR package.
+                                exportDispatchScope.launch {
+                                    val uri = editorViewModel.exportForShare() ?: return@launch
+                                    val send = Intent(Intent.ACTION_SEND).apply {
+                                        setPackage("com.hereliesaz.graffixr")
+                                        type = "image/png"
+                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    try {
+                                        context.startActivity(send)
+                                    } catch (t: Throwable) {
+                                        // GraffiXR became unresolvable between the check and the tap —
+                                        // fall back to a generic chooser so the image still goes somewhere.
+                                        context.startActivity(
+                                            Intent.createChooser(send.apply { setPackage(null) }, null)
+                                        )
+                                    }
+                                }
+                            },
                         )
                     }
 
@@ -720,21 +775,9 @@ class MainActivity : ComponentActivity() {
                         // is that auto overlays (onboarding, AR-unavailable explainer) must
                         // early-return on EVERY modal, not just one — collapsing the repeated
                         // boolean chains here prevents a future overlay from forgetting one.
-                        val anyModalActive = showLibrary || showSettings || showMarketplace || isExporting ||
+                        val anyModalActive = showLibrary || showSettings || isExporting ||
                             mainUiState.isCapturingTarget || showSaveDialog ||
                             dashboardUiState.showNewProjectDialog
-
-                        // Auto-open the edit-text box the instant a new text layer is created.
-                        // The new layer's rail item must compose first (with its hidden menu
-                        // closed) so flipping layerMenusOpen to true is a clean closed->open edge
-                        // the rail picks up; hence the brief delay.
-                        LaunchedEffect(editorUiState.autoEditTextLayerId) {
-                            val id = editorUiState.autoEditTextLayerId ?: return@LaunchedEffect
-                            editorViewModel.onLayerActivated(id)
-                            kotlinx.coroutines.delay(250)
-                            layerMenusOpen[id] = true
-                            editorViewModel.consumeAutoEditTextLayer()
-                        }
 
                         val completedTutorials by mainViewModel.completedTutorials.collectAsState()
 
@@ -1189,7 +1232,9 @@ class MainActivity : ComponentActivity() {
                                     onDismissRequest = { showSaveDialog = false },
                                     onSaveRequest = { name ->
                                         lifecycleScope.launch {
-                                            arViewModel.saveMapBlocking()
+                                            // saveMapBlocking() does native SLAM/feature-map writes; keep it off the
+                                            // main thread (it was ANR-ing on large maps). UI-state updates stay on main.
+                                            withContext(Dispatchers.IO) { arViewModel.saveMapBlocking() }
                                             editorViewModel.saveProject(name)
                                             showSaveDialog = false
                                         }
@@ -1213,30 +1258,6 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            if (showFontPicker) {
-                                FontPickerDialog(
-                                    onFontSelected = { fontName ->
-                                        fontPickerLayerId?.let { editorViewModel.onTextFontChanged(it, fontName) }
-                                        showFontPicker = false
-                                    },
-                                    onDismiss = { showFontPicker = false },
-                                    strings = strings
-                                )
-                            }
-
-
-                            if (showPosterDialog && posterSourceLayerId != null) {
-                                PosterOptionsDialog(
-                                    sourceLayerId = posterSourceLayerId!!,
-                                    layers = editorUiState.layers,
-                                    onDismiss = { showPosterDialog = false },
-                                    onGenerate = { size, selectedIds ->
-                                        editorViewModel.generatePosterPdf(selectedIds, size)
-                                        showPosterDialog = false
-                                    },
-                                    strings = strings
-                                )
-                            }
 
                             if (showWallSourceDialog) {
                                 WallSourceDialog(
@@ -1323,17 +1344,6 @@ class MainActivity : ComponentActivity() {
                                     onResetTutorials = { settingsViewModel.resetCompletedTutorials() },
                                     onClose = { showSettings = false },
                                     strings = strings
-                                )
-                            }
-
-                            if (showMarketplace) {
-                                MarketplaceScreen(
-                                    viewModel = marketplaceViewModel,
-                                    onApplyLut = { extensionId ->
-                                        editorViewModel.applyInstalledLut(extensionId)
-                                        showMarketplace = false
-                                    },
-                                    onClose = { showMarketplace = false },
                                 )
                             }
 
@@ -1445,8 +1455,6 @@ class MainActivity : ComponentActivity() {
         arUiState: ArUiState,
         strings: AppStrings,
         navItemColor: Color = Color.White,
-        onShowFontPicker: (String) -> Unit = {},
-        layerMenusOpen: MutableMap<String, Boolean>,
         showLibrary: Boolean,
         guidanceEnabled: Boolean = true,
         onToggleGuidance: () -> Unit = {},
@@ -1456,6 +1464,8 @@ class MainActivity : ComponentActivity() {
         onShowJoinScanner: () -> Unit = {},
         onWallPhoto: () -> Unit = {},
         onExportRequested: () -> Unit,
+        isGraffiXrInstalled: Boolean = false,
+        onEditInGraffiXr: () -> Unit = {},
     ) {
         val navStrings = strings.nav
         val requestPermissions = {
@@ -1501,503 +1511,29 @@ class MainActivity : ComponentActivity() {
                 azRailSubItem(id = "design.addImg", hostId = "host.design", text = "Open", color = navItemColor, shape = AzButtonShape.NONE) {
                     overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
-                azRailSubItem(id = "design.addDraw", hostId = "host.design", text = "Sketch", color = navItemColor, shape = AzButtonShape.NONE) {
-                    editorViewModel.onAddBlankLayer()
+                // Interop hand-off: only when the GraffiXR companion editor is installed. Sends the
+                // current overlay to GraffiXR for rich editing; the edited result can be shared back.
+                if (isGraffiXrInstalled) {
+                    azRailSubItem(id = "design.editInGraffixr", hostId = "host.design", text = "GraffiXR", color = navItemColor, shape = AzButtonShape.NONE) {
+                        onEditInGraffiXr()
+                    }
                 }
-                azRailSubItem(id = "design.addText", hostId = "host.design", text = "Text", color = navItemColor, shape = AzButtonShape.NONE) {
-                    editorViewModel.onAddTextLayer()
-                }
-
-                // LAYERS — contained in a "Layers" sub-host under Design (9.6 nested hosts).
-                // Each layer is a relocItem (drag to reorder); tapping it opens its nested rail of
-                // editing tools (edit/size/font/color/blend/invert/paint/retouch/etc.). The hidden
-                // menu carries link/duplicate/copy/flatten/delete.
-                // Layers is data-driven: any layer at all means open. No persisted user-collapse —
-                // expandWhen is edge-triggered so a once-collapsed host would otherwise stick.
-                azRailSubHostItem(
-                    id = "design.layers", hostId = "host.design", text = "Layers",
-                    color = navItemColor, shape = AzButtonShape.RECTANGLE,
-                    initiallyExpanded = editorUiState.layers.isNotEmpty(),
-                    expandWhen = { editorUiState.layers.isNotEmpty() && editorUiState.editorMode == EditorMode.DESIGN }
-                )
-                editorUiState.layers.reversed().forEach { layer ->
-                    val activeTool = editorUiState.activeTool
-                    val forceOpenHiddenMenu = layerMenusOpen[layer.id] ?: false
-
-                    azRailRelocItem(
-                        id = layerId(layer),
-                        hostId = "design.layers",
-                        text = layer.name,
-                        color = when {
-                            editorUiState.activeLayerId == layer.id -> Cyan   // selected
-                            layer.isLinked -> NeonGreen                       // linked (its own color)
-                            else -> HotPink                                   // any other layer
-                        },
-                        shape = AzButtonShape.NONE,
-                        nestedRailAlignment = AzNestedRailAlignment.VERTICAL,
-                        keepNestedRailOpen = true,
-                        forceHiddenMenuOpen = forceOpenHiddenMenu,
-                        onHiddenMenuDismiss = { layerMenusOpen[layer.id] = false },
-                        onClick = {
-                            editorViewModel.onLayerActivated(layer.id)
-                            editorViewModel.setActiveTool(Tool.NONE)
-                        },
-                        onRelocate = { _: Int, _: Int, new: List<String> -> editorViewModel.onLayerReordered(new.map { it.removePrefix("layer.") }.reversed()) },
-                        nestedContent = {
-                            val activate = { editorViewModel.onLayerActivated(layer.id) }
-
-                            if (layer.textParams != null) {
-                                azRailItem(
-                                    id = layerId(layer, "editText"),
-                                    text = navStrings.edit,
-                                    color = navItemColor,
-                                    shape = AzButtonShape.CIRCLE
-                                ) {
-                                    activate()
-                                    layerMenusOpen[layer.id] = true
-                                }
-                            }
-
-                            val addSizeItem: () -> Unit = {
-                                azRailItem(
-                                    id = layerId(layer, "size.brush"),
-                                    text = navStrings.size,
-                                    color = navItemColor,
-                                    shape = AzButtonShape.CIRCLE,
-                                    content = AzComposableContent { isEnabled ->
-                                        val liveState by editorViewModel.uiState.collectAsState()
-                                        var itemSizePx by remember { mutableFloatStateOf(100f) }
-                                        val density = LocalDensity.current
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxSize()
-                                                .onSizeChanged { size -> itemSizePx = size.width.toFloat() }
-                                                .pointerInput(isEnabled) {
-                                                    if (!isEnabled) return@pointerInput
-                                                    detectDragGestures { change, dragAmount ->
-                                                        change.consume()
-                                                        if (abs(dragAmount.y) >= abs(dragAmount.x)) {
-                                                            val currentSize = editorViewModel.uiState.value.brushSize
-                                                            editorViewModel.setBrushSize(
-                                                                (currentSize - dragAmount.y * 0.5f).coerceIn(1f, maxOf(1f, itemSizePx))
-                                                            )
-                                                        } else {
-                                                            val currentFeather = editorViewModel.uiState.value.brushFeathering
-                                                            editorViewModel.setBrushFeathering(
-                                                                (currentFeather + dragAmount.x * 0.005f).coerceIn(0f, 1f)
-                                                            )
-                                                        }
-                                                    }
-                                                },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            val sizeDp = with(density) {
-                                                liveState.brushSize.coerceIn(1f, maxOf(1f, itemSizePx)).toDp()
-                                            }
-                                            val checkerModifier = Modifier.drawBehind {
-                                                val squareSize = 6.dp.toPx()
-                                                val cols = (size.width / squareSize).toInt() + 1
-                                                val rows = (size.height / squareSize).toInt() + 1
-                                                for (row in 0 until rows) {
-                                                    for (col in 0 until cols) {
-                                                        val isEven = (row + col) % 2 == 0
-                                                        drawRect(
-                                                            color = if (isEven) Color.LightGray else Color.Gray,
-                                                            topLeft = Offset(col * squareSize, row * squareSize),
-                                                            size = Size(squareSize, squareSize)
-                                                        )
-                                                    }
-                                                }
-                                            }
-
-                                            Box(contentAlignment = Alignment.Center) {
-                                                if (liveState.brushFeathering > 0.05f) {
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .size(sizeDp)
-                                                            .clip(CircleShape)
-                                                            .then(checkerModifier)
-                                                            .background(Color.Black.copy(alpha = 0.5f))
-                                                    )
-                                                }
-                                                val hardCoreDp = with(density) {
-                                                    (liveState.brushSize * (1f - liveState.brushFeathering * 0.7f)).coerceIn(2f, maxOf(2f, itemSizePx)).toDp()
-                                                }
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(hardCoreDp)
-                                                        .clip(CircleShape)
-                                                        .then(checkerModifier)
-                                                )
-                                            }
-                                        }
-                                    }
-                                )
-                            }
-
-                            when {
-                                layer.textParams != null -> {
-                                    val tp = layer.textParams!!
-                                    azRailHostItem(id = layerId(layer, "grp.text"), text = "Text", color = navItemColor, shape = AzButtonShape.RECTANGLE)
-                                    azRailSubItem(
-                                        id = layerId(layer, "font"),
-                                        hostId = layerId(layer, "grp.text"),
-                                        text = navStrings.font,
-                                        color = navItemColor,
-                                        shape = AzButtonShape.CIRCLE
-                                    ) {
-                                        activate()
-                                        onShowFontPicker(layer.id)
-                                    }
-                                    azRailSubItem(
-                                        id = layerId(layer, "size.text"),
-                                        hostId = layerId(layer, "grp.text"),
-                                        text = navStrings.size,
-                                        color = navItemColor,
-                                        shape = AzButtonShape.CIRCLE,
-                                        content = AzComposableContent { isEnabled ->
-                                            val liveState by editorViewModel.uiState.collectAsState()
-                                            val displaySize = liveState.layers.find { it.id == layer.id }?.textParams?.fontSizeDp ?: 150f
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .pointerInput(isEnabled) {
-                                                        if (!isEnabled) return@pointerInput
-                                                        detectDragGestures { change, dragAmount ->
-                                                            change.consume()
-                                                            val current = editorViewModel.uiState.value.layers
-                                                                .find { it.id == layer.id }?.textParams?.fontSizeDp ?: 150f
-                                                            editorViewModel.onTextSizeChanged(layer.id, (current - dragAmount.y * 0.5f).coerceIn(8f, 300f))
-                                                        }
-                                                    },
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = "${displaySize.toInt()}pt",
-                                                    color = navItemColor,
-                                                    fontSize = 28.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        }
-                                    )
-                                    azRailSubItem(
-                                        id = layerId(layer, "color"),
-                                        hostId = layerId(layer, "grp.text"),
-                                        text = navStrings.color,
-                                        color = navItemColor,
-                                        shape = AzButtonShape.CIRCLE,
-                                        onClick = { activate(); editorViewModel.onColorClicked() },
-                                        content = AzComposableContent { isEnabled ->
-                                            val liveState by editorViewModel.uiState.collectAsState()
-                                            val currentColor = liveState.layers.find { it.id == layer.id }?.textParams?.colorArgb
-                                                ?: 0xFFFFFFFF.toInt()
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .pointerInput(isEnabled) {
-                                                        if (!isEnabled) return@pointerInput
-                                                        detectDragGestures { change, dragAmount ->
-                                                            change.consume()
-                                                            val hsv = FloatArray(3)
-                                                            android.graphics.Color.colorToHSV(currentColor, hsv)
-                                                            hsv[2] = (hsv[2] - dragAmount.y * 0.002f).coerceIn(0f, 1f)
-                                                            hsv[1] = (hsv[1] + dragAmount.x * 0.002f).coerceIn(0f, 1f)
-                                                            editorViewModel.onTextColorChanged(layer.id, android.graphics.Color.HSVToColor(hsv))
-                                                        }
-                                                    },
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                // Fill the whole rail item with the colour swatch.
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxSize()
-                                                        .clip(CircleShape)
-                                                        .background(Color(currentColor), CircleShape)
-                                                        .border(1.dp, navItemColor.copy(alpha = 0.5f), CircleShape)
-                                                )
-                                            }
-                                        }
-                                    )
-                                    azRailSubItem(
-                                        id = layerId(layer, "kern"),
-                                        hostId = layerId(layer, "grp.text"),
-                                        text = navStrings.kern,
-                                        color = navItemColor,
-                                        shape = AzButtonShape.CIRCLE,
-                                        content = AzComposableContent { isEnabled ->
-                                            val liveState by editorViewModel.uiState.collectAsState()
-                                            val displayKern = liveState.layers.find { it.id == layer.id }?.textParams?.letterSpacingEm ?: 0f
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .pointerInput(isEnabled) {
-                                                        if (!isEnabled) return@pointerInput
-                                                        detectDragGestures { change, dragAmount ->
-                                                            change.consume()
-                                                            val current = editorViewModel.uiState.value.layers
-                                                                .find { it.id == layer.id }?.textParams?.letterSpacingEm ?: 0f
-                                                            editorViewModel.onTextKerningChanged(layer.id, (current + dragAmount.x * 0.003f).coerceIn(-0.2f, 1f))
-                                                        }
-                                                    },
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = String.format("%.2f", displayKern),
-                                                    color = navItemColor,
-                                                    fontSize = 28.sp,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                            }
-                                        }
-                                    )
-                                    azRailSubItem(
-                                        id = layerId(layer, "bold"),
-                                        hostId = layerId(layer, "grp.text"),
-                                        text = navStrings.bold,
-                                        color = if (tp.isBold) Cyan else navItemColor,
-                                        shape = AzButtonShape.CIRCLE
-                                    ) {
-                                        activate()
-                                        editorViewModel.onTextStyleChanged(layer.id, !tp.isBold, tp.isItalic, tp.hasOutline, tp.hasDropShadow)
-                                    }
-                                    azRailSubItem(
-                                        id = layerId(layer, "italic"),
-                                        hostId = layerId(layer, "grp.text"),
-                                        text = navStrings.italic,
-                                        color = if (tp.isItalic) Cyan else navItemColor,
-                                        shape = AzButtonShape.CIRCLE
-                                    ) {
-                                        activate()
-                                        editorViewModel.onTextStyleChanged(layer.id, tp.isBold, !tp.isItalic, tp.hasOutline, tp.hasDropShadow)
-                                    }
-                                    azRailSubItem(
-                                        id = layerId(layer, "outline"),
-                                        hostId = layerId(layer, "grp.text"),
-                                        text = navStrings.outline,
-                                        color = if (tp.hasOutline) Cyan else navItemColor,
-                                        shape = AzButtonShape.CIRCLE
-                                    ) {
-                                        activate()
-                                        editorViewModel.onTextStyleChanged(layer.id, tp.isBold, tp.isItalic, !tp.hasOutline, tp.hasDropShadow)
-                                    }
-                                    azRailSubItem(
-                                        id = layerId(layer, "shadow"),
-                                        hostId = layerId(layer, "grp.text"),
-                                        text = navStrings.shadow,
-                                        color = if (tp.hasDropShadow) Cyan else navItemColor,
-                                        shape = AzButtonShape.CIRCLE
-                                    ) {
-                                        activate()
-                                        editorViewModel.onTextStyleChanged(layer.id, tp.isBold, tp.isItalic, tp.hasOutline, !tp.hasDropShadow)
-                                    }
-                                    if (layer.stencilType == null) {
-                                        azRailHostItem(id = layerId(layer, "grp.effects"), text = "Effects", color = navItemColor, shape = AzButtonShape.RECTANGLE)
-                                        azRailSubItem(
-                                            id = layerId(layer, "stencil"),
-                                            hostId = layerId(layer, "grp.effects"),
-                                            text = navStrings.stencil,
-                                            color = navItemColor,
-                                            shape = AzButtonShape.CIRCLE,
-                                            content = AzComposableContent { _ ->
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxSize()
-                                                        .onGloballyPositioned { coords ->
-                                                            if (coords.isAttached) {
-                                                                editorViewModel.updateStencilButtonPosition(coords.positionInWindow())
-                                                            }
-                                                        },
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(
-                                                        text = navStrings.stencil,
-                                                        color = navItemColor,
-                                                        textAlign = TextAlign.Center,
-                                                    )
-                                                }
-                                            }
-                                        ) {
-                                            activate()
-                                            editorViewModel.onGenerateStencil(layer.id)
-                                        }
-                                    }
-                                    azRailHostItem(id = layerId(layer, "grp.adjust"), text = "Adjust", color = navItemColor, shape = AzButtonShape.RECTANGLE)
-                                    azRailSubItem(
-                                        id = layerId(layer, "blend"),
-                                        hostId = layerId(layer, "grp.adjust"),
-                                        text = navStrings.build,
-                                        color = navItemColor,
-                                        shape = AzButtonShape.CIRCLE,
-                                        onClick = { activate(); editorViewModel.onCycleBlendMode() }
-                                    )
-                                    azRailSubItem(
-                                        id = layerId(layer, "adj"),
-                                        hostId = layerId(layer, "grp.adjust"),
-                                        text = navStrings.adjust,
-                                        color = navItemColor,
-                                        shape = AzButtonShape.CIRCLE,
-                                        onClick = { activate(); editorViewModel.onAdjustClicked() }
-                                    )
-                                    azRailSubItem(
-                                        id = layerId(layer, "invert"),
-                                        hostId = layerId(layer, "grp.adjust"),
-                                        text = navStrings.invert,
-                                        color = if (layer.isInverted) Cyan else navItemColor,
-                                        shape = AzButtonShape.CIRCLE,
-                                        onClick = { activate(); editorViewModel.onToggleInvert() }
-                                    )
-                                }
-                                layer.isSketch -> {
-                                    // Eraser is a top-level rail item — it used to sit under a "Paint"
-                                    // host folder that only ever contained this one child, which made
-                                    // the folder redundant and put the eraser two taps deep.
-                                    azRailItem(id = layerId(layer, "eraser"), text = navStrings.eraser, color = if (activeTool == Tool.ERASER) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
-
-                                    azRailHostItem(id = layerId(layer, "grp.retouch"), text = "Retouch", color = navItemColor, shape = AzButtonShape.RECTANGLE)
-                                    azRailSubItem(id = layerId(layer, "blur"), hostId = layerId(layer, "grp.retouch"), text = navStrings.blur, color = if (activeTool == Tool.BLUR) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
-                                    azRailSubItem(id = layerId(layer, "liquify"), hostId = layerId(layer, "grp.retouch"), text = navStrings.liquify, color = if (activeTool == Tool.LIQUIFY) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
-                                    azRailSubItem(id = layerId(layer, "dodge"), hostId = layerId(layer, "grp.retouch"), text = navStrings.dodge, color = if (activeTool == Tool.DODGE) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.DODGE) }
-                                    azRailSubItem(id = layerId(layer, "burn"), hostId = layerId(layer, "grp.retouch"), text = navStrings.burn, color = if (activeTool == Tool.BURN) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.BURN) }
-
-                                    azRailHostItem(id = layerId(layer, "grp.adjust"), text = "Adjust", color = navItemColor, shape = AzButtonShape.RECTANGLE)
-                                    azRailSubItem(id = layerId(layer, "adj"), hostId = layerId(layer, "grp.adjust"), text = navStrings.adjust, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onAdjustClicked() }
-                                    azRailSubItem(id = layerId(layer, "balance"), hostId = layerId(layer, "grp.adjust"), text = navStrings.balance, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onBalanceClicked() }
-                                    azRailSubItem(id = layerId(layer, "blend"), hostId = layerId(layer, "grp.adjust"), text = navStrings.build, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onCycleBlendMode() }
-                                    azRailSubItem(id = layerId(layer, "invert"), hostId = layerId(layer, "grp.adjust"), text = navStrings.invert, color = if (layer.isInverted) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onToggleInvert() }
-
-                                    if (layer.stencilType == null) {
-                                        azRailHostItem(id = layerId(layer, "grp.effects"), text = "Effects", color = navItemColor, shape = AzButtonShape.RECTANGLE)
-                                        azRailSubItem(
-                                            id = layerId(layer, "stencil"),
-                                            hostId = layerId(layer, "grp.effects"),
-                                            text = navStrings.stencil,
-                                            color = navItemColor,
-                                            shape = AzButtonShape.CIRCLE,
-                                            content = AzComposableContent { _ ->
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxSize()
-                                                        .onGloballyPositioned { coords ->
-                                                            if (coords.isAttached) {
-                                                                editorViewModel.updateStencilButtonPosition(coords.positionInWindow())
-                                                            }
-                                                        },
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(
-                                                        text = navStrings.stencil,
-                                                        color = navItemColor,
-                                                        textAlign = TextAlign.Center,
-                                                    )
-                                                }
-                                            }
-                                        ) {
-                                            activate()
-                                            editorViewModel.onGenerateStencil(layer.id)
-                                        }
-                                    }
-
-                                    addSizeItem()
-                                }
-                                else -> {
-                                    // Image-layer tools grouped into folders (host/sub) so the nested
-                                    // rail isn't an overwhelming flat list. Size stays a standalone
-                                    // widget (most-used control); all other tools live under a folder.
-                                    // Eraser is a top-level rail item — it used to sit under a "Paint"
-                                    // host folder that only ever contained this one child, which made
-                                    // the folder redundant and put the eraser two taps deep.
-                                    azRailItem(id = layerId(layer, "eraser"), text = navStrings.eraser, color = if (activeTool == Tool.ERASER) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.ERASER) }
-
-                                    azRailHostItem(id = layerId(layer, "grp.retouch"), text = "Retouch", color = navItemColor, shape = AzButtonShape.RECTANGLE)
-                                    azRailSubItem(id = layerId(layer, "blur"), hostId = layerId(layer, "grp.retouch"), text = navStrings.blur, color = if (activeTool == Tool.BLUR) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.BLUR) }
-                                    azRailSubItem(id = layerId(layer, "liquify"), hostId = layerId(layer, "grp.retouch"), text = navStrings.liquify, color = if (activeTool == Tool.LIQUIFY) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.LIQUIFY) }
-                                    azRailSubItem(id = layerId(layer, "dodge"), hostId = layerId(layer, "grp.retouch"), text = navStrings.dodge, color = if (activeTool == Tool.DODGE) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.DODGE) }
-                                    azRailSubItem(id = layerId(layer, "burn"), hostId = layerId(layer, "grp.retouch"), text = navStrings.burn, color = if (activeTool == Tool.BURN) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.setActiveTool(Tool.BURN) }
-
-                                    azRailHostItem(id = layerId(layer, "grp.adjust"), text = "Adjust", color = navItemColor, shape = AzButtonShape.RECTANGLE)
-                                    azRailSubItem(id = layerId(layer, "adj"), hostId = layerId(layer, "grp.adjust"), text = navStrings.adjust, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onAdjustClicked() }
-                                    azRailSubItem(id = layerId(layer, "balance"), hostId = layerId(layer, "grp.adjust"), text = navStrings.balance, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onBalanceClicked() }
-                                    azRailSubItem(id = layerId(layer, "blend"), hostId = layerId(layer, "grp.adjust"), text = navStrings.build, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onCycleBlendMode() }
-                                    azRailSubItem(id = layerId(layer, "invert"), hostId = layerId(layer, "grp.adjust"), text = navStrings.invert, color = if (layer.isInverted) Cyan else navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onToggleInvert() }
-                                    azRailSubItem(id = layerId(layer, "magic"), hostId = layerId(layer, "grp.adjust"), text = navStrings.magic, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onMagicClicked() }
-
-                                    azRailHostItem(id = layerId(layer, "grp.effects"), text = "Effects", color = navItemColor, shape = AzButtonShape.RECTANGLE)
-                                    azRailSubItem(id = layerId(layer, "iso"), hostId = layerId(layer, "grp.effects"), text = navStrings.isolate, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onRemoveBackgroundClicked() }
-                                    azRailSubItem(id = layerId(layer, "line"), hostId = layerId(layer, "grp.effects"), text = navStrings.outline, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onSketchClicked() }
-                                    azRailSubItem(id = layerId(layer, "edges"), hostId = layerId(layer, "grp.effects"), text = navStrings.edges, color = navItemColor, shape = AzButtonShape.CIRCLE) { activate(); editorViewModel.onApplyCannyEdgeClicked() }
-                                    if (layer.stencilType == null) {
-                                        azRailSubItem(
-                                            id = layerId(layer, "stencil"),
-                                            hostId = layerId(layer, "grp.effects"),
-                                            text = navStrings.stencil,
-                                            color = navItemColor,
-                                            shape = AzButtonShape.CIRCLE,
-                                            content = AzComposableContent { _ ->
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxSize()
-                                                        .onGloballyPositioned { coords ->
-                                                            if (coords.isAttached) {
-                                                                editorViewModel.updateStencilButtonPosition(coords.positionInWindow())
-                                                            }
-                                                        },
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(
-                                                        text = navStrings.stencil,
-                                                        color = navItemColor,
-                                                        textAlign = TextAlign.Center,
-                                                    )
-                                                }
-                                            }
-                                        ) {
-                                            activate()
-                                            editorViewModel.onGenerateStencil(layer.id)
-                                        }
-                                    }
-
-                                    addSizeItem()
-                                }
-                            }
-
-                            azHelpRailItem(
-                                id = "${layerId(layer)}.help",
-                                text = navStrings.help,
-                                color = navItemColor,
-                                shape = AzButtonShape.RECTANGLE
-                            )
-                        }
-                    ) {
-                        inputItem(hint = strings.editor.renameHint) { newName -> editorViewModel.onLayerRenamed(layer.id, newName) }
-                        if (layer.textParams != null) {
-                            inputItem(
-                                hint = strings.editor.editTextHint,
-                                initialValue = layer.textParams!!.text,
-                                onValueChange = { text -> editorViewModel.onTextContentChanged(layer.id, text) }
-                            )
-                        }
-                        listItem(text = strings.editor.copyEdits) { editorViewModel.copyLayerModifications(layer.id) }
-                        listItem(text = strings.editor.pasteEdits) { editorViewModel.pasteLayerModifications(layer.id) }
-                        if (layer.stencilType != null) {
-                            listItem(text = strings.editor.generatePoster) {
-                                posterSourceLayerId = layer.stencilSourceId ?: layer.id
-                                showPosterDialog = true
-                            }
-                        }
-                        listItem(text = strings.editor.duplicate) { editorViewModel.onLayerDuplicated(layer.id) }
-
-                        val layers = editorUiState.layers
-                        val idx = layers.indexOfFirst { it.id == layer.id }
-                        val isPartToUnlink = if (idx >= 0) {
-                            (idx > 0 && layers[idx].isLinked) ||
-                                    (idx + 1 < layers.size && layers[idx + 1].isLinked)
-                        } else false
-
-                        listItem(text = if (isPartToUnlink) strings.editor.unlinkLayer else strings.editor.linkLayer) { editorViewModel.onToggleLinkLayer(layer.id) }
-                        listItem(text = if (layer.isVisible) strings.editor.hideLayer else strings.editor.showLayer) { editorViewModel.onToggleVisibility(layer.id) }
-                        listItem(text = strings.editor.flattenAll) { editorViewModel.onFlattenAllLayers() }
-                        listItem(text = strings.editor.delete) { editorViewModel.onLayerRemoved(layer.id) }
+                // Core tracing prep (GraffitiXR is core-only; rich multi-layer / paint / text /
+                // effects editing is GraffiXR's job, reached via the "GraffiXR" hand-off above).
+                // These act on the active overlay layer.
+                val overlay = editorUiState.layers.find { it.id == editorUiState.activeLayerId }
+                if (overlay != null) {
+                    azRailSubItem(id = "design.outline", hostId = "host.design", text = navStrings.outline, color = navItemColor, shape = AzButtonShape.NONE) {
+                        editorViewModel.onSketchClicked()
+                    }
+                    azRailSubItem(id = "design.edges", hostId = "host.design", text = navStrings.edges, color = navItemColor, shape = AzButtonShape.NONE) {
+                        editorViewModel.onApplyCannyEdgeClicked()
+                    }
+                    azRailSubItem(id = "design.adjust", hostId = "host.design", text = navStrings.adjust, color = navItemColor, shape = AzButtonShape.NONE) {
+                        editorViewModel.onAdjustClicked()
+                    }
+                    azRailSubItem(id = "design.invert", hostId = "host.design", text = navStrings.invert, color = navItemColor, shape = AzButtonShape.NONE) {
+                        editorViewModel.onToggleInvert()
                     }
                 }
             }
@@ -2141,8 +1677,7 @@ class MainActivity : ComponentActivity() {
             }
             azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE) {                showSettings = true
             }
-            azRailSubItem(id = "proj.extensions", hostId = "host.project", text = "Extensions", color = navItemColor, shape = AzButtonShape.NONE) {                showMarketplace = true
-            }
+            // Extensions/LUT marketplace is rich editing — GraffiXR's domain under the core-only split.
 
             azDivider()
 
@@ -2883,48 +2418,3 @@ private fun PaintingProgressIndicator(
     }
 }
 
-private val AVAILABLE_FONTS = listOf(
-    "Roboto", "Oswald", "Bebas Neue", "Anton",
-    "Playfair Display", "Pacifico", "Dancing Script",
-    "Permanent Marker", "Rock Salt", "Bangers", "Righteous"
-)
-
-@Composable
-private fun FontPickerDialog(
-    onFontSelected: (String) -> Unit,
-    onDismiss: () -> Unit,
-    strings: AppStrings
-) {
-    val googleFontsProvider = remember {
-        androidx.compose.ui.text.googlefonts.GoogleFont.Provider(
-            providerAuthority = "com.google.android.gms.fonts",
-            providerPackage = "com.google.android.gms",
-            certificates = com.hereliesaz.graffitixr.R.array.com_google_android_gms_fonts_certs
-        )
-    }
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(strings.editor.chooseFont) },
-        text = {
-            LazyColumn {
-                items(AVAILABLE_FONTS) { fontName ->
-                    val googleFont = androidx.compose.ui.text.googlefonts.GoogleFont(fontName)
-                    val fontFamily = FontFamily(
-                        androidx.compose.ui.text.googlefonts.Font(googleFont, googleFontsProvider)
-                    )
-                    Text(
-                        text = "Aa  $fontName",
-                        fontFamily = fontFamily,
-                        fontSize = 20.sp,
-                        color = Color.White,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onFontSelected(fontName) }
-                            .padding(12.dp)
-                    )
-                }
-            }
-        },
-        confirmButton = {}
-    )
-}
