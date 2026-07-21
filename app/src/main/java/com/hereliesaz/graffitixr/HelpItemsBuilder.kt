@@ -28,11 +28,8 @@ internal fun buildHelpItems(strings: AppStrings, layers: List<Layer>): Map<Strin
         "mode.overlay.light" to strings.help.flashlight,
         "mockup.wall" to strings.help.wall,
 
-        // Design menu
-        "host.design" to strings.help.designHost,
-        "design.addImg" to strings.help.addImg,
-        "design.addDraw" to strings.help.addDraw,
-        "design.addText" to strings.help.addText,
+        // Open (top-level, replaces the old Design folder)
+        "item.open" to strings.help.addImg,
         "mode.trace.freeze" to strings.help.lockTrace,
 
         // Tools menu

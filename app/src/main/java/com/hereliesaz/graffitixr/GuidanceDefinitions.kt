@@ -10,9 +10,10 @@ import com.hereliesaz.graffitixr.design.theme.AppStrings
 import com.hereliesaz.graffitixr.design.R as DesignR
 
 /**
- * Per-mode guidance goal ids. Guidance is OFF by default: the Help rail item activates all of these
- * (turning the tour on) and deactivates them (turning it off). While active, the engine shows only
- * the goal whose mode the user is currently in. Nothing here self-activates.
+ * Per-mode guidance goal ids. Guidance is OFF by default and nothing here self-activates; a goal is
+ * routed only while explicitly activated on the guidance controller. (The Help rail item no longer
+ * toggles the tour — it opens AzNavRail's built-in help overlay — so these are currently declared but
+ * dormant, kept for the reactive graph below.)
  */
 internal val GUIDANCE_GOAL_IDS = listOf("gx.design", "gx.overlay", "gx.mockup", "gx.trace", "gx.ar")
 
@@ -23,7 +24,7 @@ internal val GUIDANCE_GOAL_IDS = listOf("gx.design", "gx.overlay", "gx.mockup", 
  * nowhere — the bug that made the old coach aim at the non-existent `mode.mockup.wall`.
  */
 internal val GUIDANCE_HIGHLIGHT_IDS =
-    setOf("host.design", "mockup.wall", "target.create")
+    setOf("item.open", "mockup.wall", "target.create")
 
 /**
  * Declares the reactive status-driven guidance graph (AzNavRail 10.18) that replaces the old
@@ -32,9 +33,8 @@ internal val GUIDANCE_HIGHLIGHT_IDS =
  *   - the same milestone predicates become [azStatus] nodes,
  *   - the same per-mode hints become [azEdge] instructions — text reused verbatim from the existing,
  *     already-localized `onboarding_*` string arrays (no new copy is authored), and
- *   - a per-mode [azGoal] that is activated/deactivated by the Help rail item (it does NOT auto-start
- *     on mode entry); while active it routes from the current screen to that mode's milestone and
- *     completes once the milestone is reached.
+ *   - a per-mode [azGoal] that does NOT auto-start on mode entry; while active it routes from the
+ *     current screen to that mode's milestone and completes once the milestone is reached.
  *
  * Multi-line steps use [AzInstructionStep] with `advanceWhen` so the callout pages itself forward as
  * the user's state changes, and `highlightSelector` to point at runtime layer items. The instruction
@@ -78,7 +78,7 @@ internal fun AzNavHostScope.ConfigureGuidance(
         to = "gx.hasActiveLayer",
         text = "",
         steps = listOf(
-            AzInstructionStep(text = ln(design, 1), highlightItemId = "host.design", advanceWhen = "gx.hasLayers"),
+            AzInstructionStep(text = ln(design, 1), highlightItemId = "item.open", advanceWhen = "gx.hasLayers"),
             AzInstructionStep(
                 text = ln(design, 2),
                 highlightSelector = { editorUiState.layers.firstOrNull()?.let { layerId(it) } },
@@ -93,8 +93,8 @@ internal fun AzNavHostScope.ConfigureGuidance(
         to = "gx.hasLayers",
         text = "",
         steps = listOf(
-            AzInstructionStep(text = ln(overlay, 0), highlightItemId = "host.design"),
-            AzInstructionStep(text = ln(overlay, 1), highlightItemId = "host.design", advanceWhen = "gx.hasLayers"),
+            AzInstructionStep(text = ln(overlay, 0), highlightItemId = "item.open"),
+            AzInstructionStep(text = ln(overlay, 1), highlightItemId = "item.open", advanceWhen = "gx.hasLayers"),
         ),
     )
 
@@ -108,7 +108,7 @@ internal fun AzNavHostScope.ConfigureGuidance(
             AzInstructionStep(text = ln(mockup, 1), highlightItemId = "mockup.wall", advanceWhen = "gx.hasWallPhoto"),
         ),
     )
-    azEdge(from = "gx.hasWallPhoto", to = "gx.hasLayers", text = ln(mockup, 2), highlightItemId = "host.design")
+    azEdge(from = "gx.hasWallPhoto", to = "gx.hasLayers", text = ln(mockup, 2), highlightItemId = "item.open")
 
     // --- TRACE: add a layer. ---
     azEdge(
@@ -116,8 +116,8 @@ internal fun AzNavHostScope.ConfigureGuidance(
         to = "gx.hasLayers",
         text = "",
         steps = listOf(
-            AzInstructionStep(text = ln(trace, 0), highlightItemId = "host.design"),
-            AzInstructionStep(text = ln(trace, 1), highlightItemId = "host.design", advanceWhen = "gx.hasLayers"),
+            AzInstructionStep(text = ln(trace, 0), highlightItemId = "item.open"),
+            AzInstructionStep(text = ln(trace, 1), highlightItemId = "item.open", advanceWhen = "gx.hasLayers"),
         ),
     )
 
@@ -133,10 +133,10 @@ internal fun AzNavHostScope.ConfigureGuidance(
             AzInstructionStep(text = ln(ar, 4), highlightItemId = "target.create", advanceWhen = "gx.hasTarget"),
         ),
     )
-    azEdge(from = "gx.hasTarget", to = "gx.hasLayers", text = ln(ar, 3), highlightItemId = "host.design")
+    azEdge(from = "gx.hasTarget", to = "gx.hasLayers", text = ln(ar, 3), highlightItemId = "item.open")
 
-    // --- Per-mode goals: NOT auto-started. The Help rail item activates/deactivates them; while a
-    // goal is active the engine routes from the current screen to that mode's milestone. ---
+    // --- Per-mode goals: NOT auto-started. While a goal is active the engine routes from the current
+    // screen to that mode's milestone. ---
     azGoal(id = "gx.design", target = "gx.hasActiveLayer", label = nav.design)
     azGoal(id = "gx.overlay", target = "gx.hasLayers", label = nav.overlay)
     azGoal(id = "gx.mockup", target = "gx.hasLayers", label = nav.mockup)

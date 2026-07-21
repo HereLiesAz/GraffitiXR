@@ -49,10 +49,8 @@ internal fun enumerateRailItemIdRegistrations(layers: List<Layer>, mode: EditorM
         ids += "mode.overlay.light"
     }
 
-    // Design menu
-    ids += listOf(
-        "host.design", "design.addImg", "design.addDraw", "design.addText"
-    )
+    // Open (top-level, replaces the old Design folder — no sub-items)
+    ids += "item.open"
 
     // Project menu
     ids += listOf(
