@@ -481,8 +481,23 @@ class MainActivity : ComponentActivity() {
                     arViewModel.setSpectatorOpHandler { op -> editorViewModel.applySpectatorOp(op) }
                 }
 
+                // The "Open" rail item can create+open a project (async DB write) and launch the picker
+                // in the same tap. If the user picks before projectId propagates, onAddLayer would
+                // silently no-op — so stash the URI and add it once the project id is live (mirrors the
+                // firstRunPendingUri pattern below).
+                var pendingOverlayUri by rememberSaveable { mutableStateOf<Uri?>(null) }
                 val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-                    uri?.let { editorViewModel.onAddLayer(it) }
+                    if (uri != null) {
+                        if (editorUiState.projectId == null) pendingOverlayUri = uri
+                        else editorViewModel.onAddLayer(uri)
+                    }
+                }
+                LaunchedEffect(pendingOverlayUri, editorUiState.projectId) {
+                    val uri = pendingOverlayUri
+                    if (uri != null && editorUiState.projectId != null) {
+                        editorViewModel.onAddLayer(uri)
+                        pendingOverlayUri = null
+                    }
                 }
                 val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                     uri?.let { editorViewModel.setBackgroundImage(it) }
@@ -1415,18 +1430,16 @@ class MainActivity : ComponentActivity() {
             // toggles only). host.modes' expandWhen reads railExpansion["host.project"] so opening Project
             // collapses Modes and closing it re-expands them.
 
-            // 1. OPEN (TOP) — a plain action, no sub-items (replaces the old Design folder). Ensures a
-            // project exists, enters Design mode, then opens an image picker so the chosen image lands as
-            // a new layer on the design canvas.
+            // 1. OPEN (TOP) — a plain action, no sub-items (replaces the old Design folder). Opens an
+            // image picker so the chosen image lands as a new layer, staying in the current mode (the
+            // layer is shared across every mode). Only ensures a project exists first, since onAddLayer
+            // silently no-ops without one.
             azRailItem(
                 id = "item.open",
                 text = navStrings.open,
                 color = if (isDesignMode) Cyan else navItemColor,
                 onClick = {
-                    // Design needs an active project or the added layer silently no-ops — create+open one
-                    // if the user jumped straight into Open without loading a project.
                     if (editorUiState.projectId == null) dashboardViewModel.createAndOpenProject()
-                    if (!isDesignMode) navController.navigate(EditorMode.DESIGN.name) { launchSingleTop = true }
                     overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
             )
