@@ -29,8 +29,33 @@ data class MarketplaceEntry(
 }
 
 /**
- * Bundled reference catalog. The two LUTs ship as real `.azp` assets and install + apply end-to-end;
- * the code entries are shown for browse but aren't installable until the sandbox lands.
+ * A catalog browse result: the [entries] to show, plus whether they came from the live registry
+ * ([isLive] true) or the bundled [SEED_MARKETPLACE] fallback ([isLive] false, i.e. offline).
+ */
+data class CatalogResult(
+    val entries: List<MarketplaceEntry>,
+    val isLive: Boolean,
+)
+
+/**
+ * Choose the catalog to show: live registry results when present, else the bundled [SEED_MARKETPLACE].
+ * A registry error (a failed [live]) or an empty page both fall back, so browsing never dead-ends when
+ * azphalt.store is unreachable or hasn't published its API yet. The seed is a temporary safety net —
+ * once the live storefront is dependable it can be dropped and this collapses to the live result.
+ */
+fun resolveCatalog(live: Result<List<MarketplaceEntry>>): CatalogResult {
+    val entries = live.getOrNull()
+    return if (entries.isNullOrEmpty()) {
+        CatalogResult(SEED_MARKETPLACE, isLive = false)
+    } else {
+        CatalogResult(entries, isLive = true)
+    }
+}
+
+/**
+ * Bundled reference catalog — the offline fallback when the live registry is unreachable. The two LUTs
+ * ship as real `.azp` assets and install + apply end-to-end; the code entries are shown for browse but
+ * aren't installable until the sandbox lands.
  */
 val SEED_MARKETPLACE: List<MarketplaceEntry> = listOf(
     MarketplaceEntry(
