@@ -26,7 +26,7 @@ class HelpItemsBuilderTest {
         listOf(
             "host.modes", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace",
             "target.create", "mockup.wall",
-            "host.design", "design.addImg", "design.addDraw", "design.addText", "mode.trace.freeze",
+            "item.open", "mode.trace.freeze",
             "sub.design.tools", "grp.paint", "tool.brush", "tool.eraser",
             "grp.retouch", "tool.blur", "tool.liquify",
             "grp.color", "adj.invert", "adj.balance", "adj.blend", "tool.filter",

@@ -79,7 +79,6 @@ import com.google.android.gms.common.GoogleApiAvailability
 import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.*
 import com.hereliesaz.aznavrail.HiddenMenuScope
-import com.hereliesaz.aznavrail.tutorial.LocalAzGuidanceController
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.CaptureStep
@@ -482,8 +481,23 @@ class MainActivity : ComponentActivity() {
                     arViewModel.setSpectatorOpHandler { op -> editorViewModel.applySpectatorOp(op) }
                 }
 
+                // The "Open" rail item can create+open a project (async DB write) and launch the picker
+                // in the same tap. If the user picks before projectId propagates, onAddLayer would
+                // silently no-op — so stash the URI and add it once the project id is live (mirrors the
+                // firstRunPendingUri pattern below).
+                var pendingOverlayUri by rememberSaveable { mutableStateOf<Uri?>(null) }
                 val overlayImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-                    uri?.let { editorViewModel.onAddLayer(it) }
+                    if (uri != null) {
+                        if (editorUiState.projectId == null) pendingOverlayUri = uri
+                        else editorViewModel.onAddLayer(uri)
+                    }
+                }
+                LaunchedEffect(pendingOverlayUri, editorUiState.projectId) {
+                    val uri = pendingOverlayUri
+                    if (uri != null && editorUiState.projectId != null) {
+                        editorViewModel.onAddLayer(uri)
+                        pendingOverlayUri = null
+                    }
                 }
                 val backgroundImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                     uri?.let { editorViewModel.setBackgroundImage(it) }
@@ -594,13 +608,6 @@ class MainActivity : ComponentActivity() {
                 val navStrings = strings.nav
 
                 val context = LocalContext.current
-                // Interop: is the Graffux companion editor installed? Gates the "Edit in Graffux"
-                // hand-off rail item. Visibility works because the manifest <queries> declares the pkg.
-                val isGraffiXrInstalled = remember {
-                    runCatching {
-                        context.packageManager.getLaunchIntentForPackage("com.hereliesaz.graffux") != null
-                    }.getOrDefault(false)
-                }
                 val canvasBg = editorUiState.canvasBackground
 
                 val navItemColor = remember(canvasBg) {
@@ -620,13 +627,6 @@ class MainActivity : ComponentActivity() {
                         guidanceHighlightIds = GUIDANCE_HIGHLIGHT_IDS,
                     )
                 }
-
-                // The reactive guidance controller (AzNavRail 10.18) is created by AzHostActivityLayout
-                // and provided to its subtree via LocalAzGuidanceController. It isn't in scope inside
-                // the (non-composable) host lambda where the rail's Help button is declared, so the
-                // onscreen block below reads it from that composition local and stashes it here for
-                // Help to enable / replay the guided tour.
-                val guidanceHolder = remember { mutableStateOf<com.hereliesaz.aznavrail.tutorial.AzGuidanceController?>(null) }
 
                 AzHostActivityLayout(navController = navController, currentDestination = currentRoute, initiallyExpanded = false) {
                     azTheme(
@@ -656,24 +656,6 @@ class MainActivity : ComponentActivity() {
                             overlayImagePicker, backgroundImagePicker, editorUiState, railExpansion, arUiState, strings,
                             navItemColor = navItemColor,
                             showLibrary = showLibrary,
-                            // Guidance is OFF by default; the tour is "on" only while a guidance goal is
-                            // active. The Help item toggles it: on -> enable + activate every goal;
-                            // off -> deactivate every goal AND disable, so it is immediately and
-                            // completely cancelled (no lingering callout).
-                            guidanceEnabled = guidanceHolder.value
-                                ?.let { gc -> GUIDANCE_GOAL_IDS.any { it in gc.activeGoals } } == true,
-                            onToggleGuidance = {
-                                guidanceHolder.value?.let { gc ->
-                                    val on = GUIDANCE_GOAL_IDS.any { it in gc.activeGoals }
-                                    if (on) {
-                                        GUIDANCE_GOAL_IDS.forEach(gc::deactivate)
-                                        gc.disable()
-                                    } else {
-                                        gc.enable()
-                                        GUIDANCE_GOAL_IDS.forEach(gc::activate)
-                                    }
-                                }
-                            },
                             coopState = coopState,
                             isTouchLocked = mainUiState.isTouchLocked,
                             isWaitingForTap = mainUiState.isWaitingForTap,
@@ -721,34 +703,6 @@ class MainActivity : ComponentActivity() {
                                     else -> editorViewModel.exportImage()
                                 }
                             },
-                            isGraffiXrInstalled = isGraffiXrInstalled,
-                            onEditInGraffiXr = {
-                                // Hand off the current overlay to Graffux for rich editing: composite to
-                                // a content:// Uri and fire an explicit ACTION_SEND at the Graffux package.
-                                exportDispatchScope.launch {
-                                    val uri = editorViewModel.exportForShare() ?: return@launch
-                                    val send = Intent(Intent.ACTION_SEND).apply {
-                                        setPackage("com.hereliesaz.graffux")
-                                        type = "image/png"
-                                        putExtra(Intent.EXTRA_STREAM, uri)
-                                        // Carry the URI in ClipData too: FLAG_GRANT_READ_URI_PERMISSION
-                                        // grants against the intent's data/ClipData, not EXTRA_STREAM, so
-                                        // an explicit (setPackage) hand-off can otherwise reach Graffux
-                                        // without read access. The chooser fallback reuses this intent.
-                                        clipData = ClipData.newRawUri(null, uri)
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                    }
-                                    try {
-                                        context.startActivity(send)
-                                    } catch (t: Throwable) {
-                                        // Graffux became unresolvable between the check and the tap —
-                                        // fall back to a generic chooser so the image still goes somewhere.
-                                        context.startActivity(
-                                            Intent.createChooser(send.apply { setPackage(null) }, null)
-                                        )
-                                    }
-                                }
-                            },
                         )
                     }
 
@@ -786,14 +740,9 @@ class MainActivity : ComponentActivity() {
 
                         val completedTutorials by mainViewModel.completedTutorials.collectAsState()
 
-                        // The reactive guidance overlay is rendered automatically by
-                        // AzHostActivityLayout; we only need the controller it created so the rail's
-                        // Help button can enable / replay the guided tour. Read it from the composition
-                        // local the host provides — NOT rememberAzGuidanceController(), which would
-                        // remember a *separate* controller that doesn't drive the rendered overlay. The
-                        // guidance graph itself (statuses, edges, goals) is declared in ConfigureGuidance.
-                        val guidance = LocalAzGuidanceController.current
-                        SideEffect { guidanceHolder.value = guidance }
+                        // The reactive guidance overlay (statuses, edges, per-mode goals declared in
+                        // ConfigureGuidance) is rendered automatically by AzHostActivityLayout; nothing
+                        // needs to be mounted here.
 
                         // First-launch explainer for devices where ARCore is
                         // unavailable. Modal-gated identically to the per-mode
@@ -1461,16 +1410,12 @@ class MainActivity : ComponentActivity() {
         strings: AppStrings,
         navItemColor: Color = Color.White,
         showLibrary: Boolean,
-        guidanceEnabled: Boolean = true,
-        onToggleGuidance: () -> Unit = {},
         coopState: CoopSessionState = CoopSessionState.Idle,
         isTouchLocked: Boolean,
         isWaitingForTap: Boolean = false,
         onShowJoinScanner: () -> Unit = {},
         onWallPhoto: () -> Unit = {},
         onExportRequested: () -> Unit,
-        isGraffiXrInstalled: Boolean = false,
-        onEditInGraffiXr: () -> Unit = {},
     ) {
         val navStrings = strings.nav
         val requestPermissions = {
@@ -1482,76 +1427,66 @@ class MainActivity : ComponentActivity() {
             val isDesignMode = editorUiState.editorMode == EditorMode.DESIGN
             // railExpansion (param) is the per-host expansion restored from the project so the rail reopens
             // as the user left it. Seeded into initiallyExpanded below; captured by onExpandedChange (manual
-            // toggles only). The expandWhen rules still drive reactive (a)/(b) expansion.
+            // toggles only). host.modes' expandWhen reads railExpansion["host.project"] so opening Project
+            // collapses Modes and closing it re-expands them.
 
-            // 1. DESIGN FOLDER (TOP)
-            azRailHostItem(
-                id = "host.design",
-                text = navStrings.design,
+            // 1. OPEN (TOP) — a plain action, no sub-items (replaces the old Design folder). Opens an
+            // image picker so the chosen image lands as a new layer, staying in the current mode (the
+            // layer is shared across every mode). Only ensures a project exists first, since onAddLayer
+            // silently no-ops without one.
+            azRailItem(
+                id = "item.open",
+                text = navStrings.open,
                 color = if (isDesignMode) Cyan else navItemColor,
-                // Expand Design whenever we enter Design mode (new project opens straight into it, and
-                // re-entering Design from a Mode). expandWhen re-fires on the false->true edge; the user
-                // can still collapse it manually. initiallyExpanded seeds the very first render.
-                // Restore the user's last expansion for this host on reopen; fall back to the in-mode default.
-                initiallyExpanded = railExpansion["host.design"] ?: isDesignMode,
-                // Read editorMode directly in the lambda (not the captured isDesignMode snapshot) so the
-                // evaluator subscribes to the state and re-fires on mode changes.
-                expandWhen = { editorUiState.editorMode == EditorMode.DESIGN },
-                // Persist only genuine user intent: onExpandedChange fires on manual toggles, not on
-                // expandWhen/initiallyExpanded programmatic changes.
-                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.design", it) },
                 onClick = {
-                    // From a Mode, tapping Design navigates to the dedicated Design screen. In Design it
-                    // just expands the design tools below (this onClick is a no-op there).
-                    if (!isDesignMode) {
-                        // Design needs an active project or every Add silently no-ops — create+open one
-                        // if the user jumped straight into Design without loading a project.
-                        if (editorUiState.projectId == null) dashboardViewModel.createAndOpenProject()
-                        navController.navigate(EditorMode.DESIGN.name) { launchSingleTop = true }
-                    }
+                    if (editorUiState.projectId == null) dashboardViewModel.createAndOpenProject()
+                    overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
             )
 
-            if (isDesignMode) {
-                azRailSubItem(id = "design.addImg", hostId = "host.design", text = "Open", color = navItemColor, shape = AzButtonShape.NONE) {
-                    overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                }
-                // Interop hand-off: only when the Graffux companion editor is installed. Sends the
-                // current overlay to Graffux for rich editing; the edited result can be shared back.
-                if (isGraffiXrInstalled) {
-                    azRailSubItem(id = "design.editInGraffixr", hostId = "host.design", text = "Graffux", color = navItemColor, shape = AzButtonShape.NONE) {
-                        onEditInGraffiXr()
-                    }
-                }
-                // Core tracing prep (GraffitiXR is core-only; rich multi-layer / paint / text /
-                // effects editing is Graffux's job, reached via the "Graffux" hand-off above).
-                // These act on the active overlay layer.
-                val overlay = editorUiState.layers.find { it.id == editorUiState.activeLayerId }
-                if (overlay != null) {
-                    azRailSubItem(id = "design.outline", hostId = "host.design", text = navStrings.outline, color = navItemColor, shape = AzButtonShape.NONE) {
-                        editorViewModel.onSketchClicked()
-                    }
-                    azRailSubItem(id = "design.edges", hostId = "host.design", text = navStrings.edges, color = navItemColor, shape = AzButtonShape.NONE) {
-                        editorViewModel.onApplyCannyEdgeClicked()
-                    }
-                    azRailSubItem(id = "design.adjust", hostId = "host.design", text = navStrings.adjust, color = navItemColor, shape = AzButtonShape.NONE) {
-                        editorViewModel.onAdjustClicked()
-                    }
-                    azRailSubItem(id = "design.invert", hostId = "host.design", text = navStrings.invert, color = navItemColor, shape = AzButtonShape.NONE) {
-                        editorViewModel.onToggleInvert()
-                    }
-                }
+            azDivider()
+
+            // 2. PROJECT FOLDER — directly under Open. Opening it collapses Modes (see host.modes'
+            // expandWhen below); its expansion is persisted per-project via onExpandedChange so the two
+            // folders coordinate reactively.
+            azRailHostItem(
+                id = "host.project",
+                text = navStrings.project,
+                color = navItemColor,
+                initiallyExpanded = railExpansion["host.project"] ?: false,
+                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.project", it) },
+            )
+            azRailSubItem(id = "proj.new", hostId = "host.project", text = navStrings.new, color = navItemColor, shape = AzButtonShape.NONE) {
+                dashboardViewModel.onNewProjectTriggered()
+            }
+            azRailSubItem(id = "proj.save", hostId = "host.project", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE) {
+                showSaveDialog = true
+            }
+            azRailSubItem(id = "proj.export", hostId = "host.project", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE) {
+                // Export is mode-dispatched by the caller so it has access to the CameraX
+                // controller (Overlay stills) and a coroutine scope (AR/Overlay both suspend on
+                // asynchronous captures). This handler just tells the caller "user pressed Export".
+                onExportRequested()
+            }
+            azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {
+                navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
+            }
+            azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE) {
+                showSettings = true
             }
 
             azDivider()
 
-            // 3. MODES FOLDER
+            // 3. MODES FOLDER — always expanded, unless the user manually collapses it or opens the
+            // Project folder. expandWhen returns false while Project is open (auto-collapsing Modes) and
+            // re-expands Modes on the false->true edge when Project closes; a manual collapse is respected
+            // ("user wins") until that next edge.
             azRailHostItem(
                 id = "host.modes",
                 text = navStrings.modes,
                 color = navItemColor,
-                initiallyExpanded = railExpansion["host.modes"] ?: !isDesignMode,
-                expandWhen = { editorUiState.editorMode != EditorMode.DESIGN },
+                initiallyExpanded = railExpansion["host.modes"] ?: true,
+                expandWhen = { railExpansion["host.project"] != true },
                 onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.modes", it) },
             )
 
@@ -1662,35 +1597,16 @@ class MainActivity : ComponentActivity() {
                 editorViewModel.onToggleModeTransformLocked(EditorMode.TRACE)
             }
 
-            // 4. PROJECT FOLDER
-            azRailHostItem(
-                id = "host.project",
-                text = navStrings.project,
-                color = navItemColor
-            )
-            azRailSubItem(id = "proj.new", hostId = "host.project", text = navStrings.new, color = navItemColor, shape = AzButtonShape.NONE) {                dashboardViewModel.onNewProjectTriggered()
-            }
-            azRailSubItem(id = "proj.save", hostId = "host.project", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE) {                showSaveDialog = true
-            }
-            azRailSubItem(id = "proj.export", hostId = "host.project", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE) {
-                // Export is mode-dispatched by the caller so it has access to the CameraX
-                // controller (Overlay stills) and a coroutine scope (AR/Overlay both suspend on
-                // asynchronous captures). This handler just tells the caller "user pressed Export".
-                onExportRequested()
-            }
-            azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {                navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
-            }
-            azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE) {                showSettings = true
-            }
-            // Extensions/LUT marketplace is rich editing — GraffiXR's domain under the core-only split.
-
+            // Help — opens AzNavRail's built-in help overlay (populated by azAdvanced(helpList=...)).
+            // Registering it as azHelpRailItem is what makes the overlay reachable: the library toggles
+            // the overlay only from a help item, and suppresses its own auto-injected drawer entry when
+            // an explicit one exists.
             azDivider()
 
-            azRailItem(
+            azHelpRailItem(
                 id = "item.help",
                 text = navStrings.help,
-                color = if (guidanceEnabled) Cyan else navItemColor,
-                onClick = onToggleGuidance
+                color = navItemColor,
             )
         }
     }
