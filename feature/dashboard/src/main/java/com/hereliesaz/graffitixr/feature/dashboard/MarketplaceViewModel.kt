@@ -24,9 +24,31 @@ class MarketplaceViewModel @Inject constructor(
     private val extensions: ExtensionRepository,
 ) : ViewModel() {
 
-    val catalog: List<MarketplaceEntry> = extensions.catalog()
+    private val _catalog = MutableStateFlow<List<MarketplaceEntry>>(emptyList())
+    /** The store catalog: live registry results, or the bundled seed when [offline]. */
+    val catalog: StateFlow<List<MarketplaceEntry>> = _catalog.asStateFlow()
+
+    private val _offline = MutableStateFlow(false)
+    /** True when [catalog] is the bundled seed because the registry was unreachable. */
+    val offline: StateFlow<Boolean> = _offline.asStateFlow()
+
+    private val _loading = MutableStateFlow(false)
+    val loading: StateFlow<Boolean> = _loading.asStateFlow()
 
     val installed: StateFlow<List<InstalledExtension>> = extensions.installed
+
+    init { refresh() }
+
+    /** Fetch the catalog from the live registry (falling back to the seed). Safe to call repeatedly. */
+    fun refresh(query: String? = null) {
+        viewModelScope.launch {
+            _loading.value = true
+            val result = withContext(Dispatchers.IO) { extensions.browseCatalog(query) }
+            _catalog.value = result.entries
+            _offline.value = !result.isLive
+            _loading.value = false
+        }
+    }
 
     private val _busyId = MutableStateFlow<String?>(null)
     /** Id of the entry currently installing/uninstalling, so the row can show progress and disable. */
