@@ -42,10 +42,10 @@
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <uses-feature android:name="android.hardware.location.network" android:required="false" />
 
-    <!-- Interop: Android 11+ package visibility so we can detect GraffiXR (the companion rich editor)
+    <!-- Interop: Android 11+ package visibility so we can detect Graffux (the companion rich editor)
          and hand off an overlay to it via an explicit ACTION_SEND. -->
     <queries>
-        <package android:name="com.hereliesaz.graffixr" />
+        <package android:name="com.hereliesaz.graffux" />
     </queries>
 
     <application
@@ -94,7 +94,7 @@
                 <data android:scheme="graffitixr" />
             </intent-filter>
 
-            <!-- Interop: receive an image shared from GraffiXR (e.g. an edited overlay returning from
+            <!-- Interop: receive an image shared from Graffux (e.g. an edited overlay returning from
                  the rich editor) and open it as an AR overlay layer. -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
