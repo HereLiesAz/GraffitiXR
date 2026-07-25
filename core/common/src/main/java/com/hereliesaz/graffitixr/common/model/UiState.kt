@@ -216,9 +216,6 @@ data class ArUiState(
 
 enum class CoopRole { NONE, HOST, GUEST }
 
-enum class Tool {
-    NONE, BRUSH, ERASER, BLUR, HEAL, BURN, DODGE, LIQUIFY, COLOR
-}
 
 enum class CaptureStep {
     NONE, CAPTURE, RECTIFY, MASK, REVIEW

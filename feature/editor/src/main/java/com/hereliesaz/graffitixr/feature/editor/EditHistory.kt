@@ -3,15 +3,21 @@ package com.hereliesaz.graffitixr.feature.editor
 import com.hereliesaz.graffitixr.common.model.Layer
 
 /**
- * Owns the undo/redo stacks for the editor. Pure logic — no Android, Compose, or OpenCV
- * dependencies — so it is fully unit-testable in isolation (unlike most of EditorViewModel,
- * whose tests need native OpenCV). Extracted from EditorViewModel to shrink that god-class
- * and give the history mechanics a single, testable home.
+ * A single undoable step: a snapshot of the layer set with bitmaps stripped.
  *
- * The *application* of a command (rebuilding bitmaps, restoring layer props) stays in the
- * ViewModel; this class only manages the stacks. When popping, the caller supplies the
- * counterpart entry to record on the opposite stack via [popUndo]/[popRedo], because that
- * entry depends on the ViewModel's current state.
+ * Since this app no longer edits pixels — the companion design app owns authoring — every
+ * undoable change is a property change (transform, tone, order, visibility, add/remove), so one
+ * snapshot type covers the whole history.
+ */
+internal data class EditCommand(val oldLayers: List<Layer>)
+
+/**
+ * Owns the undo/redo stacks for the editor. Pure logic — no Android or Compose dependencies — so
+ * it is fully unit-testable in isolation.
+ *
+ * The *application* of a command (restoring layer props) stays in the ViewModel; this class only
+ * manages the stacks. When popping, the caller supplies the counterpart entry to record on the
+ * opposite stack, because that entry depends on the ViewModel's current state.
  */
 internal class EditHistory(private val maxStackSize: Int = 20) {
     private val undoStack = ArrayDeque<EditCommand>()
@@ -25,19 +31,11 @@ internal class EditHistory(private val maxStackSize: Int = 20) {
      * one is ignored (returns false). Pushing clears the redo stack.
      */
     fun pushProperty(layersWithoutBitmaps: List<Layer>): Boolean {
-        val last = undoStack.lastOrNull()
-        if (last is EditCommand.PropertyChange && last.oldLayers == layersWithoutBitmaps) return false
-        undoStack.addLast(EditCommand.PropertyChange(layersWithoutBitmaps))
+        if (undoStack.lastOrNull()?.oldLayers == layersWithoutBitmaps) return false
+        undoStack.addLast(EditCommand(layersWithoutBitmaps))
         trim()
         redoStack.clear()
         return true
-    }
-
-    /** Records a completed brush stroke. Pushing clears the redo stack. */
-    fun pushDraw(layerId: String, command: StrokeCommand) {
-        undoStack.addLast(EditCommand.Draw(layerId, command))
-        trim()
-        redoStack.clear()
     }
 
     /**

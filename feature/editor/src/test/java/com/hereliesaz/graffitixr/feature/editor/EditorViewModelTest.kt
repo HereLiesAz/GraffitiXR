@@ -7,8 +7,6 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.unit.IntSize
-import com.hereliesaz.graffitixr.common.model.Tool
 import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.data.ProjectManager
@@ -17,8 +15,6 @@ import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.common.coop.OpEmitter
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
-import com.hereliesaz.graffitixr.feature.editor.stencil.StencilProcessor
-import com.hereliesaz.graffitixr.feature.editor.stencil.StencilPrintEngine
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.*
@@ -43,7 +39,6 @@ import java.io.InputStream
 
 import com.hereliesaz.graffitixr.common.DispatcherProvider
 import kotlinx.coroutines.CoroutineDispatcher
-import com.hereliesaz.graffitixr.common.model.TextLayerParams
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EditorViewModelTest {
@@ -53,9 +48,6 @@ class EditorViewModelTest {
     private val settingsRepository: SettingsRepository = mockk(relaxed = true)
     private val currentProjectFlow = kotlinx.coroutines.flow.MutableStateFlow<GraffitiProject?>(null)
     private val context: Context = mockk(relaxed = true)
-    private val subjectIsolator: SubjectIsolator = mockk(relaxed = true)
-    private val stencilProcessor: StencilProcessor = mockk(relaxed = true)
-    private val stencilPrintEngine: StencilPrintEngine = mockk(relaxed = true)
     private val projectManager: ProjectManager = mockk(relaxed = true)
     private val exportManager: com.hereliesaz.graffitixr.feature.editor.export.ExportManager = mockk(relaxed = true)
     private val slamManager: SlamManager = mockk(relaxed = true)
@@ -65,9 +57,8 @@ class EditorViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        // The OpenCV-backed singletons (ImageProcessor, SketchProcessor, StencilProcessor, …) call
-        // NativeLibLoader.loadAll() in their init blocks; on a host JVM that throws (the .so is
-        // Android-arm only). No-op it so those objects can initialise and have their methods mocked.
+        // NativeLibLoader.loadAll() throws on a host JVM (the .so is Android-arm only); no-op it
+        // for any object that still calls it from an init block.
         mockkObject(NativeLibLoader)
         every { NativeLibLoader.loadAll() } returns Unit
         // Emit a test project so projectId is non-null, enabling onAddLayer to work
@@ -83,8 +74,6 @@ class EditorViewModelTest {
         mockkStatic(Toast::class)
         every { Toast.makeText(any(), any<String>(), any()) } returns mockk(relaxed = true)
         mockkObject(com.hereliesaz.graffitixr.common.util.ImageUtils)
-        mockkObject(TextRasterizer)
-        mockkObject(GoogleFontCache)
 
         val mockBitmap = mockk<Bitmap>(relaxed = true)
         every { mockBitmap.width } returns 100
@@ -98,10 +87,6 @@ class EditorViewModelTest {
         coEvery { com.hereliesaz.graffitixr.common.util.ImageUtils.loadBitmapAsync(any(), any(), any()) } returns mockBitmap
         coEvery { projectRepository.saveArtifact(any(), any(), any()) } returns "/path/to/artifact.png"
         every { com.hereliesaz.graffitixr.common.util.ImageUtils.bitmapToByteArray(any()) } returns ByteArray(0)
-
-        // Mock TextRasterizer and GoogleFontCache to avoid Android dependencies
-        every { TextRasterizer.rasterize(any(), any(), any(), any(), any()) } returns mockBitmap
-        coEvery { GoogleFontCache.getTypeface(any(), any(), any(), any()) } returns mockk(relaxed = true)
 
         every { Uri.parse(any()) } answers {
             val uriString = it.invocation.args[0] as String
@@ -127,8 +112,7 @@ class EditorViewModelTest {
 
         viewModel = EditorViewModel(
             projectRepository, settingsRepository, projectManager, exportManager, context,
-            subjectIsolator, stencilProcessor, stencilPrintEngine, slamManager,
-            testDispatcherProvider, opEmitter, mockk(relaxed = true)
+            slamManager, testDispatcherProvider, opEmitter
         )
     }
 
@@ -140,8 +124,6 @@ class EditorViewModelTest {
         unmockkStatic(Uri::class)
         unmockkStatic(Toast::class)
         unmockkObject(com.hereliesaz.graffitixr.common.util.ImageUtils)
-        unmockkObject(TextRasterizer)
-        unmockkObject(GoogleFontCache)
         unmockkObject(NativeLibLoader)
     }
 
@@ -209,60 +191,6 @@ class EditorViewModelTest {
         val newOffset = Offset(10f, 20f)
         viewModel.onOffsetChanged(newOffset)
         assertEquals(newOffset, viewModel.uiState.value.layers.first().offset)
-    }
-
-    @Test
-    fun `onRemoveBackgroundClicked calls subjectIsolator and saves artifact`() = runTest {
-        mockkObject(com.hereliesaz.graffitixr.common.util.PerspectiveProcessor)
-        val uri = Uri.parse("content://test/image.png")
-        viewModel.onAddLayer(uri)
-        testDispatcher.scheduler.advanceUntilIdle()
-        
-        val layerId = viewModel.uiState.value.layers.first().id
-        viewModel.onLayerActivated(layerId)
-        
-        val processedBitmap = mockk<Bitmap>(relaxed = true)
-        every { processedBitmap.width } returns 100
-        every { processedBitmap.height } returns 100
-        val isolationResult = IsolationResult(
-            isolatedBitmap = processedBitmap,
-            rawConfidence = FloatArray(100 * 100) { 0.8f },
-            width = 100,
-            height = 100
-        )
-        coEvery { subjectIsolator.isolate(any()) } returns Result.success(isolationResult)
-
-        viewModel.onRemoveBackgroundClicked()
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        coVerify { subjectIsolator.isolate(any()) }
-        coVerify { projectRepository.saveArtifact(any(), any(), any()) }
-        unmockkObject(com.hereliesaz.graffitixr.common.util.PerspectiveProcessor)
-    }
-
-    @Test
-    fun `onSketchClicked calls SketchProcessor and creates linked sketch layer`() = runTest {
-        mockkObject(com.hereliesaz.graffitixr.common.util.SketchProcessor)
-        val uri = Uri.parse("content://test/image.png")
-        viewModel.onAddLayer(uri)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        val layerId = viewModel.uiState.value.layers.first().id
-        viewModel.onLayerActivated(layerId)
-
-        val sketchBitmap = mockk<Bitmap>(relaxed = true)
-        every { com.hereliesaz.graffitixr.common.util.SketchProcessor.sketchEffect(any(), any(), any()) } returns sketchBitmap
-
-        viewModel.onSketchClicked()
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        verify { com.hereliesaz.graffitixr.common.util.SketchProcessor.sketchEffect(any(), any(), any()) }
-        coVerify { projectRepository.saveArtifact(any(), any(), any()) }
-        // A new sketch layer should have been inserted above the source layer
-        val layers = viewModel.uiState.value.layers
-        assertTrue(layers.size >= 2)
-        assertTrue(layers.any { it.isSketch })
-        unmockkObject(com.hereliesaz.graffitixr.common.util.SketchProcessor)
     }
 
     @Test
@@ -376,107 +304,6 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `onStrokeStart replays all buffered points after bitmap copy`() = runTest {
-        val uri = Uri.parse("content://test/image.png")
-        viewModel.onAddLayer(uri)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        val layerId = viewModel.uiState.value.layers.first().id
-        viewModel.onLayerActivated(layerId)
-        viewModel.setActiveTool(Tool.BRUSH)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        val canvasSize = IntSize(100, 100)
-
-        viewModel.onStrokeStart(Offset(10f, 10f), canvasSize)
-        viewModel.onStrokePoint(Offset(20f, 20f))
-        viewModel.onStrokePoint(Offset(30f, 30f))
-        viewModel.onStrokePoint(Offset(40f, 40f))
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertNotNull(state.liveStrokeBitmap)
-        assertTrue("Expected liveStrokeVersion >= 1, got ${state.liveStrokeVersion}", state.liveStrokeVersion >= 1)
-    }
-
-    /**
-     * The tap path DrawingCanvas now emits: start immediately followed by end, with no drag points.
-     * Covers both halves of that gesture — the dab must actually commit (detectDragGestures never
-     * fired for a tap, so tapping with a brush selected used to do nothing at all), and the
-     * background bitmap-copy coroutine that is still queued when the stroke ends must abandon
-     * cleanly rather than indexing an emptied point list or stranding the live-stroke overlay.
-     */
-    @Test
-    fun `a tap-length stroke commits a dab and leaves no live-stroke state`() = runTest {
-        val uri = Uri.parse("content://test/image.png")
-        viewModel.onAddLayer(uri)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        val layerId = viewModel.uiState.value.layers.first().id
-        viewModel.onLayerActivated(layerId)
-        viewModel.setActiveTool(Tool.BRUSH)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        val undoBefore = viewModel.uiState.value.undoCount
-
-        // No advance between the two calls: the copy coroutine is still queued, which is exactly the
-        // ordering a tap produces.
-        viewModel.onStrokeStart(Offset(10f, 10f), IntSize(100, 100))
-        viewModel.onStrokeEnd()
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertTrue(
-            "Expected the tap to commit a dab to history, undoCount went $undoBefore -> ${state.undoCount}",
-            state.undoCount > undoBefore
-        )
-        assertNull("Live-stroke layer id should be cleared after the stroke ends", state.liveStrokeLayerId)
-        assertNull("Live-stroke bitmap should be cleared after the stroke ends", state.liveStrokeBitmap)
-    }
-
-    @Test
-    fun `setSegmentationInfluence updates state and does not crash when no confidence stored`() = runTest {
-        viewModel.setSegmentationInfluence(0.3f)
-        testDispatcher.scheduler.advanceUntilIdle()
-        assertEquals(0.3f, viewModel.uiState.value.segmentationInfluence, 0.001f)
-    }
-
-    @Test
-    fun `Stencil visibility condition is correct`() = runTest {
-        // Allow init coroutines to run so projectId is populated before any layer operations.
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        // 1. Initial empty state -> no stencil content
-        assertFalse(viewModel.uiState.value.layers.any { it.textParams == null })
-
-        // 2. Add text layer -> still no stencil content (textParams is non-null for text layers)
-        viewModel.onAddTextLayer()
-        testDispatcher.scheduler.advanceUntilIdle()
-        assertEquals(1, viewModel.uiState.value.layers.size)
-        assertFalse(viewModel.uiState.value.layers.any { it.textParams == null })
-
-        // 3. Add image layer -> stencil content exists (image layers have textParams == null)
-        val uri = Uri.parse("content://test/image.png")
-        viewModel.onAddLayer(uri)
-        testDispatcher.scheduler.advanceUntilIdle()
-        assertEquals(2, viewModel.uiState.value.layers.size)
-        assertTrue(viewModel.uiState.value.layers.any { it.textParams == null })
-
-        // 4. Remove image layer -> back to only text layer, no stencil content
-        val imageLayerId = viewModel.uiState.value.layers.find { it.textParams == null }!!.id
-        viewModel.onLayerRemoved(imageLayerId)
-        testDispatcher.scheduler.advanceUntilIdle()
-        assertEquals(1, viewModel.uiState.value.layers.size)
-        assertFalse(viewModel.uiState.value.layers.any { it.textParams == null })
-
-        // 5. Add blank sketch layer -> stencil content exists again (textParams == null)
-        viewModel.onAddBlankLayer()
-        testDispatcher.scheduler.advanceUntilIdle()
-        assertEquals(2, viewModel.uiState.value.layers.size)
-        assertTrue(viewModel.uiState.value.layers.any { it.textParams == null })
-    }
-
-    @Test
     fun `undo and redo on empty stacks do not crash`() {
         // Fresh ViewModel has empty undo and redo stacks; neither call should throw.
         viewModel.onUndoClicked()
@@ -573,44 +400,4 @@ class EditorViewModelTest {
         assertEquals(1.0f, st.layers.first { it.id == "a" }.opacity)
     }
 
-    @Test
-    fun `characterize onCycleBlendMode changes the active layer blend mode`() = runTest {
-        testDispatcher.scheduler.advanceUntilIdle()
-        viewModel.setLayers(listOf(lyr("a")))
-        viewModel.onLayerActivated("a")
-        testDispatcher.scheduler.advanceUntilIdle()
-        val before = viewModel.uiState.value.layers.first().blendMode
-        viewModel.onCycleBlendMode()
-        testDispatcher.scheduler.advanceUntilIdle()
-        val after = viewModel.uiState.value.layers.first().blendMode
-        assertTrue("blend mode should advance", before != after)
-    }
-
-    @Test
-    fun `characterize onLayerDuplicated appends a copy and activates it`() = runTest {
-        testDispatcher.scheduler.advanceUntilIdle()
-        viewModel.setLayers(listOf(lyr("a", "Alpha")))
-        viewModel.onLayerActivated("a")
-        testDispatcher.scheduler.advanceUntilIdle()
-        viewModel.onLayerDuplicated("a")
-        testDispatcher.scheduler.advanceUntilIdle()
-        val layers = viewModel.uiState.value.layers
-        assertEquals(2, layers.size)
-        val dup = layers.first { it.name == "Alpha Copy" }
-        assertEquals(dup.id, viewModel.uiState.value.activeLayerId)
-    }
-
-    @Test
-    fun `characterize setEditorMode preserves layers but clears transient overlay state`() = runTest {
-        testDispatcher.scheduler.advanceUntilIdle()
-        viewModel.setLayers(listOf(lyr("a"), lyr("b")))
-        viewModel.setEditorMode(EditorMode.MOCKUP)
-        testDispatcher.scheduler.advanceUntilIdle()
-        val st = viewModel.uiState.value
-        assertEquals(EditorMode.MOCKUP, st.editorMode)
-        assertEquals(listOf("a", "b"), st.layers.map { it.id })
-        assertNull(st.segmentationPreview)
-        assertNull(st.liveStrokeBitmap)
-        assertFalse(st.isSegmenting)
-    }
 }

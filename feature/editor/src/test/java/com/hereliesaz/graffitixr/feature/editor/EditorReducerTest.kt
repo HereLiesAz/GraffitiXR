@@ -6,7 +6,6 @@ import com.hereliesaz.graffitixr.common.model.EditorPanel
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.RotationAxis
-import com.hereliesaz.graffitixr.common.model.Tool
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -86,22 +85,6 @@ class EditorReducerTest {
     }
 
     @Test
-    fun `ActivateLayer sets the active id and resets the tool`() {
-        val s = state(lyr("a"), lyr("b")).copy(activeTool = Tool.LIQUIFY)
-        val out = reduce(s, EditorIntent.ActivateLayer("b"))
-        assertEquals("b", out.activeLayerId)
-        assertEquals(Tool.NONE, out.activeTool)
-    }
-
-    @Test
-    fun `SetActiveTool sets the tool and dismisses the panel`() {
-        val s = state(lyr("a")).copy(activePanel = EditorPanel.ADJUST)
-        val out = reduce(s, EditorIntent.SetActiveTool(Tool.LIQUIFY))
-        assertEquals(Tool.LIQUIFY, out.activeTool)
-        assertEquals(EditorPanel.NONE, out.activePanel)
-    }
-
-    @Test
     fun `ToggleAdjustPanel toggles between ADJUST and NONE`() {
         val none = state(lyr("a"))
         val opened = reduce(none, EditorIntent.ToggleAdjustPanel)
@@ -110,33 +93,9 @@ class EditorReducerTest {
     }
 
     @Test
-    fun `SetEditorMode keeps layers but clears transient overlay state`() {
-        val s = state(lyr("a"), lyr("b")).copy(
-            editorMode = EditorMode.AR,
-            isSegmenting = true,
-            liveStrokeLayerId = "a",
-        )
-        val out = reduce(s, EditorIntent.SetEditorMode(EditorMode.MOCKUP))
-        assertEquals(EditorMode.MOCKUP, out.editorMode)
-        assertEquals(listOf("a", "b"), out.layers.map { it.id })
-        assertFalse(out.isSegmenting)
-        assertNull(out.liveStrokeLayerId)
-    }
-
-    @Test
     fun `SetEditorMode to the current mode is a no-op`() {
-        val s = state(lyr("a")).copy(editorMode = EditorMode.MOCKUP, isSegmenting = true)
+        val s = state(lyr("a")).copy(editorMode = EditorMode.MOCKUP)
         assertSame(s, reduce(s, EditorIntent.SetEditorMode(EditorMode.MOCKUP)))
-    }
-
-    @Test
-    fun `AddLayer appends, activates, clears the tool, and resets the panel by default`() {
-        val s = state(lyr("a"), active = "a").copy(activeTool = Tool.LIQUIFY, activePanel = EditorPanel.ADJUST)
-        val out = reduce(s, EditorIntent.AddLayer(lyr("b")))
-        assertEquals(listOf("a", "b"), out.layers.map { it.id })
-        assertEquals("b", out.activeLayerId)
-        assertEquals(Tool.NONE, out.activeTool)
-        assertEquals(EditorPanel.NONE, out.activePanel)
     }
 
     @Test
@@ -168,49 +127,9 @@ class EditorReducerTest {
     }
 
     @Test
-    fun `ReplaceLayers swaps the whole set and activates the given id`() {
-        val s = state(lyr("a"), lyr("b"), lyr("c"), active = "b")
-        val out = reduce(s, EditorIntent.ReplaceLayers(listOf(lyr("flat")), "flat"))
-        assertEquals(listOf("flat"), out.layers.map { it.id })
-        assertEquals("flat", out.activeLayerId)
-    }
-
-    @Test
     fun `SetLoading toggles the loading flag`() {
         assertTrue(reduce(state(lyr("a")), EditorIntent.SetLoading(true)).isLoading)
         assertFalse(reduce(state(lyr("a")).copy(isLoading = true), EditorIntent.SetLoading(false)).isLoading)
-    }
-
-    @Test
-    fun `BeginSegmentation sets the flag and default influence and EndSegmentation clears state`() {
-        val begun = reduce(state(lyr("a")), EditorIntent.BeginSegmentation)
-        assertTrue(begun.isSegmenting)
-        assertEquals(0.5f, begun.segmentationInfluence)
-        val ended = reduce(begun.copy(segmentationPreview = null), EditorIntent.EndSegmentation)
-        assertFalse(ended.isSegmenting)
-        assertNull(ended.segmentationPreview)
-    }
-
-    @Test
-    fun `stencil flag intents update their fields`() {
-        val s = state(lyr("a"))
-        assertTrue(reduce(s, EditorIntent.SetStencilGenerating(true)).isStencilGenerating)
-        assertFalse(reduce(s.copy(stencilHintVisible = true), EditorIntent.SetStencilHintVisible(false)).stencilHintVisible)
-    }
-
-    @Test
-    fun `SetBrushSize and SetSketchThickness coerce into range`() {
-        assertEquals(200f, reduce(state(lyr("a")), EditorIntent.SetBrushSize(9999f)).brushSize)
-        assertEquals(1f, reduce(state(lyr("a")), EditorIntent.SetBrushSize(-5f)).brushSize)
-        assertEquals(20, reduce(state(lyr("a")), EditorIntent.SetSketchThickness(99)).sketchThickness)
-    }
-
-    @Test
-    fun `SetActiveColor sets the color and closes the picker`() {
-        val s = state(lyr("a")).copy(showColorPicker = true)
-        val out = reduce(s, EditorIntent.SetActiveColor(androidx.compose.ui.graphics.Color.Red))
-        assertEquals(androidx.compose.ui.graphics.Color.Red, out.activeColor)
-        assertFalse(out.showColorPicker)
     }
 
     @Test
@@ -324,12 +243,4 @@ class EditorReducerTest {
         assertEquals("b", out.activeLayerId)
     }
 
-    @Test
-    fun `PasteLayerModifications copies aesthetic props and warp from the source`() {
-        val source = lyr("src").copy(opacity = 0.2f, warpMesh = listOf(1f, 2f))
-        val s = state(lyr("a"))
-        val out = reduce(s, EditorIntent.PasteLayerModifications("a", source))
-        assertEquals(0.2f, out.layers.first().opacity)
-        assertEquals(listOf(1f, 2f), out.layers.first().warpMesh)
-    }
 }

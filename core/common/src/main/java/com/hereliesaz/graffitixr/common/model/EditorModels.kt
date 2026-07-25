@@ -33,8 +33,6 @@ data class Layer(
     val colorBalanceG: Float = 1.0f,
     val colorBalanceB: Float = 1.0f,
     val isImageLocked: Boolean = false,
-    val isSketch: Boolean = false,
-    val textParams: TextLayerParams? = null,
     val isLinked: Boolean = false,
     @Serializable(with = BlendModeSerializer::class)
     val blendMode: BlendMode = BlendMode.SrcOver,
@@ -46,8 +44,6 @@ data class Layer(
     val rotationZ: Float = 0f,
     val scale: Float = 1.0f,
     val isInverted: Boolean = false,
-    val stencilType: StencilLayerType? = null,
-    val stencilSourceId: String? = null
 )
 
 /**
@@ -158,8 +154,6 @@ data class EditorUiState(
     val activeLayerId: String? = null,
     val activePanel: EditorPanel = EditorPanel.NONE,
     val editorMode: EditorMode = EditorMode.AR,
-    // FIX: Default to NONE so transform gestures are always the baseline
-    val activeTool: Tool = Tool.NONE,
     val hideUiForCapture: Boolean = false,
     val isRightHanded: Boolean = true,
     val gestureInProgress: Boolean = false,
@@ -168,12 +162,6 @@ data class EditorUiState(
     val undoCount: Int = 0,
     val redoCount: Int = 0,
     val isLoading: Boolean = false,
-    val brushSize: Float = 50f,
-    // Feathering [0..1]: 0 = hard edge, 1 = fully soft (blur radius = brushSize)
-    val brushFeathering: Float = 0f,
-    val sketchThickness: Int = 5,
-    val activeColor: Color = Color.White,
-    val showColorPicker: Boolean = false,
     val showDiagOverlay: Boolean = false,
     // In-world perception layers, each independently toggleable from Settings (default on).
     // Distinct from showDiagOverlay, which governs the text telemetry HUD.
@@ -182,24 +170,9 @@ data class EditorUiState(
     val showVoxels: Boolean = true,         // SLAM voxel splats (confidence-tinted)
     val showPoints: Boolean = true,         // accumulated sparse point cloud
     val showMesh: Boolean = true,           // persistent surface mesh
-
-    // Real-time stroke rendering: the mutable bitmap being actively drawn into.
-    // Non-null only while a brush stroke is in progress (non-Liquify tools).
-    val liveStrokeLayerId: String? = null,
-    val liveStrokeBitmap: Bitmap? = null,
-    // Incremented after each stroke segment so Compose re-reads the modified pixels.
-    val liveStrokeVersion: Int = 0,
     val canvasBackground: Color = Color.Black,
-    val isSegmenting: Boolean = false,
-    val segmentationInfluence: Float = 0.5f,
-    val segmentationPreview: Bitmap? = null,
-    val isStencilGenerating: Boolean = false,
-    val stencilButtonPosition: Offset = Offset.Zero,
-    val stencilHintVisible: Boolean = false,
-    // One-shot: set to a freshly-created text layer's id so the UI can immediately open its
-    // edit-text box. Cleared once consumed.
-    val autoEditTextLayerId: String? = null,
     // Per-mode whole-design adjustments (transform + tone). Applied to the composited design in
     // that mode only; Design-mode layer edits stay global across all modes.
     val modeAdjustments: Map<EditorMode, ModeAdjustment> = emptyMap(),
 )
+

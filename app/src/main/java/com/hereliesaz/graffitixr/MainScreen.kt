@@ -42,13 +42,11 @@ import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.common.model.FeedbackEvent
-import com.hereliesaz.graffitixr.common.model.Tool
 import android.widget.Toast
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.CameraPreview
 import com.hereliesaz.graffitixr.feature.ar.FreezePreviewScreen
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
-import com.hereliesaz.graffitixr.feature.editor.DrawingCanvas
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.design.detectSmartOverlayGestures
@@ -466,15 +464,8 @@ fun MainScreen(
             ) {
                 uiState.layers.filter { it.isVisible }.forEach { layer ->
                     androidx.compose.runtime.key(layer.id) {
-                        val isLive = layer.id == uiState.liveStrokeLayerId
-                        val bmp = if (isLive) uiState.liveStrokeBitmap ?: layer.bitmap else layer.bitmap
-                        bmp?.let { displayBmp ->
-                            val imageBitmap = if (isLive) {
-                                val version = uiState.liveStrokeVersion
-                                remember(version) { displayBmp.asImageBitmap() }
-                            } else {
-                                remember(displayBmp) { displayBmp.asImageBitmap() }
-                            }
+                        layer.bitmap?.let { displayBmp ->
+                            val imageBitmap = remember(displayBmp) { displayBmp.asImageBitmap() }
                             // Memoize the colour filter. createColorMatrix() was rebuilt on EVERY
                             // recomposition for EVERY layer — a per-frame allocation storm that makes
                             // the whole screen lag. Recompute only when the inputs actually change.
@@ -537,7 +528,7 @@ fun MainScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isWaitingForTap, isTouchLocked, isGuest, uiState.editorMode) {
+                    .pointerInput(uiState.activeLayerId, isImageLocked, isWaitingForTap, isTouchLocked, isGuest, uiState.editorMode) {
                         if (isGuest) return@pointerInput // Block ALL guest interaction with layers
 
                         // Outside Design there is only ONE layer (the whole design), so transform
@@ -552,85 +543,57 @@ fun MainScreen(
                                 arViewModel.onScreenTap(nx, ny)
                             }
                         } else if (!isTouchLocked && (editingMode || !isImageLocked)) {
-                            if (uiState.activeTool == Tool.NONE) {
-                                detectTapGestures(
-                                    onDoubleTap = { editorViewModel.onCycleRotationAxis() },
-                                    // A plain tap no longer creates an AR target. Target creation only
-                                    // happens while the Target button is selected (isWaitingForTap):
-                                    // once a target is accepted the user must re-select that button to
-                                    // make another, and the active layer takes over screen gestures.
-                                    onTap = { editorViewModel.onDismissPanel() }
-                                )
-                            }
+                            detectTapGestures(
+                                onDoubleTap = { editorViewModel.onCycleRotationAxis() },
+                                // A plain tap no longer creates an AR target. Target creation only
+                                // happens while the Target button is selected (isWaitingForTap):
+                                // once a target is accepted the user must re-select that button to
+                                // make another, and the active layer takes over screen gestures.
+                                onTap = { editorViewModel.onDismissPanel() }
+                            )
                         }
                     }
-                    .pointerInput(uiState.activeLayerId, isImageLocked, uiState.activeTool, isWaitingForTap, isTouchLocked, uiState.editorMode) {
+                    .pointerInput(uiState.activeLayerId, isImageLocked, isWaitingForTap, isTouchLocked, uiState.editorMode) {
                         // Outside Design the whole design is the single layer, so transform gestures
                         // always drive the mode adjustment instead of a per-layer transform.
                         val editingMode = uiState.editorMode != EditorMode.DESIGN
                         // editingMode edits the whole design, so it isn't gated by the active layer's
                         // image lock (the mode has its own Lock via isTransformLocked, in the reducer).
                         if (!isTouchLocked && !isWaitingForTap && (editingMode || (!isImageLocked && activeLayer != null))) {
-                            if (uiState.activeTool == Tool.NONE) {
-                                detectSmartOverlayGestures(
-                                    getValidBounds = { androidx.compose.ui.geometry.Rect(0f, 0f, size.width.toFloat(), size.height.toFloat()) },
-                                    onGestureStart = { editorViewModel.onGestureStart() },
-                                    onGestureEnd = { editorViewModel.onGestureEnd() },
-                                    onGesture = { _, pan, zoom, rotation ->
-                                        // Model convention: positive rotationZ is clockwise in
-                                        // screen coordinates, matching Compose's graphicsLayer
-                                        // (y-down, CW+) and calculateRotation()'s return value.
-                                        // Pass the delta through unchanged so both slider and
-                                        // gesture yield the same visual direction in Design/Mockup/
-                                        // Overlay/Trace. The AR renderer alone rotates around a
-                                        // camera-facing +Z (CCW+ in OpenGL/right-handed convention),
-                                        // so the sign flip lives there (see the LaunchedEffect that
-                                        // pushes overlayRotationDeg to the renderer).
-                                        val turn = rotation
-                                        if (editingMode) {
-                                            // In AR the overlay lives on the wall in meters, so convert
-                                            // the screen-pixel drag to in-plane meters. Local +X on the
-                                            // wall is camera-right (matches screen +X), local +Y is
-                                            // wall-up (opposite screen +Y), so x passes through and y
-                                            // is negated so the artwork follows the finger.
-                                            val adjustedPan = if (uiState.editorMode == EditorMode.AR) {
-                                                val mpp = rendererRef.value?.currentMetersPerPixel ?: 0f
-                                                androidx.compose.ui.geometry.Offset(pan.x * mpp, -pan.y * mpp)
-                                            } else pan
-                                            editorViewModel.onModeTransformGesture(uiState.editorMode, adjustedPan, zoom, turn)
-                                        } else {
-                                            editorViewModel.onTransformGesture(pan, zoom, turn)
-                                        }
+                            detectSmartOverlayGestures(
+                                getValidBounds = { androidx.compose.ui.geometry.Rect(0f, 0f, size.width.toFloat(), size.height.toFloat()) },
+                                onGestureStart = { editorViewModel.onGestureStart() },
+                                onGestureEnd = { editorViewModel.onGestureEnd() },
+                                onGesture = { _, pan, zoom, rotation ->
+                                    // Model convention: positive rotationZ is clockwise in
+                                    // screen coordinates, matching Compose's graphicsLayer
+                                    // (y-down, CW+) and calculateRotation()'s return value.
+                                    // Pass the delta through unchanged so both slider and
+                                    // gesture yield the same visual direction in Design/Mockup/
+                                    // Overlay/Trace. The AR renderer alone rotates around a
+                                    // camera-facing +Z (CCW+ in OpenGL/right-handed convention),
+                                    // so the sign flip lives there (see the LaunchedEffect that
+                                    // pushes overlayRotationDeg to the renderer).
+                                    val turn = rotation
+                                    if (editingMode) {
+                                        // In AR the overlay lives on the wall in meters, so convert
+                                        // the screen-pixel drag to in-plane meters. Local +X on the
+                                        // wall is camera-right (matches screen +X), local +Y is
+                                        // wall-up (opposite screen +Y), so x passes through and y
+                                        // is negated so the artwork follows the finger.
+                                        val adjustedPan = if (uiState.editorMode == EditorMode.AR) {
+                                            val mpp = rendererRef.value?.currentMetersPerPixel ?: 0f
+                                            androidx.compose.ui.geometry.Offset(pan.x * mpp, -pan.y * mpp)
+                                        } else pan
+                                        editorViewModel.onModeTransformGesture(uiState.editorMode, adjustedPan, zoom, turn)
+                                    } else {
+                                        editorViewModel.onTransformGesture(pan, zoom, turn)
                                     }
-                                )
-                            }
+                                }
+                            )
                         }
                     }
             ) {}
-        }
-
-        if (!isTouchLocked && !isImageLocked && activeLayer != null && !isGuest) {
-            if (uiState.activeTool != Tool.NONE) {
-                // No graphicsLayer here: the layer bitmap above already applies the layer transform
-                // to what the user sees. DrawingCanvas is a full-screen touch layer that captures
-                // pointer positions in true screen coordinates so EditorViewModel.onStrokePoint can
-                // pass them into ImageProcessor.mapScreenToBitmap, which is what undoes the layer
-                // transform and the ContentScale.Fit letterboxing to hit the correct bitmap pixel.
-                // A graphicsLayer here would make Compose inverse-transform the pointer position
-                // before delivery — then mapScreenToBitmap would inverse-transform it AGAIN, drifting
-                // the stored stroke away from where the finger actually is (worse the further the
-                // layer is panned/scaled/rotated).
-                DrawingCanvas(
-                    activeTool = uiState.activeTool,
-                    brushSize = uiState.brushSize,
-                    activeColor = uiState.activeColor,
-                    layerBitmapKey = activeLayer.bitmap,
-                    modifier = Modifier.fillMaxSize(),
-                    onStrokeStart = { offset, size -> editorViewModel.onStrokeStart(offset, size) },
-                    onStrokePoint = { offset -> editorViewModel.onStrokePoint(offset) },
-                    onStrokeEnd = { editorViewModel.onStrokeEnd() }
-                )
-            }
         }
 
         if (uiState.isLoading && !isExporting) {
@@ -648,21 +611,6 @@ fun MainScreen(
             }
         }
 
-        val segmentationPreview = uiState.segmentationPreview
-        if (uiState.isSegmenting && segmentationPreview != null && !isExporting) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.8f))
-            ) {
-                Image(
-                    bitmap = segmentationPreview.asImageBitmap(),
-                    contentDescription = "Segmentation Preview",
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
-            }
-        }
     }
 }
 

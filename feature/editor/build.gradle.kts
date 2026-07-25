@@ -50,7 +50,6 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.arcore.client)
-    implementation(libs.opencv)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.coil.compose)
@@ -61,14 +60,11 @@ dependencies {
     implementation(libs.androidx.camera.view)
 
     implementation(libs.kotlinx.coroutines.play.services)
-    implementation(libs.mlkit.subject.segmentation)
 
     implementation(libs.hilt.android)
-    implementation(libs.androidx.ink.brush)
     ksp(libs.hilt.compiler)
 
     implementation(libs.az.nav.rail)
-    implementation(libs.compose.ui.text.google.fonts)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
