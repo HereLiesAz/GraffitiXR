@@ -1499,6 +1499,14 @@ class EditorViewModel @Inject constructor(
             // Snapshot the collected points at this moment — may include points that arrived
             // during the bitmap-copy phase.
             val catchUpPoints = snapshotStrokePoints()
+            // The copy above takes 10-50 ms, and a quick tap can lift the finger inside that
+            // window: onStrokeEnd then runs clearTransientStrokeState(), which empties the point
+            // list. Indexing mappedAll[0]/last() on that empty list threw (crashing the app from a
+            // background coroutine), and publishing the working bitmap afterwards left a live-stroke
+            // overlay that nothing would ever clear. Abandoning the stroke here is correct: the
+            // `strokeWorkingBitmap == null` branch in onStrokeEnd already rasterizes the whole
+            // stroke onto a fresh copy, so no input is lost.
+            if (catchUpPoints.isEmpty() || strokeLayerId != layerId) return@launch
             val mappedAll = ImageProcessor.mapScreenToBitmap(
                 catchUpPoints, canvasSize.width, canvasSize.height, workBitmap.width, workBitmap.height,
                 layerScale, layerOffset, layerRotationZ
@@ -1518,6 +1526,10 @@ class EditorViewModel @Inject constructor(
             val lastMapped = mappedAll.last()
 
             withContext(dispatchers.main) {
+                // Re-check on the main thread: the stroke can be abandoned between the guard above
+                // and this state publish, and adopting the working bitmap then would strand the
+                // live-stroke overlay for a stroke that has already committed.
+                if (strokeLayerId != layerId) return@withContext
                 strokeWorkingBitmap = workBitmap
                 strokeWorkingCanvas = workCanvas
                 strokePaint = paint
@@ -2252,11 +2264,16 @@ class EditorViewModel @Inject constructor(
                 val layer = _uiState.value.layers.find { it.id == layerId } ?: return
                 
                 viewModelScope.launch(dispatchers.default) {
+                    // BrushStroke.points is an interleaved [x0,y0,x1,y1,...] list decoded straight
+                    // off the co-op wire, so its length is peer-controlled and may be odd. Stopping
+                    // at size - 1 drops a trailing half-point instead of reading past the end
+                    // (which threw IndexOutOfBounds and killed the guest on a malformed op).
                     val points = mutableListOf<Offset>()
-                    for (i in 0 until stroke.points.size step 2) {
-                        points.add(Offset(stroke.points[i], stroke.points[i+1]))
+                    for (i in 0 until stroke.points.size - 1 step 2) {
+                        points.add(Offset(stroke.points[i], stroke.points[i + 1]))
                     }
-                    
+                    if (points.isEmpty()) return@launch
+
                     val tool = Tool.entries.getOrNull(stroke.blendModeOrdinal) ?: Tool.BRUSH
                     val bitmap = layer.bitmap ?: return@launch
                     

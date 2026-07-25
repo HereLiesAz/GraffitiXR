@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar.eval
 
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 /** Reads a metric range from an ARCore 16-bit depth buffer at a normalized image coordinate. */
 object DepthLookup {
@@ -21,6 +22,12 @@ object DepthLookup {
         buffer: ByteBuffer, stride: Int, depthW: Int, depthH: Int, u: Float, v: Float, radius: Int
     ): Float {
         if (depthW <= 0 || depthH <= 0) return -1f
+        // DEPTH16 samples are little-endian, but a ByteBuffer — including a direct one straight off
+        // an Image.Plane — always defaults to BIG_ENDIAN, so an unqualified getShort() byte-swaps
+        // every sample (1500 mm read back as 7173 mm: still inside the valid range, so it looked
+        // plausible while being wrong). Read through a duplicate so the caller's buffer position and
+        // order are left untouched. nativeOrder() matches the ARCore Depth API sample.
+        val src = buffer.duplicate().order(ByteOrder.nativeOrder())
         val cx = (u.coerceIn(0f, 1f) * depthW).toInt().coerceIn(0, depthW - 1)
         val cy = (v.coerceIn(0f, 1f) * depthH).toInt().coerceIn(0, depthH - 1)
         val samples = ArrayList<Int>()
@@ -31,8 +38,8 @@ object DepthLookup {
                 val x = cx + dx
                 if (x < 0 || x >= depthW) continue
                 val off = y * stride + x * 2
-                if (off < 0 || off + 2 > buffer.limit()) continue
-                val mm = buffer.getShort(off).toInt() and 0x1FFF
+                if (off < 0 || off + 2 > src.limit()) continue
+                val mm = src.getShort(off).toInt() and 0x1FFF
                 if (mm in 1..7899) samples.add(mm)
             }
         }

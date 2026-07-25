@@ -44,14 +44,17 @@ internal object Procrustes {
     private fun kabschRotation(h: Mat3): Mat3? {
         if (kotlin.math.abs(h.det()) < 1e-9f) return null
         var r = h
-        var prevDiff = Float.MAX_VALUE
-        repeat(40) {
+        // `break`, not a labelled return from a repeat{} lambda — that only skipped to the next
+        // iteration, so this always ran all 40 steps and kept perturbing an already-converged
+        // rotation with float noise instead of stopping at the fixed point.
+        var steps = 0
+        while (steps++ < 40) {
             val rt = r.transpose()
             val rtInv = rt.inverse() ?: return null
             val next = avg(r, rtInv)
-            prevDiff = frobeniusDiff(next, r)
+            val diff = frobeniusDiff(next, r)
             r = next
-            if (prevDiff < 1e-7f) return@repeat
+            if (diff < 1e-7f) break
         }
         return if (r.det() < 0f) {
             Mat3(
