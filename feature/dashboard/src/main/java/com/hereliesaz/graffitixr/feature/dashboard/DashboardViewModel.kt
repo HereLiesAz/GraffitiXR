@@ -179,16 +179,32 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    private fun parseRelease(json: String): GitHubRelease? {
+    internal fun parseRelease(json: String): GitHubRelease? {
         return try {
             val tagName = Regex("\"tag_name\"\\s*:\\s*\"([^\"]+)\"").find(json)?.groupValues?.get(1) ?: return null
-            val htmlUrl = Regex("\"html_url\"\\s*:\\s*\"([^\"]+)\"").find(json)?.groupValues?.get(1) ?: "https://github.com/hereliesaz/GraffitiXR/releases"
+            // Match the RELEASE's html_url specifically (it contains /releases/), not merely the first
+            // one in the document. The release payload also carries the author object's html_url
+            // (https://github.com/<user>), so a positional match only worked because GitHub happens to
+            // order the release's own field first — reorder the response and this would have started
+            // opening the author's profile page instead of the release.
+            val htmlUrl = Regex("\"html_url\"\\s*:\\s*\"([^\"]*/releases/[^\"]*)\"").find(json)?.groupValues?.get(1)
+                ?: "https://github.com/hereliesaz/GraffitiXR/releases"
             GitHubRelease(tagName, htmlUrl)
         } catch (e: Exception) { null }
     }
 
-    private fun isNewerVersion(latest: String, current: String): Boolean {
-        fun parse(v: String) = v.split(".").map { it.toIntOrNull() ?: 0 }
+    /**
+     * Compares dotted version strings numerically, segment by segment.
+     *
+     * Segments are read up to the first non-digit, so a qualifier travels with its segment
+     * ("1.2.3-beta" -> [1, 2, 3]) instead of collapsing it to zero. `toIntOrNull()` on the whole
+     * segment returned null for "3-beta" and fell back to 0, making 1.2.3-beta compare as 1.2.0 —
+     * which reported a *newer* release as older and silently suppressed the update prompt.
+     */
+    internal fun isNewerVersion(latest: String, current: String): Boolean {
+        fun parse(v: String) = v.trim().removePrefix("v").split(".").map { segment ->
+            segment.takeWhile { it.isDigit() }.toIntOrNull() ?: 0
+        }
         val l = parse(latest)
         val c = parse(current)
         for (i in 0 until maxOf(l.size, c.size)) {
@@ -199,5 +215,5 @@ class DashboardViewModel @Inject constructor(
         return false
     }
 
-    private data class GitHubRelease(val tagName: String, val htmlUrl: String)
+    internal data class GitHubRelease(val tagName: String, val htmlUrl: String)
 }

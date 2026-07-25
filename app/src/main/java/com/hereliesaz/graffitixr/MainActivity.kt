@@ -1588,8 +1588,10 @@ class MainActivity : ComponentActivity() {
                         color = if (isHosting) Cyan else if (canHost) navItemColor else Color.Gray,
                         shape = AzButtonShape.NONE
                     ) {
-                        // Hosting requires an established anchor with mapped splats to share.
-                        if (canHost && !isHosting) arViewModel.startHosting()
+                        // canHost still drives the colour, but the tap is no longer swallowed when it
+                        // is false: startHosting() re-checks the anchor (and that a project is open)
+                        // and explains which one is missing, rather than the button doing nothing.
+                        if (!isHosting) arViewModel.startHosting()
                     }
                     azRailSubItem(
                         id = "coop.join", hostId = "coop", text = navStrings.joinCoop,
