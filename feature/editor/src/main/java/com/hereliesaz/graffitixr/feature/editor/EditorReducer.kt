@@ -7,17 +7,16 @@ import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.common.model.RotationAxis
-import com.hereliesaz.graffitixr.common.model.Tool
 
 /**
  * The pure state-transition function for the editor — the heart of its MVI design. Given the
  * current [EditorUiState] and an [EditorIntent], it returns the next state with no dependency on
- * Android, Compose, OpenCV, IO, or coroutines, which makes every transition unit-testable without
- * a single mock.
+ * Android, Compose, IO, or coroutines, which makes every transition unit-testable without a single
+ * mock.
  *
  * Side effects that an intent also triggers (undo-history snapshot, persistence, co-op op
- * emission, OpenCV rasterization) live in EditorViewModel around the dispatch — keeping them out
- * of here is precisely what lets this be pure.
+ * emission) live in EditorViewModel around the dispatch — keeping them out of here is precisely
+ * what lets this be pure.
  */
 internal object EditorReducer {
 
@@ -51,11 +50,10 @@ internal object EditorReducer {
         is EditorIntent.ReorderLayers -> state.copy(layers = LayerListOps.reorder(state.layers, intent.order))
         is EditorIntent.RenameLayer -> state.copy(layers = LayerListOps.rename(state.layers, intent.id, intent.name))
         is EditorIntent.ToggleVisibility -> state.copy(layers = LayerListOps.toggleVisibility(state.layers, intent.id))
-        is EditorIntent.ActivateLayer -> state.copy(activeLayerId = intent.id, activeTool = Tool.NONE)
+        is EditorIntent.ActivateLayer -> state.copy(activeLayerId = intent.id)
         is EditorIntent.AddLayer -> state.copy(
             layers = state.layers + intent.layer,
             activeLayerId = intent.layer.id,
-            activeTool = Tool.NONE,
             activePanel = if (intent.resetActivePanel) EditorPanel.NONE else state.activePanel,
         )
         is EditorIntent.RemoveLayer -> {
@@ -63,12 +61,9 @@ internal object EditorReducer {
             state.copy(
                 layers = remaining,
                 activeLayerId = if (state.activeLayerId == intent.id) remaining.firstOrNull()?.id else state.activeLayerId,
-                activeTool = Tool.NONE,
             )
         }
-        is EditorIntent.ReplaceLayers -> state.copy(layers = intent.layers, activeLayerId = intent.activeId, activeTool = Tool.NONE)
 
-        is EditorIntent.SetActiveTool -> state.copy(activeTool = intent.tool, activePanel = EditorPanel.NONE)
         EditorIntent.ToggleAdjustPanel ->
             state.copy(activePanel = if (state.activePanel == EditorPanel.ADJUST) EditorPanel.NONE else EditorPanel.ADJUST)
         EditorIntent.DismissPanel -> state.copy(activePanel = EditorPanel.NONE)
@@ -107,13 +102,6 @@ internal object EditorReducer {
 
         is EditorIntent.SetLoading -> state.copy(isLoading = intent.loading)
         is EditorIntent.SetBackgroundBitmap -> state.copy(backgroundBitmap = intent.bitmap)
-        EditorIntent.BeginSegmentation -> state.copy(isSegmenting = true, segmentationInfluence = 0.5f)
-        EditorIntent.EndSegmentation -> state.copy(isSegmenting = false, segmentationPreview = null)
-        is EditorIntent.SetSegmentationInfluence -> state.copy(segmentationInfluence = intent.value)
-        is EditorIntent.SetSegmentationPreview -> state.copy(segmentationPreview = intent.preview)
-        is EditorIntent.SetStencilGenerating -> state.copy(isStencilGenerating = intent.generating)
-        is EditorIntent.SetStencilHintVisible -> state.copy(stencilHintVisible = intent.visible)
-        is EditorIntent.SetStencilButtonPosition -> state.copy(stencilButtonPosition = intent.position)
 
         is EditorIntent.SetCanvasBackground -> state.copy(canvasBackground = intent.color)
         EditorIntent.ToggleHandedness -> state.copy(isRightHanded = !state.isRightHanded)
@@ -129,14 +117,7 @@ internal object EditorReducer {
             showPoints = intent.activeMethod == MuralMethod.CLOUD_OFFSET
         )
         EditorIntent.FeedbackShown -> state.copy(showRotationAxisFeedback = false)
-        is EditorIntent.SetSketchThickness -> state.copy(sketchThickness = intent.value.coerceIn(1, 20))
-        is EditorIntent.SetBrushSize -> state.copy(brushSize = intent.value.coerceIn(1f, 200f))
-        is EditorIntent.SetBrushFeathering -> state.copy(brushFeathering = intent.value.coerceIn(0f, 1f))
-        EditorIntent.ShowColorPicker -> state.copy(showColorPicker = true)
-        EditorIntent.DismissColorPicker -> state.copy(showColorPicker = false)
-        is EditorIntent.SetActiveColor -> state.copy(activeColor = intent.color, showColorPicker = false)
         is EditorIntent.SetLayerWarp -> state.copy(layers = LayerListOps.mapLayer(state.layers, intent.layerId) { it.copy(warpMesh = intent.mesh) })
-        is EditorIntent.RenderTextLayer -> state.copy(layers = LayerListOps.mapLayer(state.layers, intent.layerId) { it.copy(bitmap = intent.bitmap, textParams = intent.params) })
 
         is EditorIntent.AppendLayer -> state.copy(layers = state.layers + intent.layer)
         is EditorIntent.RemoveLayerById -> state.copy(layers = state.layers.filterNot { it.id == intent.id })
@@ -164,35 +145,20 @@ internal object EditorReducer {
         EditorIntent.BeginGesture -> state.copy(gestureInProgress = true, activePanel = EditorPanel.NONE)
         is EditorIntent.SetLayers ->
             state.copy(layers = intent.layers, activeLayerId = state.activeLayerId.stillIn(intent.layers))
-        is EditorIntent.PasteLayerModifications -> state.copy(layers = LayerListOps.mapLayer(state.layers, intent.id) {
-            it.copy(
-                opacity = intent.source.opacity,
-                brightness = intent.source.brightness,
-                contrast = intent.source.contrast,
-                saturation = intent.source.saturation,
-                colorBalanceR = intent.source.colorBalanceR,
-                colorBalanceG = intent.source.colorBalanceG,
-                colorBalanceB = intent.source.colorBalanceB,
-                blendMode = intent.source.blendMode,
-                warpMesh = intent.source.warpMesh,
-            )
-        })
         is EditorIntent.LoadedProject -> state.copy(
             projectId = intent.projectId,
             layers = intent.layers,
             // Opening a different project must not leave activeLayerId pointing at a layer from the
             // previous one: every `find { it.id == activeLayerId }` in the ViewModel would miss, so
-            // tools and adjustments silently no-op'd. Nulling it lets the UI's auto-activate effect
-            // select the new project's first layer.
+            // adjustments silently no-op'd. Nulling it lets the UI's auto-activate effect select the
+            // new project's first layer.
             activeLayerId = state.activeLayerId.stillIn(intent.layers),
-            activeTool = Tool.NONE,
         )
         EditorIntent.ClearProject -> state.copy(
             projectId = null,
             layers = emptyList(),
             activeLayerId = null,
             backgroundBitmap = null,
-            activeTool = Tool.NONE,
         )
     }
 
@@ -202,19 +168,11 @@ internal object EditorReducer {
 
     /**
      * Mode is a view, not a container: layers (the document) persist and stay editable, but
-     * transient mode-specific overlay state — an in-flight brush stroke, a live segmentation
-     * preview — must not bleed into the next mode.
+     * transient mode-specific overlay state must not bleed into the next mode.
      */
     private fun reduceEditorMode(state: EditorUiState, mode: EditorMode): EditorUiState {
         if (state.editorMode == mode) return state
-        return state.copy(
-            editorMode = mode,
-            liveStrokeLayerId = null,
-            liveStrokeBitmap = null,
-            liveStrokeVersion = 0,
-            isSegmenting = false,
-            segmentationPreview = null,
-        )
+        return state.copy(editorMode = mode)
     }
 
     /** Applies [transform] to the active layer (no-op when there is no active layer). */

@@ -26,12 +26,8 @@ fun Layer.toOverlayLayer(): OverlayLayer {
         isImageLocked = isImageLocked,
         isVisible = isVisible,
         warpMesh = warpMesh,
-        isSketch = isSketch,
-        textParams = textParams,
         isLinked = isLinked,
         isInverted = isInverted,
-        stencilType = stencilType,
-        stencilSourceId = stencilSourceId
     )
 }
 
@@ -56,12 +52,8 @@ fun OverlayLayer.toLayer(): Layer {
         isImageLocked = isImageLocked,
         isVisible = isVisible,
         warpMesh = warpMesh ?: emptyList(),
-        isSketch = isSketch,
-        textParams = textParams,
         isLinked = isLinked,
         isInverted = isInverted,
-        stencilType = stencilType,
-        stencilSourceId = stencilSourceId
     )
 }
 

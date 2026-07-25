@@ -1,24 +1,18 @@
 package com.hereliesaz.graffitixr.feature.editor
 
-import androidx.compose.ui.unit.IntSize
 import com.hereliesaz.graffitixr.common.model.Layer
-import com.hereliesaz.graffitixr.common.model.Tool
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EditHistoryTest {
 
-    private fun layer(id: String) = Layer(id = id, name = id)
-    private fun stroke() = StrokeCommand(
-        path = emptyList(),
-        canvasSize = IntSize(1, 1),
-        tool = Tool.NONE,
-        brushSize = 1f,
-        brushColor = 0,
-        intensity = 0.5f,
-    )
+    private fun layers(vararg ids: String) = ids.map { Layer(id = it, name = it) }
+
+    /** The counterpart entry a real caller would record; content is irrelevant to stack mechanics. */
+    private fun counter(current: List<Layer>): (EditCommand) -> EditCommand = { EditCommand(current) }
 
     @Test
     fun `starts empty`() {
@@ -28,67 +22,78 @@ class EditHistoryTest {
     }
 
     @Test
-    fun `pushProperty deduplicates an identical consecutive snapshot`() {
+    fun `pushProperty records a snapshot`() {
         val h = EditHistory()
-        val snapshot = listOf(layer("a"))
-        assertTrue(h.pushProperty(snapshot))
-        assertEquals(false, h.pushProperty(listOf(layer("a")))) // structurally equal -> ignored
+        assertTrue(h.pushProperty(layers("a")))
         assertEquals(1, h.undoCount)
     }
 
     @Test
-    fun `pushProperty trims to the max stack size`() {
-        val h = EditHistory(maxStackSize = 2)
-        h.pushProperty(listOf(layer("a")))
-        h.pushProperty(listOf(layer("b")))
-        h.pushProperty(listOf(layer("c")))
-        assertEquals(2, h.undoCount)
+    fun `pushProperty deduplicates an identical consecutive snapshot`() {
+        val h = EditHistory()
+        assertTrue(h.pushProperty(layers("a")))
+        assertFalse(h.pushProperty(layers("a")))
+        assertEquals(1, h.undoCount)
     }
 
     @Test
-    fun `pushing clears the redo stack`() {
+    fun `pushProperty clears the redo stack`() {
         val h = EditHistory()
-        h.pushProperty(listOf(layer("a")))
-        h.popUndo { it }                       // redo now has 1
+        h.pushProperty(layers("a"))
+        h.popUndo(counter(layers("b")))
         assertEquals(1, h.redoCount)
-        h.pushDraw("layer-1", stroke())        // any push must clear redo
+
+        h.pushProperty(layers("c"))
         assertEquals(0, h.redoCount)
     }
 
     @Test
-    fun `popUndo on empty history returns null and records nothing`() {
+    fun `popUndo moves the command onto the redo stack`() {
         val h = EditHistory()
-        assertNull(h.popUndo { it })
-        assertEquals(0, h.redoCount)
-    }
+        h.pushProperty(layers("a"))
 
-    @Test
-    fun `popUndo moves the counterpart entry onto the redo stack`() {
-        val h = EditHistory()
-        h.pushDraw("layer-1", stroke())
-        val popped = h.popUndo { it }
-        assertTrue(popped is EditCommand.Draw)
+        val popped = h.popUndo(counter(layers("b")))
+        assertEquals(layers("a"), popped?.oldLayers)
         assertEquals(0, h.undoCount)
         assertEquals(1, h.redoCount)
     }
 
     @Test
-    fun `popRedo moves the counterpart entry back onto the undo stack`() {
+    fun `popRedo moves the command back onto the undo stack`() {
         val h = EditHistory()
-        h.pushDraw("layer-1", stroke())
-        h.popUndo { it }
-        val redone = h.popRedo { it }
-        assertTrue(redone is EditCommand.Draw)
+        h.pushProperty(layers("a"))
+        h.popUndo(counter(layers("b")))
+
+        val redone = h.popRedo(counter(layers("a")))
+        assertEquals(layers("b"), redone?.oldLayers)
         assertEquals(1, h.undoCount)
         assertEquals(0, h.redoCount)
     }
 
     @Test
+    fun `popping an empty stack returns null and records nothing`() {
+        val h = EditHistory()
+        assertNull(h.popUndo(counter(layers("a"))))
+        assertNull(h.popRedo(counter(layers("a"))))
+        assertEquals(0, h.undoCount)
+        assertEquals(0, h.redoCount)
+    }
+
+    @Test
+    fun `undo stack is capped at the configured size`() {
+        val h = EditHistory(maxStackSize = 3)
+        repeat(6) { h.pushProperty(layers("layer-$it")) }
+        assertEquals(3, h.undoCount)
+        // The oldest entries were dropped, so the deepest remaining is the 4th push.
+        repeat(2) { h.popUndo(counter(emptyList())) }
+        assertEquals(layers("layer-3"), h.popUndo(counter(emptyList()))?.oldLayers)
+    }
+
+    @Test
     fun `clear empties both stacks`() {
         val h = EditHistory()
-        h.pushProperty(listOf(layer("a")))
-        h.pushDraw("layer-1", stroke())
-        h.popUndo { it }
+        h.pushProperty(layers("a"))
+        h.popUndo(counter(layers("b")))
         h.clear()
         assertEquals(0, h.undoCount)
         assertEquals(0, h.redoCount)

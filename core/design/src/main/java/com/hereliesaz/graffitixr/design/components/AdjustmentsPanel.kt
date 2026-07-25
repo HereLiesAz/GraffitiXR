@@ -7,29 +7,14 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.graffitixr.common.model.OverlayLayer
-import com.hereliesaz.graffitixr.design.theme.HotPink
 import com.hereliesaz.graffitixr.design.theme.AppStrings
 
 data class AdjustmentsState(
@@ -71,11 +56,6 @@ fun AdjustmentsPanel(
     onAdjustmentStart: () -> Unit,
     onAdjustmentEnd: () -> Unit,
     strings: AppStrings,
-    showSegmentationSlider: Boolean = false,
-    segmentationInfluence: Float = 0.5f,
-    onSegmentationInfluenceChange: (Float) -> Unit = {},
-    onSegmentationDismiss: () -> Unit = {},
-    onSegmentationCancel: () -> Unit = {},
     // When non-null (i.e. in a Mode), the knobs reflect the whole-design mode adjustment instead of
     // the active layer's values.
     modeOpacity: Float? = null,
@@ -96,7 +76,7 @@ fun AdjustmentsPanel(
     // or if there's any history to undo/redo.
     // HOWEVER, we hide the action row (Undo, Redo, Magic) during Target Creation.
     val canShowActionRow = !state.isCapturingTarget
-    val isVisible = showKnobs || showColorBalance || showSegmentationSlider || (canShowActionRow && (hasImage || isArMode || hasHistory))
+    val isVisible = showKnobs || showColorBalance || (canShowActionRow && (hasImage || isArMode || hasHistory))
 
     if (!isVisible) return
 
@@ -122,21 +102,6 @@ fun AdjustmentsPanel(
         // Image-specific adjustment knobs
         // These are only shown if an image is actually present to adjust.
         if (hasImage) {
-            AnimatedVisibility(
-                visible = showSegmentationSlider,
-                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-            ) {
-                SegmentationInfluenceRow(
-                    influence = segmentationInfluence,
-                    onInfluenceChange = onSegmentationInfluenceChange,
-                    onDismiss = onSegmentationDismiss,
-                    onCancel = onSegmentationCancel,
-                    strings = strings,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
             AnimatedVisibility(
                 visible = showColorBalance,
                 enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
@@ -193,72 +158,3 @@ fun AdjustmentsPanel(
     }
 }
 
-@Composable
-fun SegmentationInfluenceRow(
-    influence: Float,
-    onInfluenceChange: (Float) -> Unit,
-    onDismiss: () -> Unit,
-    onCancel: () -> Unit,
-    strings: AppStrings,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Cancel button
-            Surface(
-                shape = CircleShape,
-                color = HotPink,
-                shadowElevation = 4.dp
-            ) {
-                IconButton(onClick = onCancel) {
-                    Icon(Icons.Default.Close, contentDescription = strings.common.cancel, tint = Color.White)
-                }
-            }
-
-            // Confirm button
-            Surface(
-                shape = CircleShape,
-                color = HotPink,
-                shadowElevation = 4.dp
-            ) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Check, contentDescription = strings.common.done, tint = Color.White)
-                }
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                strings.adj.detail,
-                color = Color.White,
-                style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.width(36.dp)
-            )
-            Slider(
-                value = influence,
-                onValueChange = onInfluenceChange,
-                valueRange = 0f..1f,
-                modifier = Modifier.weight(1f),
-                colors = SliderDefaults.colors(
-                    thumbColor = HotPink,
-                    activeTrackColor = HotPink,
-                    inactiveTrackColor = Color.DarkGray
-                )
-            )
-        }
-    }
-}
