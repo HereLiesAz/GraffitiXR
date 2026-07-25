@@ -98,6 +98,10 @@ class StencilProcessor @Inject constructor() {
                 emit(StencilProgress.Done(layers))
             },
             onFailure = { e ->
+                // runCatching catches Throwable, cancellation included. Reporting a cancelled
+                // collector as a pipeline Error and then emitting into it breaks structured
+                // concurrency (and the emit itself throws), so let cancellation propagate.
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 emit(StencilProgress.Error(e.message ?: "Unknown error in stencil pipeline"))
             }
         )

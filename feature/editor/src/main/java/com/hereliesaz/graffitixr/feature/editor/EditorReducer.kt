@@ -162,7 +162,8 @@ internal object EditorReducer {
         EditorIntent.ToggleColorPanel ->
             state.copy(activePanel = if (state.activePanel == EditorPanel.COLOR) EditorPanel.NONE else EditorPanel.COLOR)
         EditorIntent.BeginGesture -> state.copy(gestureInProgress = true, activePanel = EditorPanel.NONE)
-        is EditorIntent.SetLayers -> state.copy(layers = intent.layers)
+        is EditorIntent.SetLayers ->
+            state.copy(layers = intent.layers, activeLayerId = state.activeLayerId.stillIn(intent.layers))
         is EditorIntent.PasteLayerModifications -> state.copy(layers = LayerListOps.mapLayer(state.layers, intent.id) {
             it.copy(
                 opacity = intent.source.opacity,
@@ -176,9 +177,28 @@ internal object EditorReducer {
                 warpMesh = intent.source.warpMesh,
             )
         })
-        is EditorIntent.LoadedProject -> state.copy(projectId = intent.projectId, layers = intent.layers, activeTool = Tool.NONE)
-        EditorIntent.ClearProject -> state.copy(projectId = null, layers = emptyList(), backgroundBitmap = null, activeTool = Tool.NONE)
+        is EditorIntent.LoadedProject -> state.copy(
+            projectId = intent.projectId,
+            layers = intent.layers,
+            // Opening a different project must not leave activeLayerId pointing at a layer from the
+            // previous one: every `find { it.id == activeLayerId }` in the ViewModel would miss, so
+            // tools and adjustments silently no-op'd. Nulling it lets the UI's auto-activate effect
+            // select the new project's first layer.
+            activeLayerId = state.activeLayerId.stillIn(intent.layers),
+            activeTool = Tool.NONE,
+        )
+        EditorIntent.ClearProject -> state.copy(
+            projectId = null,
+            layers = emptyList(),
+            activeLayerId = null,
+            backgroundBitmap = null,
+            activeTool = Tool.NONE,
+        )
     }
+
+    /** This id if [layers] still contains it, else null — keeps activeLayerId from dangling. */
+    private fun String?.stillIn(layers: List<Layer>): String? =
+        this?.takeIf { id -> layers.any { it.id == id } }
 
     /**
      * Mode is a view, not a container: layers (the document) persist and stay editable, but

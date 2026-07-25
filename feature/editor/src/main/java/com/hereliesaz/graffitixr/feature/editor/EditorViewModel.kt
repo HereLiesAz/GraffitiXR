@@ -737,8 +737,11 @@ class EditorViewModel @Inject constructor(
                     // the PNG writer (saveBitmapToGallery uses CompressFormat.PNG) preserves alpha.
                     exportManager.compositeLayers(
                         _uiState.value.layers,
-                        metrics.widthPixels,
-                        metrics.heightPixels,
+                        // Same 1080x1920 fallback the other composite call sites use: display
+                        // metrics read back as 0 on a detached display, and a 1px export is no
+                        // more use to the user than a crash.
+                        metrics.widthPixels.takeIf { it > 0 } ?: 1080,
+                        metrics.heightPixels.takeIf { it > 0 } ?: 1920,
                         backgroundBitmap = bgBmp,
                         backgroundColor = android.graphics.Color.TRANSPARENT,
                     )
@@ -775,8 +778,8 @@ class EditorViewModel @Inject constructor(
         val metrics = context.resources.displayMetrics
         val composite = exportManager.compositeLayers(
             layers,
-            metrics.widthPixels,
-            metrics.heightPixels,
+            metrics.widthPixels.takeIf { it > 0 } ?: 1080,
+            metrics.heightPixels.takeIf { it > 0 } ?: 1920,
             backgroundColor = android.graphics.Color.TRANSPARENT,
         )
         val dir = java.io.File(context.cacheDir, "shared").apply { mkdirs() }
@@ -2200,10 +2203,17 @@ class EditorViewModel @Inject constructor(
                         _uiState.update { s ->
                             val idx = s.layers.indexOfFirst { it.id == sourceLayerId }
                             val updatedLayers = s.layers.toMutableList().also { list ->
-                                var topIdx = idx
-                                while (topIdx + 1 < list.size && list[topIdx + 1].isLinked) topIdx++
-                                // Add all new layers in order
-                                list.addAll(topIdx + 1, newLayers)
+                                if (idx < 0) {
+                                    // The source layer was removed while the pipeline ran. Walking
+                                    // the link-group scan up from idx = -1 inserted the stencils at
+                                    // an arbitrary position; append them instead.
+                                    list.addAll(newLayers)
+                                } else {
+                                    var topIdx = idx
+                                    while (topIdx + 1 < list.size && list[topIdx + 1].isLinked) topIdx++
+                                    // Add all new layers in order
+                                    list.addAll(topIdx + 1, newLayers)
+                                }
                             }
                             s.copy(
                                 layers = updatedLayers,

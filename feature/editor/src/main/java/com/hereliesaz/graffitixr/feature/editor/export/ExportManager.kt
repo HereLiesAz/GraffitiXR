@@ -21,11 +21,16 @@ class ExportManager @Inject constructor() {
 
     fun compositeLayers(
         layers: List<Layer>,
-        screenWidth: Int,
-        screenHeight: Int,
+        width: Int,
+        height: Int,
         backgroundBitmap: Bitmap? = null,
         backgroundColor: Int = android.graphics.Color.TRANSPARENT
     ): Bitmap {
+        // Bitmap.createBitmap throws on a non-positive dimension. Callers pass display metrics, and
+        // those read back as 0 on a detached/not-yet-laid-out display — clamp here so no call site
+        // can turn that into a crash mid-export.
+        val screenWidth = width.coerceAtLeast(1)
+        val screenHeight = height.coerceAtLeast(1)
         val result = Bitmap.createBitmap(screenWidth, screenHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(result)
 
