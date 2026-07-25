@@ -183,8 +183,42 @@ class ArViewModel @Inject constructor(
     fun startHosting() {
         viewModelScope.launch {
             try {
+                // Both preconditions are checked here rather than only in the rail's enablement
+                // colour, so tapping Host always yields either a session or an explanation of what
+                // is missing — previously a tap with the button greyed out simply did nothing.
+                val st = _uiState.value
+                if (!st.isAnchorEstablished || st.splatCount <= 0) {
+                    _feedback.tryEmit(
+                        com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                            "Scan and lock onto the wall first — a guest needs the mapped surface to line up with yours"
+                        )
+                    )
+                    return@launch
+                }
+                // The anchor and an open project are independent: hosting without the latter produced
+                // a session that looked healthy on the host (QR shown, WaitingForGuest) but shipped a
+                // zero-byte bulk payload, which the guest's loadAsSpectator discards on its
+                // `bytes.isEmpty()` guard — the guest joined to nothing, with no error on either end.
+                if (projectRepository.currentProject.value == null) {
+                    _feedback.tryEmit(
+                        com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                            "Open a project before sharing — there's nothing to send to a guest yet"
+                        )
+                    )
+                    return@launch
+                }
                 val fingerprint = slamManager.exportFingerprint() ?: ByteArray(0)
                 val projectBytes = projectManager.serializeCurrentProject()
+                if (projectBytes.isEmpty()) {
+                    // A project is open but its folder didn't serialize (never saved to disk, or the
+                    // directory is missing). Same silent-empty-session outcome, different cause.
+                    _feedback.tryEmit(
+                        com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                            "Couldn't package this project to share — try saving it first"
+                        )
+                    )
+                    return@launch
+                }
                 val qrString = collaborationManager.startHosting(
                     projectId = projectManager.currentProjectId(),
                     layerCount = projectRepository.currentProject.value?.layers?.size ?: 0,

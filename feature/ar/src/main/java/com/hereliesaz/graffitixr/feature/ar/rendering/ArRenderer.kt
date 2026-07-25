@@ -736,6 +736,15 @@ class ArRenderer(
         // instantaneous and we never touch a session that is being closed.
         if (isDestroying) return
         frameCount++
+        // Latch the export request HERE, at the top of the frame, not at the readback site near the
+        // end. ArViewModel.requestExport sets hideVisualization before exportRequested, so observing
+        // the request at frame start guarantees the suppression is already in effect for everything
+        // this frame draws. Reading the flag at the end instead meant a request landing mid-frame —
+        // after the perception layers had already been drawn with suppression off — was still served
+        // by that same frame's readback, baking feature points / plane grids into the exported image.
+        // Only latched here; consumed at the export block below, so a frame that bails early (no
+        // session yet) still leaves the request pending for the next one, as before.
+        val exportThisFrame = exportRequested
         lastTickMs = android.os.SystemClock.elapsedRealtime()
         lastStep = "lock"
 
@@ -1312,7 +1321,7 @@ class ArRenderer(
             }
 
             lastStep = "export"
-            if (exportRequested) {
+            if (exportThisFrame) {
                 exportRequested = false
                 try {
                     // Read the composited GL framebuffer instead of the raw camera image. By this
