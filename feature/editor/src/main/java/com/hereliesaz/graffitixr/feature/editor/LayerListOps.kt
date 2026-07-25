@@ -9,10 +9,20 @@ import com.hereliesaz.graffitixr.common.model.Layer
  */
 internal object LayerListOps {
 
-    /** Reorders [layers] to match [newOrder] (by id). Ids not present in [layers] are dropped. */
+    /**
+     * Reorders [layers] to match [newOrder] (by id). Ids not present in [layers] are dropped.
+     *
+     * Layers *missing* from [newOrder] are kept, appended in their existing relative order — a
+     * reorder is a permutation, never a deletion. Dropping them (the previous behaviour) silently
+     * destroyed layers whenever the caller's order list was incomplete, which a co-op
+     * `Op.LayerReorder` from a peer whose layer set has drifted will be.
+     */
     fun reorder(layers: List<Layer>, newOrder: List<String>): List<Layer> {
         val byId = layers.associateBy { it.id }
-        return newOrder.mapNotNull { byId[it] }
+        val ordered = newOrder.mapNotNull { byId[it] }
+        val placed = ordered.mapTo(HashSet()) { it.id }
+        return if (placed.size == layers.size) ordered
+        else ordered + layers.filterNot { it.id in placed }
     }
 
     /** Applies [transform] to the layer with [id], leaving every other layer untouched. */

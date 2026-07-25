@@ -1793,21 +1793,19 @@ class ArViewModel @Inject constructor(
         intrinsics: FloatArray?,
         stride: Int
     ): Pair<Float, Float>? {
-        if (depthBuffer == null || intrinsics == null) return null
-        
-        val cx = depthW / 2
-        val cy = depthH / 2
-        val byteOffset = cy * stride + cx * 2
-        
-        if (byteOffset + 2 > depthBuffer.limit()) return null
-        
-        val raw = depthBuffer.getShort(byteOffset).toInt() and 0xFFFF
-        val depthMm = raw and 0x1FFF
-        if (depthMm <= 0) return null
-        
-        val depthM = depthMm / 1000f
+        if (depthBuffer == null || intrinsics == null || intrinsics.size < 2) return null
+
+        // Read through DepthLookup rather than getShort()-ing the buffer here: it applies the
+        // little-endian byte order DEPTH16 requires (a raw ByteBuffer defaults to BIG_ENDIAN, which
+        // silently byte-swapped every sample) and rejects out-of-range samples, not just zeros.
+        val depthM = com.hereliesaz.graffitixr.feature.ar.eval.DepthLookup.depthMetersAt(
+            depthBuffer, stride, depthW, depthH, u = 0.5f, v = 0.5f
+        )
+        if (depthM <= 0f) return null
+
         val fx = intrinsics[0]
         val fy = intrinsics[1]
+        if (fx <= 0f || fy <= 0f) return null
 
         val halfW = (depthM * (colorW / 2f) / fx) * 0.18f
         val halfH = (depthM * (colorH / 2f) / fy) * 0.18f

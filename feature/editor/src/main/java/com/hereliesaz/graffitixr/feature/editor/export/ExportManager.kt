@@ -5,6 +5,9 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.os.Build
 import android.graphics.BlendMode as NativeBlendMode
 import androidx.compose.ui.graphics.BlendMode
 import com.hereliesaz.graffitixr.common.model.Layer
@@ -18,11 +21,16 @@ class ExportManager @Inject constructor() {
 
     fun compositeLayers(
         layers: List<Layer>,
-        screenWidth: Int,
-        screenHeight: Int,
+        width: Int,
+        height: Int,
         backgroundBitmap: Bitmap? = null,
         backgroundColor: Int = android.graphics.Color.TRANSPARENT
     ): Bitmap {
+        // Bitmap.createBitmap throws on a non-positive dimension. Callers pass display metrics, and
+        // those read back as 0 on a detached/not-yet-laid-out display — clamp here so no call site
+        // can turn that into a crash mid-export.
+        val screenWidth = width.coerceAtLeast(1)
+        val screenHeight = height.coerceAtLeast(1)
         val result = Bitmap.createBitmap(screenWidth, screenHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(result)
 
@@ -63,7 +71,7 @@ class ExportManager @Inject constructor() {
                 )
                 val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     alpha = (layer.opacity * 255).toInt().coerceIn(0, 255)
-                    blendMode = layer.blendMode.toNativeBlendMode()
+                    applyLayerBlendMode(layer.blendMode)
                     colorFilter = android.graphics.ColorMatrixColorFilter(
                         android.graphics.ColorMatrix(cm.values)
                     )
@@ -124,7 +132,7 @@ class ExportManager @Inject constructor() {
                 )
                 val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     alpha = (layer.opacity * 255).toInt().coerceIn(0, 255)
-                    blendMode = layer.blendMode.toNativeBlendMode()
+                    applyLayerBlendMode(layer.blendMode)
                     colorFilter = android.graphics.ColorMatrixColorFilter(
                         android.graphics.ColorMatrix(cm.values)
                     )
@@ -176,6 +184,51 @@ class ExportManager @Inject constructor() {
         return matrix
     }
 
+    /**
+     * Sets this paint's blend mode for [mode]. `Paint.blendMode` and `android.graphics.BlendMode`
+     * are both API 29, but this module's minSdk is 26 — assigning it unconditionally threw
+     * NoClassDefFoundError on API 26-28 the moment anything composited (export, share, thumbnail,
+     * flatten, stencil). Below 29, fall back to the PorterDuff Xfermode equivalent; the handful of
+     * separable/non-separable modes PorterDuff can't express degrade to SRC_OVER there.
+     */
+    private fun Paint.applyLayerBlendMode(mode: BlendMode) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            blendMode = mode.toNativeBlendMode()
+        } else {
+            xfermode = mode.toPorterDuffMode()?.let { PorterDuffXfermode(it) }
+        }
+    }
+
+    /**
+     * The PorterDuff equivalent of [BlendMode] for API < 29, or null (leaving the paint's default
+     * SRC_OVER) for modes PorterDuff.Mode has no counterpart for.
+     */
+    private fun BlendMode.toPorterDuffMode(): PorterDuff.Mode? = when (this) {
+        BlendMode.Clear     -> PorterDuff.Mode.CLEAR
+        BlendMode.Src       -> PorterDuff.Mode.SRC
+        BlendMode.Dst       -> PorterDuff.Mode.DST
+        BlendMode.SrcOver   -> PorterDuff.Mode.SRC_OVER
+        BlendMode.DstOver   -> PorterDuff.Mode.DST_OVER
+        BlendMode.SrcIn     -> PorterDuff.Mode.SRC_IN
+        BlendMode.DstIn     -> PorterDuff.Mode.DST_IN
+        BlendMode.SrcOut    -> PorterDuff.Mode.SRC_OUT
+        BlendMode.DstOut    -> PorterDuff.Mode.DST_OUT
+        BlendMode.SrcAtop   -> PorterDuff.Mode.SRC_ATOP
+        BlendMode.DstAtop   -> PorterDuff.Mode.DST_ATOP
+        BlendMode.Xor       -> PorterDuff.Mode.XOR
+        BlendMode.Plus      -> PorterDuff.Mode.ADD
+        BlendMode.Modulate  -> PorterDuff.Mode.MULTIPLY
+        BlendMode.Multiply  -> PorterDuff.Mode.MULTIPLY
+        BlendMode.Screen    -> PorterDuff.Mode.SCREEN
+        BlendMode.Overlay   -> PorterDuff.Mode.OVERLAY
+        BlendMode.Darken    -> PorterDuff.Mode.DARKEN
+        BlendMode.Lighten   -> PorterDuff.Mode.LIGHTEN
+        // ColorDodge / ColorBurn / Hardlight / Softlight / Difference / Exclusion / Hue /
+        // Saturation / Color / Luminosity have no PorterDuff.Mode counterpart.
+        else -> null
+    }
+
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
     private fun BlendMode.toNativeBlendMode(): NativeBlendMode {
         return when (this) {
             BlendMode.Clear -> NativeBlendMode.CLEAR

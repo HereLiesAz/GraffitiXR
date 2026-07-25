@@ -23,6 +23,25 @@ class LayerListOpsTest {
     }
 
     @Test
+    fun `reorder keeps layers missing from the order list instead of dropping them`() {
+        val layers = listOf(lyr("a"), lyr("b"), lyr("c"))
+        // A reorder is a permutation, not a deletion: 'b' is unmentioned but must survive.
+        assertEquals(listOf("c", "a", "b"), LayerListOps.reorder(layers, listOf("c", "a")).map { it.id })
+    }
+
+    @Test
+    fun `reorder preserves the relative order of unmentioned layers`() {
+        val layers = listOf(lyr("a"), lyr("b"), lyr("c"), lyr("d"))
+        assertEquals(listOf("d", "a", "b", "c"), LayerListOps.reorder(layers, listOf("d")).map { it.id })
+    }
+
+    @Test
+    fun `reorder with an empty order list is a no-op`() {
+        val layers = listOf(lyr("a"), lyr("b"))
+        assertEquals(listOf("a", "b"), LayerListOps.reorder(layers, emptyList()).map { it.id })
+    }
+
+    @Test
     fun `mapLayer transforms only the matching layer`() {
         val layers = listOf(lyr("a"), lyr("b"))
         val out = LayerListOps.mapLayer(layers, "a") { it.copy(opacity = 0.5f) }

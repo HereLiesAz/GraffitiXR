@@ -281,6 +281,12 @@ class EditorReducerTest {
     }
 
     @Test
+    fun `SetLayers clears an active id the new list no longer contains`() {
+        val s = state(lyr("a"), lyr("b"), active = "b")
+        assertNull(reduce(s, EditorIntent.SetLayers(listOf(lyr("a")))).activeLayerId)
+    }
+
+    @Test
     fun `LoadedProject sets id and layers and ClearProject resets them`() {
         val loaded = reduce(state(), EditorIntent.LoadedProject("p1", listOf(lyr("a"))))
         assertEquals("p1", loaded.projectId)
@@ -288,6 +294,34 @@ class EditorReducerTest {
         val cleared = reduce(loaded, EditorIntent.ClearProject)
         assertNull(cleared.projectId)
         assertTrue(cleared.layers.isEmpty())
+    }
+
+    @Test
+    fun `LoadedProject drops an active id belonging to the previous project`() {
+        val s = state(lyr("old"), active = "old")
+        val out = reduce(s, EditorIntent.LoadedProject("p2", listOf(lyr("new"))))
+        assertNull(out.activeLayerId)
+    }
+
+    @Test
+    fun `LoadedProject keeps the active id when the same layer is still present`() {
+        val s = state(lyr("a"), lyr("b"), active = "b")
+        val out = reduce(s, EditorIntent.LoadedProject("p1", listOf(lyr("a"), lyr("b"))))
+        assertEquals("b", out.activeLayerId)
+    }
+
+    @Test
+    fun `ClearProject drops the active id`() {
+        val s = state(lyr("a"), active = "a")
+        assertNull(reduce(s, EditorIntent.ClearProject).activeLayerId)
+    }
+
+    @Test
+    fun `ReorderLayers keeps layers the order list omits`() {
+        val s = state(lyr("a"), lyr("b"), lyr("c"), active = "b")
+        val out = reduce(s, EditorIntent.ReorderLayers(listOf("c", "a")))
+        assertEquals(listOf("c", "a", "b"), out.layers.map { it.id })
+        assertEquals("b", out.activeLayerId)
     }
 
     @Test

@@ -288,6 +288,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetGlobalConfidenc
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateDeviceMotion(JNIEnv* env, jobject thiz, jfloatArray angularVel, jfloatArray linearVel) {
     if (gSlamEngine) {
+        // updateDeviceMotion memcpy's 3 floats out of each; a shorter array (or a null one) would
+        // read past the end. Validate before pinning rather than trusting the Kotlin caller.
+        if (!angularVel || !linearVel) return;
+        if (env->GetArrayLength(angularVel) < 3 || env->GetArrayLength(linearVel) < 3) return;
         jfloat* a = env->GetFloatArrayElements(angularVel, nullptr);
         jfloat* l = env->GetFloatArrayElements(linearVel, nullptr);
         gSlamEngine->updateDeviceMotion(a, l);
@@ -438,6 +442,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(
         jfloatArray mappingViewMatrix, jfloatArray mappingProjMatrix,
         jlong timestampNs) {
     if (gSlamEngine) {
+        // All four are memcpy'd as 16 floats below (and read as 4x4 by updateCamera), so a short
+        // array would read past the end. Validate every one before pinning any of them.
+        if (!viewMatrix || !projMatrix || !mappingViewMatrix || !mappingProjMatrix) return;
+        if (env->GetArrayLength(viewMatrix) < 16 || env->GetArrayLength(projMatrix) < 16 ||
+            env->GetArrayLength(mappingViewMatrix) < 16 || env->GetArrayLength(mappingProjMatrix) < 16) {
+            return;
+        }
         jfloat* view = env->GetFloatArrayElements(viewMatrix, nullptr);
         jfloat* proj = env->GetFloatArrayElements(projMatrix, nullptr);
         jfloat* mView = env->GetFloatArrayElements(mappingViewMatrix, nullptr);
@@ -467,6 +478,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateLightLevel(J
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateAnchorTransform(JNIEnv* env, jobject thiz, jfloatArray transform) {
     if (gSlamEngine) {
+        // updateAnchorTransform memcpy's 16 floats out of this.
+        if (!transform || env->GetArrayLength(transform) < 16) return;
         jfloat* mat = env->GetFloatArrayElements(transform, nullptr);
         gSlamEngine->updateAnchorTransform(mat);
         env->ReleaseFloatArrayElements(transform, mat, JNI_ABORT);
