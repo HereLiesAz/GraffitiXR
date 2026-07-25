@@ -129,6 +129,9 @@ class EditorViewModel @Inject constructor(
     // scheduled for layer B cancel a still-pending save for layer A, silently dropping
     // A's strokes; per-layer jobs cancel only the same layer's superseded save.
     private val pendingSaveJobs = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Job>()
+    // What each pending debounce still owes the disk, so flushPendingSaves() can write it out when
+    // the app leaves the foreground rather than losing it to a process kill mid-delay.
+    private val pendingSaveTargets = java.util.concurrent.ConcurrentHashMap<String, PendingSave>()
 
     // Per-layer rebuild jobs: cancels stale compositing coroutines on rapid undo/redo so
     // only the most recent rebuild's result lands in the UI state.
@@ -427,28 +430,67 @@ class EditorViewModel @Inject constructor(
         val path = uri?.path ?: return
         // Cancel only this layer's previous pending save, never another layer's.
         pendingSaveJobs.remove(layerId)?.cancel()
+        // Record what this debounce owes the disk, so [flushPendingSaves] can honour it immediately
+        // if the app is backgrounded before the delay elapses.
+        val pending = PendingSave(bitmap, path)
+        pendingSaveTargets[layerId] = pending
         val job = viewModelScope.launch(dispatchers.io) {
             kotlinx.coroutines.delay(1500)
-            try {
-                val file = java.io.File(path)
-                java.io.FileOutputStream(file).use { out ->
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-                }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                // Normal: a newer stroke superseded this debounced save. Not a failure.
-                throw e
-            } catch (e: Exception) {
-                // A swallowed failure here means the user's edits are silently lost.
-                android.util.Log.e("EditorViewModel", "Failed to save layer bitmap to $path", e)
-                withContext(dispatchers.main) {
-                    Toast.makeText(context, "Couldn't save your changes — storage may be full", Toast.LENGTH_LONG).show()
-                }
-            } finally {
-                // Don't leak completed jobs in the map.
-                pendingSaveJobs.remove(layerId, coroutineContext[kotlinx.coroutines.Job])
-            }
+            writeLayerBitmap(layerId, pending)
+            // Don't leak completed jobs in the map.
+            pendingSaveJobs.remove(layerId, coroutineContext[kotlinx.coroutines.Job])
         }
         pendingSaveJobs[layerId] = job
+    }
+
+    /** A debounced layer write that hasn't landed on disk yet. */
+    private class PendingSave(val bitmap: Bitmap, val path: String)
+
+    private suspend fun writeLayerBitmap(layerId: String, pending: PendingSave) {
+        val bitmap = pending.bitmap
+        val path = pending.path
+        try {
+            if (bitmap.isRecycled) return
+            val file = java.io.File(path)
+            java.io.FileOutputStream(file).use { out ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+            }
+            // Value-matched removal: a newer scheduleDiskSave may have replaced the entry while this
+            // write was in flight, and that newer write still owes the disk its own bitmap.
+            pendingSaveTargets.remove(layerId, pending)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // Normal: a newer stroke superseded this debounced save. Not a failure.
+            throw e
+        } catch (e: Exception) {
+            // A swallowed failure here means the user's edits are silently lost.
+            android.util.Log.e("EditorViewModel", "Failed to save layer bitmap to $path", e)
+            withContext(dispatchers.main) {
+                Toast.makeText(context, "Couldn't save your changes — storage may be full", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    /**
+     * Writes every debounced layer save immediately instead of waiting out its 1.5 s delay.
+     *
+     * Call this when the app leaves the foreground. Without it, the last stroke before backgrounding
+     * lived only in [layerStore] and [EditHistory] — neither of which is persisted — so if Android
+     * killed the process during those 1.5 s the stroke was gone from disk and the layer reloaded from
+     * its pre-stroke file. The debounce is what makes stroke-heavy editing cheap; flushing on the way
+     * out is what makes it safe.
+     */
+    fun flushPendingSaves() {
+        val targets = pendingSaveTargets.keys.mapNotNull { id ->
+            pendingSaveTargets[id]?.let { id to it }
+        }
+        if (targets.isEmpty()) return
+        // Cancel the outstanding debounces first so they can't re-run the same write behind us.
+        targets.forEach { (id, _) -> pendingSaveJobs.remove(id)?.cancel() }
+        // NonCancellable: this runs as the app is going away, and a viewModelScope cancellation
+        // mid-write is exactly the case being defended against.
+        viewModelScope.launch(dispatchers.io + kotlinx.coroutines.NonCancellable) {
+            targets.forEach { (id, pending) -> writeLayerBitmap(id, pending) }
+        }
     }
 
     override fun onAddLayer(uri: Uri) {

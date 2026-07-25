@@ -58,6 +58,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
@@ -317,12 +318,48 @@ class MainActivity : ComponentActivity() {
 
                 // Interop: an image shared in via ACTION_SEND (e.g. an edited overlay returning from
                 // GraffiXR) becomes a new overlay layer, consumed once.
+                //
+                // Gated on a loaded project: onAddLayer requires a projectId to save the artifact
+                // under, and on a cold start via ACTION_SEND there is none yet (the library screen is
+                // still up). Firing regardless dropped the shared image with a misleading "Invalid
+                // image format or missing project" toast — the whole advertised share-in flow failed
+                // on exactly the launch path it exists for. Hold the Uri until the user opens or
+                // creates a project, then add it.
                 val sharedImage = incomingSharedImage
-                LaunchedEffect(sharedImage) {
-                    if (sharedImage != null) {
+                val projectIdForShare = editorUiState.projectId
+                LaunchedEffect(sharedImage, projectIdForShare) {
+                    if (sharedImage != null && projectIdForShare != null) {
                         editorViewModel.onAddLayer(sharedImage)
                         incomingSharedImage = null
                     }
+                }
+                // Tell the user why the shared image hasn't appeared yet, once, rather than leaving
+                // them on the library screen wondering whether the share worked. (`context` proper is
+                // declared further down this composable, so capture the local here.)
+                val shareToastContext = LocalContext.current
+                val sharePending = sharedImage != null && projectIdForShare == null
+                LaunchedEffect(sharePending) {
+                    if (sharePending) {
+                        Toast.makeText(
+                            shareToastContext,
+                            shareToastContext.getString(DesignR.string.shared_image_pick_project),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+
+                // Flush the editor's debounced layer writes when the app leaves the foreground. The
+                // 1.5 s save debounce means the last stroke exists only in memory until it elapses,
+                // so a process kill while backgrounded silently lost it.
+                val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+                DisposableEffect(lifecycleOwner) {
+                    val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                        if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                            editorViewModel.flushPendingSaves()
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
                 }
 
                 var isProcessing by remember { mutableStateOf(false) }
@@ -683,8 +720,17 @@ class MainActivity : ComponentActivity() {
                                 //     against per-mode background (backgroundBitmap / transparent).
                                 when (editorUiState.editorMode) {
                                     EditorMode.AR -> {
-                                        arViewModel.requestExport { bmp ->
+                                        isExporting = true
+                                        val requested = arViewModel.requestExport { bmp ->
+                                            isExporting = false
                                             editorViewModel.exportImage(backgroundBitmap = bmp, skipLayerComposite = true)
+                                        }
+                                        if (!requested) {
+                                            // No renderer attached (e.g. AR mode without camera
+                                            // permission), so there is no framebuffer to read back.
+                                            // Export the layers alone rather than doing nothing.
+                                            isExporting = false
+                                            editorViewModel.exportImage()
                                         }
                                     }
                                     EditorMode.OVERLAY -> {
@@ -721,6 +767,13 @@ class MainActivity : ComponentActivity() {
                             hasCameraPermission = hasCameraPermission,
                             cameraController = cameraController,
                             onRendererCreated = { _ -> },
+                            // Was omitted, so MainScreen always saw the parameter default (false) and
+                            // the flag was inert everywhere it is read. Wiring it makes the rail and
+                            // the loading/segmentation overlays actually step aside for an export, as
+                            // the export contract describes. (Suppressing the renderer's perception
+                            // layers is handled inside ArViewModel.requestExport, which doesn't have
+                            // to wait for a recomposition to reach the GL thread.)
+                            isExporting = isExporting,
                             doodlePhaseActive = firstRunDoodleActive,
                             doodleScribbleBitmap = firstRunScribbleBitmap
                         )

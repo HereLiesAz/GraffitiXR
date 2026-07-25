@@ -312,6 +312,8 @@
     <!-- Action to delete a layer. -->
     <string name="delete">Delete</string>
     <string name="new_project_name">New Project</string>
+    <!-- Shown when an image was shared into the app before a project is open, so it can't be added yet. -->
+    <string name="shared_image_pick_project">Open or create a project to add the shared image</string>
     <!-- Label for the lock button. -->
     <string name="lock_button">Lock</string>
     <!-- Label for the freeze button. -->

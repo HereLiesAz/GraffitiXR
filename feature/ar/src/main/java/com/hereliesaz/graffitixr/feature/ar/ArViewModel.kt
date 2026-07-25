@@ -200,9 +200,20 @@ class ArViewModel @Inject constructor(
                 }
                 _hostQrPayload.value = qrString
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 _uiState.update {
                     it.copy(coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.Ended(com.hereliesaz.graffitixr.common.model.CoopSessionState.EndReason.NetworkLost))
                 }
+                // Ended(NetworkLost) is the only state this can express, but the real cause is often
+                // not the network at all — HostSession fails fast on an oversized project precisely so
+                // the reason is attributable, and collapsing everything to "network lost" threw that
+                // away. Surface the actual message through the feedback channel the UI already toasts.
+                android.util.Log.e("ArViewModel", "Failed to start hosting", e)
+                _feedback.tryEmit(
+                    com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                        "Couldn't start sharing: ${e.message ?: "unknown error"}", e
+                    )
+                )
                 return@launch
             }
             // Observe collaborationManager.state and propagate (single tracked collector).
@@ -225,9 +236,18 @@ class ArViewModel @Inject constructor(
                 _uiState.update { it.copy(coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) }
                 observeCoopState()
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 _uiState.update {
                     it.copy(coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.Ended(com.hereliesaz.graffitixr.common.model.CoopSessionState.EndReason.NetworkLost))
                 }
+                // Same attribution problem as startHosting: a malformed QR payload or an unreachable
+                // host both read as "network lost" without this.
+                android.util.Log.e("ArViewModel", "Failed to join session", e)
+                _feedback.tryEmit(
+                    com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                        "Couldn't join: ${e.message ?: "unknown error"}", e
+                    )
+                )
             }
         }
     }
@@ -1861,13 +1881,29 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(isCaptureRequested = true) }
     }
 
-    fun requestExport(callback: (Bitmap) -> Unit) {
-        renderer?.onExportCaptured = { bmp ->
+    /**
+     * Asks the renderer to read back its composited framebuffer, delivering it to [callback] on the
+     * main thread. Returns false when no renderer is attached — AR mode without camera permission,
+     * or before/after the GLSurfaceView's lifetime — in which case nothing was requested and the
+     * caller must fall back. Previously both statements were null-safe no-ops, so Export in AR mode
+     * with no renderer did nothing at all and reported nothing.
+     */
+    fun requestExport(callback: (Bitmap) -> Unit): Boolean {
+        val r = renderer ?: return false
+        // Suppress the perception layers for the readback here rather than relying on the
+        // `hideVisualization = isExporting` push in MainScreen's AndroidView update block: that only
+        // runs on recomposition, so the GL thread could reach the readback first. Restore whatever the
+        // flag was (anchorEstablished drives it independently) once the frame is captured.
+        val previousHide = r.hideVisualization
+        r.hideVisualization = true
+        r.onExportCaptured = { bmp ->
+            r.hideVisualization = previousHide
             viewModelScope.launch(Dispatchers.Main) {
                 callback(bmp)
             }
         }
-        renderer?.exportRequested = true
+        r.exportRequested = true
+        return true
     }
 
     fun onCaptureRequestHandled() {
