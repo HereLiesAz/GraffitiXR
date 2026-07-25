@@ -399,6 +399,41 @@ class EditorViewModelTest {
         assertTrue("Expected liveStrokeVersion >= 1, got ${state.liveStrokeVersion}", state.liveStrokeVersion >= 1)
     }
 
+    /**
+     * The tap path DrawingCanvas now emits: start immediately followed by end, with no drag points.
+     * Covers both halves of that gesture — the dab must actually commit (detectDragGestures never
+     * fired for a tap, so tapping with a brush selected used to do nothing at all), and the
+     * background bitmap-copy coroutine that is still queued when the stroke ends must abandon
+     * cleanly rather than indexing an emptied point list or stranding the live-stroke overlay.
+     */
+    @Test
+    fun `a tap-length stroke commits a dab and leaves no live-stroke state`() = runTest {
+        val uri = Uri.parse("content://test/image.png")
+        viewModel.onAddLayer(uri)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val layerId = viewModel.uiState.value.layers.first().id
+        viewModel.onLayerActivated(layerId)
+        viewModel.setActiveTool(Tool.BRUSH)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val undoBefore = viewModel.uiState.value.undoCount
+
+        // No advance between the two calls: the copy coroutine is still queued, which is exactly the
+        // ordering a tap produces.
+        viewModel.onStrokeStart(Offset(10f, 10f), IntSize(100, 100))
+        viewModel.onStrokeEnd()
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(
+            "Expected the tap to commit a dab to history, undoCount went $undoBefore -> ${state.undoCount}",
+            state.undoCount > undoBefore
+        )
+        assertNull("Live-stroke layer id should be cleared after the stroke ends", state.liveStrokeLayerId)
+        assertNull("Live-stroke bitmap should be cleared after the stroke ends", state.liveStrokeBitmap)
+    }
+
     @Test
     fun `setSegmentationInfluence updates state and does not crash when no confidence stored`() = runTest {
         viewModel.setSegmentationInfluence(0.3f)

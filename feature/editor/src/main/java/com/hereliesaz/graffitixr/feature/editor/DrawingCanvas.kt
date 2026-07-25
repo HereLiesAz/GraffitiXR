@@ -2,6 +2,7 @@ package com.hereliesaz.graffitixr.feature.editor
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -67,6 +68,25 @@ fun DrawingCanvas(
                             liquifyPending = liquifyPoints
                             liquifyPoints = emptyList()
                         }
+                        onStrokeEnd()
+                    }
+                )
+            }
+            // detectDragGestures only fires once the touch slop is exceeded, so a plain tap produced
+            // no stroke at all — tapping with the brush selected silently did nothing, and the
+            // single-point paths that already exist downstream (ImageProcessor.drawStroke's
+            // `size == 1` drawPoint, and onStrokeEnd's whole-stroke fallback) were unreachable. A tap
+            // is a legitimate dab, so report it as a one-point stroke.
+            //
+            // Safe to combine with the drag detector above: detectDragGestures awaits its down with
+            // requireUnconsumed = false, so tap consuming the down doesn't hide it; and once slop is
+            // crossed the drag detector consumes the moves, which makes waitForUpOrCancellation
+            // return null here so onTap cannot also fire for the same gesture.
+            .pointerInput(activeTool) {
+                if (activeTool == Tool.NONE) return@pointerInput
+                detectTapGestures(
+                    onTap = { offset ->
+                        onStrokeStart(offset, canvasSize)
                         onStrokeEnd()
                     }
                 )
