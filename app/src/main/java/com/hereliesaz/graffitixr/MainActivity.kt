@@ -819,26 +819,6 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        if (editorUiState.stencilHintVisible || editorUiState.isStencilGenerating) {
-                            val pos = editorUiState.stencilButtonPosition
-                            val density = LocalDensity.current
-                            val offset = with(density) { IntOffset(pos.x.toInt() + 100.dp.roundToPx(), pos.y.toInt()) }
-
-                            Box(Modifier.offset { offset }) {
-                                if (editorUiState.isStencilGenerating) {
-                                    Text(stringResource(DesignR.string.generating), color = Color.Cyan, fontWeight = FontWeight.Bold)
-                                } else {
-                                    Text(
-                                        stringResource(DesignR.string.stencil_hint),
-                                        color = Color.White,
-                                        modifier = Modifier
-                                            .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
-                                            .padding(8.dp)
-                                    )
-                                }
-                            }
-                        }
-
                         var fullSize by remember { mutableStateOf(IntSize.Zero) }
                         var lockTaps by remember { mutableIntStateOf(0) }
                         
