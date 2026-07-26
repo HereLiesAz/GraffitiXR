@@ -203,9 +203,9 @@ class EditorViewModel @Inject constructor(
     /** The current layer set, stripped of bitmaps — what we record so an undo can be reverted. */
     private fun currentLayerSnapshot(): List<Layer> = _uiState.value.layers.map { it.copy(bitmap = null) }
 
-    override fun onUndoClicked() = applyHistory(history.popUndo { EditCommand.PropertyChange(currentLayerSnapshot()) })
+    override fun onUndoClicked() = applyHistory(history.popUndo { EditCommand(currentLayerSnapshot()) })
 
-    override fun onRedoClicked() = applyHistory(history.popRedo { EditCommand.PropertyChange(currentLayerSnapshot()) })
+    override fun onRedoClicked() = applyHistory(history.popRedo { EditCommand(currentLayerSnapshot()) })
 
     private fun applyHistory(command: EditCommand?) {
         command ?: return
