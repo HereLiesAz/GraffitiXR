@@ -1,14 +1,14 @@
 package com.hereliesaz.graffitixr.onboarding
 
-import kotlin.math.cos
+import kotlin.math.ceil
 import kotlin.math.hypot
-import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 /**
  * A single character placed in the onboarding scribble, expressed in a normalized [0,1] x [0,1]
  * canvas so the renderer can scale it to any size. [sizeFrac] is the glyph box edge as a fraction
- * of the canvas' smaller dimension; the glyph's circular footprint (used for the overlap rule) has
+ * of the canvas' smaller dimension; the glyph's circular footprint (used for the spacing rule) has
  * radius `sizeFrac / 2` around ([cx], [cy]).
  */
 data class ScribbleGlyph(
@@ -19,40 +19,47 @@ data class ScribbleGlyph(
     val sizeFrac: Float,
 )
 
-/** An ordered set of overlapping glyphs forming one connected scribble. */
+/** A set of glyphs forming one scribble for the user to copy. */
 data class Scribble(val glyphs: List<ScribbleGlyph>)
 
 /**
- * Generates the random "doodle this" scribble shown at first run: a small cluster of characters
- * (letters, digits, symbols) at random positions and rotations, with the rule that **every glyph
- * overlaps at least one other** so the result reads as a single connected mark rather than scattered
- * confetti. A complexity cap ([MAX_GLYPHS]) keeps it drawable in a few seconds regardless of the
- * user's utensil.
+ * Generates the random "draw this" scribble shown at first run: a handful of large characters
+ * (letters, digits, symbols) spread across the canvas at random rotations.
+ *
+ * Glyphs are placed on a **jittered grid** rather than chained onto each other, so the marks cover
+ * the whole area instead of clustering in the middle. That serves both halves of the job: the
+ * scribble is easier to copy onto a wall at a useful size, and — because detection solves a pose
+ * from the drawn marks — features spread across a wide baseline condition that solve far better
+ * than a tight knot of overlapping glyphs in one spot.
  *
  * Pure and deterministic given a seeded [Random], so the placement logic is unit-testable without
  * Android. Rendering (rotation, stroke) is the caller's job.
  */
 object ScribbleGenerator {
 
-    /** Complexity cap — more than this becomes an unreadable tangle nobody wants to copy. */
-    const val MAX_GLYPHS = 7
-    const val MIN_GLYPHS = 3
+    /** Complexity cap — the marks want to be big, so fewer of them fit before it turns to mush. */
+    const val MAX_GLYPHS = 6
+    const val MIN_GLYPHS = 4
 
     private val ALPHABET: List<Char> =
         (('A'..'Z') + ('a'..'z') + ('2'..'9') + listOf('#', '@', '&', '%', '*', '?', '!', '+', '=')).toList()
 
-    // Glyph footprint size range, as a fraction of the canvas' smaller edge.
-    private const val MIN_SIZE = 0.14f
-    private const val MAX_SIZE = 0.24f
+    /**
+     * Glyph footprint size range, as a fraction of the canvas' smaller edge. Deliberately large —
+     * these get copied onto a wall by hand, and a small mark is both fiddly to draw and poor to
+     * detect. Capped per-layout against the grid cell so a dense layout doesn't collapse into a blob.
+     */
+    private const val MIN_SIZE = 0.20f
+    private const val MAX_SIZE = 0.34f
 
-    // Keep centres inside a margin so rotated glyphs don't clip the canvas edge.
-    private const val MARGIN = 0.16f
+    /** Keep centres inside a margin so rotated glyphs don't clip the canvas edge. */
+    private const val MARGIN = 0.12f
 
-    // A new glyph is dropped this fraction of (r_self + r_neighbor) from a chosen neighbour's
-    // centre. < 1.0 forces the footprints to overlap (two circles overlap iff centre distance is
-    // below the radius sum); the range keeps the overlap visible but not fully concentric.
-    private const val MIN_OVERLAP_SPACING = 0.45f
-    private const val MAX_OVERLAP_SPACING = 0.80f
+    /**
+     * How far a glyph may wander from its grid cell centre, as a fraction of the cell. Enough to
+     * break up the grid so it doesn't read as a table, not enough to re-cluster.
+     */
+    private const val JITTER = 0.45f
 
     /**
      * @param random seeded for determinism/testability.
@@ -63,43 +70,35 @@ object ScribbleGenerator {
         glyphCount: Int = random.nextInt(MIN_GLYPHS, MAX_GLYPHS + 1),
     ): Scribble {
         val n = glyphCount.coerceIn(MIN_GLYPHS, MAX_GLYPHS)
-        val glyphs = ArrayList<ScribbleGlyph>(n)
 
-        // Seed glyph near centre with a little jitter.
-        glyphs += ScribbleGlyph(
-            char = ALPHABET.random(random),
-            cx = 0.5f + random.nextFloat() * 0.1f - 0.05f,
-            cy = 0.5f + random.nextFloat() * 0.1f - 0.05f,
-            rotationDeg = randomRotation(random),
-            sizeFrac = randomSize(random),
-        )
+        // Near-square grid big enough to hold n cells; shuffle which cells get used so a count that
+        // doesn't fill the grid leaves its gaps in a random place rather than always the last row.
+        val cols = ceil(sqrt(n.toFloat())).toInt().coerceAtLeast(1)
+        val rows = ceil(n / cols.toFloat()).toInt().coerceAtLeast(1)
+        val usable = 1f - 2f * MARGIN
+        val cellW = usable / cols
+        val cellH = usable / rows
 
-        while (glyphs.size < n) {
-            val neighbor = glyphs[random.nextInt(glyphs.size)]
-            val size = randomSize(random)
-            val rSelf = size / 2f
-            val rNeighbor = neighbor.sizeFrac / 2f
-            val spacing = MIN_OVERLAP_SPACING + random.nextFloat() * (MAX_OVERLAP_SPACING - MIN_OVERLAP_SPACING)
-            val dist = (rSelf + rNeighbor) * spacing
-            val angle = random.nextFloat() * (2f * Math.PI.toFloat())
+        // A glyph may exceed its cell a little (marks touching still reads as one scribble, which is
+        // fine) but not so much that neighbours bury each other.
+        val maxSize = minOf(MAX_SIZE, minOf(cellW, cellH) * 1.15f)
+        val minSize = minOf(MIN_SIZE, maxSize * 0.75f)
 
-            // Offset from the neighbour. `dist < rSelf + rNeighbor` (spacing < 1) guarantees the
-            // footprints overlap. To keep the glyph on-canvas WITHOUT shrinking that distance (which
-            // could break the overlap), mirror the offset on any axis that would leave the margin —
-            // reflection preserves |offset|, so overlap with the neighbour is retained exactly. With
-            // dist <= MAX_SIZE (0.24) and a [MARGIN, 1-MARGIN] band of width 0.68 > 2*0.24, at least
-            // one direction per axis always lands in-bounds.
-            var dx = cos(angle) * dist
-            var dy = sin(angle) * dist
-            if (neighbor.cx + dx !in MARGIN..(1f - MARGIN)) dx = -dx
-            if (neighbor.cy + dy !in MARGIN..(1f - MARGIN)) dy = -dy
+        val cells = ArrayList<Pair<Int, Int>>(rows * cols)
+        for (r in 0 until rows) for (c in 0 until cols) cells += r to c
+        cells.shuffle(random)
 
-            glyphs += ScribbleGlyph(
+        val glyphs = cells.take(n).map { (r, c) ->
+            val jx = (random.nextFloat() - 0.5f) * cellW * JITTER
+            val jy = (random.nextFloat() - 0.5f) * cellH * JITTER
+            ScribbleGlyph(
                 char = ALPHABET.random(random),
-                cx = neighbor.cx + dx,
-                cy = neighbor.cy + dy,
+                // Clamped into the margin band: jitter is at most half a cell, so the clamp is a
+                // safety net rather than something the common case relies on.
+                cx = (MARGIN + cellW * (c + 0.5f) + jx).coerceIn(MARGIN, 1f - MARGIN),
+                cy = (MARGIN + cellH * (r + 0.5f) + jy).coerceIn(MARGIN, 1f - MARGIN),
                 rotationDeg = randomRotation(random),
-                sizeFrac = size,
+                sizeFrac = minSize + random.nextFloat() * (maxSize - minSize),
             )
         }
 
@@ -107,12 +106,11 @@ object ScribbleGenerator {
     }
 
     /** True iff glyph [a]'s circular footprint overlaps glyph [b]'s (centre distance < radius sum). */
-    fun overlaps(a: ScribbleGlyph, b: ScribbleGlyph): Boolean {
-        val centreDist = hypot(a.cx - b.cx, a.cy - b.cy)
-        return centreDist < (a.sizeFrac / 2f + b.sizeFrac / 2f)
-    }
+    fun overlaps(a: ScribbleGlyph, b: ScribbleGlyph): Boolean =
+        centreDistance(a, b) < (a.sizeFrac / 2f + b.sizeFrac / 2f)
+
+    /** Centre-to-centre distance between two glyphs, in normalized canvas units. */
+    fun centreDistance(a: ScribbleGlyph, b: ScribbleGlyph): Float = hypot(a.cx - b.cx, a.cy - b.cy)
 
     private fun randomRotation(random: Random): Float = random.nextFloat() * 360f
-
-    private fun randomSize(random: Random): Float = MIN_SIZE + random.nextFloat() * (MAX_SIZE - MIN_SIZE)
 }

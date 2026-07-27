@@ -2002,11 +2002,15 @@ class ArViewModel @Inject constructor(
     private var doodleCaptureJob: Job? = null
 
     /**
-     * Host tells us when the first-run doodle overlay is up. While active we periodically capture the
-     * live frame (no tap) and try to build a wall fingerprint from whatever the user has drawn; the
-     * builder returns null until there's enough texture, so this self-times to "they've drawn enough".
-     * Once a fingerprint is set, native relocalization + self-grow run automatically and the renderer's
-     * inlier-gated lock can fire. Purist teleological path — the fingerprint IS the demo.
+     * Host tells us the first-run DETECT stage is running — the user has already drawn the scribble on
+     * their wall and is now pointing the camera at it. While active we periodically capture the live
+     * frame (no tap) and try to build a wall fingerprint from the marks; the builder returns null
+     * until there is enough texture, so this self-times to "the drawing is visible enough".
+     *
+     * Completion is the fingerprint landing, not the user holding still: a built fingerprint means
+     * the marks were genuinely recognised and relocalization has something to track, which is exactly
+     * what "detected, ready to go" should mean. The renderer's stability lock remains as a second
+     * trigger, and the timeout below as a last resort.
      */
     fun setDoodlePhase(active: Boolean) {
         if (doodlePhaseActive == active) return
@@ -2021,9 +2025,13 @@ class ArViewModel @Inject constructor(
                     delay(DOODLE_CAPTURE_INTERVAL_MS)
                     if (!_uiState.value.isAnchorEstablished || renderer?.doodleWallPlane == null) continue
                     if (deadlineMs == 0L) deadlineMs = System.currentTimeMillis() + DOODLE_LOCK_TIMEOUT_MS
-                    if (!doodleFingerprintBuilt) {
-                        requestCapture() // no onScreenTap → no tap; onTargetCaptured builds headlessly
+                    if (doodleFingerprintBuilt) {
+                        // Detected: the drawing was recognised. Done — don't make the user hold the
+                        // phone still to satisfy a separate stability gate.
+                        onDoodleLocked()
+                        continue
                     }
+                    requestCapture() // no onScreenTap → no tap; onTargetCaptured builds headlessly
                     // Graceful fallback: on a featureless wall relocalization may never converge. Rather
                     // than hang forever, after the timeout place the artwork on the plain anchor so the
                     // user still ends up with art stuck to the wall.

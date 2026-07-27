@@ -38,15 +38,44 @@ class ScribbleGeneratorTest {
         }
     }
 
+    // Bounds below are derived from the generator's grid, not guessed. For n in 4..6 the layout is
+    // 2x2 (n=4) or 2x3 (n=5,6); with at most one cell dropped every row and column stays occupied,
+    // so worst case (all jitter pulling inward) the bounding box spans cellDim*(1 - JITTER) = 0.209
+    // on the tighter axis, adjacent centres sit at least 0.139 apart, and sizeFrac is at least 0.20.
+    // The assertions sit safely under those figures.
+
     @Test
-    fun `every glyph overlaps at least one other glyph`() {
+    fun `glyphs are spread across the canvas, not clustered in the middle`() {
+        // The scribble gets copied onto a wall and then detected from the drawn marks, so the marks
+        // must cover area: a tight central knot is both awkward to draw big and a badly-conditioned
+        // pose solve.
         seeds.forEach { seed ->
             val glyphs = ScribbleGenerator.generate(Random(seed)).glyphs
-            glyphs.forEachIndexed { i, g ->
-                val hasOverlap = glyphs.withIndex().any { (j, other) ->
-                    j != i && ScribbleGenerator.overlaps(g, other)
-                }
-                assertTrue("seed=$seed glyph[$i]='${g.char}' has no overlapping neighbour", hasOverlap)
+            val spanX = glyphs.maxOf { it.cx } - glyphs.minOf { it.cx }
+            val spanY = glyphs.maxOf { it.cy } - glyphs.minOf { it.cy }
+            assertTrue("seed=$seed spanX=$spanX", spanX >= 0.15f)
+            assertTrue("seed=$seed spanY=$spanY", spanY >= 0.15f)
+        }
+    }
+
+    @Test
+    fun `no two glyphs sit on top of each other`() {
+        // Marks touching is fine and still reads as one scribble; near-concentric is not, because
+        // then there is nothing legible to copy.
+        seeds.forEach { seed ->
+            val glyphs = ScribbleGenerator.generate(Random(seed)).glyphs
+            for (i in glyphs.indices) for (j in i + 1 until glyphs.size) {
+                val d = ScribbleGenerator.centreDistance(glyphs[i], glyphs[j])
+                assertTrue("seed=$seed glyphs[$i]/[$j] centres only $d apart", d > 0.10f)
+            }
+        }
+    }
+
+    @Test
+    fun `glyphs are large enough to be worth drawing`() {
+        seeds.forEach { seed ->
+            ScribbleGenerator.generate(Random(seed)).glyphs.forEach { g ->
+                assertTrue("seed=$seed size=${g.sizeFrac}", g.sizeFrac >= 0.15f)
             }
         }
     }

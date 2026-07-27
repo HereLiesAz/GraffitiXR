@@ -38,22 +38,24 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
 /**
- * First-run AR coaching layer, drawn as a full-screen sibling over the GL camera surface. Staged:
+ * First-run step two: coaching for the **detect** pass, drawn as a full-screen sibling over the GL
+ * camera surface.
  *
- *  1. "Doodle this on your wall or canvas" appears centred, alone, for [TITLE_HOLD_MS].
- *  2. The title animates up to the top and the generated [scribble] fades in below it — this is the
- *     reference the user copies onto their real wall.
- *  3. Once ARCore is ready ([isArReady]) but no surface has been found yet ([planeDetected] false),
- *     movement guidance ([movementHint]) + a rotating hint icon appear below the scribble. They
- *     disappear the moment a surface is found, so the user isn't nagged once tracking is working.
+ * By the time this is up the user has already copied the scribble onto their wall from
+ * [ScribbleDrawScreen], so there is no reference to show here — the reference is on the wall. The
+ * job is just to get the camera pointed at it and moving enough for a surface to be found, after
+ * which the fingerprint builder latches onto the drawn marks.
  *
- * This layer shows the scribble + coaching only; latching the overlay onto the drawn marks and the
- * swap to the user's artwork are the next phase. The caller is responsible for only composing this
- * during the first-run flow (no other modal open).
+ *  1. [title] ("point your camera at what you drew") appears centred for [TITLE_HOLD_MS].
+ *  2. It rises to the top, leaving the camera view unobstructed while detection runs.
+ *  3. While ARCore is ready ([isArReady]) but no surface has been found ([planeDetected] false),
+ *     movement guidance ([movementHint]) + a rotating hint icon show. They disappear the moment a
+ *     surface is found, so the user isn't nagged once tracking is working.
+ *
+ * The caller only composes this during the first-run detect stage (no other modal open).
  */
 @Composable
 fun FirstRunOnboardingOverlay(
-    scribble: Scribble,
     isArReady: Boolean,
     planeDetected: Boolean,
     title: String,
@@ -66,7 +68,7 @@ fun FirstRunOnboardingOverlay(
         titleAtTop = true
     }
 
-    // -1 = top, 0 = centre. The title starts centred, then rises to make room for the scribble.
+    // -1 = top, 0 = centre. The title starts centred, then rises to clear the camera view.
     val titleBias by animateFloatAsState(
         targetValue = if (titleAtTop) -0.86f else 0f,
         animationSpec = tween(durationMillis = 600),
@@ -86,25 +88,12 @@ fun FirstRunOnboardingOverlay(
                 .padding(horizontal = 32.dp, vertical = 24.dp),
         )
 
-        // The scribble reference occupies the centre once the title has cleared out.
-        AnimatedVisibility(
-            visible = titleAtTop,
-            enter = fadeIn(tween(500)),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.Center),
-        ) {
-            ScribbleView(
-                scribble = scribble,
-                modifier = Modifier.size(240.dp),
-            )
-        }
-
         // Movement guidance: only while ARCore is up but hasn't found a surface yet.
         AnimatedVisibility(
             visible = titleAtTop && isArReady && !planeDetected,
             enter = fadeIn(tween(400)),
             exit = fadeOut(tween(300)),
-            modifier = Modifier.align(BiasAlignment(0f, 0.72f)),
+            modifier = Modifier.align(BiasAlignment(0f, 0.35f)),
         ) {
             MovementGuidance(movementHint)
         }
