@@ -1340,6 +1340,14 @@ class ArViewModel @Inject constructor(
                 // after reload, even though the builder doesn't run on a restored fingerprint.
                 slamManager.overlayMarkCenterLocal =
                     if (fp.markCenterLocal.size >= 3) fp.markCenterLocal.toFloatArray() else null
+            } else {
+                // No fingerprint on this project: drop whatever is left in native from earlier in the
+                // session. The restore calls only ever REPLACE the stored fingerprint, so without this
+                // an un-fingerprinted project silently relocalizes against a previous target — most
+                // visibly the marks built during first-run onboarding, which are a throwaway teaching
+                // aid and must not register anything beyond that flow.
+                slamManager.clearWallFingerprint()
+                slamManager.overlayMarkCenterLocal = null
             }
             // Restore the persistent wall feature map (Phase 2a: stored in native; matched in Phase 2b).
             // Independent of the marks fingerprint above and co-registered to the same anchor. Null on
@@ -1977,21 +1985,20 @@ class ArViewModel @Inject constructor(
         _uiState.update { if (it.planeDetected) it else it.copy(planeDetected = true) }
     }
 
-    /** Doodle demo (GL thread): report anchor-hold stability for the hold-steady indicator. */
-    fun onDoodleLockProgress(stability: Float) {
-        _uiState.update { it.copy(doodleLockStability = stability) }
-    }
-
     /** Doodle demo (GL thread): the overlay has held one spot long enough — trigger the artwork swap. */
     fun onDoodleLocked() {
         _uiState.update { if (it.doodleLocked) it else it.copy(doodleLocked = true) }
     }
 
     // --- Doodle demo: headless fingerprint build ---
-    private companion object {
+    internal companion object {
         const val DOODLE_CAPTURE_INTERVAL_MS = 2500L
         // After this long without a relocalization lock (featureless wall), place on the plain anchor.
+        // Measured from the point an anchor + wall plane exist, i.e. from when detection can start.
         const val DOODLE_LOCK_TIMEOUT_MS = 30_000L
+        // Hard cap on the whole detect phase, measured from when it starts. Guarantees the phase ends
+        // even if ARCore never finds a surface, so onboarding can't run indefinitely.
+        const val DOODLE_PHASE_TIMEOUT_MS = 60_000L
     }
     // @Volatile: written on main (setDoodlePhase) / IO (build result) and read on the GL thread
     // (onTargetCaptured), so the GL thread must observe the latest value.
@@ -2019,24 +2026,43 @@ class ArViewModel @Inject constructor(
             doodleFingerprintBuilt = false
             slamManager.overlayMarkCenterLocal = null
             doodleCaptureJob = viewModelScope.launch {
-                // Deadline starts once we actually have an anchor to build against.
-                var deadlineMs = 0L
+                // Two budgets, because they bound different failures:
+                //
+                //  - phaseTicks caps the WHOLE phase from the moment it starts. Without it, a room where
+                //    ARCore never finds a surface never arms the detect budget below, so onboarding runs
+                //    forever: the tutorial is never marked complete and doodleLockActive stays latched.
+                //    The drawn marks are a throwaway teaching aid — they must never be able to hold the
+                //    rest of the app hostage.
+                //  - detectTicks caps detection once there is actually something to build against, so a
+                //    slow-to-track room doesn't eat the detection budget.
+                //
+                // Counted in loop ticks rather than System.currentTimeMillis(): delay() is the only thing
+                // in this loop that consumes time (the native build runs off-loop on IO), so ticks are an
+                // honest elapsed-time proxy that can't be skewed by a device clock adjustment mid-flow.
+                val maxPhaseTicks = (DOODLE_PHASE_TIMEOUT_MS / DOODLE_CAPTURE_INTERVAL_MS).toInt()
+                val maxDetectTicks = (DOODLE_LOCK_TIMEOUT_MS / DOODLE_CAPTURE_INTERVAL_MS).toInt()
+                var phaseTicks = 0
+                var detectTicks = 0
                 while (isActive && doodlePhaseActive && !_uiState.value.doodleLocked) {
                     delay(DOODLE_CAPTURE_INTERVAL_MS)
+                    if (++phaseTicks >= maxPhaseTicks) {
+                        onDoodleLocked()
+                        break
+                    }
                     if (!_uiState.value.isAnchorEstablished || renderer?.doodleWallPlane == null) continue
-                    if (deadlineMs == 0L) deadlineMs = System.currentTimeMillis() + DOODLE_LOCK_TIMEOUT_MS
                     if (doodleFingerprintBuilt) {
                         // Detected: the drawing was recognised. Done — don't make the user hold the
                         // phone still to satisfy a separate stability gate.
                         onDoodleLocked()
-                        continue
+                        break
                     }
                     requestCapture() // no onScreenTap → no tap; onTargetCaptured builds headlessly
                     // Graceful fallback: on a featureless wall relocalization may never converge. Rather
-                    // than hang forever, after the timeout place the artwork on the plain anchor so the
-                    // user still ends up with art stuck to the wall.
-                    if (System.currentTimeMillis() >= deadlineMs && !_uiState.value.doodleLocked) {
+                    // than hang forever, after the budget is spent place the artwork on the plain anchor
+                    // so the user still ends up with art stuck to the wall.
+                    if (++detectTicks >= maxDetectTicks) {
                         onDoodleLocked()
+                        break
                     }
                 }
             }

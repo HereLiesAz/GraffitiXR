@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.onboarding
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,10 @@ import com.hereliesaz.aznavrail.model.AzButtonShape
  *
  * The scribble fills a square that tracks the screen width, which is what makes it big enough to
  * copy at arm's length.
+ *
+ * [onSkip] is not optional garnish. This screen is opaque and mounted ahead of everything else in its
+ * layer, so without a way out the marks would be a toll gate on reaching the app at all — and they are
+ * only ever a teaching aid for the sixty-second walkthrough.
  */
 @Composable
 fun ScribbleDrawScreen(
@@ -38,7 +43,9 @@ fun ScribbleDrawScreen(
     title: String,
     hint: String,
     doneLabel: String,
+    skipLabel: String,
     onDrawn: () -> Unit,
+    onSkip: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -84,6 +91,16 @@ fun ScribbleDrawScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 AzButton(text = doneLabel, onClick = onDrawn, shape = AzButtonShape.RECTANGLE)
+                Text(
+                    text = skipLabel,
+                    color = Color.White.copy(alpha = 0.6f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onSkip)
+                        .padding(vertical = 8.dp),
+                )
             }
         }
     }
