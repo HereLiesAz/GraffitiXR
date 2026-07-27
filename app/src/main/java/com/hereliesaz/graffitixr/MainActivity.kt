@@ -152,6 +152,12 @@ import kotlin.math.abs
 
 private const val LIBRARY_ROUTE = "library"
 
+/**
+ * Stages of the first-run "drawing in 60 seconds" flow. Split because the two halves need different
+ * things from the device: DRAW is a plain screen (no camera), DETECT needs AR.
+ */
+private enum class FirstRunStage { NONE, DRAW, DETECT }
+
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
@@ -529,16 +535,25 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // --- First-run AR doodle onboarding coordinator ---
-                // Strictly contained: the whole flow is gated behind the tutorial key + ARCore
-                // availability + camera permission. If any condition fails it's a complete no-op and
-                // normal library startup is byte-for-byte unchanged. The tutorial key is marked
-                // complete only once the demo reaches its lock/swap.
+                // --- First-run "drawing in 60 seconds" onboarding coordinator ---
+                // Two explicit stages, because they need different things from the device:
+                //
+                //   DRAW    show the scribble full-screen and wait. No camera, no plane, no anchor —
+                //           the user is looking at the phone and marking a wall. Trying to do this in
+                //           AR meant fighting for screen space with a live feed and depending on a
+                //           pose being established before there was anything drawn to anchor to.
+                //   DETECT  now that marks exist, point the camera at them and let the fingerprint
+                //           builder latch on. Completion means "detected", not "held still long
+                //           enough".
+                //
+                // Strictly contained: gated behind the tutorial key + ARCore availability + camera
+                // permission. If any condition fails it's a complete no-op and normal library startup
+                // is byte-for-byte unchanged. The key is marked complete only once detection lands.
                 val firstRunDoodleKey = "first_run_ar_doodle"
                 val firstRunCompletedTutorials by mainViewModel.completedTutorials.collectAsState()
-                // rememberSaveable so a process/config event mid-flow doesn't reset the flags and
+                // rememberSaveable so a process/config event mid-flow doesn't reset the stage and
                 // re-trigger the gate.
-                var firstRunDoodleActive by rememberSaveable { mutableStateOf(false) }
+                var firstRunStage by rememberSaveable { mutableStateOf(FirstRunStage.NONE) }
                 // Latches true once the gate has fired this session (whether the user picks or cancels),
                 // so a later key change can't re-fire it and spawn a duplicate project. Not persisted —
                 // a fresh launch re-offers onboarding until it's actually completed.
@@ -546,9 +561,6 @@ class MainActivity : ComponentActivity() {
                 // Set on a successful pick; the effect below adds the layer once the project id exists.
                 var firstRunPendingUri by rememberSaveable { mutableStateOf<Uri?>(null) }
                 val firstRunScribble = remember { com.hereliesaz.graffitixr.onboarding.ScribbleGenerator.generate() }
-                val firstRunScribbleBitmap = remember(firstRunScribble) {
-                    com.hereliesaz.graffitixr.onboarding.renderScribbleBitmap(firstRunScribble, 512)
-                }
 
                 val firstRunImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                     if (uri != null) {
@@ -557,11 +569,8 @@ class MainActivity : ComponentActivity() {
                         // has propagated — onAddLayer no-ops on a null projectId, so we can't add here.
                         dashboardViewModel.createAndOpenProject()
                         firstRunPendingUri = uri
-                        firstRunDoodleActive = true
-                        navController.navigate(EditorMode.AR.name) {
-                            popUpTo(LIBRARY_ROUTE) { inclusive = true }
-                            launchSingleTop = true
-                        }
+                        // Straight to DRAW; AR is not entered until the marks exist.
+                        firstRunStage = FirstRunStage.DRAW
                     }
                     // Cancel: firstRunTriggered stays true, so the gate won't re-fire this session; the
                     // user lands on the library. No project was created.
@@ -590,17 +599,17 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Drive the headless fingerprint-build orchestration in the AR VM with the phase.
-                LaunchedEffect(firstRunDoodleActive) {
-                    arViewModel.setDoodlePhase(firstRunDoodleActive)
+                // Detection only runs in DETECT: the AR VM's capture/fingerprint loop needs the camera,
+                // so it must not start while the user is still drawing.
+                LaunchedEffect(firstRunStage) {
+                    arViewModel.setDoodlePhase(firstRunStage == FirstRunStage.DETECT)
                 }
 
-                // Lock reached: clear the doodle phase (normal composite resumes, swapping the scribble
-                // for the user's artwork) and never show onboarding again.
+                // Detected: the fingerprint latched onto the drawn marks, so the artwork is ready to
+                // place. Tune it to the wall we just measured and never show onboarding again.
                 LaunchedEffect(arUiState.doodleLocked) {
-                    if (firstRunDoodleActive && arUiState.doodleLocked) {
-                        firstRunDoodleActive = false
-                        // Pre-set the adjustment knobs to read well against the wall we captured.
+                    if (firstRunStage == FirstRunStage.DETECT && arUiState.doodleLocked) {
+                        firstRunStage = FirstRunStage.NONE
                         editorViewModel.autoTuneActiveLayer(arUiState.doodleWallStats)
                         mainViewModel.markTutorialCompletePersistent(firstRunDoodleKey)
                     }
@@ -758,8 +767,9 @@ class MainActivity : ComponentActivity() {
                             // layers is handled inside ArViewModel.requestExport, which doesn't have
                             // to wait for a recomposition to reach the GL thread.)
                             isExporting = isExporting,
-                            doodlePhaseActive = firstRunDoodleActive,
-                            doodleScribbleBitmap = firstRunScribbleBitmap
+                            // The detect stage still needs the renderer's tap-free auto-anchor, but the
+                            // scribble is no longer projected onto the wall — it was drawn there.
+                            doodleDetectActive = firstRunStage == FirstRunStage.DETECT,
                         )
 
                     }
@@ -805,16 +815,36 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        // First-run doodle coaching layer — over the AR camera feed while the demo runs.
-                        if (firstRunDoodleActive &&
+                        // First-run DRAW stage: the scribble owns the whole screen while the user
+                        // copies it. Mounted before the AR coaching below and returns early, so
+                        // nothing else in this layer can draw over it.
+                        if (firstRunStage == FirstRunStage.DRAW && !showSettings) {
+                            com.hereliesaz.graffitixr.onboarding.ScribbleDrawScreen(
+                                scribble = firstRunScribble,
+                                title = "Draw this on your wall",
+                                hint = "Make it big — roughly the size of your artwork. It only has to be recognisable, not neat.",
+                                doneLabel = "I've drawn it",
+                                onDrawn = {
+                                    firstRunStage = FirstRunStage.DETECT
+                                    navController.navigate(EditorMode.AR.name) {
+                                        popUpTo(LIBRARY_ROUTE) { inclusive = true }
+                                        launchSingleTop = true
+                                    }
+                                },
+                            )
+                            return@onscreen
+                        }
+
+                        // First-run DETECT coaching — over the AR camera feed while we look for the
+                        // marks the user just drew.
+                        if (firstRunStage == FirstRunStage.DETECT &&
                             !showSettings &&
                             editorUiState.editorMode == EditorMode.AR
                         ) {
                             com.hereliesaz.graffitixr.onboarding.FirstRunOnboardingOverlay(
-                                scribble = firstRunScribble,
                                 isArReady = arUiState.isArReady,
                                 planeDetected = arUiState.planeDetected,
-                                title = "Doodle this on your wall or canvas",
+                                title = "Now point your camera at what you drew",
                                 movementHint = arUiState.scanHint ?: "Slowly move your device in a circle",
                             )
                         }

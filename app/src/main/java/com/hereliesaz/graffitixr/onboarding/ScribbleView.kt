@@ -1,6 +1,5 @@
 package com.hereliesaz.graffitixr.onboarding
 
-import android.graphics.Bitmap
 import android.graphics.Canvas as AndroidCanvas
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
@@ -17,7 +16,7 @@ import kotlin.math.min
  * Renders a [Scribble] — the glyphs are laid out in a normalized [0,1] square, so this scales the
  * generator's output to whatever box the caller gives it. Each glyph is drawn centred on its
  * ([ScribbleGlyph.cx], [ScribbleGlyph.cy]) and rotated by [ScribbleGlyph.rotationDeg]. A soft shadow
- * keeps it legible over the live camera feed behind the overlay.
+ * keeps it legible whether it is drawn on the dark draw-step ground or over a camera feed.
  */
 @Composable
 fun ScribbleView(
@@ -46,23 +45,6 @@ fun ScribbleView(
             drawScribble(canvas.nativeCanvas, scribble, w, h, edge, paint, fontMetrics)
         }
     }
-}
-
-/**
- * Rasterizes a [Scribble] into a transparent square [Bitmap] of [sizePx] — used as the AR overlay
- * texture during the first-run doodle demo. Same glyph layout/rotation as [ScribbleView]; drawn
- * as filled white so it reads on the wall (the overlay renderer applies it as a texture).
- */
-fun renderScribbleBitmap(scribble: Scribble, sizePx: Int, color: Color = Color.White): Bitmap {
-    val bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = color.toArgb()
-        textAlign = Paint.Align.CENTER
-        style = Paint.Style.FILL
-        isFakeBoldText = true
-    }
-    drawScribble(AndroidCanvas(bmp), scribble, sizePx.toFloat(), sizePx.toFloat(), sizePx.toFloat(), paint, Paint.FontMetrics())
-    return bmp
 }
 
 private fun drawScribble(
