@@ -824,8 +824,22 @@ class MainActivity : ComponentActivity() {
                                 title = "Draw this on your wall",
                                 hint = "Make it big — roughly the size of your artwork. It only has to be recognisable, not neat.",
                                 doneLabel = "I've drawn it",
+                                skipLabel = "Skip — I'll place it myself",
                                 onDrawn = {
                                     firstRunStage = FirstRunStage.DETECT
+                                    navController.navigate(EditorMode.AR.name) {
+                                        popUpTo(LIBRARY_ROUTE) { inclusive = true }
+                                        launchSingleTop = true
+                                    }
+                                },
+                                // Out of the walkthrough entirely: no detect stage, no marks needed. Still
+                                // lands in AR with the picked project open — the user chose an image to
+                                // trace, they only declined the guided marks — so the pick isn't orphaned
+                                // on the library behind a stray project. Marked done so it doesn't
+                                // re-offer on every launch.
+                                onSkip = {
+                                    firstRunStage = FirstRunStage.NONE
+                                    mainViewModel.markTutorialCompletePersistent(firstRunDoodleKey)
                                     navController.navigate(EditorMode.AR.name) {
                                         popUpTo(LIBRARY_ROUTE) { inclusive = true }
                                         launchSingleTop = true

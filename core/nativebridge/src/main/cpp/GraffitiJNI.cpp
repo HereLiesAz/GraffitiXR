@@ -951,6 +951,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearWallFeatureMa
     if (gSlamEngine) gSlamEngine->clearWallFeatureMap();
 }
 
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearWallFingerprint(JNIEnv*, jobject) {
+    if (gSlamEngine) gSlamEngine->clearWallFingerprint();
+}
+
 JNIEXPORT jint JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetMapPointCount(JNIEnv*, jobject) {
     return gSlamEngine ? gSlamEngine->getMapPointCount() : 0;

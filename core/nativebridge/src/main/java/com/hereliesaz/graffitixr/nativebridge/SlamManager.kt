@@ -111,6 +111,15 @@ class SlamManager @Inject constructor(
         nativeRestoreWallFingerprintMetric(descriptorsData, rows, cols, type, points3d, anchorMatrix, intrinsics)
     }
 
+    /**
+     * Drop the in-native wall fingerprint. The restore calls above only ever REPLACE the stored
+     * fingerprint, so without this it is process-lifetime state: a project that has no fingerprint of
+     * its own would keep relocalizing against whatever wall was fingerprinted earlier in the session
+     * (notably the marks built during first-run onboarding). Call it when loading a project that has
+     * no saved fingerprint, alongside [clearWallFeatureMap].
+     */
+    fun clearWallFingerprint() = nativeClearWallFingerprint()
+
     /** Restore the persistent wall feature map into native (Phase 2a: stored; matched in Phase 2b). */
     fun restoreWallFeatureMap(map: WallFeatureMap) {
         nativeRestoreWallFeatureMap(
@@ -551,6 +560,7 @@ class SlamManager @Inject constructor(
         anchor: FloatArray, intrinsics: FloatArray
     )
     private external fun nativeClearWallFeatureMap()
+    private external fun nativeClearWallFingerprint()
     private external fun nativeGetMapPointCount(): Int
     private external fun nativeSetMapRelocEnabled(enabled: Boolean)
     private external fun nativeSetMapBuildEnabled(enabled: Boolean)
