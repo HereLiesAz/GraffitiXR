@@ -411,6 +411,50 @@ class ArViewModelTest {
         assertEquals(4, state.unwarpPoints.size)
     }
 
+    // ==================== First-run walkthrough (doodle) tests ====================
+
+    @Test
+    fun `doodle detect phase ends itself when ARCore never establishes an anchor`() = runTest {
+        // The room never yields a trackable surface, so isAnchorEstablished stays false and the detect
+        // budget is never armed. The phase must still terminate: the marks the user drew are only a
+        // teaching aid for the sixty-second walkthrough, and an unbounded phase would leave onboarding
+        // running forever — the tutorial never marked complete, doodleLockActive latched on.
+        assertFalse(viewModel.uiState.value.isAnchorEstablished)
+
+        viewModel.setDoodlePhase(true)
+        testDispatcher.scheduler.advanceTimeBy(ArViewModel.DOODLE_PHASE_TIMEOUT_MS + 1_000L)
+        testDispatcher.scheduler.runCurrent()
+
+        assertTrue(
+            "detect phase must self-terminate without an anchor",
+            viewModel.uiState.value.doodleLocked,
+        )
+    }
+
+    @Test
+    fun `doodle detect phase does not end early while it still has budget`() = runTest {
+        viewModel.setDoodlePhase(true)
+        // Well past a couple of capture intervals but far short of the phase cap.
+        testDispatcher.scheduler.advanceTimeBy(ArViewModel.DOODLE_CAPTURE_INTERVAL_MS * 3)
+        testDispatcher.scheduler.runCurrent()
+
+        assertFalse(viewModel.uiState.value.doodleLocked)
+    }
+
+    @Test
+    fun `setDoodlePhase false cancels the capture loop`() = runTest {
+        viewModel.setDoodlePhase(true)
+        testDispatcher.scheduler.advanceTimeBy(ArViewModel.DOODLE_CAPTURE_INTERVAL_MS * 2)
+        testDispatcher.scheduler.runCurrent()
+
+        viewModel.setDoodlePhase(false)
+        // Past the cap: a cancelled loop must not fire the completion signal afterwards.
+        testDispatcher.scheduler.advanceTimeBy(ArViewModel.DOODLE_PHASE_TIMEOUT_MS * 2)
+        testDispatcher.scheduler.runCurrent()
+
+        assertFalse(viewModel.uiState.value.doodleLocked)
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun enableArCore() {
         // setArMode(true) early-returns unless ARCore is reported available; flip the flag on the
