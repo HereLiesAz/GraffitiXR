@@ -305,9 +305,6 @@ fun MainScreen(
                                 onPlaneDetected = {
                                     arViewModel.onFirstPlaneDetected()
                                 },
-                                onDoodleLockProgress = { stability ->
-                                    arViewModel.onDoodleLockProgress(stability)
-                                },
                                 onDoodleLocked = {
                                     arViewModel.onDoodleLocked()
                                 }

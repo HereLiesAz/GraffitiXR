@@ -46,6 +46,11 @@ public:
     // fingerprint anchor pose and the intrinsics the reloc PnP should use.
     void restoreWallFingerprintMetric(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d,
                                       const float* anchorMatrix16, const float* intrinsics4);
+    // Drop the stored wall fingerprint (marks + co-registration). Needed because a fingerprint is
+    // otherwise process-lifetime state: the restore calls above only ever REPLACE it, so a project
+    // with no fingerprint of its own would keep relocalizing against whatever wall was fingerprinted
+    // earlier in the session. Reloc already treats an empty fingerprint as "nothing to match".
+    void clearWallFingerprint();
     // Persistent wall *feature* map (lean reloc backbone; docs/RELOC_MAP_DESIGN.md), co-registered to
     // the fingerprint anchor. Restore replaces the stored map (confidence/obs optional). Phase 2a stores
     // it only; reloc matching against it (Phase 2b) is gated separately.

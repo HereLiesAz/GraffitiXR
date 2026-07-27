@@ -37,9 +37,8 @@ data class ArUiState(
     // stage transitions (show movement guidance until a surface appears, etc.).
     val isArReady: Boolean = false,
     val planeDetected: Boolean = false,
-    // First-run doodle demo: 0..1 "how steadily is the scribble overlay holding" (drives a hold-steady
-    // indicator), and a latching flag set once it has held long enough to swap in the user's artwork.
-    val doodleLockStability: Float = 0f,
+    // First-run walkthrough only: latches true once the marks the user drew have been detected (or the
+    // phase timed out), which is what ends the walkthrough and places the artwork.
     val doodleLocked: Boolean = false,
     // Wall stats from the doodle capture, used to auto-tune the artwork's adjustments on the swap.
     val doodleWallStats: com.hereliesaz.graffitixr.common.util.ImageStats? = null,

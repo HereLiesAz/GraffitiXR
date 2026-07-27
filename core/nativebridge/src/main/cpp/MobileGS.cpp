@@ -828,6 +828,16 @@ void MobileGS::restoreWallFingerprintMetric(const cv::Mat& d, const std::vector<
     if (intrinsics4)    memcpy(mFingerprintIntrinsics, intrinsics4, 4 * sizeof(float));
 }
 
+void MobileGS::clearWallFingerprint() {
+    std::lock_guard<std::mutex> lock(mMutex);
+    mWallDescriptors.release();
+    mWallKeypoints3D.clear();
+    // Back to the constructed defaults, so a later project can't inherit this one's co-registration.
+    static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    memcpy(mFingerprintAnchorMatrix, kIdentity16, 16 * sizeof(float));
+    memset(mFingerprintIntrinsics, 0, 4 * sizeof(float));
+}
+
 void MobileGS::restoreWallFeatureMap(const cv::Mat& d, const std::vector<cv::Point3f>& p,
                                      const std::vector<float>& conf, const std::vector<int>& obs,
                                      const float* anchorMatrix16, const float* intrinsics4) {

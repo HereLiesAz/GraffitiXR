@@ -49,10 +49,9 @@ class ArRenderer(
     // ViewModel flips ArUiState.planeDetected so first-run onboarding can drop
     // the "move your device" guidance once a surface exists.
     private val onPlaneDetected: () -> Unit = {},
-    // First-run doodle demo: reports the anchor-hold stability (0..1) as the user
-    // draws, and fires once when the overlay has held one spot long enough to swap
-    // the scribble for the user's artwork. Both no-op outside the doodle phase.
-    private val onDoodleLockProgress: (Float) -> Unit = {},
+    // First-run walkthrough: fires once when the fused pose has held one spot long
+    // enough to place the user's artwork. No-op outside the walkthrough's detect
+    // phase (doodleLockActive false).
     private val onDoodleLocked: () -> Unit = {},
     // Fired from the GL thread when ARCore has been stuck not-tracking for a
     // sustained run of frames (true) or recovers (false). MainScreen uses this
@@ -1097,7 +1096,6 @@ class ArRenderer(
                 // fires when the teleological SLAM has genuinely latched onto the drawn marks. On a
                 // blank wall relocalization stays weak until the user draws, so this self-times.
                 anchorLockTracker.update(anchorMatrix[12], anchorMatrix[13], anchorMatrix[14])
-                if (frameCount % 4 == 0) onDoodleLockProgress(anchorLockTracker.stability)
                 val relocInliers = slamManager.getRelocResult()[16].toInt()
                 if (anchorLockTracker.locked && relocInliers >= DOODLE_MIN_RELOC_INLIERS) {
                     doodleLockReported = true
