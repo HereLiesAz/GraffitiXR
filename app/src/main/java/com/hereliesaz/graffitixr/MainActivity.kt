@@ -442,12 +442,6 @@ class MainActivity : ComponentActivity() {
                     mainViewModel.setTouchLocked(false)
                 }
 
-                val isRailVisible = !editorUiState.hideUiForCapture &&
-                        !mainUiState.isTouchLocked &&
-                        !mainUiState.isCapturingTarget &&
-                        !showSettings &&
-                        !isExporting
-
                 // noMenu (AzNavRail 11.0) removes the side drawer entirely — all entries become rail
                 // items — and makes the app-icon tap FOLD THE RAIL UP INTO THE ICON (the scope tracks
                 // this as `isFoldedUp`).
@@ -459,7 +453,11 @@ class MainActivity : ComponentActivity() {
                 // everywhere also means the app-icon fold and AzNavRail's isExpanded=false
                 // initialisation — which keeps its outer fillMaxSize Box from attaching
                 // tapOutsideToCollapse over the screen — apply in AR, Overlay, Mockup and Trace too,
-                // not only Design/library/hidden-rail.
+                // not only Design.
+                //
+                // Folding is the ONLY thing that hides rail items. App state must never withhold
+                // them: the icon stays on screen either way, so an empty rail turns a tap on it into
+                // a dead input with no way back. See the unconditional ConfigureRailItems below.
                 val railMenuDisabled = true
 
                 var permissionRequestedAtLeastOnce by remember { mutableStateOf(hasCameraPermission) }
@@ -680,70 +678,83 @@ class MainActivity : ComponentActivity() {
                     // onboarding text, and per-mode goals that self-activate on mode entry.
                     ConfigureGuidance(editorUiState, arUiState, context, strings)
 
-                    if (isRailVisible) {
-                        ConfigureRailItems(
-                            mainViewModel, editorViewModel, arViewModel, dashboardViewModel, context,
-                            overlayImagePicker, backgroundImagePicker, editorUiState, railExpansion, arUiState, strings,
-                            navItemColor = navItemColor,
-                            showLibrary = showLibrary,
-                            coopState = coopState,
-                            isTouchLocked = mainUiState.isTouchLocked,
-                            isWaitingForTap = mainUiState.isWaitingForTap,
-                            onShowJoinScanner = { showJoinScanner = true },
-                            onWallPhoto = {
-                                if (hasCameraPermission) {
-                                    val tmpFile = File(context.cacheDir, "wall_camera_${System.currentTimeMillis()}.jpg")
-                                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tmpFile)
-                                    cameraUri = uri.toString()
-                                    takePictureLauncher.launch(uri)
-                                } else {
-                                    permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
+                    // Registered UNCONDITIONALLY. This used to be gated on an isRailVisible built from
+                    // hideUiForCapture / isTouchLocked / isCapturingTarget / showSettings /
+                    // isExporting, which emptied the rail outright in those states. The app icon stays
+                    // on screen regardless, so tapping it to bring the rail back did nothing — and
+                    // some of those states are reached FROM the rail (Trace ▸ Freeze locks touch;
+                    // Target starts a capture), so the button that got you in was the same button that
+                    // vanished. Whether items are on screen is AzNavRail's fold state, driven by the
+                    // user tapping the icon; it is not app state's call.
+                    //
+                    // Nothing needed those gates for correctness. hideUiForCapture is dead state (no
+                    // code ever sets it). Export never screenshots the Compose window — AR reads its GL
+                    // framebuffer, Overlay uses ImageCapture, the rest composite in the editor — so the
+                    // rail cannot leak into a capture. showLibrary is still honoured inside
+                    // ConfigureRailItems: that is a different navigation destination with its own UI,
+                    // not a state the user is stuck in.
+                    ConfigureRailItems(
+                        mainViewModel, editorViewModel, arViewModel, dashboardViewModel, context,
+                        overlayImagePicker, backgroundImagePicker, editorUiState, railExpansion, arUiState, strings,
+                        navItemColor = navItemColor,
+                        showLibrary = showLibrary,
+                        coopState = coopState,
+                        isTouchLocked = mainUiState.isTouchLocked,
+                        isWaitingForTap = mainUiState.isWaitingForTap,
+                        onShowJoinScanner = { showJoinScanner = true },
+                        onWallPhoto = {
+                            if (hasCameraPermission) {
+                                val tmpFile = File(context.cacheDir, "wall_camera_${System.currentTimeMillis()}.jpg")
+                                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tmpFile)
+                                cameraUri = uri.toString()
+                                takePictureLauncher.launch(uri)
+                            } else {
+                                permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
+                            }
+                        },
+                        onExportRequested = {
+                            // Mode-aware dispatch of the Export rail button. The spec is
+                            // "screenshot of the mode's content minus the rail/settings" — nothing
+                            // here touches the Compose window, so no UI overlays leak in:
+                            //   - AR: ArRenderer already reads its GL framebuffer (camera + wall
+                            //     overlay quad). skipLayerComposite=true because the layers are
+                            //     already baked into the readback as the wall quad.
+                            //   - Overlay: CameraX ImageCapture yields the sensor still; the
+                            //     editor composites layers on top at screen positions.
+                            //   - Mockup / Trace / Design: no camera capture, editor composites
+                            //     against per-mode background (backgroundBitmap / transparent).
+                            when (editorUiState.editorMode) {
+                                EditorMode.AR -> {
+                                    isExporting = true
+                                    val requested = arViewModel.requestExport { bmp ->
+                                        isExporting = false
+                                        editorViewModel.exportImage(backgroundBitmap = bmp, skipLayerComposite = true)
+                                    }
+                                    if (!requested) {
+                                        // No renderer attached (e.g. AR mode without camera
+                                        // permission), so there is no framebuffer to read back.
+                                        // Export the layers alone rather than doing nothing.
+                                        isExporting = false
+                                        editorViewModel.exportImage()
+                                    }
                                 }
-                            },
-                            onExportRequested = {
-                                // Mode-aware dispatch of the Export rail button. The spec is
-                                // "screenshot of the mode's content minus the rail/settings" — nothing
-                                // here touches the Compose window, so no UI overlays leak in:
-                                //   - AR: ArRenderer already reads its GL framebuffer (camera + wall
-                                //     overlay quad). skipLayerComposite=true because the layers are
-                                //     already baked into the readback as the wall quad.
-                                //   - Overlay: CameraX ImageCapture yields the sensor still; the
-                                //     editor composites layers on top at screen positions.
-                                //   - Mockup / Trace / Design: no camera capture, editor composites
-                                //     against per-mode background (backgroundBitmap / transparent).
-                                when (editorUiState.editorMode) {
-                                    EditorMode.AR -> {
-                                        isExporting = true
-                                        val requested = arViewModel.requestExport { bmp ->
-                                            isExporting = false
-                                            editorViewModel.exportImage(backgroundBitmap = bmp, skipLayerComposite = true)
-                                        }
-                                        if (!requested) {
-                                            // No renderer attached (e.g. AR mode without camera
-                                            // permission), so there is no framebuffer to read back.
-                                            // Export the layers alone rather than doing nothing.
-                                            isExporting = false
+                                EditorMode.OVERLAY -> {
+                                    exportDispatchScope.launch {
+                                        try {
+                                            val bmp = cameraController.takePictureAsBitmap(context)
+                                            editorViewModel.exportImage(backgroundBitmap = bmp)
+                                        } catch (t: Throwable) {
+                                            // Fall back to a layers-only export so the user
+                                            // still gets something rather than a silent failure.
+                                            android.util.Log.w("MainActivity", "Overlay capture failed; exporting layers only", t)
                                             editorViewModel.exportImage()
                                         }
                                     }
-                                    EditorMode.OVERLAY -> {
-                                        exportDispatchScope.launch {
-                                            try {
-                                                val bmp = cameraController.takePictureAsBitmap(context)
-                                                editorViewModel.exportImage(backgroundBitmap = bmp)
-                                            } catch (t: Throwable) {
-                                                // Fall back to a layers-only export so the user
-                                                // still gets something rather than a silent failure.
-                                                android.util.Log.w("MainActivity", "Overlay capture failed; exporting layers only", t)
-                                                editorViewModel.exportImage()
-                                            }
-                                        }
-                                    }
-                                    else -> editorViewModel.exportImage()
                                 }
-                            },
-                        )
-                    }
+                                else -> editorViewModel.exportImage()
+                            }
+                        },
+                    )
 
                     background(weight = 0) {
                         MainScreen(
@@ -1631,33 +1642,42 @@ class MainActivity : ComponentActivity() {
             }
 
             // Mockup ▸ Wall ▸ { Photo (take a photo), File (pick an image) }
+            // Its tools are registered only while Mockup is the active mode, matching AR and Overlay
+            // above. They used to be registered unconditionally, so an artist lining up a wall in AR
+            // was carrying a Wall ▸ Photo/File/Clear folder and a Mockup Lock that could not act on
+            // anything they were looking at. Tapping Mockup routes into the mode, so the tools are one
+            // tap away rather than gone.
             azRailSubHostItem(id = "mode.mockup", hostId = "host.modes", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.RECTANGLE)
-            azRailSubHostItem(id = "mockup.wall", hostId = "mode.mockup", text = navStrings.wall, color = navItemColor, shape = AzButtonShape.NONE)
-            azRailSubItem(id = "wall.photo", hostId = "mockup.wall", text = navStrings.photo, color = navItemColor, shape = AzButtonShape.NONE) {
-                onWallPhoto()
-            }
-            azRailSubItem(id = "wall.file", hostId = "mockup.wall", text = navStrings.file, color = navItemColor, shape = AzButtonShape.NONE) {
-                backgroundPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            }
-            // Clear — only offered once a wall photo is set, so there is something to remove.
-            if (editorUiState.backgroundBitmap != null) {
-                azRailSubItem(id = "wall.clear", hostId = "mockup.wall", text = navStrings.wallClear, color = navItemColor, shape = AzButtonShape.NONE) {
-                    editorViewModel.clearBackgroundImage()
+            if (editorUiState.editorMode == EditorMode.MOCKUP) {
+                azRailSubHostItem(id = "mockup.wall", hostId = "mode.mockup", text = navStrings.wall, color = navItemColor, shape = AzButtonShape.NONE)
+                azRailSubItem(id = "wall.photo", hostId = "mockup.wall", text = navStrings.photo, color = navItemColor, shape = AzButtonShape.NONE) {
+                    onWallPhoto()
+                }
+                azRailSubItem(id = "wall.file", hostId = "mockup.wall", text = navStrings.file, color = navItemColor, shape = AzButtonShape.NONE) {
+                    backgroundPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
+                // Clear — only offered once a wall photo is set, so there is something to remove.
+                if (editorUiState.backgroundBitmap != null) {
+                    azRailSubItem(id = "wall.clear", hostId = "mockup.wall", text = navStrings.wallClear, color = navItemColor, shape = AzButtonShape.NONE) {
+                        editorViewModel.clearBackgroundImage()
+                    }
+                }
+                val mockupLocked = editorUiState.modeAdjustments[EditorMode.MOCKUP]?.isTransformLocked == true
+                azRailSubItem(id = "mode.mockup.lock", hostId = "mode.mockup", text = "Lock", color = if (mockupLocked) Cyan else navItemColor, shape = AzButtonShape.NONE) {
+                    editorViewModel.onToggleModeTransformLocked(EditorMode.MOCKUP)
                 }
             }
-            val mockupLocked = editorUiState.modeAdjustments[EditorMode.MOCKUP]?.isTransformLocked == true
-            azRailSubItem(id = "mode.mockup.lock", hostId = "mode.mockup", text = "Lock", color = if (mockupLocked) Cyan else navItemColor, shape = AzButtonShape.NONE) {
-                editorViewModel.onToggleModeTransformLocked(EditorMode.MOCKUP)
-            }
 
-            // Trace ▸ Freeze
+            // Trace ▸ { Freeze, Lock } — same mode gating as the others.
             azRailSubHostItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.RECTANGLE)
-            azRailSubItem(id = "mode.trace.freeze", hostId = "mode.trace", text = "Freeze", color = navItemColor, shape = AzButtonShape.NONE) {
-                mainViewModel.setTouchLocked(!isTouchLocked)
-            }
-            val traceLocked = editorUiState.modeAdjustments[EditorMode.TRACE]?.isTransformLocked == true
-            azRailSubItem(id = "mode.trace.lock", hostId = "mode.trace", text = "Lock", color = if (traceLocked) Cyan else navItemColor, shape = AzButtonShape.NONE) {
-                editorViewModel.onToggleModeTransformLocked(EditorMode.TRACE)
+            if (editorUiState.editorMode == EditorMode.TRACE) {
+                azRailSubItem(id = "mode.trace.freeze", hostId = "mode.trace", text = "Freeze", color = if (isTouchLocked) Cyan else navItemColor, shape = AzButtonShape.NONE) {
+                    mainViewModel.setTouchLocked(!isTouchLocked)
+                }
+                val traceLocked = editorUiState.modeAdjustments[EditorMode.TRACE]?.isTransformLocked == true
+                azRailSubItem(id = "mode.trace.lock", hostId = "mode.trace", text = "Lock", color = if (traceLocked) Cyan else navItemColor, shape = AzButtonShape.NONE) {
+                    editorViewModel.onToggleModeTransformLocked(EditorMode.TRACE)
+                }
             }
 
             // Help — opens AzNavRail's built-in help overlay (populated by azAdvanced(helpList=...)).
