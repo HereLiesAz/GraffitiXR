@@ -105,6 +105,9 @@ public:
         return (float)inliers / (float)matches >= 0.6f;  // above PoseFusion's 0.5 trust bar
     }
 
+    /** Hard ceiling on stored wall marks — a memory guard on the self-grow append. */
+    static constexpr size_t kMaxWallMarks = 5000;
+
     /** Last [RelocReject]. */
     int lastRelocReject() const { return mLastRelocReject.load(std::memory_order_relaxed); }
     /** Correspondences built by the last attempt, successful or not. */
@@ -295,9 +298,15 @@ private:
     // restored without a capture view (rectification is then skipped — plain matching still runs).
     float mFingerprintViewMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     bool mHasFingerprintView = false;
-    // Teleological self-grow: default ON + the last reloc seq we grew from (only grow on a fresh,
+    // Teleological self-grow: default OFF + the last reloc seq we grew from (only grow on a fresh,
     // confident relock so promoted marks are placed with a current pose, never a stale one).
-    std::atomic<bool> mSelfGrowEnabled{true};
+    //
+    // OFF, not ON. This is the only mechanism in the engine that permanently mutates the
+    // authoritative reloc fingerprint, so a bad promotion is not a transient error — it is written
+    // into the map and compounds. tryUpdateFingerprint's own comment says it "stays OFF unless
+    // explicitly enabled"; the initializer said otherwise and the header won, which meant every
+    // release build promoted unsupervised with no user-facing switch to stop it.
+    std::atomic<bool> mSelfGrowEnabled{false};
     long mLastGrowSeq = 0;
     cv::Mat mWallPatch; // raw 256x256 gray canonical patch for the distortion head (desc_fp source)
     // VIO view snapshot captured alongside the reloc frame, so the rectifying warp matches that frame.

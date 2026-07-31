@@ -13,6 +13,29 @@ class PoseMathTest {
         assertEquals(m.toList(), PoseMath.multiply(identity(), m).toList())
     }
 
+    /**
+     * The identity and inverse tests above both COMMUTE (A*I == I*A, M⁻¹*M == M*M⁻¹), so an
+     * implementation of multiply(a, b) that returned b*a passes every one of them. Argument order is
+     * the thing the whole PoseFusion composition depends on, so pin it with operands that do not
+     * commute: rotate-then-translate is not translate-then-rotate.
+     */
+    @Test fun `multiply is not commutative and applies b in a's frame`() {
+        // 90 deg about Z (column-major: local +X maps to world +Y).
+        val rot = floatArrayOf(0f,1f,0f,0f, -1f,0f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
+        val tr = floatArrayOf(1f,0f,0f,0f, 0f,1f,0f,0f, 0f,0f,1f,0f, 2f,0f,0f,1f) // translate +2 along X
+
+        // multiply(rot, tr): the translation happens in rot's frame, so +2 along local X lands at
+        // world (0, 2, 0).
+        val rotThenTr = PoseMath.multiply(rot, tr)
+        assertEquals(0f, rotThenTr[12], 1e-4f)
+        assertEquals(2f, rotThenTr[13], 1e-4f)
+
+        // multiply(tr, rot): the translation is applied in world, so the origin stays at (2, 0, 0).
+        val trThenRot = PoseMath.multiply(tr, rot)
+        assertEquals(2f, trThenRot[12], 1e-4f)
+        assertEquals(0f, trThenRot[13], 1e-4f)
+    }
+
     @Test fun `rigidInverse undoes a translation+rotation`() {
         // 90 deg about Z then translate (1,2,3). inverse(M)*M == identity.
         val c = 0f; val s = 1f

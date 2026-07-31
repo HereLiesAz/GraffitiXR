@@ -141,4 +141,38 @@ class FingerprintSerializationTest {
             )
         }
     }
+
+    /**
+     * The reloc PnP subscripts the 3D point list by DESCRIPTOR ROW (`wallKps3d[match.trainIdx]`), so
+     * a file declaring more rows than it carries points reads past the end of the vector and feeds
+     * garbage 3D into solvePnPRansac. The blob-vs-rows guard above did not cover this second array.
+     */
+    @Test
+    fun `Fingerprint rejects a points3d count that disagrees with the descriptor row count`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            Fingerprint(
+                keypoints = emptyList(),
+                points3d = listOf(0.5f, 0.25f, 0.75f), // 1 point …
+                descriptorsData = byteArrayOf(1, 2, 3, 4), // … but 2 rows of 2 declared below
+                descriptorsRows = 2,
+                descriptorsCols = 2,
+                descriptorsType = 0,
+            )
+        }
+    }
+
+    /** Points-free fingerprints (keypoint-only, older projects) stay legal at any row count. */
+    @Test
+    fun `Fingerprint allows an empty points3d list alongside descriptor rows`() {
+        val fp = Fingerprint(
+            keypoints = emptyList(),
+            points3d = emptyList(),
+            descriptorsData = byteArrayOf(1, 2, 3, 4),
+            descriptorsRows = 2,
+            descriptorsCols = 2,
+            descriptorsType = 0,
+        )
+        assertEquals(2, fp.descriptorsRows)
+        assertEquals(0, fp.points3d.size)
+    }
 }

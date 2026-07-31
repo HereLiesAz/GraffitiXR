@@ -70,7 +70,10 @@ gha-creds-*.json
 /project_source_*.txt
 .worktrees/
 /.agent/
-/.claude/
+# Trailing /* rather than /: git never descends into an EXCLUDED DIRECTORY, so a negation
+# for a path inside one is unreachable. Excluding the contents instead leaves the directory
+# itself traversable, which is what makes the next line work.
+/.claude/*
 # ...except shared agent definitions, which are part of the project.
 !/.claude/agents/
 strangerdanger-494206-082913abfaab.json

@@ -393,9 +393,10 @@ Levels are set far apart deliberately — screening asks "does it matter", and w
 levels maximize the signal against E2's noise floor. Fine resolution is E5–E8's
 job.
 
-**Sets.** The set of parameters that go on to be swept; everything else is fixed
-at its prior and marked insensitive in `PARAMETERS.md`, *with the screening
-evidence recorded*, so a future session does not re-litigate it.
+**Sets.** The *shortlist*, not any values. E4 decides which parameters are worth
+sweeping; **E11** assigns them numbers. Everything E4 rejects is fixed at its prior
+and marked insensitive in `PARAMETERS.md`, *with the screening evidence recorded*,
+so a future session does not re-litigate it.
 
 ---
 
@@ -555,6 +556,101 @@ error.
 
 ---
 
+### E11 — Sweeping the screened survivors
+
+**Question.** For each parameter E4 flagged as mattering, what value minimizes the
+objective in §4.2?
+
+**Method.** One-dimensional sweep of each survivor, holding the others at their
+screened-best, on the synthetic progression at 0/50/100% coverage. Any pair whose
+E4 interaction estimate is non-negligible gets a small 2-D grid instead. Levels
+come from `PARAMETERS.md`; the candidate set is expected to include the PnP
+reprojection threshold, `MIN_INLIER_RATIO`, `BASE_ALPHA`, `CONF_FLOOR`, the two
+reloc-thread sleeps (under the E9 cost constraint), and the three
+`SEARCH_RADIUS_*` bounds.
+
+**Reasoning.** §4.1 describes screen → sweep → confirm, and this is the sweep. It
+is a separate experiment rather than a clause inside E4 because E4's job is
+*selection* and E11's is *assignment*, and conflating them is how a table ends up
+routing a dozen parameters to an experiment that sets nothing. The 1-D sweep is
+only legitimate for parameters E4 showed to be interaction-free — that
+qualification is the reason E4 has to run first and has to be Resolution IV.
+
+**Sets.** Every parameter in `PARAMETERS.md` whose "Set by" cell names E11.
+
+**Falsifies.** Nothing on its own. If a swept parameter's response curve is flat
+across its whole range, E4's screening produced a false positive and the parameter
+returns to its prior with that recorded as the evidence.
+
+---
+
+### E12 — Does the partition earn its place?
+
+**Question.** Is relocalization availability at ≥50% coverage higher with the
+footprint partition than without it?
+
+**Method.** A/B on identical replayed synthetic-progression datasets: Phase 2
+enabled versus Phase 2 forced to "everything is backbone" (the rollback constant
+from `IMPLEMENTATION.md`, which reproduces `main`'s behaviour exactly). Measure
+`availability` and `errMm` at coverage 0/25/50/75/100%.
+
+**Reasoning.** This is **P1**, and P1 is the prediction that justifies the
+partition — the single largest structural change in the plan. Every other
+experiment from E5 onward tunes *within* the new design and takes the partition as
+given; none of them compares it to not having it. Without E12 the partition would
+ship on the strength of its argument alone, which is precisely the failure mode
+the paper spends §4 documenting.
+
+The rollback constant makes this a genuinely controlled A/B: same code path, same
+build, one boolean. Nothing else differs, so a difference in availability is
+attributable to the partition and not to anything that landed alongside it.
+
+The ≥50% threshold is where the prediction lives — below that, too little of
+`F_in` has decayed for the two conditions to diverge, and a null result at 25%
+would be uninformative rather than falsifying.
+
+**Sets.** Nothing. It is the go/no-go on Phase 2.
+
+**Falsifies P1.** If availability is equal or worse with the partition at every
+coverage level, the backbone is not more durable than the undifferentiated set,
+and Phase 2 should be reverted rather than tuned. Check `backboneFeatures` before
+concluding that — an empty or tiny `F_out` (the wall-filling-design case) makes
+P1 untestable rather than false.
+
+---
+
+### E13 — Does disagreement predict pose error?
+
+**Question.** Does the rigid-offset fit over corroborated `F_in` features correlate
+with measured overlay error?
+
+**Method.** On the synthetic progression, at each frame with ≥8 corroborated
+features, fit the rigid 2-D offset between predicted and observed footprint
+positions (§5.6 of the paper). Log the fitted offset magnitude alongside `errMm`.
+Compute the correlation over frames, bucketed by coverage: 0–30%, 30–60%, 60–100%.
+
+**Reasoning.** This is **P5**, which had no experiment. It matters for two
+reasons beyond completeness. First, if the correlation holds, the offset fit
+becomes a *free error estimate* — a signal the system can act on in real time
+without ground truth, which is otherwise unavailable on a real wall. Second, it is
+the designated detector for the anchor-drift threat in §7 of the paper: if the fit
+correlates with anchor error rather than pose error, P5 passes while P1 fails, and
+that specific pattern is what tells you to stop tuning the relocalizer.
+
+The ≥8-feature floor and the coverage bucketing are both necessary. Below 8
+features the fit is dominated by noise; and the prediction is explicitly that the
+correlation appears *once coverage exceeds ~30%*, so pooling all coverages would
+average a real effect against a regime where none is expected.
+
+**Sets.** Nothing directly. If P5 holds, it justifies a follow-on: feeding the
+fitted offset into the Phase 4 search radius as a better uncertainty estimate than
+`errMm`, which is only available in evaluation.
+
+**Falsifies P5.** Correlation at `r ≤ 0.7` above 30% coverage. Combined with a
+passing P1, that points at anchor drift rather than relocalization error.
+
+---
+
 ## 6. Analysis conventions
 
 **Report medians and interquartile ranges, not means and standard deviations.**
@@ -591,12 +687,18 @@ information per hour:
    invalidate everything else. Non-negotiable.
 2. **E2** — the baseline. Without it there is no comparison.
 3. **E3** — the progress/confidence split. Cheapest real improvement in the plan.
-4. **E7** — the `ρ` × ratio grid. Tests the paper's central mechanism directly and
+4. **E12** — does the partition earn its place? One boolean, two runs, and it is
+   the go/no-go on the plan's largest structural change.
+5. **E7** — the `ρ` × ratio grid. Tests the paper's central mechanism directly and
    sets the two parameters that matter most.
-5. **E10** — the thesis.
+6. **E10** — the thesis.
 
-E4 can be skipped by fixing the insensitive parameters at their priors and
-accepting the risk. E5 can be skipped entirely by shipping promotion disabled,
-which is the default anyway. E6 is subsumed by E7's grid. E8's margins can take
-their priors. E9 must not be skipped before shipping, but can be deferred until
+E4/E11 can be collapsed by fixing the insensitive parameters at their priors and
+sweeping only the two or three you most distrust. E5 can be skipped entirely by
+shipping promotion disabled, which is the default. E6 is subsumed by E7's grid.
+E8's margins can take their priors. E13 is skippable — P5 is a nice-to-have, not
+load-bearing. E9 must not be skipped before shipping, but can be deferred until
 after the mechanism is shown to work.
+
+**E12 is not skippable.** It is the only experiment that asks whether the
+partition helps at all, and it is cheap: one boolean, two runs.

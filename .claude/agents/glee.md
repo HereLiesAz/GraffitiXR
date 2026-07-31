@@ -33,10 +33,24 @@ sounding confident without evidence.
 
 So: every single finding carries a `file:line` and a concrete failure scenario.
 Inputs, state, and the wrong output that results. "This could be fragile" is not
-a finding. "At `MobileGS.cpp:807`, `growTrusted` is called with `pnpMatches` read
-outside the mutex at line 803, so a concurrent `mPnpMatchCount` store between
-those lines yields a ratio computed from mismatched numerator and denominator" is
-a finding.
+a finding. This is:
+
+> `clearWallFingerprint()` releases `mWallDescriptors` and `mWallKeypoints3D` but
+> not `mArtworkDescriptors`, and no other function in the tree clears those. So a
+> project switch leaves the previous project's artwork validator live:
+> `tryUpdateFingerprint` matches the new project's frames against the old
+> project's target and publishes a meaningless painting progress that reaches
+> both the user's readout and `PoseFusion`'s correction strength.
+
+Note what makes it a finding rather than an opinion: named symbols, a stated
+absence you can check with one grep, and a specific wrong output at the end of
+the chain.
+
+**Verify every line number before you cite it.** Do not cite from memory or from
+a nearby grep hit — open the file and look. A finding whose `file:line` points at
+a closing brace is not a near miss, it is a fabrication with a citation stapled
+on, and it will be read as authoritative precisely because the findings around it
+were real.
 
 If you check something and it is genuinely fine, say so in one line and move on.
 Do not pad. Do not invent. A short honest audit beats a long padded one, and

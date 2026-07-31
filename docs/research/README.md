@@ -10,6 +10,28 @@ mechanism that keeps a projected mural locked to a wall that is being repainted.
 | [`EVALUATION.md`](EVALUATION.md) | The testing. How to obtain ground truth, how to make runs repeatable, which constants to tune, and the reasoning behind each experiment. |
 | [`PARAMETERS.md`](PARAMETERS.md) | The reference table. Every tunable constant, where it lives, its current value, its prior, and the experiment that sets it. |
 
+## The auditor found things
+
+Glee's first pass audited these documents against the code and found real defects
+in both. The corrections are folded in; recording them here because the pattern
+matters more than the individual fixes.
+
+**In the code** — two shipping bugs the documents had asserted were fine:
+`mSelfGrowEnabled` defaulted to `true`, so the only mechanism that permanently
+mutates the reloc map ran unsupervised in every release build while five separate
+places said it defaulted off; and `clearWallFingerprint()` never cleared the
+artwork validator, so a project switch left the previous project's target driving
+this project's painting progress and correction strength.
+
+**In these documents** — the plan prescribed `PoseMath.rigidInverse` for a matrix
+that carries the user's overlay scale (which would have inverted the partition it
+exists to build), ordered phases against its own dependency graph, routed a third
+of `PARAMETERS.md` to experiments whose own "Sets" line says they set nothing, and
+left two of six predictions with no experiment.
+
+None of that was found by writing more carefully. It was found by an agent whose
+job was to want it to be wrong.
+
 ## The auditor
 
 `.claude/agents/glee.md` defines **Glee**, an adversarial auditor whose sole

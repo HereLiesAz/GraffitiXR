@@ -43,7 +43,9 @@ halves of one convention. Phase 0 exists because of this.
 
 ## Phase 0 — Resolve the display-rotation convention
 
-**Status: prerequisite. Gates Phase 3. Does not gate Phases 1, 2, 4, 5.**
+**Status: prerequisite. Gates every phase that consumes 3D wall points — 2, 3, 4,
+and 5b. Does not gate Phase 1 (pure math on points supplied by the caller), 5a,
+or 6a.**
 
 ### The defect
 
@@ -72,13 +74,27 @@ in; `vCurrent` is the live ARCore view. If the stored points carry a baked-in
 — and it is wrong in a way that partially cancels the back-projection error,
 which is why the system limps rather than failing outright.
 
-### Why it must be settled before Phase 3
+### Why it must be settled before any 3D-consuming phase
 
-Phase 3 promotes new observations into the fingerprint using the current
-relocalized pose (`mPnpCamFromFpWorld` in `tryUpdateFingerprint`). If the pose
-carries a rotation error, promotion *writes that error into the map* and it
-compounds. Building geometric promotion on an unresolved convention converts a
-static bias into a divergent one.
+**Phase 2 (partition).** Φ classifies the very 3D points `backProject` produced.
+Skewed points land in the wrong region, in proportion to capture obliquity, and
+the partition — the structural claim of the whole design — is then computed on
+geometry that is wrong in a way nothing downstream can detect.
+
+**Phase 4 (corroboration).** The search radius is derived from a projected
+prediction. A skewed point predicts the wrong pixel, so the local search looks in
+the wrong place, and a low corroboration rate would be read as the mechanism
+failing rather than the frame convention.
+
+**Phase 3 (promotion), worst.** Promotion writes new observations into the
+fingerprint using the current relocalized pose (`mPnpCamFromFpWorld` in
+`tryUpdateFingerprint`). If the pose carries a rotation error, promotion *writes
+that error into the map* and it compounds — a static bias becomes a divergent one.
+
+The general form, which is §8 of the paper's point: any failure measured on top
+of an unresolved convention is unattributable between the new mechanism and the
+old bug. That is why Phase 0 lands before Phase 2 in the order below, despite
+being the slowest and most careful piece of work in the plan.
 
 ### The decision to make
 
@@ -181,9 +197,44 @@ boundary — they belong to neither set and should be discarded rather than
 assigned. `innerMargin` shrinks the inside test, `outerMargin` grows the outside
 test, and the gap between them is the discard band.
 
-`Footprint.of` needs a 4×4 inverse. The anchor model is rigid, so use
-`PoseMath.rigidInverse` — it already exists, it is already tested, and it avoids
-a general inverse.
+#### `M` is not rigid — do not use `rigidInverse`
+
+`Footprint.of` needs a 4×4 inverse, and the obvious move is `PoseMath.rigidInverse`,
+which already exists and is already tested. **It is the wrong function here, and
+using it silently inverts the partition.**
+
+`M` is `overlayComposedScratch` (`ArRenderer.kt:1763`), built as
+`overlayBaseScratch · overlayLocalScratch` — and `overlayLocalScratch` ends with
+
+```kotlin
+Matrix.scaleM(overlayLocalScratch, 0, overlayScale, overlayScale, 1f)
+```
+
+where `overlayScale` is the user's pinch gesture (`MainScreen.kt:236`). So `M`
+carries a similarity scale, not just rotation and translation.
+
+`rigidInverse` inverts the linear part by **transposing** it, which is the inverse
+only when there is no scale. For `A = R·S` with `S = diag(s, s, 1)`, the transpose
+gives `S·Rᵀ` where the true inverse is `S⁻¹·Rᵀ` — off by a factor of `s²` on the
+`x` and `y` components, plus a wrong translation. At `overlayScale = 2`, a feature
+sitting exactly on the design edge yields `‖Φ‖∞ = 4`, gets classified `OUTSIDE`,
+and is promoted into the backbone — the set defined as *wall that never gets
+painted*. Every feature under the artwork lands in `F_out`. That is precisely the
+corruption the partition exists to prevent, produced by the partition's own
+inverse.
+
+**Do this instead.** Decompose rather than inverting the composite: `Φ` only needs
+the *rigid* part of the anchor and the scale separately, because the scale is
+already accounted for by the half-extents. Either
+
+- pass `overlayBaseScratch` (the rigid factor) as `M` and fold `overlayScale`
+  into the effective half-extents (`h_w·s`, `h_h·s`) — cheapest and exact; or
+- add `PoseMath.similarityInverse(m)`, which extracts `s` from the first column's
+  norm, transposes, and divides by `s²`. Needed anyway if any caller only has the
+  composed matrix.
+
+Prefer the first. It keeps `Φ` a pure rigid-frame operation and makes the scale
+dependency explicit at the call site instead of buried in an inverse.
 
 ### Tests — `FootprintTest.kt`
 
@@ -199,6 +250,9 @@ a general inverse.
 6. Off-plane point: a point 0.5 m in front of the wall projects to the same `(u,v)`
    as its foot. Document this explicitly — Φ deliberately discards the normal
    component, and a reader will wonder.
+7. **Scaled anchor.** With `overlayScale = 2`, a point on the design's edge still
+   maps to `‖Φ‖∞ = 1`, not 4 and not 0.25. This is the case that catches the
+   `rigidInverse` trap above, and without it the suite ships that bug green.
 
 ### Risk
 
@@ -256,14 +310,25 @@ fun build(
 
 and the same two parameters on the single-view `PlaneMarks` path.
 
-**Snapshot the extents at capture.** `OverlayRenderer`'s extents change when the
-user scales the design. The fingerprint's regions are only meaningful against the
-extents in force when it was built, so store `halfW`/`halfH` in the `Fingerprint`
-alongside the regions. If the user rescales the design afterwards, the stored
-regions are stale — recompute them from the stored 3D points and the new extents
-rather than forcing a recapture. That is a cheap pure-Kotlin pass over the point
-array and it is worth doing because rescaling the design is a normal thing for a
-user to do mid-session.
+**Snapshot the effective footprint at capture — and watch the right variable.**
+The regions are only meaningful against the design's size at the moment they were
+computed, so store that size in the `Fingerprint`. But be precise about what
+actually changes when the user resizes the design:
+
+`OverlayRenderer.setExtent` has exactly two call sites — `ArRenderer.kt:499` (a
+fixed constant at surface-created) and `ArRenderer.kt:1664` (a one-shot initial
+screen-fit, guarded by `quadInitialFitApplied`). **Neither is driven by the user.**
+The user's resize is `overlayScale` (`ArRenderer.kt:369`, set from
+`MainScreen.kt:236`), and it enters the *model matrix*, not the extents.
+
+So a `reclassify(anchorModel, halfW, halfH)` that watches the extents would
+recompute regions from two numbers that never moved, while the quantity that did
+move sits in the transform. Store and compare **`overlayScale`** — or, following
+the Phase 1 recommendation, store the effective half-extents `h_w·s`, `h_h·s`,
+which folds both into one number per axis and makes the staleness check a single
+float comparison. Recompute regions from the stored 3D points when it changes;
+that is a cheap pure-Kotlin pass and much better than forcing a recapture, because
+pinching the design is a normal thing to do mid-session.
 
 ### Native side
 
@@ -315,7 +380,7 @@ returns to `main` exactly.
 
 ## Phase 3 — Geometric promotion
 
-**Depends on: Phase 0 (hard) and Phase 2.**
+**Depends on: Phase 0 (hard), Phase 1, and Phase 2. Lands last.**
 
 ### What changes
 
@@ -376,7 +441,7 @@ dataset.
 
 ## Phase 4 — Spatially-constrained corroboration
 
-**Depends on: Phases 1 and 2. Independent of 3.**
+**Depends on: Phase 0, Phase 1, and Phase 2. Independent of 3.**
 
 ### What changes
 
@@ -434,7 +499,7 @@ scaling `r` with the *measured* recent pose error (already available as the
 
 ## Phase 5 — Separate progress from pose error
 
-**Depends on: Phase 2. Independent of 3 and 4.**
+**5a depends on nothing — land it early. 5b depends on Phases 2 and 4.**
 
 ### The defect
 
@@ -505,7 +570,7 @@ Low, and it is the highest value-per-risk item in the plan. Do it early.
 
 ## Phase 6 — Telemetry so the evaluation is possible at all
 
-**Depends on: 2. Should land alongside 2.**
+**6a depends on nothing — land it early. 6b lands with each phase that sources its columns.**
 
 `EVALUATION.md` cannot run without these channels. Extend
 `EvalSampleLog.CSV_HEADER` — currently:
@@ -539,24 +604,52 @@ project and every new number should appear there.
 
 ## Dependency graph
 
+Two phases split, because each has a part that is genuinely independent and a
+part that is not:
+
+- **5a** — publish `corroborationConfidence` as its own channel, move the ×0.9
+  decay off the progress channel. Keeps today's `artDescs.rows` denominator.
+  Depends on nothing.
+- **5b** — change the denominator to *predicted-visible* `F_in`. Depends on 2 and 4.
+- **6a** — the telemetry plumbing: sidecar metadata, the CSV-shape test, and the
+  columns whose sources already exist (`relocReject`, the existing
+  `RelocDiagnostics` fields). Depends on nothing.
+- **6b** — the columns sourced from new phases (`backbone*` from 2, `inlierSpread`
+  from 3, `corrob*` and `searchRadiusPx` from 4). Each lands *with* its phase.
+
 ```
-Phase 0 (rotation)  ──────────────┐
-                                  ▼
-Phase 1 (Φ) ──► Phase 2 (partition) ──► Phase 3 (promotion)   [gated by 0]
-                     │
-                     ├──────────► Phase 4 (local corroboration)
-                     │
-                     ├──────────► Phase 5 (split signals)
-                     │
-                     └──────────► Phase 6 (telemetry)
+Phase 1 (Φ) ─────────────────────────────┐
+                                         ▼
+Phase 0 (rotation) ──► Phase 2 (partition) ──► Phase 3 (promotion)
+                            │                       │
+                            ├──► Phase 4 (local corroboration)
+                            │         │
+                            │         └──► Phase 5b (visible denominator)
+                            │
+                            └──► Phase 6b (partition columns)
+
+Phase 5a (split signals) ── independent
+Phase 6a (telemetry plumbing) ── independent
 ```
 
-Recommended landing order, which is not the numeric order: **1 → 6 → 5 → 2 → 4 →
-0 → 3.** Rationale: Phase 1 is free and unblocks everything; Phase 6 makes every
-later change measurable; Phase 5 is the best risk-adjusted fix and is
-independent; Phase 2 is the structural change; Phase 4 is the payoff; Phase 0 is
-slow and careful and Phase 3 is the only one that can do lasting damage, so both
-go last.
+**Phase 0 gates Phase 2, not only Phase 3.** Φ classifies 3D points that
+`PlaneMarks.backProject` produced. If those points are skewed by the rotation
+convention, the partition is computed on skewed geometry and a feature's region
+is wrong in proportion to capture obliquity. This is what §8 of the paper means
+by "prerequisite, not a parallel task" — an earlier draft of this document said
+Phase 0 gated only Phase 3, which contradicted the paper and would have put every
+E4–E8 measurement on an unattributable footing.
+
+Recommended landing order, which is not the numeric order:
+
+**1 → 5a → 6a → 0 → 2 (+6b) → 4 (+6b) → 5b → 3**
+
+Rationale: Phase 1 is free, pure, and unblocks everything. 5a is the best
+risk-adjusted fix in the plan and needs nothing. 6a makes every later change
+measurable. Phase 0 then lands *before* any 3D-consuming work, per the paragraph
+above. Phase 2 is the structural change and carries its own telemetry columns
+with it; Phase 4 is the payoff; 5b closes out the denominator once its inputs
+exist. Phase 3 is the only phase that can do lasting damage, so it goes last.
 
 ---
 
@@ -566,58 +659,86 @@ Each item is one commit-sized unit of work. Checkboxes are for tracking across
 sessions. `[T]` = has a test that must be written with it. `[N]` = touches native
 code, so CI's NDK build is the only compile check.
 
+**Sections are in landing order (1 → 5a → 6a → 0 → 2 → 4 → 5b → 3), not numeric
+order.** Work top to bottom.
+
 ### Phase 1 — footprint operator
 
 - [ ] **1.1** Create `feature/ar/.../anchor/Footprint.kt` with `Region` enum and
       empty `of` / `isInside` / `outsideDistance` / `classify` signatures.
-- [ ] **1.2** Implement `Footprint.of` using `PoseMath.rigidInverse`; return a
-      reused 2-element `FloatArray` from a caller-supplied buffer overload to
-      avoid per-feature allocation in the hot path. **[T]**
+- [ ] **1.2** Implement `Footprint.of`. **Do not use `PoseMath.rigidInverse`** —
+      the composed anchor carries `overlayScale`; take the rigid factor
+      (`overlayBaseScratch`) and fold the scale into the half-extents instead.
+      Return through a caller-supplied buffer overload to avoid per-feature
+      allocation in the hot path. **[T]**
 - [ ] **1.3** Implement `isInside` and `outsideDistance` (Chebyshev). **[T]**
 - [ ] **1.4** Implement `classify` with the inner/outer margin discard band. **[T]**
-- [ ] **1.5** Write `FootprintTest.kt` — all six cases from Phase 1 above,
-      including the rotated-anchor case and the non-square-extent case. **[T]**
+- [ ] **1.5** Write `FootprintTest.kt` — all seven cases from Phase 1 above. The
+      rotated-anchor, non-square-extent, and **scaled-anchor** cases are the three
+      that catch real bugs; the scaled-anchor case is non-optional. **[T]**
 - [ ] **1.6** Document in the KDoc that Φ discards the plane-normal component,
       with the reason.
 
-### Phase 6 — telemetry (land before behaviour changes)
+### Phase 5a — split progress from confidence (no new dependencies)
 
-- [ ] **6.1** Extend `RelocDiagnostics` with `backboneFeatures`, `inlierSpread`,
-      `corrobPredicted`, `corrobMatched`. Defaults must encode "not measured",
-      not "zero" — follow the existing `obliquityDeg = -1` precedent. **[T]**
-- [ ] **6.2** Extend `RelocDiagnosticsTest` for the new defaults and for the
-      independence of each new counter.
-- [ ] **6.3** Add the matching fields to the native diagnostics publish path in
-      `MobileGS.cpp`; keep the ordinal contract with the Kotlin enum intact. **[N]**
-- [ ] **6.4** Extend `EvalSampleLog.CSV_HEADER` with the nine columns above and
-      the matching `EvalLiveMetrics` fields.
-- [ ] **6.5** Add a CSV-shape test: header column count equals the emitted row's
+- [ ] **5a.1** Add `mCorroborationConfidence` atomic to `MobileGS.h`. **[N]**
+- [ ] **5a.2** In `tryUpdateFingerprint`, compute and publish corroboration
+      confidence separately from `mPaintingProgress`. Keep today's
+      `artDescs.rows` denominator for now — 5b changes it. **[N]**
+- [ ] **5a.3** Remove the `×0.9` decay from the painting-progress channel; leave
+      progress as a stored fraction that only a real measurement changes. **[N]**
+- [ ] **5a.4** Apply decay (or a per-frame recompute) to the confidence channel
+      only. **[N]**
+- [ ] **5a.5** Add `SlamManager.getCorroborationConfidence()`.
+- [ ] **5a.6** Switch `ArRenderer`'s `confGlobal` to the new getter; leave
+      `ArViewModel:1469` on `getPaintingProgress()`.
+- [ ] **5a.7** Extend `PoseFusionTest`: floor confidence still corrects; a
+      confidence drop slows but never reverses a correction. **[T]**
+
+### Phase 6a — telemetry plumbing (no new dependencies)
+
+- [ ] **6a.1** Add the run-identity sidecar JSON next to every `DriftCostProbe`
+      CSV: recording hash, git commit, all parameter values, RNG seed, sync/async
+      mode, device model. A CSV without a sidecar is not evidence.
+- [ ] **6a.2** Add a CSV-shape test: header column count equals the emitted row's
       field count. This is the class of bug that silently corrupts every
       downstream analysis. **[T]**
-- [ ] **6.6** Surface the new numbers in `RelocDiagnosticsOverlay`, laid out so
-      the backbone and corroboration groups are visually separated.
+- [ ] **6a.3** Add the `relocReject` ordinal column — its source already exists.
+- [ ] **6a.4** Add the eval-only fixed RNG seed and the synchronous-reloc mode
+      from `EVALUATION.md` §3.1. Both must be inert in release builds.
 
-### Phase 5 — split progress from confidence
+### Phase 0 — rotation convention
 
-- [ ] **5.1** Add `mCorroborationConfidence` atomic to `MobileGS.h`. **[N]**
-- [ ] **5.2** In `tryUpdateFingerprint`, compute and publish corroboration
-      confidence separately from `mPaintingProgress`. **[N]**
-- [ ] **5.3** Remove the `×0.9` decay from the painting-progress channel; leave
-      progress as a stored fraction that only a real measurement changes. **[N]**
-- [ ] **5.4** Apply decay (or a per-frame recompute) to the confidence channel
-      only. **[N]**
-- [ ] **5.5** Add `SlamManager.getCorroborationConfidence()`.
-- [ ] **5.6** Switch `ArRenderer`'s `confGlobal` to the new getter; leave
-      `ArViewModel:1469` on `getPaintingProgress()`.
-- [ ] **5.7** Extend `PoseFusionTest`: floor confidence still corrects; a
-      confidence drop slows but never reverses a correction. **[T]**
+- [ ] **0.1** Write `PlaneMarksObliquityTest` against a synthetic wall + camera at
+      0/20/40/60°. Expect it to fail at >0° on current `main` — that failure is
+      the reproduction. **[T]**
+- [ ] **0.2** Add `MetricMarks.glViewToCvDisplay(glView, rotationDeg)`; leave
+      `glViewToCv` untouched. **[T]**
+- [ ] **0.3** Unit-test `glViewToCvDisplay` at 0/90/180/270° against hand-computed
+      matrices. **[T]**
+- [ ] **0.4** Route the capture path through the new converter.
+- [ ] **0.5** Audit *every* consumer of the capture view matrix for the same
+      convention — `MetricFingerprintBuilder`, `PlaneMarks` callers,
+      `targetCaptureViewMatrix` in `ArViewModel`, `fingerprintViewMatrix` in
+      `MainViewModel`, and `restoreWallFingerprintMetric`'s `viewMatrix16`.
+      List each site in the commit message with its verdict.
+- [ ] **0.6** Confirm `PoseFusion.composeCorrected` is consistent under the chosen
+      convention. `PoseFusionTest` now pins the factor order with non-commuting
+      operands; extend it for the rotation, not with another round-trip (a
+      round-trip is order-insensitive and would pass either way). **[T]**
+- [ ] **0.7** Add `captureRotationDeg` to `Fingerprint`; default `-1`; refuse to
+      reload a legacy fingerprint and prompt for re-capture. **[T]**
+- [ ] **0.8** Re-run `0.1` and confirm <1 mm at all four obliquities.
 
 ### Phase 2 — partition the fingerprint
 
 - [ ] **2.1** Add `regions: ByteArray`, `captureHalfW`, `captureHalfH` to
       `Fingerprint`; empty `regions` means legacy all-backbone. **[T]**
-- [ ] **2.2** Add `Fingerprint.reclassify(anchorModel, halfW, halfH)` for the
-      user-rescales-the-design case; pure Kotlin over the stored points. **[T]**
+- [ ] **2.2** Add `Fingerprint.reclassify(...)` for the user-rescales-the-design
+      case; pure Kotlin over the stored points. Key the staleness check on
+      **`overlayScale`** (or the effective scaled half-extents), NOT on
+      `OverlayRenderer`'s extents — those have no user-driven call site and never
+      change. **[T]**
 - [ ] **2.3** Thread `overlayHalfW` / `overlayHalfH` into
       `MetricFingerprintBuilder.build` and the `PlaneMarks` single-view path.
 - [ ] **2.4** Classify each surviving point via `Footprint.classify` during
@@ -634,6 +755,9 @@ code, so CI's NDK build is the only compile check.
 - [ ] **2.9** Add a persistence round-trip test including the legacy-empty path. **[T]**
 - [ ] **2.10** Verify on a replayed recording that a legacy fingerprint produces
       byte-identical inlier counts to `main`.
+- [ ] **2.11** (6b) Add `backboneFeatures` / `backboneMatches` / `backboneInliers`
+      to `RelocDiagnostics`, the CSV, and the overlay. Defaults encode "not
+      measured", not zero — follow the `obliquityDeg = -1` precedent. **[T][N]**
 
 ### Phase 4 — spatially-constrained corroboration
 
@@ -654,26 +778,13 @@ code, so CI's NDK build is the only compile check.
       "not measured" rather than 0.0 — those are different states and
       `PoseFusion` must not read the second as the first.
 
-### Phase 0 — rotation convention
+### Phase 5b — the predicted-visible denominator
 
-- [ ] **0.1** Write `PlaneMarksObliquityTest` against a synthetic wall + camera at
-      0/20/40/60°. Expect it to fail at >0° on current `main` — that failure is
-      the reproduction. **[T]**
-- [ ] **0.2** Add `MetricMarks.glViewToCvDisplay(glView, rotationDeg)`; leave
-      `glViewToCv` untouched. **[T]**
-- [ ] **0.3** Unit-test `glViewToCvDisplay` at 0/90/180/270° against hand-computed
-      matrices. **[T]**
-- [ ] **0.4** Route the capture path through the new converter.
-- [ ] **0.5** Audit *every* consumer of the capture view matrix for the same
-      convention — `MetricFingerprintBuilder`, `PlaneMarks` callers,
-      `targetCaptureViewMatrix` in `ArViewModel`, `fingerprintViewMatrix` in
-      `MainViewModel`, and `restoreWallFingerprintMetric`'s `viewMatrix16`.
-      List each site in the commit message with its verdict.
-- [ ] **0.6** Confirm `PoseFusion.composeCorrected` is consistent under the chosen
-      convention; add a composition test that round-trips a known pose. **[T]**
-- [ ] **0.7** Add `captureRotationDeg` to `Fingerprint`; default `-1`; refuse to
-      reload a legacy fingerprint and prompt for re-capture. **[T]**
-- [ ] **0.8** Re-run `0.1` and confirm <1 mm at all four obliquities.
+- [ ] **5b.1** Switch `corroborationConfidence`'s denominator from
+      `artDescs.rows` to the Phase 4 predicted-visible count, so a close-up of
+      one corner is no longer capped by framing rather than by agreement. **[N]**
+- [ ] **5b.2** Re-derive `CONF_FLOOR` against the new denominator. Its current
+      0.5 was reasoned against the old one and does not transfer unexamined. **[T]**
 
 ### Phase 3 — geometric promotion
 
@@ -687,7 +798,10 @@ code, so CI's NDK build is the only compile check.
 - [ ] **3.5** Route `INSIDE` promotions into `F_in` with a bounded lifetime, or
       drop them — decide from E5's result, not in advance.
 - [ ] **3.6** Keep `setSelfGrowEnabled` defaulted **off**. Flip only after E5
-      shows a positive replayed-dataset effect.
+      shows a positive replayed-dataset effect. (The native default and the eval
+      overlay's toggle both said ON until this was corrected — re-check both
+      `MobileGS.h`'s initializer and `MainActivity`'s `selfGrowOn` if you touch
+      either, because the comment and the initializer disagreed for months.)
 
 ### Cross-cutting
 
