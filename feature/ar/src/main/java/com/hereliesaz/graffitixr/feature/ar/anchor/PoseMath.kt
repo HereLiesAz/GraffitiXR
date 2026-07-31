@@ -16,6 +16,53 @@ object PoseMath {
         return r
     }
 
+    /**
+     * Uniform scale baked into a similarity transform `[sR|t]`, recovered as the norm of its first
+     * column. Returns 1 for a rigid matrix.
+     *
+     * Worth having explicitly, because the AR overlay's model matrix is NOT rigid: `ArRenderer`
+     * composes the user's pinch (`Matrix.scaleM(.., overlayScale, overlayScale, 1f)`) into it, and
+     * anything that assumes otherwise — [rigidInverse] in particular — is wrong by `s²`.
+     */
+    fun scaleOf(m: FloatArray): Float = sqrt(m[0] * m[0] + m[1] * m[1] + m[2] * m[2])
+
+    /**
+     * Inverse of a SIMILARITY transform `[sR|t]` with uniform scale: `[R^T/s | -R^T t/s]`.
+     *
+     * Use this, not [rigidInverse], for any matrix that may carry the overlay scale. [rigidInverse]
+     * inverts the linear part by transposing, which yields `sR^T` where `R^T/s` was meant — an error
+     * of `s²`. At `overlayScale = 2` that misplaces every point by a factor of four, which is enough
+     * to flip a footprint classification from inside the design to outside it.
+     *
+     * **Exactness caveat, stated precisely.** The overlay is built with `scaleM(.., s, s, 1f)` —
+     * X and Y scaled, Z not — so `A = R·diag(s,s,1)` is a similarity only *in the plane*, and the
+     * `Aᵀ/s²` this computes is not its exact inverse.
+     *
+     * Working it out row by row for that matrix: the true inverse is `diag(1/s,1/s,1)·Rᵀ`, whose
+     * rows 0 and 1 are `(1/s)·(rows 0,1 of Rᵀ)`. Since `Aᵀ = diag(s,s,1)·Rᵀ`, dividing by `s²` gives
+     * `(1/s)·(rows 0,1 of Rᵀ)` for those same rows — **identical**. Only row 2, the plane normal, is
+     * off (by a further factor of `s`), and with it the Z component of the translation.
+     *
+     * So this is exact for every component [Footprint] reads, and wrong only in the component
+     * [Footprint] discards by construction. Do not reuse it where the normal direction matters
+     * without fixing row 2 first. For a genuinely uniform `diag(s,s,s)` it is exact throughout.
+     */
+    fun similarityInverse(m: FloatArray): FloatArray {
+        val s = scaleOf(m)
+        require(s > 1e-9f) { "similarityInverse: degenerate scale $s" }
+        val inv = 1f / s
+        val r = FloatArray(16)
+        // R^T/s: transpose the linear part, then divide out the scale once for the transpose's own
+        // factor of s and once for the inverse.
+        for (i in 0 until 3) for (j in 0 until 3) r[j * 4 + i] = m[i * 4 + j] * inv * inv
+        val tx = m[12]; val ty = m[13]; val tz = m[14]
+        r[12] = -(r[0] * tx + r[4] * ty + r[8] * tz)
+        r[13] = -(r[1] * tx + r[5] * ty + r[9] * tz)
+        r[14] = -(r[2] * tx + r[6] * ty + r[10] * tz)
+        r[15] = 1f
+        return r
+    }
+
     /** Inverse of a rigid transform [R|t] (rotation+translation, no scale): [R^T | -R^T t]. */
     fun rigidInverse(m: FloatArray): FloatArray {
         val r = FloatArray(16)

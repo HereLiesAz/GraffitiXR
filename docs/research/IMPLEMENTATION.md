@@ -664,19 +664,19 @@ order.** Work top to bottom.
 
 ### Phase 1 — footprint operator
 
-- [ ] **1.1** Create `feature/ar/.../anchor/Footprint.kt` with `Region` enum and
+- [x] **1.1** Create `feature/ar/.../anchor/Footprint.kt` with `Region` enum and
       empty `of` / `isInside` / `outsideDistance` / `classify` signatures.
-- [ ] **1.2** Implement `Footprint.of`. **Do not use `PoseMath.rigidInverse`** —
+- [x] **1.2** Implement `Footprint.of`. **Do not use `PoseMath.rigidInverse`** —
       the composed anchor carries `overlayScale`; take the rigid factor
       (`overlayBaseScratch`) and fold the scale into the half-extents instead.
       Return through a caller-supplied buffer overload to avoid per-feature
       allocation in the hot path. **[T]**
-- [ ] **1.3** Implement `isInside` and `outsideDistance` (Chebyshev). **[T]**
-- [ ] **1.4** Implement `classify` with the inner/outer margin discard band. **[T]**
-- [ ] **1.5** Write `FootprintTest.kt` — all seven cases from Phase 1 above. The
+- [x] **1.3** Implement `isInside` and `outsideDistance` (Chebyshev). **[T]**
+- [x] **1.4** Implement `classify` with the inner/outer margin discard band. **[T]**
+- [x] **1.5** Write `FootprintTest.kt` — all seven cases from Phase 1 above. The
       rotated-anchor, non-square-extent, and **scaled-anchor** cases are the three
       that catch real bugs; the scaled-anchor case is non-optional. **[T]**
-- [ ] **1.6** Document in the KDoc that Φ discards the plane-normal component,
+- [x] **1.6** Document in the KDoc that Φ discards the plane-normal component,
       with the reason.
 
 ### Phase 5a — split progress from confidence (no new dependencies)
@@ -709,7 +709,7 @@ order.** Work top to bottom.
 
 ### Phase 0 — rotation convention
 
-- [ ] **0.1** Write `PlaneMarksObliquityTest` against a synthetic wall + camera at
+- [x] **0.1** Write `PlaneMarksObliquityTest` against a synthetic wall + camera at
       0/20/40/60°. Expect it to fail at >0° on current `main` — that failure is
       the reproduction. **[T]**
 - [ ] **0.2** Add `MetricMarks.glViewToCvDisplay(glView, rotationDeg)`; leave
