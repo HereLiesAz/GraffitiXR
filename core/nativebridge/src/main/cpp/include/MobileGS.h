@@ -108,6 +108,17 @@ public:
     /** Hard ceiling on stored wall marks — a memory guard on the self-grow append. */
     static constexpr size_t kMaxWallMarks = 5000;
 
+    /** Sentinel for "no corroboration attempt has produced a measurement yet". */
+    static constexpr float kCorroborationUnmeasured = -1.0f;
+
+    /**
+     * Per-attempt decay applied to the CORROBORATION channel when an attempt runs and yields no
+     * usable measurement — the wall left the frame, the head refused, the patch is missing. It
+     * expresses "my last reading is getting stale", which is a statement about confidence and never
+     * was one about how much of the mural is painted.
+     */
+    static constexpr float kCorroborationDecay = 0.9f;
+
     /** Last [RelocReject]. */
     int lastRelocReject() const { return mLastRelocReject.load(std::memory_order_relaxed); }
     /** Correspondences built by the last attempt, successful or not. */
@@ -186,7 +197,31 @@ public:
     int getImmutableSplatCount() const { return 0; }   // voxel/splat map deleted
     void getConfidenceAvgs(float& outVisible, float& outGlobal) const;
     void setSplatsVisible(bool visible) { mSplatsVisible = visible; }
+    /**
+     * How much of the registered design the wall now answers for: a PROGRESS measurement, on the
+     * timescale of hours, roughly monotonic. For the user's progress readout.
+     *
+     * Never decayed. It used to be, which conflated it with the signal below.
+     */
     float getPaintingProgress() const { return mPaintingProgress.load(std::memory_order_relaxed); }
+
+    /**
+     * How much the wall corroborates the design RIGHT NOW: a per-attempt CONFIDENCE, on the
+     * timescale of frames, moving in both directions. This is what PoseFusion should scale its
+     * correction strength by.
+     *
+     * Split from painting progress because one scalar cannot mean both "the mural is 60% painted"
+     * and "I trust this frame". They move on completely different timescales, and the decay that
+     * belongs to the second was being applied to the first — so three bad frames read as the mural
+     * being un-painted, and the 0.9-per-tick decay made that persist for seconds afterwards.
+     *
+     * Returns a negative value when no corroboration attempt has produced a measurement yet, which
+     * is a different state from "attempted and found nothing" (0.0). Callers that need a plain
+     * [0,1] should clamp; PoseFusion's CONF_FLOOR already treats 0 as the conservative floor.
+     */
+    float getCorroborationConfidence() const {
+        return mCorroborationConfidence.load(std::memory_order_relaxed);
+    }
 
     void saveModel(const std::string& path);
     void loadModel(const std::string& path);
@@ -268,6 +303,22 @@ private:
     cv::Mat mArtworkDescriptors;
     std::vector<cv::Point3f> mArtworkKeypoints3D;
     std::atomic<float> mPaintingProgress{0.0f};
+    // -1 = never measured, which is NOT the same as 0.0 = measured and found nothing. Zero is a
+    // legitimate reading here, so it cannot double as the "no data yet" sentinel.
+    std::atomic<float> mCorroborationConfidence{kCorroborationUnmeasured};
+
+    /**
+     * Age the corroboration reading after an attempt that produced nothing usable.
+     *
+     * A never-measured channel stays never-measured: decaying the -1 sentinel would walk it toward
+     * zero and quietly turn "no data" into "measured, found nothing" — the exact class of bug that
+     * shipped in mLastRelocReject, where 0 doubled as both a valid code and the default.
+     */
+    void decayCorroboration() {
+        const float c = mCorroborationConfidence.load(std::memory_order_relaxed);
+        if (c < 0.0f) return;
+        mCorroborationConfidence.store(c * kCorroborationDecay, std::memory_order_relaxed);
+    }
 
     // --- Persistent wall feature map (lean reloc backbone; docs/RELOC_MAP_DESIGN.md) ---
     // Co-registered to the fingerprint anchor. Phase 2a stores it; reloc matching (Phase 2b) is gated

@@ -681,18 +681,18 @@ order.** Work top to bottom.
 
 ### Phase 5a — split progress from confidence (no new dependencies)
 
-- [ ] **5a.1** Add `mCorroborationConfidence` atomic to `MobileGS.h`. **[N]**
-- [ ] **5a.2** In `tryUpdateFingerprint`, compute and publish corroboration
+- [x] **5a.1** Add `mCorroborationConfidence` atomic to `MobileGS.h`. **[N]**
+- [x] **5a.2** In `tryUpdateFingerprint`, compute and publish corroboration
       confidence separately from `mPaintingProgress`. Keep today's
       `artDescs.rows` denominator for now — 5b changes it. **[N]**
-- [ ] **5a.3** Remove the `×0.9` decay from the painting-progress channel; leave
+- [x] **5a.3** Remove the `×0.9` decay from the painting-progress channel; leave
       progress as a stored fraction that only a real measurement changes. **[N]**
-- [ ] **5a.4** Apply decay (or a per-frame recompute) to the confidence channel
+- [x] **5a.4** Apply decay (or a per-frame recompute) to the confidence channel
       only. **[N]**
-- [ ] **5a.5** Add `SlamManager.getCorroborationConfidence()`.
-- [ ] **5a.6** Switch `ArRenderer`'s `confGlobal` to the new getter; leave
+- [x] **5a.5** Add `SlamManager.getCorroborationConfidence()`.
+- [x] **5a.6** Switch `ArRenderer`'s `confGlobal` to the new getter; leave
       `ArViewModel:1469` on `getPaintingProgress()`.
-- [ ] **5a.7** Extend `PoseFusionTest`: floor confidence still corrects; a
+- [x] **5a.7** Extend `PoseFusionTest`: floor confidence still corrects; a
       confidence drop slows but never reverses a correction. **[T]**
 
 ### Phase 6a — telemetry plumbing (no new dependencies)

@@ -81,7 +81,28 @@ class SlamManager @Inject constructor(
         nativeUpdateDeviceMotion(angularVel, linearVel)
     }
 
+    /**
+     * Fraction of the registered design the wall now answers for — a PROGRESS reading, on the
+     * timescale of hours and roughly monotonic. This is the number to show the artist.
+     */
     fun getPaintingProgress(): Float = nativeGetPaintingProgress()
+
+    /**
+     * How strongly the wall corroborates the design on the most recent look — a CONFIDENCE reading,
+     * on the timescale of frames and moving both ways. This is the number [PoseFusion-style] pose
+     * correction should scale by, NOT painting progress: one scalar cannot mean both "the mural is
+     * 60% painted" and "I trust this frame", and using progress for both meant a momentary tracking
+     * hiccup decayed the progress bar and suppressed correction strength for seconds afterwards.
+     *
+     * @return `[0,1]` once measured, or **negative** if no attempt has produced a measurement yet.
+     *   That is deliberately distinct from `0f`, which means "looked, and the wall agrees with
+     *   nothing". Callers feeding a `[0,1]` API should map the negative case to their own
+     *   conservative default rather than passing it through.
+     */
+    fun getCorroborationConfidence(): Float = nativeGetCorroborationConfidence()
+
+    /** True once a corroboration attempt has produced any measurement at all. */
+    fun hasCorroborationMeasurement(): Boolean = nativeGetCorroborationConfidence() >= 0f
 
     /**
      * Why the last relocalization attempt did not publish a pose, and how far it got. See
@@ -559,6 +580,7 @@ class SlamManager @Inject constructor(
     private external fun nativeUpdateDeviceMotion(angularVel: FloatArray, linearVel: FloatArray)
     private external fun nativeGetAnchorTransform(): FloatArray
     private external fun nativeGetPaintingProgress(): Float
+    private external fun nativeGetCorroborationConfidence(): Float
     private external fun nativeGetRelocDiagnostics(): IntArray?
     private external fun nativeSetArScanMode(mode: Int)
     private external fun nativeSetMuralMethod(method: Int)

@@ -1278,6 +1278,15 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPaintingProgres
     return 0.0f;
 }
 
+// Corroboration confidence: how much the wall backs the design RIGHT NOW, as opposed to how much of
+// it has been painted. Negative means no attempt has produced a measurement yet — with no engine
+// there is certainly no measurement, so the fallback is the sentinel and not a confident zero.
+extern "C" JNIEXPORT jfloat JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCorroborationConfidence(JNIEnv* env, jobject) {
+    if (gSlamEngine) return gSlamEngine->getCorroborationConfidence();
+    return -1.0f;
+}
+
 // Relocalization diagnostics: why the last attempt did not publish, and the counts it reached.
 // Packed into one int[] so the UI reads a consistent snapshot instead of four racing getters.
 // [0] = RelocReject code, [1] = correspondences, [2] = RANSAC inliers, [3] = features detected,

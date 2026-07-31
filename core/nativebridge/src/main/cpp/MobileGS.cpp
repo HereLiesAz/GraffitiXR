@@ -437,20 +437,26 @@ void MobileGS::relocThreadFunc() {
             if (mDistortionHead.run(crop, wallPatch, dist)) {
                 const float matchability = dist[11], coverage = dist[12];
                 if (matchability > 0.5f) {
+                    // A trusted look at the wall: it measures BOTH channels, and they are different
+                    // quantities. Coverage says how much of the design is realized (progress);
+                    // matchability says how much to trust this frame (confidence).
                     mPaintingProgress.store(coverage, std::memory_order_relaxed);
+                    mCorroborationConfidence.store(matchability, std::memory_order_relaxed);
                 } else {
-                    float p = mPaintingProgress.load(std::memory_order_relaxed);
-                    mPaintingProgress.store(p * 0.9f, std::memory_order_relaxed);
+                    // The head looked and did not recognize the wall. That is a statement about THIS
+                    // FRAME, not about the mural, so only confidence decays. Decaying progress here
+                    // is what made a three-frame glitch read as the mural being un-painted.
+                    decayCorroboration();
                 }
                 LOGI("DistortionHead: match %.2f coverage %.2f tilt %.0f log2scale %.2f",
                      matchability, coverage, dist[8], dist[9]);
             } else {
-                float p = mPaintingProgress.load(std::memory_order_relaxed);
-                mPaintingProgress.store(p * 0.9f, std::memory_order_relaxed);
+                decayCorroboration();   // head refused to run — no information either way
             }
         } else if (mDistortionHead.isLoaded()) {
-            float p = mPaintingProgress.load(std::memory_order_relaxed);
-            mPaintingProgress.store(p * 0.9f, std::memory_order_relaxed);
+            // Head is loaded but there was no patch or no correspondences to centre the crop on, so
+            // no attempt happened at all. Still a confidence statement, never a progress one.
+            decayCorroboration();
         }
 
         // Lowered floors so a close-up PARTIAL view (only a corner of the marks visible) can still
@@ -785,8 +791,18 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     }
     // The distortion head's coverage is the principled progress signal; only fall back to this
     // descriptor-corroboration ratio when the head isn't present.
-    if (artDescs.rows > 0 && !mDistortionHead.isLoaded())
-        mPaintingProgress.store((float)matched / (float)artDescs.rows, std::memory_order_relaxed);
+    //
+    // Both channels are published from this one ratio for now. They are genuinely the same number
+    // on this path today, because the denominator is every descriptor of the design — including the
+    // parts behind the camera. Phase 5b narrows the CONFIDENCE denominator to the features actually
+    // predicted visible, at which point the two diverge and a close-up of one corner stops being
+    // capped by framing rather than by agreement. Progress keeps the whole-design denominator,
+    // which is the correct one for it.
+    if (artDescs.rows > 0 && !mDistortionHead.isLoaded()) {
+        const float ratio = (float)matched / (float)artDescs.rows;
+        mPaintingProgress.store(ratio, std::memory_order_relaxed);
+        mCorroborationConfidence.store(ratio, std::memory_order_relaxed);
+    }
 
     // --- Teleological self-grow (opt-in) ---------------------------------------------------------
     // Promote validated NEW marks into the live reloc fingerprint so it self-grows from real painting
@@ -936,6 +952,9 @@ void MobileGS::clearWallFingerprint() {
     mArtworkKeypoints3D.clear();
     mWallPatch.release();
     mPaintingProgress.store(0.0f, std::memory_order_relaxed);
+    // Back to "never measured", not to zero — the next project has not been looked at yet, and
+    // reporting a confident 0 would be a measurement it never made.
+    mCorroborationConfidence.store(kCorroborationUnmeasured, std::memory_order_relaxed);
     mLastGrowSeq = 0;
 }
 
@@ -1165,6 +1184,8 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
         mArtworkDescriptors = keepDescs.clone();
         mArtworkKeypoints3D = std::move(pts3d);
         mPaintingProgress.store(0.0f, std::memory_order_relaxed);
+        // A new design means every prior corroboration reading was against a different target.
+        mCorroborationConfidence.store(kCorroborationUnmeasured, std::memory_order_relaxed);
         // Snapshot under the lock — the reloc thread reads both of these, so logging them after the
         // guard releases is a race on a cv::Mat header and a vector.
         storedRows = mArtworkDescriptors.rows;
