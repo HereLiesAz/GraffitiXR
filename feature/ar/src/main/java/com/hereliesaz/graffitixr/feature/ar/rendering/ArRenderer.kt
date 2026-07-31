@@ -324,7 +324,29 @@ class ArRenderer(
     @Volatile private var cameraNotFeedingReported = false
     var onCameraNotFeeding: (() -> Unit)? = null
     private var watchdog: Thread? = null
-    private var sensorOrientation = 90
+    // Written under `sessionLock` off the GL thread (attachSession, and its catch fallback) and
+    // read on the GL thread without it, so it needs the visibility guarantee. It was a plain var:
+    // no happens-before, so the GL thread could keep observing the initializer on a device where
+    // the real value is 270. That now decides an eval column's value, not just a rotation.
+    //
+    // The initializer is also the commonest real value AND the exception fallback, so a
+    // getCameraCharacteristics failure yields a plausible, indistinguishable reading. Not changed
+    // here — every rotation consumer would need a "sensor orientation unknown" path — but recorded
+    // because `captureRotationNeededDeg` inherits it, and E0b's attributability rests on it.
+    @Volatile private var sensorOrientation = 90
+
+    /**
+     * `rotationNeeded` at the moment the active target was captured, or [NOT_SAMPLED] if this
+     * renderer has not performed a capture. **E0b's independent variable**; see
+     * `EvalSample.captureRotationNeededDeg`. Set where the capture's geometry is fixed, not where
+     * the eval tick happens to run.
+     *
+     * Stays [NOT_SAMPLED] for a target restored from a saved project — the renderer never saw that
+     * capture. That is the honest reading; a 0 would silently file it as E0b's control condition.
+     */
+    @Volatile
+    private var lastCaptureRotationNeededDeg =
+        com.hereliesaz.graffitixr.feature.ar.eval.EvalSampleLog.NOT_SAMPLED
     private var isSurfaceCreated = false
 
     private var lastPoseX = 0f
@@ -1193,12 +1215,16 @@ class ArRenderer(
                         // FloatArrays per tick. (An earlier comment here said "four atomics", which
                         // was neither the count nor the mechanism.)
                         reloc = slamManager.getRelocDiagnostics(),
-                        // E0b's independent variable, recomputed here by the same expression the
-                        // capture path uses (ArRenderer's capture block) so the logged condition is
-                        // the condition that was actually in force. Sampled every tick because
-                        // `screenOrientation="fullUser"` lets the device rotate mid-run: one CSV can
-                        // straddle both conditions, and a per-run value would silently average them.
-                        rotationNeededDeg =
+                        // E0b's independent variable is the rotation that was in force AT CAPTURE,
+                        // because that is the one baked into the fingerprint's 3D points. Sampling
+                        // the live rotation here instead — which an earlier version of this call
+                        // did — files a portrait-captured, landscape-relocalized run under 0, the
+                        // control condition, and turns a real effect into a null result.
+                        captureRotationNeededDeg = lastCaptureRotationNeededDeg,
+                        // The live rotation is still logged, as a secondary signal: the reloc feed
+                        // has frame handling of its own, so rows where the two disagree are the
+                        // ones worth a second look.
+                        liveRotationNeededDeg =
                             (sensorOrientation - displayRotationHelper.getRotation() * 90 + 360) % 360,
                     )
                 }
@@ -1284,6 +1310,12 @@ class ArRenderer(
 
                         val displayDegrees = displayRotationHelper.getRotation() * 90
                         val rotationNeeded = (sensorOrientation - displayDegrees + 360) % 360
+                        // Recorded HERE, where the capture's geometry is decided, because this is
+                        // the angle that gets baked into the fingerprint: backProject runs once
+                        // per target inside MetricFingerprintBuilder.build, against these rotated
+                        // intrinsics and an unrotated camera.pose view matrix. However the device
+                        // is held afterwards, the skew in those 3D points does not change.
+                        lastCaptureRotationNeededDeg = rotationNeeded
 
                         var depthBuffer: ByteBuffer? = null
                         var depthWidth = 0

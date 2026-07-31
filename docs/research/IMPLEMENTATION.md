@@ -5,8 +5,11 @@ this document says *where the code goes*, *what it is called*, *what breaks it*,
 and *how you know it worked*. It assumes the paper's vocabulary — the **footprint
 operator** Φ, the **backbone set** `F_out`, the **corroboration set** `F_in`.
 
-Nothing below Phase 0 is built. Everything cited as "already fixed" landed in PRs
-#1785–#1788 and is on `main`.
+Everything cited as "already fixed" landed in PRs #1785–#1788 and is on `main`.
+Since then Phase 1, Phase 5a and three of Phase 6a's four todos have landed;
+Phase 0 itself is still unbuilt and still gates Phases 2, 3, 4 and 5b. See
+[`README.md`](README.md) "Status" for the current picture — this line said
+"nothing below Phase 0 is built" long after that stopped being true.
 
 ---
 

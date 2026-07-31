@@ -337,31 +337,48 @@ and lock rate.
 variable is how you hold the phone. Do it *first*, before any of Phase 0's
 engineering — a negative result cancels that engineering entirely.
 
-**The independent variable is now recorded per CSV row**, as `rotationNeededDeg`
-(0/90/180/270, `-1` not sampled). It was not, and that was a hole in this
-protocol rather than a detail: the experiment's entire contrast lived in whoever
-ran it remembering which way they had been holding the phone, with nothing in the
-data to check that memory against. Worse, `screenOrientation="fullUser"` means the
-device can rotate *mid-run*, so a single CSV can straddle both conditions with no
-marker where it crossed over — the two populations would mix and the effect would
-average toward nothing, which reads exactly like a negative result. Group rows by
-`rotationNeededDeg` and compare within groups; do not compare file to file.
+**The independent variable is now recorded per CSV row**, as
+`captureRotationNeededDeg` (0/90/180/270, `-1` unknown). It was not recorded at
+all, and that was a hole in this protocol rather than a detail: the experiment's
+entire contrast lived in whoever ran it remembering which way they had been
+holding the phone, with nothing in the data to check that memory against.
+
+**Group by `captureRotationNeededDeg`, never by `liveRotationNeededDeg`.** The two
+are different quantities and the distinction is the experiment. `backProject` runs
+exactly once per target, inside `MetricFingerprintBuilder.build`, so the frame
+mismatch is baked into the fingerprint's 3D points **at capture** and does not
+change however the device is held afterwards. A first version of this column
+logged the live per-tick rotation, which mislabels the central case: capture in
+portrait, relocalize in landscape, and every defect-bearing row is filed under
+`0` — the control arm — so a genuine effect averages toward nothing and reads as
+the falsification this experiment is supposed to be able to report. The live
+value is still logged as a secondary signal, because the reloc feed has frame
+handling of its own; rows where the two disagree are worth a second look.
 
 Note `0` is the control condition, not a missing value — landscape is the
 orientation predicted to *work*, so those rows are the experiment's positive
-half, and `-1` is the only "no data" marker.
+half, and `-1` is the only "no data" marker. A target restored from a saved
+project reads `-1`, because the renderer never observed that capture; re-capture
+before a run rather than trusting a loaded target.
 
-This does mean E0b now needs a build, contrary to the cost line below. Running it
-on a stock build is still possible and still informative — the overlay signals
-below are unchanged — but the per-row grouping is what makes the result
+This does mean E0b needs a build, which is what the **Cost** line below now says.
+Running it on a stock build is still possible and still informative — the overlay
+signals below are unchanged — but the per-row grouping is what makes the result
 attributable.
 
 Watch two secondary signals in the diagnostics overlay, both predicted by the
 model: healthy match counts paired with a **low inlier ratio** (PnP cannot fit a
 non-rigidly distorted cloud), and "found N features but only M landed on the wall
 surface" refusals, since mis-scaled depths fall outside `backProject`'s 0.1–10 m
-trust range. The second is measurable directly — §8.1 predicts 1280 of 1600
-points surviving at 60° versus all 1600 at 40°.
+trust range.
+
+The second is measurable directly, but **only if you tilt the wall the way §8.1
+does** — about the camera's Y axis, i.e. the phone's long axis. §8.1 predicts
+1280 of 1600 points surviving at 60° versus all 1600 at 40° *for that tilt*.
+Tilt about X instead and the same defect drops **nothing at all** at 60°, because
+the mis-scaled depths stay inside the trust range. A runner who tilts the other
+way sees 1600/1600, reads it as the prediction failing, and records a
+falsification that is a convention mismatch rather than a result.
 
 **Sets.** Nothing. It is the go/no-go on Phase 0.
 
@@ -372,12 +389,14 @@ The follow-up this line used to prescribe — "check whether `camera.pose` is
 display-oriented" — **has been done, and it is not the answer.** ARCore documents
 `getPose()` as the physical camera frame and `getDisplayOrientedPose()` as the
 display-oriented one, differing "by a local rotation about the Z axis by a
-multiple of 90°" (PAPER.md §8.2). The frames provably differ by the rotation the
-model assumes, so a negative result cannot be explained away there. Carry these
-instead: the depth error is real but swamped by other error sources; the reloc
-path does not consume `backProject`'s output the way §8 assumes; or the device's
-actual `rotationNeeded` is not what the formula predicts — which the new
-`rotationNeededDeg` column now lets you check directly rather than infer.
+multiple of 90°" (PAPER.md §8.2). The frames are documented to differ, and the
+code pairs one frame's rays with the other's plane, so a negative result cannot
+be explained away there. Carry these instead: the depth error is real but swamped
+by other error sources; the reloc path does not consume `backProject`'s output the
+way §8 assumes; or the device's actual `rotationNeeded` is not what the formula
+predicts — still live, because the documentation says "a multiple of 90°" without
+saying *which* multiple, and the new `captureRotationNeededDeg` column now lets
+you check that directly rather than infer it.
 
 **Cost.** One session, plus a build (see above).
 

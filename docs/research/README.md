@@ -50,10 +50,11 @@ set*). `PARAMETERS.md` is a lookup table, not prose.
 
 The defects `IMPLEMENTATION.md` lists as "already fixed" were repaired in PRs
 #1785–#1788 and are on `main`. Since then **Phase 1** (the footprint operator Φ,
-`anchor/Footprint.kt`), **Phase 5a** (splitting painting progress from
-corroboration confidence) and **Phase 6a** (eval telemetry: CSV shape guard,
-reloc diagnostics columns, run-identity sidecar) have landed. Phases 2, 3, 4 and
-5b are still proposed.
+`anchor/Footprint.kt`) and **Phase 5a** (splitting painting progress from
+corroboration confidence) have landed, and **Phase 6a is three of its four todos
+in** — 6a.4 (the eval-only fixed RNG seed and synchronous-reloc mode) is still
+open, so replay A/Bs continue to carry un-quantified RANSAC variance. Phases 2,
+3, 4 and 5b are still proposed.
 
 **Phase 0 is next in the landing order and blocks all four.** It is gated on
 experiment **E0b**, which has not been run — it needs a physical ARCore device.
@@ -68,12 +69,17 @@ What has been settled without one:
   physical/image-readout frame; `getDisplayOrientedPose()` is the display one; the
   docs state they differ "by a local rotation about the Z axis by a multiple of
   90°". A negative E0b can no longer be explained by that assumption failing.
-- `PAPER.md` §8.1's error table reproduces exactly on an independent
-  recomputation, once two unstated sampling conventions are supplied — both are
-  now recorded in §8.1.
-- E0b's independent variable is now logged per CSV row (`rotationNeededDeg`). It
-  previously was not logged at all, which would have made the experiment's own
-  result unattributable.
+- `PAPER.md` §8.1's error table reproduces exactly on recomputation, once two
+  unstated sampling conventions are supplied — both are now recorded in §8.1,
+  along with the limit of that check: it confirms the sampling and statistics,
+  not the geometry, because it evaluates `backProject`'s own expression.
+- E0b's independent variable is now logged per CSV row, as
+  `captureRotationNeededDeg`. It previously was not logged at all. Note it is the
+  rotation at **capture** — the mismatch is baked into the fingerprint's 3D points
+  there and does not change with how the device is held afterwards. A first
+  attempt logged the live per-tick rotation, which files a portrait-captured,
+  landscape-relocalized run under the control condition and turns a real effect
+  into a null result; `liveRotationNeededDeg` is kept only as a secondary signal.
 
 See §8 of the paper, and `../TELEOLOGICAL_SLAM.md` "Open question: the
 display-rotation convention".

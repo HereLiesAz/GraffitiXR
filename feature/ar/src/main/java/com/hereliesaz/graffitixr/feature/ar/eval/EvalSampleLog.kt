@@ -29,20 +29,41 @@ data class EvalSample(
     val relocObliquityDeg: Int = -1,
     val relocRectifiedCorr: Int = -1,
     /**
-     * `(sensorOrientation - displayRotation*90 + 360) % 360` for this tick — 0, 90, 180 or 270.
-     * -1 when not sampled.
+     * `rotationNeeded` **at the moment the active target was captured** — 0, 90, 180 or 270, or -1
+     * when no target has been captured this session (a project restored from disk reads -1; see
+     * below).
      *
-     * This is the independent variable of `EVALUATION.md` **E0b**. Capture rotates the bitmap and
-     * the intrinsics by this angle and leaves the view matrix in ARCore's physical-camera frame
-     * (`Camera.getPose()`), so it is also the exact angle of the frame mismatch `PAPER.md` §8
-     * describes: 0 means no mismatch exists, 90/180/270 mean one does.
+     * **This is the independent variable of `EVALUATION.md` E0b**, and the distinction from
+     * [liveRotationNeededDeg] is the whole point of having two columns. `PlaneMarks.backProject`
+     * runs exactly once per target, inside `MetricFingerprintBuilder.build`, against the capture's
+     * rotated intrinsics and its *unrotated* `camera.pose` view matrix. The frame mismatch
+     * `PAPER.md` §8 describes is therefore **baked into the fingerprint's 3D points at capture** and
+     * cannot change afterwards, however the device is subsequently held.
      *
-     * Per-**row** rather than in the run-identity sidecar, and that is not a stylistic choice. The
-     * app is `screenOrientation="fullUser"`, so the user can rotate the device mid-run and flip the
-     * condition between one CSV row and the next. A single per-run value would be a recorded
-     * average of two conditions, which is worse than no record at all — it would look like data.
+     * A first version of this column logged the live per-tick rotation instead, which is a
+     * different quantity and mislabels the experiment: capture in portrait (skewed fingerprint),
+     * then relocalize in landscape, and every defect-bearing row is filed under 0 — the *control*
+     * condition — so a real §8 effect averages toward nothing and reads as a falsification. The
+     * justification given for per-tick sampling was that `screenOrientation="fullUser"` lets the
+     * user rotate mid-run and flip the condition; rotating mid-run does not flip the condition,
+     * because the fingerprint was already built. That is precisely the case it labels wrongly.
+     *
+     * Known gap: the renderer only observes a capture it performed, so a target restored from a
+     * saved project reads -1 rather than its original rotation. -1 is honest there; a 0 would not
+     * be. Persisting this on `Fingerprint` is `IMPLEMENTATION.md` todo 0.7.
      */
-    val rotationNeededDeg: Int = -1,
+    val captureRotationNeededDeg: Int = -1,
+    /**
+     * `(sensorOrientation - displayRotation*90 + 360) % 360` for *this tick* — how the device is
+     * being held right now, during relocalization. -1 when not sampled.
+     *
+     * Secondary. It is **not** E0b's independent variable (see [captureRotationNeededDeg]), and
+     * grouping by it is the mistake this pair of columns exists to prevent. It is logged because
+     * the live path has frame handling of its own — the reloc feed is rotated by `cvRotateCode`
+     * while `mappingProjMatrix` is built from *unrotated* `imageIntrinsics` — so a run where the
+     * two columns disagree is the one worth looking at twice.
+     */
+    val liveRotationNeededDeg: Int = -1,
 )
 
 object EvalSampleLog {
@@ -61,7 +82,7 @@ object EvalSampleLog {
         "cpuPct", "batteryMa", "tempC", "nativeHeapKb",
         "relocReject", "relocMatches", "relocInliers", "relocDetected",
         "relocObliquityDeg", "relocRectifiedCorr",
-        "rotationNeededDeg",
+        "captureRotationNeededDeg", "liveRotationNeededDeg",
     )
 
     const val NOT_SAMPLED = -1
@@ -79,7 +100,7 @@ object EvalSampleLog {
             s.relocReject.toString(), s.relocMatches.toString(),
             s.relocInliers.toString(), s.relocDetected.toString(),
             s.relocObliquityDeg.toString(), s.relocRectifiedCorr.toString(),
-            s.rotationNeededDeg.toString(),
+            s.captureRotationNeededDeg.toString(), s.liveRotationNeededDeg.toString(),
         )
     }
 

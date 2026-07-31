@@ -40,7 +40,8 @@ class EvalSampleLogTest {
             "tsMs,deviceClass,marksVisible,errMm,errDeg,jitterMm,availability," +
                 "voxelUpdateMs,voxelKeyframeMs,surfaceMeshMs,drawMs,pnpRelocMs,cpuPct,batteryMa,tempC," +
                 "nativeHeapKb,relocReject,relocMatches,relocInliers,relocDetected," +
-                "relocObliquityDeg,relocRectifiedCorr,rotationNeededDeg",
+                "relocObliquityDeg,relocRectifiedCorr," +
+                "captureRotationNeededDeg,liveRotationNeededDeg",
             EvalSampleLog.CSV_HEADER,
         )
     }
@@ -55,7 +56,7 @@ class EvalSampleLogTest {
         )
         assertEquals(
             "12,dual,true,1.5,0.25,3.0,1.0,2.0,0.0,4.0,1.0,8.0,30.0,-450.0,31.0,20480," +
-                "-1,-1,-1,-1,-1,-1,-1",
+                "-1,-1,-1,-1,-1,-1,-1,-1",
             EvalSampleLog.toCsvRow(row),
         )
     }
@@ -202,8 +203,49 @@ class EvalSampleLogTest {
      */
     @Test
     fun `rotationNeeded reaches its own column`() {
-        val fields = EvalSampleLog.fields(sample().copy(rotationNeededDeg = 90))
-        assertEquals("90", fields[EvalSampleLog.COLUMNS.indexOf("rotationNeededDeg")])
+        val fields = EvalSampleLog.fields(sample().copy(captureRotationNeededDeg = 90))
+        assertEquals("90", fields[EvalSampleLog.COLUMNS.indexOf("captureRotationNeededDeg")])
+    }
+
+    /**
+     * The defect this pair of columns was split to fix, pinned as a test.
+     *
+     * `PlaneMarks.backProject` runs once per target inside `MetricFingerprintBuilder.build`, so
+     * §8's frame mismatch is baked into the fingerprint's 3D points **at capture**. E0b's
+     * independent variable is therefore the capture rotation, and the live rotation is a different
+     * quantity that can legitimately differ from it on the very same row.
+     *
+     * The scenario below is the one a single column got wrong: captured in portrait (skewed
+     * fingerprint), relocalized in landscape. Collapsing these two into one value files this row
+     * under 0 — E0b's *control* condition — and a genuine effect averages toward nothing, which is
+     * indistinguishable from the falsification E0b is supposed to be able to report.
+     */
+    @Test
+    fun `a portrait capture relocalized in landscape keeps both rotations distinct`() {
+        val fields = EvalSampleLog.fields(
+            sample().copy(captureRotationNeededDeg = 90, liveRotationNeededDeg = 0),
+        )
+        val capture = fields[EvalSampleLog.COLUMNS.indexOf("captureRotationNeededDeg")]
+        val live = fields[EvalSampleLog.COLUMNS.indexOf("liveRotationNeededDeg")]
+        assertEquals("the fingerprint was built under the mismatch", "90", capture)
+        assertEquals("the device is held square right now", "0", live)
+        assertTrue(
+            "grouping E0b by the live rotation would file this defect-bearing row as the control",
+            capture != live,
+        )
+    }
+
+    /**
+     * A target restored from a saved project was never captured by this renderer, so its rotation
+     * is genuinely unknown. It must read as unknown and not as landscape — `-1` excludes the row
+     * from E0b's grouping, `0` would silently enrol it in the control arm.
+     */
+    @Test
+    fun `an unobserved capture reads unknown, never as the landscape control`() {
+        val fields = EvalSampleLog.fields(sample().copy(liveRotationNeededDeg = 0))
+        assertEquals(
+            "-1", fields[EvalSampleLog.COLUMNS.indexOf("captureRotationNeededDeg")],
+        )
     }
 
     /**
@@ -215,9 +257,9 @@ class EvalSampleLogTest {
      */
     @Test
     fun `rotationNeeded zero is the landscape control, not a missing value`() {
-        val landscape = EvalSampleLog.fields(sample().copy(rotationNeededDeg = 0))
+        val landscape = EvalSampleLog.fields(sample().copy(captureRotationNeededDeg = 0))
         val unsampled = EvalSampleLog.fields(sample())
-        val i = EvalSampleLog.COLUMNS.indexOf("rotationNeededDeg")
+        val i = EvalSampleLog.COLUMNS.indexOf("captureRotationNeededDeg")
         assertEquals("0", landscape[i])
         assertEquals("-1", unsampled[i])
         assertTrue("the control condition must not read as absent", landscape[i] != unsampled[i])
