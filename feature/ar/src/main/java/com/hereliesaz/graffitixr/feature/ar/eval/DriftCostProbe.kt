@@ -64,9 +64,12 @@ class DriftCostProbe(
      * @param reloc          last relocalization diagnostics, or null when not sampled. Logged so a
      *   null relocalization becomes a diagnosis rather than an absence: NO_FEATURES and FEW_INLIERS
      *   call for opposite fixes and the aggregate error number cannot tell them apart.
-     * @param rotationNeededDeg `(sensorOrientation - displayRotation*90 + 360) % 360` at this tick,
-     *   or -1 if the caller cannot supply it. E0b's independent variable — see
-     *   [EvalSample.rotationNeededDeg] for why it is sampled per tick and not once per run.
+     * @param captureRotationNeededDeg `rotationNeeded` at the moment the ACTIVE TARGET was
+     *   captured, or -1 if unknown. **E0b's independent variable** — the frame mismatch is baked
+     *   into the fingerprint at capture, so this and not [liveRotationNeededDeg] is what results
+     *   must be grouped by. See [EvalSample.captureRotationNeededDeg].
+     * @param liveRotationNeededDeg `rotationNeeded` for this tick — how the device is held right
+     *   now. Secondary; see [EvalSample.liveRotationNeededDeg].
      */
     fun onTick(
         candidatePose: FloatArray,
@@ -75,7 +78,8 @@ class DriftCostProbe(
         stageMs: FloatArray,
         cpuPct: Float,
         reloc: com.hereliesaz.graffitixr.common.model.RelocDiagnostics? = null,
-        rotationNeededDeg: Int = EvalSampleLog.NOT_SAMPLED,
+        captureRotationNeededDeg: Int = EvalSampleLog.NOT_SAMPLED,
+        liveRotationNeededDeg: Int = EvalSampleLog.NOT_SAMPLED,
     ) {
         val file = logFile ?: return
         totalFrames++
@@ -113,7 +117,8 @@ class DriftCostProbe(
             relocDetected = reloc?.detected ?: EvalSampleLog.NOT_SAMPLED,
             relocObliquityDeg = reloc?.obliquityDeg ?: EvalSampleLog.NOT_SAMPLED,
             relocRectifiedCorr = reloc?.rectifiedCorrespondences ?: EvalSampleLog.NOT_SAMPLED,
-            rotationNeededDeg = rotationNeededDeg,
+            captureRotationNeededDeg = captureRotationNeededDeg,
+            liveRotationNeededDeg = liveRotationNeededDeg,
         )
         file.appendText(EvalSampleLog.toCsvRow(sample) + "\n")
 

@@ -549,9 +549,29 @@ mechanism described two paragraphs below. Quoting the unfiltered figure claimed
 an error 3.3× larger than the code can produce. Rows 0°–50° are unaffected;
 nothing is dropped there, so filtered and unfiltered agree exactly.
 
-**Reproduced independently**, from the geometry rather than from `backProject`'s
-code path, and every cell above matches — including the 1280/1600 survival at 60°
-and the 6913 mm unfiltered mean. Two conventions had to be recovered by trial to
+**Recomputed, and every cell above matches** — including the 1280/1600 survival at
+60° and the 6914 mm unfiltered mean.
+
+Be precise about what that does and does not establish, because an earlier
+version of this paragraph claimed the recomputation was "independent, from the
+geometry rather than from `backProject`'s code path" and it was not. The
+recomputation evaluates $t = (n \cdot p)/(n \cdot d)$ — `backProject`'s own
+expression — for both the mismatched and the true frame, differing only in which
+frame $n$ is expressed in. A sign error, a swapped numerator, or the inverse
+applied on the wrong side *in the model of the mismatch* would reproduce the
+table exactly. So what is confirmed is the **sampling and the statistics** (the
+40×40 grid, the 0.1–10 m filter, $p95$), which is precisely where the earlier
+3.3× error lived and is worth confirming. The geometry is not independently
+confirmed by it.
+
+`PlaneMarksObliquityTest` already holds the standard this fell short of: it
+rejects an earlier version of *itself* for deriving truth "with the same
+$t = (n \cdot p)/(n \cdot d)$ the implementation uses, which made the control
+tests tautologies that would have passed with a sign flip". Its fix — construct
+the truth *forward*, placing points on the wall in its own basis and projecting
+them to pixels — is what an independent check of this table would require.
+
+Two conventions had to be recovered by trial to
 get there, and neither is stated above, so they are stated here: *"a wall at 2 m"*
 means the **perpendicular** distance from the camera to the plane, not the
 distance along the optical axis (reading it the other way scales every row by
@@ -615,8 +635,15 @@ The codebase demonstrates it knows the difference: `ArRenderer` reads
 for the mapping view matrix that reaches `backProject`. So the two frames are
 distinguished deliberately elsewhere and conflated here.
 
-Two consequences for E0b. First, its prior should be much stronger than "plausible
-mechanism" — the frames provably differ by exactly the rotation the model uses.
+Two consequences for E0b. First, its prior should be stronger than "plausible
+mechanism": the two frames are documented to differ by a rotation about $z$, and
+the code pairs one frame's rays with the other's plane. Note the limit of that —
+the documentation says "a multiple of 90°", not *which* multiple, so the
+identification of that multiple with
+$(\text{sensorOrientation} - \text{displayDegrees} + 360) \bmod 360$ remains an
+inference from how Android orients preview frames, not something Google states.
+It is a good inference and it is now measurable directly rather than assumed,
+which is what the `captureRotationNeededDeg` column is for.
 Second, and more usefully, **a negative E0b result can no longer be explained by
 this assumption failing.** The paper's designated escape hatch is closed. If the
 device shows identical behaviour in both orientations, the explanation has to be
