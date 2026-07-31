@@ -43,6 +43,14 @@ data class Fingerprint(
                     "descriptor row stride (${descriptorsData.size / descriptorsRows}) must be a multiple of descriptorsCols ($descriptorsCols)"
                 }
             }
+            // Same argument, second array. The reloc PnP subscripts the 3D point list by DESCRIPTOR
+            // ROW (`wallKps3d[match.trainIdx]`), so a file whose point count disagrees with its row
+            // count indexes past the end of the vector and feeds garbage 3D into solvePnPRansac. The
+            // blob check above was carried over from WallFeatureMap; this one was not.
+            require(points3d.isEmpty() || points3d.size / 3 == descriptorsRows) {
+                "points3d holds ${points3d.size / 3} points but $descriptorsRows descriptor rows were declared; " +
+                    "the reloc path indexes points by descriptor row, so they must be 1:1"
+            }
         }
     }
 

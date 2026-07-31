@@ -21,9 +21,10 @@ goal state as an additional source of evidence. The deployed implementation used
 the goal state as an **appearance validator**: a live camera feature corroborates
 the target if its descriptor matches a descriptor extracted from the design image.
 
-We report two findings. First, the mechanism was never reachable — three of its
-four stages were disconnected in ways that are individually verifiable from source
-(§4.2), so no field evidence about the approach exists. Second, and independently,
+We report two findings. First, the mechanism was never reachable — of four defects
+verifiable from source (§4.2), three are outright disconnections between stages and
+the fourth is a gate set too strictly to fire, so no field evidence about the
+approach exists. Second, and independently,
 the appearance-validator formulation asks the goal state for the one kind of
 information it supplies least reliably: a cross-modal descriptor comparison
 between a synthetic image and photographed pigment, executed as an unconstrained
@@ -280,7 +281,7 @@ F = \underbrace{\{\,i : \|\Phi(\mathbf{x}_i)\|_\infty > 1 + \mu\,\}}_{F_{\text{o
 $$
 
 The margin $\mu$ absorbs anchor error, overlay adjustment after capture, and
-overspray. It should be tuned (§`EVALUATION.md` E4), not guessed.
+overspray. It should be tuned (§`EVALUATION.md` E8), not guessed.
 
 The two sets are not two priorities on one list. They differ in what they are
 *for* and in what they may assume:
@@ -427,22 +428,24 @@ Steps 1–9 exist. Steps 3–5, 10–19 are new. Step 20 exists and is retained.
 
 ## 6. Predictions
 
-Stated so they can be falsified. Protocols in `EVALUATION.md`.
+Stated so they can be falsified. Each names the experiment that would falsify it;
+protocols are in `EVALUATION.md`. A prediction with no experiment is an opinion,
+so the mapping is given here rather than left to be reconstructed.
 
-- **P1.** Relocalization availability at ≥50% coverage is higher with the
+- **P1** *(→ E12)*. Relocalization availability at ≥50% coverage is higher with the
   partition than without, on identical replayed sessions. *(The backbone is drawn
   from wall that was never painted.)*
-- **P2.** For fixed precision, the local test (§5.5) admits a strictly larger Lowe
-  threshold than the global test. *(Direct consequence of candidate-set size; if
+- **P2** *(→ E7)*. For fixed precision, the local test (§5.5) admits a strictly larger
+  Lowe threshold than the global test. *(Direct consequence of candidate-set size; if
   this fails, the search-space argument is wrong.)*
-- **P3.** Corroboration false-positive rate under the local test is at least an
-  order of magnitude below the global test at matched recall.
-- **P4.** Geometric promotion (§5.4) yields a lower fingerprint-corruption rate
-  than appearance promotion, measured as PnP inlier ratio over session time.
-- **P5.** The rigid-offset fit (§5.6) correlates with measured overlay error
+- **P3** *(→ E6)*. Corroboration false-positive rate under the local test is at least
+  an order of magnitude below the global test at matched recall.
+- **P4** *(→ E5)*. Geometric promotion (§5.4) yields a lower fingerprint-corruption
+  rate than appearance promotion, measured as PnP inlier ratio over session time.
+- **P5** *(→ E13)*. The rigid-offset fit (§5.6) correlates with measured overlay error
   (`errMm`) at $r > 0.7$ once coverage exceeds ~30%.
-- **P6.** End-to-end overlay error at 100% coverage does not exceed error at 0%
-  coverage. *This is the whole thesis.* Failing P6 while passing P1–P5 would mean
+- **P6** *(→ E10)*. End-to-end overlay error at 100% coverage does not exceed error at
+  0% coverage. *This is the whole thesis.* Failing P6 while passing P1–P5 would mean
   the mechanism works and the premise does not.
 
 ---
@@ -522,8 +525,8 @@ new design and the old convention bug. Resolve it first (`EVALUATION.md` E0).
 
 The teleological observation is sound and, as far as we can tell, novel. The
 deployed realization used the goal state's weakest channel — global cross-modal
-appearance matching — and was in any case disconnected at three of four stages, so
-it has never been tested.
+appearance matching — and was in any case broken at all four stages examined
+(three disconnected, one gated shut), so it has never been tested.
 
 The proposed realization partitions the goal state. The spatial channel is exact
 and available immediately; it protects the durable reference and constrains the

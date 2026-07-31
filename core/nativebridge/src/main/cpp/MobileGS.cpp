@@ -301,6 +301,12 @@ void MobileGS::relocThreadFunc() {
             const cv::Mat& descs = (preKps && preDescs) ? *preDescs : localDescs;
             if (descs.empty() || wallDescs.empty()) return;
             if (descs.type() != wallDescs.type()) return;
+            // trainIdx indexes wallDescs' ROWS but is used to subscript wallKps3d, so the two must be
+            // the same length. Every in-tree producer keeps them aligned; a truncated or hand-edited
+            // .gxr does not, and the result would be an out-of-bounds vector read feeding garbage 3D
+            // points into solvePnPRansac. The map path (below) already guards this; the wall path did
+            // not. Refuse rather than relocalize against nonsense.
+            if (wallKps3d.size() != (size_t)wallDescs.rows) return;
 
             cv::Ptr<cv::DescriptorMatcher>& matcher = (descs.type() == CV_32F) ? mL2Matcher : mMatcher;
             std::vector<std::vector<cv::DMatch>> matches;
@@ -807,7 +813,8 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         wall = mWallKeypoints3D;
         if (growTrusted(inliers, pnpMatches)) mLastGrowSeq = seq; // claim it (yield or not)
     }
-    if (!growTrusted(inliers, pnpMatches) || fx <= 0 || fy <= 0 || wall.size() < 12 || wall.size() > 5000) return;
+    if (!growTrusted(inliers, pnpMatches) || fx <= 0 || fy <= 0 ||
+        wall.size() < 12 || wall.size() >= kMaxWallMarks) return;
 
     // Wall plane (n·X = pdist, pdist>0) in the fingerprint frame, fit to the existing marks.
     cv::Mat data((int)wall.size(), 3, CV_32F);
@@ -846,15 +853,26 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     }
     if (newPts.empty()) return;
 
+    size_t promoted = 0, wallNow = 0;
     {
         std::lock_guard<std::mutex> lock(mMutex);
-        if (mWallDescriptors.type() != newDescs.type() || mWallDescriptors.cols != newDescs.cols || mWallKeypoints3D.size() > 5000) return;
-        for (int i = 0; i < (int)newPts.size(); ++i) {
+        if (mWallDescriptors.type() != newDescs.type() || mWallDescriptors.cols != newDescs.cols ||
+            mWallKeypoints3D.size() >= kMaxWallMarks) return;
+        // Fill to the cap exactly. Testing the size only BEFORE the loop let a wall sitting at
+        // kMaxWallMarks-1 grow by the full per-relock batch, so the documented ceiling was really
+        // ceiling + batch.
+        const size_t room = kMaxWallMarks - mWallKeypoints3D.size();
+        const size_t take = std::min(room, newPts.size());
+        for (size_t i = 0; i < take; ++i) {
             mWallKeypoints3D.push_back(newPts[i]);
-            mWallDescriptors.push_back(newDescs.row(i));
+            mWallDescriptors.push_back(newDescs.row((int)i));
         }
+        // Snapshot inside the lock: these feed a log line below, and reading the containers after
+        // the guard released races a concurrent restoreWallFingerprintMetric on the JNI thread.
+        promoted = take;
+        wallNow = mWallKeypoints3D.size();
     }
-    LOGI("Teleological self-grow: promoted %zu marks (wall now %zu)", newPts.size(), mWallKeypoints3D.size());
+    LOGI("Teleological self-grow: promoted %zu marks (wall now %zu)", promoted, wallNow);
 }
 void MobileGS::setArCoreTrackingState(bool t) { mIsArCoreTracking.store(t, std::memory_order_relaxed); }
 
@@ -907,6 +925,18 @@ void MobileGS::clearWallFingerprint() {
     static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     memcpy(mFingerprintAnchorMatrix, kIdentity16, 16 * sizeof(float));
     memset(mFingerprintIntrinsics, 0, 4 * sizeof(float));
+    mHasFingerprintView = false;
+
+    // The ARTWORK side has to go too. It used to survive, and there is no other path that clears it:
+    // an un-fingerprinted project would then be validated against the PREVIOUS project's artwork by
+    // tryUpdateFingerprint, publishing a meaningless painting progress that reaches the user's
+    // progress readout AND PoseFusion's correction strength — and, with self-grow enabled, promoting
+    // this project's features into its map on the strength of a different project's target.
+    mArtworkDescriptors.release();
+    mArtworkKeypoints3D.clear();
+    mWallPatch.release();
+    mPaintingProgress.store(0.0f, std::memory_order_relaxed);
+    mLastGrowSeq = 0;
 }
 
 void MobileGS::restoreWallFeatureMap(const cv::Mat& d, const std::vector<cv::Point3f>& p,
@@ -1129,14 +1159,18 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
         }
     }
 
+    int storedRows = 0; size_t storedPts = 0;
     {
         std::lock_guard<std::mutex> lock(mMutex);
         mArtworkDescriptors = keepDescs.clone();
         mArtworkKeypoints3D = std::move(pts3d);
         mPaintingProgress.store(0.0f, std::memory_order_relaxed);
+        // Snapshot under the lock — the reloc thread reads both of these, so logging them after the
+        // guard releases is a race on a cv::Mat header and a vector.
+        storedRows = mArtworkDescriptors.rows;
+        storedPts = mArtworkKeypoints3D.size();
     }
-    LOGI("setArtworkFingerprint: stored %d validator features (%zu with 3D)",
-         mArtworkDescriptors.rows, (size_t)mArtworkKeypoints3D.size());
+    LOGI("setArtworkFingerprint: stored %d validator features (%zu with 3D)", storedRows, storedPts);
 }
 
 void MobileGS::setWallPatch(const cv::Mat& img) {

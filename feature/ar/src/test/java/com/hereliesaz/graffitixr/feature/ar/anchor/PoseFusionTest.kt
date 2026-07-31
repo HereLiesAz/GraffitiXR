@@ -21,6 +21,28 @@ class PoseFusionTest {
         identity().forEachIndexed { i, e -> assertEquals(e, r[i], 1e-4f) }
     }
 
+    /**
+     * The test above uses a pure translation for all three operands, so `inverse(V)·pnp·fpAnchor` is
+     * order-independent for that input and a composition written in any order passes it. Use a
+     * rotation and a translation that do not commute so the ORDER of the three factors is actually
+     * pinned — this is the composition PlaneMarks' documented rotation-convention question turns on,
+     * and it had no test that could see a swap.
+     */
+    @Test fun `composeCorrected pins the order of its three factors`() {
+        // 90 deg about Z, no translation.
+        val rotZ = floatArrayOf(0f,1f,0f,0f, -1f,0f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
+        val v = rotZ                       // world -> camera is a pure rotation
+        val pnp = identity()               // camera -> fingerprint world is identity
+        val fpAnchor = trans(1f, 0f, 0f)   // anchor sits +1 along the fingerprint frame's X
+
+        // inverse(V)·pnp·fpAnchor = rotZ⁻¹ · I · trans(1,0,0). rotZ⁻¹ maps +X to -Y, so the composed
+        // anchor sits at (0, -1, 0). A composition in any other order does not land there.
+        val r = PoseFusion.composeCorrected(vCurrent = v, pnpMat = pnp, fpAnchor = fpAnchor)
+        assertEquals(0f, r[12], 1e-4f)
+        assertEquals(-1f, r[13], 1e-4f)
+        assertEquals(0f, r[14], 1e-4f)
+    }
+
     @Test fun `blend alpha 0 returns current, alpha 1 returns target`() {
         val cur = trans(0f,0f,0f); val tgt = trans(10f,0f,0f)
         assertEquals(0f, PoseFusion.blend(cur, tgt, 0f)[12], 1e-4f)
