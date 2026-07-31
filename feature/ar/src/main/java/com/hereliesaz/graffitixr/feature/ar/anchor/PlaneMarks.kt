@@ -3,10 +3,15 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
 /**
  * Assembles metric 3D marks from a SINGLE camera view by back-projecting detected feature pixels
  * onto a known wall plane — the depth-off, single-capture path. No triangulation and no second view:
- * by the time ARCore renders a wall plane **green** ([rendering.PlaneRenderer.PlaneMatchResult.MATCH])
- * it has already fitted that plane and solved its metric pose and distance, so the depth is already
- * paid for. The single capture only supplies the appearance (descriptors); each feature's 3D position
- * is the intersection of its camera ray with that plane.
+ * once ARCore is tracking a plane it has already fitted it and solved its metric pose and distance,
+ * so the depth is already paid for. The single capture only supplies the appearance (descriptors);
+ * each feature's 3D position is the intersection of its camera ray with that plane.
+ *
+ * The plane does NOT have to be one the UI paints green
+ * ([rendering.PlaneRenderer.PlaneMatchResult.MATCH]) — that classification judges how good the
+ * viewing angle and distance are, not whether ARCore solved the plane, and a SUBOPTIMAL plane's
+ * centerPose is exactly as metric. Requiring green used to make target creation refuse outright on
+ * dim or obliquely-viewed walls.
  *
  * Output points are in the **capture camera's frame, CV convention** (camera looks +Z, depth
  * positive) — exactly the frame [MetricMarks] produces and `MobileGS::generateFingerprint` stores

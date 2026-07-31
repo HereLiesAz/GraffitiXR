@@ -152,13 +152,25 @@ class MainViewModel @Inject constructor(
         viewMatrix: FloatArray? = null,
         wallPlane: FloatArray? = null
     ) {
-        if (bitmap == null || intrinsics == null || viewMatrix == null) { resetCaptureUi(); return }
+        if (bitmap == null || intrinsics == null || viewMatrix == null) {
+            // Was a bare reset: the artist confirmed a target and the capture simply vanished with no
+            // message, indistinguishable from the app ignoring the tap. Name it — these are ARCore
+            // frame values that should always be present by confirm time, so if this fires it is a
+            // real bug worth reporting rather than something to re-aim around.
+            resetCaptureUi()
+            Toast.makeText(
+                context,
+                "Capture incomplete (missing camera pose). Try creating the target again.",
+                Toast.LENGTH_LONG,
+            ).show()
+            return
+        }
         val safeIntr = intrinsics
         val safeView = viewMatrix
 
         if (depthBuffer == null) {
             // No depth source: build the wall fingerprint from a SINGLE capture by back-projecting
-            // features onto the green ARCore wall plane (whose metric pose ARCore already solved).
+            // features onto the ARCore wall plane (whose metric pose ARCore already solved).
             handleSingleCapture(bitmap, safeIntr, safeView, wallPlane)
             return
         }
@@ -271,7 +283,20 @@ class MainViewModel @Inject constructor(
         // Clear any prior marks-centering override; the builder re-publishes it on a successful build.
         slamManager.overlayMarkCenterLocal = null
         viewModelScope.launch(Dispatchers.IO) {
-            val currentProject = projectRepository.currentProject.value ?: return@launch
+            // A fingerprint is persisted INTO a project, so without one there is nowhere to put it.
+            // This was a bare `?: return@launch`: the artist aimed, tapped, confirmed, and nothing
+            // happened — no target, no error, no clue that the missing piece was a project.
+            val currentProject = projectRepository.currentProject.value
+            if (currentProject == null) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        context,
+                        "No project open — a target is saved into a project. Open or create one first.",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+                return@launch
+            }
             val fp = MetricFingerprintBuilder.buildSingle(
                 slamManager, bitmap, view, intr, planePoint, planeNormal, anchor
             )
