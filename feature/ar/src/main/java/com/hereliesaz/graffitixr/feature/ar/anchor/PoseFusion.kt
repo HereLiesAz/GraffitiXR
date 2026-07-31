@@ -37,9 +37,10 @@ class PoseFusion {
         /** Base smoothing rate for a (non-cold) correction update. */
         const val BASE_ALPHA = 0.25f
         /**
-         * Splat-confidence floor. Effective confidence = CONF_FLOOR + (1-CONF_FLOOR)*confGlobal, so
-         * map maturity can *raise* trust toward 1.0 but can never drop it below the floor — depth-off
-         * (confGlobal≈0) still corrects, driven by the inlier ratio.
+         * Corroboration floor. Effective confidence = CONF_FLOOR + (1-CONF_FLOOR)*confGlobal, so
+         * painting progress can *raise* trust toward 1.0 but can never drop it below the floor — an
+         * unpainted wall still corrects, driven by the inlier ratio alone. At 0.5 the floor also sets
+         * the range: a fully corroborated wall pulls exactly twice as hard as a bare one.
          */
         const val CONF_FLOOR = 0.5f
         /** A cold (hard) snap requires at least this inlier ratio … */
@@ -81,8 +82,11 @@ class PoseFusion {
      * @param vCurrent current ARCore view matrix (fresh, GL thread)
      * @param reloc    FloatArray(19): [0..15]=pnpMat, [16]=inlierCount, [17]=matchCount, [18]=seq
      * @param fpAnchor fingerprint-frame anchor model matrix
-     * @param confGlobal global splat confidence in [0,1] — reserved (unused: with the ML depth API off
-     *        the voxel map is empty so this is ~0; correction strength is driven by PnP inlier ratio).
+     * @param confGlobal teleological corroboration in [0,1] — the fraction of the registered artwork's
+     *        features the real wall currently answers for (MobileGS painting progress). Raises smooth
+     *        correction strength from [CONF_FLOOR] at 0% painted to full at 100%, which is the
+     *        "the further along, the tighter it locks" behaviour. Never lowers it below the floor, so
+     *        a bare wall still corrects on the PnP inlier ratio alone.
      */
     fun currentAnchor(
         backbone: FloatArray,

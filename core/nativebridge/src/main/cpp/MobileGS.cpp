@@ -240,7 +240,18 @@ void MobileGS::relocThreadFunc() {
             mapPriorSeq = mPnpResultSeq.load(std::memory_order_relaxed);
         }
 
-        if (frame.empty() || wallDescs.empty() || wallKps3d.empty() || !mRelocEnabled) continue;
+        if (!mRelocEnabled) {
+            mLastRelocReject.store(kRelocDisabled, std::memory_order_relaxed);
+            continue;
+        }
+        if (wallDescs.empty() || wallKps3d.empty()) {
+            // No fingerprint, or one carrying descriptors but no 3D points (the depth-path result when
+            // the depth API is off). Either way PnP has nothing to solve against, so the whole thread
+            // idles here — silently, before this reject code existed.
+            mLastRelocReject.store(kRelocNoFingerprint, std::memory_order_relaxed);
+            continue;
+        }
+        if (frame.empty()) continue;
 
         // Optionally enhance the RGB frame under low light before grayscale conversion
         cv::Mat workFrame = frame;
@@ -423,6 +434,15 @@ void MobileGS::relocThreadFunc() {
         // Lowered floors so a close-up PARTIAL view (only a corner of the marks visible) can still
         // localize: PnP needs only a handful of correspondences. The inlier RATIO (published below) is
         // the quality gate PoseFusion actually trusts, so being permissive here is safe.
+        mLastRelocMatches.store((int)imgPts.size(), std::memory_order_relaxed);
+        mLastRelocInliers.store(0, std::memory_order_relaxed);
+        if (imgPts.size() < 8) {
+            // Distinguish "the detector found nothing / the descriptors don't even compare" from
+            // "features were found but too few agreed with the fingerprint" — they call for opposite
+            // fixes (light/focus/texture vs. aim at the registered area).
+            mLastRelocReject.store(baseDescs.empty() ? kRelocNoFeatures : kRelocFewMatches,
+                                   std::memory_order_relaxed);
+        }
         if (imgPts.size() >= 8) {
             cv::Mat rvec, tvec;
             std::vector<int> inliers;
@@ -437,7 +457,13 @@ void MobileGS::relocThreadFunc() {
             double idata[] = {fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0};
             cv::Mat intr = cv::Mat(3, 3, CV_64F, idata).clone();
             StageTimer _pnpTimer(&mStageAccumMs[4], &mStageSamples[4]);
-            if (cv::solvePnPRansac(objPts, imgPts, intr, cv::Mat(), rvec, tvec, false, 100, 8.0, 0.99, inliers)) {
+            if (!cv::solvePnPRansac(objPts, imgPts, intr, cv::Mat(), rvec, tvec, false, 100, 8.0, 0.99, inliers)) {
+                mLastRelocReject.store(kRelocPnpFailed, std::memory_order_relaxed);
+            } else {
+                mLastRelocInliers.store((int)inliers.size(), std::memory_order_relaxed);
+                if (inliers.size() < 6) {
+                    mLastRelocReject.store(kRelocFewInliers, std::memory_order_relaxed);
+                }
                 if (inliers.size() >= 6) {
                     // Refine on the RANSAC inliers. The marks lie on the wall plane, so resolve the
                     // planar two-fold (flip) ambiguity with IPPE and keep whichever pose reprojects
@@ -483,6 +509,7 @@ void MobileGS::relocThreadFunc() {
                     mPnpInlierCount.store((int)inliers.size(), std::memory_order_relaxed);
                     mPnpMatchCount.store((int)imgPts.size(), std::memory_order_relaxed);
                     mPnpResultSeq.fetch_add(1, std::memory_order_relaxed);
+                    mLastRelocReject.store(kRelocOk, std::memory_order_relaxed);
                     LOGI("Relocalization: PnP match published (%zu/%zu inliers)", inliers.size(), imgPts.size());
                     // Phase 3 passive build: grow the feature map from this locked frame (default OFF).
                     if (mMapBuildEnabled.load(std::memory_order_relaxed))
@@ -730,22 +757,23 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean) {
     // backstop, but it still mutates the authoritative set, so it stays OFF unless explicitly enabled.
     if (!mSelfGrowEnabled.load(std::memory_order_relaxed) || validQuery.empty()) return;
 
-    cv::Matx33d R; cv::Vec3d t; double fx, fy, cx, cy; int inliers; long seq;
+    cv::Matx33d R; cv::Vec3d t; double fx, fy, cx, cy; int inliers; int matches; long seq;
     std::vector<cv::Point3f> wall;
     {
         std::lock_guard<std::mutex> lock(mMutex);
         seq = mPnpResultSeq.load(std::memory_order_relaxed);
         if (seq == mLastGrowSeq) return;          // no fresh relock this tick — pose would be stale
         inliers = mPnpInlierCount.load(std::memory_order_relaxed);
+        matches = mPnpMatchCount.load(std::memory_order_relaxed);
         const float* M = mPnpCamFromFpWorld;      // camera_from_fpWorld, column-major (OpenCV frame)
         R = cv::Matx33d(M[0], M[4], M[8], M[1], M[5], M[9], M[2], M[6], M[10]);
         t = cv::Vec3d(M[12], M[13], M[14]);
         fx = mFingerprintIntrinsics[0]; fy = mFingerprintIntrinsics[1];
         cx = mFingerprintIntrinsics[2]; cy = mFingerprintIntrinsics[3];
         wall = mWallKeypoints3D;
-        if (inliers >= 20) mLastGrowSeq = seq;    // claim this relock (whether or not it yields points)
+        if (growTrusted(inliers, matches)) mLastGrowSeq = seq; // claim it (yield or not)
     }
-    if (inliers < 20 || fx <= 0 || fy <= 0 || wall.size() < 12 || wall.size() > 5000) return;
+    if (!growTrusted(inliers, matches) || fx <= 0 || fy <= 0 || wall.size() < 12 || wall.size() > 5000) return;
 
     // Wall plane (n·X = pdist, pdist>0) in the fingerprint frame, fit to the existing marks.
     cv::Mat data((int)wall.size(), 3, CV_32F);

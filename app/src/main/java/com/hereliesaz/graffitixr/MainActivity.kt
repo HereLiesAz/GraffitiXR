@@ -119,6 +119,8 @@ import com.hereliesaz.graffitixr.feature.dashboard.SettingsViewModel
 import com.hereliesaz.graffitixr.feature.editor.EditorUi
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
+import com.hereliesaz.graffitixr.common.model.RelocDiagnostics
+import com.hereliesaz.graffitixr.common.model.RelocReject
 import com.hereliesaz.graffitixr.common.model.RelocState
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
@@ -361,14 +363,15 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(currentTempCapture, currentCaptureStep, isWaitingForTap) {
                     if (currentTempCapture != null) {
                         val tapPath = currentCaptureStep == CaptureStep.NONE && isWaitingForTap
-                        // Depth-off (single-capture) target creation back-projects onto the green
-                        // ARCore wall plane, so it needs one. Gate BEFORE the review step: if the tap
-                        // wasn't on a green wall, discard the frame and let the artist re-aim/re-tap,
-                        // rather than letting them erase marks on a capture we'd reject at confirm.
+                        // Depth-off (single-capture) target creation back-projects onto an ARCore wall
+                        // plane, so it needs one. Gate BEFORE the review step: if the tap landed on no
+                        // tracked surface, discard the frame and let the artist re-aim/re-tap, rather
+                        // than letting them erase marks on a capture we'd reject at confirm.
+                        // (The plane no longer has to be green — see the hit-test in ArRenderer.)
                         val depthOff = arUiState.targetDepthBuffer == null
                         val plane = arUiState.targetWallPlane
-                        val onGreenWall = plane != null && plane.size >= 6
-                        if (tapPath && depthOff && !onGreenWall) {
+                        val onWall = plane != null && plane.size >= 6
+                        if (tapPath && depthOff && !onWall) {
                             arViewModel.clearCaptureForRetry()
                             mainViewModel.notifyTargetNotOnWall()
                         } else if (tapPath) {
@@ -1083,6 +1086,20 @@ class MainActivity : ComponentActivity() {
 
                             if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings) {
                                 AnchorLockFlash(isAnchorEstablished = arUiState.isAnchorEstablished, strings = strings)
+                            }
+
+                            // Relocalization state — available in RELEASE too, behind the same opt-in
+                            // Diagnostic Overlay setting. The eval panel below is a dev instrument and
+                            // stays debug-only, but "is relocalization working, and if not which gate
+                            // is it missing" is the question an artist in the field needs answered,
+                            // and it was only reachable through logcat on a debug build.
+                            if (editorUiState.showDiagOverlay && editorUiState.editorMode == EditorMode.AR &&
+                                !showLibrary && !showSettings && !mainUiState.isCapturingTarget) {
+                                RelocDiagnosticsOverlay(
+                                    diagnostics = arUiState.relocDiagnostics,
+                                    fingerprintPoints = arUiState.evalLiveMetrics.wallCount,
+                                    paintingProgress = arUiState.paintingProgress,
+                                )
                             }
 
                             // Dev/eval overlay: debug builds only, and off unless the user opts in
@@ -2065,6 +2082,61 @@ private fun DiagnosticOverlay(
 
 // Eval overlay only renders in debug builds; production users never see it.
 private val EVAL_OVERLAY_ENABLED = com.hereliesaz.graffitixr.BuildConfig.DEBUG
+
+/**
+ * Live relocalization state: whether the wall fingerprint exists, whether PnP is locking, and if not,
+ * which gate the last attempt missed and by how much.
+ *
+ * This is deliberately shipped in release (behind the Diagnostic Overlay setting) because the failure
+ * modes are all silent otherwise — a relocalizer that has never locked once looks exactly like one
+ * that is idle, and the counters that did exist only updated on success.
+ */
+@Composable
+private fun RelocDiagnosticsOverlay(
+    diagnostics: RelocDiagnostics,
+    fingerprintPoints: Int,
+    paintingProgress: Float,
+) {
+    val d = diagnostics
+    // What to DO about it, not just what happened.
+    val (label, hint) = when (d.reject) {
+        RelocReject.OK -> "LOCKED" to "matching the wall"
+        RelocReject.NO_FINGERPRINT ->
+            "NO TARGET" to "create a target — nothing to match against"
+        RelocReject.DISABLED -> "OFF" to "relocalization disabled"
+        RelocReject.NO_FEATURES ->
+            "NO FEATURES" to "frame has no texture — light, focus or blur"
+        RelocReject.FEW_MATCHES ->
+            "${d.matches}/8 MATCHES" to "aim at the registered marks, closer and squarer"
+        RelocReject.PNP_FAILED ->
+            "NO POSE" to "${d.matches} matches, none geometrically consistent"
+        RelocReject.FEW_INLIERS ->
+            "${d.inliers}/6 INLIERS" to "close — hold steadier, or get square to the wall"
+        RelocReject.UNKNOWN -> "—" to "waiting for the first attempt"
+    }
+    val locked = d.reject == RelocReject.OK
+    androidx.compose.foundation.layout.Column(
+        androidx.compose.ui.Modifier
+            .background(androidx.compose.ui.graphics.Color(0xAA000000))
+            .padding(8.dp)
+    ) {
+        DiagnosticRow(
+            "Reloc", label,
+            if (locked) androidx.compose.ui.graphics.Color.Green else androidx.compose.ui.graphics.Color.Yellow,
+        )
+        if (hint.isNotEmpty()) {
+            DiagnosticRow("", hint, androidx.compose.ui.graphics.Color.LightGray)
+        }
+        // The ratio is what PoseFusion actually gates on (>= 0.5 to correct at all, >= 0.7 with 20+
+        // inliers to hard-snap), so show it rather than making the artist divide two numbers.
+        DiagnosticRow(
+            "Inliers", "${d.inliers}/${d.matches} (${(d.inlierRatio * 100).toInt()}%)",
+            androidx.compose.ui.graphics.Color.White,
+        )
+        DiagnosticRow("FP pts", fingerprintPoints.toString(), androidx.compose.ui.graphics.Color.Cyan)
+        DiagnosticRow("Corroborated", "${(paintingProgress * 100).toInt()}%", androidx.compose.ui.graphics.Color.White)
+    }
+}
 
 @Composable
 private fun EvalOverlay(

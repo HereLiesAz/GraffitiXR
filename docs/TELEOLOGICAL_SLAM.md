@@ -30,8 +30,54 @@ on top of the OpenCV relocalizer:
    becomes more aggressive — the overlay "snaps" more tightly the more of the
    mural exists on the wall.
 
+   Concretely: `ArRenderer` passes the progress as `PoseFusion.currentAnchor`'s
+   `confGlobal`, which scales the smoothing rate as
+   `alpha = BASE_ALPHA * inlierRatio * (CONF_FLOOR + (1 - CONF_FLOOR) * progress)`.
+   The floor means a bare wall still corrects at half strength on the PnP inlier
+   ratio alone; a fully corroborated one earns twice that.
+
+   (Until 2026-07 this stage was **not wired**: `confGlobal` was pinned at `1f`
+   with a comment about the retired voxel map, so progress reached the HUD and
+   nothing else and correction strength was identical at 0% and 100% painted.)
+
+4. **Self-grow.** Live features that pass the same corroboration test are
+   promoted into the reloc fingerprint (`mSelfGrowEnabled`, default on), so
+   relocalization survives the original marks being painted over. The promotion
+   gate is `MobileGS::growTrusted` — a strong inlier ratio qualifies at a lower
+   absolute count, because a half-covered wall rarely reaches a large raw inlier
+   count and the old flat `inliers >= 20` meant the fingerprint could only grow
+   when it was already strong.
+
 This is the inverse of the failure mode other tracing apps hit, where accuracy
 degrades as the original reference marks disappear under paint.
+
+## What "matching the image" does and does not mean
+
+The corroboration test is **descriptor similarity, not geometric accuracy**. A
+live feature corroborates the artwork when its nearest neighbour among the
+design composite's descriptors passes a Lowe ratio of 0.75
+(`MobileGS::tryUpdateFingerprint`). There is no positional tolerance, no scale
+or colour check, and nothing anywhere compares your brushwork to the design
+geometrically. Painting "more accurately" only helps insofar as it makes the
+wall's local appearance descriptor-match the design image.
+
+Tracking itself never consults the artwork at all: relocalization matches the
+live camera against the **photograph of the wall taken at target creation**.
+
+## Diagnosing it
+
+Every failure in this chain used to be silent. `RelocDiagnostics` (surfaced by
+the Diagnostic Overlay, in release as well as debug) reports which gate the last
+attempt missed:
+
+| State | Meaning |
+|---|---|
+| `NO_FINGERPRINT` | no target created, or one with no 3D points — nothing to match |
+| `NO_FEATURES` | live frame had no usable texture (light, focus, blur) |
+| `FEW_MATCHES` | fewer than 8 correspondences survived the ratio test |
+| `PNP_FAILED` | matches found, none geometrically consistent |
+| `FEW_INLIERS` | PnP solved but fewer than 6 inliers agreed |
+| `OK` | pose published; PoseFusion applies it if the inlier ratio ≥ 0.5 |
 
 ## Relationship to the rest of the engine
 

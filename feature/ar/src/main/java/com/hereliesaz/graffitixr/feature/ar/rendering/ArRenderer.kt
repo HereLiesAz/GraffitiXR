@@ -330,6 +330,9 @@ class ArRenderer(
     private var lastPoseX = 0f
     private var lastPoseY = 0f
     private var lastPoseZ = 0f
+    // ARCore frame timestamp (ns) of the last motion sample, so velocity uses the real interval
+    // rather than a hardcoded rate that only matched one of the two feed throttles.
+    private var lastMotionSampleNs = 0L
     // Last camera rotation quaternion [x,y,z,w], for delta-based angular velocity.
     private var lastQuat: FloatArray? = null
 
@@ -1119,10 +1122,18 @@ class ArRenderer(
                     vCurrent = viewMatrix,
                     reloc = slamManager.getRelocResult(),
                     fpAnchor = slamManager.getFingerprintAnchor(),
-                    // Map retirement: confGlobal came from the (now-neutralized) voxel map's global
-                    // confidence, which is always 0 once the map stops building. Decouple PoseFusion
-                    // from it — pass full trust so smooth correction keeps working on the inlier ratio.
-                    confGlobal = 1f,
+                    // THE teleological input, finally connected. The claim in TELEOLOGICAL_SLAM.md is
+                    // that the further along the painting is, the more real-world corroboration the
+                    // engine has and the harder the overlay locks. That third stage was never wired:
+                    // this argument was pinned at 1f, so painting progress reached the HUD and nothing
+                    // else, and correction strength was identical at 0% and 100% painted.
+                    //
+                    // It now carries the measured corroboration (fraction of the registered artwork's
+                    // features the real wall currently answers for). PoseFusion floors it at
+                    // CONF_FLOOR, so an unpainted wall still corrects at half strength on the inlier
+                    // ratio alone — the previous behaviour is the floor, not the ceiling — and a
+                    // well-advanced mural earns up to 2x that.
+                    confGlobal = slamManager.getPaintingProgress(),
                 )
             } else backbone
 
@@ -1322,25 +1333,39 @@ class ArRenderer(
                         }
 
                         // Single-capture target creation needs the metric wall plane being aimed at.
-                        // Hit-test the tapped pixel for an ARCore plane that classifies as MATCH (green
-                        // = parallel and within range) and capture its world point + normal. Null when
-                        // the tap isn't on a green plane, which gates target creation downstream.
+                        //
+                        // This used to accept ONLY a plane classifying as MATCH (green: near-parallel
+                        // and within 3 m). But MATCH is a judgement about how good the VIEW is, not
+                        // about whether ARCore has solved the plane — a SUBOPTIMAL plane's centerPose
+                        // is exactly as metric. Requiring green meant that on a dim wall, or one taken
+                        // at an angle, target creation refused outright with "face a wall", and the
+                        // artist had no way to proceed. Now any tracking plane under the tap will do,
+                        // green preferred; the honest quality bar is downstream, where the fingerprint
+                        // needs enough features to actually localize.
                         var wallPlane: FloatArray? = null
                         if (tap != null && surfaceWidth > 0) {
                             try {
                                 val px = tap[0] * surfaceWidth
                                 val py = tap[1] * surfaceHeight
+                                var fallback: com.google.ar.core.Plane? = null
                                 for (h in frame.hitTest(px, py)) {
                                     val tr = h.trackable
-                                    if (tr is com.google.ar.core.Plane && tr.isPoseInPolygon(h.hitPose) &&
-                                        planeRenderer.classifyPlane(tr, camera.pose) ==
+                                    if (tr !is com.google.ar.core.Plane) continue
+                                    if (tr.trackingState != TrackingState.TRACKING) continue
+                                    if (tr.subsumedBy != null) continue
+                                    if (!tr.isPoseInPolygon(h.hitPose)) continue
+                                    if (planeRenderer.classifyPlane(tr, camera.pose) ==
                                             PlaneRenderer.PlaneMatchResult.MATCH) {
-                                        val c = tr.centerPose
-                                        val nrm = FloatArray(3)
-                                        c.getTransformedAxis(1, 1.0f, nrm, 0) // plane local +Y = normal
-                                        wallPlane = floatArrayOf(c.tx(), c.ty(), c.tz(), nrm[0], nrm[1], nrm[2])
-                                        break
+                                        fallback = tr
+                                        break // green wins outright
                                     }
+                                    if (fallback == null) fallback = tr // first non-green hit, kept
+                                }
+                                fallback?.let { tr ->
+                                    val c = tr.centerPose
+                                    val nrm = FloatArray(3)
+                                    c.getTransformedAxis(1, 1.0f, nrm, 0) // plane local +Y = normal
+                                    wallPlane = floatArrayOf(c.tx(), c.ty(), c.tz(), nrm[0], nrm[1], nrm[2])
                                 }
                             } catch (e: Exception) {
                                 Timber.w(e, "Wall-plane hit-test for capture failed")
@@ -1404,18 +1429,32 @@ class ArRenderer(
                 }
             }
 
-            // Throttle frame feeding to 15Hz (every 4 frames at 60Hz) to halve processing-related power draw.
-            // When tracking is stable and the device is stationary, we could throttle even further.
-            // ── Frame Data Pipeline (Throttle to 20Hz or 2Hz for Battery Efficiency) ──
+            // ── Frame Data Pipeline ──
+            // Post-anchor this was every 30th frame — 2 Hz at 60 fps — which is the rate the wall gets
+            // re-checked for relocalization while the artist is actually painting, i.e. the rate the
+            // overlay can recover after drift or a look-away. That was set when every feed did a full
+            // YUV->RGB convert plus rotate on this thread whether or not anything wanted the result;
+            // relocWantsFrame() now rejects that work up front, so a feed the reloc worker isn't ready
+            // for costs only the YUV assembly. The worker itself self-limits (200 ms between attempts),
+            // so feeding at ~6 Hz keeps it saturated without ever queueing.
             lastStep = "slamFeed"
-            val throttleRate = if (anchorEstablished) 30 else 3 // 2Hz vs 20Hz
+            val throttleRate = if (anchorEstablished) 10 else 3 // 6Hz vs 20Hz
             if (isTracking && frameCount % throttleRate == 0) {
                 // Calculate device motion (linear and angular velocity) for deblurring
                 val currentPose = camera.displayOrientedPose
                 if (frameCount > 0) {
-                    // Simple delta-based velocity estimation
-                    // In a production app, we'd use raw IMU high-frequency data.
-                    val dt = 1.0f / 20.0f // Approx 20Hz throttle
+                    // Delta-based velocity estimation, over the MEASURED interval. This was hardcoded
+                    // to 1/20 s "approx 20Hz throttle", which only ever matched the pre-anchor rate —
+                    // post-anchor the same divisor was applied to a 2 Hz sample interval, inflating
+                    // every reported velocity by 10x. The deblur consumer reads these, so the error
+                    // was real, not cosmetic. Clamped so a long first gap can't produce a wild value.
+                    val nowNs = frame.timestamp
+                    val dt = if (lastMotionSampleNs > 0L && nowNs > lastMotionSampleNs) {
+                        ((nowNs - lastMotionSampleNs) / 1_000_000_000.0f).coerceIn(0.005f, 1f)
+                    } else {
+                        throttleRate / 60f // first sample: assume the nominal 60 fps camera
+                    }
+                    lastMotionSampleNs = nowNs
                     val linVel = floatArrayOf(
                         (currentPose.tx() - lastPoseX) / dt,
                         (currentPose.ty() - lastPoseY) / dt,

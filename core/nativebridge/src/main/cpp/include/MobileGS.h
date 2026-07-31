@@ -67,6 +67,45 @@ public:
     // Phase 3: passively grow the feature map from reloc-locked frames. Default OFF, and independent of
     // the match flag (accumulate without matching, or match a persisted map without growing).
     void setMapBuildEnabled(bool e) { mMapBuildEnabled.store(e, std::memory_order_relaxed); }
+    /**
+     * Why the last relocalization attempt failed to publish a pose. Ordered by how early the gate
+     * sits in the pipeline, so the largest value reached is the furthest the attempt got.
+     */
+    enum RelocReject {
+        kRelocOk = 0,            //!< published a pose
+        kRelocNoFingerprint = 1, //!< no wall fingerprint yet (or it carries no 3D points)
+        kRelocDisabled = 2,      //!< relocalization switched off
+        kRelocNoFeatures = 3,    //!< nothing detected in the live frame, or descriptor type mismatch
+        kRelocFewMatches = 4,    //!< fewer than 8 correspondences survived the Lowe ratio test
+        kRelocPnpFailed = 5,     //!< solvePnPRansac found no consistent pose
+        kRelocFewInliers = 6,    //!< PnP solved but fewer than 6 inliers agreed
+    };
+
+    /**
+     * Whether a relock is trusted enough to promote new marks into the authoritative fingerprint.
+     *
+     * This used to be a flat `inliers >= 20`, which could not bootstrap: self-grow is the mechanism
+     * that keeps relocalization alive as the original marks get painted over, but a wall whose marks
+     * are already half-covered rarely reaches 20 raw inliers, so the fingerprint could only grow when
+     * it was already strong — exactly when it needed to least.
+     *
+     * The ratio is the quality signal (it is what PoseFusion trusts), so a strong ratio now qualifies
+     * at a lower absolute count, while a weak ratio still cannot qualify at any count. RANSAC in the
+     * reloc PnP remains the geometric backstop for anything this lets through.
+     */
+    static bool growTrusted(int inliers, int matches) {
+        if (inliers >= 20) return true;                  // unchanged: a big lock always qualifies
+        if (inliers < 10 || matches <= 0) return false;  // absolute floor — PnP noise below this
+        return (float)inliers / (float)matches >= 0.6f;  // above PoseFusion's 0.5 trust bar
+    }
+
+    /** Last [RelocReject]. */
+    int lastRelocReject() const { return mLastRelocReject.load(std::memory_order_relaxed); }
+    /** Correspondences built by the last attempt, successful or not. */
+    int lastRelocMatches() const { return mLastRelocMatches.load(std::memory_order_relaxed); }
+    /** RANSAC inliers from the last attempt, successful or not (0 if PnP never ran). */
+    int lastRelocInliers() const { return mLastRelocInliers.load(std::memory_order_relaxed); }
+
     void scheduleRelocCheck(const cv::Mat& colorFrame);
     /**
      * Cheap pre-check for the three conditions under which scheduleRelocCheck() drops the frame:
@@ -273,5 +312,17 @@ private:
     std::atomic<bool>       mRelocRunning{false};
     std::atomic<bool>       mRelocRequested{false};
     std::atomic<bool>       mRelocEnabled{true};
+
+    /**
+     * Why the most recent relocalization attempt did not publish a pose (a RelocReject value), and
+     * the correspondence/inlier counts from that attempt whether or not it succeeded.
+     *
+     * mPnpMatchCount / mPnpInlierCount only update on SUCCESS, so before the first lock they read
+     * zero and a failing pipeline is indistinguishable from an idle one. These always reflect the
+     * last attempt, so the diagnostics can say which gate is being missed and by how much.
+     */
+    std::atomic<int>        mLastRelocReject{0};
+    std::atomic<int>        mLastRelocMatches{0};
+    std::atomic<int>        mLastRelocInliers{0};
     cv::Mat                 mRelocColorFrame;
 };

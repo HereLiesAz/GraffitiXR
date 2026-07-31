@@ -65,6 +65,33 @@ class PoseFusionTest {
         assertTrue("expected non-zero correction with depth off, got ${out[12]}", out[12] > 0f)
     }
 
+    /**
+     * The teleological claim: the further along the painting, the harder the overlay locks. This is
+     * the behaviour that was inert while ArRenderer pinned confGlobal at 1f — both ends of the range
+     * produced the identical correction.
+     */
+    @Test fun `corroboration scales correction strength`() {
+        // Same relock, same inlier ratio; only the corroboration differs.
+        val bare = PoseFusion().currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(10f,0f,0f), inliers = 60f, matches = 100f, seq = 1f), identity(), confGlobal = 0f)
+        val painted = PoseFusion().currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(10f,0f,0f), inliers = 60f, matches = 100f, seq = 1f), identity(), confGlobal = 1f)
+        assertTrue(
+            "a corroborated wall should pull harder than a bare one: bare=${bare[12]} painted=${painted[12]}",
+            painted[12] > bare[12],
+        )
+        // And the floor bounds how much: CONF_FLOOR=0.5 means full corroboration is exactly 2x.
+        assertEquals(2f, painted[12] / bare[12], 1e-3f)
+    }
+
+    @Test fun `corroboration outside 0-1 is clamped, not extrapolated`() {
+        val full = PoseFusion().currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(10f,0f,0f), inliers = 60f, matches = 100f, seq = 1f), identity(), confGlobal = 1f)
+        val over = PoseFusion().currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(10f,0f,0f), inliers = 60f, matches = 100f, seq = 1f), identity(), confGlobal = 5f)
+        assertEquals(full[12], over[12], 1e-4f)
+    }
+
     @Test fun `correction persists and stays world-locked between snaps`() {
         val f = PoseFusion()
         // Confident cold snap establishes D = +10x at backbone origin.

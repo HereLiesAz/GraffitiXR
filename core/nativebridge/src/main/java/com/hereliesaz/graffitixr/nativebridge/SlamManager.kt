@@ -5,6 +5,8 @@ import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.util.Log
 import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.RelocDiagnostics
+import com.hereliesaz.graffitixr.common.model.RelocReject
 import com.hereliesaz.graffitixr.common.model.WallFeatureMap
 import com.hereliesaz.graffitixr.common.sensor.CameraFrame
 import com.hereliesaz.graffitixr.common.sensor.ImuSample
@@ -80,6 +82,21 @@ class SlamManager @Inject constructor(
     }
 
     fun getPaintingProgress(): Float = nativeGetPaintingProgress()
+
+    /**
+     * Why the last relocalization attempt did not publish a pose, and how far it got. See
+     * [RelocDiagnostics]; the native side packs the three values into one int[] so the read is a
+     * consistent snapshot rather than three racing getters.
+     */
+    fun getRelocDiagnostics(): RelocDiagnostics {
+        val v = nativeGetRelocDiagnostics()
+        if (v == null || v.size < 3) return RelocDiagnostics()
+        return RelocDiagnostics(
+            reject = RelocReject.entries.getOrElse(v[0]) { RelocReject.UNKNOWN },
+            matches = v[1],
+            inliers = v[2],
+        )
+    }
 
     fun getAnchorTransform(): FloatArray = nativeGetAnchorTransform()
 
@@ -530,6 +547,7 @@ class SlamManager @Inject constructor(
     private external fun nativeUpdateDeviceMotion(angularVel: FloatArray, linearVel: FloatArray)
     private external fun nativeGetAnchorTransform(): FloatArray
     private external fun nativeGetPaintingProgress(): Float
+    private external fun nativeGetRelocDiagnostics(): IntArray?
     private external fun nativeSetArScanMode(mode: Int)
     private external fun nativeSetMuralMethod(method: Int)
     private external fun nativeGetStageTimings(out: FloatArray)

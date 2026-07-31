@@ -1239,7 +1239,7 @@ class ArViewModel @Inject constructor(
     /**
      * Drops the large capture bitmaps and the native depth buffer held in [ArUiState], letting
      * GC reclaim them. We deliberately do NOT call recycle(): on AR-mode teardown a background
-     * fingerprint/save coroutine (onConfirmTargetCreation, setArtworkFingerprintFromComposite)
+     * fingerprint/save coroutine (onConfirmTargetCreation, updatePaintingGuide)
      * may still hold these same bitmap instances, and recycling them out from under it would
      * cause a "trying to use a recycled bitmap" crash. Nulling the references is deterministic
      * and safe; the platform reclaims the memory once no coroutine references them.
@@ -1463,6 +1463,9 @@ class ArViewModel @Inject constructor(
         globConf: Float = 0f
     ) {
         val progress = if (isTracking) slamManager.getPaintingProgress() else _uiState.value.paintingProgress
+        // Read every tick (~15 Hz) rather than only on a successful lock — the whole point is to show
+        // the FAILING states, which by definition never reach a success path.
+        val relocDiag = slamManager.getRelocDiagnostics()
 
         val nowMs = System.currentTimeMillis()
         if (isTracking) lastTrackingTimestampMs = nowMs
@@ -1499,6 +1502,7 @@ class ArViewModel @Inject constructor(
                 immutableSplatCount = immutableSplatCount,
                 isDepthApiSupported = isDepthApiSupported,
                 paintingProgress = progress,
+                relocDiagnostics = relocDiag,
                 scanPhase = newPhase,
                 ambientSectorsCovered = sectorsCovered / 3, // Keep backward compatibility for 30 degree UI units if needed
                 worldMappingProgress = mappingProgress,
@@ -2142,27 +2146,11 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    fun setArtworkFingerprintFromComposite(bitmap: Bitmap) {
-        val ui = _uiState.value
-        val depth = ui.targetDepthBuffer ?: return
-        val intr = ui.targetIntrinsics ?: return
-        val view = ui.targetCaptureViewMatrix ?: return
-        
-        viewModelScope.launch(Dispatchers.IO) {
-            slamManager.setArtworkFingerprint(
-                bitmap,
-                depth,
-                ui.targetDepthBufferWidth,
-                ui.targetDepthBufferHeight,
-                ui.targetDepthStride,
-                intr,
-                view
-            )
-            
-            // Progress is reset when new features are added
-            _uiState.update { it.copy(paintingProgress = 0f) }
-        }
-    }
+    // setArtworkFingerprintFromComposite removed: nothing called it, and it bailed on its first line
+    // (`targetDepthBuffer ?: return`) because the ARCore depth API is disabled, so it could not have
+    // registered an artwork base even if something had. [updatePaintingGuide] is the live path — it
+    // re-registers the design composite whenever the design changes, descriptors-only, which is all
+    // the teleological corroboration test needs.
 
     fun computeScanHint(isTracking: Boolean, splatCount: Int, lightLevel: Float, scanPhase: ScanPhase, sectorsCovered: Int): String? {
         if (!isTracking) return appContext.getString(DesignR.string.scan_hint_recover)

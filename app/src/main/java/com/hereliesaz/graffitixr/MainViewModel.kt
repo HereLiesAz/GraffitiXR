@@ -276,10 +276,22 @@ class MainViewModel @Inject constructor(
                 slamManager, bitmap, view, intr, planePoint, planeNormal, anchor
             )
             if (fp == null) {
+                // Say WHICH way it fell short. "Not enough texture" was the same message whether the
+                // frame was blank, out of focus, or full of features that simply missed the plane —
+                // three problems with three different fixes, and no way to tell them apart.
+                val detected = MetricFingerprintBuilder.lastDetected
+                val placed = MetricFingerprintBuilder.lastPlaced
+                val need = MetricFingerprintBuilder.lastRequired
+                val message = when {
+                    detected < need ->
+                        "Only $detected features on this wall (need $need). Too dark, too smooth, " +
+                            "or out of focus — try a more detailed patch or more light."
+                    else ->
+                        "Found $detected features but only $placed landed on the wall surface " +
+                            "(need $need). Aim at the middle of the detected wall, square on."
+                }
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context,
-                        "Not enough texture on the wall to lock a target. Try a more detailed area.",
-                        Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                 }
                 return@launch
             }
@@ -307,11 +319,14 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    // Shared guidance shown when single-capture target creation isn't aimed at a green wall plane
+    // Shared guidance shown when single-capture target creation lands on no tracked wall plane at all
     // (used by both the pre-review gate and the handleSingleCapture backstop). Toast-in-VM matches the
     // existing capture toasts here; a full AppStrings/event-channel i18n pass is a separate cleanup.
+    //
+    // No longer says "green": any tracked plane under the tap is accepted now (see the wall-plane
+    // hit-test in ArRenderer), so the only real failure is aiming where no surface has been detected.
     private val notOnGreenWallMessage =
-        "Aim at a wall shown in green (face it straight-on, within ~3 m), then tap your marks."
+        "No wall detected there yet. Sweep the phone across the surface until it's outlined, then tap."
 
     /**
      * The single-capture tap wasn't on a green (parallel, in-range) wall plane. Guide the artist;

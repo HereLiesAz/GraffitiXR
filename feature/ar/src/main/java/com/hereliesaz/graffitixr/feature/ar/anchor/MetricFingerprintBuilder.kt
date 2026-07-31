@@ -149,6 +149,23 @@ object MetricFingerprintBuilder {
      * @param planeNormalWorld the wall plane normal in world space.
      * @param anchorModel the anchor's world pose (column-major 4x4) at capture time.
      */
+    /**
+     * How a [buildSingle] attempt went, so a failure can say what was actually short instead of a
+     * generic "not enough texture". Reset at the start of each attempt.
+     *
+     * [detected] is how many features the detector found in the frame at all; [placed] is how many of
+     * those back-projected onto the wall plane. detected≈0 means the frame had no texture to work
+     * with (light, focus, blur, a blank wall). detected high but placed low means the features were
+     * there but missed the plane — usually aiming past the plane's extent, or a plane whose polygon
+     * doesn't cover what the camera sees.
+     */
+    @Volatile var lastDetected: Int = 0
+        private set
+    @Volatile var lastPlaced: Int = 0
+        private set
+    @Volatile var lastRequired: Int = 0
+        private set
+
     fun buildSingle(
         slam: SlamManager,
         bitmap: Bitmap, glView: FloatArray, intr: FloatArray,
@@ -156,6 +173,7 @@ object MetricFingerprintBuilder {
         anchorModel: FloatArray,
         minPoints: Int = 20,
     ): Fingerprint? {
+        lastDetected = 0; lastPlaced = 0; lastRequired = minPoints
         val cvView = MetricMarks.glViewToCv(glView)
 
         val sp = unpackSuperPoint(slam.detectSuperPoint(bitmap))
@@ -204,6 +222,10 @@ object MetricFingerprintBuilder {
             pixels, cvView, planePointWorld, planeNormalWorld,
             intr[0], intr[1], intr[2], intr[3],
         )
+        // Record before the bail so a refusal can report how far short it fell. SuperPoint runs first
+        // and ORB is the fallback, so keep whichever pass got furthest rather than the last one.
+        if (pixels.size > lastDetected) lastDetected = pixels.size
+        if (res.count > lastPlaced) lastPlaced = res.count
         if (res.count < minPoints) return null
 
         // Center the AR overlay on the marks (their centroid), not the screen-center anchor.
