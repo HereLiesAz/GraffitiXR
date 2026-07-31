@@ -933,13 +933,22 @@ class ArViewModel @Inject constructor(
         try {
             val s = Session(context)
             val config = Config(s)
-            // FIXED, not AUTO: autofocus sweeps shift the effective focal length mid-stream, and on
-            // devices with sloppy OEM intrinsics that destabilizes ARCore's feature triangulation —
-            // this device's perception threads (MTC_vio, MTC_triangulati) have segfaulted inside
-            // libarcore_c during live tracking. FIXED keeps the optics constant, which is also
-            // ARCore's documented recommendation for tracking-priority apps. Revisit if nearby
-            // surfaces render too blurred for mark detection.
-            config.focusMode = Config.FocusMode.FIXED
+            // AUTO, except in safe mode. FIXED parks the lens at infinity, which is right for a
+            // room-scale tracking app but wrong for this one: an artist works a wall at arm's length,
+            // often at night with a torch, and at that range a fixed-infinity lens delivers a blurred
+            // frame with no usable texture. ARCore then finds no features, so no plane ever forms —
+            // "impossible to get a surface to read in low light, even with a flashlight" — and the
+            // fragments it does form are too noisy to merge into one wall. The blur cost was called
+            // out when FIXED was chosen ("Revisit if nearby surfaces render too blurred for mark
+            // detection"); close-range low light is exactly that case, so AUTO is the default now.
+            //
+            // The stability reason for FIXED is preserved: autofocus sweeps shift the effective focal
+            // length mid-stream and on devices with sloppy OEM intrinsics that destabilized ARCore's
+            // triangulation badly enough to segfault its perception threads (MTC_vio,
+            // MTC_triangulati) inside libarcore_c. forceSafeCameraConfig is the flag those devices
+            // already set after a camera stall, so safe mode keeps the old constant-optics behaviour.
+            config.focusMode =
+                if (forceSafeCameraConfig) Config.FocusMode.FIXED else Config.FocusMode.AUTO
             // LATEST_CAMERA_IMAGE so session.update() never blocks the GL render thread. On this
             // device the BLOCKING mode left the renderer stuck "Waiting for first frame" (the render
             // heartbeat never fired) — update() hung waiting for a frame that never arrived, so the
@@ -1959,6 +1968,16 @@ class ArViewModel @Inject constructor(
 
     fun toggleFlashlight() {
         _uiState.update { it.copy(isFlashlightOn = !it.isFlashlightOn) }
+    }
+
+    /**
+     * ARCore refused a torch request (no flash unit, or a camera config that can't drive one).
+     * Called from the GL thread. Drop the toggle back off so the rail button reflects the real
+     * state instead of latching on over a light that never came on.
+     */
+    fun onFlashlightUnavailable() {
+        _uiState.update { it.copy(isFlashlightOn = false) }
+        appendDiag("flashlight: unavailable on this device/camera config")
     }
 
     fun updateLightLevel(level: Float) {

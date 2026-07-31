@@ -450,17 +450,17 @@ class MainActivity : ComponentActivity() {
 
                 // noMenu (AzNavRail 11.0) removes the side drawer entirely — all entries become rail
                 // items — and makes the app-icon tap FOLD THE RAIL UP INTO THE ICON (the scope tracks
-                // this as `isFoldedUp`). That is exactly the Design-mode behaviour we want: the user
-                // asked for the rail to fold up when the app icon is pressed in Design mode with the
-                // menu disabled, and 11.0's noMenu delivers it natively (10.32 could not — it had no
-                // app-icon/expansion hook, so this used to be only an approximation).
+                // this as `isFoldedUp`).
                 //
-                // We also assert noMenu while the rail is hidden or the library screen is up: forcing
-                // it there re-initialises AzNavRail's saved isExpanded to false so its outer
-                // fillMaxSize Box never attaches tapOutsideToCollapse over those screens.
-                val railMenuDisabled = !isRailVisible ||
-                        showLibrary ||
-                        editorUiState.editorMode == EditorMode.DESIGN
+                // The menu is disabled in EVERY mode, not just Design. Nothing is lost by doing so:
+                // this app declares no drawer-only entries at all (no azMenuItem / azMenuToggle /
+                // azMenuCycler / azMenu*Host anywhere — every entry is an azRailItem, azRailHostItem
+                // or azRailSubItem), so the side drawer only ever duplicated the rail. Disabling it
+                // everywhere also means the app-icon fold and AzNavRail's isExpanded=false
+                // initialisation — which keeps its outer fillMaxSize Box from attaching
+                // tapOutsideToCollapse over the screen — apply in AR, Overlay, Mockup and Trace too,
+                // not only Design/library/hidden-rail.
+                val railMenuDisabled = true
 
                 var permissionRequestedAtLeastOnce by remember { mutableStateOf(hasCameraPermission) }
 

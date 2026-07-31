@@ -57,7 +57,11 @@ class ArRenderer(
     // sustained run of frames (true) or recovers (false). MainScreen uses this
     // to drop the GLSurfaceView render mode to WHEN_DIRTY so the saturated
     // main thread can serve input again.
-    private val onTrackingLoopStuck: (Boolean) -> Unit = {}
+    private val onTrackingLoopStuck: (Boolean) -> Unit = {},
+    // Fired from the GL thread when a torch request was rejected by ARCore (no flash unit, or a
+    // camera config that can't drive one), so the UI can drop the toggle instead of latching a
+    // light that never came on.
+    private val onFlashlightUnavailable: () -> Unit = {}
 ) : GLSurfaceView.Renderer {
 
     /**
@@ -245,6 +249,8 @@ class ArRenderer(
     // Set by updateFlashlight (any thread); consumed at the top of onDrawFrame so the ARCore
     // configure() runs on the GL thread under sessionLock, never concurrently with update().
     @Volatile private var flashDirty: Boolean = false
+    // Guards onFlashlightUnavailable so a rejected torch reports once per request, not once a frame.
+    private var flashUnsupportedReported: Boolean = false
 
     fun saveCloudPoints(path: String) {
         pointCloudRenderer.saveToFile(path)
@@ -375,6 +381,15 @@ class ArRenderer(
     // drift and survives anchor re-establishment and project reload.
     private var markOffsetX: Float = 0f
     private var markOffsetY: Float = 0f
+    // Per-frame pose scratch. These were allocated fresh inside onDrawFrame, so at 60 fps they made
+    // five 16-float arrays a frame purely to be filled and dropped — allocation churn on the GL
+    // thread, which is the one thread whose pauses the artist sees as the overlay stuttering
+    // against the wall. Owned by onDrawFrame; not safe to read from another thread.
+    private val viewMatrixScratch = FloatArray(16)
+    private val projMatrixScratch = FloatArray(16)
+    private val mappingViewMatrixScratch = FloatArray(16)
+    private val mappingProjMatrixScratch = FloatArray(16)
+    private val backboneScratch = FloatArray(16)
     // Scratch for composing the overlay matrix (anchor frame * in-plane transform).
     private val overlayBaseScratch = FloatArray(16)
     private val overlayLocalScratch = FloatArray(16)
@@ -498,15 +513,25 @@ class ArRenderer(
      * held (GL frame body or [attachSession]) so configure() is serialized against update().
      */
     private fun applyFlashlightStateLocked(activeSession: Session) {
+        val wanted = if (isFlashlightRequested) Config.FlashMode.TORCH else Config.FlashMode.OFF
         try {
             val config = activeSession.config
-            val newMode = if (isFlashlightRequested) Config.FlashMode.TORCH else Config.FlashMode.OFF
-            if (config.flashMode != newMode) {
-                config.flashMode = newMode
+            if (config.flashMode != wanted) {
+                config.flashMode = wanted
                 activeSession.configure(config)
             }
+            flashUnsupportedReported = false
         } catch (e: Exception) {
+            // ARCore rejects TORCH when the device has no flash unit or the selected camera config
+            // can't drive it. This used to be logged and dropped, so the rail's torch button latched
+            // on while the light stayed off and the artist had no way to know the camera — not their
+            // technique — was why a dark wall wouldn't read. Surface it once per request instead.
             Timber.e(e, "Failed to set flash mode via ARCore Config")
+            if (isFlashlightRequested && !flashUnsupportedReported) {
+                flashUnsupportedReported = true
+                onDiag("flashlight: not available on this camera config (${e.javaClass.simpleName})")
+                onFlashlightUnavailable()
+            }
         }
     }
 
@@ -990,13 +1015,16 @@ class ArRenderer(
             val isDualLensHardware = activeSession.cameraConfig.stereoCameraUsage == com.google.ar.core.CameraConfig.StereoCameraUsage.REQUIRE_AND_USE
             val isDualLens = isDualLensHardware || (stereoProvider?.isDualLensActive == true)
 
-            val viewMatrix = FloatArray(16)
-            val projMatrix = FloatArray(16)
+            val viewMatrix = viewMatrixScratch
+            val projMatrix = projMatrixScratch
             camera.getViewMatrix(viewMatrix, 0)
             camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
 
-            val mappingViewMatrix = FloatArray(16)
-            val mappingProjMatrix = FloatArray(16)
+            val mappingViewMatrix = mappingViewMatrixScratch
+            val mappingProjMatrix = mappingProjMatrixScratch
+            // mappingProjMatrix is only partially overwritten below (cells 0/5/8/9/10/11/14/15), so
+            // a reused buffer has to be cleared or it would carry the previous frame's stray cells.
+            java.util.Arrays.fill(mappingProjMatrix, 0f)
             camera.pose.inverse().toMatrix(mappingViewMatrix, 0)
 
             val intrinsics = camera.imageIntrinsics
@@ -1077,7 +1105,7 @@ class ArRenderer(
             // --- Democratic Consensus Transformation + smoothed reloc fusion ---
             // Backbone: ARCore consensus once anchored, else the native cached pose (as before).
             lastStep = "consensus"
-            val backbone = FloatArray(16)
+            val backbone = backboneScratch
             if (anchorEstablished) {
                 anchorOrchestrator.getConsensusMatrix(backbone)
             } else {
@@ -1155,6 +1183,9 @@ class ArRenderer(
                 } catch (e: Exception) { /* ignore */ }
                 // Snapshot the smoothed value (kept across invalid/dropped frames) for the readout.
                 val centerDepth = smoothedCenterDepth
+                // The view matrix is GL-thread scratch that the next frame overwrites in place, so
+                // the coroutine below gets its own copy rather than a live reference.
+                val viewMatrixSnapshot = viewMatrix.copyOf()
 
                 backgroundScope.launch {
                     val (count, immutableCount) = if (currentScanMode == ArScanMode.CLOUD_POINTS) {
@@ -1170,7 +1201,7 @@ class ArRenderer(
                     val distanceMeters = run {
                         if (!anchorEstablished) return@run -1f
                         val camPose = FloatArray(16)
-                        android.opengl.Matrix.invertM(camPose, 0, viewMatrix, 0)
+                        android.opengl.Matrix.invertM(camPose, 0, viewMatrixSnapshot, 0)
                         val dx = anchorMatrix[12] - camPose[12]
                         val dy = anchorMatrix[13] - camPose[13]
                         val dz = anchorMatrix[14] - camPose[14]
@@ -1731,7 +1762,11 @@ class ArRenderer(
                 val moved = perceptionPoseChanged(viewMatrix)
                 val splatCount = slamManager.getSplatCount()
                 val mapGrew = splatCount != lastPerceptionSplatCount
-                val refresh = !havePerceptionCache || (due && (moved || mapGrew))
+                // A plane mid-dissolve changes every frame with nothing else moving, so it has to
+                // count as a reason to redraw. Otherwise holding the phone still — exactly when the
+                // artist is watching the surfaces settle — would freeze the dissolve part-way.
+                val dissolving = nowMs < planeRenderer.dissolveCompletesAtMs
+                val refresh = !havePerceptionCache || (due && (moved || mapGrew || dissolving))
                 if (refresh) {
                     val t0 = android.os.SystemClock.elapsedRealtime()
                     perceptionFbo.bindForRender()
@@ -1780,22 +1815,43 @@ class ArRenderer(
         // Find the plane most directly ahead of the camera (unbiased search)
         val planes = session.getAllTrackables(com.google.ar.core.Plane::class.java)
         var bestPlane: com.google.ar.core.Plane? = null
-        var maxDot = 0.4f
+        var bestDot = 0f
+        var bestArea = 0f
 
         for (plane in planes) {
             if (plane.trackingState != TrackingState.TRACKING) continue
-            
+            // A subsumed plane is a stale fragment ARCore has already merged into a larger one. It
+            // keeps its own centerPose, so leaving it in the search let the anchor snap onto a
+            // leftover shard of the wall and jump between shards as the artist moved.
+            if (plane.subsumedBy != null) continue
+
             val pose = plane.centerPose
             val dx = pose.tx() - camX
             val dy = pose.ty() - camY
             val dz = pose.tz() - camZ
             val len = kotlin.math.sqrt((dx * dx + dy * dy + dz * dz).toDouble()).toFloat()
             if (len < 0.3f || len > 15f) continue
-            
+
             val dot = (dx * fwdX + dy * fwdY + dz * fwdZ) / len
-            if (dot > maxDot) { 
-                maxDot = dot
-                bestPlane = plane 
+            if (dot < PLANE_PICK_MIN_DOT) continue
+            val area = plane.extentX * plane.extentZ
+            // Within a tie band of "most directly ahead", prefer the LARGER plane. ARCore leaves
+            // co-planar fragments of one wall un-subsumed, and they all point roughly the same way,
+            // so a raw argmax on the dot product picked whichever shard happened to be centred
+            // nearest the view axis — the anchor then hopped between fragments of the same surface
+            // from frame to frame, which reads as the overlay refusing to settle.
+            val better = when {
+                bestPlane == null -> true
+                dot > bestDot + PLANE_PICK_DOT_TIE -> true   // clearly more centred
+                dot < bestDot - PLANE_PICK_DOT_TIE -> false  // clearly less centred
+                else -> area > bestArea                      // as centred as each other → bigger wins
+            }
+            if (better) {
+                // max(), so the tie band stays anchored to the best centring seen rather than
+                // sliding every time a larger-but-less-centred plane wins.
+                bestDot = kotlin.math.max(bestDot, dot)
+                bestArea = area
+                bestPlane = plane
             }
         }
 
@@ -1927,6 +1983,13 @@ class ArRenderer(
         // Higher values → subtler perspective; lower → more dramatic. 3.0 gives a moderate
         // effect visible at 20-30° and dramatic at 45°+.
         const val CONTENT_PERSPECTIVE_FACTOR = 3.0f
+
+        // Anchor plane pick: minimum cos(angle) between the camera forward axis and the direction to
+        // a plane's centre for that plane to be considered "ahead" at all (the previous inline 0.4f).
+        const val PLANE_PICK_MIN_DOT = 0.4f
+        // Planes whose centring differs by less than this count as equally centred, and the larger
+        // one wins — so the anchor settles on the whole wall instead of the nearest-centred fragment.
+        const val PLANE_PICK_DOT_TIE = 0.05f
 
         const val PERCEPTION_FULL_FPS = 60
         const val PERCEPTION_FLOOR_FPS = 30

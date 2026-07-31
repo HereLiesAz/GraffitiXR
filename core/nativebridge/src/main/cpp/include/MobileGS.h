@@ -68,6 +68,17 @@ public:
     // the match flag (accumulate without matching, or match a persisted map without growing).
     void setMapBuildEnabled(bool e) { mMapBuildEnabled.store(e, std::memory_order_relaxed); }
     void scheduleRelocCheck(const cv::Mat& colorFrame);
+    /**
+     * Cheap pre-check for the three conditions under which scheduleRelocCheck() drops the frame:
+     * relocalization disabled, no wall fingerprint to match against yet, or the reloc worker still
+     * busy with the previous request.
+     *
+     * Callers convert a raw camera frame to RGB (and rotate it) before they can schedule it, which
+     * is the single most expensive thing on the GL render thread. Ask this first so that work is
+     * only paid for on frames the worker will actually take — during scanning there is no
+     * fingerprint yet, so every one of those conversions used to be built and thrown away.
+     */
+    bool relocWantsFrame();
     void getAnchorTransform(float* outMat16) const;
     void getRelocResult(float* out19) const;       // [0..15]=pnpMat,16=inliers,17=matches,18=seq
     void getFingerprintAnchor(float* out16) const;
