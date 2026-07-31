@@ -431,6 +431,15 @@ class ArRenderer(
                 frameCount = 0
                 resetCameraStreamWatchdog()
                 displayRotationHelper.onResume()
+                // Display geometry is per-session state. This session is new, so it has never been told
+                // the viewport — and onSurfaceChanged won't fire again for a surface that already
+                // exists (AR re-entry, resume, or a rebuild onto a fallback camera config). Force the
+                // geometry to be re-pushed on the next frame and drop the cached camera UV transform,
+                // which belongs to the previous session. Without both, the background quad gets a
+                // transform derived from ARCore's default geometry and the camera renders magnified to
+                // the point of showing a single pixel across the whole screen.
+                displayRotationHelper.markGeometryDirty()
+                backgroundRenderer.invalidateDisplayGeometry()
                 if (isSurfaceCreated) {
                     session.setCameraTextureName(backgroundRenderer.textureId)
                 }
@@ -505,6 +514,9 @@ class ArRenderer(
         onDiag("surface: onSurfaceCreated start")
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         backgroundRenderer.createOnGlThread(context)
+        // The GL surface is (re)born here, so recompute the camera UV transform once the follow-up
+        // onSurfaceChanged has pushed the viewport, rather than reusing UVs cached before the pause.
+        backgroundRenderer.invalidateDisplayGeometry()
         onDiag("surface: bg prog=${backgroundRenderer.isProgramReady} shader=${backgroundRenderer.shaderLog} tex=${backgroundRenderer.textureId}")
 
         // SLAM GL init is isolated: if it throws it must NOT kill the GL thread (that would leave the
