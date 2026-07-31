@@ -757,23 +757,24 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean) {
     // backstop, but it still mutates the authoritative set, so it stays OFF unless explicitly enabled.
     if (!mSelfGrowEnabled.load(std::memory_order_relaxed) || validQuery.empty()) return;
 
-    cv::Matx33d R; cv::Vec3d t; double fx, fy, cx, cy; int inliers; int matches; long seq;
+    // pnpMatches, not `matches` — that name is already the knnMatch result vector in this scope.
+    cv::Matx33d R; cv::Vec3d t; double fx, fy, cx, cy; int inliers; int pnpMatches; long seq;
     std::vector<cv::Point3f> wall;
     {
         std::lock_guard<std::mutex> lock(mMutex);
         seq = mPnpResultSeq.load(std::memory_order_relaxed);
         if (seq == mLastGrowSeq) return;          // no fresh relock this tick — pose would be stale
         inliers = mPnpInlierCount.load(std::memory_order_relaxed);
-        matches = mPnpMatchCount.load(std::memory_order_relaxed);
+        pnpMatches = mPnpMatchCount.load(std::memory_order_relaxed);
         const float* M = mPnpCamFromFpWorld;      // camera_from_fpWorld, column-major (OpenCV frame)
         R = cv::Matx33d(M[0], M[4], M[8], M[1], M[5], M[9], M[2], M[6], M[10]);
         t = cv::Vec3d(M[12], M[13], M[14]);
         fx = mFingerprintIntrinsics[0]; fy = mFingerprintIntrinsics[1];
         cx = mFingerprintIntrinsics[2]; cy = mFingerprintIntrinsics[3];
         wall = mWallKeypoints3D;
-        if (growTrusted(inliers, matches)) mLastGrowSeq = seq; // claim it (yield or not)
+        if (growTrusted(inliers, pnpMatches)) mLastGrowSeq = seq; // claim it (yield or not)
     }
-    if (!growTrusted(inliers, matches) || fx <= 0 || fy <= 0 || wall.size() < 12 || wall.size() > 5000) return;
+    if (!growTrusted(inliers, pnpMatches) || fx <= 0 || fy <= 0 || wall.size() < 12 || wall.size() > 5000) return;
 
     // Wall plane (n·X = pdist, pdist>0) in the fingerprint frame, fit to the existing marks.
     cv::Mat data((int)wall.size(), 3, CV_32F);
