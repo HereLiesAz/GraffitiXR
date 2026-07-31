@@ -8,11 +8,14 @@ import com.hereliesaz.graffitixr.common.model.Layer
  * Pure function; no Compose. Used by tests (RailIdUniquenessTest) and the debug-only
  * RailIntegrityCheck.
  *
- * Conditional registration in ConfigureRailItems is mirrored here:
- *   - target.host / target.create only registered in AR mode
- *   - design.wall only registered in MOCKUP mode
- *   - coop / coop.host / coop.join only registered in AR mode (coop.leave is
- *     additionally gated on an active session, so it is omitted here)
+ * Conditional registration in ConfigureRailItems is mirrored here. Each mode's sub-host is always
+ * registered (it is the navigation entry); that mode's tools are registered only while it is active:
+ *   - target.create / mode.ar.light / mode.ar.lock / coop / coop.host / coop.join in AR mode
+ *     (coop.leave is additionally gated on an active session, so it is omitted here)
+ *   - mode.overlay.light / mode.overlay.lock in OVERLAY mode
+ *   - mockup.wall / wall.photo / wall.file / mode.mockup.lock in MOCKUP mode
+ *     (wall.clear is additionally gated on a wall photo existing, so it is omitted here)
+ *   - mode.trace.freeze / mode.trace.lock in TRACE mode
  *
  * CAVEAT: the per-layer block below emits the UNION of every layer-menu suffix, whereas
  * ConfigureRailItems registers a different suffix subset per layer type (text vs sketch vs
@@ -36,17 +39,26 @@ internal fun enumerateRailItemIds(layers: List<Layer>, mode: EditorMode): Set<St
 internal fun enumerateRailItemIdRegistrations(layers: List<Layer>, mode: EditorMode): List<String> {
     val ids = mutableListOf<String>()
 
-    // Modes menu
-    ids += listOf(
-        "host.modes", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace", "mockup.wall", "mode.trace.freeze"
-    )
+    // Modes menu. Every mode's sub-host is always registered (they are the navigation entries); each
+    // mode's TOOLS are registered only while that mode is active.
+    ids += listOf("host.modes", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace")
     if (mode == EditorMode.AR) {
         ids += "target.create"
         ids += "mode.ar.light"
+        ids += "mode.ar.lock"
         ids += listOf("coop", "coop.host", "coop.join")
     }
     if (mode == EditorMode.OVERLAY) {
         ids += "mode.overlay.light"
+        ids += "mode.overlay.lock"
+    }
+    if (mode == EditorMode.MOCKUP) {
+        // wall.clear is additionally gated on a wall photo existing, so it is omitted here for the
+        // same reason as coop.leave.
+        ids += listOf("mockup.wall", "wall.photo", "wall.file", "mode.mockup.lock")
+    }
+    if (mode == EditorMode.TRACE) {
+        ids += listOf("mode.trace.freeze", "mode.trace.lock")
     }
 
     // Open (top-level, replaces the old Design folder — no sub-items)
