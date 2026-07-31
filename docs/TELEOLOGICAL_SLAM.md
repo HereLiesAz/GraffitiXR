@@ -88,6 +88,45 @@ The reloc thread runs at 5 Hz once locked and ~16 Hz while hunting, since the
 cost of an extra attempt is far smaller than the cost of the overlay staying
 adrift.
 
+## Open question: the display-rotation convention
+
+**Unresolved, and the leading suspect if relocalization matches but places the
+overlay wrong.** Recorded here so the analysis isn't redone from scratch.
+
+At capture, `ArRenderer` rotates the intrinsics to display orientation (the
+`when (rotationNeeded)` block: swap `fx`/`fy`, remap `cx`/`cy`) and `ArViewModel`
+rotates the bitmap by the same angle. The **view matrix is not rotated** — it is
+`camera.pose.inverse()` in ARCore's own camera frame.
+
+`PlaneMarks.backProject` builds each ray from the rotated pixel and rotated `K`,
+then intersects it with the plane transformed into the camera frame by that
+unrotated view. Working the algebra for a 90° turn: a pixel's ray in the rotated
+frame is `d' = (-d_y, d_x, 1)`, i.e. `d' = R·d` with `R = [[0,-1,0],[1,0,0],[0,0,1]]`.
+So the rays live in a frame rotated about the optical axis relative to the plane
+they are being intersected with, and the resulting depths are skewed — the
+fingerprint's 3D structure is not the real wall, and no consistent PnP pose
+exists over it.
+
+Two details make this fit the observed "never locks" behaviour:
+
+- The error **vanishes for a head-on wall** — a plane normal of `(0,0,±1)` is
+  invariant under rotation about Z — and grows with obliquity. That matches a
+  failure that feels intermittent rather than absolute.
+- The onboarding doodle path (`buildDoodleFingerprint`) uses the identical
+  convention, so it would fail the same way.
+
+Why it was not simply fixed: rotating the capture view is not sufficient on its
+own. The 3D points would then live in the rotated camera frame, while
+`PoseFusion.composeCorrected` composes `inverse(V_current) · pnp · fpAnchor` with
+`V_current` in ARCore's **unrotated** frame — so the composition needs the same
+treatment, and the sign of every rotation has to be right or the overlay lands
+worse than it does now. That is a system-wide convention change and wants device
+evidence first.
+
+**How to tell:** with the Diagnostic Overlay on, a healthy match count and a
+**low inlier ratio** points here. `NO TARGET` / `NO FEATURES` / a low in-frame
+feature count point at capture problems instead, which are covered above.
+
 ## Relationship to the rest of the engine
 
 - **Relocalization** (snap-back after tracking loss / screen-off) is the

@@ -24,6 +24,14 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
  * looks +Z); ARCore/OpenGL views look −Z, so convert them with [MetricMarks.glViewToCv] first. The
  * plane point and normal are in ARCore **world** space (e.g. `plane.centerPose` translation and its
  * local +Y axis); they are moved into the camera frame here.
+ *
+ * CAUTION — unresolved convention mismatch. Callers pass pixels and intrinsics that have been rotated
+ * to DISPLAY orientation, but a view matrix that has not. The rays built here therefore live in a
+ * frame rotated about the optical axis relative to the plane they are intersected with, which skews
+ * the depths for anything but a head-on wall (a normal of (0,0,±1) is invariant under that rotation,
+ * which is why it is not obvious). Fixing it properly also requires the matching change in
+ * PoseFusion's pose composition — see "Open question: the display-rotation convention" in
+ * docs/TELEOLOGICAL_SLAM.md before changing anything here.
  */
 object PlaneMarks {
 
