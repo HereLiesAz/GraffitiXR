@@ -504,10 +504,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
 
     cv::Mat yMat(height, width, CV_8UC1, yData, yStride);
 
-    if (gLastColorFrame.empty() || gLastColorFrame.cols != width || gLastColorFrame.rows != height) {
-        gLastColorFrame = cv::Mat(height, width, CV_8UC3);
-    }
-
+    // This runs on the GL render thread, so every allocation here costs frame time directly.
+    // An eagerly allocated CV_8UC3 height x width Mat used to be assigned to gLastColorFrame here
+    // and then immediately overwritten below by the YUV frame — a full RGB-sized allocation (~6 MB
+    // at 1080p) thrown away on every single call. Its size guard could never match either, because
+    // gLastColorFrame ends up height*1.5 rows tall, so it re-allocated every frame forever.
     cv::Mat yuv(height + height / 2, width, CV_8UC1);
     yMat.copyTo(yuv(cv::Rect(0, 0, width, height)));
 
@@ -528,35 +529,51 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
                 dst[2 * c + 1] = (uCap <= 0 || (jlong)idx < uCap) ? uData[idx] : 0; // U
             }
         }
-        // No conversion on GL thread; pass raw YUV to map thread
-        gLastColorFrame = yuv.clone();
+        // No conversion on GL thread; pass raw YUV to map thread. Plain assignment, not clone():
+        // `yuv` is a local whose buffer nothing else writes, so cv::Mat's refcount hands ownership
+        // over for free. The clone() this replaces copied the whole frame a second time, on the GL
+        // thread, every call.
+        gLastColorFrame = yuv;
     } else if (uvPixelStride == 2) {
+        // Semi-planar (NV12/NV21): the interleaved chroma can be memcpy'd straight into the YUV
+        // block's rows. The previous version built a separate zero-filled full-chroma Mat and then
+        // copyTo'd it across — an extra allocation, an extra zero-fill and an extra copy per frame.
         jlong vCap = env->GetDirectBufferCapacity(vBuffer);
-        cv::Mat uvInterleaved = cv::Mat::zeros(height / 2, width, CV_8UC1);
+        cv::Mat chroma = yuv(cv::Rect(0, height, width, height / 2));
         size_t limit = (vCap > 0) ? (size_t)vCap : (size_t)((height / 2 - 1) * uvStride + width);
         for (int r = 0; r < height / 2; ++r) {
-            size_t rowStart = r * uvStride;
+            uint8_t* dst = chroma.ptr(r);
+            size_t rowStart = (size_t)r * uvStride;
             size_t rowLen = std::min((size_t)width, (size_t)(limit > rowStart ? limit - rowStart : 0));
-            if (rowLen > 0) {
-                std::memcpy(uvInterleaved.ptr(r), vData + rowStart, rowLen);
-            }
+            if (rowLen > 0) std::memcpy(dst, vData + rowStart, rowLen);
+            // Rows the source can't fill must still be cleared: a fresh cv::Mat is uninitialised,
+            // whereas the scratch Mat this replaces was zero-filled.
+            if (rowLen < (size_t)width) std::memset(dst + rowLen, 0, (size_t)width - rowLen);
         }
-        uvInterleaved.copyTo(yuv(cv::Rect(0, height, width, height / 2)));
-        // No conversion on GL thread; pass raw YUV to map thread
-        gLastColorFrame = yuv.clone();
+        gLastColorFrame = yuv;
     } else {
         cv::cvtColor(yMat, gLastColorFrame, cv::COLOR_GRAY2RGB);
     }
 
-    // Relocalization MATCHING still uses the Display-Aligned frame for best user feedback
-    if (!gLastColorFrame.empty() && gLastColorFrame.rows == height + height/2) {
+    // Relocalization MATCHING still uses the Display-Aligned frame for best user feedback.
+    //
+    // Ask FIRST whether the reloc worker will take a frame. scheduleRelocCheck drops the frame
+    // outright when relocalization is off, when there is no wall fingerprint to match against yet,
+    // or when the worker is still busy with the previous one — and building its argument costs a
+    // full-frame YUV->RGB conversion plus a full-frame rotate, both on the GL render thread. That
+    // work used to be done unconditionally, so during the entire scanning phase (no fingerprint
+    // exists yet, by definition) every single conversion was built and immediately thrown away,
+    // several times a second, stalling the render loop for nothing.
+    if (gLastColorFrame.empty() || !gSlamEngine->relocWantsFrame()) return;
+
+    if (gLastColorFrame.rows == height + height/2) {
         cv::Mat relocFrame;
         cv::cvtColor(gLastColorFrame, relocFrame, cv::COLOR_YUV2RGB_NV21);
         if (cvRotateCode >= 0) {
             cv::rotate(relocFrame, relocFrame, cvRotateCode);
         }
         gSlamEngine->scheduleRelocCheck(relocFrame);
-    } else if (!gLastColorFrame.empty()) {
+    } else {
         cv::Mat relocFrame = gLastColorFrame.clone();
         if (cvRotateCode >= 0) {
             cv::rotate(relocFrame, relocFrame, cvRotateCode);

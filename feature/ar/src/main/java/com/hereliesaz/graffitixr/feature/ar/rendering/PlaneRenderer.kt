@@ -109,7 +109,7 @@ class PlaneRenderer : GlReleasable {
      * emphasised local axes instead of the ink-develop fill, so their orientation is visible.
      */
     fun drawPlanes(session: Session, viewMatrix: FloatArray, projectionMatrix: FloatArray, cameraPose: Pose, gridMode: Boolean = false) {
-        val planes = session.getAllTrackables(Plane::class.java)
+        val planes = mergeCoplanar(session.getAllTrackables(Plane::class.java))
 
         GLES20.glUseProgram(planeProgram)
         GLES20.glDepthMask(false)
@@ -139,6 +139,60 @@ class PlaneRenderer : GlReleasable {
         GLES20.glDisable(GLES20.GL_BLEND)
         GLES20.glDepthMask(true)
     }
+
+    /**
+     * Collapses co-planar detections down to one plane per real surface.
+     *
+     * ARCore only sets [Plane.getSubsumedBy] when it actually merges two detections. A single wall
+     * scanned from a few angles routinely ends up as several separate TRACKING planes that share a
+     * normal and lie on the same infinite plane but are never subsumed — and drawing all of them
+     * stacks overlapping, differently-coloured, differently-sized quads on one surface, which is the
+     * "surfaces don't combine, they overlap into a mess" the artist sees.
+     *
+     * Planes are grouped by (normal direction, signed distance along that normal from the origin);
+     * within a group only the largest is drawn, so a wall reads as one surface. Groups stay separate
+     * when normals differ past [NORMAL_DOT_EPS] or the planes sit on parallel-but-offset surfaces
+     * more than [COPLANAR_DIST_M] apart, so genuinely distinct walls are never fused.
+     *
+     * This is a rendering/selection filter only — no ARCore state is modified, and the discarded
+     * planes stay available to hit tests.
+     */
+    private fun mergeCoplanar(planes: Collection<Plane>): List<Plane> {
+        val kept = ArrayList<Plane>(planes.size)
+        for (plane in planes) {
+            if (plane.trackingState != TrackingState.TRACKING || plane.subsumedBy != null) continue
+            val pose = plane.centerPose
+            val normal = FloatArray(3)
+            pose.getTransformedAxis(1, 1f, normal, 0) // plane local +Y is the surface normal
+            var merged = false
+            for (i in kept.indices) {
+                if (coplanar(kept[i], plane, normal)) {
+                    // Keep the bigger detection: it is the one that actually covers the surface, and
+                    // the smaller fragments are what produce the overlapping stack.
+                    if (area(plane) > area(kept[i])) kept[i] = plane
+                    merged = true
+                    break
+                }
+            }
+            if (!merged) kept.add(plane)
+        }
+        return kept
+    }
+
+    /** True when [b] (whose world-space normal is [bNormal]) lies on the same infinite plane as [a]. */
+    private fun coplanar(a: Plane, b: Plane, bNormal: FloatArray): Boolean {
+        val aPose = a.centerPose
+        val aNormal = FloatArray(3)
+        aPose.getTransformedAxis(1, 1f, aNormal, 0)
+        val bPose = b.centerPose
+        return isCoplanar(
+            aNormal, aPose.tx(), aPose.ty(), aPose.tz(),
+            bNormal, bPose.tx(), bPose.ty(), bPose.tz(),
+        )
+    }
+
+    /** Extent-based area proxy; ARCore reports the plane's extent, not its polygon area. */
+    private fun area(plane: Plane): Float = plane.extentX * plane.extentZ
 
     private fun drawPlane(plane: Plane, viewMatrix: FloatArray, projectionMatrix: FloatArray) {
         val polygon = plane.polygon
@@ -234,5 +288,41 @@ class PlaneRenderer : GlReleasable {
 
     companion object {
         private const val TAG = "PlaneRenderer"
+
+        /**
+         * |dot| of two plane normals above which they count as the same orientation (~14°). Loose
+         * enough to absorb the normal jitter between separate detections of one wall, tight enough
+         * that a wall and an adjoining floor/ceiling never merge.
+         */
+        private const val NORMAL_DOT_EPS = 0.97f
+
+        /**
+         * Max separation (m) along the shared normal for two same-orientation planes to count as the
+         * same surface. Covers ARCore's depth error on a wall without fusing, say, two parallel walls
+         * of a corridor.
+         */
+        private const val COPLANAR_DIST_M = 0.10f
+
+        /**
+         * Pure geometry behind [mergeCoplanar]: do two oriented surface patches lie on the same
+         * infinite plane? Split out from the ARCore types so it can be unit-tested.
+         *
+         * @param aNormal unit surface normal of the first patch (world space)
+         * @param bNormal unit surface normal of the second patch (world space)
+         */
+        fun isCoplanar(
+            aNormal: FloatArray, aX: Float, aY: Float, aZ: Float,
+            bNormal: FloatArray, bX: Float, bY: Float, bZ: Float,
+        ): Boolean {
+            val dot = aNormal[0] * bNormal[0] + aNormal[1] * bNormal[1] + aNormal[2] * bNormal[2]
+            // abs(): one wall seen from opposite sides yields anti-parallel normals.
+            if (abs(dot) < NORMAL_DOT_EPS) return false
+            val dx = bX - aX
+            val dy = bY - aY
+            val dz = bZ - aZ
+            // Only the offset ALONG the shared normal matters — two patches far apart across the
+            // face of the same wall are still the same surface.
+            return abs(dx * aNormal[0] + dy * aNormal[1] + dz * aNormal[2]) <= COPLANAR_DIST_M
+        }
     }
 }

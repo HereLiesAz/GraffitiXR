@@ -944,6 +944,13 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
     }
     LOGI("Co-op: Received fingerprint with %u points. Relocalization triggered.", numPoints);
 }
+bool MobileGS::relocWantsFrame() {
+    if (!mRelocEnabled) return false;
+    if (mRelocRequested) return false; // worker still holds the previous frame
+    std::lock_guard<std::mutex> lock(mMutex);
+    return !mWallDescriptors.empty();
+}
+
 void MobileGS::scheduleRelocCheck(const cv::Mat& f) {
     // Feed the latest camera frame to the background relocalization thread. Previously a no-op, which
     // meant mRelocColorFrame was never populated and the reloc thread always saw an empty frame —

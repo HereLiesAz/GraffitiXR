@@ -307,6 +307,9 @@ fun MainScreen(
                                 },
                                 onDoodleLocked = {
                                     arViewModel.onDoodleLocked()
+                                },
+                                onFlashlightUnavailable = {
+                                    arViewModel.onFlashlightUnavailable()
                                 }
                             )
                             renderer.hideVisualization = isExporting
