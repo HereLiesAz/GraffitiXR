@@ -138,6 +138,16 @@ data class GraffitiProject(
     val fingerprintIntrinsics: List<Float> = emptyList(),
     val fingerprintAnchor: List<Float> = emptyList(),
 
+    // The camera view (column-major 4x4, GL convention world→camera) at fingerprint capture. This is
+    // what lets the reloc thread pre-cancel oblique-vs-frontal distortion: the marks lie on a known
+    // plane, so with the capture view and the live view it can warp the live frame into the
+    // fingerprint's frontal frame, match there, and map the correspondences back.
+    // Without it MobileGS::computeRectifyHomography returns false and that whole pass is skipped —
+    // which is what happened to every metric fingerprint, since only the (dead, depth-API) capture
+    // path ever set it. An artist working a wall at arm's length is oblique most of the time, so this
+    // is exactly the case it exists for. Empty on projects saved before this field.
+    val fingerprintViewMatrix: List<Float> = emptyList(),
+
     // Persistent confidence-weighted feature map of the wall around the marks fingerprint — the
     // lean spatial backbone for wide-area relocalization (see docs/RELOC_MAP_DESIGN.md). Null on
     // projects without one; built passively during normal use. Defaulted for back-compat.

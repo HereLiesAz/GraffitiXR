@@ -121,12 +121,21 @@ class SlamManager @Inject constructor(
      * Ingest a fingerprint built from triangulated metric marks (no depth source). Also fixes the
      * fingerprint anchor pose (column-major 4x4) and the camera intrinsics (fx,fy,cx,cy) the reloc
      * PnP should use. points3d are in keyframe-0's CV camera frame (see [MetricMarks]).
+     *
+     * [viewMatrix] is the GL-convention world->camera view at capture. Supplying it enables the
+     * reloc thread's plane-guided rectification: the marks lie on a known plane, so the oblique-
+     * vs-frontal distortion is a homography that can be pre-cancelled before matching. Pass an empty
+     * array only when the capture view genuinely isn't known (e.g. a project saved before it was
+     * persisted) — then that pass is skipped rather than run against a stale frontal frame.
      */
     fun restoreWallFingerprintMetric(
         descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,
         points3d: FloatArray, anchorMatrix: FloatArray, intrinsics: FloatArray,
+        viewMatrix: FloatArray = FloatArray(0),
     ) {
-        nativeRestoreWallFingerprintMetric(descriptorsData, rows, cols, type, points3d, anchorMatrix, intrinsics)
+        nativeRestoreWallFingerprintMetric(
+            descriptorsData, rows, cols, type, points3d, anchorMatrix, intrinsics, viewMatrix,
+        )
     }
 
     /**
@@ -571,7 +580,8 @@ class SlamManager @Inject constructor(
     )
     private external fun nativeRestoreWallFingerprintMetric(
         descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,
-        points3d: FloatArray, anchorMatrix: FloatArray, intrinsics: FloatArray
+        points3d: FloatArray, anchorMatrix: FloatArray, intrinsics: FloatArray,
+        viewMatrix: FloatArray
     )
     private external fun nativeRestoreWallFeatureMap(
         descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,

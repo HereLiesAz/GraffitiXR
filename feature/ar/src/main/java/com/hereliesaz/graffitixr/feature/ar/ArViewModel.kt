@@ -1328,6 +1328,10 @@ class ArViewModel @Inject constructor(
                         fp.points3d.toFloatArray(),
                         anchor.toFloatArray(),
                         intr.toFloatArray(),
+                        // Empty on projects saved before the capture view was persisted; native then
+                        // skips the rectification pass rather than warping to a stale frontal frame.
+                        viewMatrix = project.fingerprintViewMatrix
+                            .takeIf { it.size == 16 }?.toFloatArray() ?: FloatArray(0),
                     )
                 } else {
                     // Depth-path or pre-existing project: descriptors-only legacy restore.

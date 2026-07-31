@@ -44,8 +44,14 @@ public:
     void restoreWallFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
     // Ingest a fingerprint built from triangulated metric marks (no depth source): also fixes the
     // fingerprint anchor pose and the intrinsics the reloc PnP should use.
+    //
+    // viewMatrix16 (optional, GL-convention world->camera at capture) enables the plane-guided
+    // rectification pass in relocThreadFunc. Without it computeRectifyHomography bails and oblique
+    // views get no correction — which was the case for EVERY fingerprint built this way, since only
+    // generateFingerprint (the depth path, disabled) ever set it.
     void restoreWallFingerprintMetric(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d,
-                                      const float* anchorMatrix16, const float* intrinsics4);
+                                      const float* anchorMatrix16, const float* intrinsics4,
+                                      const float* viewMatrix16 = nullptr);
     // Drop the stored wall fingerprint (marks + co-registration). Needed because a fingerprint is
     // otherwise process-lifetime state: the restore calls above only ever REPLACE it, so a project
     // with no fingerprint of its own would keep relocalizing against whatever wall was fingerprinted
@@ -336,7 +342,10 @@ private:
      * zero and a failing pipeline is indistinguishable from an idle one. These always reflect the
      * last attempt, so the diagnostics can say which gate is being missed and by how much.
      */
-    std::atomic<int>        mLastRelocReject{0};
+    // NOT {0}: zero is kRelocOk, so a default-constructed engine would report a successful lock
+    // before a single attempt had run and the overlay would read LOCKED on a wall it had never seen.
+    // kRelocNoFingerprint is the truthful starting state — there is no fingerprint until one is built.
+    std::atomic<int>        mLastRelocReject{kRelocNoFingerprint};
     std::atomic<int>        mLastRelocMatches{0};
     std::atomic<int>        mLastRelocInliers{0};
     std::atomic<int>        mLastRelocDetected{0};

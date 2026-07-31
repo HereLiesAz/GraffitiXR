@@ -184,7 +184,7 @@ object MetricFingerprintBuilder {
                 var i = 0
                 while (i + 1 < pos.size) { pixels.add(PlaneMarks.Pixel(pos[i], pos[i + 1])); i += 2 }
                 val fp = ingestSingle(slam, descs, pixels, cvView, intr,
-                    planePointWorld, planeNormalWorld, anchorModel, minPoints)
+                    planePointWorld, planeNormalWorld, anchorModel, minPoints, glView)
                 if (fp != null) return fp
             } finally {
                 descs.release()
@@ -203,7 +203,7 @@ object MetricFingerprintBuilder {
             if (d.empty()) return null
             val pixels = kp.toArray().map { PlaneMarks.Pixel(it.pt.x.toFloat(), it.pt.y.toFloat()) }
             return ingestSingle(slam, d, pixels, cvView, intr,
-                planePointWorld, planeNormalWorld, anchorModel, minPoints)
+                planePointWorld, planeNormalWorld, anchorModel, minPoints, glView)
         } finally {
             gray.release(); norm.release(); kp.release(); d.release()
         }
@@ -217,6 +217,9 @@ object MetricFingerprintBuilder {
         cvView: FloatArray, intr: FloatArray,
         planePointWorld: FloatArray, planeNormalWorld: FloatArray,
         anchorModel: FloatArray, minPoints: Int,
+        // GL-convention capture view, handed to native so the reloc thread can pre-cancel
+        // oblique-vs-frontal distortion. Null on the two-keyframe path, which has no single view.
+        glView: FloatArray? = null,
     ): Fingerprint? {
         val res = PlaneMarks.backProject(
             pixels, cvView, planePointWorld, planeNormalWorld,
@@ -254,7 +257,10 @@ object MetricFingerprintBuilder {
         }
         keptDesc.release()
 
-        slam.restoreWallFingerprintMetric(bytes, rows, cols, type, res.pointsCam, anchorModel, intr)
+        slam.restoreWallFingerprintMetric(
+            bytes, rows, cols, type, res.pointsCam, anchorModel, intr,
+            viewMatrix = glView ?: FloatArray(0),
+        )
         return Fingerprint(
             keypoints, res.pointsCam.toList(), bytes, rows, cols, type,
             markCenterLocal = markCenterLocal?.toList() ?: emptyList(),

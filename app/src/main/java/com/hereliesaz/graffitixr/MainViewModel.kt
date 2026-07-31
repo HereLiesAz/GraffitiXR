@@ -329,10 +329,12 @@ class MainViewModel @Inject constructor(
                 context = context,
                 projectData = currentProject.copy(
                     fingerprint = fp.copy(patchData = patch),
-                    // Persist the capture's intrinsics + anchor — the exact values just fed to
-                    // restoreWallFingerprintMetric — so reload relocalizes with the true intrinsics.
+                    // Persist the capture's intrinsics + anchor + view — the exact values just fed to
+                    // restoreWallFingerprintMetric — so reload relocalizes with the true intrinsics
+                    // and keeps the plane-guided rectification that the capture session had.
                     fingerprintIntrinsics = intr.toList(),
                     fingerprintAnchor = anchor.toList(),
+                    fingerprintViewMatrix = view.toList(),
                 ),
                 targetImages = listOf(bitmap)
             )
