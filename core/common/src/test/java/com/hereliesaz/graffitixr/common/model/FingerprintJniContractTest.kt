@@ -39,7 +39,13 @@ class FingerprintJniContractTest {
     @Test
     fun `fromNative passes every field through unchanged`() {
         val keypoints = listOf(KeyPoint(1f, 2f, 3f, 4f, 5f, 6, 7))
-        val points3d = listOf(0.5f, -1.5f, 2f)
+        // TWO points for the two declared descriptor rows. The counts used to be arbitrary here —
+        // this test is about ABI pass-through, not geometry — but Fingerprint's init now requires
+        // points3d and descriptorsRows to be 1:1, because the reloc path subscripts the point list
+        // by descriptor row. A mismatched fixture would throw inside the factory, which is also
+        // what a mismatched NATIVE payload now does (buildFingerprintObject's ExceptionCheck bails
+        // to nullptr instead of handing back a fingerprint that reads out of bounds).
+        val points3d = listOf(0.5f, -1.5f, 2f, 3.5f, 4f, -6.25f)
         val descriptors = byteArrayOf(1, 2, 3, 4)
         val patch = byteArrayOf(9, 8)
         val center = listOf(0.1f, 0.2f, 0.3f)
