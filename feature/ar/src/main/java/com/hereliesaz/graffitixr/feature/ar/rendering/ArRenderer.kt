@@ -1193,6 +1193,13 @@ class ArRenderer(
                         // FloatArrays per tick. (An earlier comment here said "four atomics", which
                         // was neither the count nor the mechanism.)
                         reloc = slamManager.getRelocDiagnostics(),
+                        // E0b's independent variable, recomputed here by the same expression the
+                        // capture path uses (ArRenderer's capture block) so the logged condition is
+                        // the condition that was actually in force. Sampled every tick because
+                        // `screenOrientation="fullUser"` lets the device rotate mid-run: one CSV can
+                        // straddle both conditions, and a per-run value would silently average them.
+                        rotationNeededDeg =
+                            (sensorOrientation - displayRotationHelper.getRotation() * 90 + 360) % 360,
                     )
                 }
 

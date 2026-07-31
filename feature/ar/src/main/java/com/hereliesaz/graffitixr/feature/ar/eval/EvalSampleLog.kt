@@ -28,6 +28,21 @@ data class EvalSample(
     // device run be compared against PAPER.md 8.1's curve instead of argued about.
     val relocObliquityDeg: Int = -1,
     val relocRectifiedCorr: Int = -1,
+    /**
+     * `(sensorOrientation - displayRotation*90 + 360) % 360` for this tick — 0, 90, 180 or 270.
+     * -1 when not sampled.
+     *
+     * This is the independent variable of `EVALUATION.md` **E0b**. Capture rotates the bitmap and
+     * the intrinsics by this angle and leaves the view matrix in ARCore's physical-camera frame
+     * (`Camera.getPose()`), so it is also the exact angle of the frame mismatch `PAPER.md` §8
+     * describes: 0 means no mismatch exists, 90/180/270 mean one does.
+     *
+     * Per-**row** rather than in the run-identity sidecar, and that is not a stylistic choice. The
+     * app is `screenOrientation="fullUser"`, so the user can rotate the device mid-run and flip the
+     * condition between one CSV row and the next. A single per-run value would be a recorded
+     * average of two conditions, which is worse than no record at all — it would look like data.
+     */
+    val rotationNeededDeg: Int = -1,
 )
 
 object EvalSampleLog {
@@ -46,6 +61,7 @@ object EvalSampleLog {
         "cpuPct", "batteryMa", "tempC", "nativeHeapKb",
         "relocReject", "relocMatches", "relocInliers", "relocDetected",
         "relocObliquityDeg", "relocRectifiedCorr",
+        "rotationNeededDeg",
     )
 
     const val NOT_SAMPLED = -1
@@ -63,6 +79,7 @@ object EvalSampleLog {
             s.relocReject.toString(), s.relocMatches.toString(),
             s.relocInliers.toString(), s.relocDetected.toString(),
             s.relocObliquityDeg.toString(), s.relocRectifiedCorr.toString(),
+            s.rotationNeededDeg.toString(),
         )
     }
 

@@ -48,10 +48,32 @@ set*). `PARAMETERS.md` is a lookup table, not prose.
 
 ## Status
 
-Nothing in `IMPLEMENTATION.md` is built yet. The defects it lists as "already
-fixed" were repaired in PRs #1785–#1788 and are on `main`; everything under
-Phase 1 onward is proposed.
+The defects `IMPLEMENTATION.md` lists as "already fixed" were repaired in PRs
+#1785–#1788 and are on `main`. Since then **Phase 1** (the footprint operator Φ,
+`anchor/Footprint.kt`), **Phase 5a** (splitting painting progress from
+corroboration confidence) and **Phase 6a** (eval telemetry: CSV shape guard,
+reloc diagnostics columns, run-identity sidecar) have landed. Phases 2, 3, 4 and
+5b are still proposed.
 
-One prerequisite is unresolved and gates Phase 3 — see
-[`../TELEOLOGICAL_SLAM.md`](../TELEOLOGICAL_SLAM.md) "Open question: the
-display-rotation convention", and §8 of the paper.
+**Phase 0 is next in the landing order and blocks all four.** It is gated on
+experiment **E0b**, which has not been run — it needs a physical ARCore device.
+What has been settled without one:
+
+- The source chain is confirmed. Capture rotates the bitmap
+  (`ArViewModel.onTargetCaptured`) and the intrinsics (`ArRenderer`'s
+  `rotationNeeded` branches) into display orientation, and pairs them with a view
+  matrix built from `camera.pose.inverse()`, which is not rotated.
+- **The assumption §8.2 flagged as load-bearing is closed by ARCore's own
+  reference documentation**, in favour of the diagnosis. `Camera.getPose()` is the
+  physical/image-readout frame; `getDisplayOrientedPose()` is the display one; the
+  docs state they differ "by a local rotation about the Z axis by a multiple of
+  90°". A negative E0b can no longer be explained by that assumption failing.
+- `PAPER.md` §8.1's error table reproduces exactly on an independent
+  recomputation, once two unstated sampling conventions are supplied — both are
+  now recorded in §8.1.
+- E0b's independent variable is now logged per CSV row (`rotationNeededDeg`). It
+  previously was not logged at all, which would have made the experiment's own
+  result unattributable.
+
+See §8 of the paper, and `../TELEOLOGICAL_SLAM.md` "Open question: the
+display-rotation convention".
