@@ -333,10 +333,28 @@ in landscape, then in portrait, same wall, same obliquity; then attempt
 relocalization from the same standing positions for each. Compare inlier ratio
 and lock rate.
 
-**Reasoning.** The cheapest experiment in the document, and it runs on the
-shipped build with no code change, because the independent variable is how you
-hold the phone. Do it *first*, before any of Phase 0's engineering — a negative
-result cancels that engineering entirely.
+**Reasoning.** The cheapest experiment in the document, and the independent
+variable is how you hold the phone. Do it *first*, before any of Phase 0's
+engineering — a negative result cancels that engineering entirely.
+
+**The independent variable is now recorded per CSV row**, as `rotationNeededDeg`
+(0/90/180/270, `-1` not sampled). It was not, and that was a hole in this
+protocol rather than a detail: the experiment's entire contrast lived in whoever
+ran it remembering which way they had been holding the phone, with nothing in the
+data to check that memory against. Worse, `screenOrientation="fullUser"` means the
+device can rotate *mid-run*, so a single CSV can straddle both conditions with no
+marker where it crossed over — the two populations would mix and the effect would
+average toward nothing, which reads exactly like a negative result. Group rows by
+`rotationNeededDeg` and compare within groups; do not compare file to file.
+
+Note `0` is the control condition, not a missing value — landscape is the
+orientation predicted to *work*, so those rows are the experiment's positive
+half, and `-1` is the only "no data" marker.
+
+This does mean E0b now needs a build, contrary to the cost line below. Running it
+on a stock build is still possible and still informative — the overlay signals
+below are unchanged — but the per-row grouping is what makes the result
+attributable.
 
 Watch two secondary signals in the diagnostics overlay, both predicted by the
 model: healthy match counts paired with a **low inlier ratio** (PnP cannot fit a
@@ -348,11 +366,20 @@ points surviving at 60° versus all 1600 at 40°.
 **Sets.** Nothing. It is the go/no-go on Phase 0.
 
 **Falsifies §8 entirely.** Identical behaviour in both orientations means the
-convention is not the cause and Phase 0 should be dropped. In that case check the
-assumption it rests on: that ARCore's `camera.pose` is in the physical camera
-frame rather than a display-oriented one.
+convention is not the cause and Phase 0 should be dropped.
 
-**Cost.** One session. No build required.
+The follow-up this line used to prescribe — "check whether `camera.pose` is
+display-oriented" — **has been done, and it is not the answer.** ARCore documents
+`getPose()` as the physical camera frame and `getDisplayOrientedPose()` as the
+display-oriented one, differing "by a local rotation about the Z axis by a
+multiple of 90°" (PAPER.md §8.2). The frames provably differ by the rotation the
+model assumes, so a negative result cannot be explained away there. Carry these
+instead: the depth error is real but swamped by other error sources; the reloc
+path does not consume `backProject`'s output the way §8 assumes; or the device's
+actual `rotationNeeded` is not what the formula predicts — which the new
+`rotationNeededDeg` column now lets you check directly rather than infer.
+
+**Cost.** One session, plus a build (see above).
 
 ---
 

@@ -549,6 +549,24 @@ mechanism described two paragraphs below. Quoting the unfiltered figure claimed
 an error 3.3× larger than the code can produce. Rows 0°–50° are unaffected;
 nothing is dropped there, so filtered and unfiltered agree exactly.
 
+**Reproduced independently**, from the geometry rather than from `backProject`'s
+code path, and every cell above matches — including the 1280/1600 survival at 60°
+and the 6913 mm unfiltered mean. Two conventions had to be recovered by trial to
+get there, and neither is stated above, so they are stated here: *"a wall at 2 m"*
+means the **perpendicular** distance from the camera to the plane, not the
+distance along the optical axis (reading it the other way scales every row by
+$\cos\theta$ — 251 mm rather than 267 mm at 20°); and the wall is tilted about
+the camera's **Y** axis.
+
+That second one is not cosmetic. At $\text{rotationNeeded} = 90$ the tilt axis
+does not matter, but at **180 it does**: tilting about Y gives 265 mm at 20°,
+tilting about X gives **486 mm**. The 60° row is likewise tilt-dependent once the
+depth filter engages — 2107 mm about Y, 6913 mm about X, with nothing dropped in
+the latter. So the table is a slice through a parameter the table does not name,
+and the 180° figure in §8.2 is the Y-tilt value specifically. Any device
+measurement compared against these numbers has to match the tilt axis too, or the
+comparison is between two different quantities.
+
 ### 8.2 A device test that does not require the fix
 
 `rotationNeeded = (sensorOrientation - displayDegrees + 360) \bmod 360`, and the
@@ -560,7 +578,7 @@ whether the bug is active at all:
 |---|---|---|
 | landscape | 0 | **0.0 mm — no mismatch** |
 | portrait | 90 | 267 mm |
-| landscape, other way | 180 | 265 mm |
+| landscape, other way | 180 | 265 mm (Y-tilt; 486 mm about X — see §8.1) |
 
 So the hypothesis is falsifiable on the current build with no code change:
 **capture a target in landscape, then in portrait, same wall, same angle.** If
@@ -573,11 +591,40 @@ diagnostics overlay: healthy match counts paired with a **low inlier ratio**
 $M$ landed on the wall surface" refusals, since mis-scaled depths fall outside
 `backProject`'s 0.1–10 m trust range and are silently dropped.
 
-**The assumption this all rests on** is that ARCore's `camera.pose` is in the
+**The assumption this all rests on** was that ARCore's `camera.pose` is in the
 physical camera frame rather than a display-oriented one — i.e. that ARCore
 handles display rotation through `setDisplayGeometry`/`transformCoordinates2d`
-and not by rotating the pose. If that is false there is no mismatch. It is the
-first thing to check if the device test comes back negative.
+and not by rotating the pose. If that were false there would be no mismatch, and
+it was recorded here as the first thing to check if the device test came back
+negative.
+
+**It is no longer an assumption. ARCore's reference documentation settles it, and
+settles it in favour of the diagnosis.** `Camera.getPose()` is specified as the
+pose of the *physical* camera, with "right" and "up" *"relative to the image
+readout in the usual left-to-right, top-to-bottom order"* — the raw sensor frame.
+`Camera.getDisplayOrientedPose()` is a separate method returning the virtual
+camera pose with "right" and "up" *"relative to current logical display
+orientation"*, and the docs state the two *"differ by a local rotation about the Z
+axis by a multiple of 90°"* — which is precisely the $R_z$ posited above, named by
+Google in the same terms. `Camera.getImageIntrinsics()`, the source of the
+intrinsics the capture path then rotates by hand, is likewise documented as
+*"the **unrotated** camera intrinsics for the CPU image."*
+
+The codebase demonstrates it knows the difference: `ArRenderer` reads
+`camera.displayOrientedPose` for motion estimation, and `camera.pose.inverse()`
+for the mapping view matrix that reaches `backProject`. So the two frames are
+distinguished deliberately elsewhere and conflated here.
+
+Two consequences for E0b. First, its prior should be much stronger than "plausible
+mechanism" — the frames provably differ by exactly the rotation the model uses.
+Second, and more usefully, **a negative E0b result can no longer be explained by
+this assumption failing.** The paper's designated escape hatch is closed. If the
+device shows identical behaviour in both orientations, the explanation has to be
+found somewhere else — that the depth error is real but dominated by other error
+sources, that the reloc path never reaches `backProject`'s output in the way
+assumed, or that `rotationNeeded` is not what the device actually computes. Those
+are the hypotheses to carry into a negative result, and they are not
+interchangeable with the one that was written here.
 
 ### 8.3 Why the correction is not local
 

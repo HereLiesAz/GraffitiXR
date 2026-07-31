@@ -40,7 +40,7 @@ class EvalSampleLogTest {
             "tsMs,deviceClass,marksVisible,errMm,errDeg,jitterMm,availability," +
                 "voxelUpdateMs,voxelKeyframeMs,surfaceMeshMs,drawMs,pnpRelocMs,cpuPct,batteryMa,tempC," +
                 "nativeHeapKb,relocReject,relocMatches,relocInliers,relocDetected," +
-                "relocObliquityDeg,relocRectifiedCorr",
+                "relocObliquityDeg,relocRectifiedCorr,rotationNeededDeg",
             EvalSampleLog.CSV_HEADER,
         )
     }
@@ -55,7 +55,7 @@ class EvalSampleLogTest {
         )
         assertEquals(
             "12,dual,true,1.5,0.25,3.0,1.0,2.0,0.0,4.0,1.0,8.0,30.0,-450.0,31.0,20480," +
-                "-1,-1,-1,-1,-1,-1",
+                "-1,-1,-1,-1,-1,-1,-1",
             EvalSampleLog.toCsvRow(row),
         )
     }
@@ -192,6 +192,35 @@ class EvalSampleLogTest {
         val fields = EvalSampleLog.fields(sample(reloc = d))
         assertEquals("37", fields[EvalSampleLog.COLUMNS.indexOf("relocObliquityDeg")])
         assertEquals("12", fields[EvalSampleLog.COLUMNS.indexOf("relocRectifiedCorr")])
+    }
+
+    /**
+     * `EVALUATION.md` **E0b** compares relocalization between device orientations, so the
+     * orientation has to be *in the data*. Without this column the experiment's independent
+     * variable exists only in whoever ran it remembering which way they were holding the phone —
+     * and `screenOrientation="fullUser"` means a single run can straddle both conditions.
+     */
+    @Test
+    fun `rotationNeeded reaches its own column`() {
+        val fields = EvalSampleLog.fields(sample().copy(rotationNeededDeg = 90))
+        assertEquals("90", fields[EvalSampleLog.COLUMNS.indexOf("rotationNeededDeg")])
+    }
+
+    /**
+     * The trap this column could most easily fall into. **0 is E0b's control condition** — landscape,
+     * no frame mismatch, the orientation predicted to work — so it is the single most important
+     * value the column ever carries. Had it doubled as the not-sampled sentinel, every successful
+     * control row would have been indistinguishable from missing data, and the experiment would
+     * have been unable to report its own negative result.
+     */
+    @Test
+    fun `rotationNeeded zero is the landscape control, not a missing value`() {
+        val landscape = EvalSampleLog.fields(sample().copy(rotationNeededDeg = 0))
+        val unsampled = EvalSampleLog.fields(sample())
+        val i = EvalSampleLog.COLUMNS.indexOf("rotationNeededDeg")
+        assertEquals("0", landscape[i])
+        assertEquals("-1", unsampled[i])
+        assertTrue("the control condition must not read as absent", landscape[i] != unsampled[i])
     }
 
     /**
