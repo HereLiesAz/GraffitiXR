@@ -707,15 +707,18 @@ order.** Work top to bottom.
 
 ### Phase 6a — telemetry plumbing (no new dependencies)
 
-- [ ] **6a.1** Add the run-identity sidecar JSON next to every `DriftCostProbe`
+- [x] **6a.1** Add the run-identity sidecar JSON next to every `DriftCostProbe`
       CSV: recording hash, git commit, all parameter values, RNG seed, sync/async
       mode, device model. A CSV without a sidecar is not evidence.
-- [ ] **6a.2** Add a CSV-shape test: header column count equals the emitted row's
+- [x] **6a.2** Add a CSV-shape test: header column count equals the emitted row's
       field count. This is the class of bug that silently corrupts every
       downstream analysis. **[T]**
-- [ ] **6a.3** Add the `relocReject` ordinal column — its source already exists.
+- [x] **6a.3** Add the `relocReject` ordinal column — its source already exists.
 - [ ] **6a.4** Add the eval-only fixed RNG seed and the synchronous-reloc mode
-      from `EVALUATION.md` §3.1. Both must be inert in release builds.
+      from `EVALUATION.md` §3.1. Both must be inert in release builds. *(The
+      sidecar already records `rngSeed` and `syncReloc` so a run states which it
+      used; the native plumbing that honours them is still outstanding, and until
+      it lands every replay A/B carries un-quantified RANSAC variance.)*
 
 ### Phase 0 — rotation convention
 

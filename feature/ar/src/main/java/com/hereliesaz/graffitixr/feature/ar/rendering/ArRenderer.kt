@@ -1183,6 +1183,11 @@ class ArRenderer(
                         isTracking = anchorEstablished,
                         stageMs = stageMs,
                         cpuPct = -1f, // CPU% sampled by overlay; -1 here keeps the GL thread cheap
+                        // Why the last attempt did not publish, logged per row. EVALUATION.md §6:
+                        // a configuration whose failures are NO_FEATURES needs different work from
+                        // one whose failures are FEW_INLIERS, and the aggregate error number cannot
+                        // tell them apart. This is a cheap read of four atomics.
+                        reloc = slamManager.getRelocDiagnostics(),
                     )
                 }
 
