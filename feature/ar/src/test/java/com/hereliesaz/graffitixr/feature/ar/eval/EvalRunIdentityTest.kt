@@ -99,7 +99,76 @@ class EvalRunIdentityTest {
         assertTrue(j.contains("\"a\\\"b\""))
         assertTrue(j.contains("\"back\\\\slash\""))
         assertTrue(j.contains("\"1\\n5\""))
-        // Balanced quotes is a cheap proxy for "still parseable".
-        assertEquals(0, j.count { it == '"' } % 2)
+        assertStructurallyValidJson(j)
+    }
+
+    /** Control characters must become \uXXXX escapes rather than raw bytes in the output. */
+    @Test
+    fun `control characters are escaped`() {
+        val j = EvalRunIdentity(
+            // Built rather than written as a literal: a raw control byte in a source file is
+            // fragile (editors and tooling silently eat it), and the escape form is easy to
+            // mistake for the two-character sequence it is meant to test.
+            gitCommit = "a" + 1.toChar() + "b",
+            deviceModel = "m", androidRelease = "15", deviceClass = "mono",
+        ).toJson()
+        assertTrue("expected a \\u0001 escape in:\n$j", j.contains("\"a\\u0001b\""))
+        assertTrue("no raw control byte may survive", j.none { it < ' ' && it != '\n' })
+        assertStructurallyValidJson(j)
+    }
+
+    /** Parameter KEYS come from `PARAMETERS.md` names but are still strings that must be escaped. */
+    @Test
+    fun `a parameter key needing escapes stays valid`() {
+        val j = EvalRunIdentity(
+            gitCommit = "x", deviceModel = "m", androidRelease = "15", deviceClass = "mono",
+            parameters = mapOf("odd\"key" to "va\\lue"),
+        ).toJson()
+        assertTrue(j.contains("\"odd\\\"key\""))
+        assertTrue(j.contains("\"va\\\\lue\""))
+        assertStructurallyValidJson(j)
+    }
+
+    @Test
+    fun `the ordinary case is structurally valid too`() {
+        assertStructurallyValidJson(identity().toJson())
+    }
+
+    /**
+     * Escape-aware structural validation: every string closes, braces balance, and nothing nests
+     * negative.
+     *
+     * The first version of this file used `j.count { it == '"' } % 2 == 0` as a "cheap proxy for
+     * still parseable". It is not a proxy for that — it counts *escaped* quotes as delimiters, so a
+     * correctly-escaped `"a\"b"` reads as unbalanced and the assertion fails on valid output. It did
+     * fail, in CI, on correct code. A test whose failure mode is "the implementation was right" is
+     * worse than no test: it trains you to loosen the assertion rather than look.
+     */
+    private fun assertStructurallyValidJson(j: String) {
+        var depth = 0
+        var inString = false
+        var escaped = false
+        var unescapedQuotes = 0
+        for (c in j) {
+            if (inString) {
+                when {
+                    escaped -> escaped = false
+                    c == '\\' -> escaped = true
+                    c == '"' -> { inString = false; unescapedQuotes++ }
+                }
+            } else {
+                when (c) {
+                    '"' -> { inString = true; unescapedQuotes++ }
+                    '{', '[' -> depth++
+                    '}', ']' -> {
+                        depth--
+                        assertTrue("closed more than was opened in:\n$j", depth >= 0)
+                    }
+                }
+            }
+        }
+        assertEquals("unterminated string in:\n$j", false, inString)
+        assertEquals("unbalanced braces in:\n$j", 0, depth)
+        assertEquals("odd number of string delimiters in:\n$j", 0, unescapedQuotes % 2)
     }
 }
