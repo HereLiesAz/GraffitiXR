@@ -52,14 +52,32 @@ class DisplayRotationHelper(context: Context) : DisplayListener {
     }
 
     /**
-     * Updates the session display geometry if a change was registered in [onSurfaceChanged] or in
-     * [onDisplayChanged]. Should be called from [android.opengl.GLSurfaceView.Renderer.onDrawFrame].
+     * Forces the next [updateSessionIfNeeded] to re-push the display geometry even though neither the
+     * surface nor the display rotation changed.
+     *
+     * Display geometry is per-[Session] state, not per-surface state. When a NEW session is attached to
+     * a renderer whose surface already exists (AR re-entry, resume, or a session rebuilt onto a
+     * fallback camera config), [onSurfaceChanged] does not fire again — so without this the fresh
+     * session would never be told the real viewport and would keep ARCore's default geometry. The
+     * camera-background texture transform derived from that default collapses the whole quad onto a
+     * sliver of the camera image, which renders as a hugely magnified preview.
+     */
+    fun markGeometryDirty() {
+        lock.withLock { viewportChanged = true }
+    }
+
+    /**
+     * Updates the session display geometry if a change was registered in [onSurfaceChanged],
+     * [onDisplayChanged], or [markGeometryDirty]. Should be called from
+     * [android.opengl.GLSurfaceView.Renderer.onDrawFrame].
      *
      * @param session The session to update.
      */
     fun updateSessionIfNeeded(session: Session) {
         lock.withLock {
-            if (viewportChanged) {
+            // A zero-size viewport means onSurfaceChanged hasn't run yet. Pushing it would hand ARCore
+            // a degenerate geometry; keep the dirty flag set so the real size lands as soon as it's known.
+            if (viewportChanged && viewportWidth > 0 && viewportHeight > 0) {
                 val displayRotation = display.rotation
                 session.setDisplayGeometry(displayRotation, viewportWidth, viewportHeight)
                 viewportChanged = false

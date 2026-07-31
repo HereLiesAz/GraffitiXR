@@ -38,8 +38,14 @@ class BackgroundRenderer : GlReleasable {
     private var uMask: Int = 0
     private var uDotSize: Int = 0
     private var uGrayscale: Int = 0
-    private var hasTransformed = false
+    /** @Volatile: cleared off the GL thread by [invalidateDisplayGeometry] when a new session is
+     *  attached; read and written on the GL thread by [draw]. */
+    @Volatile private var hasTransformed = false
     private var diagFrame = 0
+    private var badTransformFrame = 0
+    /** Last UV set that passed [transformedTexCoordsAreSane], restored whenever a fresh transform is
+     *  rejected. Starts as the identity mapping so the very first rejection still shows the frame. */
+    private val lastGoodTexCoords = QUAD_TEXCOORDS.copyOf()
 
     // 36-sector scan-coverage mask (for the world-mapping "ink develop" reveal).
     private var maskTextureId = 0
@@ -83,8 +89,13 @@ class BackgroundRenderer : GlReleasable {
                 .order(ByteOrder.nativeOrder()).asFloatBuffer().apply { put(QUAD_TEXCOORDS); position(0) }
         }
         if (!::quadTexCoordTransformed.isInitialized) {
+            // Seeded with the identity UVs, NOT left zero-filled. A zero-filled buffer makes all four
+            // vertices sample texel (0,0), so the camera renders as one texel stretched over the whole
+            // screen — indistinguishable from a broken camera. The identity mapping is the wrong
+            // orientation on most devices but still shows the whole frame, so any window where the
+            // ARCore transform is missing or rejected degrades to a readable preview.
             quadTexCoordTransformed = ByteBuffer.allocateDirect(numVertices * 2 * 4)
-                .order(ByteOrder.nativeOrder()).asFloatBuffer()
+                .order(ByteOrder.nativeOrder()).asFloatBuffer().apply { put(QUAD_TEXCOORDS); position(0) }
         }
 
         // Try ESSL3 (matches the rest of the pipeline). If this driver lacks the
@@ -108,6 +119,41 @@ class BackgroundRenderer : GlReleasable {
         uMask = GLES30.glGetUniformLocation(backgroundProgram, "u_MaskTex")
         uDotSize = GLES30.glGetUniformLocation(backgroundProgram, "u_DotSizePx")
         uGrayscale = GLES30.glGetUniformLocation(backgroundProgram, "u_Grayscale")
+    }
+
+    /**
+     * Drops the cached camera UV transform so [draw] recomputes it on the next frame.
+     *
+     * Must be called whenever a different [com.google.ar.core.Frame] source takes over — i.e. when a
+     * new ARCore session is attached — because the cached UVs describe the previous session's camera
+     * image and display geometry. Safe to call off the GL thread.
+     */
+    fun invalidateDisplayGeometry() {
+        hasTransformed = false
+    }
+
+    /**
+     * True when the transformed UVs still cover a meaningful span of the camera image in both axes.
+     *
+     * A correct full-screen transform always spans most of the texture (ARCore centre-crops the camera
+     * image to the viewport, so the smaller axis never drops far below half). Anything near-degenerate
+     * — or non-finite — means the transform was taken against geometry ARCore hasn't been given yet,
+     * and drawing with it magnifies a few texels across the whole screen.
+     */
+    private fun transformedTexCoordsAreSane(): Boolean {
+        var minU = Float.MAX_VALUE; var maxU = -Float.MAX_VALUE
+        var minV = Float.MAX_VALUE; var maxV = -Float.MAX_VALUE
+        for (i in 0 until 4) {
+            // Absolute gets: transformCoordinates2d may leave the buffer's position anywhere.
+            val u = quadTexCoordTransformed.get(i * 2)
+            val v = quadTexCoordTransformed.get(i * 2 + 1)
+            if (!u.isFinite() || !v.isFinite()) return false
+            if (u < minU) minU = u
+            if (u > maxU) maxU = u
+            if (v < minV) minV = v
+            if (v > maxV) maxV = v
+        }
+        return (maxU - minU) >= MIN_UV_SPAN && (maxV - minV) >= MIN_UV_SPAN
     }
 
     /** Push the 36-sector visited bitmask that drives the ink-develop reveal. */
@@ -138,13 +184,41 @@ class BackgroundRenderer : GlReleasable {
         if (diagFrame % 120 == 0) Log.i("ARDIAG", "BackgroundRenderer.draw: drawing camera quad (scanActive=$scanActive)")
 
         if (frame.hasDisplayGeometryChanged() || !hasTransformed) {
-            frame.transformCoordinates2d(
-                Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
-                quadVertices,
-                Coordinates2d.TEXTURE_NORMALIZED,
-                quadTexCoordTransformed
-            )
-            hasTransformed = true
+            // Rewind both buffers first: transformCoordinates2d reads/writes from the current position,
+            // and the transform can now run on more than the first frame.
+            quadVertices.position(0)
+            quadTexCoordTransformed.position(0)
+            val transformed = try {
+                frame.transformCoordinates2d(
+                    Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,
+                    quadVertices,
+                    Coordinates2d.TEXTURE_NORMALIZED,
+                    quadTexCoordTransformed
+                )
+                // Only accept a result that actually maps the quad across the camera image. A transform
+                // taken against a session that hasn't been given the real display geometry collapses the
+                // full-screen quad onto a sliver (or a single point) of the texture, which draws as the
+                // camera magnified to the point of showing one pixel.
+                transformedTexCoordsAreSane()
+            } catch (t: Throwable) {
+                // This now runs on more than just the first frame, so a throw here must not take the GL
+                // thread (and with it the whole camera passthrough) down.
+                Log.w("ARDIAG", "BackgroundRenderer: camera UV transform threw", t)
+                false
+            }
+            quadTexCoordTransformed.position(0)
+            if (transformed) {
+                quadTexCoordTransformed.get(lastGoodTexCoords)
+                hasTransformed = true
+            } else {
+                // Fall back to the last accepted UVs (identity until one is accepted) and retry next
+                // frame, by which time DisplayRotationHelper will have pushed the viewport.
+                quadTexCoordTransformed.put(lastGoodTexCoords)
+                if (badTransformFrame++ % 120 == 0) {
+                    Log.w("ARDIAG", "BackgroundRenderer: camera UV transform rejected -> last good UVs")
+                }
+            }
+            quadTexCoordTransformed.position(0)
         }
 
         GLES30.glBindVertexArray(0)
@@ -260,6 +334,10 @@ class BackgroundRenderer : GlReleasable {
     companion object {
         private const val SECTOR_COUNT = 36
         private const val DOT_SIZE_PX = 6.0f // halftone cell size in screen pixels (newspaper grain)
+
+        /** Minimum span, per axis, a valid camera UV transform must cover. A real one covers ~0.5–1.0;
+         *  this floor only catches collapsed transforms, never a legitimate crop. */
+        private const val MIN_UV_SPAN = 0.1f
 
         private val QUAD_COORDS = floatArrayOf(
             -1.0f, -1.0f,
