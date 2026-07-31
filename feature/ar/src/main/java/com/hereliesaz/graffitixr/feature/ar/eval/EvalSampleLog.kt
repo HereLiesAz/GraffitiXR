@@ -23,6 +23,11 @@ data class EvalSample(
     val relocMatches: Int = -1,
     val relocInliers: Int = -1,
     val relocDetected: Int = -1,
+    // The remaining two RelocDiagnostics fields. obliquityDeg in particular is the quantity
+    // PlaneMarksObliquityTest predicts the error scales with, so having it per-row is what lets a
+    // device run be compared against PAPER.md 8.1's curve instead of argued about.
+    val relocObliquityDeg: Int = -1,
+    val relocRectifiedCorr: Int = -1,
 )
 
 object EvalSampleLog {
@@ -40,6 +45,7 @@ object EvalSampleLog {
         "voxelUpdateMs", "voxelKeyframeMs", "surfaceMeshMs", "drawMs", "pnpRelocMs",
         "cpuPct", "batteryMa", "tempC", "nativeHeapKb",
         "relocReject", "relocMatches", "relocInliers", "relocDetected",
+        "relocObliquityDeg", "relocRectifiedCorr",
     )
 
     const val NOT_SAMPLED = -1
@@ -56,12 +62,17 @@ object EvalSampleLog {
             s.cpuPct.toString(), s.batteryMa.toString(), s.tempC.toString(), s.nativeHeapKb.toString(),
             s.relocReject.toString(), s.relocMatches.toString(),
             s.relocInliers.toString(), s.relocDetected.toString(),
+            s.relocObliquityDeg.toString(), s.relocRectifiedCorr.toString(),
         )
     }
 
     fun toCsvRow(s: EvalSample): String {
         val f = fields(s)
-        // Cheap, and it fires at the first row of a run rather than during analysis weeks later.
+        // Belt-and-braces only. `fields()` returns a literal list, so its arity is a source constant
+        // and no input can make this fire at runtime — the real guard is EvalSampleLogTest, which
+        // catches the drift at build time. Kept because it costs nothing and localizes the failure
+        // if someone later makes `fields()` conditional. (`check`, not `assert`: `assert` is gated
+        // by -ea and would be inert in exactly the builds that write eval logs.)
         check(f.size == COLUMNS.size) {
             "CSV shape drift: ${f.size} fields for ${COLUMNS.size} columns"
         }

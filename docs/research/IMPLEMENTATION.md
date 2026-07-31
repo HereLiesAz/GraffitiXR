@@ -582,15 +582,15 @@ Low, and it is the highest value-per-risk item in the plan. Do it early.
 
 **6a depends on nothing — land it early. 6b lands with each phase that sources its columns.**
 
-`EVALUATION.md` cannot run without these channels. Extend
-`EvalSampleLog.CSV_HEADER` — currently:
+`EVALUATION.md` cannot run without these channels. Extend the CSV.
 
-```
-tsMs,deviceClass,marksVisible,errMm,errDeg,jitterMm,availability,voxelUpdateMs,
-voxelKeyframeMs,surfaceMeshMs,drawMs,pnpRelocMs,cpuPct,batteryMa,tempC,nativeHeapKb
-```
+**Do not restate the header here.** An earlier version of this section
+hand-copied the 16-column header as "currently:", and the commit whose headline
+change was *"header and row now derive from one `COLUMNS` list"* added four
+columns without updating this third copy — inside the same commit. The list lives
+in `EvalSampleLog.COLUMNS`; read it there.
 
-with:
+Columns to add:
 
 | Column | Source | Why the eval needs it |
 |---|---|---|

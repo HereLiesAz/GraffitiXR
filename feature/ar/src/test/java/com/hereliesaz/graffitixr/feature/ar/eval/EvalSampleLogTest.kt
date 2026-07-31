@@ -30,6 +30,8 @@ class EvalSampleLogTest {
         relocMatches = reloc?.matches ?: EvalSampleLog.NOT_SAMPLED,
         relocInliers = reloc?.inliers ?: EvalSampleLog.NOT_SAMPLED,
         relocDetected = reloc?.detected ?: EvalSampleLog.NOT_SAMPLED,
+        relocObliquityDeg = reloc?.obliquityDeg ?: EvalSampleLog.NOT_SAMPLED,
+        relocRectifiedCorr = reloc?.rectifiedCorrespondences ?: EvalSampleLog.NOT_SAMPLED,
     )
 
     @Test
@@ -37,7 +39,8 @@ class EvalSampleLogTest {
         assertEquals(
             "tsMs,deviceClass,marksVisible,errMm,errDeg,jitterMm,availability," +
                 "voxelUpdateMs,voxelKeyframeMs,surfaceMeshMs,drawMs,pnpRelocMs,cpuPct,batteryMa,tempC," +
-                "nativeHeapKb,relocReject,relocMatches,relocInliers,relocDetected",
+                "nativeHeapKb,relocReject,relocMatches,relocInliers,relocDetected," +
+                "relocObliquityDeg,relocRectifiedCorr",
             EvalSampleLog.CSV_HEADER,
         )
     }
@@ -51,7 +54,8 @@ class EvalSampleLogTest {
             nativeHeapKb = 20480L,
         )
         assertEquals(
-            "12,dual,true,1.5,0.25,3.0,1.0,2.0,0.0,4.0,1.0,8.0,30.0,-450.0,31.0,20480,-1,-1,-1,-1",
+            "12,dual,true,1.5,0.25,3.0,1.0,2.0,0.0,4.0,1.0,8.0,30.0,-450.0,31.0,20480," +
+                "-1,-1,-1,-1,-1,-1",
             EvalSampleLog.toCsvRow(row),
         )
     }
@@ -100,11 +104,46 @@ class EvalSampleLogTest {
     /**
      * `deviceClass` reaches the log as a free-form string from a caller. One comma in it shifts every
      * subsequent column of that row — silently, because the file still parses.
+     *
+     * Asserted by PARSING the row, not by looking for a quote. An earlier version of this test only
+     * checked that `"mono,rear"` appeared somewhere in the output, under a name promising the
+     * columns could not shift — which it never checked. Note a naive `split(",")` on this row gives
+     * one token too many; that is the bug, and it is why the reader below is quote-aware.
      */
     @Test
     fun `a comma in a free-form field cannot shift the columns`() {
         val row = EvalSampleLog.toCsvRow(sample(deviceClass = "mono,rear"))
         assertTrue("the value must be quoted, got: $row", row.contains("\"mono,rear\""))
+
+        val parsed = parseCsvRow(row)
+        assertEquals("column count must survive an embedded comma", EvalSampleLog.COLUMNS.size, parsed.size)
+        assertEquals("mono,rear", parsed[EvalSampleLog.COLUMNS.indexOf("deviceClass")])
+        // And the column AFTER it must still be itself, which is what "shift" would break.
+        assertEquals("true", parsed[EvalSampleLog.COLUMNS.indexOf("marksVisible")])
+
+        // The naive reader really does miscount — recorded so the quoting is not mistaken for
+        // cosmetic, and so a future consumer written with split(",") is a known-bad choice.
+        assertEquals(EvalSampleLog.COLUMNS.size + 1, row.split(",").size)
+    }
+
+    /** Minimal RFC4180 field splitter: quote-aware, handles doubled quotes inside a quoted field. */
+    private fun parseCsvRow(row: String): List<String> {
+        val out = ArrayList<String>()
+        val cur = StringBuilder()
+        var inQuotes = false
+        var i = 0
+        while (i < row.length) {
+            val c = row[i]
+            when {
+                inQuotes && c == '"' && i + 1 < row.length && row[i + 1] == '"' -> { cur.append('"'); i++ }
+                c == '"' -> inQuotes = !inQuotes
+                c == ',' && !inQuotes -> { out.add(cur.toString()); cur.setLength(0) }
+                else -> cur.append(c)
+            }
+            i++
+        }
+        out.add(cur.toString())
+        return out
     }
 
     @Test
@@ -142,6 +181,17 @@ class EvalSampleLogTest {
         assertEquals("40", fields[EvalSampleLog.COLUMNS.indexOf("relocMatches")])
         assertEquals("7", fields[EvalSampleLog.COLUMNS.indexOf("relocInliers")])
         assertEquals("1200", fields[EvalSampleLog.COLUMNS.indexOf("relocDetected")])
+    }
+
+    @Test
+    fun `obliquity and rectified correspondences reach their own columns`() {
+        val d = RelocDiagnostics(
+            RelocReject.OK, matches = 40, inliers = 30, detected = 900,
+            obliquityDeg = 37, rectifiedCorrespondences = 12,
+        )
+        val fields = EvalSampleLog.fields(sample(reloc = d))
+        assertEquals("37", fields[EvalSampleLog.COLUMNS.indexOf("relocObliquityDeg")])
+        assertEquals("12", fields[EvalSampleLog.COLUMNS.indexOf("relocRectifiedCorr")])
     }
 
     /**

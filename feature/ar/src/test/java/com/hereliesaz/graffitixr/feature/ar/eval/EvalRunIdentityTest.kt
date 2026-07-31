@@ -30,10 +30,23 @@ class EvalRunIdentityTest {
         assertEquals("eval_mono_123.run.json", identity().sidecarNameFor("eval_mono_123.csv"))
     }
 
-    /** A name without the extension must not silently produce a collidng or extension-less file. */
+    /**
+     * An extension-less input yields the SAME name as its `.csv` form — `removeSuffix` is a no-op
+     * when the suffix is absent, so the two are indistinguishable in the output.
+     *
+     * Recorded as the actual behaviour rather than dressed up as collision-safety, which is what an
+     * earlier version of this KDoc claimed while asserting the collision. It is unreachable today:
+     * the only caller passes `File.name` for a file it just created as `eval_*.csv`. If a second
+     * caller ever appears, this is the constraint it has to respect.
+     */
     @Test
-    fun `sidecar name handles a csv name without the extension`() {
+    fun `sidecar name is not disambiguated for an extension-less input`() {
         assertEquals("eval_mono_123.run.json", identity().sidecarNameFor("eval_mono_123"))
+        assertEquals(
+            "the two inputs collide by design; see the KDoc",
+            identity().sidecarNameFor("eval_mono_123.csv"),
+            identity().sidecarNameFor("eval_mono_123"),
+        )
     }
 
     @Test

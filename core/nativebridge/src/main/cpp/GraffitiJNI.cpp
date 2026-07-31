@@ -1288,13 +1288,20 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCorroborationCo
 }
 
 // Relocalization diagnostics: why the last attempt did not publish, and the counts it reached.
-// Packed into one int[] so the UI reads a consistent snapshot instead of four racing getters.
+// Packed into one int[] so the UI reads a consistent snapshot instead of six racing getters.
 // [0] = RelocReject code, [1] = correspondences, [2] = RANSAC inliers, [3] = features detected,
 // [4] = obliquity in degrees (-1 when the rectification pass wasn't eligible), [5] = correspondences
 // the rectification pass contributed.
 extern "C" JNIEXPORT jintArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostics(JNIEnv* env, jobject) {
-    jint vals[6] = {0, 0, 0, 0, -1, 0};
+    // NOT {0, ...}: zero is kRelocOk, so a no-engine fallback of 0 reports a SUCCESSFUL LOCK with
+    // zero correspondences — and the reject histogram this feeds would then count "the engine was
+    // not initialized" as a win. That is the same defect MobileGS.h guards against in
+    // mLastRelocReject's initializer, reintroduced here two files away. 7 is RelocReject.UNKNOWN,
+    // the Kotlin-only code that absorbs anything the native side cannot account for; the counts are
+    // -1 (not sampled) rather than 0, because zero matches is a real measurement.
+    static constexpr jint kRelocUnknownOrdinal = 7;
+    jint vals[6] = {kRelocUnknownOrdinal, -1, -1, -1, -1, -1};
     if (gSlamEngine) {
         vals[0] = gSlamEngine->lastRelocReject();
         vals[1] = gSlamEngine->lastRelocMatches();

@@ -106,8 +106,9 @@ class SlamManager @Inject constructor(
 
     /**
      * Why the last relocalization attempt did not publish a pose, and how far it got. See
-     * [RelocDiagnostics]; the native side packs the three values into one int[] so the read is a
-     * consistent snapshot rather than three racing getters.
+     * [RelocDiagnostics]; the native side packs SIX values into one int[] so the read is a
+     * consistent snapshot rather than six racing getters. (Three separate comments used to say
+     * three, four and six; the array has always been six wide.)
      */
     fun getRelocDiagnostics(): RelocDiagnostics {
         val v = nativeGetRelocDiagnostics()

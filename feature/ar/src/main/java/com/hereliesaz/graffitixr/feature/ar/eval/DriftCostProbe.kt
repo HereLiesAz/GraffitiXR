@@ -107,6 +107,8 @@ class DriftCostProbe(
             relocMatches = reloc?.matches ?: EvalSampleLog.NOT_SAMPLED,
             relocInliers = reloc?.inliers ?: EvalSampleLog.NOT_SAMPLED,
             relocDetected = reloc?.detected ?: EvalSampleLog.NOT_SAMPLED,
+            relocObliquityDeg = reloc?.obliquityDeg ?: EvalSampleLog.NOT_SAMPLED,
+            relocRectifiedCorr = reloc?.rectifiedCorrespondences ?: EvalSampleLog.NOT_SAMPLED,
         )
         file.appendText(EvalSampleLog.toCsvRow(sample) + "\n")
 
