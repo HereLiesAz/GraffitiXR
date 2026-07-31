@@ -1183,6 +1183,16 @@ class ArRenderer(
                         isTracking = anchorEstablished,
                         stageMs = stageMs,
                         cpuPct = -1f, // CPU% sampled by overlay; -1 here keeps the GL thread cheap
+                        // Why the last attempt did not publish, logged per row. EVALUATION.md §6:
+                        // a configuration whose failures are NO_FEATURES needs different work from
+                        // one whose failures are FEW_INLIERS, and the aggregate error number cannot
+                        // tell them apart. Cost: one JNI transition, six relaxed atomic loads, and
+                        // two short-lived allocations (the jintArray and the RelocDiagnostics). Not
+                        // free — but this whole block is inside `driftCostProbe?.let`, so it does
+                        // not exist outside an eval run, and the block already allocates two
+                        // FloatArrays per tick. (An earlier comment here said "four atomics", which
+                        // was neither the count nor the mechanism.)
+                        reloc = slamManager.getRelocDiagnostics(),
                     )
                 }
 

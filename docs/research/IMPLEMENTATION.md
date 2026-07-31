@@ -582,15 +582,15 @@ Low, and it is the highest value-per-risk item in the plan. Do it early.
 
 **6a depends on nothing — land it early. 6b lands with each phase that sources its columns.**
 
-`EVALUATION.md` cannot run without these channels. Extend
-`EvalSampleLog.CSV_HEADER` — currently:
+`EVALUATION.md` cannot run without these channels. Extend the CSV.
 
-```
-tsMs,deviceClass,marksVisible,errMm,errDeg,jitterMm,availability,voxelUpdateMs,
-voxelKeyframeMs,surfaceMeshMs,drawMs,pnpRelocMs,cpuPct,batteryMa,tempC,nativeHeapKb
-```
+**Do not restate the header here.** An earlier version of this section
+hand-copied the 16-column header as "currently:", and the commit whose headline
+change was *"header and row now derive from one `COLUMNS` list"* added four
+columns without updating this third copy — inside the same commit. The list lives
+in `EvalSampleLog.COLUMNS`; read it there.
 
-with:
+Columns to add:
 
 | Column | Source | Why the eval needs it |
 |---|---|---|
@@ -707,15 +707,18 @@ order.** Work top to bottom.
 
 ### Phase 6a — telemetry plumbing (no new dependencies)
 
-- [ ] **6a.1** Add the run-identity sidecar JSON next to every `DriftCostProbe`
+- [x] **6a.1** Add the run-identity sidecar JSON next to every `DriftCostProbe`
       CSV: recording hash, git commit, all parameter values, RNG seed, sync/async
       mode, device model. A CSV without a sidecar is not evidence.
-- [ ] **6a.2** Add a CSV-shape test: header column count equals the emitted row's
+- [x] **6a.2** Add a CSV-shape test: header column count equals the emitted row's
       field count. This is the class of bug that silently corrupts every
       downstream analysis. **[T]**
-- [ ] **6a.3** Add the `relocReject` ordinal column — its source already exists.
+- [x] **6a.3** Add the `relocReject` ordinal column — its source already exists.
 - [ ] **6a.4** Add the eval-only fixed RNG seed and the synchronous-reloc mode
-      from `EVALUATION.md` §3.1. Both must be inert in release builds.
+      from `EVALUATION.md` §3.1. Both must be inert in release builds. *(The
+      sidecar already records `rngSeed` and `syncReloc` so a run states which it
+      used; the native plumbing that honours them is still outstanding, and until
+      it lands every replay A/B carries un-quantified RANSAC variance.)*
 
 ### Phase 0 — rotation convention
 

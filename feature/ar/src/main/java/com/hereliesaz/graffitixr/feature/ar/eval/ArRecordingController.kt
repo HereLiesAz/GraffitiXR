@@ -50,14 +50,31 @@ class ArRecordingController(private val context: Context) {
         }
     }
 
+    /**
+     * Name of the dataset currently set for playback, or null for a live session.
+     *
+     * Recorded so the eval run-identity sidecar can state which recording a run replayed — without
+     * it, two CSVs from different datasets are indistinguishable after the fact and their numbers
+     * are not comparable. Cleared by [clearPlayback] so a live run after a replay does not inherit
+     * the stale name.
+     */
+    @Volatile
+    var currentPlaybackName: String? = null
+        private set
+
     /** Set a recorded dataset for playback. Session must be paused; caller resumes after. */
     fun startPlayback(session: Session, file: File): Boolean = try {
         session.setPlaybackDatasetUri(Uri.fromFile(file))
+        currentPlaybackName = file.name
         true
     } catch (e: Exception) {
         Timber.w(e, "eval: startPlayback failed (set the dataset while the session is paused)")
+        currentPlaybackName = null
         false
     }
+
+    /** Forget the playback dataset, so a subsequent live run reports itself as live. */
+    fun clearPlayback() { currentPlaybackName = null }
 
     fun isPlaying(session: Session): Boolean = session.playbackStatus == PlaybackStatus.OK
 

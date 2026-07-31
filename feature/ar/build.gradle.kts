@@ -6,12 +6,26 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+/**
+ * Short git commit for the eval run-identity sidecar (EVALUATION.md 3.2).
+ *
+ * A CSV whose build is unknown cannot be compared against another run, so this is recorded rather
+ * than inferred. Resolved at configure time and never allowed to fail the build: CI shallow clones,
+ * source archives and worktrees can all leave git unusable, and "unknown" is an honest answer where
+ * a crashed build is not.
+ */
+val gitCommitForEval: String = providers.exec {
+    commandLine("git", "rev-parse", "--short", "HEAD")
+}.standardOutput.asText.map { it.trim() }.orElse("unknown").getOrElse("unknown")
+    .ifBlank { "unknown" }
+
 android {
     namespace = "com.hereliesaz.graffitixr.feature.ar"
     compileSdk = 37
     defaultConfig {
         minSdk = 26
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "GIT_COMMIT", "\"$gitCommitForEval\"")
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -26,6 +40,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true   // for GIT_COMMIT, above
     }
 
     testOptions {

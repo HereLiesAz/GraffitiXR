@@ -317,10 +317,50 @@ class ArViewModel @Inject constructor(
     @Volatile private var evalLogging = false
 
     fun evalStartLog() {
-        evalProbe.start()
+        // Every run gets its identity sidecar. Making `identity` optional on start() shipped a
+        // serializer with no caller — a run-identity feature that produced zero run identities,
+        // ticked as done. EVALUATION.md 3.2's rule is that a CSV without a sidecar is not evidence,
+        // so the call site has to supply one or the whole thing is decoration.
+        evalProbe.start(buildEvalRunIdentity())
         renderer?.driftCostProbe = evalProbe
         evalLogging = true
     }
+
+    /**
+     * Snapshot of everything needed to reconstruct this run: build, device, and the tunables whose
+     * values the numbers depend on.
+     *
+     * `rngSeed` and `syncReloc` are reported as "not set" because the native plumbing that would
+     * honour them does not exist yet (IMPLEMENTATION.md todo 6a.4). That is deliberately stated
+     * rather than defaulted: `solvePnPRansac` draws random samples, so an unseeded replay A/B is not
+     * a controlled comparison, and the reader can only know that if the field says so.
+     */
+    private fun buildEvalRunIdentity() = com.hereliesaz.graffitixr.feature.ar.eval.EvalRunIdentity(
+        gitCommit = BuildConfig.GIT_COMMIT,
+        recordingName = evalRecorder.currentPlaybackName,
+        recordingSha256 = null, // hashing a multi-hundred-MB MP4 on the UI path is not worth it
+        deviceModel = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
+        androidRelease = android.os.Build.VERSION.RELEASE ?: "unknown",
+        deviceClass = if (_uiState.value.isHardwareStereoActive) "dual" else "mono",
+        rngSeed = null,
+        syncReloc = false,
+        parameters = mapOf(
+            "MIN_INLIER_RATIO" to
+                com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion.MIN_INLIER_RATIO.toString(),
+            "BASE_ALPHA" to
+                com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion.BASE_ALPHA.toString(),
+            "CONF_FLOOR" to
+                com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion.CONF_FLOOR.toString(),
+            "COLD_SNAP_INLIER_RATIO" to
+                com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion.COLD_SNAP_INLIER_RATIO.toString(),
+            "COLD_SNAP_MIN_INLIERS" to
+                com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion.COLD_SNAP_MIN_INLIERS.toString(),
+            "COLD_SNAP_DIST_M" to
+                com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion.COLD_SNAP_DIST_M.toString(),
+            "COLD_SNAP_ANGLE_DEG" to
+                com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion.COLD_SNAP_ANGLE_DEG.toString(),
+        ),
+    )
 
     fun evalStopLog() {
         evalLogging = false

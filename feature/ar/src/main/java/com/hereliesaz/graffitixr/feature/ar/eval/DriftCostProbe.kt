@@ -29,10 +29,21 @@ class DriftCostProbe(
         context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
     }
 
-    fun start(): File {
+    /**
+     * Begin a run. Pass [identity] so the CSV gets its run-identity sidecar — `EVALUATION.md` §3.2:
+     * a CSV without one is not evidence, because the parameter values, build and determinism
+     * settings that produced it are not recoverable from the numbers afterwards.
+     *
+     * [identity] is nullable only so ad-hoc debugging can still start a probe; any run whose numbers
+     * are meant to be compared against another run must supply it.
+     */
+    fun start(identity: EvalRunIdentity? = null): File {
         val dir = File(context.filesDir, "eval").apply { mkdirs() }
         val f = File(dir, "eval_${deviceClass}_${nowMs()}.csv")
         f.writeText(EvalSampleLog.CSV_HEADER + "\n")
+        if (identity != null) {
+            File(dir, identity.sidecarNameFor(f.name)).writeText(identity.toJson())
+        }
         logFile = f
         usableFrames = 0; totalFrames = 0; lossMs = null; relockMs = null
         recentTranslations.clear()
@@ -50,6 +61,9 @@ class DriftCostProbe(
      * @param isTracking    whether the mechanism currently has a usable lock (for recovery/availability)
      * @param stageMs        native stage timings from SlamManager.getStageTimings()
      * @param cpuPct         caller-sampled CPU percent (or -1 if unavailable)
+     * @param reloc          last relocalization diagnostics, or null when not sampled. Logged so a
+     *   null relocalization becomes a diagnosis rather than an absence: NO_FEATURES and FEW_INLIERS
+     *   call for opposite fixes and the aggregate error number cannot tell them apart.
      */
     fun onTick(
         candidatePose: FloatArray,
@@ -57,6 +71,7 @@ class DriftCostProbe(
         isTracking: Boolean,
         stageMs: FloatArray,
         cpuPct: Float,
+        reloc: com.hereliesaz.graffitixr.common.model.RelocDiagnostics? = null,
     ) {
         val file = logFile ?: return
         totalFrames++
@@ -86,6 +101,14 @@ class DriftCostProbe(
             batteryMa = sampleBatteryMa(),
             tempC = -1f, // wired from caller's thermal sample if available; -1 = not sampled
             nativeHeapKb = android.os.Debug.getNativeHeapAllocatedSize() / 1024L,
+            // -1 throughout when not sampled. Zero matches and zero detected are both legitimate
+            // readings, so they cannot double as the "no data" marker.
+            relocReject = reloc?.reject?.ordinal ?: EvalSampleLog.NOT_SAMPLED,
+            relocMatches = reloc?.matches ?: EvalSampleLog.NOT_SAMPLED,
+            relocInliers = reloc?.inliers ?: EvalSampleLog.NOT_SAMPLED,
+            relocDetected = reloc?.detected ?: EvalSampleLog.NOT_SAMPLED,
+            relocObliquityDeg = reloc?.obliquityDeg ?: EvalSampleLog.NOT_SAMPLED,
+            relocRectifiedCorr = reloc?.rectifiedCorrespondences ?: EvalSampleLog.NOT_SAMPLED,
         )
         file.appendText(EvalSampleLog.toCsvRow(sample) + "\n")
 
