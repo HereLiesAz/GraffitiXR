@@ -41,7 +41,10 @@ object PoseMath {
      * Working it out row by row for that matrix: the true inverse is `diag(1/s,1/s,1)·Rᵀ`, whose
      * rows 0 and 1 are `(1/s)·(rows 0,1 of Rᵀ)`. Since `Aᵀ = diag(s,s,1)·Rᵀ`, dividing by `s²` gives
      * `(1/s)·(rows 0,1 of Rᵀ)` for those same rows — **identical**. Only row 2, the plane normal, is
-     * off (by a further factor of `s`), and with it the Z component of the translation.
+     * off: the true inverse leaves it as `Rᵀ_row2`, this yields `Rᵀ_row2 / s²`. At `s = 2` the
+     * normal row comes out a quarter of its correct value, not a half. The Z component of the
+     * translation inherits the same factor; `r[12]` and `r[13]` do not, since they are built from
+     * rows 0 and 1 only.
      *
      * So this is exact for every component [Footprint] reads, and wrong only in the component
      * [Footprint] discards by construction. Do not reuse it where the normal direction matters

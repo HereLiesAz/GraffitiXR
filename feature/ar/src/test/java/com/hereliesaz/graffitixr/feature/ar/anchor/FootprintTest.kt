@@ -78,8 +78,9 @@ class FootprintTest {
     /**
      * With the design rotated 45 degrees in its own plane, a point along the design's LOCAL +X axis
      * must map to (1, 0). Using the forward transform instead of the inverse rotates the answer
-     * instead of un-rotating it, and lands somewhere near (0.71, 0.71) — plausible enough to pass a
-     * sloppier assertion.
+     * instead of un-rotating it: with these constants that gives `lx = HALF_W·cos90° = 0` and
+     * `ly = HALF_W·sin90° = 1.5`, i.e. `(0, 2)` once normalized. Wrong on both axes, so this case
+     * catches the substitution decisively.
      */
     @Test
     fun `rotated anchor maps the design's own axes, not the world's`() {
@@ -143,8 +144,13 @@ class FootprintTest {
 
     /**
      * Using the preferred call shape — rigid anchor with the scale folded into the extents — must
-     * agree exactly with [Footprint.ofComposed]. The plan offers both; if they disagree, one of the
-     * two call sites in the codebase would be silently wrong.
+     * agree exactly with [Footprint.ofComposed]. The plan offers both and Phase 2 will pick one per
+     * call site; if they disagree, that choice silently becomes a correctness decision instead of a
+     * performance one. (Φ has no production callers yet — this guards the choice before it is made.)
+     *
+     * The rigid factor passed here is the FULL rigid part, rotation and translation included.
+     * `ArRenderer`'s `overlayBaseScratch` alone is NOT that — the pan and in-plane spin live in
+     * `overlayLocalScratch` alongside the scale — which is why the plan's wording needed correcting.
      */
     @Test
     fun `folding scale into the extents matches dividing it out of the inverse`() {
@@ -172,6 +178,57 @@ class FootprintTest {
         val offWall = Footprint.of(a, HALF_W, HALF_H, 1.4f, 2.3f, 0.5f)
         assertEquals(onWall[0], offWall[0], EPS)
         assertEquals(onWall[1], offWall[1], EPS)
+    }
+
+    /**
+     * Every other anchor here rotates about Z, which leaves the inverse's third column zero — so the
+     * coefficients Φ applies to the world `z` are never exercised, and the normal-discarding claim
+     * is only demonstrated for a wall that happens to BE the world XY plane. A real wall's local Z
+     * lies along its own normal, which is generally not world Z. This tilts the anchor so those
+     * coefficients are non-zero.
+     */
+    @Test
+    fun `tilted anchor still maps its own axes and still discards its own normal`() {
+        // 30 degrees about world X: local +Y tilts out of the world XY plane, local +Z with it.
+        val a = Math.toRadians(30.0)
+        val c = cos(a).toFloat(); val s = sin(a).toFloat()
+        val tilted = floatArrayOf(
+            1f, 0f, 0f, 0f,      // local +X stays world +X
+            0f, c, s, 0f,        // local +Y tilts
+            0f, -s, c, 0f,       // local +Z tilts with it — this is the wall normal
+            0f, 0f, 0f, 1f,
+        )
+        // Local (HALF_W, 0, 0) and (0, HALF_H, 0), expressed in world.
+        val edgeU = Footprint.of(tilted, HALF_W, HALF_H, HALF_W, 0f, 0f)
+        assertEquals(1f, edgeU[0], EPS); assertEquals(0f, edgeU[1], EPS)
+
+        val edgeV = Footprint.of(tilted, HALF_W, HALF_H, 0f, c * HALF_H, s * HALF_H)
+        assertEquals(0f, edgeV[0], EPS); assertEquals(1f, edgeV[1], EPS)
+
+        // A point half a metre along the wall's OWN normal must share its foot's footprint.
+        val foot = Footprint.of(tilted, HALF_W, HALF_H, 0f, c * HALF_H, s * HALF_H).copyOf()
+        val off = Footprint.of(tilted, HALF_W, HALF_H, 0f, c * HALF_H - 0.5f * s, s * HALF_H + 0.5f * c)
+        assertEquals(foot[0], off[0], EPS)
+        assertEquals(foot[1], off[1], EPS)
+    }
+
+    /** Hoisting the inverse out of a per-feature loop must give bit-identical results. */
+    @Test
+    fun `pre-inverted path matches the per-call path`() {
+        val scale = 2f
+        val rigid = anchor(30f, tx = -4f, ty = 9f)
+        val composed = composedAnchor(scale, 30f, tx = -4f, ty = 9f)
+        val world = floatArrayOf(-1.2f, 10.4f, 0.3f)
+
+        val invRigid = Footprint.inverseOfRigid(rigid)
+        val a1 = Footprint.of(rigid, HALF_W, HALF_H, world[0], world[1], world[2]).copyOf()
+        val a2 = Footprint.ofInverted(invRigid, HALF_W, HALF_H, world[0], world[1], world[2])
+        assertEquals(a1[0], a2[0], EPS); assertEquals(a1[1], a2[1], EPS)
+
+        val invComposed = Footprint.inverseOfComposed(composed)
+        val b1 = Footprint.ofComposed(composed, HALF_W, HALF_H, world[0], world[1], world[2]).copyOf()
+        val b2 = Footprint.ofInverted(invComposed, HALF_W, HALF_H, world[0], world[1], world[2])
+        assertEquals(b1[0], b2[0], EPS); assertEquals(b1[1], b2[1], EPS)
     }
 
     @Test

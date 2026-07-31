@@ -44,6 +44,85 @@ class PoseMathTest {
         identity().forEachIndexed { i, e -> assertEquals(e, prod[i], 1e-4f) }
     }
 
+    /** Rotation of [deg] about an arbitrary (normalized) axis — deliberately NOT about Z. */
+    private fun axisRot(ax: Float, ay: Float, az: Float, deg: Float): FloatArray {
+        val n = sqrt(ax * ax + ay * ay + az * az)
+        val x = ax / n; val y = ay / n; val z = az / n
+        val c = kotlin.math.cos(Math.toRadians(deg.toDouble())).toFloat()
+        val s = kotlin.math.sin(Math.toRadians(deg.toDouble())).toFloat()
+        val t = 1f - c
+        // Row-major R, written into column-major storage.
+        val r = floatArrayOf(
+            t*x*x + c,   t*x*y + s*z, t*x*z - s*y, 0f,
+            t*x*y - s*z, t*y*y + c,   t*y*z + s*x, 0f,
+            t*x*z + s*y, t*y*z - s*x, t*z*z + c,   0f,
+            0f, 0f, 0f, 1f,
+        )
+        return r
+    }
+
+    private fun withTranslation(m: FloatArray, tx: Float, ty: Float, tz: Float) =
+        m.copyOf().also { it[12] = tx; it[13] = ty; it[14] = tz }
+
+    /** Scale columns 0..[cols)-1 of the linear part, mimicking `Matrix.scaleM`. */
+    private fun scaleCols(m: FloatArray, s: Float, cols: Int) = m.copyOf().also {
+        for (c in 0 until cols) for (row in 0 until 3) it[c * 4 + row] *= s
+    }
+
+    @Test fun `scaleOf returns one for a rigid matrix and s for a scaled one`() {
+        assertEquals(1f, PoseMath.scaleOf(identity()), 1e-5f)
+        val rot = axisRot(0.3f, -0.7f, 0.6f, 37f)
+        assertEquals(1f, PoseMath.scaleOf(rot), 1e-5f)
+        assertEquals(2.5f, PoseMath.scaleOf(scaleCols(rot, 2.5f, 3)), 1e-4f)
+        // Reading the FIRST column means an in-plane-only scale still reports s.
+        assertEquals(2.5f, PoseMath.scaleOf(scaleCols(rot, 2.5f, 2)), 1e-4f)
+    }
+
+    /**
+     * For a genuinely uniform similarity the inverse must be exact — and with a rotation about an
+     * arbitrary axis, not just Z. Every anchor in `FootprintTest` rotates about Z, which leaves the
+     * inverse's third column trivially zero and would hide an error there.
+     */
+    @Test fun `similarityInverse is exact for a uniform scale and an arbitrary axis`() {
+        val m = withTranslation(scaleCols(axisRot(0.3f, -0.7f, 0.6f, 37f), 2.5f, 3), 1.5f, -2f, 4f)
+        val prod = PoseMath.multiply(PoseMath.similarityInverse(m), m)
+        identity().forEachIndexed { i, e -> assertEquals("element $i", e, prod[i], 1e-4f) }
+    }
+
+    /**
+     * The exactness caveat in `similarityInverse`'s KDoc, asserted rather than merely asserted-in-
+     * prose: for the overlay's `scaleM(s, s, 1f)` the computed inverse is EXACT in rows 0 and 1 and
+     * wrong in row 2 by a factor of `1/s²`. Footprint reads only rows 0 and 1, which is what makes
+     * it safe there — and this test is what stops someone reusing it where row 2 matters.
+     */
+    @Test fun `similarityInverse is exact in-plane and off by one over s-squared on the normal row`() {
+        val s = 2.5f
+        val rot = axisRot(0.3f, -0.7f, 0.6f, 37f)
+        val m = scaleCols(rot, s, 2)                       // diag(s, s, 1), not uniform
+        val got = PoseMath.similarityInverse(m)
+
+        // True inverse of R*diag(s,s,1) is diag(1/s,1/s,1)*R^T.
+        val true0 = FloatArray(16).also {
+            for (i in 0 until 3) for (j in 0 until 3) {
+                it[j * 4 + i] = rot[i * 4 + j] * if (i < 2) 1f / s else 1f
+            }
+            it[15] = 1f
+        }
+        for (j in 0 until 3) {
+            assertEquals("row 0 col $j must be exact", true0[j * 4], got[j * 4], 1e-4f)
+            assertEquals("row 1 col $j must be exact", true0[j * 4 + 1], got[j * 4 + 1], 1e-4f)
+            // Row 2 is scaled by 1/s^2 relative to truth — documented, and relied on being harmless.
+            assertEquals("row 2 col $j must be off by 1/s^2",
+                true0[j * 4 + 2] / (s * s), got[j * 4 + 2], 1e-4f)
+        }
+    }
+
+    @Test fun `similarityInverse rejects a degenerate scale instead of dividing by zero`() {
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) {
+            PoseMath.similarityInverse(FloatArray(16))
+        }
+    }
+
     @Test fun `quaternion round-trips through matrix`() {
         // 90 deg about Z
         val q = PoseMath.matrixToQuaternion(floatArrayOf(0f,1f,0f,0f, -1f,0f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f))

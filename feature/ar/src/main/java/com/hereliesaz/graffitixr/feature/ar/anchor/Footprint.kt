@@ -69,8 +69,9 @@ object Footprint {
      *   overlay scale, use [ofComposed] instead — see the class docs.
      * @param halfW half-width of the design in metres, already multiplied by the overlay scale.
      * @param halfH half-height, likewise.
-     * @param out a caller-supplied 2-element buffer. Φ runs once per feature per capture, so the
-     *   overload exists to keep it out of the allocator.
+     * @param out a caller-supplied 2-element buffer. Note this alone does **not** make Φ
+     *   allocation-free: this overload still builds a `FloatArray(16)` inverse per call. For a
+     *   per-feature loop, hoist the inverse with [inverseOfRigid] and call [ofInverted].
      */
     fun of(
         anchorModel: FloatArray,
@@ -90,6 +91,37 @@ object Footprint {
         x: Float, y: Float, z: Float,
         out: FloatArray = FloatArray(2),
     ): FloatArray = project(PoseMath.similarityInverse(composedModel), halfW, halfH, x, y, z, out)
+
+    /**
+     * Pre-compute the inverse once, for a whole capture's worth of features.
+     *
+     * [of] and [ofComposed] each allocate a `FloatArray(16)` for the inverse on **every call**, and
+     * [ofComposed] additionally does a `sqrt` per call to recover a scale that is constant across
+     * the capture. That dwarfs the 2-float array the `out` buffer saves, so the buffer overload only
+     * earns its keep when the inverse is hoisted out of the loop as well:
+     *
+     * ```kotlin
+     * val inv = Footprint.inverseOfComposed(anchorComposed)
+     * val uv = FloatArray(2)
+     * for (p in points) { Footprint.ofInverted(inv, halfW, halfH, p.x, p.y, p.z, uv); ... }
+     * ```
+     */
+    fun inverseOfRigid(anchorModel: FloatArray): FloatArray = PoseMath.rigidInverse(anchorModel)
+
+    /** As [inverseOfRigid], for a model matrix carrying the overlay's in-plane scale. */
+    fun inverseOfComposed(composedModel: FloatArray): FloatArray = PoseMath.similarityInverse(composedModel)
+
+    /**
+     * Φ from an inverse produced by [inverseOfRigid] or [inverseOfComposed]. The extents must match
+     * the choice: scaled half-extents for a rigid inverse, unscaled for a composed one — exactly as
+     * in [of] and [ofComposed] respectively.
+     */
+    fun ofInverted(
+        inverse: FloatArray,
+        halfW: Float, halfH: Float,
+        x: Float, y: Float, z: Float,
+        out: FloatArray = FloatArray(2),
+    ): FloatArray = project(inverse, halfW, halfH, x, y, z, out)
 
     /** Shared core: apply an already-inverted transform, then normalize by the half-extents. */
     private fun project(

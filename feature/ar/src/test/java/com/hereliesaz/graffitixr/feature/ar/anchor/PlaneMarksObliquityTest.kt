@@ -33,15 +33,25 @@ import org.junit.Test
  *    loosening a bound; a suddenly-passing characterization test means the bug moved, not that it
  *    was fixed.
  *
- * Expected magnitudes are in `PAPER.md` §8.1 and were derived independently of this code.
+ * Ground truth is built FORWARD (see [samplesOn]): points are placed on the wall in its own basis
+ * and projected to pixels, so the truth path never evaluates the ray-plane intersection that
+ * `backProject` is being tested on. An earlier version derived truth from the pixel with the same
+ * `t = (n·p)/(n·d)` the implementation uses, which made the control tests tautologies that would
+ * have passed with a sign flip or a swapped numerator.
+ *
+ * Magnitudes here will NOT match `PAPER.md` §8.1's table. That table samples uniformly in PIXEL
+ * space over a 40x40 grid; this samples uniformly on the WALL, which weights oblique views
+ * differently. Both are correct measurements of the same defect; only the sampling differs. The
+ * assertions below are therefore ranges and orderings, not the paper's decimals.
  */
 class PlaneMarksObliquityTest {
 
     private companion object {
         // Display-oriented intrinsics for a 1080x1920 portrait frame (fx/fy already swapped by
-        // ArRenderer's rotationNeeded==90 branch).
+        // ArRenderer's rotationNeeded==90 branch). Deliberately DIFFERENT. Equal focal lengths make an fx/fy swap — the exact thing the
+        // display rotation does to the intrinsics — undetectable by every test in this file.
         const val FX = 1400f
-        const val FY = 1400f
+        const val FY = 1250f
         const val CX = 540f
         const val CY = 960f
         const val W = 1080
@@ -68,68 +78,73 @@ class PlaneMarksObliquityTest {
 
     private fun identityView() = rzView(0f)
 
-    /** A grid of pixels over the central 80% of the frame — the region features actually land in. */
-    private fun samplePixels(step: Int = 8): List<PlaneMarks.Pixel> = buildList {
-        for (i in 0 until step) {
-            val v = 0.1f * H + 0.8f * H * i / (step - 1)
-            for (j in 0 until step) {
-                val u = 0.1f * W + 0.8f * W * j / (step - 1)
-                add(PlaneMarks.Pixel(u, v))
-            }
-        }
-    }
-
     /** Wall normal in the CAMERA frame, tilted [obliquityDeg] about the camera's Y axis. */
     private fun wallNormalCam(obliquityDeg: Float): FloatArray {
         val a = Math.toRadians(obliquityDeg.toDouble())
         return floatArrayOf(sin(a).toFloat(), 0f, cos(a).toFloat())
     }
 
+    /** A 3D point paired with the pixel it projects to. */
+    private class Sample(val world: FloatArray, val pixel: PlaneMarks.Pixel)
+
     /**
-     * Ground truth, computed in CLOSED FORM rather than by calling the code under test. For each
-     * sampled pixel, walk its camera ray to the wall analytically: `t = (n·p)/(n·d)`, point = `t·d`.
+     * Ground truth, built **forward**: parameterize the wall by its own two in-plane basis vectors,
+     * place points on it, and project each through the pinhole model to get its pixel.
      *
-     * Deriving truth independently is what makes the control tests real. Comparing `backProject`
-     * against a second `backProject` call would be a tautology that passes no matter how wrong the
-     * implementation is.
+     * The direction matters. An earlier version of this file computed truth by re-deriving
+     * `t = (n·p)/(n·d)` from the pixel — which is `backProject`'s own loop retyped, so the controls
+     * compared the implementation against itself and would have passed with a sign flip, a swapped
+     * numerator, or a wrong ray. Going forward shares only the pinhole projection, and shares it as
+     * the *inverse* operation, so an error in the unprojection cannot be mirrored into the truth.
      */
-    private fun analyticTruth(obliquityDeg: Float, pixels: List<PlaneMarks.Pixel>): Map<Int, FloatArray> {
+    private fun samplesOn(obliquityDeg: Float, steps: Int = 25, span: Float = 4f): List<Sample> {
+        val a = Math.toRadians(obliquityDeg.toDouble())
         val n = wallNormalCam(obliquityDeg)
         val p = floatArrayOf(n[0] * DIST_M, n[1] * DIST_M, n[2] * DIST_M)
-        val nDotP = n[0] * p[0] + n[1] * p[1] + n[2] * p[2]
-        val out = HashMap<Int, FloatArray>(pixels.size)
-        for ((i, px) in pixels.withIndex()) {
-            val dx = (px.u - CX) / FX
-            val dy = (px.v - CY) / FY
-            val nDotD = n[0] * dx + n[1] * dy + n[2]
-            if (abs(nDotD) < 1e-6f) continue
-            val t = nDotP / nDotD
-            if (t < 0.1f || t > 10f) continue // backProject's own trust range
-            out[i] = floatArrayOf(t * dx, t * dy, t)
+        // Orthonormal in-plane basis: e1 lies in the XZ plane perpendicular to n, e2 is world +Y.
+        val e1 = floatArrayOf(cos(a).toFloat(), 0f, -sin(a).toFloat())
+        val e2 = floatArrayOf(0f, 1f, 0f)
+
+        val out = ArrayList<Sample>()
+        for (i in 0 until steps) {
+            val s = -span + 2f * span * i / (steps - 1)
+            for (j in 0 until steps) {
+                val t = -span + 2f * span * j / (steps - 1)
+                val wx = p[0] + s * e1[0] + t * e2[0]
+                val wy = p[1] + s * e1[1] + t * e2[1]
+                val wz = p[2] + s * e1[2] + t * e2[2]
+                if (wz < 0.1f || wz > 10f) continue                      // behind, or past the trust range
+                val u = wx / wz * FX + CX
+                val v = wy / wz * FY + CY
+                if (u < 0.05f * W || u > 0.95f * W) continue             // off-frame
+                if (v < 0.05f * H || v > 0.95f * H) continue
+                out.add(Sample(floatArrayOf(wx, wy, wz), PlaneMarks.Pixel(u, v)))
+            }
         }
         return out
     }
 
     /**
-     * Per-pixel distance in mm between what `backProject` returns when the plane arrives through
-     * [viewForPlane] and the closed-form truth. The rays are always in the frame the pixels were
-     * measured in, so [viewForPlane] is exactly the shipped mismatch: identity means the plane is in
-     * the same frame as the rays (correct), a rotation means it is not.
+     * Per-point distance in mm between what `backProject` returns when the plane arrives through
+     * [viewForPlane] and the forward-constructed truth. The rays are always in the frame the pixels
+     * were measured in, so [viewForPlane] IS the shipped mismatch: identity means the plane is in
+     * that same frame (correct), a rotation means it is not.
      */
     private fun errorsMm(obliquityDeg: Float, viewForPlane: FloatArray): List<Float> {
-        val pixels = samplePixels()
+        val samples = samplesOn(obliquityDeg)
         val n = wallNormalCam(obliquityDeg)
         val p = floatArrayOf(n[0] * DIST_M, n[1] * DIST_M, n[2] * DIST_M)
-        val truth = analyticTruth(obliquityDeg, pixels)
 
-        val actual = PlaneMarks.backProject(pixels, viewForPlane, p, n, FX, FY, CX, CY)
+        val actual = PlaneMarks.backProject(
+            samples.map { it.pixel }, viewForPlane, p, n, FX, FY, CX, CY,
+        )
         val out = ArrayList<Float>(actual.count)
         for ((slot, src) in actual.kept.withIndex()) {
-            val t = truth[src] ?: continue
+            val truth = samples[src].world
             val o = slot * 3
-            val dx = actual.pointsCam[o] - t[0]
-            val dy = actual.pointsCam[o + 1] - t[1]
-            val dz = actual.pointsCam[o + 2] - t[2]
+            val dx = actual.pointsCam[o] - truth[0]
+            val dy = actual.pointsCam[o + 1] - truth[1]
+            val dz = actual.pointsCam[o + 2] - truth[2]
             out.add(hypot(hypot(dx, dy), dz) * 1000f)
         }
         return out
@@ -142,9 +157,13 @@ class PlaneMarksObliquityTest {
     // ---------------------------------------------------------------------------------------
 
     /**
-     * When the rays and the plane are in the same frame, `backProject` matches the closed form
-     * exactly. This is the control: it proves any error measured below comes from the frame
-     * mismatch and not from the back-projection itself.
+     * When the rays and the plane are in the same frame, `backProject` recovers the forward-
+     * constructed points exactly. Two things at once: it proves the unprojection genuinely inverts
+     * the projection (FX != FY here, so a focal-length swap fails this), and it establishes that any
+     * error measured below comes from the frame mismatch and not from `backProject` itself.
+     *
+     * This is also the LANDSCAPE case — `rotationNeeded == 0` means no mismatch exists to make — so
+     * it doubles as the prediction EVALUATION.md E0b asks you to check by rotating the phone.
      */
     @Test
     fun `frames agreeing recovers the truth exactly`() {
@@ -164,14 +183,27 @@ class PlaneMarksObliquityTest {
      */
     @Test
     fun `back-projection inverts a hand-computed projection`() {
-        val n = wallNormalCam(30f)
+        val deg = 30f
+        val a = Math.toRadians(deg.toDouble())
+        val n = wallNormalCam(deg)
         val p = floatArrayOf(n[0] * DIST_M, n[1] * DIST_M, n[2] * DIST_M)
-        // A point on the plane: start from a ray, walk it to the plane analytically.
-        val d = floatArrayOf(0.15f, -0.08f, 1f)
-        val t = (n[0] * p[0] + n[1] * p[1] + n[2] * p[2]) / (n[0] * d[0] + n[1] * d[1] + n[2] * d[2])
-        val truth = floatArrayOf(t * d[0], t * d[1], t * d[2])
-        val pixel = PlaneMarks.Pixel(truth[0] / truth[2] * FX + CX, truth[1] / truth[2] * FY + CY)
 
+        // Build the point FORWARD, from the plane's own basis — never from a ray. Walking a ray to
+        // the plane would be `backProject`'s own intersection formula, and the assertion would then
+        // only confirm the implementation agrees with itself.
+        val e1 = floatArrayOf(cos(a).toFloat(), 0f, -sin(a).toFloat())
+        val s = 0.31f
+        val t = -0.17f
+        val truth = floatArrayOf(
+            p[0] + s * e1[0],
+            p[1] + t,                 // e2 is world +Y
+            p[2] + s * e1[2],
+        )
+        // Sanity: the constructed point really is on the plane (n·(x-p) == 0).
+        val onPlane = n[0] * (truth[0] - p[0]) + n[1] * (truth[1] - p[1]) + n[2] * (truth[2] - p[2])
+        assertEquals("fixture must lie on the wall", 0f, onPlane, 1e-5f)
+
+        val pixel = PlaneMarks.Pixel(truth[0] / truth[2] * FX + CX, truth[1] / truth[2] * FY + CY)
         val r = PlaneMarks.backProject(listOf(pixel), identityView(), p, n, FX, FY, CX, CY)
         assertEquals(1, r.count)
         for (i in 0..2) assertEquals(truth[i], r.pointsCam[i], TOLERANCE_MM / 1000f)
@@ -193,22 +225,6 @@ class PlaneMarksObliquityTest {
         }
     }
 
-    /**
-     * Landscape sets `rotationNeeded == 0`, so there is no mismatch to make — the whole defect is
-     * inactive at every obliquity. This is what makes the hypothesis testable on a shipped build by
-     * rotating the phone (EVALUATION.md E0b), and it must keep holding after Phase 0.
-     */
-    @Test
-    fun `zero rotation is exact at every obliquity`() {
-        for (obliquity in floatArrayOf(0f, 20f, 40f, 60f)) {
-            val e = errorsMm(obliquity, rzView(0f))
-            assertTrue(
-                "rotationNeeded==0 must be exact at ${obliquity}deg, was ${meanMm(e)}mm",
-                e.all { it < TOLERANCE_MM },
-            )
-        }
-    }
-
     // ---------------------------------------------------------------------------------------
     // Characterization of the CURRENT defect. INVERT THESE WHEN PHASE 0 LANDS.
     // ---------------------------------------------------------------------------------------
@@ -223,10 +239,11 @@ class PlaneMarksObliquityTest {
     fun `CHARACTERIZATION portrait rotation skews depths badly off-square`() {
         val mean20 = meanMm(errorsMm(20f, rzView(90f)))
         val mean40 = meanMm(errorsMm(40f, rzView(90f)))
-        // PAPER.md 8.1 predicts ~267mm and ~834mm. Assert the order of magnitude, not the decimal —
-        // the sampling grid here is coarser than the one used for the table.
-        assertTrue("expected hundreds of mm at 20deg, got $mean20", mean20 in 100f..600f)
-        assertTrue("expected ~metre-scale at 40deg, got $mean40", mean40 in 400f..2000f)
+        // Wall-uniform sampling gives ~328mm and ~1148mm here; PAPER.md 8.1's pixel-uniform 40x40
+        // grid gives 267mm and 834mm for the same defect. Assert the band both live in, so neither
+        // sampling choice is silently baked in as the definition of the bug.
+        assertTrue("expected hundreds of mm at 20deg, got $mean20", mean20 in 150f..700f)
+        assertTrue("expected ~metre-scale at 40deg, got $mean40", mean40 in 500f..2500f)
         assertTrue("error must grow with obliquity", mean40 > mean20)
     }
 
@@ -241,6 +258,7 @@ class PlaneMarksObliquityTest {
     fun `CHARACTERIZATION half-turn rotation is also a mismatch`() {
         val mean = meanMm(errorsMm(20f, rzView(180f)))
         assertTrue("expected a real error at 180deg, got $mean", mean > 100f)
+        assertTrue("...but bounded; a runaway here means the model changed, got $mean", mean < 700f)
     }
 
     /**
@@ -273,12 +291,13 @@ class PlaneMarksObliquityTest {
      */
     @Test
     fun `CHARACTERIZATION steep obliquity silently discards marks`() {
-        val pixels = samplePixels()
+        val samples = samplesOn(60f)
+        val pixels = samples.map { it.pixel }
         val n = wallNormalCam(60f)
         val p = floatArrayOf(n[0] * DIST_M, n[1] * DIST_M, n[2] * DIST_M)
         val kept = PlaneMarks.backProject(pixels, rzView(90f), p, n, FX, FY, CX, CY).count
         val keptTruth = PlaneMarks.backProject(pixels, identityView(), p, n, FX, FY, CX, CY).count
-        assertTrue("control should keep everything, kept $keptTruth of ${pixels.size}", keptTruth == pixels.size)
+        assertEquals("control must keep every forward-constructed point", pixels.size, keptTruth)
         assertTrue("expected the mismatch to drop marks at 60deg, kept $kept of ${pixels.size}", kept < keptTruth)
     }
 

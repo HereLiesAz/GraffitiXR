@@ -523,19 +523,31 @@ that varies across the image — a **non-rigid** distortion of the point cloud,
 which matters because a rigid one would be absorbed by PnP and this is not.
 
 For 1080×1920 display-oriented intrinsics ($f = 1400$, principal point centred)
-and a wall at 2 m, sampling the central 80% of the frame:
+and a wall at 2 m, on a 40×40 grid over the central 80% of the frame, with
+`backProject`'s own 0.1–10 m trust range applied and $p95$ taken as
+$\text{sorted}[\lfloor 0.95N \rfloor]$:
 
-| obliquity | mean error | p95 |
-|---|---|---|
-| 0° | **0.0 mm** | 0.0 mm |
-| 10° | 121 mm | 282 mm |
-| 20° | 267 mm | 630 mm |
-| 30° | 475 mm | 1154 mm |
-| 40° | 834 mm | 2213 mm |
-| 60° | 6914 mm | 37386 mm |
+| obliquity | mean error | p95 | marks surviving |
+|---|---|---|---|
+| 0° | **0.0 mm** | 0.0 mm | 1600/1600 |
+| 10° | 121 mm | 282 mm | 1600/1600 |
+| 20° | 267 mm | 630 mm | 1600/1600 |
+| 30° | 475 mm | 1154 mm | 1600/1600 |
+| 40° | 834 mm | 2213 mm | 1600/1600 |
+| 50° | 1650 mm | 5260 mm | 1600/1600 |
+| 60° | 2107 mm | 5635 mm | 1280/1600 |
 
 Exactly zero at 0°, which is why it survived: anyone testing square-on to a wall
 sees nothing wrong.
+
+**The sampling parameters above are load-bearing and were omitted from an earlier
+version of this table.** The mean depends on the grid density, and the 60° row
+depended on something worse: without the depth filter it reads 6914 mm mean /
+37386 mm p95, because the mis-scaled rays land as far out as 93 m. Those points
+do not exist — `backProject` discards anything past 10 m, which is the very
+mechanism described two paragraphs below. Quoting the unfiltered figure claimed
+an error 3.3× larger than the code can produce. Rows 0°–50° are unaffected;
+nothing is dropped there, so filtered and unfiltered agree exactly.
 
 ### 8.2 A device test that does not require the fix
 

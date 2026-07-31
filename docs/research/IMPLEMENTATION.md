@@ -227,8 +227,15 @@ inverse.
 the *rigid* part of the anchor and the scale separately, because the scale is
 already accounted for by the half-extents. Either
 
-- pass `overlayBaseScratch` (the rigid factor) as `M` and fold `overlayScale`
-  into the effective half-extents (`h_w·s`, `h_h·s`) — cheapest and exact; or
+- pass the **rigid factor** as `M` and fold `overlayScale` into the effective
+  half-extents (`h_w·s`, `h_h·s`) — cheapest and exact. Note the rigid factor is
+  `overlayBaseScratch · T(pan) · Rz(overlayRotationDeg)`, **not**
+  `overlayBaseScratch` alone: `overlayLocalScratch` is
+  `T(markOffset+pan) · Rz(spin) · S(s,s,1)`, so passing the base by itself
+  silently drops the user's pan and in-plane spin and offsets every Φ by exactly
+  those — a feature dead-centre on the artwork would report non-zero `‖Φ‖∞` and,
+  past the margin, land in the backbone. That is the same corruption `ofComposed`
+  exists to prevent, arriving through the recipe this bullet recommends; or
 - add `PoseMath.similarityInverse(m)`, which extracts `s` from the first column's
   norm, transposes, and divides by `s²`. Needed anyway if any caller only has the
   composed matrix.
@@ -245,8 +252,11 @@ dependency explicit at the call site instead of buried in an inverse.
    forward transform where the inverse was needed — the most likely bug here.
 4. Non-square extents (`h_w = 2·h_h`): both axes still saturate at 1 at their own
    edge. Catches dividing both axes by the same half-extent.
-5. `classify` with `innerMargin=0.05, outerMargin=0.15`: a point at Φ radius 0.98
-   is `INSIDE`, at 1.10 is `BAND`, at 1.30 is `OUTSIDE`.
+5. `classify` with `innerMargin=0.05, outerMargin=0.15`: a point at Φ radius 0.90
+   is `INSIDE` (the inside test is `d ≤ 1 − innerMargin = 0.95`, so 0.98 is
+   **`BAND`**, not `INSIDE` — an earlier draft of this line had it wrong), 1.10 is
+   `BAND`, 1.30 is `OUTSIDE`. Assert the boundaries themselves too: 0.95 is
+   `INSIDE` and 1.15 is `OUTSIDE`, which pins the comparisons as inclusive.
 6. Off-plane point: a point 0.5 m in front of the wall projects to the same `(u,v)`
    as its foot. Document this explicitly — Φ deliberately discards the normal
    component, and a reader will wonder.
@@ -710,8 +720,12 @@ order.** Work top to bottom.
 ### Phase 0 — rotation convention
 
 - [x] **0.1** Write `PlaneMarksObliquityTest` against a synthetic wall + camera at
-      0/20/40/60°. Expect it to fail at >0° on current `main` — that failure is
-      the reproduction. **[T]**
+      0/20/40/60°. **Delivered as passing characterization rather than a red
+      reproduction**: a permanently-failing test cannot live in CI, so the
+      magnitudes are asserted as ranges that hold *because* the defect is present,
+      each marked with what to invert when Phase 0 lands. Ground truth is built
+      forward (place 3D points on the wall, project them) so the controls are not
+      the implementation compared against itself. **[T]**
 - [ ] **0.2** Add `MetricMarks.glViewToCvDisplay(glView, rotationDeg)`; leave
       `glViewToCv` untouched. **[T]**
 - [ ] **0.3** Unit-test `glViewToCvDisplay` at 0/90/180/270° against hand-computed
