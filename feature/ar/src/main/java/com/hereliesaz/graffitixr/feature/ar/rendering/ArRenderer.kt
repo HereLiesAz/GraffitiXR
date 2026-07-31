@@ -1762,7 +1762,11 @@ class ArRenderer(
                 val moved = perceptionPoseChanged(viewMatrix)
                 val splatCount = slamManager.getSplatCount()
                 val mapGrew = splatCount != lastPerceptionSplatCount
-                val refresh = !havePerceptionCache || (due && (moved || mapGrew))
+                // A plane mid-dissolve changes every frame with nothing else moving, so it has to
+                // count as a reason to redraw. Otherwise holding the phone still — exactly when the
+                // artist is watching the surfaces settle — would freeze the dissolve part-way.
+                val dissolving = nowMs < planeRenderer.dissolveCompletesAtMs
+                val refresh = !havePerceptionCache || (due && (moved || mapGrew || dissolving))
                 if (refresh) {
                     val t0 = android.os.SystemClock.elapsedRealtime()
                     perceptionFbo.bindForRender()

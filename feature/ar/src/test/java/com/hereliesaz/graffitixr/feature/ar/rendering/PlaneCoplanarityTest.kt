@@ -1,12 +1,13 @@
 package com.hereliesaz.graffitixr.feature.ar.rendering
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
  * Geometry behind the co-planar plane merge that stops one wall from rendering as a stack of
- * overlapping ARCore detections.
+ * overlapping ARCore detections, and the timing of the non-green surface dissolve.
  */
 class PlaneCoplanarityTest {
 
@@ -76,6 +77,27 @@ class PlaneCoplanarityTest {
                 jittered, 0.5f, 0f, 0f,
             )
         )
+    }
+
+    @Test
+    fun `surface is fully drawn through the five second hold`() {
+        assertEquals(1f, PlaneRenderer.dissolveFade(0L), 1e-4f)
+        assertEquals(1f, PlaneRenderer.dissolveFade(4_999L), 1e-4f)
+        assertEquals(1f, PlaneRenderer.dissolveFade(PlaneRenderer.HOLD_MS), 1e-4f)
+    }
+
+    @Test
+    fun `dissolve ramps linearly over ten seconds after the hold`() {
+        assertEquals(1f, PlaneRenderer.dissolveFade(5_001L), 1e-3f)
+        assertEquals(0.75f, PlaneRenderer.dissolveFade(7_500L), 1e-4f)
+        assertEquals(0.5f, PlaneRenderer.dissolveFade(10_000L), 1e-4f)
+        assertEquals(0.25f, PlaneRenderer.dissolveFade(12_500L), 1e-4f)
+    }
+
+    @Test
+    fun `surface is gone at fifteen seconds and stays gone`() {
+        assertEquals(0f, PlaneRenderer.dissolveFade(PlaneRenderer.HOLD_MS + PlaneRenderer.DISSOLVE_MS), 1e-4f)
+        assertEquals(0f, PlaneRenderer.dissolveFade(60_000L), 1e-4f)
     }
 
     @Test

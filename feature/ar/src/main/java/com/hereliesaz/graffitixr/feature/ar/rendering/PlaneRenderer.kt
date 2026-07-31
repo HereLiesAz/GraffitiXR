@@ -25,7 +25,29 @@ class PlaneRenderer : GlReleasable {
     private var isOutlineUniform = 0
     private var gridModeUniform = 0
     private var developUniform = 0
+    private var fadeUniform = 0
     private var firstDrawNs = -1L // for the ink-spread develop ramp
+
+    /**
+     * When each still-drawn plane was first classified as non-green (elapsedRealtime ms). A plane
+     * that classifies as MATCH is removed, so going green stops the dissolve outright and turning
+     * non-green again restarts the full hold + dissolve from zero.
+     *
+     * Keyed on [Plane]: ARCore's trackables define equals/hashCode over the underlying native
+     * object, so the wrapper instances handed back by successive getAllTrackables calls hash to the
+     * same entry. Pruned every pass to whatever is still being drawn, so it can't grow unbounded.
+     */
+    private val nonGreenSinceMs = HashMap<Plane, Long>()
+    private val seenThisPass = HashSet<Plane>()
+
+    /**
+     * elapsedRealtime (ms) at which the last in-progress dissolve finishes, or 0 when nothing is
+     * dissolving. ArRenderer caches the perception layers in an FBO and only redraws them when the
+     * pose moves or the map grows — without this a dissolve would freeze the moment the artist held
+     * the phone still, which is exactly when they are looking at it.
+     */
+    var dissolveCompletesAtMs: Long = 0L
+        private set
 
     private var vertexBuffer = ByteBuffer.allocateDirect(1000 * 4) // Reusable buffer (Float = 4 bytes), grown on demand
         .order(ByteOrder.nativeOrder())
@@ -59,6 +81,11 @@ class PlaneRenderer : GlReleasable {
             uniform int u_IsOutline;
             uniform int u_GridMode;
             uniform float u_Develop;
+            // 1 = fully present, 0 = gone. Drives the timed dissolve of surfaces that aren't a good
+            // match for the artwork, so the scan view declutters down to the usable walls. It erodes
+            // through the same value noise the ink fill develops through, so a surface breaks up in
+            // patches instead of just dimming uniformly.
+            uniform float u_Fade;
             varying vec2 v_PosXZ;
             float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
             float vnoise(vec2 p) {
@@ -69,7 +96,8 @@ class PlaneRenderer : GlReleasable {
             }
             void main() {
                 if (u_IsOutline == 1) {
-                    gl_FragColor = vec4(u_Color.rgb, 0.9);
+                    // A line loop is too thin to read as patchy, so the outline just fades out.
+                    gl_FragColor = vec4(u_Color.rgb, 0.9 * u_Fade);
                 } else if (u_GridMode == 1) {
                     vec2 f = fract(v_PosXZ * 4.0);
                     vec2 d = min(f, 1.0 - f);
@@ -78,11 +106,17 @@ class PlaneRenderer : GlReleasable {
                     // Lines lifted toward white so the grid reads over the camera and any hue.
                     vec3 lineCol = mix(u_Color.rgb, vec3(1.0), 0.55);
                     float a = max(line * 0.85, axis);
-                    gl_FragColor = vec4(lineCol, max(a, 0.03));
+                    // Erode the grid through the same plane-local noise, so it breaks up in patches
+                    // on the surface as it goes rather than dimming as one flat sheet.
+                    float n = vnoise(v_PosXZ * 18.0);
+                    a *= smoothstep(n - 0.18, n + 0.18, u_Fade);
+                    gl_FragColor = vec4(lineCol, max(a, 0.03) * u_Fade);
                 } else {
                     float n = vnoise(v_PosXZ * 18.0);
-                    float ink = smoothstep(n - 0.18, n + 0.18, u_Develop);
-                    gl_FragColor = vec4(u_Color.rgb, ink * 0.5);
+                    // Running the develop threshold back down is the ink un-soaking from the wall:
+                    // the same patches that spread in are the ones that recede.
+                    float ink = smoothstep(n - 0.18, n + 0.18, u_Develop * u_Fade);
+                    gl_FragColor = vec4(u_Color.rgb, ink * 0.5 * u_Fade);
                 }
             }
         """.trimIndent()
@@ -102,6 +136,7 @@ class PlaneRenderer : GlReleasable {
         isOutlineUniform = GLES20.glGetUniformLocation(planeProgram, "u_IsOutline")
         gridModeUniform = GLES20.glGetUniformLocation(planeProgram, "u_GridMode")
         developUniform = GLES20.glGetUniformLocation(planeProgram, "u_Develop")
+        fadeUniform = GLES20.glGetUniformLocation(planeProgram, "u_Fade")
     }
 
     /**
@@ -125,20 +160,58 @@ class PlaneRenderer : GlReleasable {
         val develop = ((System.nanoTime() - firstDrawNs) / 1_500_000_000.0f).coerceIn(0f, 1f)
         GLES20.glUniform1f(developUniform, develop)
 
+        val nowMs = android.os.SystemClock.elapsedRealtime()
+        var lastDissolveEndMs = 0L
+        seenThisPass.clear()
+
         for (plane in planes) {
             if (plane.trackingState != TrackingState.TRACKING || plane.subsumedBy != null) {
                 continue
             }
+            seenThisPass.add(plane)
 
-            val color = calculatePlaneColor(plane, cameraPose)
-            GLES20.glUniform4fv(planeColorUniform, 1, color, 0)
+            val match = classifyPlane(plane, cameraPose)
+            val fade = fadeFor(plane, match, nowMs)
+            if (fade <= 0f) continue // fully dissolved — stays gone until it goes green again
+            if (fade < 1f) {
+                lastDissolveEndMs = maxOf(lastDissolveEndMs, dissolveEndMs(plane))
+            }
+
+            GLES20.glUniform4fv(planeColorUniform, 1, colorFor(match), 0)
+            GLES20.glUniform1f(fadeUniform, fade)
 
             drawPlane(plane, viewMatrix, projectionMatrix)
         }
 
+        // Forget planes that are no longer drawn, so a long session can't accumulate entries for
+        // trackables ARCore has since dropped or subsumed.
+        nonGreenSinceMs.keys.retainAll(seenThisPass)
+        dissolveCompletesAtMs = lastDissolveEndMs
+
         GLES20.glDisable(GLES20.GL_BLEND)
         GLES20.glDepthMask(true)
     }
+
+    /**
+     * Dissolve weight for [plane] this frame: 1 while it is green or still inside the hold, ramping
+     * to 0 across [DISSOLVE_MS] once the hold expires.
+     *
+     * A green (MATCH) classification clears the plane's timer entirely, so a surface that goes green
+     * stops dissolving immediately and — if it later stops matching — starts a fresh
+     * [HOLD_MS] + [DISSOLVE_MS] rather than resuming where it left off.
+     */
+    private fun fadeFor(plane: Plane, match: PlaneMatchResult, nowMs: Long): Float {
+        if (match == PlaneMatchResult.MATCH) {
+            nonGreenSinceMs.remove(plane)
+            return 1f
+        }
+        val since = nonGreenSinceMs.getOrPut(plane) { nowMs }
+        return dissolveFade(nowMs - since)
+    }
+
+    /** When [plane]'s in-progress dissolve finishes, or 0 if it isn't dissolving. */
+    private fun dissolveEndMs(plane: Plane): Long =
+        nonGreenSinceMs[plane]?.let { it + HOLD_MS + DISSOLVE_MS } ?: 0L
 
     /**
      * Collapses co-planar detections down to one plane per real surface.
@@ -271,12 +344,13 @@ class PlaneRenderer : GlReleasable {
         }
     }
 
-    fun calculatePlaneColor(plane: Plane, cameraPose: Pose): FloatArray {
-        return when (classifyPlane(plane, cameraPose)) {
-            PlaneMatchResult.MATCH -> floatArrayOf(0.0f, 1.0f, 0.0f, 0.3f)
-            PlaneMatchResult.NO_MATCH -> floatArrayOf(1.0f, 0.4f, 0.7f, 0.3f)
-            PlaneMatchResult.SUBOPTIMAL -> floatArrayOf(0.0f, 1.0f, 1.0f, 0.3f)
-        }
+    fun calculatePlaneColor(plane: Plane, cameraPose: Pose): FloatArray =
+        colorFor(classifyPlane(plane, cameraPose))
+
+    private fun colorFor(match: PlaneMatchResult): FloatArray = when (match) {
+        PlaneMatchResult.MATCH -> floatArrayOf(0.0f, 1.0f, 0.0f, 0.3f)
+        PlaneMatchResult.NO_MATCH -> floatArrayOf(1.0f, 0.4f, 0.7f, 0.3f)
+        PlaneMatchResult.SUBOPTIMAL -> floatArrayOf(0.0f, 1.0f, 1.0f, 0.3f)
     }
 
     private fun calculateDistance(p1: Pose, p2: Pose): Float {
@@ -288,6 +362,24 @@ class PlaneRenderer : GlReleasable {
 
     companion object {
         private const val TAG = "PlaneRenderer"
+
+        /** How long a surface stays fully drawn after it stops classifying as a green match. */
+        const val HOLD_MS = 5_000L
+
+        /** How long the dissolve itself takes once the hold expires. */
+        const val DISSOLVE_MS = 10_000L
+
+        /**
+         * Dissolve weight from how long a surface has been continuously non-green: 1 through the
+         * hold, then a linear ramp to 0 across the dissolve. Split out from the ARCore types so it
+         * can be unit-tested. The caller clears the elapsed time whenever the surface goes green, so
+         * this only ever sees an unbroken non-green run.
+         */
+        fun dissolveFade(elapsedSinceNonGreenMs: Long): Float = when {
+            elapsedSinceNonGreenMs <= HOLD_MS -> 1f
+            elapsedSinceNonGreenMs >= HOLD_MS + DISSOLVE_MS -> 0f
+            else -> 1f - (elapsedSinceNonGreenMs - HOLD_MS).toFloat() / DISSOLVE_MS
+        }
 
         /**
          * |dot| of two plane normals above which they count as the same orientation (~14°). Loose
