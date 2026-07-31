@@ -2147,6 +2147,14 @@ private fun RelocDiagnosticsOverlay(
             androidx.compose.ui.graphics.Color.White,
         )
         DiagnosticRow("In frame", "${d.detected} features", androidx.compose.ui.graphics.Color.White)
+        // Whether the plane-guided rectification pass is firing. It was dead in practice until the
+        // capture view started being stored, so seeing a real angle here is the confirmation that it
+        // now runs; "off" means it wasn't eligible (no capture view, not tracking, too few points).
+        DiagnosticRow(
+            "Oblique",
+            if (d.obliquityDeg < 0) "off" else "${d.obliquityDeg}° +${d.rectifiedCorrespondences} corr",
+            androidx.compose.ui.graphics.Color.White,
+        )
         DiagnosticRow("FP pts", fingerprintPoints.toString(), androidx.compose.ui.graphics.Color.Cyan)
         DiagnosticRow("Corroborated", "${(paintingProgress * 100).toInt()}%", androidx.compose.ui.graphics.Color.White)
     }

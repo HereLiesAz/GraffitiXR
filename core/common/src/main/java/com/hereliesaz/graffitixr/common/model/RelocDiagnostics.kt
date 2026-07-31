@@ -23,6 +23,14 @@ data class RelocDiagnostics(
      * wall" (aimed somewhere else) — a low match count means opposite things in those two cases.
      */
     val detected: Int = 0,
+    /**
+     * Obliquity (degrees between the wall normal and the optical axis) measured by the plane-guided
+     * rectification pass, or -1 when that pass wasn't eligible — no capture view stored, ARCore not
+     * tracking, or too few fingerprint points. The pass only warps above 25°.
+     */
+    val obliquityDeg: Int = -1,
+    /** Correspondences the rectification pass contributed on top of the plain and scaled passes. */
+    val rectifiedCorrespondences: Int = 0,
 ) {
     /** Inlier ratio of the last attempt, or 0 when it produced no correspondences. */
     val inlierRatio: Float get() = if (matches > 0) inliers.toFloat() / matches else 0f

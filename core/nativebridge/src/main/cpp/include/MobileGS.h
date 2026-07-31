@@ -117,6 +117,10 @@ public:
      * count means opposite things in those two cases.
      */
     int lastRelocDetected() const { return mLastRelocDetected.load(std::memory_order_relaxed); }
+    /** Obliquity (deg) measured by the rectification pass, or -1 when it wasn't eligible. */
+    int lastRelocObliquityDeg() const { return mLastRelocObliquityDeg.load(std::memory_order_relaxed); }
+    /** Extra correspondences the rectification pass contributed to the last attempt. */
+    int lastRelocRectifiedCorr() const { return mLastRelocRectifiedCorr.load(std::memory_order_relaxed); }
 
     void scheduleRelocCheck(const cv::Mat& colorFrame);
     /**
@@ -349,5 +353,9 @@ private:
     std::atomic<int>        mLastRelocMatches{0};
     std::atomic<int>        mLastRelocInliers{0};
     std::atomic<int>        mLastRelocDetected{0};
+    // Obliquity (degrees) the rectification pass measured, or -1 when it wasn't eligible; and how many
+    // extra correspondences it contributed.
+    std::atomic<int>        mLastRelocObliquityDeg{-1};
+    std::atomic<int>        mLastRelocRectifiedCorr{0};
     cv::Mat                 mRelocColorFrame;
 };

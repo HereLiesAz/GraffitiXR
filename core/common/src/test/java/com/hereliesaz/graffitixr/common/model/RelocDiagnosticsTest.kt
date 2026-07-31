@@ -38,6 +38,10 @@ class RelocDiagnosticsTest {
         assertEquals(RelocReject.UNKNOWN, RelocDiagnostics().reject)
         assertEquals(0, RelocDiagnostics().matches)
         assertEquals(0, RelocDiagnostics().detected)
+        // -1, not 0: zero degrees is a legitimate measurement (dead-on square to the wall), so the
+        // "rectification wasn't eligible" state needs its own value.
+        assertEquals(-1, RelocDiagnostics().obliquityDeg)
+        assertEquals(0, RelocDiagnostics().rectifiedCorrespondences)
     }
 
     /**

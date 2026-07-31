@@ -90,12 +90,14 @@ class SlamManager @Inject constructor(
      */
     fun getRelocDiagnostics(): RelocDiagnostics {
         val v = nativeGetRelocDiagnostics()
-        if (v == null || v.size < 4) return RelocDiagnostics()
+        if (v == null || v.size < 6) return RelocDiagnostics()
         return RelocDiagnostics(
             reject = RelocReject.entries.getOrElse(v[0]) { RelocReject.UNKNOWN },
             matches = v[1],
             inliers = v[2],
             detected = v[3],
+            obliquityDeg = v[4],
+            rectifiedCorrespondences = v[5],
         )
     }
 

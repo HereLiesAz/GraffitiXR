@@ -342,13 +342,22 @@ void MobileGS::relocThreadFunc() {
         // known plane and VIO gives a pose, so the oblique-vs-frontal distortion is a homography we can
         // pre-cancel: warp the live frame into the fingerprint's frontal frame, match, and ADD the
         // correspondences mapped back to the current image (RANSAC filters any that don't fit).
+        // Published so the diagnostics can show whether this pass is actually running. It was dead in
+        // practice for a long time (nothing set mHasFingerprintView on the live capture path), so
+        // "did rectification fire, and did it help" is worth being able to read off the device rather
+        // than infer. -1 = the pass was not eligible at all this attempt.
+        mLastRelocObliquityDeg.store(-1, std::memory_order_relaxed);
+        mLastRelocRectifiedCorr.store(0, std::memory_order_relaxed);
         if (hasFpView && mIsArCoreTracking.load(std::memory_order_relaxed) && wallKps3d.size() >= 12) {
             cv::Mat Hcur_fp, Hfp_cur; double obliqDeg = 0.0;
-            if (computeRectifyHomography(relocView, Hcur_fp, Hfp_cur, obliqDeg) && obliqDeg > 25.0) {
+            const bool haveH = computeRectifyHomography(relocView, Hcur_fp, Hfp_cur, obliqDeg);
+            if (haveH) mLastRelocObliquityDeg.store((int)(obliqDeg + 0.5), std::memory_order_relaxed);
+            if (haveH && obliqDeg > 25.0) {
                 cv::Mat grayRect;
                 cv::warpPerspective(gray, grayRect, Hfp_cur, gray.size());
                 size_t before = imgPts.size();
                 buildCorr(grayRect, Hcur_fp, imgPts, objPts);
+                mLastRelocRectifiedCorr.store((int)(imgPts.size() - before), std::memory_order_relaxed);
                 if (imgPts.size() > before)
                     LOGI("Reloc: rectified (obliquity %.0f deg) added %zu corr (total %zu)",
                          obliqDeg, imgPts.size() - before, imgPts.size());
