@@ -5,6 +5,8 @@ import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.util.Log
 import com.hereliesaz.graffitixr.common.model.Fingerprint
+import com.hereliesaz.graffitixr.common.model.RelocDiagnostics
+import com.hereliesaz.graffitixr.common.model.RelocReject
 import com.hereliesaz.graffitixr.common.model.WallFeatureMap
 import com.hereliesaz.graffitixr.common.sensor.CameraFrame
 import com.hereliesaz.graffitixr.common.sensor.ImuSample
@@ -81,6 +83,24 @@ class SlamManager @Inject constructor(
 
     fun getPaintingProgress(): Float = nativeGetPaintingProgress()
 
+    /**
+     * Why the last relocalization attempt did not publish a pose, and how far it got. See
+     * [RelocDiagnostics]; the native side packs the three values into one int[] so the read is a
+     * consistent snapshot rather than three racing getters.
+     */
+    fun getRelocDiagnostics(): RelocDiagnostics {
+        val v = nativeGetRelocDiagnostics()
+        if (v == null || v.size < 6) return RelocDiagnostics()
+        return RelocDiagnostics(
+            reject = RelocReject.entries.getOrElse(v[0]) { RelocReject.UNKNOWN },
+            matches = v[1],
+            inliers = v[2],
+            detected = v[3],
+            obliquityDeg = v[4],
+            rectifiedCorrespondences = v[5],
+        )
+    }
+
     fun getAnchorTransform(): FloatArray = nativeGetAnchorTransform()
 
     fun setWallFingerprint(
@@ -103,12 +123,21 @@ class SlamManager @Inject constructor(
      * Ingest a fingerprint built from triangulated metric marks (no depth source). Also fixes the
      * fingerprint anchor pose (column-major 4x4) and the camera intrinsics (fx,fy,cx,cy) the reloc
      * PnP should use. points3d are in keyframe-0's CV camera frame (see [MetricMarks]).
+     *
+     * [viewMatrix] is the GL-convention world->camera view at capture. Supplying it enables the
+     * reloc thread's plane-guided rectification: the marks lie on a known plane, so the oblique-
+     * vs-frontal distortion is a homography that can be pre-cancelled before matching. Pass an empty
+     * array only when the capture view genuinely isn't known (e.g. a project saved before it was
+     * persisted) — then that pass is skipped rather than run against a stale frontal frame.
      */
     fun restoreWallFingerprintMetric(
         descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,
         points3d: FloatArray, anchorMatrix: FloatArray, intrinsics: FloatArray,
+        viewMatrix: FloatArray = FloatArray(0),
     ) {
-        nativeRestoreWallFingerprintMetric(descriptorsData, rows, cols, type, points3d, anchorMatrix, intrinsics)
+        nativeRestoreWallFingerprintMetric(
+            descriptorsData, rows, cols, type, points3d, anchorMatrix, intrinsics, viewMatrix,
+        )
     }
 
     /**
@@ -530,6 +559,7 @@ class SlamManager @Inject constructor(
     private external fun nativeUpdateDeviceMotion(angularVel: FloatArray, linearVel: FloatArray)
     private external fun nativeGetAnchorTransform(): FloatArray
     private external fun nativeGetPaintingProgress(): Float
+    private external fun nativeGetRelocDiagnostics(): IntArray?
     private external fun nativeSetArScanMode(mode: Int)
     private external fun nativeSetMuralMethod(method: Int)
     private external fun nativeGetStageTimings(out: FloatArray)
@@ -552,7 +582,8 @@ class SlamManager @Inject constructor(
     )
     private external fun nativeRestoreWallFingerprintMetric(
         descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,
-        points3d: FloatArray, anchorMatrix: FloatArray, intrinsics: FloatArray
+        points3d: FloatArray, anchorMatrix: FloatArray, intrinsics: FloatArray,
+        viewMatrix: FloatArray
     )
     private external fun nativeRestoreWallFeatureMap(
         descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,

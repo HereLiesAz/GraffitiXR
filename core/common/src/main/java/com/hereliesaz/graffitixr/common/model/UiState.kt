@@ -211,6 +211,11 @@ data class ArUiState(
     val trackingFailed: Boolean = false,
 
     val evalLiveMetrics: EvalLiveMetrics = EvalLiveMetrics(),
+
+    // Live relocalization state: locked, or which gate the last attempt missed. Surfaced by the
+    // Diagnostic Overlay in release as well as debug — every one of these failures is otherwise
+    // silent, which is why "it never works" was so hard to pin down.
+    val relocDiagnostics: RelocDiagnostics = RelocDiagnostics(),
 )
 
 enum class CoopRole { NONE, HOST, GUEST }

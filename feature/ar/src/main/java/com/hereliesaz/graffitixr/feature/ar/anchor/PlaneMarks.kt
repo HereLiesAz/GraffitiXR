@@ -3,10 +3,15 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
 /**
  * Assembles metric 3D marks from a SINGLE camera view by back-projecting detected feature pixels
  * onto a known wall plane — the depth-off, single-capture path. No triangulation and no second view:
- * by the time ARCore renders a wall plane **green** ([rendering.PlaneRenderer.PlaneMatchResult.MATCH])
- * it has already fitted that plane and solved its metric pose and distance, so the depth is already
- * paid for. The single capture only supplies the appearance (descriptors); each feature's 3D position
- * is the intersection of its camera ray with that plane.
+ * once ARCore is tracking a plane it has already fitted it and solved its metric pose and distance,
+ * so the depth is already paid for. The single capture only supplies the appearance (descriptors);
+ * each feature's 3D position is the intersection of its camera ray with that plane.
+ *
+ * The plane does NOT have to be one the UI paints green
+ * ([rendering.PlaneRenderer.PlaneMatchResult.MATCH]) — that classification judges how good the
+ * viewing angle and distance are, not whether ARCore solved the plane, and a SUBOPTIMAL plane's
+ * centerPose is exactly as metric. Requiring green used to make target creation refuse outright on
+ * dim or obliquely-viewed walls.
  *
  * Output points are in the **capture camera's frame, CV convention** (camera looks +Z, depth
  * positive) — exactly the frame [MetricMarks] produces and `MobileGS::generateFingerprint` stores
@@ -19,6 +24,14 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
  * looks +Z); ARCore/OpenGL views look −Z, so convert them with [MetricMarks.glViewToCv] first. The
  * plane point and normal are in ARCore **world** space (e.g. `plane.centerPose` translation and its
  * local +Y axis); they are moved into the camera frame here.
+ *
+ * CAUTION — unresolved convention mismatch. Callers pass pixels and intrinsics that have been rotated
+ * to DISPLAY orientation, but a view matrix that has not. The rays built here therefore live in a
+ * frame rotated about the optical axis relative to the plane they are intersected with, which skews
+ * the depths for anything but a head-on wall (a normal of (0,0,±1) is invariant under that rotation,
+ * which is why it is not obvious). Fixing it properly also requires the matching change in
+ * PoseFusion's pose composition — see "Open question: the display-rotation convention" in
+ * docs/TELEOLOGICAL_SLAM.md before changing anything here.
  */
 object PlaneMarks {
 

@@ -173,6 +173,10 @@ class EditorViewModel @Inject constructor(
             slamManager.restoreWallFingerprintMetric(
                 fp.descriptorsData, fp.descriptorsRows, fp.descriptorsCols, fp.descriptorsType,
                 fp.points3d.toFloatArray(), anchor.toFloatArray(), intr.toFloatArray(),
+                // Capture view, so reload keeps the plane-guided rectification for oblique views.
+                // Empty on projects saved before it was persisted — native then skips that pass.
+                viewMatrix = project.fingerprintViewMatrix
+                    .takeIf { it.size == 16 }?.toFloatArray() ?: FloatArray(0),
             )
         } else {
             slamManager.restoreWallFingerprint(

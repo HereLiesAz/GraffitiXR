@@ -152,13 +152,25 @@ class MainViewModel @Inject constructor(
         viewMatrix: FloatArray? = null,
         wallPlane: FloatArray? = null
     ) {
-        if (bitmap == null || intrinsics == null || viewMatrix == null) { resetCaptureUi(); return }
+        if (bitmap == null || intrinsics == null || viewMatrix == null) {
+            // Was a bare reset: the artist confirmed a target and the capture simply vanished with no
+            // message, indistinguishable from the app ignoring the tap. Name it — these are ARCore
+            // frame values that should always be present by confirm time, so if this fires it is a
+            // real bug worth reporting rather than something to re-aim around.
+            resetCaptureUi()
+            Toast.makeText(
+                context,
+                "Capture incomplete (missing camera pose). Try creating the target again.",
+                Toast.LENGTH_LONG,
+            ).show()
+            return
+        }
         val safeIntr = intrinsics
         val safeView = viewMatrix
 
         if (depthBuffer == null) {
             // No depth source: build the wall fingerprint from a SINGLE capture by back-projecting
-            // features onto the green ARCore wall plane (whose metric pose ARCore already solved).
+            // features onto the ARCore wall plane (whose metric pose ARCore already solved).
             handleSingleCapture(bitmap, safeIntr, safeView, wallPlane)
             return
         }
@@ -271,15 +283,40 @@ class MainViewModel @Inject constructor(
         // Clear any prior marks-centering override; the builder re-publishes it on a successful build.
         slamManager.overlayMarkCenterLocal = null
         viewModelScope.launch(Dispatchers.IO) {
-            val currentProject = projectRepository.currentProject.value ?: return@launch
+            // A fingerprint is persisted INTO a project, so without one there is nowhere to put it.
+            // This was a bare `?: return@launch`: the artist aimed, tapped, confirmed, and nothing
+            // happened — no target, no error, no clue that the missing piece was a project.
+            val currentProject = projectRepository.currentProject.value
+            if (currentProject == null) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        context,
+                        "No project open — a target is saved into a project. Open or create one first.",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+                return@launch
+            }
             val fp = MetricFingerprintBuilder.buildSingle(
                 slamManager, bitmap, view, intr, planePoint, planeNormal, anchor
             )
             if (fp == null) {
+                // Say WHICH way it fell short. "Not enough texture" was the same message whether the
+                // frame was blank, out of focus, or full of features that simply missed the plane —
+                // three problems with three different fixes, and no way to tell them apart.
+                val detected = MetricFingerprintBuilder.lastDetected
+                val placed = MetricFingerprintBuilder.lastPlaced
+                val need = MetricFingerprintBuilder.lastRequired
+                val message = when {
+                    detected < need ->
+                        "Only $detected features on this wall (need $need). Too dark, too smooth, " +
+                            "or out of focus — try a more detailed patch or more light."
+                    else ->
+                        "Found $detected features but only $placed landed on the wall surface " +
+                            "(need $need). Aim at the middle of the detected wall, square on."
+                }
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(context,
-                        "Not enough texture on the wall to lock a target. Try a more detailed area.",
-                        Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                 }
                 return@launch
             }
@@ -292,10 +329,12 @@ class MainViewModel @Inject constructor(
                 context = context,
                 projectData = currentProject.copy(
                     fingerprint = fp.copy(patchData = patch),
-                    // Persist the capture's intrinsics + anchor — the exact values just fed to
-                    // restoreWallFingerprintMetric — so reload relocalizes with the true intrinsics.
+                    // Persist the capture's intrinsics + anchor + view — the exact values just fed to
+                    // restoreWallFingerprintMetric — so reload relocalizes with the true intrinsics
+                    // and keeps the plane-guided rectification that the capture session had.
                     fingerprintIntrinsics = intr.toList(),
                     fingerprintAnchor = anchor.toList(),
+                    fingerprintViewMatrix = view.toList(),
                 ),
                 targetImages = listOf(bitmap)
             )
@@ -307,11 +346,14 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    // Shared guidance shown when single-capture target creation isn't aimed at a green wall plane
+    // Shared guidance shown when single-capture target creation lands on no tracked wall plane at all
     // (used by both the pre-review gate and the handleSingleCapture backstop). Toast-in-VM matches the
     // existing capture toasts here; a full AppStrings/event-channel i18n pass is a separate cleanup.
+    //
+    // No longer says "green": any tracked plane under the tap is accepted now (see the wall-plane
+    // hit-test in ArRenderer), so the only real failure is aiming where no surface has been detected.
     private val notOnGreenWallMessage =
-        "Aim at a wall shown in green (face it straight-on, within ~3 m), then tap your marks."
+        "No wall detected there yet. Sweep the phone across the surface until it's outlined, then tap."
 
     /**
      * The single-capture tap wasn't on a green (parallel, in-range) wall plane. Guide the artist;
