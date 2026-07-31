@@ -71,4 +71,6 @@ gha-creds-*.json
 .worktrees/
 /.agent/
 /.claude/
+# ...except shared agent definitions, which are part of the project.
+!/.claude/agents/
 strangerdanger-494206-082913abfaab.json
