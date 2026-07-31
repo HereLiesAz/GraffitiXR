@@ -1133,7 +1133,18 @@ class ArRenderer(
                     // CONF_FLOOR, so an unpainted wall still corrects at half strength on the inlier
                     // ratio alone — the previous behaviour is the floor, not the ceiling — and a
                     // well-advanced mural earns up to 2x that.
-                    confGlobal = slamManager.getPaintingProgress(),
+                    //
+                    // Corroboration CONFIDENCE, not painting PROGRESS. Progress answers "how much of
+                    // the mural exists" on a timescale of hours; this answers "how much do I trust
+                    // this frame" on a timescale of frames. They were one scalar, so a momentary
+                    // tracking hiccup decayed the progress reading and went on suppressing correction
+                    // strength for seconds after the wall came back into view.
+                    //
+                    // Negative means no corroboration attempt has produced a measurement yet — a
+                    // different state from "measured, found nothing". Map it to 0f so PoseFusion
+                    // falls back to CONF_FLOOR and corrects on the inlier ratio alone, rather than
+                    // feeding a negative through a parameter documented as [0,1].
+                    confGlobal = slamManager.getCorroborationConfidence().coerceAtLeast(0f),
                 )
             } else backbone
 

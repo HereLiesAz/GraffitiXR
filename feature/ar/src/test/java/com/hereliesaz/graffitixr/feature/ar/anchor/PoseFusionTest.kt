@@ -106,6 +106,49 @@ class PoseFusionTest {
         assertEquals(2f, painted[12] / bare[12], 1e-3f)
     }
 
+    /**
+     * Phase 5a moved the per-attempt decay off the painting-progress channel and onto a separate
+     * corroboration-confidence channel, which is what now feeds `confGlobal`. The reason the split
+     * matters is a TRANSIENT, not a steady state: a few bad frames used to decay the signal by 0.9
+     * per reloc tick, and at a 60 ms tick that suppressed correction strength for seconds after the
+     * wall came back. A steady-state comparison cannot see that; this simulates the dip.
+     *
+     * The contract being pinned: a confidence dip may SLOW the correction, never reverse it.
+     */
+    @Test fun `a confidence dip slows the correction but never reverses it`() {
+        val f = PoseFusion()
+        val backbone = trans(0f, 0f, 0f)
+        // Warm relock at full confidence.
+        f.currentAnchor(backbone, identity(),
+            reloc(trans(10f, 0f, 0f), inliers = 60f, matches = 100f, seq = 1f), identity(), confGlobal = 1f)
+        val afterGood = f.currentAnchor(backbone, identity(),
+            reloc(trans(10f, 0f, 0f), inliers = 60f, matches = 100f, seq = 2f), identity(), confGlobal = 1f)[12]
+
+        // Three ticks of a decayed reading (0.9^1..0.9^3), same relock quality throughout.
+        var last = afterGood
+        for ((i, conf) in listOf(0.9f, 0.81f, 0.729f).withIndex()) {
+            val out = f.currentAnchor(backbone, identity(),
+                reloc(trans(10f, 0f, 0f), inliers = 60f, matches = 100f, seq = 3f + i), identity(),
+                confGlobal = conf)[12]
+            assertTrue("a dip must not push the overlay backwards: was $last now $out", out >= last)
+            last = out
+        }
+        assertTrue("the correction must still be advancing toward the fix, got $last", last > afterGood)
+    }
+
+    /**
+     * `getCorroborationConfidence` returns a NEGATIVE sentinel when nothing has been measured yet,
+     * which is a different state from "measured and found nothing". ArRenderer maps it to 0f. Pin
+     * that 0f behaves as the conservative floor rather than freezing the overlay — otherwise a
+     * never-corroborated wall (no design registered at all) would stop correcting entirely.
+     */
+    @Test fun `unmeasured corroboration mapped to zero still corrects at the floor`() {
+        val unmeasured = PoseFusion().currentAnchor(trans(0f, 0f, 0f), identity(),
+            reloc(trans(10f, 0f, 0f), inliers = 60f, matches = 100f, seq = 1f), identity(),
+            confGlobal = (-1f).coerceAtLeast(0f))
+        assertTrue("an unmeasured wall must still correct, got ${unmeasured[12]}", unmeasured[12] > 0f)
+    }
+
     @Test fun `corroboration outside 0-1 is clamped, not extrapolated`() {
         val full = PoseFusion().currentAnchor(trans(0f,0f,0f), identity(),
             reloc(trans(10f,0f,0f), inliers = 60f, matches = 100f, seq = 1f), identity(), confGlobal = 1f)

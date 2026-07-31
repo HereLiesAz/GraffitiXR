@@ -296,6 +296,20 @@ normal is invariant under a rotation about the optical axis. If the measured
 error curve does not have that shape — flat, or largest at 0° — the diagnosis in
 §8 of the paper is wrong and Phase 0 is chasing the wrong thing.
 
+**Expected values.** Computed analytically in `PAPER.md` §8.1: 0.0 mm at 0°,
+267 mm at 20°, 834 mm at 40°, 2107 mm at 60°, for a wall at 2 m with 1080×1920
+display intrinsics on a 40×40 pixel-space grid. E0's job on device is to confirm
+the *shape*, not to discover it. Writing the prediction down before running is
+what makes a surprise informative — if the device disagrees, the model of the
+defect is wrong, not merely the constant.
+
+`PlaneMarksObliquityTest` asserts the same defect but **does not encode those
+decimals**, and should not be read as doing so. It samples uniformly on the wall
+rather than uniformly in pixel space, which weights oblique views differently and
+gives ~328 mm at 20° and ~1148 mm at 40° for the identical bug. Its assertions
+are therefore ranges and orderings. Two samplings, one defect; quoting either as
+*the* number would be picking a convention and calling it a measurement.
+
 **Sets.** Nothing. It is a correctness gate, not a tuning experiment.
 
 **Falsifies.** If (a) shows <1 mm error at 60°, there is no rotation bug and
@@ -303,6 +317,42 @@ Phase 0 should be abandoned. If (b) and (c) both fail, the error is not a pure
 `R_z` and the analysis is incomplete.
 
 **Cost.** Minutes. Runs in CI forever after.
+
+---
+
+### E0b — the device test that needs no fix
+
+**Question.** Does the defect appear and disappear with the phone's physical
+orientation, as the convention analysis predicts?
+
+**Method.** `rotationNeeded = (sensorOrientation - displayDegrees + 360) % 360`
+and the app is `screenOrientation="fullUser"`, so on a typical phone the device's
+physical orientation decides whether the mismatch exists at all: **landscape → 0
+(no mismatch); portrait → 90; landscape the other way → 180.** Capture a target
+in landscape, then in portrait, same wall, same obliquity; then attempt
+relocalization from the same standing positions for each. Compare inlier ratio
+and lock rate.
+
+**Reasoning.** The cheapest experiment in the document, and it runs on the
+shipped build with no code change, because the independent variable is how you
+hold the phone. Do it *first*, before any of Phase 0's engineering — a negative
+result cancels that engineering entirely.
+
+Watch two secondary signals in the diagnostics overlay, both predicted by the
+model: healthy match counts paired with a **low inlier ratio** (PnP cannot fit a
+non-rigidly distorted cloud), and "found N features but only M landed on the wall
+surface" refusals, since mis-scaled depths fall outside `backProject`'s 0.1–10 m
+trust range. The second is measurable directly — §8.1 predicts 1280 of 1600
+points surviving at 60° versus all 1600 at 40°.
+
+**Sets.** Nothing. It is the go/no-go on Phase 0.
+
+**Falsifies §8 entirely.** Identical behaviour in both orientations means the
+convention is not the cause and Phase 0 should be dropped. In that case check the
+assumption it rests on: that ARCore's `camera.pose` is in the physical camera
+frame rather than a display-oriented one.
+
+**Cost.** One session. No build required.
 
 ---
 

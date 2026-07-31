@@ -506,12 +506,86 @@ head-on wall** — a plane normal $(0,0,\pm1)$ is invariant under rotation about
 — and grows with obliquity; and the onboarding path shares the convention, so it
 fails identically.
 
-It is unresolved because the correction is not local. Rotating the capture view
-moves $F$ into the rotated frame, while `PoseFusion` composes
-$V_{\text{cur}}^{-1} \cdot \text{pnp} \cdot T$ with $V_{\text{cur}}$ unrotated —
-so the composition needs the matching change, and every rotation sign must be
-right or the overlay lands worse than today. This is a system-wide convention
-change and it wants device evidence first.
+### 8.1 Magnitude
+
+This was asserted from a source comment for several development cycles before
+anyone computed it. The comment was passed forward, cited as established, and
+used to justify a behavioural change — with no test covering it
+(`PlaneMarksTest` has no oblique case) and no measurement. What follows is the
+calculation that should have accompanied the claim.
+
+Substituting the mismatched frames into `backProject`'s own expression
+$t = (n \cdot p)/(n \cdot d)$: rotation preserves the dot product, so the
+numerator $n \cdot p$ is unchanged and the entire error lives in the
+denominator, $n_s \cdot d$ where $n_d \cdot d$ was meant. Each recovered point
+therefore lies on the *correct ray* at the *wrong depth*, scaled by a factor
+that varies across the image — a **non-rigid** distortion of the point cloud,
+which matters because a rigid one would be absorbed by PnP and this is not.
+
+For 1080×1920 display-oriented intrinsics ($f = 1400$, principal point centred)
+and a wall at 2 m, on a 40×40 grid over the central 80% of the frame, with
+`backProject`'s own 0.1–10 m trust range applied and $p95$ taken as
+$\text{sorted}[\lfloor 0.95N \rfloor]$:
+
+| obliquity | mean error | p95 | marks surviving |
+|---|---|---|---|
+| 0° | **0.0 mm** | 0.0 mm | 1600/1600 |
+| 10° | 121 mm | 282 mm | 1600/1600 |
+| 20° | 267 mm | 630 mm | 1600/1600 |
+| 30° | 475 mm | 1154 mm | 1600/1600 |
+| 40° | 834 mm | 2213 mm | 1600/1600 |
+| 50° | 1650 mm | 5260 mm | 1600/1600 |
+| 60° | 2107 mm | 5635 mm | 1280/1600 |
+
+Exactly zero at 0°, which is why it survived: anyone testing square-on to a wall
+sees nothing wrong.
+
+**The sampling parameters above are load-bearing and were omitted from an earlier
+version of this table.** The mean depends on the grid density, and the 60° row
+depended on something worse: without the depth filter it reads 6914 mm mean /
+37386 mm p95, because the mis-scaled rays land as far out as 93 m. Those points
+do not exist — `backProject` discards anything past 10 m, which is the very
+mechanism described two paragraphs below. Quoting the unfiltered figure claimed
+an error 3.3× larger than the code can produce. Rows 0°–50° are unaffected;
+nothing is dropped there, so filtered and unfiltered agree exactly.
+
+### 8.2 A device test that does not require the fix
+
+`rotationNeeded = (sensorOrientation - displayDegrees + 360) \bmod 360`, and the
+app is `screenOrientation="fullUser"`. On a phone with the usual
+$\text{sensorOrientation} = 90$, the *device's physical orientation* selects
+whether the bug is active at all:
+
+| held | `rotationNeeded` | error at 20° obliquity |
+|---|---|---|
+| landscape | 0 | **0.0 mm — no mismatch** |
+| portrait | 90 | 267 mm |
+| landscape, other way | 180 | 265 mm |
+
+So the hypothesis is falsifiable on the current build with no code change:
+**capture a target in landscape, then in portrait, same wall, same angle.** If
+landscape relocalizes and portrait does not, the convention is the cause. If they
+behave identically, this section is wrong and Phase 0 should be dropped.
+
+Two secondary predictions, useful because they are already observable in the
+diagnostics overlay: healthy match counts paired with a **low inlier ratio**
+(PnP cannot fit a non-rigidly distorted cloud), and "found $N$ features but only
+$M$ landed on the wall surface" refusals, since mis-scaled depths fall outside
+`backProject`'s 0.1–10 m trust range and are silently dropped.
+
+**The assumption this all rests on** is that ARCore's `camera.pose` is in the
+physical camera frame rather than a display-oriented one — i.e. that ARCore
+handles display rotation through `setDisplayGeometry`/`transformCoordinates2d`
+and not by rotating the pose. If that is false there is no mismatch. It is the
+first thing to check if the device test comes back negative.
+
+### 8.3 Why the correction is not local
+
+Rotating the capture view moves $F$ into the rotated frame, while `PoseFusion`
+composes $V_{\text{cur}}^{-1} \cdot \text{pnp} \cdot T$ with $V_{\text{cur}}$
+unrotated — so the composition needs the matching change, and every rotation
+sign must be right or the overlay lands worse than today. This is a system-wide
+convention change.
 
 **It is a prerequisite, not a parallel task.** Every 3D quantity in Approach B —
 $\Phi$, the partition, geometric stability, the offset fit — is built on
