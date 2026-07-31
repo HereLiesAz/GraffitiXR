@@ -1277,19 +1277,20 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPaintingProgres
 }
 
 // Relocalization diagnostics: why the last attempt did not publish, and the counts it reached.
-// Packed into one int[] so the UI reads a consistent snapshot instead of three racing getters.
-// [0] = RelocReject code, [1] = correspondences, [2] = RANSAC inliers.
+// Packed into one int[] so the UI reads a consistent snapshot instead of four racing getters.
+// [0] = RelocReject code, [1] = correspondences, [2] = RANSAC inliers, [3] = features detected.
 extern "C" JNIEXPORT jintArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostics(JNIEnv* env, jobject) {
-    jint vals[3] = {0, 0, 0};
+    jint vals[4] = {0, 0, 0, 0};
     if (gSlamEngine) {
         vals[0] = gSlamEngine->lastRelocReject();
         vals[1] = gSlamEngine->lastRelocMatches();
         vals[2] = gSlamEngine->lastRelocInliers();
+        vals[3] = gSlamEngine->lastRelocDetected();
     }
-    jintArray out = env->NewIntArray(3);
+    jintArray out = env->NewIntArray(4);
     if (!out) return nullptr;
-    env->SetIntArrayRegion(out, 0, 3, vals);
+    env->SetIntArrayRegion(out, 0, 4, vals);
     return out;
 }
 

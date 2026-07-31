@@ -77,7 +77,13 @@ void MobileGS::initialize(int width, int height) {
     std::lock_guard<std::mutex> lock(mMutex);
     mScreenWidth = width;
     mScreenHeight = height;
-    mFeatureDetector = cv::ORB::create(500);
+    // 1500, not 500. This is the QUERY side: the live frame matched against a fingerprint built with
+    // ORB(1500) (MetricFingerprintBuilder) or ORB(1000) (generateFingerprint). Detecting a third as
+    // many features on the query as exist in the reference throws away matches before the ratio test
+    // even runs — and PnP needs 8 survivors from a frame that may show the marks small, partial or
+    // off-centre. ORB is cheap next to the SuperPoint path this falls back from, and it runs on the
+    // background reloc thread, so the symmetric budget is the right default.
+    mFeatureDetector = cv::ORB::create(1500);
     mMatcher = cv::DescriptorMatcher::create("BruteForce-Hamming");
     mL2Matcher = cv::DescriptorMatcher::create("BruteForce");
 
@@ -280,6 +286,7 @@ void MobileGS::relocThreadFunc() {
             if (sp && !mSuperPoint.detect(gray, baseKps, baseDescs)) sp = false;
             if (!sp) mFeatureDetector->detectAndCompute(gray, cv::noArray(), baseKps, baseDescs);
         }
+        mLastRelocDetected.store((int)baseKps.size(), std::memory_order_relaxed);
 
         auto buildCorr = [&](const cv::Mat& g, const cv::Mat& Hback,
                              std::vector<cv::Point2f>& outImg, std::vector<cv::Point3f>& outObj,
@@ -520,9 +527,15 @@ void MobileGS::relocThreadFunc() {
 
         // Teleological gatekeeper: update painting-progress from how much of the artwork base the clean
         // frame now corroborates. No-op until an artwork is registered; read-only on the reloc set.
-        tryUpdateFingerprint(gray);
+        // Hands over this frame's detection so it isn't recomputed (see tryUpdateFingerprint).
+        tryUpdateFingerprint(gray, &baseKps, &baseDescs);
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        // Back off only once locked. A flat 200 ms capped every state at 5 Hz, including the one that
+        // matters most — hunting for the first lock, or re-acquiring after the artist looks away —
+        // where the cost of an extra attempt is far smaller than the cost of the overlay staying
+        // adrift. Locked and stable, 200 ms is plenty and keeps the thermal/battery profile.
+        const bool locked = mLastRelocReject.load(std::memory_order_relaxed) == kRelocOk;
+        std::this_thread::sleep_for(std::chrono::milliseconds(locked ? 200 : 60));
     }
 }
 bool MobileGS::computeRectifyHomography(const float* viewCur16, cv::Mat& Hcur_fp,
@@ -711,7 +724,9 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
     if (added > 0) LOGI("Map build: +%d pts (map now %zu)", added, mMapPoints3D.size());
 }
 
-void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean) {
+void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
+                                    const std::vector<cv::KeyPoint>* preKps,
+                                    const cv::Mat* preDescs) {
     cv::Mat artDescs;
     {
         std::lock_guard<std::mutex> lock(mMutex);
@@ -723,10 +738,19 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean) {
     // Detect on the CLEAN frame (the real wall incl. any new paint — overlays are GL-only, never in
     // this CV frame) and match against the ARTWORK base: a clean feature corroborates the target only
     // if it matches what the artwork expects. This is the validator for the upcoming self-grow.
-    std::vector<cv::KeyPoint> kps; cv::Mat descs;
-    bool sp = mSuperPoint.isLoaded() && (artDescs.type() == CV_32F);
-    if (sp && !mSuperPoint.detect(grayClean, kps, descs)) sp = false;
-    if (!sp) mFeatureDetector->detectAndCompute(grayClean, cv::noArray(), kps, descs);
+    //
+    // Reuse the caller's detection when it is usable: the reloc thread has already run the detector
+    // over this identical frame, and with SuperPoint that is a whole ONNX forward pass. A descriptor
+    // type mismatch can't knnMatch against the artwork anyway, so that case re-detects.
+    std::vector<cv::KeyPoint> localKps; cv::Mat localDescs;
+    const bool reuse = preKps && preDescs && !preDescs->empty() && preDescs->type() == artDescs.type();
+    if (!reuse) {
+        bool sp = mSuperPoint.isLoaded() && (artDescs.type() == CV_32F);
+        if (sp && !mSuperPoint.detect(grayClean, localKps, localDescs)) sp = false;
+        if (!sp) mFeatureDetector->detectAndCompute(grayClean, cv::noArray(), localKps, localDescs);
+    }
+    const std::vector<cv::KeyPoint>& kps = reuse ? *preKps : localKps;
+    const cv::Mat& descs = reuse ? *preDescs : localDescs;
     if (descs.empty() || descs.type() != artDescs.type()) return;
 
     cv::Ptr<cv::DescriptorMatcher>& matcher = (descs.type() == CV_32F) ? mL2Matcher : mMatcher;

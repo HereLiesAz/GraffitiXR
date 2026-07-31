@@ -2084,6 +2084,13 @@ private fun DiagnosticOverlay(
 private val EVAL_OVERLAY_ENABLED = com.hereliesaz.graffitixr.BuildConfig.DEBUG
 
 /**
+ * Live-frame feature count below which a match shortfall is blamed on the capture (dark, blurred,
+ * blank wall) rather than on aim. The detector is configured for 1500, and a fingerprint needs 20 to
+ * exist at all, so a frame yielding under 100 is starved regardless of where it's pointed.
+ */
+private const val FEW_FEATURES_IN_FRAME = 100
+
+/**
  * Live relocalization state: whether the wall fingerprint exists, whether PnP is locking, and if not,
  * which gate the last attempt missed and by how much.
  *
@@ -2107,7 +2114,13 @@ private fun RelocDiagnosticsOverlay(
         RelocReject.NO_FEATURES ->
             "NO FEATURES" to "frame has no texture — light, focus or blur"
         RelocReject.FEW_MATCHES ->
-            "${d.matches}/8 MATCHES" to "aim at the registered marks, closer and squarer"
+            // Same shortfall, opposite causes. Few features in frame at all is a capture problem;
+            // plenty of features that don't match is an aiming problem.
+            "${d.matches}/8 MATCHES" to if (d.detected < FEW_FEATURES_IN_FRAME) {
+                "only ${d.detected} features in frame — more light, or a more detailed patch"
+            } else {
+                "${d.detected} features but few match — aim at the registered marks, closer and squarer"
+            }
         RelocReject.PNP_FAILED ->
             "NO POSE" to "${d.matches} matches, none geometrically consistent"
         RelocReject.FEW_INLIERS ->
@@ -2133,6 +2146,7 @@ private fun RelocDiagnosticsOverlay(
             "Inliers", "${d.inliers}/${d.matches} (${(d.inlierRatio * 100).toInt()}%)",
             androidx.compose.ui.graphics.Color.White,
         )
+        DiagnosticRow("In frame", "${d.detected} features", androidx.compose.ui.graphics.Color.White)
         DiagnosticRow("FP pts", fingerprintPoints.toString(), androidx.compose.ui.graphics.Color.Cyan)
         DiagnosticRow("Corroborated", "${(paintingProgress * 100).toInt()}%", androidx.compose.ui.graphics.Color.White)
     }

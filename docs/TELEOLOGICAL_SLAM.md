@@ -79,6 +79,15 @@ attempt missed:
 | `FEW_INLIERS` | PnP solved but fewer than 6 inliers agreed |
 | `OK` | pose published; PoseFusion applies it if the inlier ratio ≥ 0.5 |
 
+The overlay also shows how many features the live frame yielded *before* matching.
+That disambiguates `FEW_MATCHES`, which means opposite things depending on it: a
+handful of features in frame is a capture problem (light, focus, a blank wall),
+while a thousand features that don't match is an aiming problem.
+
+The reloc thread runs at 5 Hz once locked and ~16 Hz while hunting, since the
+cost of an extra attempt is far smaller than the cost of the overlay staying
+adrift.
+
 ## Relationship to the rest of the engine
 
 - **Relocalization** (snap-back after tracking loss / screen-off) is the

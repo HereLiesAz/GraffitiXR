@@ -105,6 +105,12 @@ public:
     int lastRelocMatches() const { return mLastRelocMatches.load(std::memory_order_relaxed); }
     /** RANSAC inliers from the last attempt, successful or not (0 if PnP never ran). */
     int lastRelocInliers() const { return mLastRelocInliers.load(std::memory_order_relaxed); }
+    /**
+     * Features detected in the last live frame, before any matching. Separates "this frame has no
+     * texture to work with" from "plenty of texture, none of it the registered wall" — a low match
+     * count means opposite things in those two cases.
+     */
+    int lastRelocDetected() const { return mLastRelocDetected.load(std::memory_order_relaxed); }
 
     void scheduleRelocCheck(const cv::Mat& colorFrame);
     /**
@@ -213,7 +219,16 @@ private:
     // Teleological self-grow (gatekeeper stage): measure how much of the registered artwork base is now
     // corroborated by real wall content in the clean camera frame -> mPaintingProgress. Read-only on the
     // reloc fingerprint; the promotion step (adding validated new marks) is staged separately.
-    void tryUpdateFingerprint(const cv::Mat& grayClean);
+    /**
+     * @param preKps,preDescs features already detected on [grayClean] by the caller. The reloc thread
+     *        has just run the detector over this exact frame, and SuperPoint is an ONNX forward pass —
+     *        detecting it a second time doubled the per-cycle cost for an identical result. Reused
+     *        only when the descriptor type matches the artwork's (a mismatch can't knnMatch anyway,
+     *        so it re-detects with the right detector). Pass nullptr to always detect.
+     */
+    void tryUpdateFingerprint(const cv::Mat& grayClean,
+                              const std::vector<cv::KeyPoint>* preKps = nullptr,
+                              const cv::Mat* preDescs = nullptr);
     // Plane-guided rectification: homography (current-image <-> fingerprint-image) from the wall plane
     // and the VIO baseline between the current and fingerprint-capture views, plus the viewing
     // obliquity in degrees. False if no fingerprint view is stored or the geometry is degenerate.
@@ -324,5 +339,6 @@ private:
     std::atomic<int>        mLastRelocReject{0};
     std::atomic<int>        mLastRelocMatches{0};
     std::atomic<int>        mLastRelocInliers{0};
+    std::atomic<int>        mLastRelocDetected{0};
     cv::Mat                 mRelocColorFrame;
 };

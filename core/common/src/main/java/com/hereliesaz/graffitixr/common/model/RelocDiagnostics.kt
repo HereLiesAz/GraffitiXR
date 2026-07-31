@@ -17,6 +17,12 @@ data class RelocDiagnostics(
     val matches: Int = 0,
     /** RANSAC inliers the last attempt found. Publishing needs 6; PoseFusion trusts a ratio ≥ 0.5. */
     val inliers: Int = 0,
+    /**
+     * Features detected in the live frame before any matching. Separates "this frame has no texture
+     * to work with" (dark, blurred, blank wall) from "plenty of texture, none of it the registered
+     * wall" (aimed somewhere else) — a low match count means opposite things in those two cases.
+     */
+    val detected: Int = 0,
 ) {
     /** Inlier ratio of the last attempt, or 0 when it produced no correspondences. */
     val inlierRatio: Float get() = if (matches > 0) inliers.toFloat() / matches else 0f
