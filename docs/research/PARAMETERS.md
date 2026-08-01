@@ -54,18 +54,42 @@ All in `feature/ar/.../anchor/PoseFusion.kt`, companion object.
 |---|---|---|---|---|
 | `MIN_INLIER_RATIO` | `0.5` | guessed | **sweep** | E4 → **E11** |
 | `BASE_ALPHA` | `0.25` | guessed | **sweep** | E4 → **E11** |
-| `CONF_FLOOR` | `0.5` | guessed, but with a stated rationale: at 0.5 a fully corroborated wall pulls exactly twice as hard as a bare one | **sweep** | E4 → **E11**; re-derived against the new denominator in Phase 5b |
+| `CONF_FLOOR` | `0.5` | **rationale withdrawn in 5b.2, value retained** — the old "exactly twice as hard" reasoning assumed an input that can reach 1.0, and the new denominator cannot; see below | **sweep** | **E11**, which must measure the achievable corroboration maximum FIRST |
 | `COLD_SNAP_INLIER_RATIO` | `0.7` | guessed | screen | E4 → E11 |
 | `COLD_SNAP_MIN_INLIERS` | `20` | guessed | screen | E4 → E11 |
 | `COLD_SNAP_DIST_M` | `0.20` m | guessed | screen | E4 → E11 |
 | `COLD_SNAP_ANGLE_DEG` | `15°` | guessed | screen | E4 → E11 |
 
-`CONF_FLOOR` changes meaning under Phase 5b — its input becomes
-`corroborationConfidence` with a predicted-visible denominator instead of
-`paintingProgress` over all design features. The current value's rationale does
-not survive that change intact, so it must be re-derived (todo 5b.2) rather than
-assumed to transfer. E3 tests that the *contract* still holds; **E11** sets the
-number.
+`CONF_FLOOR` changed meaning under Phase 5b, and **5b.2 has now re-derived it.
+The rationale did not survive; the number did.**
+
+The old justification was that at 0.5 a fully corroborated wall pulls exactly
+twice as hard as a bare one. That was true of the old input — painting progress
+over the whole design, whose 1.0 was at least conceptually reachable by painting
+the whole mural. The input is now `matched / predicted`, and **its ceiling is not
+reachable on any real wall**: descriptor repeatability across a repaint, the
+lighting difference between registration and painting, and Phase 4's
+lone-candidate skip each hold it below 1. So `effConf` spans
+`[0.5, 0.5 + 0.5·m]` for some achievable maximum `m`, and the 2x is arithmetic at
+an input the system cannot produce rather than a property of the system. At
+`m = 0.6` a well-painted wall pulls 1.6x a bare one.
+
+The value stays 0.5 because `m` has never been measured, and choosing a floor to
+compensate for an unknown ceiling is guessing dressed as derivation. The two
+available arguments also point in opposite directions: the new signal moves per
+*frame* in both directions where progress moved over hours, which argues for a
+higher floor so a momentary dip does not slash correction — while the whole point
+of splitting confidence from progress was to let correction scale by something
+trustworthy, which argues for a lower one and a wider range.
+
+**E11 must measure `m` before sweeping the floor.** The two jointly determine the
+real dynamic range, so a sweep of the floor alone reports the wrong contour. E3
+tests that the *contract* still holds, and `PoseFusionTest`'s
+`the floor bounds correction from below at any achievable corroboration` states
+that contract in a form that survives the number changing — bare walls still
+correct, correction is monotone in corroboration, and nothing goes below the
+floor. Mutation-verified: removing the floor term fails 4 tests, inverting the
+corroboration sense fails 2.
 
 **"E4 → E11" is not a typo.** E4 is the screening stage and sets nothing but the
 shortlist; it decides *which* parameters are worth sweeping. E11 is the sweep that

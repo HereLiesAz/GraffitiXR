@@ -1179,9 +1179,38 @@ order.** Work top to bottom.
       *Ticked here rather than left open because the code has shipped it; an
       unticked item whose implementation is already merged is the same class of
       lie as a comment that describes what the code used to do.)*
-- [ ] **5b.2** Re-derive `CONF_FLOOR` against the new denominator. Its current
+- [x] **5b.2** Re-derive `CONF_FLOOR` against the new denominator. Its current
       0.5 was reasoned against the old one and does not transfer unexamined. **[T]**
-      *(BLOCKED by X.3, not by difficulty. This is a live change to `PoseFusion`,
+      *(RE-DERIVED. **The rationale did not survive; the number did**, and saying so
+      is the deliverable — the item asks for a re-derivation, not for a different
+      constant.*
+      *The old justification was "at 0.5 a fully corroborated wall pulls exactly
+      twice as hard as a bare one". True of the old input, whose 1.0 was at least
+      conceptually reachable by painting the whole mural. The input is now
+      `matched / predicted`, and its ceiling is **not reachable on any real wall**:
+      descriptor repeatability across a repaint, the lighting difference between
+      registration and painting, and Phase 4's own lone-candidate skip each hold it
+      below 1. `effConf` therefore spans `[0.5, 0.5 + 0.5·m]` for some achievable
+      maximum `m`, and the 2x is arithmetic at an input the system cannot produce.*
+      *The value stays 0.5 because `m` has never been measured, and picking a floor
+      to compensate for an unknown ceiling is guessing dressed as derivation. The two
+      available arguments point opposite ways: the new signal moves per FRAME in both
+      directions where progress moved over hours (argues for a higher floor, so a dip
+      does not slash correction), while the entire point of splitting confidence from
+      progress was to let correction scale by something trustworthy (argues for a
+      lower one and a wider range). Only a measurement settles it, and **E11 must
+      measure `m` first** — floor and ceiling jointly set the real dynamic range, so
+      sweeping the floor alone reports the wrong contour.*
+      *`PoseFusionTest`'s existing 2x assertion is kept and re-labelled: it pins
+      CONF_FLOOR's VALUE (1/0.5), which is what it can actually prove, rather than a
+      claim about walls. Added beside it is
+      `the floor bounds correction from below at any achievable corroboration`, which
+      states the contract in a form that survives E11 moving the number — bare walls
+      still correct, correction is monotone in corroboration, nothing goes below the
+      floor, and the unmeasured sentinel lands exactly on it. Mutation-verified:
+      removing the floor term fails 4 tests, inverting the corroboration sense fails
+      2.)*
+      *(Superseded note, kept for the record: this was BLOCKED by X.3, not by difficulty. This is a live change to `PoseFusion`,
       so landing it on the Phase 4 branch would put two phases in one CI run —
       exactly what X.3 forbids, and the reason is that E11 cannot attribute a
       change in correction behaviour to the denominator or to the floor if both
@@ -1190,7 +1219,7 @@ order.** Work top to bottom.
       correction strength` asserts `painted[12] / bare[12] == 2f` exactly, and that
       2 is `1 / CONF_FLOOR`. It is not an incidental number — moving the floor moves
       that assertion, and a re-derivation that leaves the test green has almost
-      certainly not changed anything.)*
+      certainly not changed anything. #1807 has since merged, unblocking it.)*
 
 ### Phase 3 — geometric promotion
 
