@@ -290,10 +290,30 @@ class MainViewModel @Inject constructor(
         resetCaptureUi()
         val planePoint = floatArrayOf(wallPlane[0], wallPlane[1], wallPlane[2])
         val planeNormal = floatArrayOf(wallPlane[3], wallPlane[4], wallPlane[5])
-        val anchor = slamManager.getAnchorTransform()
         // Clear any prior marks-centering override; the builder re-publishes it on a successful build.
         slamManager.overlayMarkCenterLocal = null
         viewModelScope.launch(Dispatchers.IO) {
+            // The anchor is read HERE, not on the caller's thread, and only once one exists.
+            //
+            // Target creation is what ESTABLISHES the anchor: `setInitialAnchorFromCapture` raises a
+            // flag and the renderer acts on it a frame later. Reading `getAnchorTransform()`
+            // synchronously at the call site — as this did — therefore returned the identity native
+            // is constructed with, and the identity is the worst possible wrong answer because it is
+            // indistinguishable from a real pose at the world origin. That identity became the
+            // fingerprint's co-registration frame, `markCenterLocal`'s frame, and (since Phase 2)
+            // `captureAnchorCam`, leaving the partition composed through a stray `A_est⁻¹`.
+            val anchor = slamManager.awaitAnchorTransform()
+            if (anchor == null || anchor.size != 16) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        context,
+                        "Couldn't lock an anchor for this target — hold the phone steady on the " +
+                            "wall and try again.",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+                return@launch
+            }
             // A fingerprint is persisted INTO a project, so without one there is nowhere to put it.
             // This was a bare `?: return@launch`: the artist aimed, tapped, confirmed, and nothing
             // happened — no target, no error, no clue that the missing piece was a project.

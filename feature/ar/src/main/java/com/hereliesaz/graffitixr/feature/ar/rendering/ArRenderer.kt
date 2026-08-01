@@ -454,9 +454,28 @@ class ArRenderer(
     // A millimetre. Below this a "resize" is float noise in the composed transform, and firing on it
     // would reclassify the whole fingerprint every frame the artist rests a finger on the screen.
     private val DESIGN_EXTENT_EPS = 1e-3f
+    private val DESIGN_POSE_EPS = 1e-3f
     private val designFootprintLock = Any()
     private val designRigidModel = FloatArray(16)
     private val designAnchorInvScratch = FloatArray(16)
+    private val designPoseScratch = FloatArray(16)
+
+    /**
+     * True when the freshly-computed design pose differs from the published one by more than a
+     * millimetre of translation or the rotational equivalent.
+     *
+     * A flat element-wise comparison, which is the right test here precisely because it is crude: it
+     * catches translation, in-plane spin and the wall-frame re-orthonormalisation alike, and every
+     * one of those changes what Φ answers. The rotation columns are unit-length, so an element
+     * threshold of 1e-3 is roughly a milliradian — comfortably below anything a hand does and
+     * comfortably above float noise in the compose chain.
+     */
+    private fun designPoseMoved(): Boolean {
+        for (i in 0 until 16) {
+            if (kotlin.math.abs(designPoseScratch[i] - designRigidModel[i]) > DESIGN_POSE_EPS) return true
+        }
+        return false
+    }
     private var designEffectiveHalfW = -1f
     private var designEffectiveHalfH = -1f
     private var designPlaced = false
@@ -1980,6 +1999,11 @@ class ArRenderer(
             // the design's size would make Φ swallow every feature in view and report zero backbone
             // — "the artwork covers the whole wall" on a design the artist has only just opened.
             val placed = anchorEstablished && overlayRenderer.hasTexture && quadInitialFitApplied
+            // Size OR pose. Φ asks where a feature sits relative to the artwork, and panning or
+            // spinning the design changes that answer exactly as much as resizing it does — the
+            // artist drags the artwork across the wall far more often than they pinch it. Watching
+            // the extents alone left every one of those moves silently unpartitioned, against a
+            // footprint the artwork had left.
             val extentMoved = placed &&
                 (kotlin.math.abs(newHalfW - designEffectiveHalfW) > DESIGN_EXTENT_EPS ||
                     kotlin.math.abs(newHalfH - designEffectiveHalfH) > DESIGN_EXTENT_EPS)
@@ -1993,13 +2017,20 @@ class ArRenderer(
                     android.opengl.Matrix.invertM(designAnchorInvScratch, 0, anchorMatrix, 0)
                 if (placed && invertible) {
                     android.opengl.Matrix.multiplyMM(
-                        designRigidModel, 0, designAnchorInvScratch, 0, overlayRigidScratch, 0,
+                        designPoseScratch, 0, designAnchorInvScratch, 0, overlayRigidScratch, 0,
                     )
+                }
+                // Compared BEFORE designRigidModel is overwritten below, and only against the model
+                // that was actually published — comparing against the scratch would compare a value
+                // with itself.
+                val poseMoved = placed && invertible && designPoseMoved()
+                if (placed && invertible) {
+                    System.arraycopy(designPoseScratch, 0, designRigidModel, 0, 16)
                 }
                 designEffectiveHalfW = newHalfW
                 designEffectiveHalfH = newHalfH
                 designPlaced = placed && invertible
-                if (extentMoved && designPlaced) {
+                if (designPlaced && (extentMoved || poseMoved)) {
                     footprint = com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
                         .DesignFootprint(designRigidModel.copyOf(), newHalfW, newHalfH)
                 }

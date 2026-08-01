@@ -1523,6 +1523,46 @@ class ArViewModel @Inject constructor(
     private var partitionJob: Job? = null
 
     /**
+     * The most recent design footprint the renderer published, or null before the artwork is placed.
+     *
+     * Kept because the two events that make a partition possible — the artwork being placed, and the
+     * fingerprint becoming live — race, and the losing order was the common one. In a capture
+     * session the fingerprint arrives only after detection, `saveProject` and `loadProject`, long
+     * after the single footprint edge that follows confirmation; with only the callback, that
+     * session's fingerprint was never partitioned at all.
+     */
+    @Volatile private var latestDesignFootprint: FingerprintPartition.DesignFootprint? = null
+
+    /**
+     * The design pose the live partition was last computed against, or null when none has been.
+     *
+     * In memory rather than on the `Fingerprint`: the stored `captureHalfW`/`captureHalfH` already
+     * answer "was this partitioned against a different SIZE", and adding a persisted pose would mean
+     * a fourth parallel field to keep consistent for a question that only matters within a session.
+     * Null after a reload forces exactly one partition, which is what should happen there regardless.
+     */
+    @Volatile private var lastPartitionedPose: FloatArray? = null
+
+    /** Element-wise, with the same millimetre/milliradian threshold the renderer's edge uses. */
+    private fun poseDiffers(pose: FloatArray, previous: FloatArray?): Boolean {
+        if (previous == null || previous.size != pose.size) return true
+        for (i in pose.indices) if (kotlin.math.abs(pose[i] - previous[i]) > 1e-3f) return true
+        return false
+    }
+
+    /**
+     * Partition the live fingerprint against the last known design footprint, if both exist and the
+     * partition is missing or stale.
+     *
+     * The pull half of the pair above: called when the FINGERPRINT arrives, where
+     * [onDesignFootprintChanged] is called when the FOOTPRINT moves.
+     */
+    private fun partitionLiveFingerprintIfNeeded() {
+        val design = latestDesignFootprint ?: return
+        onDesignFootprintChanged(design)
+    }
+
+    /**
      * The artwork was placed or resized: (re)partition the live fingerprint against where it now
      * sits (`IMPLEMENTATION.md` 2.2/2.4).
      *
@@ -1538,9 +1578,24 @@ class ArViewModel @Inject constructor(
      * Called from the GL thread; all work is dispatched off it.
      */
     fun onDesignFootprintChanged(design: FingerprintPartition.DesignFootprint) {
+        // Retained so the partition can also be driven the OTHER way round — see
+        // [partitionLiveFingerprintIfNeeded]. The footprint edge and the fingerprint's arrival are
+        // two independent events and neither reliably comes second, so whichever is later has to be
+        // able to start the work. Holding only a callback made this a one-shot that the capture
+        // session always lost.
+        latestDesignFootprint = design
         val live = liveFingerprint ?: return
         val fp = live.fingerprint
-        if (!fp.isUnpartitioned() && !fp.isPartitionStale(design.halfW, design.halfH)) return
+        // Three ways this is worth doing, and the third is the one a size-only check misses.
+        // `Fingerprint.isPartitionStale` compares extents, because extents are what it stores — so
+        // a design the artist DRAGGED across the wall is not "stale" by that measure while being
+        // completely wrong by Φ's. The pose it was last partitioned against is therefore tracked
+        // here, in memory, rather than persisted: after a reload `lastPartitionedPose` is null,
+        // which forces one partition, and that is the correct answer anyway.
+        val needsPartition = fp.isUnpartitioned() ||
+            fp.isPartitionStale(design.halfW, design.halfH) ||
+            poseDiffers(design.rigidModelAnchorLocal, lastPartitionedPose)
+        if (!needsPartition) return
         // Cancel rather than skip: the newest design size is the correct one, and an older in-flight
         // partition can only write a size the artist has already left behind.
         partitionJob?.cancel()
@@ -1562,6 +1617,7 @@ class ArViewModel @Inject constructor(
                 regions = updated.regions,
             )
             liveFingerprint = LiveFingerprint(updated, current.anchor, current.intrinsics, current.view)
+            lastPartitionedPose = design.rigidModelAnchorLocal.copyOf()
 
             // IMPLEMENTATION.md 2.8, relocated. The capture cannot raise this — it has no footprint
             // to measure — so it is raised here, where the artwork's size is what made it true. A
@@ -1663,6 +1719,12 @@ class ArViewModel @Inject constructor(
                         project.fingerprintViewMatrix.takeIf { it.size == 16 }?.toFloatArray()
                             ?: FloatArray(0),
                     )
+                    // The fingerprint just became available. If the artwork is already placed — which
+                    // it is on every project load, and on every capture session by the time the
+                    // save/load round trip finishes — partition it now rather than waiting for a
+                    // footprint edge that has already been and gone.
+                    lastPartitionedPose = null
+                    partitionLiveFingerprintIfNeeded()
                 } else {
                     // Depth-path or pre-existing project: descriptors-only legacy restore.
                     slamManager.restoreWallFingerprint(

@@ -22,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @Singleton
@@ -64,7 +65,45 @@ class SlamManager @Inject constructor(
     fun getLastDepthTrace(): String = nativeGetLastDepthTrace()
     fun getLastSplatTrace(): String = nativeGetLastSplatTrace()
 
-    fun updateAnchorTransform(transform: FloatArray) = nativeUpdateAnchorTransform(transform)
+    /**
+     * True once an anchor pose has actually been written, as opposed to the identity the native
+     * engine starts with.
+     *
+     * `getAnchorTransform()` cannot express "no anchor yet" — `mAnchorMatrix` is constructed as the
+     * identity and stays that way until the renderer establishes one, so a caller that reads it too
+     * early gets a perfectly well-formed matrix that means nothing. That is not hypothetical: target
+     * creation *is* what establishes the anchor (`setInitialAnchorFromCapture` only raises a flag,
+     * and the renderer acts on it a frame later), so the capture path read the identity and used it
+     * as the fingerprint's co-registration frame.
+     */
+    private val _anchorEverSet = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val anchorEverSet: kotlinx.coroutines.flow.StateFlow<Boolean> = _anchorEverSet
+
+    fun updateAnchorTransform(transform: FloatArray) {
+        nativeUpdateAnchorTransform(transform)
+        _anchorEverSet.value = true
+    }
+
+    /**
+     * The anchor pose, waiting up to [timeoutMs] for one to be established if none has been.
+     *
+     * Returns null on timeout rather than the identity, because the identity is exactly the wrong
+     * answer to fall back to — it is indistinguishable from a real pose at the world origin, and
+     * every frame composed through it is silently off by the anchor's true transform.
+     */
+    suspend fun awaitAnchorTransform(timeoutMs: Long = 2_000L): FloatArray? {
+        if (!_anchorEverSet.value) {
+            val arrived = kotlinx.coroutines.withTimeoutOrNull(timeoutMs) {
+                _anchorEverSet.first { it }
+            }
+            if (arrived == null) return null
+        }
+        return nativeGetAnchorTransform()
+    }
+
+    /** Forget that an anchor was ever set. Call when tearing a session down, or the next project
+     *  inherits this one's "established" answer while native has been reset under it. */
+    fun clearAnchorEverSet() { _anchorEverSet.value = false }
 
     /**
      * Centroid of the matched fingerprint marks, expressed in the FINGERPRINT ANCHOR's local frame
