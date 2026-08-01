@@ -56,6 +56,20 @@ data class ArUiState(
     // [pointX,pointY,pointZ, normalX,normalY,normalZ] in world space. Null when the tap wasn't on a
     // qualifying (MATCH/green) plane — single-capture target creation requires one (back-projection).
     val targetWallPlane: FloatArray? = null,
+    /**
+     * Where the artwork sat at capture (`IMPLEMENTATION.md` 2.3): its **rigid** world model matrix
+     * (column-major 4x4) and its **effective**, scale-included half-extents in metres. Null/-1 when
+     * the overlay had no placement to take a footprint of, which leaves the fingerprint
+     * unpartitioned — the legacy all-backbone reading.
+     *
+     * Carried as three loose values rather than the `DesignFootprint` the builder takes, because
+     * that type lives in `feature/ar` and this module is below it in the graph. Reassembled at the
+     * one place that consumes it (`MainViewModel.handleSingleCapture`) so the loose form never
+     * spreads past this boundary.
+     */
+    val targetDesignModel: FloatArray? = null,
+    val targetDesignHalfW: Float = -1f,
+    val targetDesignHalfH: Float = -1f,
     val capturedTargetUris: List<Uri> = emptyList(),
     val capturedTargetImages: List<Bitmap> = emptyList(),
     val gpsData: GpsData? = null,
@@ -95,6 +109,13 @@ data class ArUiState(
     val targetRawBitmap: Bitmap? = null,
     // Store the rotation applied to the display bitmap
     val targetDisplayRotation: Int = 0,
+    /**
+     * How and where the device was held when the active target was captured.
+     *
+     * Null until a capture happens this session. Persisted onto the project at save, because the
+     * conditions a fingerprint was built under are not recoverable from the fingerprint.
+     */
+    val targetCaptureEnvironment: CaptureEnvironment? = null,
     /**
      * Set when a saved wall fingerprint was refused at load because it predates Phase 0 and its 3D
      * points are in the sensor frame with no recorded capture rotation (IMPLEMENTATION.md 0.7).

@@ -167,10 +167,46 @@ object MetricFingerprintBuilder {
         private set
 
     /**
+     * How many of the placed points landed in the backbone set `F_out`, or -1 when the capture was
+     * not partitioned at all (no design footprint supplied — the legacy all-backbone case).
+     *
+     * -1 rather than 0 for the reason `EVALUATION.md` records twice over: 0 is a *measurement*, and
+     * "the design covers the whole wall so there is no backbone" and "nobody asked for a partition"
+     * are opposite situations that must not print the same number.
+     */
+    @Volatile var lastBackbone: Int = -1
+        private set
+
+    /**
+     * Minimum backbone size for a capture to be worth keeping (`IMPLEMENTATION.md` 2.8).
+     *
+     * `F_out` is what the reloc PnP solves from with no prior. If the design covers the whole
+     * visible wall there is nothing outside it, and the target will never lock — the paper states
+     * this as a limit of the domain of applicability, so the implementation's job is to say so at
+     * capture rather than let the artist discover it as mysterious tracking failure an hour later.
+     *
+     * `40` is the pre-registered prior from `PARAMETERS.md` §4 (`BACKBONE_MIN_FEATURES`): 5× the
+     * native PnP correspondence floor of 8, leaving room for the fact that only a fraction of stored
+     * features match in any one live frame. It is a *prior*, not a measurement — `EVALUATION.md` E8
+     * is the experiment that sets it, and both failure modes are real: too high refuses captures
+     * that would have worked, too low ships a target that can never lock.
+     *
+     * Deliberately NOT tied to `minPoints`' default of 20. The two floors ask different questions —
+     * "did enough features land on the wall at all" versus "is enough of what landed outside the
+     * artwork" — and a capture can comfortably pass the first while failing the second, which is
+     * exactly the design-covers-the-whole-wall case this exists to catch.
+     */
+    const val MIN_BACKBONE = 40
+
+    /**
      * @param rotationDeg `rotationNeeded` for this capture — the angle the caller already applied
      *   to [bitmap] and to [intr]. The view is rotated to match (`IMPLEMENTATION.md` Phase 0,
      *   convention B); passing 0 while handing in rotated pixels reinstates the `PAPER.md` §8
      *   defect, which is why it has no default.
+     * @param design where the artwork sits at capture, in world space (`IMPLEMENTATION.md` 2.3/2.4).
+     *   Null — the default — leaves the fingerprint unpartitioned, which every consumer reads as
+     *   all-backbone and is byte-for-byte the behaviour before Phase 2. That is a real default, not
+     *   a shortcut: the depth path and the doodle path have no placed design to speak of.
      */
     fun buildSingle(
         slam: SlamManager,
@@ -179,8 +215,9 @@ object MetricFingerprintBuilder {
         anchorModel: FloatArray,
         rotationDeg: Int,
         minPoints: Int = 20,
+        design: FingerprintPartition.DesignFootprint? = null,
     ): Fingerprint? {
-        lastDetected = 0; lastPlaced = 0; lastRequired = minPoints
+        lastDetected = 0; lastPlaced = 0; lastRequired = minPoints; lastBackbone = -1
         // Convention B: the bitmap and intrinsics arrived in display orientation, so the view goes
         // there too. This is the fix for PAPER.md §8 — previously `glViewToCv(glView)`, which left
         // display-frame rays intersecting a sensor-frame plane.
@@ -194,7 +231,8 @@ object MetricFingerprintBuilder {
                 var i = 0
                 while (i + 1 < pos.size) { pixels.add(PlaneMarks.Pixel(pos[i], pos[i + 1])); i += 2 }
                 val fp = ingestSingle(slam, descs, pixels, cvView, intr,
-                    planePointWorld, planeNormalWorld, anchorModel, minPoints, glView, rotationDeg)
+                    planePointWorld, planeNormalWorld, anchorModel, minPoints, glView, rotationDeg,
+                    design)
                 if (fp != null) return fp
             } finally {
                 descs.release()
@@ -213,7 +251,8 @@ object MetricFingerprintBuilder {
             if (d.empty()) return null
             val pixels = kp.toArray().map { PlaneMarks.Pixel(it.pt.x.toFloat(), it.pt.y.toFloat()) }
             return ingestSingle(slam, d, pixels, cvView, intr,
-                planePointWorld, planeNormalWorld, anchorModel, minPoints, glView, rotationDeg)
+                planePointWorld, planeNormalWorld, anchorModel, minPoints, glView, rotationDeg,
+                design)
         } finally {
             gray.release(); norm.release(); kp.release(); d.release()
         }
@@ -232,6 +271,7 @@ object MetricFingerprintBuilder {
         glView: FloatArray? = null,
         /** rotationNeeded for this capture; rotates [glView] to match the points. See 0.10. */
         rotationDeg: Int = 0,
+        design: FingerprintPartition.DesignFootprint? = null,
     ): Fingerprint? {
         val res = PlaneMarks.backProject(
             pixels, cvView, planePointWorld, planeNormalWorld,
@@ -242,6 +282,26 @@ object MetricFingerprintBuilder {
         if (pixels.size > lastDetected) lastDetected = pixels.size
         if (res.count > lastPlaced) lastPlaced = res.count
         if (res.count < minPoints) return null
+
+        // IMPLEMENTATION.md 2.4 — tag each surviving point with its region relative to the design's
+        // projected footprint. `res.pointsCam` is in the capture CV camera frame and the renderer's
+        // design pose is in world, so the design is moved into the points' frame ONCE here rather
+        // than every point being moved into the design's; see DesignFootprint.inFrameOf for why the
+        // two are equivalent. A null or degenerate design leaves regions empty, which every consumer
+        // reads as all-backbone — Phase 2's documented rollback, reached by doing nothing.
+        val designInPointFrame = design?.takeIf { it.isUsable }?.inFrameOf(cvView)
+        val regions = designInPointFrame?.let {
+            FingerprintPartition.classify(res.pointsCam, it.rigidModel, it.halfW, it.halfH)
+        } ?: ByteArray(0)
+
+        // IMPLEMENTATION.md 2.8 — refuse a capture with no backbone to localize against. Checked
+        // before anything is published or committed, so a refusal leaves no half-built target and no
+        // stale overlay re-centering behind. lastBackbone stays -1 when unpartitioned: not measured,
+        // not zero.
+        if (regions.isNotEmpty()) {
+            lastBackbone = FingerprintPartition.backboneCount(regions)
+            if (lastBackbone < MIN_BACKBONE) return null
+        }
 
         // Center the AR overlay on the marks (their centroid), not the screen-center anchor.
         val markCenterLocal = marksCentroidLocal(res.pointsCam, cvView, anchorModel)
@@ -278,6 +338,10 @@ object MetricFingerprintBuilder {
             bytes, rows, cols, type, res.pointsCam, anchorModel, intr,
             viewMatrix = glView?.let { MetricMarks.glViewDisplayOriented(it, rotationDeg) }
                 ?: FloatArray(0),
+            // IMPLEMENTATION.md 2.6 — native filters the reloc correspondence build by these, and
+            // reads a zero-length array as all-backbone, so an unpartitioned capture behaves as it
+            // did before Phase 2 rather than losing its whole map.
+            regions = regions,
         )
         return Fingerprint(
             keypoints, res.pointsCam.toList(), bytes, rows, cols, type,
@@ -285,6 +349,13 @@ object MetricFingerprintBuilder {
             // IMPLEMENTATION.md 0.7 — record the frame these points were built in, so a reload can
             // tell a Phase-0 fingerprint from a pre-Phase-0 one instead of guessing.
             captureRotationDeg = rotationDeg,
+            // IMPLEMENTATION.md 2.4 — the partition, and the design placement that defines it. The
+            // model is stored in the POINTS' frame (see DesignFootprint.inFrameOf) so a later
+            // reclassify after a project reload has a frame it can trust.
+            regions = regions,
+            captureHalfW = designInPointFrame?.halfW ?: -1f,
+            captureHalfH = designInPointFrame?.halfH ?: -1f,
+            captureDesignModel = designInPointFrame?.rigidModel?.toList() ?: emptyList(),
         )
     }
 

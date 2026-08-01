@@ -100,20 +100,31 @@ to agree and nothing enforces it.
 
 ---
 
-## 4. Footprint partition — proposed
+## 4. Footprint partition — landed
 
-New, from `IMPLEMENTATION.md` Phases 1–2. No current values; the prior column is
-a starting point for the sweep, not a recommendation.
+Phases 1–2 have landed, so these now have real locations and real values. Every
+one is still a **prior**, not a measurement: E8 is the experiment that sets them.
 
-| Parameter | Prior | Reasoning for the prior | Set by |
-|---|---|---|---|
-| `FOOTPRINT_INNER_MARGIN` | `0.05` | 5% of the design's half-extent — roughly a brush-width at typical mural scale | E8 |
-| `FOOTPRINT_OUTER_MARGIN` | `0.15` | Wider than inner, because overspray extends past the design and a doomed feature in `F_out` is worse than a discarded one | E8 |
-| `BACKBONE_MIN_FEATURES` | `40` | 5× the PnP correspondence floor of 8, to leave room for the match rate | E8 |
+| Parameter | Location | Current | Prior it shipped as | Basis | Set by |
+|---|---|---|---|---|---|
+| `DEFAULT_INNER_MARGIN` | `FingerprintPartition.kt` | `0.04` | `0.05` | guessed — a few per cent of the design's half-extent, of the order of a brush width at mural scale | E8 |
+| `DEFAULT_OUTER_MARGIN` | `FingerprintPartition.kt` | `0.10` | `0.15` | guessed — wider than inner, because overspray extends past the design and a doomed feature in `F_out` is worse than a discarded one | E8 |
+| `MIN_BACKBONE` | `MetricFingerprintBuilder.kt` | `40` | `40` | guessed — 5× the native PnP correspondence floor of 8, leaving room for the match rate | E8 |
 
-`BACKBONE_MIN_FEATURES` drives the capture refusal ("step back — the target needs
-some wall around it to lock onto"). Setting it too high refuses valid captures;
-too low ships a fingerprint that cannot relocalize. E8 measures both sides.
+**The margins shipped at values this table did not predict.** Phase 1 landed
+`0.04` / `0.10` while this file said `0.05` / `0.15`; the discrepancy went
+unnoticed until Phase 2 was wired. The landed values are recorded above rather
+than the code being changed to match, because altering an already-landed phase's
+behaviour to satisfy a prior is the wrong way round — but the pre-registered
+numbers are kept in their own column so E8 can report against both. Note the
+ratio also changed: 3.0× inner as pre-registered, 2.5× as shipped.
+
+`MIN_BACKBONE` drives the capture refusal ("the artwork covers almost the whole
+wall in view — step back so there's some bare wall around the design to lock
+onto"). Setting it too high refuses valid captures; too low ships a fingerprint
+that cannot relocalize. E8 measures both sides. It is deliberately independent of
+`MetricFingerprintBuilder`'s `minPoints` floor of 20 — those two ask different
+questions, and a capture can pass one while failing the other.
 
 ---
 

@@ -49,9 +49,15 @@ public:
     // rectification pass in relocThreadFunc. Without it computeRectifyHomography bails and oblique
     // views get no correction — which was the case for EVERY fingerprint built this way, since only
     // generateFingerprint (the depth path, disabled) ever set it.
+    //
+    // regions (optional, IMPLEMENTATION.md Phase 2) is one Footprint::Region ordinal per 3D point.
+    // The reloc correspondence build excludes INSIDE points — they sit under the artwork and decay
+    // as it is painted, so matching against them is what makes accuracy degrade with task progress.
+    // EMPTY MEANS ALL BACKBONE, reproducing pre-Phase-2 behaviour exactly for legacy fingerprints.
     void restoreWallFingerprintMetric(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d,
                                       const float* anchorMatrix16, const float* intrinsics4,
-                                      const float* viewMatrix16 = nullptr);
+                                      const float* viewMatrix16 = nullptr,
+                                      const std::vector<uint8_t>& regions = {});
     // Drop the stored wall fingerprint (marks + co-registration). Needed because a fingerprint is
     // otherwise process-lifetime state: the restore calls above only ever REPLACE it, so a project
     // with no fingerprint of its own would keep relocalizing against whatever wall was fingerprinted
@@ -312,6 +318,18 @@ private:
 
     cv::Mat mWallDescriptors;
     std::vector<cv::Point3f> mWallKeypoints3D;
+    // IMPLEMENTATION.md Phase 2 — the footprint partition, parallel to mWallKeypoints3D. One
+    // Footprint::Region ordinal per point. EMPTY means "no partition" and is read as all-backbone,
+    // so a pre-Phase-2 fingerprint relocalizes exactly as it does on main. Always either empty or
+    // the same size as mWallKeypoints3D; the JNI layer drops a mismatched array rather than let a
+    // short one be indexed by point index.
+    std::vector<uint8_t> mWallRegions;
+    // Ordinals must match Footprint.Region's declaration order (INSIDE, BAND, OUTSIDE). Kotlin
+    // writes the byte and C++ reads it, so the two enums are a wire format with no compiler to
+    // check them; FootprintRegionWireTest pins the Kotlin side against these values.
+    static constexpr uint8_t kRegionInside = 0;
+    static constexpr uint8_t kRegionBand = 1;
+    static constexpr uint8_t kRegionOutside = 2;
     cv::Mat mArtworkDescriptors;
     std::vector<cv::Point3f> mArtworkKeypoints3D;
     std::atomic<float> mPaintingProgress{0.0f};

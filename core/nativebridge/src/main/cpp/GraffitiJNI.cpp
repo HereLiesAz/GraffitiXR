@@ -886,7 +886,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerprintMetric(
         JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type,
-        jfloatArray ptsArray, jfloatArray anchorArray, jfloatArray intrArray, jfloatArray viewArray) {
+        jfloatArray ptsArray, jfloatArray anchorArray, jfloatArray intrArray, jfloatArray viewArray,
+        jbyteArray regionsArray) {
     // Same defensive validation as the plain restore: reject a malformed/old .gxr before cv::Mat
     // wraps the descriptor blob (valid OpenCV type + 64-bit overflow-safe size check), and only pass
     // anchor/intrinsics when correctly sized (native copies a fixed 16 / 4 floats and tolerates null),
@@ -909,7 +910,24 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
     jfloat* anchor = (anchorArray && env->GetArrayLength(anchorArray) == 16) ? env->GetFloatArrayElements(anchorArray, nullptr) : nullptr;
     jfloat* intr   = (intrArray && env->GetArrayLength(intrArray) == 4)    ? env->GetFloatArrayElements(intrArray, nullptr)   : nullptr;
     jfloat* view   = (viewArray && env->GetArrayLength(viewArray) == 16)   ? env->GetFloatArrayElements(viewArray, nullptr)   : nullptr;
-    gSlamEngine->restoreWallFingerprintMetric(descriptors, points3d, anchor, intr, view);
+    // Phase 2 partition: one byte per 3D point. An empty array is the legacy "all backbone" case and
+    // is passed through as empty. A NON-empty array whose length disagrees with the point count is
+    // dropped rather than truncated: native indexes it by point when building reloc correspondences,
+    // so a short array reads past the end of a vector, and a long one means the two disagree about
+    // what the map even is. Dropping degrades to all-backbone, which is safe; truncating is not.
+    std::vector<uint8_t> regions;
+    if (regionsArray) {
+        jsize regLen = env->GetArrayLength(regionsArray);
+        if (regLen > 0 && (size_t)regLen == points3d.size()) {
+            jbyte* regData = env->GetByteArrayElements(regionsArray, nullptr);
+            regions.assign((uint8_t*)regData, (uint8_t*)regData + regLen);
+            env->ReleaseByteArrayElements(regionsArray, regData, JNI_ABORT);
+        } else if (regLen > 0) {
+            LOGE("restoreWallFingerprintMetric: %d regions for %zu points - dropping partition",
+                 (int)regLen, points3d.size());
+        }
+    }
+    gSlamEngine->restoreWallFingerprintMetric(descriptors, points3d, anchor, intr, view, regions);
     env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
     env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
     if (anchor) env->ReleaseFloatArrayElements(anchorArray, anchor, JNI_ABORT);

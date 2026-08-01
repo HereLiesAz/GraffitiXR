@@ -802,6 +802,107 @@ class ArViewModel @Inject constructor(
         Timber.w("ARDIAG onCameraStreamStalled: next AR entry will use ARCore default camera config (safe mode)")
     }
 
+    /**
+     * Physical device attitude. Created lazily so a device with no motion sensors costs nothing, and
+     * started/stopped with AR mode — sensors left registered drain a phone the artist is holding up
+     * for an hour.
+     */
+    private var attitudeProvider: DeviceAttitudeProvider? = null
+
+    /** Last known location, cached while AR is active. Null until a fix arrives or if denied. */
+    @Volatile
+    private var lastLocation: android.location.Location? = null
+    private var locationTracker: com.hereliesaz.graffitixr.common.LocationTracker? = null
+
+    /**
+     * Begin sampling attitude and location for capture records. Idempotent.
+     *
+     * Location is cached from a low-rate subscription rather than requested at capture: the capture
+     * happens on the GL thread inside a frame callback and cannot wait on a fix. A cached value with
+     * its age recorded is strictly better than a blocking call that would drop frames — and the age
+     * is what makes a stale fix visible instead of silently wrong.
+     */
+    private fun startEnvironmentSampling(context: Context) {
+        // Each source is guarded separately, and neither can stop AR mode.
+        //
+        // This is a correctness requirement, not defensiveness for its own sake: the capture record
+        // is OPTIONAL telemetry, and AR is the product. A device with no SENSOR_SERVICE, or a
+        // Play-Services location client that refuses to start (it needs a Looper, and throws
+        // "invalid null looper" without one), must degrade to recording less — never to an artist
+        // unable to enter AR. The first version of this let a location-client failure propagate out
+        // of setArMode and take the session with it.
+        try {
+            if (attitudeProvider == null) {
+                attitudeProvider = DeviceAttitudeProvider(context).also {
+                    if (!it.isAvailable) Timber.i("No motion sensors; captures will record no attitude")
+                }
+            }
+            attitudeProvider?.start()
+        } catch (t: Throwable) {
+            Timber.w(t, "attitude sampling unavailable; captures will record no attitude")
+            attitudeProvider = null
+        }
+
+        try {
+            if (locationTracker == null) {
+                locationTracker = com.hereliesaz.graffitixr.common.LocationTracker(context)
+            }
+            locationTracker?.let { tracker ->
+                if (tracker.hasPermissions()) {
+                    tracker.startLocationUpdates { loc -> lastLocation = loc }
+                } else {
+                    // Not an error: location is optional and a capture must never depend on it.
+                    Timber.i("Location permission not granted; captures will record no location")
+                }
+            }
+        } catch (t: Throwable) {
+            Timber.w(t, "location sampling unavailable; captures will record no location")
+            locationTracker = null
+        }
+    }
+
+    /**
+     * Stop sampling. Must run whenever AR stops, or the sensors and GPS stay hot.
+     *
+     * Also guarded: a teardown that throws would leave the other source registered, which is the
+     * exact leak this method exists to prevent.
+     */
+    private fun stopEnvironmentSampling() {
+        try {
+            attitudeProvider?.stop()
+        } catch (t: Throwable) {
+            Timber.w(t, "attitude sampling teardown failed")
+        }
+        try {
+            locationTracker?.stopLocationUpdates()
+        } catch (t: Throwable) {
+            Timber.w(t, "location sampling teardown failed")
+        }
+    }
+
+    /** The latest location as a serializable fix, with its age. Null when none has arrived. */
+    private fun locationFix(): com.hereliesaz.graffitixr.common.model.LocationFix? {
+        val l = lastLocation ?: return null
+        val ageMs = if (l.elapsedRealtimeNanos > 0L) {
+            (android.os.SystemClock.elapsedRealtimeNanos() - l.elapsedRealtimeNanos) / 1_000_000L
+        } else {
+            -1L
+        }
+        return com.hereliesaz.graffitixr.common.model.LocationFix(
+            latitude = l.latitude,
+            longitude = l.longitude,
+            altitudeM = if (l.hasAltitude()) l.altitude else Double.NaN,
+            horizontalAccuracyM = if (l.hasAccuracy()) l.accuracy else -1f,
+            verticalAccuracyM = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O &&
+                l.hasVerticalAccuracy()
+            ) l.verticalAccuracyMeters else -1f,
+            bearingDeg = if (l.hasBearing()) l.bearing else Float.NaN,
+            speedMps = if (l.hasSpeed()) l.speed else Float.NaN,
+            provider = l.provider ?: "",
+            ageMs = ageMs,
+        )
+    }
+
     fun setArMode(enabled: Boolean, context: Context) {
         if (enabled && !_uiState.value.isArCoreAvailable) {
             // ARCore is not supported on this device. Refuse to enter AR mode
@@ -823,6 +924,9 @@ class ArViewModel @Inject constructor(
             if (_uiState.value.trackingFailed) {
                 _uiState.update { it.copy(trackingFailed = false) }
             }
+            startEnvironmentSampling(context)
+        } else {
+            stopEnvironmentSampling()
         }
         updateSessionStateLocked(context)
     }
@@ -1387,6 +1491,65 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    /**
+     * The wall fingerprint currently live in native, retained so a design resize can repartition it
+     * (`IMPLEMENTATION.md` 2.2) without a round trip through the project file.
+     *
+     * Held alongside the intrinsics/anchor/view it was restored with, because a repartition has to
+     * re-push all of them — `restoreWallFingerprintMetric` REPLACES the stored fingerprint, so
+     * pushing regions alone would drop the co-registration and the rectification view with it.
+     */
+    private class LiveFingerprint(
+        val fingerprint: com.hereliesaz.graffitixr.common.model.Fingerprint,
+        val anchor: FloatArray,
+        val intrinsics: FloatArray,
+        val view: FloatArray,
+    )
+
+    @Volatile private var liveFingerprint: LiveFingerprint? = null
+
+    /**
+     * The artist pinched the design: its footprint moved, so the stored partition now describes a
+     * shape that is no longer on the wall.
+     *
+     * Recomputed from the stored 3D points — a pure-Kotlin pass over a few hundred points — rather
+     * than forcing a re-capture, which is the whole reason the design model is persisted in the
+     * points' own frame. A fingerprint that carries no model (legacy, depth path) is left alone by
+     * `reclassify`, so this degrades to a no-op instead of guessing a frame.
+     *
+     * Called from the GL thread; the work is dispatched off it.
+     */
+    fun onDesignExtentChanged(halfW: Float, halfH: Float) {
+        val live = liveFingerprint ?: return
+        if (!live.fingerprint.isPartitionStale(halfW, halfH)) return
+        viewModelScope.launch(Dispatchers.Default) {
+            val current = liveFingerprint ?: return@launch
+            val updated = com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
+                .reclassify(current.fingerprint, halfW, halfH)
+            // Identity check, not equality: reclassify returns the RECEIVER when it refuses (no
+            // stored design model), and re-pushing an unchanged fingerprint would reset native's
+            // reloc state for nothing.
+            if (updated === current.fingerprint) return@launch
+            slamManager.restoreWallFingerprintMetric(
+                updated.descriptorsData, updated.descriptorsRows, updated.descriptorsCols,
+                updated.descriptorsType, updated.points3d.toFloatArray(),
+                current.anchor, current.intrinsics,
+                viewMatrix = current.view,
+                regions = updated.regions,
+            )
+            liveFingerprint = LiveFingerprint(updated, current.anchor, current.intrinsics, current.view)
+            // Persist so the next load starts from the size the artist actually settled on. Merged
+            // through the repository transform rather than a full-object write, for the save-race
+            // reason documented on the wall-map save above.
+            projectRepository.updateProject { it.copy(fingerprint = updated) }
+            Timber.i(
+                "Design resized to %.3f x %.3f m; repartitioned %d points (backbone %d)",
+                halfW, halfH, updated.points3d.size / 3,
+                com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.backboneCount(updated),
+            )
+        }
+    }
+
     private fun loadFingerprintIfExists() {
         viewModelScope.launch(Dispatchers.IO) {
             val project = projectRepository.currentProject.value ?: return@launch
@@ -1433,6 +1596,17 @@ class ArViewModel @Inject constructor(
                         // skips the rectification pass rather than warping to a stale frontal frame.
                         viewMatrix = project.fingerprintViewMatrix
                             .takeIf { it.size == 16 }?.toFloatArray() ?: FloatArray(0),
+                        // IMPLEMENTATION.md 2.6 — the partition travels with the points it indexes.
+                        // Empty on a pre-Phase-2 project, which native reads as all-backbone, so the
+                        // reload relocalizes exactly as it did before the phase landed.
+                        regions = fp.regions,
+                    )
+                    // Retained for the repartition-on-resize path (2.2). Stored with exactly the
+                    // values just pushed, so a later re-push cannot drift from what native holds.
+                    liveFingerprint = LiveFingerprint(
+                        fp, anchor.toFloatArray(), intr.toFloatArray(),
+                        project.fingerprintViewMatrix.takeIf { it.size == 16 }?.toFloatArray()
+                            ?: FloatArray(0),
                     )
                 } else {
                     // Depth-path or pre-existing project: descriptors-only legacy restore.
@@ -1549,6 +1723,11 @@ class ArViewModel @Inject constructor(
         renderer = r
         renderer?.stereoProvider = stereoProvider
         renderer?.onCameraNotFeeding = { onCameraNotFeeding() }
+        // The renderer assembles the capture record on the GL thread; these hand it the two pieces
+        // whose lifecycles live here. Lambdas rather than direct references so the renderer never
+        // touches a SensorManager or a location client it does not own.
+        renderer?.attitudeSampler = { attitudeProvider?.snapshot() }
+        renderer?.locationSampler = { locationFix() }
         renderer?.attachSession(session)
         loadCloudPointsIfExists()
     }
@@ -1816,7 +1995,18 @@ class ArViewModel @Inject constructor(
         viewMatrix: FloatArray,
         displayRotation: Int,
         tapDistanceMeters: Float,
-        wallPlane: FloatArray? = null
+        wallPlane: FloatArray? = null,
+        /**
+         * How and where the device was held at capture. Defaulted so the doodle path and tests can
+         * omit it; the real capture path always supplies one.
+         */
+        environment: com.hereliesaz.graffitixr.common.model.CaptureEnvironment =
+            com.hereliesaz.graffitixr.common.model.CaptureEnvironment(),
+        /**
+         * Where the artwork sat at capture, for the Phase-2 partition. Null leaves the fingerprint
+         * unpartitioned, which every consumer reads as all-backbone — pre-Phase-2 behaviour.
+         */
+        design: com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.DesignFootprint? = null,
     ) {
         // Doodle demo: a headless capture (no tap, no review) — build the fingerprint from the
         // drawing and return before the normal capture/review flow runs. Clear the capture-request
@@ -1852,6 +2042,7 @@ class ArViewModel @Inject constructor(
                     tapMarks = it.tapMarks + com.hereliesaz.graffitixr.common.model.TapMark(tapPos.first, tapPos.second, tapDistanceMeters),
                     targetRawBitmap = bitmap,
                     targetDisplayRotation = displayRotation,
+                    targetCaptureEnvironment = environment,
                     targetDepthBuffer = depthBuffer,
                     targetDepthWidth = colorW,
                     targetDepthHeight = colorH,
@@ -1861,6 +2052,9 @@ class ArViewModel @Inject constructor(
                     targetIntrinsics = intrinsics,
                     targetCaptureViewMatrix = viewMatrix,
                     targetWallPlane = wallPlane,
+                    targetDesignModel = design?.rigidModel,
+                    targetDesignHalfW = design?.halfW ?: -1f,
+                    targetDesignHalfH = design?.halfH ?: -1f,
                     targetPhysicalExtent = extent,
                     isCaptureRequested = false,
                     tempCaptureBitmap = rotatedBmp,
@@ -1881,6 +2075,7 @@ class ArViewModel @Inject constructor(
                 annotatedCaptureBitmap = rotatedBmp.isolateMarkings(),
                 targetRawBitmap = bitmap,
                 targetDisplayRotation = displayRotation,
+                targetCaptureEnvironment = environment,
                 targetDepthBuffer = depthBuffer,
                 targetDepthWidth = colorW,
                 targetDepthHeight = colorH,
@@ -1890,6 +2085,9 @@ class ArViewModel @Inject constructor(
                 targetIntrinsics = intrinsics,
                 targetCaptureViewMatrix = viewMatrix,
                 targetWallPlane = wallPlane,
+                targetDesignModel = design?.rigidModel,
+                targetDesignHalfW = design?.halfW ?: -1f,
+                targetDesignHalfH = design?.halfH ?: -1f,
                 targetPhysicalExtent = extent,
                 isCaptureRequested = false
             )
@@ -2425,6 +2623,9 @@ class ArViewModel @Inject constructor(
         coopStateJob?.cancel()
         coopStateJob = null
         collaborationManager.leaveSessionAsync()
+        // setArMode(false) is not guaranteed to run before the ViewModel dies (process death,
+        // task removal), and a registered SensorEventListener outlives it.
+        stopEnvironmentSampling()
         destroyArSession()
     }
 }

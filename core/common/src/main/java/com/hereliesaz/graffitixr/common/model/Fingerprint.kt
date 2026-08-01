@@ -70,6 +70,25 @@ data class Fingerprint(
      */
     val captureHalfW: Float = -1f,
     val captureHalfH: Float = -1f,
+    /**
+     * The design's **rigid** model matrix at capture (column-major 4x4, 16 floats), expressed in the
+     * *same frame as [points3d]* — the capture camera frame, not world. Empty when unknown.
+     *
+     * Stored so the partition can be recomputed later without it. [points3d] is a capture-frame
+     * quantity that outlives the ARCore session that produced it; the design's world pose does not.
+     * Holding the world pose here would make a reclassify after a project reload silently wrong —
+     * two frames, both plausible, no way to tell them apart from the numbers. Pre-multiplying the
+     * capture view once, at capture, removes the frame question from every later caller:
+     *
+     * ```
+     * inv(V·M) · p_cam  ==  inv(M) · inv(V) · p_cam  ==  inv(M) · p_world
+     * ```
+     *
+     * Rigid, not composed: the overlay's scale is folded into [captureHalfW]/[captureHalfH] instead,
+     * because `Matrix.scaleM(m, 0, s, s, 1f)` is **not** a uniform similarity and inverting it as one
+     * is wrong on the Z axis. See `Footprint`'s "scale trap".
+     */
+    val captureDesignModel: List<Float> = emptyList(),
 ) {
     init {
         // Defensive: a corrupt or truncated project file must never construct a Fingerprint whose
@@ -105,6 +124,13 @@ data class Fingerprint(
         require(regions.isEmpty() || regions.size == points3d.size / 3) {
             "regions holds ${regions.size} tags but ${points3d.size / 3} points were supplied; " +
                 "the partition is indexed per point, so they must be 1:1 (or regions empty for legacy)"
+        }
+        // A 4x4 or nothing. A short list here would be read as a matrix by every consumer and index
+        // past its end; a long one silently ignores whatever follows. Neither should reach a
+        // reclassify from a truncated project file.
+        require(captureDesignModel.isEmpty() || captureDesignModel.size == 16) {
+            "captureDesignModel holds ${captureDesignModel.size} floats; a column-major 4x4 is 16 " +
+                "(or empty when unknown)"
         }
     }
 
@@ -149,6 +175,15 @@ data class Fingerprint(
         if (descriptorsType != other.descriptorsType) return false
         if (!patchData.contentEquals(other.patchData)) return false
         if (markCenterLocal != other.markCenterLocal) return false
+        // The Phase-0/Phase-2 fields belong here for one concrete reason: a persistence round-trip
+        // test asserts `decoded == original`, and a field missing from equals makes that assertion
+        // pass whether or not the field survived serialization. Two fingerprints differing only in
+        // which frame their points are in, or in how their points are partitioned, are not equal.
+        if (captureRotationDeg != other.captureRotationDeg) return false
+        if (!regions.contentEquals(other.regions)) return false
+        if (captureHalfW != other.captureHalfW) return false
+        if (captureHalfH != other.captureHalfH) return false
+        if (captureDesignModel != other.captureDesignModel) return false
         return true
     }
 
@@ -161,6 +196,11 @@ data class Fingerprint(
         result = 31 * result + descriptorsType
         result = 31 * result + patchData.contentHashCode()
         result = 31 * result + markCenterLocal.hashCode()
+        result = 31 * result + captureRotationDeg
+        result = 31 * result + regions.contentHashCode()
+        result = 31 * result + captureHalfW.hashCode()
+        result = 31 * result + captureHalfH.hashCode()
+        result = 31 * result + captureDesignModel.hashCode()
         return result
     }
 

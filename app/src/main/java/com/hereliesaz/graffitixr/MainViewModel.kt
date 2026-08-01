@@ -157,6 +157,16 @@ class MainViewModel @Inject constructor(
          * [intrinsics]. Routed to the view matrix too (IMPLEMENTATION.md Phase 0, convention B).
          */
         rotationDeg: Int = 0,
+        /** How and where the device was held at capture; persisted onto the project. */
+        captureEnvironment: com.hereliesaz.graffitixr.common.model.CaptureEnvironment? = null,
+        /**
+         * Where the artwork sat at capture (`IMPLEMENTATION.md` 2.3): rigid world model matrix and
+         * effective, scale-included half-extents. Null/-1 leaves the fingerprint unpartitioned,
+         * which every consumer reads as all-backbone — pre-Phase-2 behaviour.
+         */
+        designModel: FloatArray? = null,
+        designHalfW: Float = -1f,
+        designHalfH: Float = -1f,
     ) {
         if (bitmap == null || intrinsics == null || viewMatrix == null) {
             // Was a bare reset: the artist confirmed a target and the capture simply vanished with no
@@ -177,7 +187,16 @@ class MainViewModel @Inject constructor(
         if (depthBuffer == null) {
             // No depth source: build the wall fingerprint from a SINGLE capture by back-projecting
             // features onto the ARCore wall plane (whose metric pose ARCore already solved).
-            handleSingleCapture(bitmap, safeIntr, safeView, wallPlane, rotationDeg)
+            handleSingleCapture(
+                bitmap, safeIntr, safeView, wallPlane, rotationDeg, captureEnvironment,
+                // Reassembled here, at the one place that consumes it, so the three loose values the
+                // UiState boundary forced never travel any further as three loose values.
+                designModel?.takeIf { it.size == 16 }?.let {
+                    com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.DesignFootprint(
+                        it, designHalfW, designHalfH,
+                    )
+                },
+            )
             return
         }
         resetCaptureUi()
@@ -278,6 +297,8 @@ class MainViewModel @Inject constructor(
      */
     private fun handleSingleCapture(
         bitmap: Bitmap, intr: FloatArray, view: FloatArray, wallPlane: FloatArray?, rotationDeg: Int,
+        captureEnvironment: com.hereliesaz.graffitixr.common.model.CaptureEnvironment?,
+        design: com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.DesignFootprint? = null,
     ) {
         if (wallPlane == null || wallPlane.size < 6) {
             resetCaptureUi()
@@ -308,6 +329,7 @@ class MainViewModel @Inject constructor(
             val fp = MetricFingerprintBuilder.buildSingle(
                 slamManager, bitmap, view, intr, planePoint, planeNormal, anchor,
                 rotationDeg = rotationDeg,
+                design = design,
             )
             if (fp == null) {
                 // Say WHICH way it fell short. "Not enough texture" was the same message whether the
@@ -316,7 +338,16 @@ class MainViewModel @Inject constructor(
                 val detected = MetricFingerprintBuilder.lastDetected
                 val placed = MetricFingerprintBuilder.lastPlaced
                 val need = MetricFingerprintBuilder.lastRequired
+                val backbone = MetricFingerprintBuilder.lastBackbone
                 val message = when {
+                    // IMPLEMENTATION.md 2.8. Checked FIRST: this failure has enough features and
+                    // they landed on the wall, so both of the messages below would be false. `>= 0`
+                    // rather than `> 0` — the partition ran and found zero backbone is the very case
+                    // this message is for; -1 means it never ran.
+                    backbone >= 0 && backbone < MetricFingerprintBuilder.MIN_BACKBONE ->
+                        "The artwork covers almost the whole wall in view — only $backbone features " +
+                            "sit outside it (need ${MetricFingerprintBuilder.MIN_BACKBONE}). Step " +
+                            "back so there's some bare wall around the design to lock onto."
                     detected < need ->
                         "Only $detected features on this wall (need $need). Too dark, too smooth, " +
                             "or out of focus — try a more detailed patch or more light."
@@ -351,6 +382,10 @@ class MainViewModel @Inject constructor(
                         MetricMarks.glViewDisplayOriented(view, rotationDeg).toList(),
                     // 0.11 — which display frame that was. -1 elsewhere means "genuinely unknown".
                     fingerprintCaptureRotationDeg = rotationDeg,
+                    // The full record of how and where the device was held at capture. The
+                    // fingerprint's geometry is frozen at that instant, so these are the conditions
+                    // any later attribution has to work from — and they exist nowhere else.
+                    captureEnvironment = captureEnvironment,
                 ),
                 targetImages = listOf(bitmap)
             )
