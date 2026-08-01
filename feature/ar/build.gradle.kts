@@ -99,3 +99,14 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
 }
+// `FootprintRegionWireTest` reads MobileGS.h and MobileGS.cpp as *text*: the Footprint.Region
+// ordinals are a wire format shared between Kotlin and C++ with nothing in either toolchain
+// validating them against each other. Declaring the sources as inputs keeps the task from staying
+// UP-TO-DATE when only the native side moves — which is precisely when the check matters.
+tasks.withType<Test>().configureEach {
+    inputs.files(
+        rootProject.file("core/nativebridge/src/main/cpp/include/MobileGS.h"),
+        rootProject.file("core/nativebridge/src/main/cpp/MobileGS.cpp"),
+    ).withPropertyName("nativeSourcesForRegionWireTest")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}

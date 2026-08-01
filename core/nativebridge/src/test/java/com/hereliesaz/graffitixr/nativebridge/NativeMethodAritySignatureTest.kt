@@ -51,6 +51,18 @@ class NativeMethodAritySignatureTest {
             m.groupValues[1] to (countCppParams(m.groupValues[2]) - 2)
         }
 
+        // Orphans on the C++ side. The intersection below structurally cannot see these — a JNI
+        // entry point with no Kotlin declaration is dead export surface that nothing will ever call,
+        // and two of them survived a feature deletion here before this assertion existed. The
+        // reverse direction (Kotlin with no C++) is not checked here because it fails loudly at
+        // runtime with UnsatisfiedLinkError; a C++ orphan fails silently, forever.
+        val orphans = (cppArities.keys - kotlinArities.keys).sorted()
+        assertTrue(
+            "GraffitiJNI.cpp exports $orphans with no matching `external fun` in SlamManager.kt. " +
+                "Nothing can call them; delete the export or add the declaration.",
+            orphans.isEmpty(),
+        )
+
         val checked = kotlinArities.keys.intersect(cppArities.keys)
         assertTrue(
             "no native method names matched between the two files; one of the two regexes is wrong",

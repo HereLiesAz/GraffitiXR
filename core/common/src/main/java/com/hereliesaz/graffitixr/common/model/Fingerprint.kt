@@ -71,24 +71,33 @@ data class Fingerprint(
     val captureHalfW: Float = -1f,
     val captureHalfH: Float = -1f,
     /**
-     * The design's **rigid** model matrix at capture (column-major 4x4, 16 floats), expressed in the
-     * *same frame as [points3d]* — the capture camera frame, not world. Empty when unknown.
+     * The fingerprint **anchor's** pose expressed in the capture camera frame — `V_cv · A`, where
+     * `V_cv` is the capture's CV-convention world→camera view and `A` the anchor's world pose
+     * (column-major 4x4, 16 floats). Empty when unknown.
      *
-     * Stored so the partition can be recomputed later without it. [points3d] is a capture-frame
-     * quantity that outlives the ARCore session that produced it; the design's world pose does not.
-     * Holding the world pose here would make a reclassify after a project reload silently wrong —
-     * two frames, both plausible, no way to tell them apart from the numbers. Pre-multiplying the
-     * capture view once, at capture, removes the frame question from every later caller:
+     * This is the bridge the Phase-2 partition crosses. [points3d] are in the capture camera frame;
+     * the artwork's pose is known in world. Φ needs both in one frame, and there is no *durable*
+     * world frame to meet in — ARCore's world origin does not survive a session, and even within one
+     * it drifts and gets corrected by reloc. The anchor is the frame that does survive, which is why
+     * [markCenterLocal] is already stored relative to it.
+     *
+     * So the durable composition is
      *
      * ```
-     * inv(V·M) · p_cam  ==  inv(M) · inv(V) · p_cam  ==  inv(M) · p_world
+     * design_in_points_frame  =  captureAnchorCam · (A_live⁻¹ · M_designWorld)
      * ```
      *
-     * Rigid, not composed: the overlay's scale is folded into [captureHalfW]/[captureHalfH] instead,
-     * because `Matrix.scaleM(m, 0, s, s, 1f)` is **not** a uniform similarity and inverting it as one
-     * is wrong on the Z axis. See `Footprint`'s "scale trap".
+     * — capture-time constant on the left, live anchor-relative design pose on the right, and no
+     * world frame anywhere. Both factors are rigid, so the product is, and `Footprint`'s rigid
+     * inverse stays applicable.
+     *
+     * Stored unconditionally at capture, **including when no design is placed yet**. That case is
+     * not an edge case: target creation is what *establishes* the anchor the artwork will sit on, so
+     * on a first capture there is no artwork to partition against. Recording this now is what lets
+     * the partition be computed later, the moment the design does land, instead of the fingerprint
+     * being permanently unpartitionable.
      */
-    val captureDesignModel: List<Float> = emptyList(),
+    val captureAnchorCam: List<Float> = emptyList(),
 ) {
     init {
         // Defensive: a corrupt or truncated project file must never construct a Fingerprint whose
@@ -128,8 +137,8 @@ data class Fingerprint(
         // A 4x4 or nothing. A short list here would be read as a matrix by every consumer and index
         // past its end; a long one silently ignores whatever follows. Neither should reach a
         // reclassify from a truncated project file.
-        require(captureDesignModel.isEmpty() || captureDesignModel.size == 16) {
-            "captureDesignModel holds ${captureDesignModel.size} floats; a column-major 4x4 is 16 " +
+        require(captureAnchorCam.isEmpty() || captureAnchorCam.size == 16) {
+            "captureAnchorCam holds ${captureAnchorCam.size} floats; a column-major 4x4 is 16 " +
                 "(or empty when unknown)"
         }
     }
@@ -183,7 +192,7 @@ data class Fingerprint(
         if (!regions.contentEquals(other.regions)) return false
         if (captureHalfW != other.captureHalfW) return false
         if (captureHalfH != other.captureHalfH) return false
-        if (captureDesignModel != other.captureDesignModel) return false
+        if (captureAnchorCam != other.captureAnchorCam) return false
         return true
     }
 
@@ -200,7 +209,7 @@ data class Fingerprint(
         result = 31 * result + regions.contentHashCode()
         result = 31 * result + captureHalfW.hashCode()
         result = 31 * result + captureHalfH.hashCode()
-        result = 31 * result + captureDesignModel.hashCode()
+        result = 31 * result + captureAnchorCam.hashCode()
         return result
     }
 

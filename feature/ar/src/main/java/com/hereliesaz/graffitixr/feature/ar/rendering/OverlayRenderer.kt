@@ -130,9 +130,13 @@ class OverlayRenderer(private val context: Context) : GlReleasable {
      * The artwork quad's current half-extents in metres, before the user's `overlayScale`.
      *
      * Exposed for the Phase-2 partition, which needs the design's real size on the wall to ask
-     * whether a feature sits under it. Read-only on purpose: the two [setExtent] call sites are a
-     * fixed constant and a one-shot screen-fit, and neither is user-driven — the user's resize is
-     * `overlayScale`, which lives in the model matrix.
+     * whether a feature sits under it. Read-only on purpose: neither [setExtent] call site is
+     * user-driven — the user's resize is `overlayScale`, which lives in the model matrix.
+     *
+     * The two writers are **ordered**, and the order is the trap. `ArRenderer.updateOverlayExtent`
+     * writes a fixed [QUAD_HALF_EXTENT] placeholder and can run at any time; the screen-fit that
+     * writes a real size is one-shot. So the placeholder can land *after* the fit and, unless the
+     * fit is re-armed, stick — which is exactly what `updateOverlayExtent` now does.
      */
     val extentHalfW: Float get() = halfW
     val extentHalfH: Float get() = halfH

@@ -21,8 +21,10 @@ import com.google.ar.core.CameraConfig
 import com.google.ar.core.CameraConfigFilter
 import com.hereliesaz.graffitixr.common.DispatcherProvider
 import com.hereliesaz.graffitixr.common.util.imageStats
+import com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import com.google.ar.core.Config
 import com.google.ar.core.Session
@@ -1509,27 +1511,49 @@ class ArViewModel @Inject constructor(
     @Volatile private var liveFingerprint: LiveFingerprint? = null
 
     /**
-     * The artist pinched the design: its footprint moved, so the stored partition now describes a
-     * shape that is no longer on the wall.
+     * Serializes the partition work and lets a newer request cancel an in-flight older one.
      *
-     * Recomputed from the stored 3D points — a pure-Kotlin pass over a few hundred points — rather
-     * than forcing a re-capture, which is the whole reason the design model is persisted in the
-     * points' own frame. A fingerprint that carries no model (legacy, depth path) is left alone by
-     * `reclassify`, so this degrades to a no-op instead of guessing a frame.
-     *
-     * Called from the GL thread; the work is dispatched off it.
+     * Both properties matter and neither is cosmetic. A pinch gesture moves the design every frame,
+     * so without cancellation this launches a coroutine per frame, each of which replaces the native
+     * fingerprint and writes the project file to disk. Without serialization those coroutines finish
+     * out of order, and the LAST write can be the partition for an intermediate size — leaving
+     * native and disk describing a design the artist has already resized past, with nothing to
+     * correct it because the renderer's own extent tracking has moved on.
      */
-    fun onDesignExtentChanged(halfW: Float, halfH: Float) {
+    private var partitionJob: Job? = null
+
+    /**
+     * The artwork was placed or resized: (re)partition the live fingerprint against where it now
+     * sits (`IMPLEMENTATION.md` 2.2/2.4).
+     *
+     * **This is where the partition actually happens**, not at capture. Target creation is what
+     * establishes the anchor the artwork will sit on, so a capture has no placed design to ask Φ
+     * about; the first time the question has an answer is here.
+     *
+     * Fires on an unpartitioned fingerprint as well as a stale one. That is the case
+     * `FingerprintPartition.partition` was written for and the one the flow above guarantees:
+     * `isPartitionStale` is defined as false when there is no partition yet, so gating on staleness
+     * alone would mean a fingerprint that starts unpartitioned stays that way forever.
+     *
+     * Called from the GL thread; all work is dispatched off it.
+     */
+    fun onDesignFootprintChanged(design: FingerprintPartition.DesignFootprint) {
         val live = liveFingerprint ?: return
-        if (!live.fingerprint.isPartitionStale(halfW, halfH)) return
-        viewModelScope.launch(Dispatchers.Default) {
+        val fp = live.fingerprint
+        if (!fp.isUnpartitioned() && !fp.isPartitionStale(design.halfW, design.halfH)) return
+        // Cancel rather than skip: the newest design size is the correct one, and an older in-flight
+        // partition can only write a size the artist has already left behind.
+        partitionJob?.cancel()
+        partitionJob = viewModelScope.launch(Dispatchers.Default) {
             val current = liveFingerprint ?: return@launch
-            val updated = com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
-                .reclassify(current.fingerprint, halfW, halfH)
-            // Identity check, not equality: reclassify returns the RECEIVER when it refuses (no
-            // stored design model), and re-pushing an unchanged fingerprint would reset native's
-            // reloc state for nothing.
+            val updated = FingerprintPartition.partition(current.fingerprint, design)
+            // Identity, not equality: `partition` returns the RECEIVER when it refuses (no points, no
+            // captureAnchorCam, no usable extents), and re-pushing an unchanged fingerprint would
+            // reset native's reloc state for nothing.
             if (updated === current.fingerprint) return@launch
+            ensureActive()
+
+            val backbone = FingerprintPartition.backboneCount(updated)
             slamManager.restoreWallFingerprintMetric(
                 updated.descriptorsData, updated.descriptorsRows, updated.descriptorsCols,
                 updated.descriptorsType, updated.points3d.toFloatArray(),
@@ -1538,14 +1562,36 @@ class ArViewModel @Inject constructor(
                 regions = updated.regions,
             )
             liveFingerprint = LiveFingerprint(updated, current.anchor, current.intrinsics, current.view)
-            // Persist so the next load starts from the size the artist actually settled on. Merged
-            // through the repository transform rather than a full-object write, for the save-race
-            // reason documented on the wall-map save above.
+
+            // IMPLEMENTATION.md 2.8, relocated. The capture cannot raise this — it has no footprint
+            // to measure — so it is raised here, where the artwork's size is what made it true. A
+            // warning rather than a refusal for the same reason: by this point the target exists and
+            // the honest advice is "make the artwork smaller or step back", not "that never worked".
+            val tooSmall = backbone in 0 until FingerprintPartition.MIN_BACKBONE
+            val wasTooSmall = _uiState.value.backboneTooSmall
+            _uiState.update { it.copy(backboneTooSmall = tooSmall) }
+            // Say it, don't just record it. A `uiState` boolean that nothing reads is the same
+            // failure as an operator that nothing calls — and this codebase already had one of these
+            // sitting next to it (`legacyFingerprintRefused`, set with a KDoc claiming it was
+            // "surfaced", read by nothing). Emitted on the EDGE so a slow pinch through the
+            // threshold does not toast every frame.
+            if (tooSmall && !wasTooSmall) {
+                _feedback.tryEmit(
+                    com.hereliesaz.graffitixr.common.model.FeedbackEvent.Toast(
+                        "The artwork covers nearly all the wall in view — only $backbone tracked " +
+                            "features sit outside it. Make it smaller or step back, or the target " +
+                            "may not lock.",
+                    ),
+                )
+            }
+
+            // Persist so the next load starts from the size the artist settled on. Merged through
+            // the repository transform rather than a full-object write, for the save-race reason
+            // documented on the wall-map save above.
             projectRepository.updateProject { it.copy(fingerprint = updated) }
             Timber.i(
-                "Design resized to %.3f x %.3f m; repartitioned %d points (backbone %d)",
-                halfW, halfH, updated.points3d.size / 3,
-                com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.backboneCount(updated),
+                "Design footprint %.3f x %.3f m; partitioned %d points, backbone %d",
+                design.halfW, design.halfH, updated.points3d.size / 3, backbone,
             )
         }
     }
@@ -1578,6 +1624,15 @@ class ArViewModel @Inject constructor(
                             "frame and the capture rotation was never recorded. Re-capture the target.",
                     )
                     _uiState.update { it.copy(legacyFingerprintRefused = true) }
+                    // Same argument as backboneTooSmall above: the flag's own KDoc says it is
+                    // "surfaced so the artist is told to re-capture", and until now nothing read it,
+                    // so the target silently never locked and looked like bad tracking.
+                    _feedback.tryEmit(
+                        com.hereliesaz.graffitixr.common.model.FeedbackEvent.Toast(
+                            "This project's saved target was made by an older version and its 3D " +
+                                "geometry can't be corrected. Create the target again to use it.",
+                        ),
+                    )
                     return@launch
                 }
 
@@ -2002,11 +2057,6 @@ class ArViewModel @Inject constructor(
          */
         environment: com.hereliesaz.graffitixr.common.model.CaptureEnvironment =
             com.hereliesaz.graffitixr.common.model.CaptureEnvironment(),
-        /**
-         * Where the artwork sat at capture, for the Phase-2 partition. Null leaves the fingerprint
-         * unpartitioned, which every consumer reads as all-backbone — pre-Phase-2 behaviour.
-         */
-        design: com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.DesignFootprint? = null,
     ) {
         // Doodle demo: a headless capture (no tap, no review) — build the fingerprint from the
         // drawing and return before the normal capture/review flow runs. Clear the capture-request
@@ -2052,9 +2102,6 @@ class ArViewModel @Inject constructor(
                     targetIntrinsics = intrinsics,
                     targetCaptureViewMatrix = viewMatrix,
                     targetWallPlane = wallPlane,
-                    targetDesignModel = design?.rigidModel,
-                    targetDesignHalfW = design?.halfW ?: -1f,
-                    targetDesignHalfH = design?.halfH ?: -1f,
                     targetPhysicalExtent = extent,
                     isCaptureRequested = false,
                     tempCaptureBitmap = rotatedBmp,
@@ -2085,9 +2132,6 @@ class ArViewModel @Inject constructor(
                 targetIntrinsics = intrinsics,
                 targetCaptureViewMatrix = viewMatrix,
                 targetWallPlane = wallPlane,
-                targetDesignModel = design?.rigidModel,
-                targetDesignHalfW = design?.halfW ?: -1f,
-                targetDesignHalfH = design?.halfH ?: -1f,
                 targetPhysicalExtent = extent,
                 isCaptureRequested = false
             )

@@ -1243,11 +1243,6 @@ class MainActivity : ComponentActivity() {
                                             // view matrix now follows (Phase 0, convention B).
                                             arUiState.targetDisplayRotation,
                                             arUiState.targetCaptureEnvironment,
-                                            // Where the artwork was at capture, for the Phase-2
-                                            // partition. Absent leaves it unpartitioned.
-                                            arUiState.targetDesignModel,
-                                            arUiState.targetDesignHalfW,
-                                            arUiState.targetDesignHalfH,
                                         )
                                     },
                                     onRetake = {

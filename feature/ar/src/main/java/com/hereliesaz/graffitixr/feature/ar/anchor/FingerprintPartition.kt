@@ -39,50 +39,55 @@ object FingerprintPartition {
     const val DEFAULT_OUTER_MARGIN = 0.10f
 
     /**
-     * The design's placement at capture, in **world** space, as the renderer knows it.
+     * Minimum backbone size for a partitioned fingerprint to be able to relocalize at all
+     * (`IMPLEMENTATION.md` 2.8).
+     *
+     * `F_out` is what the reloc PnP solves from with no prior. If the artwork covers the whole
+     * visible wall there is nothing outside it and the target will never lock — `PAPER.md` states
+     * this as a limit of the domain of applicability, so the implementation's job is to say so
+     * plainly rather than let the artist discover it as mysterious tracking failure an hour in.
+     *
+     * `40` is the pre-registered `PARAMETERS.md` §4 prior: 5× the native PnP correspondence floor of
+     * 8, leaving room for the fact that only a fraction of stored features match in any one live
+     * frame. A prior, not a measurement — `EVALUATION.md` E8 sets it, and both failure modes are
+     * real: too high cries wolf, too low stays silent on a target that cannot work.
+     *
+     * Checked where the partition is computed, which is when the artwork is placed — **not** at
+     * capture. Target creation is what establishes the anchor the artwork sits on, so at capture
+     * there is no footprint and therefore no such thing as too little wall around it.
+     */
+    const val MIN_BACKBONE = 40
+
+    /**
+     * Where the artwork sits, expressed **relative to the fingerprint anchor** — `A⁻¹ · M_design` —
+     * together with its effective, scale-included half-extents in metres.
+     *
+     * **Anchor-relative, not world.** The obvious choice is the design's world pose, and it is
+     * wrong: ARCore's world origin does not survive a session, and within one it drifts and is
+     * corrected by relocalization, so a world pose recorded at one moment does not describe the same
+     * physical place at another. The anchor does survive both — it is the frame
+     * [Fingerprint.markCenterLocal] already uses for exactly this reason — so pairing it with
+     * [Fingerprint.captureAnchorCam] gives a composition with no world frame in it at all.
      *
      * One object rather than three loose parameters because the three are only meaningful together,
-     * and because "no partition" then reads as a deliberate `null` at the call site instead of three
-     * numbers somebody forgot. Absent is safe here — an unpartitioned fingerprint is the legacy
-     * all-backbone case, i.e. exactly today's behaviour — which is why the builder is allowed to
-     * default it away, unlike `rotationDeg`, where the safe value does not exist.
+     * and because "no design placed" then reads as a deliberate `null` at the call site instead of
+     * three numbers somebody forgot. Absent is safe: an unpartitioned fingerprint is the legacy
+     * all-backbone case, which is exactly the behaviour before Phase 2.
      *
-     * @param rigidModel the design's world pose **without** the overlay scale.
+     * @param rigidModelAnchorLocal the design's pose relative to the anchor, **without** the overlay
+     *   scale — that is folded into the extents instead, because `Matrix.scaleM(m, 0, s, s, 1f)`
+     *   scales X and Y but not Z and is therefore not the uniform similarity an inverse-with-scale
+     *   would assume. See `Footprint`'s "scale trap".
      * @param halfW the design's **effective** (scale-included) half-width in metres.
      */
     class DesignFootprint(
-        val rigidModel: FloatArray,
+        val rigidModelAnchorLocal: FloatArray,
         val halfW: Float,
         val halfH: Float,
     ) {
         /** True when this describes a design with real extents; a zero/negative one cannot be Φ'd. */
         val isUsable: Boolean
-            get() = rigidModel.size == 16 && halfW > 1e-6f && halfH > 1e-6f
-
-        /**
-         * The same footprint with its model expressed in a capture camera frame, given that frame's
-         * world→camera view.
-         *
-         * This is the whole frame story in one line. [Fingerprint.points3d] are camera-frame, the
-         * renderer's design pose is world-frame, and Φ requires both in one frame. Pre-multiplying
-         * the view is exact rather than approximate:
-         *
-         * ```
-         * inv(V·M) · p_cam  ==  inv(M) · inv(V) · p_cam  ==  inv(M) · p_world
-         * ```
-         *
-         * and rigid ∘ rigid stays rigid, so [Footprint.inverseOfRigid] remains applicable. Doing it
-         * this way — rather than mapping every point to world — also costs one 4x4 multiply instead
-         * of one per feature, and leaves a single matrix that can be stored for a later reclassify.
-         *
-         * [PoseMath.multiply] rather than `android.opengl.Matrix.multiplyMM`: identical arithmetic,
-         * but it runs under a plain JVM unit test. The framework version is a stub off-device, and a
-         * stubbed matrix multiply does not fail — it silently yields zeros, which invert to garbage
-         * and classify everything as INSIDE. This function's whole correctness claim is a frame
-         * reconciliation, so it has to be the kind of thing a test can actually exercise.
-         */
-        fun inFrameOf(view: FloatArray): DesignFootprint =
-            DesignFootprint(PoseMath.multiply(view, rigidModel), halfW, halfH)
+            get() = rigidModelAnchorLocal.size == 16 && halfW > 1e-6f && halfH > 1e-6f
     }
 
     /**
@@ -90,8 +95,8 @@ object FingerprintPartition {
      *
      * [points] and [designModel] must be expressed in the **same frame**, whichever that is. Φ is
      * frame-agnostic: it only ever computes `inv(designModel) · p`, so world/world and camera/camera
-     * are both correct and world/camera is silently, plausibly wrong. Use
-     * [DesignFootprint.inFrameOf] to reconcile them rather than doing it by hand at the call site.
+     * are both correct and world/camera is silently, plausibly wrong. Prefer [partition], which
+     * composes the frames for you, over reconciling them by hand at the call site.
      *
      * @param designModel the design's model matrix. Pass [composed] = true when it carries the
      *   overlay's uniform in-plane scale, in which case [halfW]/[halfH] must be the design's
@@ -127,62 +132,51 @@ object FingerprintPartition {
     }
 
     /**
-     * Recompute [Fingerprint.regions] against a new design size, returning an updated copy.
+     * Partition (or repartition) [fingerprint] against where the artwork currently sits, returning
+     * an updated copy.
      *
-     * The artist pinching the design mid-session is normal, so the response is to reclassify the
-     * stored 3D points — a cheap pure-Kotlin pass — rather than force a re-capture.
+     * This is the only entry point production should use, and it takes no matrix in the points'
+     * frame — so no caller can supply one in the wrong frame. It composes the two durable factors:
      *
-     * Returns the receiver unchanged when there is nothing to do: no points to classify. Note it
-     * does **not** short-circuit on [Fingerprint.isPartitionStale] being false, because a caller may
-     * legitimately want to partition a previously-unpartitioned (legacy) fingerprint, for which
-     * "stale" is defined as false.
+     * ```
+     * design_in_points_frame  =  fingerprint.captureAnchorCam · design.rigidModelAnchorLocal
+     * ```
      *
-     * [designModel] must be **rigid**, with the overlay scale folded into [halfW]/[halfH] — the
-     * convention `Footprint` calls preferred, and the only one that can be stored and replayed. A
-     * composed matrix has no place here: `Matrix.scaleM(m, 0, s, s, 1f)` scales X and Y but not Z,
-     * so it is not the uniform similarity [Footprint.inverseOfComposed] assumes, and the stored
-     * [Fingerprint.captureHalfW] is defined as scale-included regardless.
+     * the first frozen at capture, the second read live off the renderer, and neither expressed in
+     * a world frame that drift or a session boundary could invalidate.
+     *
+     * **This runs when the artwork lands, not (only) at capture.** Target creation is what
+     * *establishes* the anchor the artwork will sit on, so at first capture there is no design to
+     * partition against and `regions` is legitimately empty. Deferring the partition to the moment
+     * the design is placed or resized is not a fallback — it is the only point in the flow where the
+     * question Φ asks ("is this feature under the artwork?") has an answer.
+     *
+     * Returns the **receiver itself** — identity-comparable, so a caller can cheaply skip a
+     * re-push — when it cannot honestly partition: no 3D points, no [Fingerprint.captureAnchorCam]
+     * (a pre-Phase-2 or depth-path fingerprint), or a design with no usable extents. Each is a
+     * refusal rather than a guess: partitioning against an assumed frame produces a complete,
+     * plausible, wrong answer, whereas leaving it unpartitioned reproduces `main` exactly.
      */
-    fun reclassify(
+    fun partition(
         fingerprint: Fingerprint,
-        designModel: FloatArray,
-        halfW: Float,
-        halfH: Float,
+        design: DesignFootprint,
         innerMargin: Float = DEFAULT_INNER_MARGIN,
         outerMargin: Float = DEFAULT_OUTER_MARGIN,
     ): Fingerprint {
         if (fingerprint.points3d.isEmpty()) return fingerprint
-        val regions = classify(
-            fingerprint.points3d.toFloatArray(), designModel, halfW, halfH,
-            composed = false, innerMargin = innerMargin, outerMargin = outerMargin,
+        if (fingerprint.captureAnchorCam.size != 16) return fingerprint
+        if (!design.isUsable) return fingerprint
+        val designInPointFrame = PoseMath.multiply(
+            fingerprint.captureAnchorCam.toFloatArray(), design.rigidModelAnchorLocal,
         )
         return fingerprint.copy(
-            regions = regions,
-            captureHalfW = halfW,
-            captureHalfH = halfH,
-            // Keep the model that produced these bytes with them. Without it the next reclassify has
-            // to be handed a matrix again, and after a project reload there is no correct one to
-            // hand it — the capture's world frame is gone with the ARCore session.
-            captureDesignModel = designModel.toList(),
+            regions = classify(
+                fingerprint.points3d.toFloatArray(), designInPointFrame, design.halfW, design.halfH,
+                composed = false, innerMargin = innerMargin, outerMargin = outerMargin,
+            ),
+            captureHalfW = design.halfW,
+            captureHalfH = design.halfH,
         )
-    }
-
-    /**
-     * Reclassify against the design model the fingerprint already carries — the reload-safe form.
-     *
-     * This is the one a resize handler should call. It cannot be given a matrix in the wrong frame
-     * because it is not given one at all: [Fingerprint.captureDesignModel] was pre-multiplied into
-     * the capture frame at capture, which is the frame [Fingerprint.points3d] is in.
-     *
-     * Returns the receiver unchanged when there is no stored model (a pre-Phase-2 or depth-path
-     * fingerprint). That is a refusal, not a silent success: reclassifying against a guessed frame
-     * would produce a full, plausible, wrong partition, and the legacy all-backbone reading is the
-     * behaviour `main` already has.
-     */
-    fun reclassify(fingerprint: Fingerprint, halfW: Float, halfH: Float): Fingerprint {
-        val model = fingerprint.captureDesignModel
-        if (model.size != 16) return fingerprint
-        return reclassify(fingerprint, model.toFloatArray(), halfW, halfH)
     }
 
     /**
