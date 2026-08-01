@@ -748,8 +748,17 @@ order.** Work top to bottom.
       convention. `PoseFusionTest` now pins the factor order with non-commuting
       operands; extend it for the rotation, not with another round-trip (a
       round-trip is order-insensitive and would pass either way). **[T]**
-- [ ] **0.7** Add `captureRotationDeg` to `Fingerprint`; default `-1`; refuse to
+- [x] **0.7** Add `captureRotationDeg` to `Fingerprint`; default `-1`; refuse to
       reload a legacy fingerprint and prompt for re-capture. **[T]**
+      *(DONE. Safe to add to `Fingerprint` after all: JNI constructs through the FROZEN
+      `fromNative` static factory, not the primary constructor, precisely so defaulted
+      fields cannot break the descriptor lookup — the model comment claiming a "fixed
+      constructor signature" is superseded by that factory, and was checked against
+      `JNI_FACTORY_DESCRIPTOR` before the field was added. The refusal keys on
+      `isLegacyFrame()` = metric points present AND no recorded rotation, so a
+      descriptors-only fingerprint — no 3D, nothing to be in the wrong frame — is never
+      refused. `< 0` and not `<= 0`: landscape capture is `rotationNeeded == 0` and is
+      valid. Mutation-tested; `<= 0` fails 2 tests.)*
       *(STILL OPEN — the one Phase 0 item not landed. A fingerprint saved before this
       change stores sensor-frame points; it is no **worse** than it was, because the live
       side was already display-frame and the pair never agreed, but it is not fixed either
@@ -804,10 +813,14 @@ order.** Work top to bottom.
       through the literal-matrix-tested CV converter, rather than rebuilding `D·R_z·D`
       in the test — which would have been the implementation retyped. Mutation-tested:
       using the same sense as CV fails 2 tests.)*
-- [ ] **0.11** Persist `captureRotationDeg` in `GraffitiProject` at save time.
+- [x] **0.11** Persist `captureRotationDeg` in `GraffitiProject` at save time.
       Without it, projects captured *after* Phase 0 — the correct ones — are
       indistinguishable on disk from legacy ones, so 0.7's "refuse to reload a legacy
       fingerprint" would reject them too.
+      *(DONE, and it caught a second defect: `saveProject` persisted
+      `fingerprintViewMatrix = view.toList()` — the RAW sensor-frame view — so 0.10 was
+      undone the moment a project reloaded. Now persists the display-oriented view,
+      matching both the stored points and what native received at capture.)*
 
 ### Phase 2 — partition the fingerprint
 
