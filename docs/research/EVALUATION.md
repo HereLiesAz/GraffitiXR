@@ -10,6 +10,30 @@ number" produces a number nobody can defend later.
 
 ---
 
+> [!CAUTION]
+> **`errMm` was structurally `-1` in every CSV row written before 2026-08-01.** Any run
+> recorded before then measures nothing and must be discarded rather than
+> re-interpreted.
+>
+> `DriftCostProbe` only records a pose error when it is handed a ground-truth pose,
+> and `ArRenderer` gated that on
+> `slamManager.getVisibleConfidenceAvg() > markVisibleConf` with `markVisibleConf =
+> 0.5f`. `MobileGS::getConfidenceAvgs` assigns `0.0f` to both outputs
+> unconditionally — "voxel/splat map deleted" — so the comparison was `0.0 > 0.5`,
+> always false. `truthPose` was always null, so `errMm` and `errDeg` were always
+> `-1` and `marksVisible` always `false`.
+>
+> This makes **E2, E3, E4, E5, E10, E11 and E12 unrunnable as written**, not merely
+> noisy: each compares `errMm`, and there was no `errMm`. All of Phase 6a's
+> telemetry — the CSV shape guard, the reloc columns, the run-identity sidecar, the
+> fixed RANSAC seed — was feeding a file whose headline column was absent.
+>
+> The gate now keys on `RelocDiagnostics`: truth is recorded when relocalization
+> published a pose this cycle (`reject == OK`) with at least 6 inliers, matching
+> `PoseFusion`'s own bar for a usable fix. **This has not been validated on device**
+> — it is known-correct in the sense that the old gate was unconditionally false and
+> this one is not, which is a weaker claim than "the numbers are right".
+
 ## 1. The measurement problem
 
 ### 1.1 What we actually want to know

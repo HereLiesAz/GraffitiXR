@@ -2066,13 +2066,18 @@ private fun DiagnosticOverlay(
             Spacer(Modifier.height(4.dp))
 
             Text(text = "CONFIDENCE", color = Color.Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            ConfidenceProgressBar("Visible", uiState.visibleSplatConfidenceAvg)
-            ConfidenceProgressBar("Global", uiState.globalSplatConfidenceAvg)
+            // "Visible"/"Global" splat confidence removed: getConfidenceAvgs() assigns 0.0 to both
+            // unconditionally ("voxel/splat map deleted"), so both bars rendered empty forever. A
+            // progress bar pinned at zero reads as "the system is failing", not "this number no
+            // longer exists" — the same misreading the debugView `voxels=0` field invited.
 
             Spacer(Modifier.height(4.dp))
 
-            DiagnosticRow("Splats", "${uiState.splatCount}", Color.White)
-            DiagnosticRow("Immutable", "${uiState.immutableSplatCount}", if (uiState.immutableSplatCount > 0) HotPink else Color.White)
+            // "Splats" named the voxel/splat map, which was deleted; this number is now the
+            // accumulated ARCore point cloud. A label that names a subsystem the app no longer has
+            // sends the reader looking for the wrong thing — the same reason the debugView line
+            // stopped printing `voxels=`.
+            DiagnosticRow("Map points", "${uiState.splatCount}", Color.White)
 
             val sensors = uiState.sensorData
             if (sensors != null) {

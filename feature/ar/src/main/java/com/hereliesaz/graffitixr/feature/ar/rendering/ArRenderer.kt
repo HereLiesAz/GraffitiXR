@@ -219,7 +219,14 @@ class ArRenderer(
     // Scratch holder for the mark-PnP "truth" pose read from the native anchor transform.
     private val truthPoseScratch = FloatArray(16)
     // Visible-confidence threshold above which mark-PnP is treated as truth for eval.
-    private val markVisibleConf = 0.5f
+    /**
+     * Inliers required before a relocalization is trusted as eval ground truth.
+     *
+     * Matches PoseFusion's own bar for a usable fix rather than inventing a second one: a pose good
+     * enough to move the overlay is good enough to measure against, and two different thresholds
+     * would make the CSV disagree with what the app actually did.
+     */
+    private val MIN_TRUTH_INLIERS = 6
 
     @Volatile var showAnchorBoundary: Boolean = false
     @Volatile var anchorEstablished: Boolean = false
@@ -1189,9 +1196,25 @@ class ArRenderer(
             if (frameCount % 4 == 0) {
                 driftCostProbe?.let { probe ->
                     val stageMs = slamManager.getStageTimings()
-                    // Truth = mark-PnP pose when a confident match exists; getVisibleConfidenceAvg()
-                    // gates "marks visible". Reuse the native anchor transform as the PnP-refined pose.
-                    val marksVisible = slamManager.getVisibleConfidenceAvg() > markVisibleConf
+                    // Truth = the mark-PnP pose, available only when relocalization actually
+                    // published one this cycle.
+                    //
+                    // This gate used to be `getVisibleConfidenceAvg() > markVisibleConf` (0.5f).
+                    // getConfidenceAvgs returns a HARDCODED 0.0 — "voxel/splat map deleted" — so the
+                    // comparison was `0.0 > 0.5`, always false. truthPose was therefore always null,
+                    // and EVERY eval CSV row carried errMm = -1 and marksVisible = false. The
+                    // harness's headline metric could not be populated at all, which makes every
+                    // errMm comparison in EVALUATION.md (E2's baseline, E3, E4's screening, E10,
+                    // E11, E12) unrunnable rather than merely noisy. All of Phase 6a's telemetry fed
+                    // a file whose primary column was structurally absent.
+                    //
+                    // RelocDiagnostics is the live signal: reject == OK means solvePnPRansac
+                    // published a pose this cycle, and the inlier count says how well. Read once
+                    // here and reused for the reloc columns below, so the row's truth flag and its
+                    // diagnostics describe the same relocalization rather than two samples.
+                    val relocDiag = slamManager.getRelocDiagnostics()
+                    val marksVisible = relocDiag.reject == com.hereliesaz.graffitixr.common.model
+                        .RelocReject.OK && relocDiag.inliers >= MIN_TRUTH_INLIERS
                     val truth = if (marksVisible) {
                         System.arraycopy(slamManager.getAnchorTransform(), 0, truthPoseScratch, 0, 16)
                         truthPoseScratch
@@ -1211,7 +1234,7 @@ class ArRenderer(
                         // not exist outside an eval run, and the block already allocates two
                         // FloatArrays per tick. (An earlier comment here said "four atomics", which
                         // was neither the count nor the mechanism.)
-                        reloc = slamManager.getRelocDiagnostics(),
+                        reloc = relocDiag,
                         // E0b's independent variable is the rotation that was in force AT CAPTURE,
                         // because that is the one baked into the fingerprint's 3D points. Sampling
                         // the live rotation here instead — which an earlier version of this call
