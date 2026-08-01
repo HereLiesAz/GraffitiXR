@@ -967,13 +967,34 @@ order.** Work top to bottom.
 
 ### Phase 4 — spatially-constrained corroboration
 
-- [ ] **4.1** Create `feature/ar/.../anchor/SearchRadius.kt`; compute `r` from
+- [x] **4.1** Create `feature/ar/.../anchor/SearchRadius.kt`; compute `r` from
       `ρ`, half-extents, wall distance, focal length. Floor and ceiling it. **[T]**
-- [ ] **4.2** `SearchRadiusTest` — assert scaling relationships, not absolutes. **[T]**
-- [ ] **4.3** Feed the measured `errMm` from `DriftCostProbe` into `r` so the
+      *(Two asymmetries are deliberate. Degenerate geometry returns the CEILING —
+      a too-wide search costs precision the ratio test still filters, a too-tight
+      one returns nothing and reads as "the wall does not corroborate the design",
+      indistinguishable from an unpainted wall. And the design's anisotropy enters
+      as a geometric mean, not a max: the radius bounds how wrong a POSE is, and
+      that error is isotropic in the image whatever the artwork's aspect ratio.)*
+- [x] **4.2** `SearchRadiusTest` — assert scaling relationships, not absolutes. **[T]**
+      *(Ratios only, because every constant here is a prior E6/E7/E11 are expected
+      to move; a test pinning an absolute would encode a guess as a requirement.
+      The priors themselves are pinned separately and literally, so a silent edit
+      shows up as a test change rather than a number that quietly moved.)*
+- [x] **4.3** Feed the measured `errMm` from `DriftCostProbe` into `r` so the
       radius widens when the pose is known to be drifting. **[T]**
-- [ ] **4.4** Implement uniform-grid keypoint bucketing in Kotlin as the
+      *(`errMm < 0` is "not measured" and contributes nothing — not a confident
+      zero, and not an invented widening either. Mutation-verified: dropping the
+      drift term fails two tests.)*
+- [x] **4.4** Implement uniform-grid keypoint bucketing in Kotlin as the
       reference implementation, with a brute-force equivalence test. **[T]**
+      *(Equivalence is asserted one-directionally — every true neighbour must be
+      returned, extras are allowed — because that is the contract the grid
+      actually offers; asserting set equality would assert a contract it does not.
+      The tests caught a real defect in the first cut: out-of-range queries were
+      CLAMPED into the grid, so on a one-cell grid a query nowhere near any
+      keypoint returned all of them, turning the local search back into a global
+      one. Mutation-verified against a hard-coded 3x3 sweep, which is the error
+      the native transliteration is most likely to reintroduce.)*
 - [ ] **4.5** Transliterate the grid into `MobileGS.cpp`; replace the global
       `knnMatch` against `artDescs` with the gated match. **[N]**
 - [ ] **4.6** Publish `corrobPredicted` / `corrobMatched` / `searchRadiusPx`

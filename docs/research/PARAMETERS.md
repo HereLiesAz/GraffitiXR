@@ -135,17 +135,33 @@ different questions asked at different moments.
 
 ---
 
-## 5. Spatially-constrained corroboration — proposed
+## 5. Spatially-constrained corroboration — Kotlin reference landed
 
-From Phase 4. These two are the most important numbers in the plan.
+From Phase 4. These are the most important numbers in the plan. The pure-Kotlin
+half has landed (`SearchRadius.kt`, `KeypointGrid.kt`, 4.1–4.4); the native
+transliteration and the gated match (4.5–4.8) have not, so nothing reads these at
+runtime yet.
 
-| Parameter | Prior | Reasoning for the prior | Set by |
-|---|---|---|---|
-| `CORROB_SEARCH_RHO` | `0.05` | The paper's §5.5 worked example: at ρ=0.05 the candidate set is ~0.2% of the design | E6, refined by E7 |
-| `CORROB_LOWE_RATIO` | `0.85` | Looser than the reloc path's 0.75, which is the entire point — a smaller candidate set should admit a looser threshold at the same precision | E7 |
-| `SEARCH_RADIUS_MIN_PX` | `4` | Below a few pixels the radius is inside the keypoint localization noise | **E11** |
-| `SEARCH_RADIUS_MAX_PX` | `120` | Above this the "local" search is not local and the argument collapses | **E11** |
-| `SEARCH_RADIUS_ERR_GAIN` | `1.0` | Radius scales linearly with measured `errMm`; gain 1.0 is the neutral prior | **E11** |
+| Parameter | Location | Current | Prior | Basis | Set by |
+|---|---|---|---|---|---|
+| `SearchRadius.RHO` | `SearchRadius.kt` | `0.05` | `0.05` | guessed — the paper's §5.5 worked example: at ρ=0.05 the candidate set is ~0.2% of the design | E6, refined by E7 |
+| `CORROB_LOWE_RATIO` | *proposed*, 4.7 | — | `0.85` | **a prediction, not a setting** — see below | E7 |
+| `SearchRadius.MIN_PX` | `SearchRadius.kt` | `4` | `4` | guessed — below a few pixels the radius is inside the keypoint localization noise | **E11** |
+| `SearchRadius.MAX_PX` | `SearchRadius.kt` | `120` | `120` | guessed — above this the "local" search is not local and the argument collapses | **E11** |
+| `SearchRadius.ERR_GAIN` | `SearchRadius.kt` | `1.0` | `1.0` | guessed — radius scales linearly with measured `errMm`; 1.0 is the neutral prior | **E11** |
+
+All four landed at their pre-registered priors, which is worth stating explicitly
+given §4's history: the Phase-2 margins shipped at values this file did not
+predict and nobody noticed until an audit checked.
+
+**Two asymmetries in `SearchRadius` are deliberate and are not tuning.**
+Degenerate geometry (no distance, no focal length, no design extent) returns the
+**ceiling**, not the floor: a too-wide search costs precision that the ratio test
+still filters, while a too-tight one returns no candidates and reads downstream
+as "the wall does not corroborate the design" — a confident wrong answer
+indistinguishable from an unpainted wall. And an `errMm` of -1 means *not
+measured* (the `DriftCostProbe` convention), contributing no drift term rather
+than being read as a confident zero.
 
 `CORROB_LOWE_RATIO` at 0.85 is a *prediction*, not a setting. P2 says the local
 test admits a larger threshold than the global one; 0.85 is where we expect to
