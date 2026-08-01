@@ -18,8 +18,12 @@
     <uses-feature android:glEsVersion="0x00030000" android:required="false" />
 
     <!-- Storage and Location Permissions -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- No READ_MEDIA_IMAGES / READ_EXTERNAL_STORAGE.
+         Every image comes from the Android photo picker (ActivityResultContracts.PickVisualMedia),
+         and project import uses ActivityResultContracts.GetContent (SAF). Both hand back a URI the
+         app already has read access to, so neither needs a broad storage grant — and Play policy
+         only permits these permissions where a system picker is technically insufficient, which
+         here it is not. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />

@@ -10,6 +10,30 @@ number" produces a number nobody can defend later.
 
 ---
 
+> [!CAUTION]
+> **`errMm` was structurally `-1` in every CSV row written before 2026-08-01.** Any run
+> recorded before then measures nothing and must be discarded rather than
+> re-interpreted.
+>
+> `DriftCostProbe` only records a pose error when it is handed a ground-truth pose,
+> and `ArRenderer` gated that on
+> `slamManager.getVisibleConfidenceAvg() > markVisibleConf` with `markVisibleConf =
+> 0.5f`. `MobileGS::getConfidenceAvgs` assigns `0.0f` to both outputs
+> unconditionally — "voxel/splat map deleted" — so the comparison was `0.0 > 0.5`,
+> always false. `truthPose` was always null, so `errMm` and `errDeg` were always
+> `-1` and `marksVisible` always `false`.
+>
+> This makes **E2, E3, E4, E5, E10, E11 and E12 unrunnable as written**, not merely
+> noisy: each compares `errMm`, and there was no `errMm`. All of Phase 6a's
+> telemetry — the CSV shape guard, the reloc columns, the run-identity sidecar, the
+> fixed RANSAC seed — was feeding a file whose headline column was absent.
+>
+> The gate now keys on `RelocDiagnostics`: truth is recorded when relocalization
+> published a pose this cycle (`reject == OK`) with at least 6 inliers, matching
+> `PoseFusion`'s own bar for a usable fix. **This has not been validated on device**
+> — it is known-correct in the sense that the old gate was unconditionally false and
+> this one is not, which is a weaker claim than "the numbers are right".
+
 ## 1. The measurement problem
 
 ### 1.1 What we actually want to know
@@ -348,6 +372,29 @@ and lock rate.
 > deliberate call — but it was not recorded when the call was made, and a device
 > session spent on tip-of-tree would have produced a confident falsification of a
 > defect that had just been repaired.
+
+**Precondition — auto-rotate must be ON, or the independent variable never moves.**
+
+The app tracks the **display** rotation, not the device's physical orientation.
+There is no `OrientationEventListener` and no sensor listener anywhere in the
+codebase; `rotationNeeded` is derived entirely from `CameraCharacteristics`'
+`sensorOrientation` (a fixed hardware constant) and `display.rotation`, which
+`DisplayRotationHelper` reads from a `DisplayListener`.
+
+The manifest sets `screenOrientation="fullUser"`, which respects the user's
+auto-rotate setting. **With auto-rotate off the activity stays locked,
+`display.rotation` never changes, and `rotationNeeded` is constant however the
+phone is physically held.** E0b's method — "capture in landscape, then in
+portrait" — manipulates physical orientation, so under rotation lock both arms are
+the *same* condition. The experiment would report "identical behaviour in both
+orientations", which the **Falsifies** clause below tells the reader to interpret
+as refuting §8. It would be refuting nothing.
+
+Check the CSV rather than trusting the setting: if `captureRotationNeededDeg` is
+the same value in both arms, the condition never changed and the run is void
+regardless of what the phone was doing. That is precisely what the per-row column
+is for — the failure shows up in the data instead of being averaged into a null
+result.
 
 **Precondition — turn the Depth API OFF, or E0b does not test §8 at all.**
 `MainViewModel.onConfirmTargetCreation` branches on whether a depth buffer was

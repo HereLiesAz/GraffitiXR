@@ -116,12 +116,6 @@ fun SettingsScreen(
         onCheckForUpdates()
     }
 
-    val storagePermissionName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        Manifest.permission.READ_MEDIA_IMAGES
-    } else {
-        Manifest.permission.READ_EXTERNAL_STORAGE
-    }
-
     // Permissions State — recomputed on ON_RESUME so returning from App Settings (where the user may
     // have just granted a permission via [openAppSettings]) reflects the new grant, instead of the
     // stale value a keyless remember{} would freeze at first composition.
@@ -129,14 +123,10 @@ fun SettingsScreen(
     var cameraPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
-    var storagePermission by remember {
-        mutableStateOf(ContextCompat.checkSelfPermission(context, storagePermissionName) == PackageManager.PERMISSION_GRANTED)
-    }
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 cameraPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-                storagePermission = ContextCompat.checkSelfPermission(context, storagePermissionName) == PackageManager.PERMISSION_GRANTED
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -400,7 +390,6 @@ fun SettingsScreen(
                         item {
                             SettingsSectionTitle(strings.settings.permissions)
                             PermissionItem(name = strings.settings.cameraAccess, isGranted = cameraPermission, onClick = openAppSettings, strings = strings)
-                            PermissionItem(name = strings.settings.photoAccess, isGranted = storagePermission, onClick = openAppSettings, strings = strings)
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                 val notificationPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
                                 PermissionItem(name = strings.settings.notifications, isGranted = notificationPermission, onClick = openAppSettings, strings = strings)
