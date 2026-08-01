@@ -1001,12 +1001,26 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            val showPostTargetHint = arUiState.isAnchorEstablished
+                            // isAnchorEstablished means ARCore made an anchor. It says NOTHING about
+                            // whether the wall fingerprint got built, and gating the success banner
+                            // on it alone told artists a target was ready when back-projection had
+                            // produced no usable points — so the overlay could only ever drift, and
+                            // the one screen that could have explained it claimed success instead.
+                            // Gate on the thing that actually has to exist.
+                            val basePostTargetVisible = arUiState.isAnchorEstablished
                                     && editorUiState.layers.isEmpty()
                                     && !mainUiState.isCapturingTarget
                                     && editorUiState.editorMode == EditorMode.AR
                                     && !showLibrary && !showSettings
-                            if (showPostTargetHint) {
+                            val hasWallFingerprint = arUiState.wallFingerprintPoints > 0
+                            if (basePostTargetVisible && !hasWallFingerprint) {
+                                TargetIncompleteOverlay(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .padding(bottom = 140.dp)
+                                )
+                            }
+                            if (basePostTargetVisible && hasWallFingerprint) {
                                 PostTargetInstructionOverlay(
                                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp)
                                 )
@@ -2243,6 +2257,47 @@ private fun ConfidenceProgressBar(label: String, progress: Float) {
             color = Cyan,
             trackColor = Color.White.copy(alpha = 0.1f)
         )
+    }
+}
+
+/**
+ * Shown when an ARCore anchor exists but the wall fingerprint does not — the state that used to
+ * render as "TARGET ESTABLISHED".
+ *
+ * This is a real and recoverable failure, not an edge case: back-projection drops any feature whose
+ * recovered depth falls outside its 0.1-10 m trust range, so a capture can find well over a thousand
+ * features and place none of them on the wall. Without a fingerprint the reloc thread has nothing to
+ * match against, every diagnostic freezes, and the overlay runs on raw VIO and drifts within
+ * seconds. Naming it is the difference between "re-capture, squarer and closer" and "this app
+ * doesn't work".
+ */
+@Composable
+private fun TargetIncompleteOverlay(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .background(Color(0xEE1A1A1A), RoundedCornerShape(20.dp))
+            .border(2.dp, HotPink, RoundedCornerShape(20.dp))
+            .padding(horizontal = 24.dp, vertical = 20.dp)
+            .widthIn(max = 340.dp)
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "TARGET NOT LOCKED",
+                color = HotPink,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "The anchor is placed, but no wall features were matched to it — the overlay " +
+                    "will drift. Re-capture the target: get squarer to the wall, closer, and aim at " +
+                    "a patch with more detail.",
+                color = Color.White,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 

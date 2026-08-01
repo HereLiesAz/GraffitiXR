@@ -1547,6 +1547,9 @@ class ArViewModel @Inject constructor(
         // Read every tick (~15 Hz) rather than only on a successful lock — the whole point is to show
         // the FAILING states, which by definition never reach a success path.
         val relocDiag = slamManager.getRelocDiagnostics()
+        // Read alongside the diagnostics, not on a success path: the state this exists to expose is
+        // "the capture produced nothing", which by definition never reaches one.
+        val wallPoints = slamManager.getWallKeypointCount()
 
         val nowMs = System.currentTimeMillis()
         if (isTracking) lastTrackingTimestampMs = nowMs
@@ -1584,6 +1587,7 @@ class ArViewModel @Inject constructor(
                 isDepthApiSupported = isDepthApiSupported,
                 paintingProgress = progress,
                 relocDiagnostics = relocDiag,
+                wallFingerprintPoints = wallPoints,
                 scanPhase = newPhase,
                 ambientSectorsCovered = sectorsCovered / 3, // Keep backward compatibility for 30 degree UI units if needed
                 worldMappingProgress = mappingProgress,
