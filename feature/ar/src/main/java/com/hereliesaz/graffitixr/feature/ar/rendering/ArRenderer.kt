@@ -1970,19 +1970,16 @@ class ArRenderer(
             // the design's size would make Φ swallow every feature in view and report zero backbone
             // — "the artwork covers the whole wall" on a design the artist has only just opened.
             val placed = anchorEstablished && overlayRenderer.hasTexture && quadInitialFitApplied
-            // Size OR pose. Φ asks where a feature sits relative to the artwork, and panning or
-            // spinning the design changes that answer exactly as much as resizing it does — the
-            // artist drags the artwork across the wall far more often than they pinch it. Watching
-            // the extents alone left every one of those moves silently unpartitioned, against a
-            // footprint the artwork had left.
-            // Size AND placement, in one detector. Φ asks where a feature sits relative to the
-            // artwork, and dragging or spinning the design changes that answer as much as resizing
-            // does — artists drag far more often than they pinch.
-            // Forget the last publish whenever the design is not placed, so the first placed frame
-            // afterwards always republishes rather than comparing against a footprint from before
-            // the gap. Note this is a weak guard on its own: `anchorEstablished` is a one-way latch,
-            // so `placed` does not drop on a re-capture — the anchor generation below is what
-            // carries that case.
+            // Size, placement, and which anchor the placement is relative to — one detector.
+            //
+            // Φ asks where a feature sits relative to the artwork, so dragging or spinning it
+            // changes the answer as much as resizing does, and artists drag far more often than they
+            // pinch. The anchor generation is in there because a re-capture REPLACES the anchor the
+            // design pose is expressed against, and nothing else in the list moves on that path.
+            //
+            // The reset is a weak guard on its own — `anchorEstablished` is a one-way latch, so
+            // `placed` does not drop on a re-capture — but it keeps the remembered values from
+            // surviving a gap where the design was not placed at all.
             if (!placed) designMoveDetector.reset()
             val designMoved = placed && designMoveDetector.moved(
                 overlayPanX, overlayPanY, overlayRotationDeg, newHalfW, newHalfH,

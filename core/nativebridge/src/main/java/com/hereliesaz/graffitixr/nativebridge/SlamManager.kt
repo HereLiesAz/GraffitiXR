@@ -99,6 +99,20 @@ class SlamManager @Inject constructor(
     @Volatile private var hasAnchor = false
 
     /**
+     * Bumped every time the AR session is torn down, so a wait started in one session cannot be
+     * satisfied by an anchor established in the next.
+     *
+     * The monotonic generation counter alone cannot express this. It fixed a real bug — resetting to
+     * zero stranded in-flight waits — but it also turned a fail-CLOSED outcome into a fail-OPEN one:
+     * teardown then re-entry produces a generation strictly greater than the waiter's baseline with
+     * `hasAnchor` true again, so the wait resolves and hands the new session's anchor to the old
+     * session's capture. That capture back-projects its pixels through a foreign anchor and persists
+     * a structurally valid, geometrically meaningless target. Refusing is the correct outcome, and
+     * `PARAMETERS.md` §6 already states it as the contract.
+     */
+    @Volatile private var sessionEpoch = 0
+
+    /**
      * The anchor generation as of the moment a capture asked for a new anchor.
      *
      * Lives here rather than being snapshotted by the waiter because only the requester can take it
@@ -124,8 +138,9 @@ class SlamManager @Inject constructor(
 
     /**
      * The anchor pose, waiting up to [timeoutMs] for an establishment **newer than**
-     * [sinceGeneration] — which the caller must snapshot from [anchorGeneration] before asking for
-     * one.
+     * [sinceGeneration] — which the capture path takes from [captureAnchorGenerationBaseline],
+     * recorded by the requester rather than snapshotted here, because only the requester can take it
+     * without racing the establishment it is meant to precede.
      *
      * Returns null on timeout rather than a pose, because every candidate fallback is a well-formed
      * matrix that means the wrong thing: the identity reads as a real pose at the world origin, the
@@ -136,11 +151,15 @@ class SlamManager @Inject constructor(
         sinceGeneration: Int,
         timeoutMs: Long = ANCHOR_WAIT_MS,
     ): FloatArray? {
+        // Pinned at entry: an anchor from a LATER session answers a different question than the one
+        // this capture asked, so the wait must expire rather than accept it.
+        val epochAtEntry = sessionEpoch
         if (!(hasAnchor && _anchorGeneration.value > sinceGeneration)) {
             kotlinx.coroutines.withTimeoutOrNull(timeoutMs) {
-                _anchorGeneration.first { it > sinceGeneration && hasAnchor }
+                _anchorGeneration.first { it > sinceGeneration && hasAnchor && sessionEpoch == epochAtEntry }
             } ?: return null
         }
+        if (sessionEpoch != epochAtEntry) return null
         val m = nativeGetAnchorTransform()
         // Native hands back a freshly ZEROED array when the engine is gone, which passes a bare
         // size check and yields a singular matrix — strictly worse than the identity this exists to
@@ -162,6 +181,7 @@ class SlamManager @Inject constructor(
     @Synchronized
     fun clearAnchorEstablished() {
         hasAnchor = false
+        sessionEpoch += 1
         _anchorGeneration.value = _anchorGeneration.value + 1
     }
 

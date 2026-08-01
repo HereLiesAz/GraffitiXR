@@ -168,8 +168,9 @@ if repartition cost or missed repartitions ever show up in a run, start here.
 | `DEFAULT_ROT_EPS_DEG` | `DesignMoveDetector.kt` | `0.1`° | guessed — a tenth of a degree of in-plane spin |
 | `ANCHOR_WAIT_MS` | `SlamManager.kt` | `2000` ms | derived — the anchor is established on the GL frame after confirm (under 35 ms at 30 fps); this is a stall ceiling, not an expected duration, and timing out REFUSES rather than falling back |
 
-**The repartition trigger reads the artist's gesture inputs only**, and that is a
-correctness requirement rather than a tuning choice. `anchorMatrix` is the
+**The repartition trigger's *thresholded* inputs are the artist's gestures only**,
+and that is a correctness requirement rather than a tuning choice. (It also reads
+the anchor generation, which is discrete and compared exactly — see below.) `anchorMatrix` is the
 *fused* pose, re-corrected every frame, and `anchorMatrix⁻¹ · overlayRigid`
 carries `R_anchorᵀ` — so any threshold on that product fires on drift with the
 phone sitting still. Two successive cuts got this wrong: the first keyed on the

@@ -119,6 +119,46 @@ class SlamManagerAnchorEstablishmentTest {
         )
     }
 
+    /**
+     * **The session boundary**, and the case the monotonic counter opened up.
+     *
+     * Resetting the counter to zero on teardown stranded in-flight waits, so it became monotonic —
+     * which fixed that and silently turned a fail-CLOSED outcome into a fail-OPEN one: teardown then
+     * re-entry yields a generation strictly greater than the waiter's baseline with an anchor
+     * present again, so the wait resolved and handed the NEW session's anchor to the OLD session's
+     * capture. That capture back-projects its pixels through a foreign anchor and persists a
+     * structurally valid, geometrically meaningless target.
+     *
+     * Refusing is the contract (`PARAMETERS.md` §6: "timing out REFUSES rather than falling back").
+     */
+    @Test
+    fun `an anchor from a later session cannot satisfy an earlier session's wait`() = runTest {
+        slamManager.markAnchorEstablished()
+        val baseline = slamManager.anchorGeneration.value
+
+        var outcome: Result<FloatArray?>? = null
+        val waiter = launch {
+            outcome = runCatching { slamManager.awaitAnchorTransform(baseline, timeoutMs = 60_000L) }
+        }
+        testScheduler.runCurrent()
+        assertFalse(waiter.isCompleted)
+
+        slamManager.clearAnchorEstablished()  // AR teardown
+        slamManager.markAnchorEstablished()   // a new session establishes its own anchor
+        testScheduler.runCurrent()
+        testScheduler.advanceUntilIdle()
+
+        assertTrue("the wait must end rather than hang", waiter.isCompleted)
+        assertNull(
+            "a later session's anchor answers a different question; the capture must be refused",
+            outcome?.getOrNull(),
+        )
+        assertFalse(
+            "and it must refuse by returning null, not by reaching JNI; got $outcome",
+            outcome?.exceptionOrNull() is UnsatisfiedLinkError,
+        )
+    }
+
     @Test
     fun `clearAnchorEstablished makes the next capture wait again`() = runTest {
         slamManager.markAnchorEstablished()

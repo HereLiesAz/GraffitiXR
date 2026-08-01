@@ -34,8 +34,10 @@ import kotlin.math.abs
  * **And it must react to the anchor being REPLACED.** Removing the marks offset removed the only
  * input that moved when a re-capture established a new anchor — so the trigger went quiet on
  * exactly the path that most needs it, and the new fingerprint got partitioned against the previous
- * anchor's design pose. [anchorGeneration] restores that as a discrete counter: it changes once per
- * establishment and never otherwise, so it carries the signal with none of the drift.
+ * anchor's design pose. [anchorGeneration] restores that as a discrete counter, carrying the signal
+ * with none of the drift. Note it also advances on session TEARDOWN, not only on establishment — so
+ * the renderer must be stopped before teardown clears the partition state, or this fires on the way
+ * down and republishes a footprint belonging to the session being destroyed.
  */
 class DesignMoveDetector(
     private val panEpsM: Float = DEFAULT_PAN_EPS_M,

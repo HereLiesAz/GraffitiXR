@@ -947,6 +947,16 @@ class ArViewModel @Inject constructor(
     fun exitArMode() {
         isInArMode = false
         isDestroying = true
+        // Stop the GL thread FIRST, before any of the state below is cleared.
+        //
+        // `onDrawFrame` returns immediately on this flag, and until it is set the renderer keeps
+        // running full frames — `anchorEstablished` is a one-way latch, so `placed` stays true right
+        // through teardown. `clearAnchorEstablished()` two lines down advances the anchor
+        // generation, which the move detector reads as a change, so the renderer would publish a
+        // footprint and `onDesignFootprintChanged` would write `latestDesignFootprint` straight back
+        // after the line below nulls it. The next session would then partition its fingerprint
+        // against the DEAD session's design pose. Ordering is the whole fix.
+        renderer?.isDestroying = true
         lastMappingPausedCmd = null
         // Drop the marks-centering override so a later AR re-entry (or a different project) doesn't
         // center the overlay on a stale target's marks before a new one is built/restored.
@@ -959,7 +969,7 @@ class ArViewModel @Inject constructor(
         // The partition's in-memory state belongs to the session that built it: the retained design
         // footprint is expressed relative to an anchor that is about to stop existing.
         latestDesignFootprint = null
-        dropLoadedFingerprintState()
+        dropPartitionState()
         // Cancel any in-flight session update (including a running stereo probe) so it stops pumping
         // the camera and releases the session mutex before cleanup tries to acquire it.
         sessionUpdateJob?.cancel()
@@ -1733,23 +1743,38 @@ class ArViewModel @Inject constructor(
     @Volatile private var restoredFingerprint: com.hereliesaz.graffitixr.common.model.Fingerprint? = null
 
     /**
-     * Forget everything that describes a fingerprint loaded into native.
+     * Forget the Kotlin-side state describing a partitionable fingerprint.
      *
-     * Every path that leaves native holding no usable map must call this, and there are three of
-     * them: no fingerprint at all, a pre-Phase-0 fingerprint that is refused, and session teardown.
-     * They were fixed one at a time and the refusal path was missed, which is why this is a function
-     * rather than three copies of the same three assignments.
+     * `liveFingerprint` left set is the dangerous one: a design move partitions the PREVIOUS
+     * project's map and `updateProject` writes it into the CURRENT project's file. `restoredFingerprint`
+     * left set arms the suppression guard, so switching back never re-pushes — native holding one
+     * thing, Kotlin believing another, reloc dead for the process and looking like bad tracking.
      *
-     * `restoredFingerprint` left set means switching BACK to the project that owned it hits the
-     * suppression guard and never re-pushes — native empty, Kotlin believing otherwise, reloc dead
-     * for the rest of the process and looking exactly like bad tracking. `liveFingerprint` left set
-     * is worse: a design move partitions the PREVIOUS project's map and `updateProject` writes it
-     * into the current project's file.
+     * Call this from any path that leaves no partitionable map loaded, *including* one that leaves a
+     * descriptors-only map in native. [dropLoadedFingerprint] is the stronger form for paths that
+     * must also empty native.
      */
-    private fun dropLoadedFingerprintState() {
+    private fun dropPartitionState() {
         restoredFingerprint = null
         liveFingerprint = null
         lastPartitionedPose = null
+    }
+
+    /**
+     * Leave nothing loaded, in native or in Kotlin: no fingerprint, no marks centre, no partition
+     * state.
+     *
+     * This exists because the alternative kept failing. The branches of `loadFingerprintIfExists`
+     * were fixed one at a time — no-fingerprint first, then the legacy refusal, and each time a
+     * sibling was missed. The refusal branch got the Kotlin half and not `clearWallFingerprint`, so
+     * a project whose target was refused went on relocalizing against the PREVIOUS project's wall
+     * and centring its overlay on the previous project's marks. Bundling the three operations means
+     * a future branch cannot get one and forget the others.
+     */
+    private fun dropLoadedFingerprint() {
+        slamManager.clearWallFingerprint()
+        slamManager.overlayMarkCenterLocal = null
+        dropPartitionState()
     }
 
     private fun loadFingerprintIfExists() {
@@ -1797,12 +1822,11 @@ class ArViewModel @Inject constructor(
                                 "geometry can't be corrected. Create the target again to use it.",
                         ),
                     )
-                    // Refusing is a no-map outcome, so it must drop the caches exactly as the
-                    // no-fingerprint branch below does. Leaving them meant a design move would
-                    // partition the PREVIOUS project's map and `updateProject` would write it into
-                    // THIS project's file — the same leak that branch was fixed for, sitting
-                    // untouched sixty lines above it.
-                    dropLoadedFingerprintState()
+                    // Refusing means this project has no usable map, so nothing may be left loaded
+                    // — in Kotlin OR in native. An earlier cut dropped only the Kotlin caches, so a
+                    // refused project kept relocalizing against the PREVIOUS project's wall and
+                    // centring its overlay on that project's marks.
+                    dropLoadedFingerprint()
                     return@launch
                 }
 
@@ -1853,6 +1877,13 @@ class ArViewModel @Inject constructor(
                         fp.descriptorsType,
                         fp.points3d.toFloatArray()
                     )
+                    // Native now holds THIS project's map, so it must not be cleared — but the map
+                    // carries no co-registration and cannot be partitioned, so every Kotlin cache
+                    // describing a partitionable fingerprint has to go. Missing this was the fourth
+                    // instance of the same leak: `liveFingerprint` kept describing the PREVIOUS
+                    // project while native held this one, and a design move wrote the previous
+                    // project's partitioned map into this project's file.
+                    dropPartitionState()
                 }
                 // Restore the distortion-head canonical patch so the head works after reload, not only
                 // in the capture session. 256x256 raw gray (= sqrt(len)); inert if absent/head unloaded.
@@ -1870,9 +1901,7 @@ class ArViewModel @Inject constructor(
                 // an un-fingerprinted project silently relocalizes against a previous target — most
                 // visibly the marks built during first-run onboarding, which are a throwaway teaching
                 // aid and must not register anything beyond that flow.
-                slamManager.clearWallFingerprint()
-                slamManager.overlayMarkCenterLocal = null
-                dropLoadedFingerprintState()
+                dropLoadedFingerprint()
             }
             // Restore the persistent wall feature map (Phase 2a: stored in native; matched in Phase 2b).
             // Independent of the marks fingerprint above and co-registered to the same anchor. Null on
