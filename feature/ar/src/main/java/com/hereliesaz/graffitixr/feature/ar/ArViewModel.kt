@@ -23,6 +23,7 @@ import com.hereliesaz.graffitixr.common.DispatcherProvider
 import com.hereliesaz.graffitixr.common.util.imageStats
 import com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
+import com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
@@ -1649,6 +1650,38 @@ class ArViewModel @Inject constructor(
      *
      * Called from the GL thread; all work is dispatched off it.
      */
+    /**
+     * `IMPLEMENTATION.md` **4.5** — hand the engine the design's pose in the fingerprint's own
+     * frame, which is what the corroboration match projects design features through.
+     *
+     * The composition is `captureAnchorCam · rigidModelAnchorLocal`, exactly as
+     * [FingerprintPartition.partition] builds it, and it is built here rather than in C++ for the
+     * same reason Φ's is: neither factor is expressed in a world frame that drift or a session
+     * boundary could invalidate, and re-deriving the product on the far side of JNI would be a
+     * second chance to get the frame wrong with no test able to see it.
+     *
+     * Refuses on the same conditions `partition` refuses on. A fingerprint with no
+     * `captureAnchorCam` (pre-Phase-2, or the depth path) has no frame to express a placement in,
+     * and clearing is not a degradation — it returns corroboration to the global search it did
+     * before Phase 4, which is a path that still works.
+     */
+    private fun pushDesignPlacement(
+        fingerprint: com.hereliesaz.graffitixr.common.model.Fingerprint,
+        design: FingerprintPartition.DesignFootprint,
+    ) {
+        if (!design.isUsable || fingerprint.captureAnchorCam.size != 16) {
+            slamManager.setDesignPlacement(null, 0f, 0f)
+            return
+        }
+        slamManager.setDesignPlacement(
+            PoseMath.multiply(
+                fingerprint.captureAnchorCam.toFloatArray(), design.rigidModelAnchorLocal,
+            ),
+            design.halfW,
+            design.halfH,
+        )
+    }
+
     fun onDesignFootprintChanged(design: FingerprintPartition.DesignFootprint) {
         // Retained so the partition can also be driven the OTHER way round — see
         // [partitionLiveFingerprintIfNeeded]. The footprint edge and the fingerprint's arrival are
@@ -1663,6 +1696,17 @@ class ArViewModel @Inject constructor(
         latestDesignFootprint = design
         val live = liveFingerprint ?: return
         val fp = live.fingerprint
+        // IMPLEMENTATION.md 4.5 — push the placement on EVERY footprint change, not only when a
+        // repartition is due. The two have different sensitivities: the partition only has to be
+        // redone when the design moves far enough to change WHICH features sit under it, while the
+        // corroboration match predicts a pixel per design feature, so a drag far too small to
+        // restratify anything still puts every prediction in the wrong place. Gating this behind
+        // `needsPartition` would leave the gated search aiming at where the design used to be —
+        // silently, because a search in the wrong place reads as "the wall does not corroborate".
+        //
+        // Cheap enough to do unconditionally: one 4x4 multiply and a JNI call, at the
+        // DesignMoveDetector's rate rather than the frame rate.
+        pushDesignPlacement(fp, design)
         // Three ways this is worth doing, and the third is the one a size-only check misses.
         // `Fingerprint.isPartitionStale` compares extents, because extents are what it stores — so
         // a design the artist DRAGGED across the wall is not "stale" by that measure while being
@@ -2048,6 +2092,12 @@ class ArViewModel @Inject constructor(
         // Read every tick (~15 Hz) rather than only on a successful lock — the whole point is to show
         // the FAILING states, which by definition never reach a success path.
         val relocDiag = slamManager.getRelocDiagnostics()
+        // IMPLEMENTATION.md 4.6, read on the same tick and for the same reason. Separate call
+        // because these are floats and the record above arrives as an int[]; the two are read one
+        // after the other rather than merged natively, so they can disagree by one reloc cycle. That
+        // is acceptable here — these are diagnostics, not numbers PoseFusion acts on — and it is
+        // written down so a later reader does not mistake the pair for an atomic snapshot.
+        val corrobDiag = slamManager.getCorroborationDiagnostics()
         // Read alongside the diagnostics, not on a success path: the state this exists to expose is
         // "the capture produced nothing", which by definition never reaches one.
         val wallPoints = slamManager.getWallKeypointCount()
@@ -2087,6 +2137,7 @@ class ArViewModel @Inject constructor(
                 isDepthApiSupported = isDepthApiSupported,
                 paintingProgress = progress,
                 relocDiagnostics = relocDiag,
+                corroborationDiagnostics = corrobDiag,
                 wallFingerprintPoints = wallPoints,
                 scanPhase = newPhase,
                 ambientSectorsCovered = sectorsCovered / 3, // Keep backward compatibility for 30 degree UI units if needed

@@ -99,14 +99,18 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
 }
-// `FootprintRegionWireTest` reads MobileGS.h and MobileGS.cpp as *text*: the Footprint.Region
-// ordinals are a wire format shared between Kotlin and C++ with nothing in either toolchain
-// validating them against each other. Declaring the sources as inputs keeps the task from staying
-// UP-TO-DATE when only the native side moves — which is precisely when the check matters.
+// `FootprintRegionWireTest` and `CorroborationTranslitTest` read these native sources as *text*.
+// Both check agreements that no toolchain validates: the Footprint.Region ordinals are a wire
+// format shared between Kotlin and C++, and the Phase-4 search radius and keypoint grid exist twice
+// — a tested Kotlin reference and the C++ transliteration that actually runs on the device.
+// Declaring the sources as inputs keeps the task from staying UP-TO-DATE when only the native side
+// moves, which is precisely when the checks matter.
 tasks.withType<Test>().configureEach {
     inputs.files(
         rootProject.file("core/nativebridge/src/main/cpp/include/MobileGS.h"),
         rootProject.file("core/nativebridge/src/main/cpp/MobileGS.cpp"),
-    ).withPropertyName("nativeSourcesForRegionWireTest")
+        rootProject.file("core/nativebridge/src/main/cpp/include/SearchRadius.h"),
+        rootProject.file("core/nativebridge/src/main/cpp/include/KeypointGrid.h"),
+    ).withPropertyName("nativeSourcesForWireAndTranslitTests")
         .withPathSensitivity(PathSensitivity.RELATIVE)
 }

@@ -995,15 +995,85 @@ order.** Work top to bottom.
       keypoint returned all of them, turning the local search back into a global
       one. Mutation-verified against a hard-coded 3x3 sweep, which is the error
       the native transliteration is most likely to reintroduce.)*
-- [ ] **4.5** Transliterate the grid into `MobileGS.cpp`; replace the global
+- [x] **4.5** Transliterate the grid into `MobileGS.cpp`; replace the global
       `knnMatch` against `artDescs` with the gated match. **[N]**
-- [ ] **4.6** Publish `corrobPredicted` / `corrobMatched` / `searchRadiusPx`
+      *(Landed as `include/KeypointGrid.h` + `include/SearchRadius.h`, one C++ file
+      per Kotlin reference so a reviewer can diff them side by side, plus the gated
+      branch in `tryUpdateFingerprint`. NDK build verified for both ABIs.*
+      ***The plan's premise did not survive contact with the code.** 4.5 says to
+      project each `F_in` 3D point through the current pose, but the corroboration
+      match compares the frame against `mArtworkDescriptors` — the DESIGN's
+      features — and those have no position in the fingerprint frame.
+      `mArtworkKeypoints3D` is empty on the shipping path (the design composite
+      carries no depth) and, when depth exists, is expressed in the artwork
+      capture camera's frame, which has no relation to the fingerprint's. So the
+      prediction goes through the design's PLACEMENT instead: a new
+      `setDesignPlacement` carries `captureAnchorCam · rigidModelAnchorLocal` —
+      the exact composition Φ is classified with, passed rather than re-derived so
+      the two cannot disagree — and each artwork feature's composite pixel maps
+      parametrically onto the design plane before projecting. Missing placement,
+      missing pose, or a 2D/descriptor length mismatch falls back to the global
+      search, which is Phase 4 off rather than Phase 4 guessing.*
+      *Two consequences worth naming. The match direction INVERTS — the gated path
+      asks each design feature which frame keypoint it is, because that is the
+      direction a predicted location exists in. And painting progress had to become
+      cumulative (`mArtworkCorroborated`, guarded by an artwork generation counter):
+      a gated match only ever looks at the part of the design in frame, so the
+      instantaneous ratio the old code published would have become a statement
+      about where the artist is standing. Cumulative is also what
+      `getPaintingProgress()` already promised — "hours, roughly monotonic, never
+      decayed".*
+      *The one recall cost is deliberate and logged: a neighbourhood holding a
+      single candidate is SKIPPED, because Lowe's ratio has nothing to divide by
+      and accepting unconditionally would corroborate any keypoint that lands near
+      a prediction regardless of what it looks like — a confidence signal measuring
+      the wall's texture density, feeding `PoseFusion`'s correction strength. It
+      deflates `matched` without touching `predicted`, so the cost surfaces as
+      lower confidence rather than a wrong one. E6 must report that skip rate; a
+      high one means ρ is too tight.)*
+- [x] **4.6** Publish `corrobPredicted` / `corrobMatched` / `searchRadiusPx`
       through the Phase 6 channels. **[N]**
-- [ ] **4.7** Make the Lowe ratio for the *corroboration* match a separate
+      *(Two ints widen the packed `nativeGetRelocDiagnostics` array to 11 —
+      `getRelocDiagnostics`'s width guard stays at `< 9` on purpose, so a 2.11-era
+      `.so` still yields its nine good diagnostics instead of being refused whole
+      for missing two. The floats could not ride an `int[]` without rounding a
+      sub-pixel radius to zero at exactly the tight radii the phase is measuring,
+      so they get their own `CorroborationDiagnostics` channel — which also carries
+      `relocReprojPx`, a fourth number 4.6 did not name but 4.3 needs (see below).
+      All four reach the eval CSV and the on-device overlay. The overlay's
+      "Corroborated" row was fed `paintingProgress`, a label for a different
+      number; it is now "Painted", with a real "Corrob" row beside it showing
+      `matched/predicted · r=NNpx`.)*
+- [x] **4.7** Make the Lowe ratio for the *corroboration* match a separate
       constant from the reloc ratio, so E7 can sweep it independently.
-- [ ] **4.8** Guard: if the predicted-visible count is zero, publish confidence as
+      *(`kCorrobLoweRatio = 0.85` against `kRelocLoweRatio = 0.75`. The literal
+      `0.75f` appeared at FOUR sites, not two: the reloc wall match, the reloc map
+      match, the map association in `growMapFromReloc`, and corroboration. The
+      first three are all global searches with no prior and keep the reloc
+      constant. `CorroborationTranslitTest` asserts the corroboration ratio is
+      strictly looser, that the gated match actually applies it, and that no bare
+      Lowe literal survives — a separate constant nothing reads is an antipattern
+      this project has already shipped once.)*
+- [x] **4.8** Guard: if the predicted-visible count is zero, publish confidence as
       "not measured" rather than 0.0 — those are different states and
       `PoseFusion` must not read the second as the first.
+      *(`predicted > 0 ? matched/predicted : kCorroborationUnmeasured`, pinned by
+      source-text assertion because the two differ by one ternary and the wrong one
+      is the shorter expression. Note the two states are numerically identical by
+      the time they reach `PoseFusion` — `ArRenderer` coerces the negative to 0f
+      and `CONF_FLOOR` absorbs both — so the value of this guard is entirely in the
+      diagnostics and the eval CSV, which is where E6 has to tell "looking away"
+      apart from "looked, found nothing".)*
+- [x] **4.3b** Feed the reloc PnP's mean inlier reprojection error into the radius.
+      *(Not in the original list, and it is the honest half of 4.3.
+      `DriftCostProbe.errMm` — the signal 4.3 nominates — needs a ground-truth pose
+      and returns -1 without one, so on every non-eval run the drift term was dead
+      code and the phase's stated risk mitigation was unimplemented. The
+      reprojection residual is measured on every lock and is already in pixels.
+      Added as a second term with its own gain (`REPROJ_GAIN = 2.0`, deliberately
+      not neutral: it is a residual over the points the pose was fitted to, and
+      RANSAC's 8 px threshold caps what it can report) rather than converted into
+      the first, and published as its own diagnostic.)*
 
 ### Phase 5b — the predicted-visible denominator
 

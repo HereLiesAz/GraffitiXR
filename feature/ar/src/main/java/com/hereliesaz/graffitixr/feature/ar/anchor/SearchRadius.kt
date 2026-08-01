@@ -24,12 +24,30 @@ import kotlin.math.sqrt
  *
  *  - a **scale** term, `ρ` × the design's on-screen size, which keeps the search scale-free: the
  *    same fraction of the artwork whether the artist is a metre away or five;
- *  - a **drift** term, the measured recent pose error projected into pixels, which widens the search
- *    precisely when the prediction is known to be unreliable.
+ *  - a **drift** term, the measured recent pose error, which widens the search precisely when the
+ *    prediction is known to be unreliable.
  *
- * The drift term reads `errMm` from `DriftCostProbe` rather than a fixed allowance, because a fixed
- * allowance is either too tight when drifting or too loose when not, and there is no value that is
- * both.
+ * The drift term reads a *measurement* rather than a fixed allowance, because a fixed allowance is
+ * either too tight when drifting or too loose when not, and there is no value that is both.
+ *
+ * ## Two drift measurements, because only one of them exists in production
+ *
+ * `DriftCostProbe.errMm` is the phase's nominated signal, and it is the better one — a real
+ * translation error against a ground-truth pose. But it is computed as
+ * `EvalMetrics.poseError(candidate, truth)` and returns the `-1f` sentinel whenever `truthPose` is
+ * null, which on the shipping path it always is: truth comes from a fiducial the artist is not
+ * holding. Feeding only that term would mean the drift term is dead code outside an eval run, and
+ * the phase's stated risk — a radius too tight *after* the pose has drifted — would go unmitigated
+ * on the one path that matters.
+ *
+ * So there is a second term fed by the reloc PnP's **mean inlier reprojection error**, which is
+ * measured on every lock, is already in pixels (no projection, no invented conversion), and is
+ * bounded by the RANSAC inlier threshold by construction. It is a weaker signal — a residual on
+ * the points the pose was *fitted* to understates the error at points it was not — which is what
+ * [REPROJ_GAIN] is for, and why the two terms are separate parameters with separate gains instead
+ * of one being quietly converted into the other.
+ *
+ * Both default to "not measured" and both contribute nothing when they are.
  */
 object SearchRadius {
 
@@ -44,7 +62,11 @@ object SearchRadius {
      * @param poseErrMm the measured recent pose error in millimetres, or **negative when not
      *   measured** — the `DriftCostProbe` convention. Not-measured contributes no drift term, which
      *   is the honest reading: an unmeasured error is not a zero error, but it is also not a licence
-     *   to widen the search by an invented amount.
+     *   to widen the search by an invented amount. Negative on every non-eval run; see the class
+     *   note.
+     * @param reprojErrPx the reloc PnP's mean inlier reprojection error in pixels, or negative when
+     *   not measured. Already in the output's units, so it is added directly — the one drift signal
+     *   available on the shipping path.
      *
      * Returns a value clamped to `[MIN_PX, MAX_PX]`. Degenerate geometry — a non-positive distance
      * or focal length, or a design with no extent — yields [MAX_PX] rather than [MIN_PX]: when the
@@ -59,7 +81,9 @@ object SearchRadius {
         wallDistanceMeters: Float,
         focalLengthPx: Float,
         poseErrMm: Float,
+        reprojErrPx: Float = NOT_MEASURED,
         errGain: Float = ERR_GAIN,
+        reprojGain: Float = REPROJ_GAIN,
         minPx: Float = MIN_PX,
         maxPx: Float = MAX_PX,
     ): Float {
@@ -79,8 +103,12 @@ object SearchRadius {
         val driftTermPx =
             if (poseErrMm >= 0f && poseErrMm.isFinite()) errGain * (poseErrMm / 1000f) * pxPerMeter
             else 0f
+        // Already pixels. Not divided by anything and not scaled by pxPerMeter — a reprojection
+        // residual is measured in the image, so projecting it again would square the perspective.
+        val reprojTermPx =
+            if (reprojErrPx >= 0f && reprojErrPx.isFinite()) reprojGain * reprojErrPx else 0f
 
-        return (scaleTermPx + driftTermPx).coerceIn(minPx, maxPx)
+        return (scaleTermPx + driftTermPx + reprojTermPx).coerceIn(minPx, maxPx)
     }
 
     /**
@@ -103,9 +131,23 @@ object SearchRadius {
      * localization noise; `MAX_PX` is where "local" stops meaning anything and the argument for
      * loosening the ratio collapses with it. `ERR_GAIN` at 1.0 is the neutral prior — the drift term
      * contributes exactly the measured error, neither damped nor amplified.
+     *
+     * `REPROJ_GAIN` is deliberately **not** neutral. Its input is a residual over the inliers the
+     * pose was fitted to, so it is a lower bound on the error at points the fit never saw; and
+     * `solvePnPRansac` is called with an 8 px inlier threshold, which caps the mean it can report
+     * however bad the pose actually is. 2.0 is the smallest gain that keeps the term meaningful
+     * against both, and it is a prior, not a measurement — E7 sets it.
      */
     const val RHO = 0.05f
     const val MIN_PX = 4f
     const val MAX_PX = 120f
     const val ERR_GAIN = 1.0f
+    const val REPROJ_GAIN = 2.0f
+
+    /**
+     * The "no reading" value for both drift inputs. Negative, never 0 — zero is a legitimate
+     * measurement here (a perfectly-tracking pose really does have no error) and cannot double as
+     * the default.
+     */
+    const val NOT_MEASURED = -1f
 }

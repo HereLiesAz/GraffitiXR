@@ -125,6 +125,53 @@ class RelocDiagnosticsTest {
     }
 
     /**
+     * `IMPLEMENTATION.md` **4.8** — the corroboration counts carry the same three-way distinction as
+     * the backbone trio, and the middle case is the one the guard exists for.
+     *
+     * -1 is "no *gated* corroboration attempt has run" — no design placement, or no pose this
+     * frame, so the global fallback match measured a different quantity and deliberately did not
+     * fill these in. Zero predicted is "the artist is looking away from the design", which is
+     * ordinary and self-correcting. Zero matched under a positive predicted is the real alarm: the
+     * design is in view and the wall backs none of it. Collapsing any two of those would hide the
+     * third.
+     */
+    @Test
+    fun `unmeasured, nothing-in-view and nothing-corroborated are three distinct readings`() {
+        val unmeasured = RelocDiagnostics()
+        assertEquals(-1, unmeasured.corrobPredicted)
+        assertEquals(-1, unmeasured.corrobMatched)
+
+        val lookingAway = RelocDiagnostics(RelocReject.OK, corrobPredicted = 0, corrobMatched = 0)
+        val inViewNoAgreement =
+            RelocDiagnostics(RelocReject.OK, corrobPredicted = 240, corrobMatched = 0)
+        assertEquals(
+            "the three states must not share a corrobPredicted value",
+            3,
+            setOf(unmeasured, lookingAway, inViewNoAgreement).map { it.corrobPredicted }.toSet().size,
+        )
+        // ...and the two zero-matched states are told apart by the denominator alone, which is the
+        // whole reason predicted is published rather than just the ratio.
+        assertEquals(lookingAway.corrobMatched, inViewNoAgreement.corrobMatched)
+        assertTrue(lookingAway.corrobPredicted != inViewNoAgreement.corrobPredicted)
+    }
+
+    /**
+     * The float channel's sentinel, which cannot be zero for a reason the int fields do not share:
+     * a perfectly tracking pose really does report a near-zero reprojection residual, and a search
+     * radius clamped to its floor is a real 4 px. Both are readings this column exists to show.
+     */
+    @Test
+    fun `corroboration float diagnostics default to minus one, and zero is a real reading`() {
+        assertEquals(-1f, CorroborationDiagnostics().searchRadiusPx, 0f)
+        assertEquals(-1f, CorroborationDiagnostics().relocReprojPx, 0f)
+        val perfectLock = CorroborationDiagnostics(searchRadiusPx = 4f, relocReprojPx = 0f)
+        assertTrue(
+            "a zero reprojection error must not be indistinguishable from not measured",
+            perfectLock != CorroborationDiagnostics(),
+        )
+    }
+
+    /**
      * The same match shortfall means opposite things depending on how much texture the frame had, so
      * the two have to be independently readable.
      */

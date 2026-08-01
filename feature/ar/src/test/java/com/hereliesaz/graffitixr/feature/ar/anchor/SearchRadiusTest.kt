@@ -36,11 +36,14 @@ class SearchRadiusTest {
         dist: Float = DIST_M,
         focal: Float = FOCAL_PX,
         errMm: Float = NO_ERR,
+        reprojPx: Float = NO_ERR,
         // Wide bounds so the clamp does not silently absorb the relationship under test. The clamp
         // has its own tests below.
         minPx: Float = 0f,
         maxPx: Float = 1e6f,
-    ) = SearchRadius.pixels(rho, halfW, halfH, dist, focal, errMm, minPx = minPx, maxPx = maxPx)
+    ) = SearchRadius.pixels(
+        rho, halfW, halfH, dist, focal, errMm, reprojPx, minPx = minPx, maxPx = maxPx,
+    )
 
     @Test
     fun `radius scales inversely with distance to the wall`() {
@@ -124,6 +127,47 @@ class SearchRadiusTest {
         assertEquals("any negative sentinel behaves the same", r(errMm = 0f), r(errMm = -999f), 1e-4f)
     }
 
+    /**
+     * The reprojection residual is measured **in the image**, so it is added in pixels and must not
+     * be scaled by the metres-to-pixels factor. Projecting an already-projected quantity would
+     * square the perspective: the term would grow as the artist steps closer, on a signal whose
+     * whole point is that it is already expressed in the output's units.
+     *
+     * This is the transliteration error most likely to appear in `MobileGS.cpp`, where `pxPerMeter`
+     * is sitting right there in scope next to the other drift term.
+     */
+    @Test
+    fun `the reprojection term is pixels and is not reprojected again`() {
+        val expected = SearchRadius.REPROJ_GAIN * 3f
+        assertEquals(expected, r(reprojPx = 3f) - r(reprojPx = 0f), expected * 1e-3f)
+        // The same reading at half the distance must add the same number of pixels. If the term
+        // were multiplied by pxPerMeter this delta would double.
+        val nearDelta = r(dist = 1f, reprojPx = 3f) - r(dist = 1f, reprojPx = 0f)
+        assertEquals("the pixel term must not depend on wall distance", expected, nearDelta, expected * 1e-3f)
+    }
+
+    @Test
+    fun `an unmeasured reprojection error contributes nothing`() {
+        assertEquals(r(reprojPx = 0f), r(reprojPx = -1f), 1e-4f)
+        assertEquals(r(reprojPx = 0f), r(reprojPx = Float.NaN), 1e-4f)
+    }
+
+    /**
+     * The two drift signals are independent measurements of the same failure, not alternatives, so
+     * a run that has both must widen by both. Asserted because the tempting implementation — an
+     * `if/else` picking whichever is measured — reads as reasonable and silently discards the
+     * ground-truth term on exactly the eval runs that exist to measure it.
+     */
+    @Test
+    fun `both drift signals contribute when both are measured`() {
+        val neither = r(errMm = NO_ERR, reprojPx = NO_ERR)
+        val mmOnly = r(errMm = 20f, reprojPx = NO_ERR)
+        val pxOnly = r(errMm = NO_ERR, reprojPx = 3f)
+        val both = r(errMm = 20f, reprojPx = 3f)
+        assertEquals("the terms must add", (mmOnly - neither) + (pxOnly - neither), both - neither,
+            (both - neither) * 1e-3f)
+    }
+
     // -------------------------------------------------------------------------------------
     // Clamping and degenerate inputs
     // -------------------------------------------------------------------------------------
@@ -177,5 +221,7 @@ class SearchRadiusTest {
         assertEquals(4f, SearchRadius.MIN_PX, 0f)
         assertEquals(120f, SearchRadius.MAX_PX, 0f)
         assertEquals(1.0f, SearchRadius.ERR_GAIN, 0f)
+        assertEquals(2.0f, SearchRadius.REPROJ_GAIN, 0f)
+        assertEquals(-1f, SearchRadius.NOT_MEASURED, 0f)
     }
 }

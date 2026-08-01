@@ -249,6 +249,16 @@ data class ArUiState(
     // silent, which is why "it never works" was so hard to pin down.
     val relocDiagnostics: RelocDiagnostics = RelocDiagnostics(),
     /**
+     * `IMPLEMENTATION.md` **4.6** — the corroboration path's pixel-valued readings, carried apart
+     * from [relocDiagnostics] only because that record is filled from an `int[]` channel.
+     *
+     * Both fields are -1 until measured. The search radius in particular is the number that tells an
+     * artist's bug report apart from a tuning problem: a radius pinned at its ceiling means the
+     * design's on-screen scale is being read wrongly, and one pinned at its floor means
+     * corroboration is being starved — two opposite faults that look identical from the outside.
+     */
+    val corroborationDiagnostics: CorroborationDiagnostics = CorroborationDiagnostics(),
+    /**
      * How many 3D points the live wall fingerprint holds — 0 when there is none.
      *
      * The direct answer to "did the target actually get built", read straight from the engine

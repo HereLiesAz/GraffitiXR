@@ -1302,6 +1302,12 @@ class ArRenderer(
                     // here and reused for the reloc columns below, so the row's truth flag and its
                     // diagnostics describe the same relocalization rather than two samples.
                     val relocDiag = slamManager.getRelocDiagnostics()
+                    // The corroboration path's two pixel-valued readings. A second call rather than
+                    // two more slots in the reloc int[] because a radius rounded to an integer is
+                    // destroyed at exactly the tight radii Phase 4 is trying to measure. Read here,
+                    // next to relocDiag, so a row's corroboration numbers describe the same tick as
+                    // its reject code instead of straddling two attempts.
+                    val corrobDiag = slamManager.getCorroborationDiagnostics()
                     val marksVisible = relocDiag.reject == com.hereliesaz.graffitixr.common.model
                         .RelocReject.OK && relocDiag.inliers >= MIN_TRUTH_INLIERS
                     val truth = if (marksVisible) {
@@ -1324,6 +1330,7 @@ class ArRenderer(
                         // FloatArrays per tick. (An earlier comment here said "four atomics", which
                         // was neither the count nor the mechanism.)
                         reloc = relocDiag,
+                        corrob = corrobDiag,
                         // E0b's independent variable is the rotation that was in force AT CAPTURE,
                         // because that is the one baked into the fingerprint's 3D points. Sampling
                         // the live rotation here instead — which an earlier version of this call

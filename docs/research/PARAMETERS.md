@@ -135,38 +135,80 @@ different questions asked at different moments.
 
 ---
 
-## 5. Spatially-constrained corroboration — Kotlin reference landed
+## 5. Spatially-constrained corroboration — landed, unmeasured
 
-From Phase 4. These are the most important numbers in the plan. The pure-Kotlin
-half has landed (`SearchRadius.kt`, `KeypointGrid.kt`, 4.1–4.4); the native
-transliteration and the gated match (4.5–4.8) have not, so nothing reads these at
-runtime yet.
+From Phase 4. These are the most important numbers in the plan. Phase 4 has
+landed whole (4.1–4.8): the Kotlin references, the C++ transliterations, the
+gated match, the diagnostics. Every value below is still a pre-registered prior —
+landing the mechanism is not measuring it, and none of E6/E7/E11 has run.
+
+Each number exists twice, in a tested Kotlin reference and in the C++ that
+actually runs. `CorroborationTranslitTest` pins the two together by reading the
+headers as text; see the note at the end of this section for what that does and
+does not buy.
 
 | Parameter | Location | Current | Prior | Basis | Set by |
 |---|---|---|---|---|---|
-| `SearchRadius.RHO` | `SearchRadius.kt` | `0.05` | `0.05` | guessed — the paper's §5.5 worked example: at ρ=0.05 the candidate set is ~0.2% of the design | E6, refined by E7 |
-| `CORROB_LOWE_RATIO` | *proposed*, 4.7 | — | `0.85` | **a prediction, not a setting** — see below | E7 |
-| `SearchRadius.MIN_PX` | `SearchRadius.kt` | `4` | `4` | guessed — below a few pixels the radius is inside the keypoint localization noise | **E11** |
-| `SearchRadius.MAX_PX` | `SearchRadius.kt` | `120` | `120` | guessed — above this the "local" search is not local and the argument collapses | **E11** |
-| `SearchRadius.ERR_GAIN` | `SearchRadius.kt` | `1.0` | `1.0` | guessed — radius scales linearly with measured `errMm`; 1.0 is the neutral prior | **E11** |
+| `SearchRadius.RHO` / `kRho` | `SearchRadius.kt`, `SearchRadius.h` | `0.05` | `0.05` | guessed — the paper's §5.5 worked example: at ρ=0.05 the candidate set is ~0.2% of the design | E6, refined by E7 |
+| `kCorrobLoweRatio` | `MobileGS.h` | `0.85` | `0.85` | **a prediction, not a setting** — see below | E7 |
+| `kRelocLoweRatio` | `MobileGS.h` | `0.75` | `0.75` | the value that shipped; split out in 4.7 so E7 can move the one above without moving this | E7 (as the control) |
+| `SearchRadius.MIN_PX` / `kMinPx` | `SearchRadius.kt`, `SearchRadius.h` | `4` | `4` | guessed — below a few pixels the radius is inside the keypoint localization noise | **E11** |
+| `SearchRadius.MAX_PX` / `kMaxPx` | `SearchRadius.kt`, `SearchRadius.h` | `120` | `120` | guessed — above this the "local" search is not local and the argument collapses | **E11** |
+| `SearchRadius.ERR_GAIN` / `kErrGain` | `SearchRadius.kt`, `SearchRadius.h` | `1.0` | `1.0` | guessed — radius scales linearly with measured `errMm`; 1.0 is the neutral prior | **E11** |
+| `SearchRadius.REPROJ_GAIN` / `kReprojGain` | `SearchRadius.kt`, `SearchRadius.h` | `2.0` | *added in 4.5* | guessed — deliberately not neutral; see below | E7 |
 
-All four landed at their pre-registered priors, which is worth stating explicitly
-given §4's history: the Phase-2 margins shipped at values this file did not
-predict and nobody noticed until an audit checked.
+All of them landed at their pre-registered priors, which is worth stating
+explicitly given §4's history: the Phase-2 margins shipped at values this file did
+not predict and nobody noticed until an audit checked. `REPROJ_GAIN` is the one
+row with no prior, because the parameter did not exist when this file was
+written — it is registered here now, before any experiment has looked at it.
 
-**Two asymmetries in `SearchRadius` are deliberate and are not tuning.**
+**Why there are two drift terms, and why only one of them runs.** The plan
+nominates `DriftCostProbe.errMm` as the signal that widens the radius when the
+pose is known to be drifting. That was checked against the code rather than
+assumed, and it does not exist on the shipping path: `errMm` is
+`EvalMetrics.poseError(candidate, truth)` and returns its own -1 sentinel
+whenever `truthPose` is null, which is every run where the artist is not holding
+a fiducial. Left at that, Phase 4's stated risk mitigation would have been dead
+code outside an eval session.
+
+So `pixels()` takes a second measurement: the reloc PnP's **mean inlier
+reprojection error**, computed on every lock, already in pixels, and published as
+`relocReprojPx`. It is the weaker signal — a residual over the points the pose
+was *fitted* to understates the error at points it was not, and
+`solvePnPRansac`'s 8 px inlier threshold caps what it can report at all — which
+is exactly why its gain is 2.0 rather than the neutral 1.0, and why it is a
+separate parameter instead of being quietly converted into millimetres and
+folded into the first. Both default to not-measured and both contribute nothing
+when they are.
+
+**Three asymmetries in `SearchRadius` are deliberate and are not tuning.**
 Degenerate geometry (no distance, no focal length, no design extent) returns the
 **ceiling**, not the floor: a too-wide search costs precision that the ratio test
 still filters, while a too-tight one returns no candidates and reads downstream
 as "the wall does not corroborate the design" — a confident wrong answer
-indistinguishable from an unpainted wall. And an `errMm` of -1 means *not
-measured* (the `DriftCostProbe` convention), contributing no drift term rather
-than being read as a confident zero.
+indistinguishable from an unpainted wall. A negative reading on **either** drift
+input means *not measured* and contributes nothing, rather than being read as a
+confident zero. And design anisotropy enters as the geometric mean, not the max:
+the radius bounds pose error, which is isotropic in the image whatever the
+artwork's aspect ratio.
 
-`CORROB_LOWE_RATIO` at 0.85 is a *prediction*, not a setting. P2 says the local
+`kCorrobLoweRatio` at 0.85 is a *prediction*, not a setting. P2 says the local
 test admits a larger threshold than the global one; 0.85 is where we expect to
 land if P2 holds. If E7's iso-precision contour is flat, this reverts to 0.75 and
-P2 is falsified.
+P2 is falsified. It is now genuinely separable from `kRelocLoweRatio`, which is
+what makes that a measurement rather than an argument.
+
+**What the transliteration test does not cover.** Every assertion in
+`SearchRadiusTest` and `KeypointGridTest` exercises Kotlin that never runs on a
+device. `CorroborationTranslitTest` pins the constants and the handful of
+structural choices where a plausible C++ rewrite silently changes behaviour — the
+unclamped out-of-range test, `floor` over truncation, the cell *range* sweep, the
+reprojection term not being scaled by `pxPerMeter`. It cannot prove the two
+compute the same function; there is no native test harness in this project, and
+adding one is a larger change than the phase it would serve. This is a known gap,
+recorded rather than papered over: a native smoke assertion against the same
+fixtures remains the right fix and is not done.
 
 ---
 

@@ -4,6 +4,7 @@ package com.hereliesaz.graffitixr.nativebridge
 import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.util.Log
+import com.hereliesaz.graffitixr.common.model.CorroborationDiagnostics
 import com.hereliesaz.graffitixr.common.model.Fingerprint
 import com.hereliesaz.graffitixr.common.model.RelocDiagnostics
 import com.hereliesaz.graffitixr.common.model.RelocReject
@@ -239,13 +240,18 @@ class SlamManager @Inject constructor(
 
     /**
      * Why the last relocalization attempt did not publish a pose, and how far it got. See
-     * [RelocDiagnostics]; the native side packs NINE values into one int[] so the read is a
-     * consistent snapshot rather than nine racing getters. (Three separate comments used to say
-     * three, four and six; the array was six wide until 2.11 added the three backbone counts.)
+     * [RelocDiagnostics]; the native side packs ELEVEN values into one int[] so the read is a
+     * consistent snapshot rather than eleven racing getters. (Three separate comments used to say
+     * three, four and six; the array was six wide until 2.11 added the three backbone counts, and
+     * nine until 4.6 added the two corroboration counts.)
      *
-     * A short array falls back to the default [RelocDiagnostics] — whose backbone fields are the -1
-     * "not measured" sentinel, not 0 — rather than to a partially-filled one, so an old .so paired
-     * with this build reads as unmeasured instead of as an empty backbone.
+     * A short array falls back to the default [RelocDiagnostics] — whose backbone and corroboration
+     * fields are the -1 "not measured" sentinel, not 0 — rather than to a partially-filled one, so
+     * an old .so paired with this build reads as unmeasured instead of as an empty backbone.
+     *
+     * The width check is `< 9`, not `< 11`, on purpose: everything through index 8 is what a 2.11-era
+     * .so provides, and refusing the whole record because it predates 4.6 would throw away nine good
+     * diagnostics to avoid two missing ones. The two are read only when they are actually there.
      */
     fun getRelocDiagnostics(): RelocDiagnostics {
         val v = nativeGetRelocDiagnostics()
@@ -260,7 +266,40 @@ class SlamManager @Inject constructor(
             backboneFeatures = v[6],
             backboneMatches = v[7],
             backboneInliers = v[8],
+            corrobPredicted = if (v.size > 9) v[9] else -1,
+            corrobMatched = if (v.size > 10) v[10] else -1,
         )
+    }
+
+    /**
+     * IMPLEMENTATION.md 4.6 — the corroboration path's two float readings: the search radius the
+     * last gated attempt used, and the mean reprojection error over the last lock's PnP inliers.
+     * Both in pixels, both `-1f` when not measured.
+     *
+     * A separate call from [getRelocDiagnostics] only because these are floats and that channel is
+     * an `int[]`; rounding a sub-pixel radius to an int to share the array would destroy the reading
+     * at exactly the tight radii the phase is trying to measure.
+     */
+    fun getCorroborationDiagnostics(): CorroborationDiagnostics {
+        val v = nativeGetCorroborationDiagnostics()
+        if (v == null || v.size < 2) return CorroborationDiagnostics()
+        return CorroborationDiagnostics(searchRadiusPx = v[0], relocReprojPx = v[1])
+    }
+
+    /**
+     * IMPLEMENTATION.md 4.5 — tell the engine where the design sits, so the corroboration match can
+     * predict where each design feature should appear instead of searching the whole frame.
+     *
+     * @param fpFromDesign16 the design's model matrix in the WALL FINGERPRINT frame, column-major.
+     *   This is `FingerprintPartition.partition`'s `designInPointFrame`
+     *   (`captureAnchorCam * rigidModelAnchorLocal`) — pass that composition, do not rebuild it. It
+     *   is rigid: the overlay's scale belongs in the extents, not in this matrix.
+     * @param halfW,halfH the design's effective (scale-included) half-extents in metres.
+     *
+     * Pass `null` to clear, which returns corroboration to its pre-Phase-4 global search.
+     */
+    fun setDesignPlacement(fpFromDesign16: FloatArray?, halfW: Float, halfH: Float) {
+        nativeSetDesignPlacement(fpFromDesign16, halfW, halfH)
     }
 
     fun getAnchorTransform(): FloatArray = nativeGetAnchorTransform()
@@ -763,6 +802,8 @@ class SlamManager @Inject constructor(
     private external fun nativeGetPaintingProgress(): Float
     private external fun nativeGetCorroborationConfidence(): Float
     private external fun nativeGetRelocDiagnostics(): IntArray?
+    private external fun nativeGetCorroborationDiagnostics(): FloatArray?
+    private external fun nativeSetDesignPlacement(fpFromDesign16: FloatArray?, halfW: Float, halfH: Float)
     private external fun nativeGetStageTimings(out: FloatArray)
     private external fun nativeSetStageEnabled(stage: Int, enabled: Boolean)
     private external fun nativeGetRelocResult(out: FloatArray)

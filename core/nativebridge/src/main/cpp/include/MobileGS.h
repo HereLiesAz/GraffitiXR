@@ -125,6 +125,24 @@ public:
      */
     static constexpr float kCorroborationDecay = 0.9f;
 
+    /**
+     * IMPLEMENTATION.md 4.7 — the two Lowe ratios, named apart so E7 can sweep them independently.
+     *
+     * They were the same literal `0.75f` written at four call sites, which made them look like one
+     * decision. They are not. The reloc match is a GLOBAL search over the backbone with no prior — as
+     * are the two map matches, which is why those keep `kRelocLoweRatio` — where a
+     * loose ratio admits false correspondences that RANSAC then has to reject; the corroboration
+     * match after Phase 4 searches a candidate set roughly 0.2% the size, where the false-positive
+     * population has already collapsed and the same threshold throws away true matches for nothing.
+     * Phase 4's entire justification is that the constraint lets this one be LOOSENED — so it has to
+     * be a separate number, or the effect cannot be measured.
+     *
+     * Both are pre-registered priors (PARAMETERS.md section 5). `kRelocLoweRatio` is the value that
+     * shipped; `kCorrobLoweRatio` is the paper's suggested 0.85, and E7 sets it for real.
+     */
+    static constexpr float kRelocLoweRatio = 0.75f;
+    static constexpr float kCorrobLoweRatio = 0.85f;
+
     /** Last [RelocReject]. */
     int lastRelocReject() const { return mLastRelocReject.load(std::memory_order_relaxed); }
     /** Correspondences built by the last attempt, successful or not. */
@@ -151,6 +169,47 @@ public:
     int lastRelocBackboneMatches() const { return mLastRelocBackboneMatches.load(std::memory_order_relaxed); }
     /** RANSAC inliers that came from F_out points; -1 when PnP never produced an inlier set. */
     int lastRelocBackboneInliers() const { return mLastRelocBackboneInliers.load(std::memory_order_relaxed); }
+
+    /**
+     * IMPLEMENTATION.md 4.6 — the corroboration match's own counts, so the effect Phase 4 claims can
+     * be seen rather than argued about.
+     *
+     * `corrobPredicted` is how many design features the current pose puts inside the frame;
+     * `corrobMatched` is how many of those the wall answered for. Both -1 until a GATED attempt has
+     * run: the global fallback path measures a different thing (every descriptor of the design,
+     * framing included) and reporting its numbers here would make the two look comparable.
+     *
+     * Zero predicted is a real reading — the artist is looking away from the design — and is the
+     * state 4.8 exists to keep distinct from zero matched.
+     */
+    int corrobPredicted() const { return mCorrobPredicted.load(std::memory_order_relaxed); }
+    int corrobMatched() const { return mCorrobMatched.load(std::memory_order_relaxed); }
+    /** Search radius the last gated attempt used, in pixels, or -1 when no gated attempt has run. */
+    float corrobSearchRadiusPx() const { return mCorrobSearchRadiusPx.load(std::memory_order_relaxed); }
+    /**
+     * Mean reprojection error over the last lock's PnP inliers, in pixels, or -1 when not measured.
+     *
+     * Feeds the search radius' drift term (SearchRadius.h) and is a diagnostic in its own right.
+     * Bounded above by the RANSAC inlier threshold by construction, which is why the gain applied to
+     * it is not 1.0 — see `SearchRadius.REPROJ_GAIN`.
+     */
+    float lastRelocReprojPx() const { return mLastRelocReprojPx.load(std::memory_order_relaxed); }
+
+    /**
+     * IMPLEMENTATION.md 4.5 — where the design sits, so the corroboration match can predict where
+     * each of its features should appear.
+     *
+     * @param fpFromDesign16 the design's model matrix expressed in the WALL FINGERPRINT frame,
+     *   column-major. This is exactly `FingerprintPartition.partition`'s `designInPointFrame`
+     *   (`captureAnchorCam * rigidModelAnchorLocal`) — the same composition Phi is classified with,
+     *   deliberately, because a second derivation of the same quantity is a second chance to get the
+     *   frame wrong. RIGID: the overlay's scale is folded into the extents, not this matrix.
+     * @param halfW,halfH the design's effective (scale-included) half-extents in metres.
+     *
+     * Pass a null pointer or a non-positive extent to clear the placement, which returns the
+     * corroboration match to the global search it did before Phase 4.
+     */
+    void setDesignPlacement(const float* fpFromDesign16, float halfW, float halfH);
 
     void scheduleRelocCheck(const cv::Mat& colorFrame);
     /**
@@ -340,6 +399,34 @@ private:
     static constexpr uint8_t kRegionOutside = 2;
     cv::Mat mArtworkDescriptors;
     std::vector<cv::Point3f> mArtworkKeypoints3D;
+    // IMPLEMENTATION.md 4.5 — the artwork features' 2D positions in the composite the descriptors
+    // were detected on, kept 1:1 with mArtworkDescriptors THROUGH the depth-path row filter in
+    // setArtworkFingerprint. mArtworkKeypoints3D is not usable for this: it is empty on the shipping
+    // path (the design composite carries no depth) and, when depth does exist, it is expressed in
+    // the artwork CAPTURE camera's frame, which has no relation to the wall fingerprint frame the
+    // reloc pose is in. Predicting where a design feature should appear goes through the design's
+    // placement instead, which is a frame the app actually knows.
+    std::vector<cv::Point2f> mArtworkKeypoints2D;
+    // Pixel size of that composite; the design-plane mapping is parametric in it, so a design
+    // re-registered at a different resolution stays correct without rescaling the keypoints.
+    int mArtworkImageW = 0;
+    int mArtworkImageH = 0;
+    // One flag per artwork descriptor: has the wall EVER answered for this feature? Painting
+    // progress is the popcount over this, not the current frame's match count.
+    //
+    // Before Phase 4 the instantaneous ratio was already the whole design's, so a frame that saw
+    // everything reported everything. The gated match only ever looks at the part of the design in
+    // view, so the instantaneous ratio would become a statement about where the artist is standing.
+    // Accumulating is also closer to what getPaintingProgress() already promises — "on the timescale
+    // of hours, roughly monotonic. Never decayed." Cleared whenever a new artwork is registered,
+    // because every prior reading was against a different target.
+    std::vector<uint8_t> mArtworkCorroborated;
+    // Bumped whenever the artwork is replaced or cleared. tryUpdateFingerprint snapshots the
+    // descriptors under the lock, spends milliseconds matching outside it, and then merges its
+    // result back in; without this it would merge into whatever artwork is registered by then. The
+    // sizes alone are not enough — a design swapped for one with the same feature count would pass a
+    // length check and corrupt the accumulator with another target's hits.
+    long mArtworkGeneration = 0;
     std::atomic<float> mPaintingProgress{0.0f};
     // -1 = never measured, which is NOT the same as 0.0 = measured and found nothing. Zero is a
     // legitimate reading here, so it cannot double as the "no data yet" sentinel.
@@ -382,6 +469,14 @@ private:
     float mFingerprintAnchorMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     // fx,fy,cx,cy the wall fingerprint's 3D points were built with; {0,..} => unset (use a default).
     float mFingerprintIntrinsics[4] = {0,0,0,0};
+    // IMPLEMENTATION.md 4.5 — the design's rigid pose in the FINGERPRINT frame plus its
+    // scale-included half-extents. Guarded by mMutex like everything else here, and false until
+    // Kotlin has pushed a placement: absent means the corroboration match falls back to the global
+    // search, which is Phase 4 turned off rather than Phase 4 guessing.
+    float mDesignFpFromDesign[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    float mDesignHalfW = 0.0f;
+    float mDesignHalfH = 0.0f;
+    bool mHasDesignPlacement = false;
     // VIO view matrix at fingerprint-capture time + flag; used to rectify oblique live views to the
     // fingerprint's frontal frame before matching (perspective-robust matching). False for fingerprints
     // restored without a capture view (rectification is then skipped — plain matching still runs).
@@ -465,5 +560,14 @@ private:
     std::atomic<int>        mLastRelocBackboneFeatures{-1};
     std::atomic<int>        mLastRelocBackboneMatches{-1};
     std::atomic<int>        mLastRelocBackboneInliers{-1};
+    // IMPLEMENTATION.md 4.6 — the corroboration match's counts and the radius it used. All -1 for
+    // "no gated attempt has run", following the same rule as the trio above: zero predicted is a
+    // real reading (the artist is not looking at the design) and cannot double as the default.
+    std::atomic<int>        mCorrobPredicted{-1};
+    std::atomic<int>        mCorrobMatched{-1};
+    std::atomic<float>      mCorrobSearchRadiusPx{-1.0f};
+    // Mean reprojection error over the last lock's PnP inliers, in pixels. -1 = not measured, and it
+    // stays -1 on every path that does not reach a refined inlier set.
+    std::atomic<float>      mLastRelocReprojPx{-1.0f};
     cv::Mat                 mRelocColorFrame;
 };

@@ -1,8 +1,11 @@
 #include "include/MobileGS.h"
+#include "include/KeypointGrid.h"
+#include "include/SearchRadius.h"
 #include <jni.h>
 #include <EGL/egl.h>
 #include <algorithm>
 #include <android/log.h>
+#include <cfloat>
 #include <cstring>
 #include <vector>
 #include <fstream>
@@ -252,6 +255,11 @@ void MobileGS::relocThreadFunc() {
         mLastRelocBackboneFeatures.store(-1, std::memory_order_relaxed);
         mLastRelocBackboneMatches.store(-1, std::memory_order_relaxed);
         mLastRelocBackboneInliers.store(-1, std::memory_order_relaxed);
+        // Same rule for the reprojection residual (IMPLEMENTATION.md 4.3): it is only meaningful
+        // for the attempt that produced it, and the search radius reads it as a drift measurement.
+        // Leaving a previous lock's value in place would widen or narrow the corroboration search
+        // on the strength of a pose that is no longer the one being predicted from.
+        mLastRelocReprojPx.store(-1.0f, std::memory_order_relaxed);
 
         if (!mRelocEnabled) {
             mLastRelocReject.store(kRelocDisabled, std::memory_order_relaxed);
@@ -340,7 +348,7 @@ void MobileGS::relocThreadFunc() {
             matcher->knnMatch(descs, wallDescs, matches, 2);
             for (auto& match : matches) {
                 if (match.size() < 2) continue;
-                if (match[0].distance < 0.75f * match[1].distance) {
+                if (match[0].distance < kRelocLoweRatio * match[1].distance) {
                     // PAPER.md §5: the reloc PnP solves the GLOBAL problem, with no prior, and must
                     // therefore see only the backbone. Points under the artwork (INSIDE) are the
                     // work surface — they decay as it is painted, which is exactly what makes
@@ -446,7 +454,7 @@ void MobileGS::relocThreadFunc() {
                     size_t before = imgPts.size();
                     for (auto& m : matches) {
                         if (m.size() < 2) continue;
-                        if (m[0].distance < 0.75f * m[1].distance) {
+                        if (m[0].distance < kRelocLoweRatio * m[1].distance) {
                             imgPts.push_back(baseKps[m[0].queryIdx].pt);
                             objPts.push_back(mapKps3d[visible[m[0].trainIdx]]);
                             // NOT backbone: the persistent map is a separate point set that Φ has
@@ -594,6 +602,14 @@ void MobileGS::relocThreadFunc() {
                                 if (e < bestErr) { bestErr = e; rvecs[s].copyTo(rvec); tvecs[s].copyTo(tvec); }
                             }
                         } catch (const cv::Exception&) { /* keep RANSAC pose */ }
+                        // IMPLEMENTATION.md 4.3 — publish the MEAN, not the sum `reproj` returns.
+                        // The sum grows with the inlier count, so a better lock would report a worse
+                        // error and the corroboration search would tighten exactly when it has the
+                        // most to gain from staying put. Divided by the same set it was summed over.
+                        if (!inObj.empty()) {
+                            mLastRelocReprojPx.store((float)(bestErr / (double)inObj.size()),
+                                                     std::memory_order_relaxed);
+                        }
                     }
                     cv::Mat R;
                     cv:: Rodrigues(rvec, R);
@@ -783,7 +799,7 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
         matcher->knnMatch(descs, mMapDescriptors, matches, 2);
         for (auto& m : matches) {
             if (m.size() < 2) continue;
-            if (m[0].distance < 0.75f * m[1].distance) {
+            if (m[0].distance < kRelocLoweRatio * m[1].distance) {
                 int ti = m[0].trainIdx, qi = m[0].queryIdx;
                 if (ti >= 0 && ti < (int)mMapConfidence.size() && qi >= 0 && qi < (int)matched.size()) {
                     mMapConfidence[ti] = std::min(1.0f, mMapConfidence[ti] + 0.1f);
@@ -826,10 +842,29 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
                                     const std::vector<cv::KeyPoint>* preKps,
                                     const cv::Mat* preDescs) {
     cv::Mat artDescs;
+    std::vector<cv::Point2f> artPts2d;
+    int artImgW = 0, artImgH = 0;
+    long artGeneration = 0;
+    bool havePlacement = false;
+    float fpFromDesign[16];
+    float designHalfW = 0.0f, designHalfH = 0.0f;
+    float camFromFp[16];
+    float fpFx = 0.0f, fpFy = 0.0f, fpCx = 0.0f, fpCy = 0.0f;
     {
         std::lock_guard<std::mutex> lock(mMutex);
         if (mArtworkDescriptors.empty()) return;
         artDescs = mArtworkDescriptors;
+        artPts2d = mArtworkKeypoints2D;
+        artImgW = mArtworkImageW;
+        artImgH = mArtworkImageH;
+        artGeneration = mArtworkGeneration;
+        havePlacement = mHasDesignPlacement;
+        memcpy(fpFromDesign, mDesignFpFromDesign, 16 * sizeof(float));
+        designHalfW = mDesignHalfW;
+        designHalfH = mDesignHalfH;
+        memcpy(camFromFp, mPnpCamFromFpWorld, 16 * sizeof(float));
+        fpFx = mFingerprintIntrinsics[0]; fpFy = mFingerprintIntrinsics[1];
+        fpCx = mFingerprintIntrinsics[2]; fpCy = mFingerprintIntrinsics[3];
     }
     if (grayClean.empty()) return;
 
@@ -851,34 +886,201 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     const cv::Mat& descs = reuse ? *preDescs : localDescs;
     if (descs.empty() || descs.type() != artDescs.type()) return;
 
-    cv::Ptr<cv::DescriptorMatcher>& matcher = (descs.type() == CV_32F) ? mL2Matcher : mMatcher;
-    std::vector<std::vector<cv::DMatch>> matches;
-    matcher->knnMatch(descs, artDescs, matches, 2);
+    // IMPLEMENTATION.md 4.5 — is the SPATIALLY-CONSTRAINED match available for this frame?
+    //
+    // Four things have to hold, and each missing one is a refusal rather than a guess:
+    //  - the design's placement on the wall, pushed from Kotlin (setDesignPlacement);
+    //  - a pose for THIS frame. mLastRelocReject is written by the attempt that just ran, a few
+    //    lines above the call into here, so kRelocOk means mPnpCamFromFpWorld describes this frame
+    //    and not some earlier lock. Predicting from a stale pose is precisely the failure the phase
+    //    warns about, and it fails silently — the search looks in a confidently wrong place;
+    //  - the artwork's 2D positions, one per descriptor row. A length mismatch means the two fell
+    //    out of step and every prediction after that point would be another feature's;
+    //  - the intrinsics the fingerprint's 3D was built with, which the reloc PnP also uses.
+    //
+    // When any of them is missing this falls back to the global knnMatch below, which is exactly
+    // pre-Phase-4 behaviour.
+    const bool gated =
+        havePlacement &&
+        mLastRelocReject.load(std::memory_order_relaxed) == kRelocOk &&
+        (int)artPts2d.size() == artDescs.rows &&
+        artImgW > 0 && artImgH > 0 && fpFx > 0.0f && fpFy > 0.0f;
 
     std::vector<char> hit(artDescs.rows, 0);
     std::vector<int> validQuery;   // clean keypoints that corroborate the artwork (self-grow candidates)
     int matched = 0;
-    for (auto& m : matches) {
-        if (m.size() < 2) continue;
-        if (m[0].distance < 0.75f * m[1].distance) {
-            int a = m[0].trainIdx;
-            if (a >= 0 && a < (int)hit.size() && !hit[a]) { hit[a] = 1; matched++; }
-            validQuery.push_back(m[0].queryIdx);
+    int predicted = -1;            // -1 = no gated attempt ran; 0 is a real reading
+    float radiusPx = -1.0f;
+
+    if (gated) {
+        // camera_from_design = camera_from_fingerprintWorld * fingerprintWorld_from_design. Both are
+        // column-major, which is glm's layout, so make_mat4 is a reinterpretation and not a
+        // transpose. The right-hand factor is the SAME composition Phi is classified with — see
+        // setDesignPlacement — deliberately, so the two cannot disagree about where the design is.
+        const glm::mat4 camFromDesign = glm::make_mat4(camFromFp) * glm::make_mat4(fpFromDesign);
+        // Distance to the wall along the view axis: the design origin's depth in the camera frame.
+        // OpenCV convention (+Z forward), because that matrix came out of solvePnP.
+        const float wallDistM = camFromDesign[3][2];
+        const float focalPx = 0.5f * (fpFx + fpFy);
+        // poseErrMm is unconditionally "not measured" here and that is not an oversight: the only
+        // producer is DriftCostProbe, which needs a ground-truth pose and returns its own -1 sentinel
+        // without one. The reprojection residual below is the drift signal that exists on this path.
+        radiusPx = searchradius::pixels(
+            searchradius::kRho, designHalfW, designHalfH, wallDistM, focalPx,
+            /*poseErrMm=*/searchradius::kNotMeasured,
+            /*reprojErrPx=*/mLastRelocReprojPx.load(std::memory_order_relaxed));
+
+        KeypointGrid grid;
+        grid.build(kps, radiusPx);
+
+        // Descriptor distance, computed directly rather than through a matcher: the query here is
+        // "these few candidates", and building a per-feature cv::Mat to hand to knnMatch would cost
+        // more than the comparison. L2 for SuperPoint (CV_32F), Hamming for ORB — the same pairing
+        // mL2Matcher/mMatcher encode, and the type equality was checked above.
+        const bool isFloat = descs.type() == CV_32F;
+        const int dcols = descs.cols;
+        auto descDistance = [&](int q, int a) -> float {
+            if (isFloat) {
+                const float* pq = descs.ptr<float>(q);
+                const float* pa = artDescs.ptr<float>(a);
+                float acc = 0.0f;
+                for (int k = 0; k < dcols; ++k) { const float d = pq[k] - pa[k]; acc += d * d; }
+                return std::sqrt(acc);
+            }
+            const uchar* pq = descs.ptr<uchar>(q);
+            const uchar* pa = artDescs.ptr<uchar>(a);
+            int acc = 0;
+            for (int k = 0; k < dcols; ++k) acc += __builtin_popcount((unsigned)(pq[k] ^ pa[k]));
+            return (float)acc;
+        };
+
+        const float frameW = (float)grayClean.cols;
+        const float frameH = (float)grayClean.rows;
+        std::vector<int> cand;
+        predicted = 0;
+        int loneCandidateSkips = 0;
+        for (int a = 0; a < artDescs.rows; ++a) {
+            const cv::Point2f& ap = artPts2d[(size_t)a];
+            // Composite pixel -> design-plane metres. The overlay quad spans [-halfW, halfW] x
+            // [-halfH, halfH] with the texture stretched across it and V flipped (OverlayRenderer
+            // writes `1 - v` alongside `y = -halfH + v * 2 * halfH`), so image row 0 is +halfH. The
+            // mapping is parametric in the composite's size, which is why it needs no aspect
+            // agreement between the bitmap and the quad.
+            const float lx = designHalfW * (2.0f * ap.x / (float)artImgW - 1.0f);
+            const float ly = designHalfH * (1.0f - 2.0f * ap.y / (float)artImgH);
+            const glm::vec4 pc = camFromDesign * glm::vec4(lx, ly, 0.0f, 1.0f);
+            if (!(pc.z > 1e-4f)) continue;                       // behind or on the camera plane
+            const float u = fpFx * pc.x / pc.z + fpCx;
+            const float v = fpFy * pc.y / pc.z + fpCy;
+            if (!std::isfinite(u) || !std::isfinite(v)) continue;
+            // Predicted OUTSIDE the frame is not visible, and must not count in the denominator —
+            // that is the whole of 5b.1. The radius is allowed as slack on each edge because a
+            // feature predicted just off-frame can still have its true detection just on it.
+            if (u < -radiusPx || v < -radiusPx || u > frameW + radiusPx || v > frameH + radiusPx) continue;
+            ++predicted;
+
+            grid.candidatesWithin(u, v, radiusPx, cand);
+            if (cand.size() < 2) {
+                // Lowe's ratio needs a second-best to divide by. With one candidate there is nothing
+                // to compare against, and accepting it unconditionally would corroborate any
+                // keypoint that happens to land near the prediction regardless of what it looks
+                // like — a confidence signal that measures the wall's texture density instead of its
+                // agreement with the design, feeding PoseFusion's correction strength.
+                //
+                // Skipping instead deflates `matched` without touching `predicted`, so the cost
+                // shows up as lower confidence rather than as a wrong one. If this count is large,
+                // the radius is too tight and rho wants raising; E6 is where that gets decided
+                // rather than guessed, which is why it is logged.
+                if (cand.size() == 1) ++loneCandidateSkips;
+                continue;
+            }
+            float best = FLT_MAX, second = FLT_MAX;
+            int bestQ = -1;
+            for (int q : cand) {
+                const float d = descDistance(q, a);
+                if (d < best) { second = best; best = d; bestQ = q; }
+                else if (d < second) { second = d; }
+            }
+            if (bestQ < 0) continue;
+            if (best < kCorrobLoweRatio * second) {
+                hit[a] = 1;
+                ++matched;
+                validQuery.push_back(bestQ);
+            }
+        }
+        if (loneCandidateSkips > 0) {
+            LOGI("Corroboration (gated): r=%.1fpx predicted=%d matched=%d lone-candidate skips=%d",
+                 radiusPx, predicted, matched, loneCandidateSkips);
+        }
+    } else {
+        // Pre-Phase-4 global search: every frame descriptor against every artwork descriptor, no
+        // prior, tight ratio. Note the direction is the opposite of the gated path's — here each
+        // FRAME keypoint asks which design feature it is, because there is no predicted location to
+        // ask the question the other way round.
+        cv::Ptr<cv::DescriptorMatcher>& matcher = (descs.type() == CV_32F) ? mL2Matcher : mMatcher;
+        std::vector<std::vector<cv::DMatch>> matches;
+        matcher->knnMatch(descs, artDescs, matches, 2);
+        for (auto& m : matches) {
+            if (m.size() < 2) continue;
+            if (m[0].distance < kRelocLoweRatio * m[1].distance) {
+                int a = m[0].trainIdx;
+                if (a >= 0 && a < (int)hit.size() && !hit[a]) { hit[a] = 1; matched++; }
+                validQuery.push_back(m[0].queryIdx);
+            }
         }
     }
-    // The distortion head's coverage is the principled progress signal; only fall back to this
-    // descriptor-corroboration ratio when the head isn't present.
+
+    // IMPLEMENTATION.md 4.6 — publish what the match actually did. Only the gated path writes these:
+    // the global path measures a different quantity (the whole design, framing included) and
+    // reporting its numbers in the same channels would make the two look comparable.
+    if (gated) {
+        mCorrobPredicted.store(predicted, std::memory_order_relaxed);
+        mCorrobMatched.store(matched, std::memory_order_relaxed);
+        mCorrobSearchRadiusPx.store(radiusPx, std::memory_order_relaxed);
+    }
+
+    // Fold this attempt's hits into the running "has the wall ever answered for this feature" set,
+    // under the generation check — the artwork may have been replaced while the match ran.
+    int everCorroborated = -1;
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        if (mArtworkGeneration == artGeneration &&
+            mArtworkCorroborated.size() == (size_t)artDescs.rows) {
+            for (int a = 0; a < artDescs.rows; ++a) if (hit[a]) mArtworkCorroborated[(size_t)a] = 1;
+            everCorroborated = (int)std::count(mArtworkCorroborated.begin(),
+                                               mArtworkCorroborated.end(), (uint8_t)1);
+        }
+    }
+
+    // The distortion head's coverage is the principled progress signal; only fall back to these
+    // descriptor-corroboration ratios when the head isn't present.
     //
-    // Both channels are published from this one ratio for now. They are genuinely the same number
-    // on this path today, because the denominator is every descriptor of the design — including the
-    // parts behind the camera. Phase 5b narrows the CONFIDENCE denominator to the features actually
-    // predicted visible, at which point the two diverge and a close-up of one corner stops being
-    // capped by framing rather than by agreement. Progress keeps the whole-design denominator,
-    // which is the correct one for it.
-    if (artDescs.rows > 0 && !mDistortionHead.isLoaded()) {
-        const float ratio = (float)matched / (float)artDescs.rows;
-        mPaintingProgress.store(ratio, std::memory_order_relaxed);
-        mCorroborationConfidence.store(ratio, std::memory_order_relaxed);
+    // The two channels have DIFFERENT denominators now, which is the point of Phase 4/5b.
+    //
+    // PROGRESS is cumulative over the whole design: how much of the artwork the wall has ever
+    // answered for. It has to be cumulative because the gated match only ever looks at the part of
+    // the design in frame, so an instantaneous ratio would measure where the artist is standing. It
+    // is also what getPaintingProgress() already promises — hours, roughly monotonic, never decayed.
+    //
+    // CONFIDENCE is instantaneous over the predicted-visible set: of the design features the current
+    // pose says should be in view, how many does the wall back right now. A close-up of one corner
+    // is no longer capped by framing rather than by agreement (5b.1).
+    if (!mDistortionHead.isLoaded()) {
+        if (everCorroborated >= 0 && artDescs.rows > 0) {
+            mPaintingProgress.store((float)everCorroborated / (float)artDescs.rows,
+                                    std::memory_order_relaxed);
+        }
+        if (gated) {
+            // 4.8: zero predicted-visible is "the artist is not looking at the design", NOT "the
+            // wall does not corroborate it". Publishing 0.0 would be a measurement never taken, and
+            // PoseFusion scales its correction strength by this.
+            mCorroborationConfidence.store(
+                predicted > 0 ? (float)matched / (float)predicted : kCorroborationUnmeasured,
+                std::memory_order_relaxed);
+        } else if (artDescs.rows > 0) {
+            mCorroborationConfidence.store((float)matched / (float)artDescs.rows,
+                                           std::memory_order_relaxed);
+        }
     }
 
     // --- Teleological self-grow (opt-in) ---------------------------------------------------------
@@ -889,7 +1091,9 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     // backstop, but it still mutates the authoritative set, so it stays OFF unless explicitly enabled.
     if (!mSelfGrowEnabled.load(std::memory_order_relaxed) || validQuery.empty()) return;
 
-    // pnpMatches, not `matches` — that name is already the knnMatch result vector in this scope.
+    // pnpMatches, not `matches`: that name used to be the knnMatch result vector in this scope, and
+    // although Phase 4 moved it inside the global-fallback branch the reason to keep them apart
+    // stands — one counts descriptor correspondences, the other counts the PnP's.
     cv::Matx33d R; cv::Vec3d t; double fx, fy, cx, cy; int inliers; int pnpMatches; long seq;
     std::vector<cv::Point3f> wall;
     {
@@ -1046,12 +1250,50 @@ void MobileGS::clearWallFingerprint() {
     // this project's features into its map on the strength of a different project's target.
     mArtworkDescriptors.release();
     mArtworkKeypoints3D.clear();
+    mArtworkKeypoints2D.clear();
+    mArtworkCorroborated.clear();
+    ++mArtworkGeneration;
+    mArtworkImageW = 0;
+    mArtworkImageH = 0;
+    // The design's placement belongs to the project that placed it. Left behind, the corroboration
+    // match would predict the next project's design features at the previous design's location on
+    // the wall — a gated search that is confidently, precisely looking in the wrong place, which
+    // reads downstream as "the wall does not corroborate" rather than as a stale-state bug.
+    mHasDesignPlacement = false;
+    mDesignHalfW = 0.0f;
+    mDesignHalfH = 0.0f;
     mWallPatch.release();
     mPaintingProgress.store(0.0f, std::memory_order_relaxed);
     // Back to "never measured", not to zero — the next project has not been looked at yet, and
     // reporting a confident 0 would be a measurement it never made.
     mCorroborationConfidence.store(kCorroborationUnmeasured, std::memory_order_relaxed);
+    mCorrobPredicted.store(-1, std::memory_order_relaxed);
+    mCorrobMatched.store(-1, std::memory_order_relaxed);
+    mCorrobSearchRadiusPx.store(-1.0f, std::memory_order_relaxed);
     mLastGrowSeq = 0;
+}
+
+// IMPLEMENTATION.md 4.5. Takes the composition Kotlin already built for the Phi partition rather
+// than the two factors, deliberately: recomposing it here would be a second derivation of the same
+// quantity in a file that cannot see whether the anchor it was relative to is still the live one.
+void MobileGS::setDesignPlacement(const float* fpFromDesign16, float halfW, float halfH) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    if (!fpFromDesign16 || !(halfW > 0.0f) || !(halfH > 0.0f) ||
+        !std::isfinite(halfW) || !std::isfinite(halfH)) {
+        // A refusal, not a guess. Without a usable placement the corroboration match falls back to
+        // the global search — Phase 4 off, which is a state the code already handles correctly.
+        mHasDesignPlacement = false;
+        mDesignHalfW = 0.0f;
+        mDesignHalfH = 0.0f;
+        return;
+    }
+    for (int i = 0; i < 16; ++i) {
+        if (!std::isfinite(fpFromDesign16[i])) { mHasDesignPlacement = false; return; }
+    }
+    memcpy(mDesignFpFromDesign, fpFromDesign16, 16 * sizeof(float));
+    mDesignHalfW = halfW;
+    mDesignHalfH = halfH;
+    mHasDesignPlacement = true;
 }
 
 void MobileGS::restoreWallFeatureMap(const cv::Mat& d, const std::vector<cv::Point3f>& p,
@@ -1260,6 +1502,13 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
     // bailed on the option-A path, so painting-progress never registered.
     std::vector<cv::Point3f> pts3d;
     cv::Mat keepDescs = descs;
+    // IMPLEMENTATION.md 4.5 — kept in lockstep with keepDescs, INCLUDING through the depth filter
+    // below. The filter rebuilds the descriptor matrix from a subset of rows; a 2D list built before
+    // it and stored afterwards would be indexed by descriptor row and silently return a different
+    // feature's pixel, which projects to a plausible place and corroborates the wrong thing.
+    std::vector<cv::Point2f> keepPts2d;
+    keepPts2d.reserve(kps.size());
+    for (const auto& kp : kps) keepPts2d.push_back(kp.pt);
     if (depthData && depthW > 0 && depthH > 0 && depthStride > 0 && intr) {
         const float fx = intr[0], fy = intr[1], cx = intr[2], cy = intr[3];
         const float scaleX = (float)depthW / (float)composite.cols;
@@ -1278,9 +1527,14 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
         }
         if (!validIdx.empty()) {
             cv::Mat validDescs((int)validIdx.size(), descs.cols, descs.type());
-            for (int k = 0; k < (int)validIdx.size(); ++k)
+            std::vector<cv::Point2f> validPts2d;
+            validPts2d.reserve(validIdx.size());
+            for (int k = 0; k < (int)validIdx.size(); ++k) {
                 descs.row(validIdx[k]).copyTo(validDescs.row(k));
+                validPts2d.push_back(kps[(size_t)validIdx[k]].pt);
+            }
             keepDescs = validDescs;   // keep descriptors aligned 1:1 with pts3d
+            keepPts2d = std::move(validPts2d);
         }
     }
 
@@ -1289,6 +1543,15 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
         std::lock_guard<std::mutex> lock(mMutex);
         mArtworkDescriptors = keepDescs.clone();
         mArtworkKeypoints3D = std::move(pts3d);
+        mArtworkKeypoints2D = std::move(keepPts2d);
+        mArtworkImageW = gray.cols;
+        mArtworkImageH = gray.rows;
+        // A new design means nothing corroborated so far corroborates THIS one.
+        mArtworkCorroborated.assign((size_t)mArtworkDescriptors.rows, 0);
+        ++mArtworkGeneration;
+        mCorrobPredicted.store(-1, std::memory_order_relaxed);
+        mCorrobMatched.store(-1, std::memory_order_relaxed);
+        mCorrobSearchRadiusPx.store(-1.0f, std::memory_order_relaxed);
         mPaintingProgress.store(0.0f, std::memory_order_relaxed);
         // A new design means every prior corroboration reading was against a different target.
         mCorroborationConfidence.store(kCorroborationUnmeasured, std::memory_order_relaxed);
