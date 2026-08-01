@@ -37,10 +37,45 @@ class PoseFusion {
         /** Base smoothing rate for a (non-cold) correction update. */
         const val BASE_ALPHA = 0.25f
         /**
-         * Corroboration floor. Effective confidence = CONF_FLOOR + (1-CONF_FLOOR)*confGlobal, so
-         * painting progress can *raise* trust toward 1.0 but can never drop it below the floor — an
-         * unpainted wall still corrects, driven by the inlier ratio alone. At 0.5 the floor also sets
-         * the range: a fully corroborated wall pulls exactly twice as hard as a bare one.
+         * Corroboration floor. `effConf = CONF_FLOOR + (1 - CONF_FLOOR) * confGlobal`, so
+         * corroboration can *raise* trust toward 1.0 but can never drop it below the floor — an
+         * unpainted wall still corrects, driven by the inlier ratio alone.
+         *
+         * ## `IMPLEMENTATION.md` 5b.2 — re-derived, and the old rationale did not survive
+         *
+         * This used to say: "at 0.5 a fully corroborated wall pulls exactly twice as hard as a bare
+         * one." That sentence was true of the OLD input and is misleading about the new one.
+         *
+         * Before Phase 5b, `confGlobal` was painting progress with a whole-design denominator —
+         * `matched / artDescs.rows`. Its ceiling of 1.0 was at least *conceptually* reachable: paint
+         * the whole mural and the wall answers for every design feature. The 2x followed.
+         *
+         * It is now `matched / predicted`, the corroboration confidence over the features the
+         * current pose predicts are visible. **That ceiling is not reachable on any real wall.** Its
+         * maximum is bounded by how much of a painted design the detector actually re-finds, and
+         * three separate things hold that below 1: descriptor repeatability across a repaint, the
+         * lighting difference between registration and painting, and — since Phase 4 — the
+         * lone-candidate skip, which deflates `matched` without touching `predicted` whenever a
+         * predicted feature's neighbourhood holds fewer than two candidates.
+         *
+         * So `effConf` does not span `[0.5, 1.0]` in practice; it spans `[0.5, 0.5 + 0.5·m]` where
+         * `m` is that achievable maximum. **The 2x is arithmetic at an input the system cannot
+         * produce, not a property of the system.** If `m` turns out to be 0.6, a well-painted wall
+         * pulls 1.6x a bare one, not 2x.
+         *
+         * ## Why the number is still 0.5
+         *
+         * Because `m` has never been measured, and picking a floor to compensate for an unknown
+         * ceiling is guessing dressed as derivation. The two arguments also point opposite ways: the
+         * new signal moves per *frame* in both directions where progress moved over hours, which
+         * argues for a HIGHER floor so a momentary dip does not slash correction — while the entire
+         * point of splitting confidence from progress was to let correction scale by something
+         * trustworthy, which argues for a LOWER one and a wider dynamic range. Only a measurement
+         * settles that.
+         *
+         * **E11 sets it, and it must measure `m` first** — the floor and the achievable maximum
+         * jointly determine the real dynamic range, so a sweep of the floor alone would report the
+         * wrong contour. `PARAMETERS.md` §2 carries this as the parameter's basis.
          */
         const val CONF_FLOOR = 0.5f
         /** A cold (hard) snap requires at least this inlier ratio … */

@@ -221,8 +221,58 @@ class PoseFusionTest {
             "a corroborated wall should pull harder than a bare one: bare=${bare[12]} painted=${painted[12]}",
             painted[12] > bare[12],
         )
-        // And the floor bounds how much: CONF_FLOOR=0.5 means full corroboration is exactly 2x.
+        // And the floor bounds how much. This 2x is ARITHMETIC at confGlobal = 1, and it is pinned
+        // here as a check on CONF_FLOOR's VALUE — 1/0.5 — not as a claim about real walls.
+        //
+        // IMPLEMENTATION.md 5b.2: since the denominator became `matched / predicted`, an input of
+        // 1.0 is not reachable on any wall (descriptor repeatability across a repaint, lighting
+        // drift, and Phase 4's lone-candidate skip each hold it below). The realistic ratio is
+        // `1 + m` where m is the achievable maximum, and it is smaller than this. Read this
+        // assertion as "CONF_FLOOR is still 0.5", which is what it can actually prove.
         assertEquals(2f, painted[12] / bare[12], 1e-3f)
+        assertEquals("...which is exactly a restatement of the constant", 0.5f, PoseFusion.CONF_FLOOR, 0f)
+    }
+
+    /**
+     * `IMPLEMENTATION.md` **5b.2** — the CONTRACT the floor has to satisfy, asserted so it survives
+     * E11 moving the number.
+     *
+     * The test above pins `CONF_FLOOR == 0.5` through an arithmetic consequence, which is useful and
+     * will need editing the moment E11 reports. These three properties are what must hold for *any*
+     * floor in `(0, 1)`, so they keep their meaning across that change — and they are the ones a
+     * re-derivation could plausibly break:
+     *
+     *  - a bare wall still corrects, or an unpainted mural can never relock;
+     *  - correction is monotone in corroboration, or the signal is wired backwards;
+     *  - the floor is a floor — nothing drives correction below it, including the "not measured"
+     *    sentinel, which `ArRenderer` maps to 0 precisely so it lands here.
+     *
+     * Asserted at a REALISTIC corroboration maximum rather than at 1.0, because that is the regime
+     * the system actually runs in and the one 5b.2 says the old rationale mis-described.
+     */
+    @Test
+    fun `the floor bounds correction from below at any achievable corroboration`() {
+        fun at(conf: Float) = PoseFusion().currentAnchor(
+            trans(0f, 0f, 0f), identity(),
+            reloc(trans(10f, 0f, 0f), inliers = 60f, matches = 100f, seq = 1f), identity(),
+            confGlobal = conf,
+        )[12]
+
+        val bare = at(0f)
+        assertTrue("a bare wall must still correct", bare > 0f)
+        // Monotone, sampled across the range a real wall can produce rather than only at the ends.
+        var prev = bare
+        for (c in floatArrayOf(0.1f, 0.25f, 0.4f, 0.55f, 0.7f)) {
+            val here = at(c)
+            assertTrue("correction must not fall as corroboration rises: $c gave $here after $prev",
+                here >= prev)
+            prev = here
+        }
+        // The floor is the low end, and the unmeasured sentinel lands exactly on it — ArRenderer
+        // coerces the negative to 0f, so this is the value PoseFusion actually sees when the artist
+        // is looking away from the design.
+        assertEquals("the sentinel path must land on the floor, not below it", bare, at(0f), 0f)
+        assertTrue("nothing may drive correction below the bare-wall floor", at(0.7f) >= bare)
     }
 
     /**
