@@ -224,6 +224,20 @@ data class ArUiState(
     // Diagnostic Overlay in release as well as debug — every one of these failures is otherwise
     // silent, which is why "it never works" was so hard to pin down.
     val relocDiagnostics: RelocDiagnostics = RelocDiagnostics(),
+    /**
+     * How many 3D points the live wall fingerprint holds — 0 when there is none.
+     *
+     * The direct answer to "did the target actually get built", read straight from the engine
+     * rather than inferred from [relocDiagnostics], which is stale until the reloc thread has run at
+     * least once and therefore cannot be trusted in the seconds right after a capture.
+     *
+     * Exists because "TARGET ESTABLISHED" was gated on [isAnchorEstablished] — an ARCore anchor,
+     * which says nothing about the fingerprint. A capture whose back-projection produced no usable
+     * points still lit the success banner, and the artist was told to go ahead and paint against an
+     * overlay that could only ever drift. The failure was fully diagnosable in the engine and the UI
+     * asserted the opposite.
+     */
+    val wallFingerprintPoints: Int = 0,
 )
 
 enum class CoopRole { NONE, HOST, GUEST }

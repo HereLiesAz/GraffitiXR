@@ -161,9 +161,7 @@ class ArRenderer(
     // suppressed during target capture. Each governs one layer of "what the AR is seeing".
     @Volatile var showFeaturePoints: Boolean = true  // ARCore tracker landmarks (yellow dots)
     @Volatile var showPlaneGrids: Boolean = true      // detected planes as metric grids
-    @Volatile var showVoxels: Boolean = true          // SLAM voxel splats (confidence-tinted)
     @Volatile var showPoints: Boolean = true          // accumulated sparse point cloud
-    @Volatile var showMesh: Boolean = true            // persistent surface mesh
 
     // --- Throttled perception (FBO-cached) -----------------------------------------------------
     // World-locked perception is redrawn into an offscreen buffer only when the pose moves or the
@@ -688,7 +686,11 @@ class ArRenderer(
             planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose, gridMode = true)
         }
         // Diagnostic perception view: ALL active layers of what the AR is seeing.
-        val anyLayerOn = showFeaturePoints || showPlaneGrids || showVoxels || showPoints || showMesh
+        // showVoxels/showMesh are NOT consulted: the voxel/splat map and SurfaceMesh were deleted, so
+        // neither draws anything, and including them here meant two toggles that render nothing could
+        // still switch on the container for the three that do. Only the layers that actually draw
+        // decide whether the perception view is worth composing.
+        val anyLayerOn = showFeaturePoints || showPlaneGrids || showPoints
         // Show the perception mask (feature points / voxels) on the LIVE camera during scanning —
         // including while aiming a target. The captured frame is the raw camera image (GL overlays
         // aren't baked in), so the mask belongs here, not painted onto the frozen target preview.
@@ -1339,30 +1341,21 @@ class ArRenderer(
                             }
                         }
 
-                        var fx = intrinsics.focalLength[0]
-                        var fy = intrinsics.focalLength[1]
-                        var cx = intrinsics.principalPoint[0]
-                        var cy = intrinsics.principalPoint[1]
+                        val fx = intrinsics.focalLength[0]
+                        val fy = intrinsics.focalLength[1]
+                        val cx = intrinsics.principalPoint[0]
+                        val cy = intrinsics.principalPoint[1]
                         val dims = intrinsics.imageDimensions
                         val rawW = dims[0].toFloat()
                         val rawH = dims[1].toFloat()
 
-                        when (rotationNeeded) {
-                            90 -> {
-                                val t_fx = fx; fx = fy; fy = t_fx
-                                val t_cx = cx; cx = rawH - cy; cy = t_cx
-                            }
-                            180 -> {
-                                cx = rawW - cx
-                                cy = rawH - cy
-                            }
-                            270 -> {
-                                val t_fx = fx; fx = fy; fy = t_fx
-                                val t_cx = cx; cx = cy; cy = rawW - t_cx
-                            }
-                        }
-
-                        val intrArr = floatArrayOf(fx, fy, cx, cy)
+                        // Extracted to CaptureRotation so the convention is testable AT ITS ORIGIN.
+                        // Phase 0's correctness argument is that this transform, paired with the
+                        // bitmap rotation, turns a sensor ray into R_z(+rotationNeeded) * itself —
+                        // and while it lived inline here nothing could drive a pixel through it, so
+                        // the derivation and the tests both rested on one reading of these lines.
+                        val intrArr = com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation
+                            .rotateIntrinsics(fx, fy, cx, cy, rawW, rawH, rotationNeeded)
 
                         // Camera→point distance at the tapped pixel (Sub-project C). Map the tap from
                         // view pixels to the depth image via ARCore's rotation/crop-aware transform,

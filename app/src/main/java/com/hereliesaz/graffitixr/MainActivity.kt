@@ -1001,12 +1001,26 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            val showPostTargetHint = arUiState.isAnchorEstablished
+                            // isAnchorEstablished means ARCore made an anchor. It says NOTHING about
+                            // whether the wall fingerprint got built, and gating the success banner
+                            // on it alone told artists a target was ready when back-projection had
+                            // produced no usable points — so the overlay could only ever drift, and
+                            // the one screen that could have explained it claimed success instead.
+                            // Gate on the thing that actually has to exist.
+                            val basePostTargetVisible = arUiState.isAnchorEstablished
                                     && editorUiState.layers.isEmpty()
                                     && !mainUiState.isCapturingTarget
                                     && editorUiState.editorMode == EditorMode.AR
                                     && !showLibrary && !showSettings
-                            if (showPostTargetHint) {
+                            val hasWallFingerprint = arUiState.wallFingerprintPoints > 0
+                            if (basePostTargetVisible && !hasWallFingerprint) {
+                                TargetIncompleteOverlay(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .padding(bottom = 140.dp)
+                                )
+                            }
+                            if (basePostTargetVisible && hasWallFingerprint) {
                                 PostTargetInstructionOverlay(
                                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp)
                                 )
@@ -1356,14 +1370,8 @@ class MainActivity : ComponentActivity() {
                                     onFeaturePointsChanged = { editorViewModel.toggleFeaturePoints() },
                                     showPlaneGrids = editorUiState.showPlaneGrids,
                                     onPlaneGridsChanged = { editorViewModel.togglePlaneGrids() },
-                                    showVoxels = editorUiState.showVoxels,
-                                    onVoxelsChanged = { editorViewModel.toggleVoxels() },
                                     showPoints = editorUiState.showPoints,
                                     onPointsChanged = { editorViewModel.togglePoints() },
-                                    showMesh = editorUiState.showMesh,
-                                    onMeshChanged = { editorViewModel.toggleMesh() },
-                                    parallaxMinDegrees = arUiState.parallaxMinDegrees,
-                                    onParallaxMinDegreesChanged = { arViewModel.setParallaxMinDegrees(it) },
                                     cameraTargetFps = arUiState.cameraTargetFps,
                                     onCameraTargetFpsChanged = { arViewModel.setCameraTargetFps(it) },
                                     throttleOnThermal = arUiState.throttleOnThermal,
@@ -1384,8 +1392,6 @@ class MainActivity : ComponentActivity() {
                                     onImperialUnitsChanged = { arViewModel.setImperialUnits(it) },
                                     backgroundColor = editorUiState.canvasBackground.toArgb(),
                                     onBackgroundColorChanged = { argb -> settingsViewModel.setBackgroundColor(argb) },
-                                    muralMethod = arUiState.muralMethod,
-                                    onMuralMethodChanged = { arViewModel.setMuralMethod(it) },
                                     onCheckForUpdates = { dashboardViewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
                                     onOpenUpdatePage = { dashboardViewModel.openUpdatePage(this@MainActivity) },
                                     onResetTutorials = { settingsViewModel.resetCompletedTutorials() },
@@ -1542,34 +1548,6 @@ class MainActivity : ComponentActivity() {
             // 2. PROJECT FOLDER — directly under Open. Opening it collapses Modes (see host.modes'
             // expandWhen below); its expansion is persisted per-project via onExpandedChange so the two
             // folders coordinate reactively.
-            azRailHostItem(
-                id = "host.project",
-                text = navStrings.project,
-                color = navItemColor,
-                initiallyExpanded = railExpansion["host.project"] ?: false,
-                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.project", it) },
-            )
-            azRailSubItem(id = "proj.new", hostId = "host.project", text = navStrings.new, color = navItemColor, shape = AzButtonShape.NONE) {
-                dashboardViewModel.onNewProjectTriggered()
-            }
-            azRailSubItem(id = "proj.save", hostId = "host.project", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE) {
-                showSaveDialog = true
-            }
-            azRailSubItem(id = "proj.export", hostId = "host.project", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE) {
-                // Export is mode-dispatched by the caller so it has access to the CameraX
-                // controller (Overlay stills) and a coroutine scope (AR/Overlay both suspend on
-                // asynchronous captures). This handler just tells the caller "user pressed Export".
-                onExportRequested()
-            }
-            azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {
-                navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
-            }
-            azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE) {
-                showSettings = true
-            }
-
-            azDivider()
-
             // 3. MODES FOLDER — always expanded, unless the user manually collapses it or opens the
             // Project folder. expandWhen returns false while Project is open (auto-collapsing Modes) and
             // re-expands Modes on the false->true edge when Project closes; a manual collapse is respected
@@ -1700,6 +1678,35 @@ class MainActivity : ComponentActivity() {
                     editorViewModel.onToggleModeTransformLocked(EditorMode.TRACE)
                 }
             }
+
+            azDivider()
+
+            azRailHostItem(
+                id = "host.project",
+                text = navStrings.project,
+                color = navItemColor,
+                initiallyExpanded = railExpansion["host.project"] ?: false,
+                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.project", it) },
+            )
+            azRailSubItem(id = "proj.new", hostId = "host.project", text = navStrings.new, color = navItemColor, shape = AzButtonShape.NONE) {
+                dashboardViewModel.onNewProjectTriggered()
+            }
+            azRailSubItem(id = "proj.save", hostId = "host.project", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE) {
+                showSaveDialog = true
+            }
+            azRailSubItem(id = "proj.export", hostId = "host.project", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE) {
+                // Export is mode-dispatched by the caller so it has access to the CameraX
+                // controller (Overlay stills) and a coroutine scope (AR/Overlay both suspend on
+                // asynchronous captures). This handler just tells the caller "user pressed Export".
+                onExportRequested()
+            }
+            azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {
+                navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
+            }
+            azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE) {
+                showSettings = true
+            }
+
 
             // Help — opens AzNavRail's built-in help overlay (populated by azAdvanced(helpList=...)).
             // Registering it as azHelpRailItem is what makes the overlay reachable: the library toggles
@@ -2243,6 +2250,47 @@ private fun ConfidenceProgressBar(label: String, progress: Float) {
             color = Cyan,
             trackColor = Color.White.copy(alpha = 0.1f)
         )
+    }
+}
+
+/**
+ * Shown when an ARCore anchor exists but the wall fingerprint does not — the state that used to
+ * render as "TARGET ESTABLISHED".
+ *
+ * This is a real and recoverable failure, not an edge case: back-projection drops any feature whose
+ * recovered depth falls outside its 0.1-10 m trust range, so a capture can find well over a thousand
+ * features and place none of them on the wall. Without a fingerprint the reloc thread has nothing to
+ * match against, every diagnostic freezes, and the overlay runs on raw VIO and drifts within
+ * seconds. Naming it is the difference between "re-capture, squarer and closer" and "this app
+ * doesn't work".
+ */
+@Composable
+private fun TargetIncompleteOverlay(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .background(Color(0xEE1A1A1A), RoundedCornerShape(20.dp))
+            .border(2.dp, HotPink, RoundedCornerShape(20.dp))
+            .padding(horizontal = 24.dp, vertical = 20.dp)
+            .widthIn(max = 340.dp)
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "TARGET NOT LOCKED",
+                color = HotPink,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "The anchor is placed, but no wall features were matched to it — the overlay " +
+                    "will drift. Re-capture the target: get squarer to the wall, closer, and aim at " +
+                    "a patch with more detail.",
+                color = Color.White,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
