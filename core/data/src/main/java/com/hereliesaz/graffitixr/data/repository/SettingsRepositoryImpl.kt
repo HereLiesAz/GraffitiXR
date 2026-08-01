@@ -10,7 +10,6 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.hereliesaz.graffitixr.common.model.AppLanguage
-import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -28,7 +27,18 @@ class SettingsRepositoryImpl @Inject constructor(
 
     private val LANGUAGE = stringPreferencesKey("language")
     private val IS_RIGHT_HANDED = booleanPreferencesKey("is_right_handed")
+    // Legacy: the Canvas/Mural scan mode, read only to migrate an existing preference (below).
     private val AR_SCAN_MODE = stringPreferencesKey("ar_scan_mode")
+    private val AMBIENT_SCAN_ENABLED = booleanPreferencesKey("ambient_scan_enabled")
+
+    /**
+     * The legacy Canvas mode's persisted name, as a literal.
+     *
+     * Deliberately not a reference to the enum: the enum is deleted, and a migration that depends on
+     * live code is a migration that breaks the next time that code is refactored. What is on disk is
+     * a string, so the check is against a string.
+     */
+    private val LEGACY_CANVAS_MODE = "CLOUD_POINTS"
     private val MURAL_METHOD = stringPreferencesKey("mural_method")
     private val SHOW_ANCHOR_BOUNDARY = booleanPreferencesKey("show_anchor_boundary")
     private val FORCED_STEREO_UNSTABLE = booleanPreferencesKey("forced_stereo_unstable")
@@ -72,13 +82,17 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
-    override val arScanMode: Flow<ArScanMode> = context.dataStore.data
+    /**
+     * Migrates rather than resets. Canvas (`CLOUD_POINTS`) was precisely the mode that skipped the
+     * ambient sweep, so a user who picked it keeps skipping it; everyone else — including the
+     * untouched default, Mural — keeps requiring it. Reading the legacy key only when the new one is
+     * absent means the migration happens once and a later explicit choice always wins.
+     */
+    override val ambientScanEnabled: Flow<Boolean> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { preferences ->
-            when (preferences[AR_SCAN_MODE]) {
-                ArScanMode.CLOUD_POINTS.name -> ArScanMode.CLOUD_POINTS
-                else -> ArScanMode.MURAL  // default
-            }
+            preferences[AMBIENT_SCAN_ENABLED]
+                ?: (preferences[AR_SCAN_MODE] != LEGACY_CANVAS_MODE)
         }
 
     override val muralMethod: Flow<MuralMethod> = context.dataStore.data
@@ -97,9 +111,9 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun setArScanMode(mode: ArScanMode) {
+    override suspend fun setAmbientScanEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
-            preferences[AR_SCAN_MODE] = mode.name
+            preferences[AMBIENT_SCAN_ENABLED] = enabled
         }
     }
 

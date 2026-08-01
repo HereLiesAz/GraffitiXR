@@ -2,7 +2,6 @@ package com.hereliesaz.graffitixr.feature.ar
 
 import android.content.Context
 import com.google.ar.core.Session
-import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.wearable.WearableManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
@@ -54,7 +53,7 @@ class ArSessionTest {
         Dispatchers.setMain(testDispatcher)
         mockkObject(NativeLibLoader)
         every { NativeLibLoader.loadAll() } returns Unit
-        every { settingsRepository.arScanMode } returns flowOf(ArScanMode.CLOUD_POINTS)
+        every { settingsRepository.ambientScanEnabled } returns flowOf(true)
         every { settingsRepository.isRightHanded } returns flowOf(true)
         every { settingsRepository.showAnchorBoundary } returns flowOf(false)
         every { projectRepository.currentProject } returns MutableStateFlow(null)

@@ -328,7 +328,7 @@ fun MainScreen(
                         },
                         update = { view ->
                             rendererRef.value?.let { r ->
-                                r.scanMode = arUiState.arScanMode
+                                r.ambientScanEnabled = arUiState.ambientScanEnabled
                                 r.muralMethod = arUiState.muralMethod
                                 r.captureRequested = arUiState.isCaptureRequested
                                 r.isCapturingTarget = mainUiState.isCapturingTarget

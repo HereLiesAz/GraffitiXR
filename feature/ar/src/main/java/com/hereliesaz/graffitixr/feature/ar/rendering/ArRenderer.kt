@@ -11,7 +11,6 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.NotYetAvailableException
 import com.google.ar.core.exceptions.SessionPausedException
-import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.nativebridge.YuvConverter
@@ -213,7 +212,8 @@ class ArRenderer(
     // on this hardware; metric depth comes from triangulation/stereo instead. Set from ArViewModel.
     @Volatile var depthApiEnabled: Boolean = false
 
-    @Volatile var scanMode: ArScanMode = ArScanMode.MURAL
+    /** Whether the 360-degree ambient sweep is required. See ArUiState.ambientScanEnabled. */
+    @Volatile var ambientScanEnabled: Boolean = true
     @Volatile var muralMethod: MuralMethod = MuralMethod.VOXEL_HASH
 
     // Eval (Sub-project A): null unless dev/eval mode is on. Set from ArViewModel.
@@ -868,7 +868,7 @@ class ArRenderer(
             }
             // During the AMBIENT scan, the camera background renders as a newspaper halftone with full
             // colour bleeding in (like ink) as each yaw sector is mapped — the world-mapping indicator.
-            val scanActive = !anchorEstablished && scanMode == ArScanMode.MURAL && scanPhase == ScanPhase.AMBIENT
+            val scanActive = !anchorEstablished && ambientScanEnabled && scanPhase == ScanPhase.AMBIENT
             // Voxel-method reveal-mask: while scanning in VOXEL_HASH, the camera renders full colour
             // but DIMMED, and the voxel coverage pass (composited below as a mask) reveals the world
             // at full brightness/colour only where it has been mapped — so the user literally sees
@@ -888,7 +888,7 @@ class ArRenderer(
             backgroundRenderer.draw(frame, scanActive && !voxelRevealMaskActive, grayscale = false)
             // Coverage mask is now drawn with the throttled perception layers (see "debugView").
             if (frameCount <= 10 || frameCount % 60 == 0) {
-                Timber.i("ARDIAG drawFrame f=$frameCount tracking=${frame.camera.trackingState} anchor=$anchorEstablished scanMode=$scanMode scanActive=$scanActive")
+                Timber.i("ARDIAG drawFrame f=$frameCount tracking=${frame.camera.trackingState} anchor=$anchorEstablished ambientScan=$ambientScanEnabled scanActive=$scanActive")
                 // On-screen heartbeat. f climbing => render loop alive; ts (camera frame timestamp)
                 // changing => ARCore is streaming camera images; track => PAUSED until ARCore converges.
                 // f stuck at 1 = loop stalled; f climbs + ts frozen = camera not streaming; f climbs +
@@ -1125,8 +1125,6 @@ class ArRenderer(
                 }
             }
 
-            val currentScanMode = scanMode
-            slamManager.setArScanMode(currentScanMode.ordinal)
             slamManager.setMuralMethod(muralMethod.ordinal)
             
             // --- Democratic Consensus Transformation + smoothed reloc fusion ---

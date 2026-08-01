@@ -109,7 +109,15 @@ data class ArUiState(
     val targetPhysicalExtent: Pair<Float, Float>? = null,
 
     // Which 3-D mapping mode is active. Defaults to MURAL.
-    val arScanMode: ArScanMode = ArScanMode.MURAL,
+    /**
+     * Whether the 360-degree ambient sweep is required before the wall scan begins. Default on.
+     *
+     * Replaces the Canvas/Mural `arScanMode`. Those modes named two mapping engines — splatting and
+     * surface mesh — that were deleted, and natively the mode was inert (`mScanMode` was stored and
+     * read nowhere). The only behaviour that still genuinely differed between them was this sweep,
+     * so that is what the setting now says.
+     */
+    val ambientScanEnabled: Boolean = true,
     // The specific engine used when MURAL is active.
     val muralMethod: MuralMethod = MuralMethod.VOXEL_HASH,
 
@@ -247,18 +255,6 @@ enum class CaptureStep {
     NONE, CAPTURE, RECTIFY, MASK, REVIEW
 }
 
-enum class ArScanMode {
-    /** 
-     * User-facing: "Canvas". Optimized for smaller desk-scale art.
-     * Use ARCore's built-in feature-point cloud (reliable, no depth API required). 
-     */
-    CLOUD_POINTS,
-    /**
-     * User-facing: "Mural". The specific engine (Splatting or Surface Mesh) 
-     * is determined by the MuralMethod setting.
-     */
-    MURAL
-}
 
 enum class MuralMethod {
     /** Gaussian Splatting (Mural v1) */

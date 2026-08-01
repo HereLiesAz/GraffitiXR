@@ -80,7 +80,6 @@ import com.google.android.gms.common.GoogleApiAvailability
 import com.hereliesaz.aznavrail.*
 import com.hereliesaz.aznavrail.model.*
 import com.hereliesaz.aznavrail.HiddenMenuScope
-import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.ScanPhase
@@ -1384,8 +1383,8 @@ class MainActivity : ComponentActivity() {
                                     onThrottleOnLagChanged = { arViewModel.setThrottleOnLag(it) },
                                     adaptiveRateEnabled = arUiState.adaptiveRateEnabled,
                                     onAdaptiveRateEnabledChanged = { arViewModel.setAdaptiveRateEnabled(it) },
-                                    arScanMode = arUiState.arScanMode,
-                                    onArScanModeChanged = { arViewModel.setArScanMode(it) },
+                                    ambientScanEnabled = arUiState.ambientScanEnabled,
+                                    onAmbientScanEnabledChanged = { arViewModel.setAmbientScanEnabled(it) },
                                     showAnchorBoundary = arUiState.showAnchorBoundary,
                                     onAnchorBoundaryChanged = { arViewModel.setShowAnchorBoundary(it) },
                                     isImperialUnits = arUiState.isImperialUnits,

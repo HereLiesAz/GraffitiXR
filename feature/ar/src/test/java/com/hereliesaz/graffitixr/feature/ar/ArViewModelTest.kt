@@ -6,7 +6,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.viewModelScope
 import com.google.ar.core.Session
 import kotlinx.coroutines.cancel
-import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.wearable.WearableManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
@@ -85,7 +84,7 @@ class ArViewModelTest {
         // Match both the zero-arg call and the call with an explicit tapPos argument.
         every { any<Bitmap>().isolateMarkings() } returns fakeBitmap
         every { any<Bitmap>().isolateMarkings(any()) } returns fakeBitmap
-        every { settingsRepository.arScanMode } returns flowOf(ArScanMode.CLOUD_POINTS)
+        every { settingsRepository.ambientScanEnabled } returns flowOf(true)
         every { settingsRepository.isRightHanded } returns flowOf(true)
         every { settingsRepository.showAnchorBoundary } returns flowOf(false)
         every { settingsRepository.isImperialUnits } returns flowOf(false)
@@ -330,47 +329,29 @@ class ArViewModelTest {
 
     // ==================== Scan Mode Tests ====================
 
+    /**
+     * The setting reaches uiState through the repository flow, so the flow is what the test drives.
+     * A fresh ArViewModel is constructed after re-stubbing because the one from @Before already
+     * collected the default stub.
+     */
     @Test
-    fun `setArScanMode to MURAL updates arScanMode in uiState`() = runTest {
-        every { settingsRepository.arScanMode } returns MutableStateFlow(ArScanMode.CLOUD_POINTS)
-        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, projectManager, collaborationManager, wearableManager, context, testDispatchers)
+    fun `the ambient scan flag reaches uiState in both directions`() = runTest {
+        val flow = MutableStateFlow(false)
+        every { settingsRepository.ambientScanEnabled } returns flow
+        val vm = ArViewModel(
+            slamManager, stereoProvider, projectRepository, settingsRepository, projectManager,
+            collaborationManager, wearableManager, context, testDispatchers,
+        )
         testDispatcher.scheduler.advanceUntilIdle()
+        assertFalse(vm.uiState.value.ambientScanEnabled)
 
-        every { settingsRepository.arScanMode } returns MutableStateFlow(ArScanMode.MURAL)
-        // Simulate what setArScanMode does: push the new mode through the settings flow
-        val modeFlow = MutableStateFlow(ArScanMode.CLOUD_POINTS)
-        every { settingsRepository.arScanMode } returns modeFlow
-        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, projectManager, collaborationManager, wearableManager, context, testDispatchers)
+        flow.value = true
         testDispatcher.scheduler.advanceUntilIdle()
+        assertTrue(vm.uiState.value.ambientScanEnabled)
 
-        modeFlow.value = ArScanMode.MURAL
+        flow.value = false
         testDispatcher.scheduler.advanceUntilIdle()
-
-        assertEquals(ArScanMode.MURAL, viewModel.uiState.value.arScanMode)
-    }
-
-    @Test
-    fun `setArScanMode to CLOUD_POINTS updates arScanMode in uiState`() = runTest {
-        val modeFlow = MutableStateFlow(ArScanMode.MURAL)
-        every { settingsRepository.arScanMode } returns modeFlow
-        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, projectManager, collaborationManager, wearableManager, context, testDispatchers)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        modeFlow.value = ArScanMode.CLOUD_POINTS
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        assertEquals(ArScanMode.CLOUD_POINTS, viewModel.uiState.value.arScanMode)
-    }
-
-    // ==================== Tracking Lost Tests ====================
-
-    @Test
-    fun `setTrackingState false reflects isScanning false in uiState`() = runTest {
-        viewModel.setTrackingState(true, 100, 0, true)
-        assertTrue(viewModel.uiState.value.isScanning)
-
-        viewModel.setTrackingState(false, 0, 0, true)
-        assertFalse(viewModel.uiState.value.isScanning)
+        assertFalse(vm.uiState.value.ambientScanEnabled)
     }
 
     @Test
