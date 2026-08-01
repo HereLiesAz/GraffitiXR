@@ -333,6 +333,47 @@ in landscape, then in portrait, same wall, same obliquity; then attempt
 relocalization from the same standing positions for each. Compare inlier ratio
 and lock rate.
 
+**Precondition — turn the Depth API OFF, or E0b does not test §8 at all.**
+`MainViewModel.onConfirmTargetCreation` branches on whether a depth buffer was
+captured, and the two branches do not share a line of geometry:
+
+| Depth API | Capture path | Reaches `PlaneMarks.backProject`? |
+|---|---|---|
+| **off** | `handleSingleCapture` → `MetricFingerprintBuilder` | **yes — this is §8's path** |
+| on | `SlamManager.setWallFingerprint` → native `generateFingerprint` | no; 3D comes from the depth image |
+
+`depthApiEnabled` follows the `useArCoreDepthApi` setting (`ArViewModel`), and
+`ArRenderer` only populates the buffer when it is on. So on a depth-capable
+device with the setting left on, **`backProject` never runs during E0b** and a
+result either way says nothing about §8.
+
+Worse, it will not *look* uninformative. The depth path has an orientation
+dependence of its own, and it also singles out landscape. `generateFingerprint`
+(`MobileGS.cpp`) unprojects keypoints with the supplied `intr` and maps them to
+the depth image by linear scaling `depthW/image.cols`, so the bitmap, the depth
+image and the intrinsics must all be in one frame. The depth buffer is ARCore's
+raw sensor-frame image; the intrinsics handed over are the *display-rotated*
+`intrArr`, in every orientation; and the bitmap is conditionally un-rotated by a
+**hardcoded `postRotate(-90f)`** (`MainViewModel.kt:188`) gated on
+`isPortrait && height > width`. Working the four cases at
+$\text{sensorOrientation} = 90$:
+
+| display | `rotationNeeded` | bitmap after the fixup | intrinsics | consistent |
+|---|---|---|---|---|
+| `ROTATION_90` | 0 | sensor frame | unrotated | **yes** |
+| `ROTATION_0` | 90 | sensor frame (−90 is right here) | 90-rotated | no |
+| `ROTATION_180` | 270 | **180° off** (−90 applied, −270 needed) | 270-rotated | no |
+| `ROTATION_270` | 180 | **180° off** (no fixup fires) | 180-rotated | no |
+
+So a depth-path E0b run shows landscape working and portrait failing — the exact
+signature §8 predicts — for an entirely unrelated reason. Running E0b with depth
+on and reading the result as confirmation would be the strongest-looking evidence
+in the programme and would be measuring the wrong defect.
+
+This is unfixed and deliberately so: correcting it changes capture geometry with
+no experiment gating it, and §8.3's warning applies — every rotation sign has to
+be right or the overlay lands worse than today.
+
 **Reasoning.** The cheapest experiment in the document, and the independent
 variable is how you hold the phone. Do it *first*, before any of Phase 0's
 engineering — a negative result cancels that engineering entirely.
