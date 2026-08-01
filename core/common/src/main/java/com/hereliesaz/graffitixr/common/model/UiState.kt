@@ -56,6 +56,20 @@ data class ArUiState(
     // [pointX,pointY,pointZ, normalX,normalY,normalZ] in world space. Null when the tap wasn't on a
     // qualifying (MATCH/green) plane — single-capture target creation requires one (back-projection).
     val targetWallPlane: FloatArray? = null,
+    /**
+     * Where the artwork sat at capture (`IMPLEMENTATION.md` 2.3): its **rigid** world model matrix
+     * (column-major 4x4) and its **effective**, scale-included half-extents in metres. Null/-1 when
+     * the overlay had no placement to take a footprint of, which leaves the fingerprint
+     * unpartitioned — the legacy all-backbone reading.
+     *
+     * Carried as three loose values rather than the `DesignFootprint` the builder takes, because
+     * that type lives in `feature/ar` and this module is below it in the graph. Reassembled at the
+     * one place that consumes it (`MainViewModel.handleSingleCapture`) so the loose form never
+     * spreads past this boundary.
+     */
+    val targetDesignModel: FloatArray? = null,
+    val targetDesignHalfW: Float = -1f,
+    val targetDesignHalfH: Float = -1f,
     val capturedTargetUris: List<Uri> = emptyList(),
     val capturedTargetImages: List<Bitmap> = emptyList(),
     val gpsData: GpsData? = null,

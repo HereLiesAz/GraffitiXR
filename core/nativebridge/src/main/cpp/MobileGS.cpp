@@ -223,6 +223,8 @@ void MobileGS::relocThreadFunc() {
 
         cv::Mat wallDescs;
         std::vector<cv::Point3f> wallKps3d;
+        // Phase 2: parallel to wallKps3d, or empty for a legacy fingerprint (= all backbone).
+        std::vector<uint8_t> wallRegions;
         cv::Mat wallPatch;
         float fpIntrinsics[4];
         bool hasFpView = false;
@@ -237,6 +239,7 @@ void MobileGS::relocThreadFunc() {
             std::lock_guard<std::mutex> lock(mMutex);
             wallDescs = mWallDescriptors.clone();
             wallKps3d = mWallKeypoints3D;
+            wallRegions = mWallRegions;
             wallPatch = mWallPatch.clone();
             memcpy(fpIntrinsics, mFingerprintIntrinsics, 4 * sizeof(float));
             hasFpView = mHasFingerprintView;
@@ -307,6 +310,10 @@ void MobileGS::relocThreadFunc() {
             // points into solvePnPRansac. The map path (below) already guards this; the wall path did
             // not. Refuse rather than relocalize against nonsense.
             if (wallKps3d.size() != (size_t)wallDescs.rows) return;
+            // IMPLEMENTATION.md 2.7 — honour the partition only when it indexes THIS point set. A
+            // regions array of the wrong length is treated as absent (all backbone) rather than
+            // subscripted, so a legacy or mismatched fingerprint relocalizes exactly as on main.
+            const bool usePartition = wallRegions.size() == wallKps3d.size();
 
             cv::Ptr<cv::DescriptorMatcher>& matcher = (descs.type() == CV_32F) ? mL2Matcher : mMatcher;
             std::vector<std::vector<cv::DMatch>> matches;
@@ -314,6 +321,12 @@ void MobileGS::relocThreadFunc() {
             for (auto& match : matches) {
                 if (match.size() < 2) continue;
                 if (match[0].distance < 0.75f * match[1].distance) {
+                    // PAPER.md §5: the reloc PnP solves the GLOBAL problem, with no prior, and must
+                    // therefore see only the backbone. Points under the artwork (INSIDE) are the
+                    // work surface — they decay as it is painted, which is exactly what makes
+                    // accuracy degrade with task progress. BAND straddles the edge and is trusted by
+                    // neither side. Corroboration against F_in happens later, once a pose exists.
+                    if (usePartition && wallRegions[match[0].trainIdx] != kRegionOutside) continue;
                     cv::Point2f p = kps[match[0].queryIdx].pt;
                     if (!Hback.empty()) {
                         std::vector<cv::Point2f> in{p}, outp;
@@ -890,6 +903,14 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         for (size_t i = 0; i < take; ++i) {
             mWallKeypoints3D.push_back(newPts[i]);
             mWallDescriptors.push_back(newDescs.row((int)i));
+            // Keep the partition 1:1 with the points it indexes, or the reloc filter silently
+            // switches itself off (its length check fails) and the whole map goes back to being
+            // undifferentiated. Promoted marks are tagged BAND — trusted by NEITHER set — because
+            // nothing here has run Φ on them: admitting an unclassified feature to the backbone is
+            // precisely the corruption the band exists to prevent. IMPLEMENTATION.md 3.4 is the item
+            // that classifies promotion candidates properly; until then self-grow (default OFF)
+            // cannot enlarge F_out.
+            if (!mWallRegions.empty()) mWallRegions.push_back(kRegionBand);
         }
         // Snapshot inside the lock: these feed a log line below, and reading the containers after
         // the guard released races a concurrent restoreWallFingerprintMetric on the JNI thread.
@@ -924,13 +945,21 @@ void MobileGS::restoreWallFingerprint(const cv::Mat& d, const std::vector<cv::Po
     std::lock_guard<std::mutex> lock(mMutex);
     mWallDescriptors = d.clone();
     mWallKeypoints3D = p;
+    // This path carries no partition, and the previous fingerprint's must not survive onto it: the
+    // bytes would index a different point set entirely. Empty = all backbone, as before Phase 2.
+    mWallRegions.clear();
 }
 void MobileGS::restoreWallFingerprintMetric(const cv::Mat& d, const std::vector<cv::Point3f>& p,
                                             const float* anchorMatrix16, const float* intrinsics4,
-                                            const float* viewMatrix16) {
+                                            const float* viewMatrix16,
+                                            const std::vector<uint8_t>& regions) {
     std::lock_guard<std::mutex> lock(mMutex);
     mWallDescriptors = d.clone();
     mWallKeypoints3D = p;
+    // Belt and braces over the JNI-side length check: a partition that does not index the points it
+    // is stored beside is worse than no partition, and this is the last place it can be refused
+    // before the reloc thread subscripts it. Empty = all backbone = pre-Phase-2 behaviour.
+    mWallRegions = (regions.size() == p.size()) ? regions : std::vector<uint8_t>();
     if (anchorMatrix16) memcpy(mFingerprintAnchorMatrix, anchorMatrix16, 16 * sizeof(float));
     if (intrinsics4)    memcpy(mFingerprintIntrinsics, intrinsics4, 4 * sizeof(float));
     if (viewMatrix16) {
@@ -947,6 +976,7 @@ void MobileGS::clearWallFingerprint() {
     std::lock_guard<std::mutex> lock(mMutex);
     mWallDescriptors.release();
     mWallKeypoints3D.clear();
+    mWallRegions.clear();
     // Back to the constructed defaults, so a later project can't inherit this one's co-registration.
     static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     memcpy(mFingerprintAnchorMatrix, kIdentity16, 16 * sizeof(float));
@@ -1070,6 +1100,10 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
         std::lock_guard<std::mutex> lock(mMutex);
         mWallKeypoints3D = std::move(points3d);
         mWallDescriptors = descs.clone();
+        // A peer's fingerprint carries no partition, and the local one indexes a different point
+        // set. Empty = all backbone, i.e. pre-Phase-2 behaviour, which is the right default for a
+        // map whose design footprint this device never saw.
+        mWallRegions.clear();
         mRelocRequested = true; // Trigger relocalization thread to start searching
     }
     LOGI("Co-op: Received fingerprint with %u points. Relocalization triggered.", numPoints);
@@ -1391,6 +1425,9 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
         std::lock_guard<std::mutex> lock(mMutex);
         mWallDescriptors  = fd.descriptors.clone();
         mWallKeypoints3D  = std::move(pts3d);
+        // The depth path supplies no partition. Clearing rather than leaving the previous
+        // fingerprint's is not optional: those bytes index a point set that no longer exists.
+        mWallRegions.clear();
         memcpy(mFingerprintAnchorMatrix, mAnchorMatrix, 16 * sizeof(float));
         memcpy(mFingerprintIntrinsics, intr, 4 * sizeof(float));
         if (viewMat) {

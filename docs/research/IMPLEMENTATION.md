@@ -847,29 +847,89 @@ order.** Work top to bottom.
 
 ### Phase 2 — partition the fingerprint
 
-- [ ] **2.1** Add `regions: ByteArray`, `captureHalfW`, `captureHalfH` to
+- [x] **2.1** Add `regions: ByteArray`, `captureHalfW`, `captureHalfH` to
       `Fingerprint`; empty `regions` means legacy all-backbone. **[T]**
-- [ ] **2.2** Add `Fingerprint.reclassify(...)` for the user-rescales-the-design
+      *(Also `captureDesignModel` — the design's rigid pose in the POINTS' frame.
+      Without it `reclassify` cannot be called correctly after a reload: the
+      capture's world frame dies with the ARCore session, and a world-frame model
+      applied to camera-frame points produces a full, plausible, wrong partition.
+      `equals`/`hashCode` were extended to cover the new fields, without which the
+      2.9 round-trip assertion would have passed whether or not they serialized.)*
+- [x] **2.2** Add `Fingerprint.reclassify(...)` for the user-rescales-the-design
       case; pure Kotlin over the stored points. Key the staleness check on
       **`overlayScale`** (or the effective scaled half-extents), NOT on
       `OverlayRenderer`'s extents — those have no user-driven call site and never
       change. **[T]**
-- [ ] **2.3** Thread `overlayHalfW` / `overlayHalfH` into
+      *(Wired, not merely written: `ArRenderer` fires `onDesignExtentChanged` when
+      the EFFECTIVE half-extents move past 1 mm — edge-triggered, so a resting
+      finger doesn't repartition every frame — and `ArViewModel` reclassifies the
+      retained fingerprint, re-pushes it to native, and persists it. The
+      matrix-free `reclassify(fp, halfW, halfH)` overload is what the handler
+      calls, so there is no frame for a caller to get wrong.)*
+- [x] **2.3** Thread `overlayHalfW` / `overlayHalfH` into
       `MetricFingerprintBuilder.build` and the `PlaneMarks` single-view path.
-- [ ] **2.4** Classify each surviving point via `Footprint.classify` during
+      *(As one `DesignFootprint` (rigid model + effective half-extents) rather than
+      two loose floats, so "no partition" reads as a deliberate `null`. Carried
+      `ArRenderer` → `ArViewModel` → `UiState` → `MainViewModel` → builder; the
+      `UiState` hop is three loose values because that module sits below
+      `feature/ar` and cannot see the type, and it is reassembled immediately.
+      Note the two-keyframe `build` overload has NO production caller and was left
+      unpartitioned rather than given a parameter nothing would pass.)*
+- [x] **2.4** Classify each surviving point via `Footprint.classify` during
       `assemble`; populate `regions`. **[T]**
-- [ ] **2.5** Add `FingerprintPartitionTest` — synthetic straddling point set,
+      *(The frame trap, and the reason this was not a two-line change: the points
+      are in the capture CV camera frame and the renderer's design pose is in
+      world. `DesignFootprint.inFrameOf(view)` pre-multiplies the view once —
+      `inv(V·M)·p_cam == inv(M)·p_world` exactly, and rigid∘rigid stays rigid — so
+      Φ sees one frame, at the cost of one 4×4 multiply instead of one per
+      feature. `PoseMath.multiply`, not `android.opengl.Matrix`: the framework
+      class is a stub under a plain JVM unit test that silently returns zeros, so
+      the framework version would have been untestable AND would have classified
+      everything INSIDE. A test caught exactly that.)*
+- [x] **2.5** Add `FingerprintPartitionTest` — synthetic straddling point set,
       expected counts per region. **[T]**
-- [ ] **2.6** Add `regions` to `SlamManager.restoreWallFingerprintMetric`'s
+      *(Extended with the frame reconciliation in both directions: camera-frame
+      classification must agree with world-frame, and skipping the reconciliation
+      must NOT agree — otherwise the mechanism is decorative.)*
+- [x] **2.6** Add `regions` to `SlamManager.restoreWallFingerprintMetric`'s
       signature and JNI binding.
-- [ ] **2.7** Store `mWallRegions` in `MobileGS`; filter the reloc correspondence
+      *(JNI binds by SHORT NAME and does not check the descriptor, so an arity
+      change on one side alone links, runs, and reads a garbage register.
+      `NativeMethodAritySignatureTest` now pins the parameter counts of every
+      `native*` method against `GraffitiJNI.cpp`; mutation-verified by adding a
+      parameter to the C++ side only, which the Kotlin compiler cannot see.)*
+- [x] **2.7** Store `mWallRegions` in `MobileGS`; filter the reloc correspondence
       build to exclude `INSIDE`. Zero-length regions → all backbone. **[N]**
-- [ ] **2.8** Add the `F_out`-too-small capture refusal with the specific
+      *(Filter keeps only `OUTSIDE` — "not INSIDE" and "is OUTSIDE" differ exactly
+      on the BAND, which is the region that must be trusted by neither side.
+      `mWallRegions` is cleared at all four other sites that replace
+      `mWallKeypoints3D` (plain restore, co-op receive, depth-path
+      `generateFingerprint`, `clearWallFingerprint`), because a partition left
+      behind indexes a point set that no longer exists. Self-grow appends `BAND`
+      per promoted mark so the 1:1 invariant survives without admitting an
+      unclassified feature to the backbone — 3.4 is what classifies them properly.
+      The ordinals are a wire format with no compiler checking either side, so
+      `FootprintRegionWireTest` pins the Kotlin enum against `MobileGS.h`'s
+      constants by reading the header.)*
+- [x] **2.8** Add the `F_out`-too-small capture refusal with the specific
       "step back" message, following `MainViewModel`'s existing
       `lastDetected/lastPlaced/lastRequired` toast pattern.
-- [ ] **2.9** Add a persistence round-trip test including the legacy-empty path. **[T]**
+      *(`MIN_BACKBONE = 40`, the pre-registered `PARAMETERS.md` prior. Checked
+      before anything is published to native or the overlay re-centred, so a
+      refusal leaves nothing half-built. `lastBackbone` defaults to **-1**, not 0:
+      "the design covers everything" and "nobody asked for a partition" must not
+      print the same number, and the refusal branch is ordered first because the
+      other two messages would both be false in this case.)*
+- [x] **2.9** Add a persistence round-trip test including the legacy-empty path. **[T]**
+      *(Asserted through `GraffitiProject` as well as `Fingerprint`, and the first
+      assertion is that equality can *tell the two apart* — a field missing from
+      `equals` makes `assertEquals(decoded, original)` prove nothing.)*
 - [ ] **2.10** Verify on a replayed recording that a legacy fingerprint produces
       byte-identical inlier counts to `main`.
+      *(Blocked on hardware — needs a replayed recording, which this environment
+      cannot produce. The static argument is that a legacy fingerprint has empty
+      `regions`, `usePartition` is therefore false, and the correspondence loop is
+      byte-identical; that is an argument, not the measurement the item asks for.)*
 - [ ] **2.11** (6b) Add `backboneFeatures` / `backboneMatches` / `backboneInliers`
       to `RelocDiagnostics`, the CSV, and the overlay. Defaults encode "not
       measured", not zero — follow the `obliquityDeg = -1` precedent. **[T][N]**

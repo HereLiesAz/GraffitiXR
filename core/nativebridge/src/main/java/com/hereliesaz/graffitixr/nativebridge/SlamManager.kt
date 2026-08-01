@@ -151,14 +151,23 @@ class SlamManager @Inject constructor(
      * vs-frontal distortion is a homography that can be pre-cancelled before matching. Pass an empty
      * array only when the capture view genuinely isn't known (e.g. a project saved before it was
      * persisted) — then that pass is skipped rather than run against a stale frontal frame.
+     *
+     * [regions] is the Phase-2 partition: one byte per 3D point, holding a `Footprint.Region`
+     * ordinal. The reloc correspondence build excludes the points tagged `INSIDE` — they sit under
+     * the artwork and decay as it is painted. **An empty array means all-backbone**, which is
+     * exactly the behaviour before Phase 2, so a legacy fingerprint keeps relocalizing against its
+     * whole map rather than losing it. A non-empty array of the wrong length is rejected native-side
+     * rather than silently truncating, because the partition is indexed by point.
      */
     fun restoreWallFingerprintMetric(
         descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,
         points3d: FloatArray, anchorMatrix: FloatArray, intrinsics: FloatArray,
         viewMatrix: FloatArray = FloatArray(0),
+        regions: ByteArray = ByteArray(0),
     ) {
         nativeRestoreWallFingerprintMetric(
             descriptorsData, rows, cols, type, points3d, anchorMatrix, intrinsics, viewMatrix,
+            regions,
         )
     }
 
@@ -635,7 +644,7 @@ class SlamManager @Inject constructor(
     private external fun nativeRestoreWallFingerprintMetric(
         descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,
         points3d: FloatArray, anchorMatrix: FloatArray, intrinsics: FloatArray,
-        viewMatrix: FloatArray
+        viewMatrix: FloatArray, regions: ByteArray
     )
     private external fun nativeRestoreWallFeatureMap(
         descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,

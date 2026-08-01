@@ -35,7 +35,7 @@ class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
     // Last arg is the camera→point distance (meters) at the tapped pixel, or -1f when unavailable.
-    private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int, Float, FloatArray?, com.hereliesaz.graffitixr.common.model.CaptureEnvironment) -> Unit,
+    private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int, Float, FloatArray?, com.hereliesaz.graffitixr.common.model.CaptureEnvironment, com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.DesignFootprint?) -> Unit,
     private val onTrackingUpdated: (Boolean, Int, Int, Boolean, Float, Float, Triple<Float, Float, Float>?, Boolean, Boolean, Float, Float, Float) -> Unit,
     private val onLightUpdated: (Float) -> Unit,
     private val onDiag: (String) -> Unit = {},
@@ -59,7 +59,16 @@ class ArRenderer(
     // Fired from the GL thread when a torch request was rejected by ARCore (no flash unit, or a
     // camera config that can't drive one), so the UI can drop the toggle instead of latching a
     // light that never came on.
-    private val onFlashlightUnavailable: () -> Unit = {}
+    private val onFlashlightUnavailable: () -> Unit = {},
+    // Fired from the GL thread when the artwork's EFFECTIVE (scale-included) half-extents change —
+    // i.e. the artist pinched the design. IMPLEMENTATION.md 2.2: the stored fingerprint's partition
+    // was computed against the old size and is now stale, so the regions get recomputed from the
+    // stored 3D points rather than the artist being made to re-capture.
+    //
+    // Edge-triggered, not per-frame: the renderer knows when the number moved and the ViewModel does
+    // not, so debouncing here costs one float compare a frame and saves a listener that would
+    // otherwise have to poll.
+    private val onDesignExtentChanged: (Float, Float) -> Unit = { _, _ -> },
 ) : GLSurfaceView.Renderer {
 
     /**
@@ -431,6 +440,45 @@ class ArRenderer(
     private val overlayBaseScratch = FloatArray(16)
     private val overlayLocalScratch = FloatArray(16)
     private val overlayComposedScratch = FloatArray(16)
+    private val overlayRigidScratch = FloatArray(16)
+
+    // Where the artwork sits, published for the capture path (IMPLEMENTATION.md 2.3/2.4).
+    //
+    // Guarded rather than @Volatile: the four values are only meaningful together, and the capture
+    // block reads them a few statements after the draw block wrote them. A torn read here would
+    // partition a whole fingerprint against half of one design's pose and half of another's, and the
+    // result would look entirely plausible. The lock is uncontended in practice — both sides are the
+    // GL thread — and costs nothing next to the frame it sits inside.
+    // A millimetre. Below this a "resize" is float noise in the composed transform, and firing on it
+    // would reclassify the whole fingerprint every frame the artist rests a finger on the screen.
+    private val DESIGN_EXTENT_EPS = 1e-3f
+    private val designFootprintLock = Any()
+    private val designRigidModel = FloatArray(16)
+    private var designEffectiveHalfW = -1f
+    private var designEffectiveHalfH = -1f
+    private var designPlaced = false
+
+    /**
+     * The design's placement as of the last drawn frame, or null when there is no placed artwork to
+     * take a footprint of.
+     *
+     * Null is the honest answer before the overlay has an anchor and a texture, and it leaves the
+     * capture unpartitioned — the legacy all-backbone reading, i.e. exactly `main`'s behaviour. The
+     * alternative, inventing an identity pose, would partition every point against a design sitting
+     * at the world origin and produce a full, confident, meaningless answer.
+     *
+     * One frame stale by construction: the capture block runs before the overlay is composed for
+     * this frame, so these are the previous frame's values. At 30–60 fps that is 16–33 ms of device
+     * motion on a shot the artist has just framed and confirmed, and it is the same transform the
+     * artist was looking at when they tapped — which is the one the partition should be against.
+     */
+    fun designFootprint(): com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.DesignFootprint? =
+        synchronized(designFootprintLock) {
+            if (!designPlaced || designEffectiveHalfW <= 0f || designEffectiveHalfH <= 0f) return null
+            com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.DesignFootprint(
+                designRigidModel.copyOf(), designEffectiveHalfW, designEffectiveHalfH,
+            )
+        }
     // Scratch for the 2D perspective content rotation matrix (X/Y axes).
     private val contentRotationScratch = FloatArray(16)
     private val contentRotationTemp = FloatArray(16)
@@ -1526,7 +1574,12 @@ class ArRenderer(
                             depthWidth, depthHeight, depthStride,
                             intrArr, mappingViewMatrix.copyOf(),
                             rotationNeeded, tapDistanceMeters,
-                            wallPlane, captureEnvironment
+                            wallPlane, captureEnvironment,
+                            // IMPLEMENTATION.md 2.3 — where the artwork is, so the fingerprint can
+                            // be partitioned into backbone and corroboration at the moment its
+                            // geometry is frozen. Null until the overlay has an anchor and a
+                            // texture, which leaves the capture unpartitioned (= all backbone).
+                            designFootprint(),
                         )
                     }
                 } catch (e: Exception) {
@@ -1908,6 +1961,32 @@ class ArRenderer(
             )
             // Spin the artwork in its own plane (Z-axis rotation about the wall normal).
             android.opengl.Matrix.rotateM(overlayLocalScratch, 0, overlayRotationDeg, 0f, 0f, 1f)
+            // Snapshot the design's frame BEFORE the scale goes in (IMPLEMENTATION.md 2.3/2.4). Φ
+            // needs a rigid matrix with the scale folded into the extents instead: the composed one
+            // below is scaled (s, s, 1), which is NOT the uniform similarity an inverse-with-scale
+            // would assume, and inverting it as one is wrong on Z. Taken here rather than
+            // reconstructed at capture so it cannot drift from the transform actually drawn.
+            android.opengl.Matrix.multiplyMM(
+                overlayRigidScratch, 0, overlayBaseScratch, 0, overlayLocalScratch, 0
+            )
+            val newHalfW = overlayRenderer.extentHalfW * overlayScale
+            val newHalfH = overlayRenderer.extentHalfH * overlayScale
+            // `quadInitialFitApplied` is part of the precondition, not an optimisation. Until the
+            // screen-fit above has run, the quad's extents are still QUAD_HALF_EXTENT — a 10 m
+            // square placeholder chosen so artwork is never spatially confined. Publishing that as
+            // the design's size would make Φ swallow every feature in view, report a backbone of
+            // zero, and refuse every capture with "the artwork covers almost the whole wall".
+            val placed = anchorEstablished && overlayRenderer.hasTexture && quadInitialFitApplied
+            val extentMoved = placed &&
+                (kotlin.math.abs(newHalfW - designEffectiveHalfW) > DESIGN_EXTENT_EPS ||
+                    kotlin.math.abs(newHalfH - designEffectiveHalfH) > DESIGN_EXTENT_EPS)
+            synchronized(designFootprintLock) {
+                System.arraycopy(overlayRigidScratch, 0, designRigidModel, 0, 16)
+                designEffectiveHalfW = newHalfW
+                designEffectiveHalfH = newHalfH
+                designPlaced = placed
+            }
+            if (extentMoved) onDesignExtentChanged(newHalfW, newHalfH)
             android.opengl.Matrix.scaleM(overlayLocalScratch, 0, overlayScale, overlayScale, 1f)
             android.opengl.Matrix.multiplyMM(
                 overlayComposedScratch, 0, overlayBaseScratch, 0, overlayLocalScratch, 0

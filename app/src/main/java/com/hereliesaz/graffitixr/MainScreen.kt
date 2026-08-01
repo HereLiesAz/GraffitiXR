@@ -275,12 +275,12 @@ fun MainScreen(
                             val renderer = ArRenderer(
                                 context = ctx,
                                 slamManager = slamManager,
-                                onTargetCaptured = { bmp, cw, ch, depth, dw, dh, stride, intr, viewMat, rot, tapDist, wallPlane, environment ->
+                                onTargetCaptured = { bmp, cw, ch, depth, dw, dh, stride, intr, viewMat, rot, tapDist, wallPlane, environment, design ->
                                     arViewModel.onTargetCaptured(
                                         bmp, depth,
                                         cw, ch,
                                         dw, dh, stride,
-                                        intr, viewMat, rot, tapDist, wallPlane, environment
+                                        intr, viewMat, rot, tapDist, wallPlane, environment, design
                                     )
                                 },
                                 onTrackingUpdated = { isTracking, splatCount, immutableSplatCount, isDepthSupported, yaw, distanceMeters, relDir, isDualLens, isHardwareStereo, centerDepth, visConf, globConf ->
@@ -307,6 +307,9 @@ fun MainScreen(
                                 },
                                 onFlashlightUnavailable = {
                                     arViewModel.onFlashlightUnavailable()
+                                },
+                                onDesignExtentChanged = { halfW, halfH ->
+                                    arViewModel.onDesignExtentChanged(halfW, halfH)
                                 }
                             )
                             renderer.hideVisualization = isExporting

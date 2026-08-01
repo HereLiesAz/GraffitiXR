@@ -1491,6 +1491,65 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    /**
+     * The wall fingerprint currently live in native, retained so a design resize can repartition it
+     * (`IMPLEMENTATION.md` 2.2) without a round trip through the project file.
+     *
+     * Held alongside the intrinsics/anchor/view it was restored with, because a repartition has to
+     * re-push all of them — `restoreWallFingerprintMetric` REPLACES the stored fingerprint, so
+     * pushing regions alone would drop the co-registration and the rectification view with it.
+     */
+    private class LiveFingerprint(
+        val fingerprint: com.hereliesaz.graffitixr.common.model.Fingerprint,
+        val anchor: FloatArray,
+        val intrinsics: FloatArray,
+        val view: FloatArray,
+    )
+
+    @Volatile private var liveFingerprint: LiveFingerprint? = null
+
+    /**
+     * The artist pinched the design: its footprint moved, so the stored partition now describes a
+     * shape that is no longer on the wall.
+     *
+     * Recomputed from the stored 3D points — a pure-Kotlin pass over a few hundred points — rather
+     * than forcing a re-capture, which is the whole reason the design model is persisted in the
+     * points' own frame. A fingerprint that carries no model (legacy, depth path) is left alone by
+     * `reclassify`, so this degrades to a no-op instead of guessing a frame.
+     *
+     * Called from the GL thread; the work is dispatched off it.
+     */
+    fun onDesignExtentChanged(halfW: Float, halfH: Float) {
+        val live = liveFingerprint ?: return
+        if (!live.fingerprint.isPartitionStale(halfW, halfH)) return
+        viewModelScope.launch(Dispatchers.Default) {
+            val current = liveFingerprint ?: return@launch
+            val updated = com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
+                .reclassify(current.fingerprint, halfW, halfH)
+            // Identity check, not equality: reclassify returns the RECEIVER when it refuses (no
+            // stored design model), and re-pushing an unchanged fingerprint would reset native's
+            // reloc state for nothing.
+            if (updated === current.fingerprint) return@launch
+            slamManager.restoreWallFingerprintMetric(
+                updated.descriptorsData, updated.descriptorsRows, updated.descriptorsCols,
+                updated.descriptorsType, updated.points3d.toFloatArray(),
+                current.anchor, current.intrinsics,
+                viewMatrix = current.view,
+                regions = updated.regions,
+            )
+            liveFingerprint = LiveFingerprint(updated, current.anchor, current.intrinsics, current.view)
+            // Persist so the next load starts from the size the artist actually settled on. Merged
+            // through the repository transform rather than a full-object write, for the save-race
+            // reason documented on the wall-map save above.
+            projectRepository.updateProject { it.copy(fingerprint = updated) }
+            Timber.i(
+                "Design resized to %.3f x %.3f m; repartitioned %d points (backbone %d)",
+                halfW, halfH, updated.points3d.size / 3,
+                com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.backboneCount(updated),
+            )
+        }
+    }
+
     private fun loadFingerprintIfExists() {
         viewModelScope.launch(Dispatchers.IO) {
             val project = projectRepository.currentProject.value ?: return@launch
@@ -1537,6 +1596,17 @@ class ArViewModel @Inject constructor(
                         // skips the rectification pass rather than warping to a stale frontal frame.
                         viewMatrix = project.fingerprintViewMatrix
                             .takeIf { it.size == 16 }?.toFloatArray() ?: FloatArray(0),
+                        // IMPLEMENTATION.md 2.6 — the partition travels with the points it indexes.
+                        // Empty on a pre-Phase-2 project, which native reads as all-backbone, so the
+                        // reload relocalizes exactly as it did before the phase landed.
+                        regions = fp.regions,
+                    )
+                    // Retained for the repartition-on-resize path (2.2). Stored with exactly the
+                    // values just pushed, so a later re-push cannot drift from what native holds.
+                    liveFingerprint = LiveFingerprint(
+                        fp, anchor.toFloatArray(), intr.toFloatArray(),
+                        project.fingerprintViewMatrix.takeIf { it.size == 16 }?.toFloatArray()
+                            ?: FloatArray(0),
                     )
                 } else {
                     // Depth-path or pre-existing project: descriptors-only legacy restore.
@@ -1932,6 +2002,11 @@ class ArViewModel @Inject constructor(
          */
         environment: com.hereliesaz.graffitixr.common.model.CaptureEnvironment =
             com.hereliesaz.graffitixr.common.model.CaptureEnvironment(),
+        /**
+         * Where the artwork sat at capture, for the Phase-2 partition. Null leaves the fingerprint
+         * unpartitioned, which every consumer reads as all-backbone — pre-Phase-2 behaviour.
+         */
+        design: com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.DesignFootprint? = null,
     ) {
         // Doodle demo: a headless capture (no tap, no review) — build the fingerprint from the
         // drawing and return before the normal capture/review flow runs. Clear the capture-request
@@ -1977,6 +2052,9 @@ class ArViewModel @Inject constructor(
                     targetIntrinsics = intrinsics,
                     targetCaptureViewMatrix = viewMatrix,
                     targetWallPlane = wallPlane,
+                    targetDesignModel = design?.rigidModel,
+                    targetDesignHalfW = design?.halfW ?: -1f,
+                    targetDesignHalfH = design?.halfH ?: -1f,
                     targetPhysicalExtent = extent,
                     isCaptureRequested = false,
                     tempCaptureBitmap = rotatedBmp,
@@ -2007,6 +2085,9 @@ class ArViewModel @Inject constructor(
                 targetIntrinsics = intrinsics,
                 targetCaptureViewMatrix = viewMatrix,
                 targetWallPlane = wallPlane,
+                targetDesignModel = design?.rigidModel,
+                targetDesignHalfW = design?.halfW ?: -1f,
+                targetDesignHalfH = design?.halfH ?: -1f,
                 targetPhysicalExtent = extent,
                 isCaptureRequested = false
             )

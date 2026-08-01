@@ -126,6 +126,17 @@ class OverlayRenderer(private val context: Context) : GlReleasable {
         hasTexture = true
     }
 
+    /**
+     * The artwork quad's current half-extents in metres, before the user's `overlayScale`.
+     *
+     * Exposed for the Phase-2 partition, which needs the design's real size on the wall to ask
+     * whether a feature sits under it. Read-only on purpose: the two [setExtent] call sites are a
+     * fixed constant and a one-shot screen-fit, and neither is user-driven — the user's resize is
+     * `overlayScale`, which lives in the model matrix.
+     */
+    val extentHalfW: Float get() = halfW
+    val extentHalfH: Float get() = halfH
+
     fun setExtent(halfW: Float, halfH: Float) {
         if (this.halfW != halfW || this.halfH != halfH) {
             this.halfW = halfW

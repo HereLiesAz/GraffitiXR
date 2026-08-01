@@ -1,9 +1,11 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
 import com.hereliesaz.graffitixr.common.model.Fingerprint
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.opencv.core.KeyPoint
@@ -203,5 +205,153 @@ class FingerprintPartitionTest {
     @Test(expected = IllegalArgumentException::class)
     fun `a regions array that disagrees with the point count is rejected`() {
         fp(listOf(0f, 0f, 0f, 1f, 1f, 1f), regions = ByteArray(1))
+    }
+
+    // -------------------------------------------------------------------------------------
+    // The frame reconciliation — DesignFootprint.inFrameOf
+    // -------------------------------------------------------------------------------------
+
+    /**
+     * A deliberately awkward rigid world→camera view: a 30° rotation about Z composed with a
+     * translation, so neither the rotation nor the translation can cancel out by accident and a
+     * dropped factor changes the answer.
+     */
+    private fun view(): FloatArray {
+        // Written out rather than built with android.opengl.Matrix: that class is a stub under a
+        // plain JVM unit test and returns zeros without complaining, which would make every point
+        // land at the origin and every assertion below pass for the wrong reason.
+        val c = kotlin.math.cos(Math.toRadians(30.0)).toFloat()
+        val s = kotlin.math.sin(Math.toRadians(30.0)).toFloat()
+        return floatArrayOf(
+            c, s, 0f, 0f,
+            -s, c, 0f, 0f,
+            0f, 0f, 1f, 0f,
+            0.3f, -1.7f, 4.0f, 1f,
+        )
+    }
+
+    /** Apply a column-major 4x4 to a point, returning [x,y,z]. */
+    private fun apply(m: FloatArray, p: FloatArray): FloatArray = floatArrayOf(
+        m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12],
+        m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13],
+        m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14],
+    )
+
+    /**
+     * The claim `inFrameOf` rests on, checked end to end rather than by re-deriving its algebra:
+     * classifying camera-frame points against the view-premultiplied design gives the SAME bytes as
+     * classifying the corresponding world-frame points against the world design.
+     *
+     * This is the assertion that catches the bug the whole design is arranged to avoid — Φ applied
+     * across two frames. `Fingerprint.points3d` are camera-frame and the renderer's design pose is
+     * world-frame, and mixing them produces a full, plausible, entirely wrong partition.
+     */
+    @Test
+    fun `classifying in the camera frame agrees with classifying in world`() {
+        val v = view()
+        // World points chosen to land in all three regions against a design at the world origin.
+        val world = floatArrayOf(
+            0f, 0f, 0f,            // inside
+            HALF_W, 0f, 0f,        // on the edge -> band
+            5f, 0f, 0f,            // outside
+            0.5f, 1.5f, 0f,        // outside via the SHORT axis
+        )
+        val designWorld = FingerprintPartition.DesignFootprint(identity(), HALF_W, HALF_H)
+
+        val inWorld = FingerprintPartition.classify(world, designWorld.rigidModel, HALF_W, HALF_H)
+
+        // The same points, expressed in the camera frame, against the design moved into that frame.
+        val cam = FloatArray(world.size)
+        for (i in 0 until world.size / 3) {
+            val p = apply(v, floatArrayOf(world[i * 3], world[i * 3 + 1], world[i * 3 + 2]))
+            p.copyInto(cam, i * 3)
+        }
+        val designCam = designWorld.inFrameOf(v)
+        val inCam = FingerprintPartition.classify(cam, designCam.rigidModel, designCam.halfW, designCam.halfH)
+
+        assertArrayEquals("the frame must not change the partition", inWorld, inCam)
+        // ...and the fixture is not degenerate: all three regions are represented, so an
+        // everything-is-OUTSIDE bug could not produce this.
+        assertEquals(INSIDE, inWorld[0]); assertEquals(BAND, inWorld[1])
+        assertEquals(OUTSIDE, inWorld[2]); assertEquals(OUTSIDE, inWorld[3])
+    }
+
+    /**
+     * The negative half of the test above. Classifying camera-frame points against the *world*
+     * design — the mistake `inFrameOf` exists to prevent — must give a different answer, or the
+     * reconciliation is decorative and this whole mechanism could be deleted.
+     */
+    @Test
+    fun `skipping the frame reconciliation changes the answer`() {
+        val v = view()
+        val world = floatArrayOf(0f, 0f, 0f, 5f, 0f, 0f)
+        val cam = FloatArray(world.size)
+        for (i in 0 until world.size / 3) {
+            apply(v, floatArrayOf(world[i * 3], world[i * 3 + 1], world[i * 3 + 2])).copyInto(cam, i * 3)
+        }
+        val correct = FingerprintPartition.classify(
+            cam, FingerprintPartition.DesignFootprint(identity(), HALF_W, HALF_H).inFrameOf(v).rigidModel,
+            HALF_W, HALF_H,
+        )
+        val wrong = FingerprintPartition.classify(cam, identity(), HALF_W, HALF_H)
+        assertFalse("mixing frames must be detectable", correct.contentEquals(wrong))
+    }
+
+    /**
+     * The capture-time `F_out` floor (2.8) counts through this overload, so the distinction it draws
+     * has to be pinned: the BAND is **not** backbone. A "step back, not enough wall" refusal that
+     * counted the band would let a design covering everything but its own border pass.
+     */
+    @Test
+    fun `the raw backbone count excludes the band as well as the inside`() {
+        assertEquals(1, FingerprintPartition.backboneCount(byteArrayOf(INSIDE, BAND, OUTSIDE)))
+        assertEquals(0, FingerprintPartition.backboneCount(byteArrayOf(INSIDE, BAND, BAND)))
+        assertEquals(3, FingerprintPartition.backboneCount(byteArrayOf(OUTSIDE, OUTSIDE, OUTSIDE)))
+        assertEquals("no regions is no backbone at this level", 0, FingerprintPartition.backboneCount(ByteArray(0)))
+    }
+
+    @Test
+    fun `a design with no extents is not usable`() {
+        assertFalse(FingerprintPartition.DesignFootprint(identity(), 0f, 1f).isUsable)
+        assertFalse(FingerprintPartition.DesignFootprint(identity(), 1f, -1f).isUsable)
+        assertFalse(FingerprintPartition.DesignFootprint(FloatArray(4), 1f, 1f).isUsable)
+        assertTrue(FingerprintPartition.DesignFootprint(identity(), 1f, 1f).isUsable)
+    }
+
+    // -------------------------------------------------------------------------------------
+    // The self-contained reclassify
+    // -------------------------------------------------------------------------------------
+
+    /**
+     * The reload-safe form: no matrix passed in, so no matrix can be passed in wrong. It must reach
+     * the same answer as the explicit form given the model the fingerprint already carries.
+     */
+    @Test
+    fun `reclassify without a matrix uses the stored design model`() {
+        val explicit = FingerprintPartition.reclassify(
+            fp(listOf(0f, 0f, 0f, 5f, 0f, 0f)), identity(), HALF_W, HALF_H,
+        )
+        assertEquals("the explicit form must store what it used", 16, explicit.captureDesignModel.size)
+
+        val implicit = FingerprintPartition.reclassify(explicit, 2f, 1f)
+        assertEquals(2f, implicit.captureHalfW, 1e-6f)
+        assertArrayEquals(
+            FingerprintPartition.reclassify(explicit, identity(), 2f, 1f).regions,
+            implicit.regions,
+        )
+    }
+
+    /**
+     * A fingerprint with no stored model must be returned untouched. Guessing a frame here would
+     * produce a complete and completely wrong partition; the legacy all-backbone reading is what
+     * `main` already does and is the safe refusal.
+     */
+    @Test
+    fun `reclassify without a matrix refuses a fingerprint that has no stored model`() {
+        val legacy = fp(listOf(0f, 0f, 0f))
+        assertTrue(legacy.captureDesignModel.isEmpty())
+        val out = FingerprintPartition.reclassify(legacy, 1f, 1f)
+        assertSame("must be the same object, not a silently-partitioned copy", legacy, out)
+        assertTrue(out.isUnpartitioned())
     }
 }
