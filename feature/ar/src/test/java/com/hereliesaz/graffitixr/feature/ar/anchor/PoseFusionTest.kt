@@ -43,6 +43,61 @@ class PoseFusionTest {
         assertEquals(0f, r[14], 1e-4f)
     }
 
+    /**
+     * `IMPLEMENTATION.md` **0.6** — `composeCorrected` under convention B.
+     *
+     * The finding that settles it: `vCurrent` is `Camera.getViewMatrix`, which ARCore documents as
+     * *"incorporates the display orientation … equivalent to
+     * `camera.getDisplayOrientedPose().inverse().asMatrix()`"*. So the LIVE side of this
+     * composition was always in the display frame, while capture stored its 3D points in the
+     * sensor frame (`camera.pose.inverse()`). The two sides never agreed; Phase 0 moves capture to
+     * display and they now do. `composeCorrected` itself therefore needs no change — this pins that
+     * conclusion rather than asserting it in a comment.
+     *
+     * Deliberately **not** a round trip. `IMPLEMENTATION.md` 0.6 calls that out: a round trip is
+     * order- and sign-insensitive and would pass under either convention, which is exactly how this
+     * defect survived. Instead: feed a `pnpMat` carrying a residual `R_z` — the pre-Phase-0
+     * situation — and assert the error lands in the output, at full size and in a known direction.
+     */
+    @Test fun `a residual rotation between the pnp and live frames lands in the anchor`() {
+        val rotZ90 = floatArrayOf(0f,1f,0f,0f, -1f,0f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
+        val fpAnchor = trans(1f, 0f, 0f)
+
+        // Frames agree (post-Phase-0): pnp in the same display frame as vCurrent.
+        val matched = PoseFusion.composeCorrected(identity(), identity(), fpAnchor)
+        assertEquals("anchor must sit where the fingerprint put it", 1f, matched[12], 1e-4f)
+        assertEquals(0f, matched[13], 1e-4f)
+
+        // Frames disagree by R_z(90) (pre-Phase-0): the anchor swings a quarter turn, a full metre
+        // at this radius. Not a subtle bias — which is why "the overlay limps" was the symptom.
+        val mismatched = PoseFusion.composeCorrected(identity(), rotZ90, fpAnchor)
+        assertEquals(0f, mismatched[12], 1e-4f)
+        assertEquals(1f, mismatched[13], 1e-4f)
+
+        val dx = matched[12] - mismatched[12]
+        val dy = matched[13] - mismatched[13]
+        assertEquals(
+            "a 90deg frame mismatch must displace a 1 m anchor by sqrt(2) m",
+            kotlin.math.sqrt(2f), kotlin.math.sqrt(dx * dx + dy * dy), 1e-4f,
+        )
+    }
+
+    /**
+     * The rotation enters through `pnpMat` only. If a future change also rotated `vCurrent`, the
+     * two would cancel and the mismatch above would silently stop being detectable — so pin that
+     * rotating BOTH is the identity case, distinguishing "consistent" from "both wrong the same
+     * way" would-be fixes.
+     */
+    @Test fun `rotating both sides together cancels, as a consistent convention must`() {
+        val rotZ90 = floatArrayOf(0f,1f,0f,0f, -1f,0f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
+        val fpAnchor = trans(1f, 0f, 0f)
+        val both = PoseFusion.composeCorrected(rotZ90, rotZ90, fpAnchor)
+        val neither = PoseFusion.composeCorrected(identity(), identity(), fpAnchor)
+        for (i in 0 until 16) {
+            assertEquals("element $i", neither[i], both[i], 1e-4f)
+        }
+    }
+
     @Test fun `blend alpha 0 returns current, alpha 1 returns target`() {
         val cur = trans(0f,0f,0f); val tgt = trans(10f,0f,0f)
         assertEquals(0f, PoseFusion.blend(cur, tgt, 0f)[12], 1e-4f)

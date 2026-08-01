@@ -732,23 +732,33 @@ order.** Work top to bottom.
       each marked with what to invert when Phase 0 lands. Ground truth is built
       forward (place 3D points on the wall, project them) so the controls are not
       the implementation compared against itself. **[T]**
-- [ ] **0.2** Add `MetricMarks.glViewToCvDisplay(glView, rotationDeg)`; leave
+- [x] **0.2** Add `MetricMarks.glViewToCvDisplay(glView, rotationDeg)`; leave
       `glViewToCv` untouched. **[T]**
-- [ ] **0.3** Unit-test `glViewToCvDisplay` at 0/90/180/270° against hand-computed
+- [x] **0.3** Unit-test `glViewToCvDisplay` at 0/90/180/270° against hand-computed
       matrices. **[T]**
-- [ ] **0.4** Route the capture path through the new converter.
-- [ ] **0.5** Audit *every* consumer of the capture view matrix for the same
+- [x] **0.4** Route the capture path through the new converter. `buildSingle` now takes
+      `rotationDeg` with **no default** — a default would let a caller silently reinstate the
+      defect. Plumbed from `MainActivity` → `MainViewModel` and from the doodle path.
+- [x] **0.5** Audit *every* consumer of the capture view matrix for the same
       convention — `MetricFingerprintBuilder`, `PlaneMarks` callers,
       `targetCaptureViewMatrix` in `ArViewModel`, `fingerprintViewMatrix` in
       `MainViewModel`, and `restoreWallFingerprintMetric`'s `viewMatrix16`.
       List each site in the commit message with its verdict.
-- [ ] **0.6** Confirm `PoseFusion.composeCorrected` is consistent under the chosen
+- [x] **0.6** Confirm `PoseFusion.composeCorrected` is consistent under the chosen
       convention. `PoseFusionTest` now pins the factor order with non-commuting
       operands; extend it for the rotation, not with another round-trip (a
       round-trip is order-insensitive and would pass either way). **[T]**
 - [ ] **0.7** Add `captureRotationDeg` to `Fingerprint`; default `-1`; refuse to
       reload a legacy fingerprint and prompt for re-capture. **[T]**
-- [ ] **0.8** Re-run `0.1` and confirm <1 mm at all four obliquities.
+      *(STILL OPEN — the one Phase 0 item not landed. A fingerprint saved before this
+      change stores sensor-frame points; it is no **worse** than it was, because the live
+      side was already display-frame and the pair never agreed, but it is not fixed either
+      and nothing tells the user. Separable from the geometry: it is persistence and
+      migration, not frames. Until it lands, a legacy project silently keeps the §8 defect.)*
+- [x] **0.8** Re-run `0.1` and confirm <1 mm at all four obliquities. Done at four
+      obliquities × four rotations, through the real converter rather than a hand-built
+      mismatch, with a negative control asserting the old wiring still fails on the same
+      fixture. The rotation direction is mutation-tested: transposing `R_z` fails 8 tests.
 
 ### Phase 2 — partition the fingerprint
 

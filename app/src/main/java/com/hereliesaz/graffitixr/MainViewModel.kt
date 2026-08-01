@@ -150,7 +150,12 @@ class MainViewModel @Inject constructor(
         depthStride: Int = 0,
         intrinsics: FloatArray? = null,
         viewMatrix: FloatArray? = null,
-        wallPlane: FloatArray? = null
+        wallPlane: FloatArray? = null,
+        /**
+         * `rotationNeeded` for this capture — the angle already applied to [bitmap] and
+         * [intrinsics]. Routed to the view matrix too (IMPLEMENTATION.md Phase 0, convention B).
+         */
+        rotationDeg: Int = 0,
     ) {
         if (bitmap == null || intrinsics == null || viewMatrix == null) {
             // Was a bare reset: the artist confirmed a target and the capture simply vanished with no
@@ -171,7 +176,7 @@ class MainViewModel @Inject constructor(
         if (depthBuffer == null) {
             // No depth source: build the wall fingerprint from a SINGLE capture by back-projecting
             // features onto the ARCore wall plane (whose metric pose ARCore already solved).
-            handleSingleCapture(bitmap, safeIntr, safeView, wallPlane)
+            handleSingleCapture(bitmap, safeIntr, safeView, wallPlane, rotationDeg)
             return
         }
         resetCaptureUi()
@@ -270,7 +275,9 @@ class MainViewModel @Inject constructor(
      * captured features onto it ([MetricFingerprintBuilder.buildSingle]) instead of triangulating a
      * second view. No green plane → refuse and guide the artist to face a wall.
      */
-    private fun handleSingleCapture(bitmap: Bitmap, intr: FloatArray, view: FloatArray, wallPlane: FloatArray?) {
+    private fun handleSingleCapture(
+        bitmap: Bitmap, intr: FloatArray, view: FloatArray, wallPlane: FloatArray?, rotationDeg: Int,
+    ) {
         if (wallPlane == null || wallPlane.size < 6) {
             resetCaptureUi()
             Toast.makeText(context, notOnGreenWallMessage, Toast.LENGTH_LONG).show()
@@ -298,7 +305,8 @@ class MainViewModel @Inject constructor(
                 return@launch
             }
             val fp = MetricFingerprintBuilder.buildSingle(
-                slamManager, bitmap, view, intr, planePoint, planeNormal, anchor
+                slamManager, bitmap, view, intr, planePoint, planeNormal, anchor,
+                rotationDeg = rotationDeg,
             )
             if (fp == null) {
                 // Say WHICH way it fell short. "Not enough texture" was the same message whether the

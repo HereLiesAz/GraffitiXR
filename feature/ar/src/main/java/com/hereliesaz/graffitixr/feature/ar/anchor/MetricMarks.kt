@@ -41,6 +41,60 @@ object MetricMarks {
     }
 
     /**
+     * [glViewToCv], then rotated into the **display** camera frame — `IMPLEMENTATION.md` Phase 0,
+     * convention B: every capture-side quantity lives in display orientation.
+     *
+     * The capture path rotates the bitmap and the intrinsics by `rotationNeeded` and left the view
+     * matrix in ARCore's physical-camera frame (`Camera.getPose()`, documented as "relative to the
+     * image readout"). `PlaneMarks.backProject` then intersected display-frame rays with a
+     * sensor-frame plane — the defect in `PAPER.md` §8. This closes it on the view-matrix side.
+     *
+     * **Direction.** For `rotationDeg = 90` the capture path maps pixel `(u,v)` to `(rawH - v, u)`
+     * and swaps `fx`/`fy`, so a sensor-frame ray `d_s` becomes
+     * `d_d = ((cy_s - v)/fy_s, (u - cx_s)/fx_s, 1) = (-d_s.y, d_s.x, 1)`, which is `R_z(+90) d_s`
+     * with the standard `[[c,-s],[s,c]]`. Hence **display = `R_z(+rotationDeg)` · sensor**, and
+     * since `p_display = R_z (V_sensor p_world)`, the rotation **pre-multiplies** the view.
+     *
+     * `glViewToCv` is deliberately left untouched: the two-keyframe triangulation path supplies its
+     * own pixels and intrinsics in a consistent frame already, and has no display rotation to
+     * reconcile.
+     *
+     * @param rotationDeg `(sensorOrientation - displayRotation*90 + 360) % 360`. Must be a multiple
+     *   of 90; anything else is a caller bug and throws rather than silently skewing the map.
+     */
+    fun glViewToCvDisplay(view: FloatArray, rotationDeg: Int): FloatArray {
+        val r = ((rotationDeg % 360) + 360) % 360
+        require(r % 90 == 0) { "rotationDeg must be a multiple of 90, was $rotationDeg" }
+        val cv = glViewToCv(view)
+        if (r == 0) return cv                     // R_z(0) == I; skip the multiply entirely
+        return rotateZ(cv, r)
+    }
+
+    /**
+     * Pre-multiply a column-major CV view by `R_z(deg)`, rotating the camera-frame *result*.
+     *
+     * Only rows 0 and 1 change, and only by the exact integer sine/cosine values — written as
+     * literals rather than via `Math.cos` so that 90/180/270 are exact and no 6.1e-17 leaks into a
+     * matrix that is compared for exactness in tests.
+     */
+    private fun rotateZ(cv: FloatArray, deg: Int): FloatArray {
+        val (c, s) = when (deg) {
+            90 -> 0f to 1f
+            180 -> -1f to 0f
+            270 -> 0f to -1f
+            else -> 1f to 0f
+        }
+        val out = cv.copyOf()
+        for (col in 0 until 4) {
+            val x = cv[col * 4 + 0]
+            val y = cv[col * 4 + 1]
+            out[col * 4 + 0] = c * x - s * y      // row 0
+            out[col * 4 + 1] = s * x + c * y      // row 1
+        }
+        return out
+    }
+
+    /**
      * Triangulate matched marks into keyframe-0's CV camera frame, keeping only those that are
      * non-degenerate, in front of both cameras, and reproject within [maxReprojPx] in both views.
      * Returns an empty result if the baseline is below [minBaselineM] (geometry too weak to trust).
