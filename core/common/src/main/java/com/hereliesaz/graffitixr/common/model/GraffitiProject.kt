@@ -159,6 +159,12 @@ data class GraffitiProject(
     // inferred at load time.
     val fingerprintCaptureRotationDeg: Int = -1,
 
+    // How and where the device was held when this project's target was captured — attitude,
+    // ARCore's three poses, the frame rotations, and a location fix. Null on projects saved before
+    // the app collected any of it. See CaptureEnvironment for why each group is independently
+    // optional.
+    val captureEnvironment: CaptureEnvironment? = null,
+
     // Persistent confidence-weighted feature map of the wall around the marks fingerprint — the
     // lean spatial backbone for wide-area relocalization (see docs/RELOC_MAP_DESIGN.md). Null on
     // projects without one; built passively during normal use. Defaulted for back-compat.

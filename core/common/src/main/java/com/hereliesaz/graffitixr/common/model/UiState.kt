@@ -96,6 +96,13 @@ data class ArUiState(
     // Store the rotation applied to the display bitmap
     val targetDisplayRotation: Int = 0,
     /**
+     * How and where the device was held when the active target was captured.
+     *
+     * Null until a capture happens this session. Persisted onto the project at save, because the
+     * conditions a fingerprint was built under are not recoverable from the fingerprint.
+     */
+    val targetCaptureEnvironment: CaptureEnvironment? = null,
+    /**
      * Set when a saved wall fingerprint was refused at load because it predates Phase 0 and its 3D
      * points are in the sensor frame with no recorded capture rotation (IMPLEMENTATION.md 0.7).
      *

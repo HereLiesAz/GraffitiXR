@@ -802,6 +802,107 @@ class ArViewModel @Inject constructor(
         Timber.w("ARDIAG onCameraStreamStalled: next AR entry will use ARCore default camera config (safe mode)")
     }
 
+    /**
+     * Physical device attitude. Created lazily so a device with no motion sensors costs nothing, and
+     * started/stopped with AR mode — sensors left registered drain a phone the artist is holding up
+     * for an hour.
+     */
+    private var attitudeProvider: DeviceAttitudeProvider? = null
+
+    /** Last known location, cached while AR is active. Null until a fix arrives or if denied. */
+    @Volatile
+    private var lastLocation: android.location.Location? = null
+    private var locationTracker: com.hereliesaz.graffitixr.common.LocationTracker? = null
+
+    /**
+     * Begin sampling attitude and location for capture records. Idempotent.
+     *
+     * Location is cached from a low-rate subscription rather than requested at capture: the capture
+     * happens on the GL thread inside a frame callback and cannot wait on a fix. A cached value with
+     * its age recorded is strictly better than a blocking call that would drop frames — and the age
+     * is what makes a stale fix visible instead of silently wrong.
+     */
+    private fun startEnvironmentSampling(context: Context) {
+        // Each source is guarded separately, and neither can stop AR mode.
+        //
+        // This is a correctness requirement, not defensiveness for its own sake: the capture record
+        // is OPTIONAL telemetry, and AR is the product. A device with no SENSOR_SERVICE, or a
+        // Play-Services location client that refuses to start (it needs a Looper, and throws
+        // "invalid null looper" without one), must degrade to recording less — never to an artist
+        // unable to enter AR. The first version of this let a location-client failure propagate out
+        // of setArMode and take the session with it.
+        try {
+            if (attitudeProvider == null) {
+                attitudeProvider = DeviceAttitudeProvider(context).also {
+                    if (!it.isAvailable) Timber.i("No motion sensors; captures will record no attitude")
+                }
+            }
+            attitudeProvider?.start()
+        } catch (t: Throwable) {
+            Timber.w(t, "attitude sampling unavailable; captures will record no attitude")
+            attitudeProvider = null
+        }
+
+        try {
+            if (locationTracker == null) {
+                locationTracker = com.hereliesaz.graffitixr.common.LocationTracker(context)
+            }
+            locationTracker?.let { tracker ->
+                if (tracker.hasPermissions()) {
+                    tracker.startLocationUpdates { loc -> lastLocation = loc }
+                } else {
+                    // Not an error: location is optional and a capture must never depend on it.
+                    Timber.i("Location permission not granted; captures will record no location")
+                }
+            }
+        } catch (t: Throwable) {
+            Timber.w(t, "location sampling unavailable; captures will record no location")
+            locationTracker = null
+        }
+    }
+
+    /**
+     * Stop sampling. Must run whenever AR stops, or the sensors and GPS stay hot.
+     *
+     * Also guarded: a teardown that throws would leave the other source registered, which is the
+     * exact leak this method exists to prevent.
+     */
+    private fun stopEnvironmentSampling() {
+        try {
+            attitudeProvider?.stop()
+        } catch (t: Throwable) {
+            Timber.w(t, "attitude sampling teardown failed")
+        }
+        try {
+            locationTracker?.stopLocationUpdates()
+        } catch (t: Throwable) {
+            Timber.w(t, "location sampling teardown failed")
+        }
+    }
+
+    /** The latest location as a serializable fix, with its age. Null when none has arrived. */
+    private fun locationFix(): com.hereliesaz.graffitixr.common.model.LocationFix? {
+        val l = lastLocation ?: return null
+        val ageMs = if (l.elapsedRealtimeNanos > 0L) {
+            (android.os.SystemClock.elapsedRealtimeNanos() - l.elapsedRealtimeNanos) / 1_000_000L
+        } else {
+            -1L
+        }
+        return com.hereliesaz.graffitixr.common.model.LocationFix(
+            latitude = l.latitude,
+            longitude = l.longitude,
+            altitudeM = if (l.hasAltitude()) l.altitude else Double.NaN,
+            horizontalAccuracyM = if (l.hasAccuracy()) l.accuracy else -1f,
+            verticalAccuracyM = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O &&
+                l.hasVerticalAccuracy()
+            ) l.verticalAccuracyMeters else -1f,
+            bearingDeg = if (l.hasBearing()) l.bearing else Float.NaN,
+            speedMps = if (l.hasSpeed()) l.speed else Float.NaN,
+            provider = l.provider ?: "",
+            ageMs = ageMs,
+        )
+    }
+
     fun setArMode(enabled: Boolean, context: Context) {
         if (enabled && !_uiState.value.isArCoreAvailable) {
             // ARCore is not supported on this device. Refuse to enter AR mode
@@ -823,6 +924,9 @@ class ArViewModel @Inject constructor(
             if (_uiState.value.trackingFailed) {
                 _uiState.update { it.copy(trackingFailed = false) }
             }
+            startEnvironmentSampling(context)
+        } else {
+            stopEnvironmentSampling()
         }
         updateSessionStateLocked(context)
     }
@@ -1549,6 +1653,11 @@ class ArViewModel @Inject constructor(
         renderer = r
         renderer?.stereoProvider = stereoProvider
         renderer?.onCameraNotFeeding = { onCameraNotFeeding() }
+        // The renderer assembles the capture record on the GL thread; these hand it the two pieces
+        // whose lifecycles live here. Lambdas rather than direct references so the renderer never
+        // touches a SensorManager or a location client it does not own.
+        renderer?.attitudeSampler = { attitudeProvider?.snapshot() }
+        renderer?.locationSampler = { locationFix() }
         renderer?.attachSession(session)
         loadCloudPointsIfExists()
     }
@@ -1816,7 +1925,13 @@ class ArViewModel @Inject constructor(
         viewMatrix: FloatArray,
         displayRotation: Int,
         tapDistanceMeters: Float,
-        wallPlane: FloatArray? = null
+        wallPlane: FloatArray? = null,
+        /**
+         * How and where the device was held at capture. Defaulted so the doodle path and tests can
+         * omit it; the real capture path always supplies one.
+         */
+        environment: com.hereliesaz.graffitixr.common.model.CaptureEnvironment =
+            com.hereliesaz.graffitixr.common.model.CaptureEnvironment(),
     ) {
         // Doodle demo: a headless capture (no tap, no review) — build the fingerprint from the
         // drawing and return before the normal capture/review flow runs. Clear the capture-request
@@ -1852,6 +1967,7 @@ class ArViewModel @Inject constructor(
                     tapMarks = it.tapMarks + com.hereliesaz.graffitixr.common.model.TapMark(tapPos.first, tapPos.second, tapDistanceMeters),
                     targetRawBitmap = bitmap,
                     targetDisplayRotation = displayRotation,
+                    targetCaptureEnvironment = environment,
                     targetDepthBuffer = depthBuffer,
                     targetDepthWidth = colorW,
                     targetDepthHeight = colorH,
@@ -1881,6 +1997,7 @@ class ArViewModel @Inject constructor(
                 annotatedCaptureBitmap = rotatedBmp.isolateMarkings(),
                 targetRawBitmap = bitmap,
                 targetDisplayRotation = displayRotation,
+                targetCaptureEnvironment = environment,
                 targetDepthBuffer = depthBuffer,
                 targetDepthWidth = colorW,
                 targetDepthHeight = colorH,
@@ -2425,6 +2542,9 @@ class ArViewModel @Inject constructor(
         coopStateJob?.cancel()
         coopStateJob = null
         collaborationManager.leaveSessionAsync()
+        // setArMode(false) is not guaranteed to run before the ViewModel dies (process death,
+        // task removal), and a registered SensorEventListener outlives it.
+        stopEnvironmentSampling()
         destroyArSession()
     }
 }

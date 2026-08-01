@@ -157,6 +157,8 @@ class MainViewModel @Inject constructor(
          * [intrinsics]. Routed to the view matrix too (IMPLEMENTATION.md Phase 0, convention B).
          */
         rotationDeg: Int = 0,
+        /** How and where the device was held at capture; persisted onto the project. */
+        captureEnvironment: com.hereliesaz.graffitixr.common.model.CaptureEnvironment? = null,
     ) {
         if (bitmap == null || intrinsics == null || viewMatrix == null) {
             // Was a bare reset: the artist confirmed a target and the capture simply vanished with no
@@ -177,7 +179,7 @@ class MainViewModel @Inject constructor(
         if (depthBuffer == null) {
             // No depth source: build the wall fingerprint from a SINGLE capture by back-projecting
             // features onto the ARCore wall plane (whose metric pose ARCore already solved).
-            handleSingleCapture(bitmap, safeIntr, safeView, wallPlane, rotationDeg)
+            handleSingleCapture(bitmap, safeIntr, safeView, wallPlane, rotationDeg, captureEnvironment)
             return
         }
         resetCaptureUi()
@@ -278,6 +280,7 @@ class MainViewModel @Inject constructor(
      */
     private fun handleSingleCapture(
         bitmap: Bitmap, intr: FloatArray, view: FloatArray, wallPlane: FloatArray?, rotationDeg: Int,
+        captureEnvironment: com.hereliesaz.graffitixr.common.model.CaptureEnvironment?,
     ) {
         if (wallPlane == null || wallPlane.size < 6) {
             resetCaptureUi()
@@ -351,6 +354,10 @@ class MainViewModel @Inject constructor(
                         MetricMarks.glViewDisplayOriented(view, rotationDeg).toList(),
                     // 0.11 — which display frame that was. -1 elsewhere means "genuinely unknown".
                     fingerprintCaptureRotationDeg = rotationDeg,
+                    // The full record of how and where the device was held at capture. The
+                    // fingerprint's geometry is frozen at that instant, so these are the conditions
+                    // any later attribution has to work from — and they exist nowhere else.
+                    captureEnvironment = captureEnvironment,
                 ),
                 targetImages = listOf(bitmap)
             )

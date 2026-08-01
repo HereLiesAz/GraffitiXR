@@ -1242,6 +1242,7 @@ class MainActivity : ComponentActivity() {
                                             // and intrinsics above were already rotated by it; the
                                             // view matrix now follows (Phase 0, convention B).
                                             arUiState.targetDisplayRotation,
+                                            arUiState.targetCaptureEnvironment,
                                         )
                                     },
                                     onRetake = {

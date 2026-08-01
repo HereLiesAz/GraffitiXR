@@ -35,7 +35,7 @@ class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
     // Last arg is the camera→point distance (meters) at the tapped pixel, or -1f when unavailable.
-    private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int, Float, FloatArray?) -> Unit,
+    private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int, Float, FloatArray?, com.hereliesaz.graffitixr.common.model.CaptureEnvironment) -> Unit,
     private val onTrackingUpdated: (Boolean, Int, Int, Boolean, Float, Float, Triple<Float, Float, Float>?, Boolean, Boolean, Float, Float, Float) -> Unit,
     private val onLightUpdated: (Float) -> Unit,
     private val onDiag: (String) -> Unit = {},
@@ -216,6 +216,15 @@ class ArRenderer(
 
     // Eval (Sub-project A): null unless dev/eval mode is on. Set from ArViewModel.
     @Volatile var driftCostProbe: com.hereliesaz.graffitixr.feature.ar.eval.DriftCostProbe? = null
+
+    /**
+     * Latest physical device attitude, or null when unavailable. Supplied by the ViewModel, which
+     * owns the sensor lifecycle — the renderer only reads it, and only at capture.
+     */
+    @Volatile var attitudeSampler: (() -> com.hereliesaz.graffitixr.common.model.DeviceAttitude?)? = null
+
+    /** Latest location fix, or null. Same ownership split as [attitudeSampler]. */
+    @Volatile var locationSampler: (() -> com.hereliesaz.graffitixr.common.model.LocationFix?)? = null
     // Scratch holder for the mark-PnP "truth" pose read from the native anchor transform.
     private val truthPoseScratch = FloatArray(16)
     // Visible-confidence threshold above which mark-PnP is treated as truth for eval.
@@ -735,6 +744,40 @@ class ArRenderer(
     }
 
     /** Perception redraw rate: full normally, floored while any enabled throttle trigger is active. */
+    /**
+     * `[tx, ty, tz, qx, qy, qz, qw]` for an ARCore pose, or empty if it throws.
+     *
+     * Flattened rather than stored as a Pose because this crosses into a serializable model: a Pose
+     * is an ARCore handle, and persisting one would tie a saved project to the SDK's object graph.
+     */
+    private fun poseToList(pose: com.google.ar.core.Pose?): List<Float> = try {
+        if (pose == null) emptyList() else listOf(
+            pose.tx(), pose.ty(), pose.tz(),
+            pose.qx(), pose.qy(), pose.qz(), pose.qw(),
+        )
+    } catch (e: Exception) {
+        Timber.w(e, "pose flatten failed")
+        emptyList()
+    }
+
+    /**
+     * Whether system auto-rotate is on.
+     *
+     * Recorded at capture because it is the one setting that explains a `rotationNeeded` which
+     * disagrees with the physical attitude: `screenOrientation="fullUser"` honours it, so with
+     * auto-rotate off the window orientation stops following the device entirely. It is also the
+     * precondition for EVALUATION.md E0b — with it off, rotating the phone does not move the
+     * experiment's independent variable at all.
+     */
+    private fun isAutoRotateEnabled(): Boolean = try {
+        android.provider.Settings.System.getInt(
+            context.contentResolver,
+            android.provider.Settings.System.ACCELEROMETER_ROTATION,
+        ) == 1
+    } catch (e: Exception) {
+        false
+    }
+
     private fun effectivePerceptionFps(): Int {
         val laggy = lagThrottleEnabled && perceptionRefreshAvgMs > PERCEPTION_LAG_MS
         return if (systemThrottle || laggy) PERCEPTION_FLOOR_FPS else PERCEPTION_FULL_FPS
@@ -1455,13 +1498,35 @@ class ArRenderer(
                             }
                         }
 
+                        // Everything knowable about how and where the device was held, sampled at
+                        // the instant the geometry is frozen. backProject runs once per target, so
+                        // this is the only moment these conditions exist to be recorded — afterwards
+                        // the fingerprint carries their consequences with no record of their cause.
+                        val captureEnvironment = com.hereliesaz.graffitixr.common.model.CaptureEnvironment(
+                            capturedAtEpochMs = System.currentTimeMillis(),
+                            elapsedRealtimeNs = android.os.SystemClock.elapsedRealtimeNanos(),
+                            frame = com.hereliesaz.graffitixr.common.model.FrameOrientation(
+                                displayRotationDeg = displayDegrees,
+                                sensorOrientationDeg = sensorOrientation,
+                                rotationNeededDeg = rotationNeeded,
+                                autoRotateEnabled = isAutoRotateEnabled(),
+                            ),
+                            attitude = attitudeSampler?.invoke(),
+                            arPoses = com.hereliesaz.graffitixr.common.model.ArPoseSnapshot(
+                                cameraPose = poseToList(camera.pose),
+                                displayOrientedPose = poseToList(camera.displayOrientedPose),
+                                androidSensorPose = poseToList(frame.androidSensorPose),
+                            ),
+                            location = locationSampler?.invoke(),
+                        )
+
                         onTargetCaptured(
                             bitmap, image.width, image.height,
                             depthBuffer,
                             depthWidth, depthHeight, depthStride,
                             intrArr, mappingViewMatrix.copyOf(),
                             rotationNeeded, tapDistanceMeters,
-                            wallPlane
+                            wallPlane, captureEnvironment
                         )
                     }
                 } catch (e: Exception) {
