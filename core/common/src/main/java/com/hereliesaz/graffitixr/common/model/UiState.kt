@@ -95,6 +95,14 @@ data class ArUiState(
     val targetRawBitmap: Bitmap? = null,
     // Store the rotation applied to the display bitmap
     val targetDisplayRotation: Int = 0,
+    /**
+     * Set when a saved wall fingerprint was refused at load because it predates Phase 0 and its 3D
+     * points are in the sensor frame with no recorded capture rotation (IMPLEMENTATION.md 0.7).
+     *
+     * Surfaced so the artist is told to re-capture rather than left wondering why the overlay never
+     * locks onto a target the app appears to have loaded.
+     */
+    val legacyFingerprintRefused: Boolean = false,
 
     // Physical half-extents of the overlay quad in meters (computed from depth center pixel).
     // OverlayRenderer sizes its textured quad to (halfW*2) × (halfH*2) meters.

@@ -148,6 +148,17 @@ data class GraffitiProject(
     // is exactly the case it exists for. Empty on projects saved before this field.
     val fingerprintViewMatrix: List<Float> = emptyList(),
 
+    // rotationNeeded at fingerprint capture (0/90/180/270), or -1 when unknown — IMPLEMENTATION.md
+    // 0.11. Persisted alongside the view matrix because the two only mean anything together: the
+    // stored points, the stored view and the intrinsics are all in the DISPLAY frame as of Phase 0,
+    // and this records which display frame that was.
+    //
+    // Without it, a project captured AFTER Phase 0 — a correct one — is indistinguishable on disk
+    // from one captured before, so the legacy check in 0.7 would reject both. -1 therefore has to
+    // mean "genuinely unknown" and not "not written yet", which is why it is defaulted rather than
+    // inferred at load time.
+    val fingerprintCaptureRotationDeg: Int = -1,
+
     // Persistent confidence-weighted feature map of the wall around the marks fingerprint — the
     // lean spatial backbone for wide-area relocalization (see docs/RELOC_MAP_DESIGN.md). Null on
     // projects without one; built passively during normal use. Defaulted for back-compat.

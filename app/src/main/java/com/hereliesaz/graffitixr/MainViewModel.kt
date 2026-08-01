@@ -10,6 +10,7 @@ import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
+import com.hereliesaz.graffitixr.feature.ar.anchor.MetricMarks
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
@@ -342,7 +343,14 @@ class MainViewModel @Inject constructor(
                     // and keeps the plane-guided rectification that the capture session had.
                     fingerprintIntrinsics = intr.toList(),
                     fingerprintAnchor = anchor.toList(),
-                    fingerprintViewMatrix = view.toList(),
+                    // DISPLAY-oriented, matching what ingestSingle just handed native (0.10) and the
+                    // frame the stored 3D points are in. Persisting the raw sensor-frame view here
+                    // would have made 0.10 regress the moment the project was reloaded: the runtime
+                    // fingerprint would be consistent and its saved copy would not.
+                    fingerprintViewMatrix =
+                        MetricMarks.glViewDisplayOriented(view, rotationDeg).toList(),
+                    // 0.11 — which display frame that was. -1 elsewhere means "genuinely unknown".
+                    fingerprintCaptureRotationDeg = rotationDeg,
                 ),
                 targetImages = listOf(bitmap)
             )

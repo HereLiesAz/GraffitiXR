@@ -282,6 +282,9 @@ object MetricFingerprintBuilder {
         return Fingerprint(
             keypoints, res.pointsCam.toList(), bytes, rows, cols, type,
             markCenterLocal = markCenterLocal?.toList() ?: emptyList(),
+            // IMPLEMENTATION.md 0.7 — record the frame these points were built in, so a reload can
+            // tell a Phase-0 fingerprint from a pre-Phase-0 one instead of guessing.
+            captureRotationDeg = rotationDeg,
         )
     }
 

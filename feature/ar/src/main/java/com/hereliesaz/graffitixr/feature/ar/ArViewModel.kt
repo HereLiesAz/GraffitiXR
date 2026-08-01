@@ -1357,6 +1357,30 @@ class ArViewModel @Inject constructor(
             if (fp != null) {
                 val intr = project.fingerprintIntrinsics
                 val anchor = project.fingerprintAnchor
+
+                // IMPLEMENTATION.md 0.7 — refuse a pre-Phase-0 metric fingerprint instead of
+                // relocalizing against it.
+                //
+                // Its 3D points were back-projected with display-rotated pixels and intrinsics but a
+                // SENSOR-frame view (PAPER.md §8), so they are skewed by an angle that was never
+                // recorded and cannot be recovered from the file. Restoring it would put the app in
+                // the exact state Phase 0 exists to end, silently, on a wall the artist has already
+                // painted — and the failure would look like poor tracking rather than stale data.
+                //
+                // The check keys on the PROJECT field, not the Fingerprint's, because a project
+                // saved before 0.11 has no rotation on either. Descriptors-only fingerprints are
+                // untouched: with no 3D points there is no frame to be wrong about, which is what
+                // `isLegacyFrame()` encodes.
+                val legacyFrame = fp.isLegacyFrame() && project.fingerprintCaptureRotationDeg < 0
+                if (legacyFrame && intr.size >= 4 && anchor.size == 16) {
+                    Timber.w(
+                        "Refusing a pre-Phase-0 wall fingerprint: its 3D points are in the sensor " +
+                            "frame and the capture rotation was never recorded. Re-capture the target.",
+                    )
+                    _uiState.update { it.copy(legacyFingerprintRefused = true) }
+                    return@launch
+                }
+
                 if (intr.size >= 4 && anchor.size == 16) {
                     // Metric fingerprint: replay the true capture intrinsics + anchor so PnP reloc
                     // matches the live capture instead of using a default-intrinsics guess.
