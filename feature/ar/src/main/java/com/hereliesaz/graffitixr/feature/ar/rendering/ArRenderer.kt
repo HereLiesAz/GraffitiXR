@@ -1255,11 +1255,23 @@ class ArRenderer(
                 val viewMatrixSnapshot = viewMatrix.copyOf()
 
                 backgroundScope.launch {
-                    val (count, immutableCount) = if (currentScanMode == ArScanMode.CLOUD_POINTS) {
-                        pointCloudRenderer.accumulatedPointCount to 0
-                    } else {
-                        slamManager.getSplatCount() to slamManager.getImmutableSplatCount()
-                    }
+                    // Both modes report the accumulated ARCore point cloud. MURAL used to read
+                    // slamManager.getSplatCount(), which is `return 0;` since the voxel/splat map was
+                    // deleted — so in MURAL, the DEFAULT mode, splatCount was structurally zero and
+                    // four separate decisions silently degraded:
+                    //
+                    //   * co-op hosting refused outright (`splatCount <= 0` gate) no matter how long
+                    //     the artist scanned;
+                    //   * the WALL scan hint pinned to "build the map" forever (`< 5000`), with the
+                    //     "closer" and "higher/lower" hints unreachable;
+                    //   * WALL -> COMPLETE reachable only via the anchor, never via map coverage;
+                    //   * the stereo-stuck recovery trigger vacuously true, since it keys on
+                    //     `splatCount == 0 && MURAL`.
+                    //
+                    // Reading a hardcoded 0 is never the right answer, and the point cloud is now the
+                    // only live map, so both modes read it. That also restores the stereo check to a
+                    // real condition rather than a constant.
+                    val (count, immutableCount) = pointCloudRenderer.accumulatedPointCount to 0
 
                     val visConf = slamManager.getVisibleConfidenceAvg()
                     val globConf = slamManager.getGlobalConfidenceAvg()
@@ -1557,9 +1569,11 @@ class ArRenderer(
                 if (!anchorEstablished) {
                     try {
                         frame.acquirePointCloud().use { pointCloud ->
-                            if (currentScanMode == ArScanMode.CLOUD_POINTS || showPoints) {
-                                pointCloudRenderer.update(pointCloud)
-                            }
+                            // Always accumulate. This count now drives co-op gating, the scan
+                            // hints and phase completion, so it cannot hang off `showPoints` — that
+                            // is a DRAW toggle, and letting a visualization setting decide whether
+                            // the map is built is how turning off a layer silently disables co-op.
+                            pointCloudRenderer.update(pointCloud)
                             
                             // Feed sparse points to Gaussian engine for seeding
                             val pts = FloatArray(pointCloud.points.remaining())
