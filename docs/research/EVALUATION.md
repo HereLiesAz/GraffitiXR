@@ -373,6 +373,29 @@ and lock rate.
 > session spent on tip-of-tree would have produced a confident falsification of a
 > defect that had just been repaired.
 
+**Precondition — auto-rotate must be ON, or the independent variable never moves.**
+
+The app tracks the **display** rotation, not the device's physical orientation.
+There is no `OrientationEventListener` and no sensor listener anywhere in the
+codebase; `rotationNeeded` is derived entirely from `CameraCharacteristics`'
+`sensorOrientation` (a fixed hardware constant) and `display.rotation`, which
+`DisplayRotationHelper` reads from a `DisplayListener`.
+
+The manifest sets `screenOrientation="fullUser"`, which respects the user's
+auto-rotate setting. **With auto-rotate off the activity stays locked,
+`display.rotation` never changes, and `rotationNeeded` is constant however the
+phone is physically held.** E0b's method — "capture in landscape, then in
+portrait" — manipulates physical orientation, so under rotation lock both arms are
+the *same* condition. The experiment would report "identical behaviour in both
+orientations", which the **Falsifies** clause below tells the reader to interpret
+as refuting §8. It would be refuting nothing.
+
+Check the CSV rather than trusting the setting: if `captureRotationNeededDeg` is
+the same value in both arms, the condition never changed and the run is void
+regardless of what the phone was doing. That is precisely what the per-row column
+is for — the failure shows up in the data instead of being averaged into a null
+result.
+
 **Precondition — turn the Depth API OFF, or E0b does not test §8 at all.**
 `MainViewModel.onConfirmTargetCreation` branches on whether a depth buffer was
 captured, and the two branches do not share a line of geometry:
