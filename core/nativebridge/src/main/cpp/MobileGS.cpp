@@ -247,6 +247,12 @@ void MobileGS::relocThreadFunc() {
             mapPriorSeq = mPnpResultSeq.load(std::memory_order_relaxed);
         }
 
+        // 2.11: reset the backbone counters BEFORE the early-outs below, so an attempt that never
+        // reaches the fingerprint publishes "not measured" instead of the previous attempt's numbers.
+        mLastRelocBackboneFeatures.store(-1, std::memory_order_relaxed);
+        mLastRelocBackboneMatches.store(-1, std::memory_order_relaxed);
+        mLastRelocBackboneInliers.store(-1, std::memory_order_relaxed);
+
         if (!mRelocEnabled) {
             mLastRelocReject.store(kRelocDisabled, std::memory_order_relaxed);
             continue;
@@ -258,6 +264,25 @@ void MobileGS::relocThreadFunc() {
             mLastRelocReject.store(kRelocNoFingerprint, std::memory_order_relaxed);
             continue;
         }
+
+        // IMPLEMENTATION.md 2.7 — honour the partition only when it indexes THIS point set. A
+        // regions array of the wrong length is treated as absent (all backbone) rather than
+        // subscripted, so a legacy or mismatched fingerprint relocalizes exactly as on main.
+        // Hoisted out of buildCorr so the filter below and the count published here cannot drift
+        // apart: they must agree about which fingerprint is partitioned or the diagnostics describe
+        // a different point set from the one PnP saw.
+        const bool usePartition = wallRegions.size() == wallKps3d.size();
+        // 2.11: how many stored points PnP is allowed to draw on. An UNPARTITIONED fingerprint is
+        // 2.7's legacy all-backbone case, so it reports its FULL point count — not zero, and not the
+        // -1 sentinel. Zero here is a real measurement meaning F_out is empty (the artwork covers
+        // the whole wall), which is the one state reloc cannot recover from; reporting a legacy
+        // fingerprint as zero would raise that alarm on every project saved before Phase 2.
+        mLastRelocBackboneFeatures.store(
+            usePartition
+                ? (int)std::count(wallRegions.begin(), wallRegions.end(), kRegionOutside)
+                : (int)wallKps3d.size(),
+            std::memory_order_relaxed);
+
         if (frame.empty()) continue;
 
         // Optionally enhance the RGB frame under low light before grayscale conversion
@@ -291,6 +316,7 @@ void MobileGS::relocThreadFunc() {
 
         auto buildCorr = [&](const cv::Mat& g, const cv::Mat& Hback,
                              std::vector<cv::Point2f>& outImg, std::vector<cv::Point3f>& outObj,
+                             std::vector<uint8_t>& outFromBackbone,
                              const std::vector<cv::KeyPoint>* preKps = nullptr, const cv::Mat* preDescs = nullptr) {
             std::vector<cv::KeyPoint> localKps; cv::Mat localDescs;
             if (!(preKps && preDescs)) {
@@ -308,10 +334,6 @@ void MobileGS::relocThreadFunc() {
             // points into solvePnPRansac. The map path (below) already guards this; the wall path did
             // not. Refuse rather than relocalize against nonsense.
             if (wallKps3d.size() != (size_t)wallDescs.rows) return;
-            // IMPLEMENTATION.md 2.7 — honour the partition only when it indexes THIS point set. A
-            // regions array of the wrong length is treated as absent (all backbone) rather than
-            // subscripted, so a legacy or mismatched fingerprint relocalizes exactly as on main.
-            const bool usePartition = wallRegions.size() == wallKps3d.size();
 
             cv::Ptr<cv::DescriptorMatcher>& matcher = (descs.type() == CV_32F) ? mL2Matcher : mMatcher;
             std::vector<std::vector<cv::DMatch>> matches;
@@ -333,13 +355,20 @@ void MobileGS::relocThreadFunc() {
                     }
                     outImg.push_back(p);
                     outObj.push_back(wallKps3d[match[0].trainIdx]);
+                    // Everything that survives the filter above is F_out: under a partition because
+                    // non-OUTSIDE rows were skipped, and without one because 2.7's zero-length rule
+                    // makes the whole fingerprint backbone. Recorded per correspondence rather than
+                    // counted, because the inlier attribution below indexes back through this.
+                    outFromBackbone.push_back(1);
                 }
             }
         };
 
         std::vector<cv::Point2f> imgPts;
         std::vector<cv::Point3f> objPts;
-        buildCorr(gray, cv::Mat(), imgPts, objPts, &baseKps, &baseDescs);
+        // 2.11: parallel to imgPts/objPts — 1 where the correspondence came from a backbone point.
+        std::vector<uint8_t> corrFromBackbone;
+        buildCorr(gray, cv::Mat(), imgPts, objPts, corrFromBackbone, &baseKps, &baseDescs);
 
         // Multi-scale matching (distance robustness). SuperPoint isn't scale-invariant, and the marks
         // shrink in the frame from far away and grow up close, so also match the frame DOWN- and
@@ -352,7 +381,7 @@ void MobileGS::relocThreadFunc() {
             cv::resize(gray, scaled, cv::Size(), s, s, cv::INTER_LINEAR);
             double hdata[] = {1.0/(double)s, 0.0, 0.0, 0.0, 1.0/(double)s, 0.0, 0.0, 0.0, 1.0};
             cv::Mat Hback = cv::Mat(3, 3, CV_64F, hdata).clone();
-            buildCorr(scaled, Hback, imgPts, objPts);
+            buildCorr(scaled, Hback, imgPts, objPts, corrFromBackbone);
         }
 
         // Plane-guided rectification (perspective robustness for oblique views). The marks lie on a
@@ -373,7 +402,7 @@ void MobileGS::relocThreadFunc() {
                 cv::Mat grayRect;
                 cv::warpPerspective(gray, grayRect, Hfp_cur, gray.size());
                 size_t before = imgPts.size();
-                buildCorr(grayRect, Hcur_fp, imgPts, objPts);
+                buildCorr(grayRect, Hcur_fp, imgPts, objPts, corrFromBackbone);
                 mLastRelocRectifiedCorr.store((int)(imgPts.size() - before), std::memory_order_relaxed);
                 if (imgPts.size() > before)
                     LOGI("Reloc: rectified (obliquity %.0f deg) added %zu corr (total %zu)",
@@ -420,6 +449,11 @@ void MobileGS::relocThreadFunc() {
                         if (m[0].distance < 0.75f * m[1].distance) {
                             imgPts.push_back(baseKps[m[0].queryIdx].pt);
                             objPts.push_back(mapKps3d[visible[m[0].trainIdx]]);
+                            // NOT backbone: the persistent map is a separate point set that Φ has
+                            // never classified, so counting it in F_out would report a backbone the
+                            // partition never vouched for — and mask an empty F_out on exactly the
+                            // configuration (large overlay, marks off-frame) the map exists for.
+                            corrFromBackbone.push_back(0);
                         }
                     }
                     if (imgPts.size() > before)
@@ -475,6 +509,20 @@ void MobileGS::relocThreadFunc() {
         // the quality gate PoseFusion actually trusts, so being permissive here is safe.
         mLastRelocMatches.store((int)imgPts.size(), std::memory_order_relaxed);
         mLastRelocInliers.store(0, std::memory_order_relaxed);
+        // corrFromBackbone is parallel to imgPts by construction, and the inlier attribution below
+        // subscripts it with indices into imgPts. A future pass that appends to one and not the
+        // other would make that read out of bounds, so a length disagreement publishes "not
+        // measured" instead of a wrong number.
+        const bool haveBackboneFlags = corrFromBackbone.size() == imgPts.size();
+        // 2.11: counted SEPARATELY from mLastRelocMatches, never in place of it. The same shortfall
+        // means different things — a low total is "the frame is not looking at the registered wall",
+        // a low backbone under a healthy total is "everything it can see is under the artwork" — and
+        // those call for opposite advice (aim differently vs. shrink the design / step back).
+        mLastRelocBackboneMatches.store(
+            haveBackboneFlags
+                ? (int)std::count(corrFromBackbone.begin(), corrFromBackbone.end(), (uint8_t)1)
+                : -1,
+            std::memory_order_relaxed);
         if (imgPts.size() < 8) {
             // Distinguish "the detector found nothing / the descriptors don't even compare" from
             // "features were found but too few agreed with the fingerprint" — they call for opposite
@@ -508,6 +556,16 @@ void MobileGS::relocThreadFunc() {
                 mLastRelocReject.store(kRelocPnpFailed, std::memory_order_relaxed);
             } else {
                 mLastRelocInliers.store((int)inliers.size(), std::memory_order_relaxed);
+                // 2.11: which of those inliers RANSAC drew from F_out. Left at -1 on the PnP-failed
+                // branch above, because no inlier set exists there to attribute — that is "not
+                // measured", not "no backbone agreed".
+                if (haveBackboneFlags) {
+                    int backboneInliers = 0;
+                    for (int idx : inliers) {
+                        if (idx >= 0 && idx < (int)corrFromBackbone.size() && corrFromBackbone[idx]) ++backboneInliers;
+                    }
+                    mLastRelocBackboneInliers.store(backboneInliers, std::memory_order_relaxed);
+                }
                 if (inliers.size() < 6) {
                     mLastRelocReject.store(kRelocFewInliers, std::memory_order_relaxed);
                 }

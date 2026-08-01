@@ -28,6 +28,14 @@ data class EvalSample(
     // device run be compared against PAPER.md 8.1's curve instead of argued about.
     val relocObliquityDeg: Int = -1,
     val relocRectifiedCorr: Int = -1,
+    // The backbone (F_out) counts, logged beside the totals rather than replacing them
+    // (IMPLEMENTATION.md 2.11). Phase 2 changed what a reloc failure means: a run whose backbone
+    // count collapses as the design is scaled up is a different result from one whose total matches
+    // collapse, and without these columns the two are the same row. -1 = not sampled; 0 is a real
+    // reading meaning F_out is empty, so it cannot double as the marker.
+    val relocBackboneFeatures: Int = -1,
+    val relocBackboneMatches: Int = -1,
+    val relocBackboneInliers: Int = -1,
     /**
      * `rotationNeeded` **at the moment the active target was captured** — 0, 90, 180 or 270, or -1
      * when no target has been captured this session (a project restored from disk reads -1; see
@@ -86,6 +94,7 @@ object EvalSampleLog {
         "cpuPct", "batteryMa", "tempC", "nativeHeapKb",
         "relocReject", "relocMatches", "relocInliers", "relocDetected",
         "relocObliquityDeg", "relocRectifiedCorr",
+        "relocBackboneFeatures", "relocBackboneMatches", "relocBackboneInliers",
         "captureRotationNeededDeg", "liveRotationNeededDeg",
     )
 
@@ -104,6 +113,8 @@ object EvalSampleLog {
             s.relocReject.toString(), s.relocMatches.toString(),
             s.relocInliers.toString(), s.relocDetected.toString(),
             s.relocObliquityDeg.toString(), s.relocRectifiedCorr.toString(),
+            s.relocBackboneFeatures.toString(), s.relocBackboneMatches.toString(),
+            s.relocBackboneInliers.toString(),
             s.captureRotationNeededDeg.toString(), s.liveRotationNeededDeg.toString(),
         )
     }

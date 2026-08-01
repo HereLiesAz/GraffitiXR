@@ -1,6 +1,5 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
-import android.opengl.Matrix
 import com.google.ar.core.Anchor
 import com.google.ar.core.Pose
 import com.google.ar.core.Session
@@ -99,7 +98,11 @@ class AnchorOrchestrator {
             // frame. Only fall back to identity before any consensus has ever been computed.
             synchronized(this) {
                 if (hasLastGood) System.arraycopy(lastGoodMatrix, 0, outMatrix, 0, 16)
-                else Matrix.setIdentityM(outMatrix, 0)
+                // Hand-written instead of Matrix.setIdentityM: the unit tests run with
+                // `unitTests.isReturnDefaultValues = true`, under which setIdentityM is a no-op stub
+                // that leaves outMatrix all zeros without throwing — so this fallback could never be
+                // asserted. Same layout as PoseFusion.identity().
+                else identity().copyInto(outMatrix)
             }
             return
         }
@@ -166,6 +169,8 @@ class AnchorOrchestrator {
             hasLastGood = true
         }
     }
+
+    private fun identity() = floatArrayOf(1f,0f,0f,0f, 0f,1f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
 
     fun getActiveAnchorCount(): Int = synchronized(this) {
         consensusAnchors.count { it.anchor.trackingState == TrackingState.TRACKING }

@@ -141,6 +141,16 @@ public:
     int lastRelocObliquityDeg() const { return mLastRelocObliquityDeg.load(std::memory_order_relaxed); }
     /** Extra correspondences the rectification pass contributed to the last attempt. */
     int lastRelocRectifiedCorr() const { return mLastRelocRectifiedCorr.load(std::memory_order_relaxed); }
+    /**
+     * Stored fingerprint points in F_out — the backbone the reloc PnP is allowed to use — or -1 when
+     * no attempt has got far enough to look. An unpartitioned fingerprint reports its full point
+     * count, not zero, per the zero-length-regions rule.
+     */
+    int lastRelocBackboneFeatures() const { return mLastRelocBackboneFeatures.load(std::memory_order_relaxed); }
+    /** Correspondences built against F_out, counted apart from the total; -1 when not measured. */
+    int lastRelocBackboneMatches() const { return mLastRelocBackboneMatches.load(std::memory_order_relaxed); }
+    /** RANSAC inliers that came from F_out points; -1 when PnP never produced an inlier set. */
+    int lastRelocBackboneInliers() const { return mLastRelocBackboneInliers.load(std::memory_order_relaxed); }
 
     void scheduleRelocCheck(const cv::Mat& colorFrame);
     /**
@@ -446,5 +456,14 @@ private:
     // extra correspondences it contributed.
     std::atomic<int>        mLastRelocObliquityDeg{-1};
     std::atomic<int>        mLastRelocRectifiedCorr{0};
+    // IMPLEMENTATION.md 2.11 — the backbone (F_out) counts, all three -1 for "not measured".
+    // They CANNOT default to 0 the way the totals above do. With the partition landed, a zero
+    // backbone is a real reading with a specific meaning — the artwork covers the whole wall, so
+    // reloc has nothing left to bootstrap from, which is the failure Phase 2's risk section names
+    // and ArUiState.backboneTooSmall warns about. If zero also meant "never sampled", the one
+    // condition these counters exist to expose would be indistinguishable from an idle thread.
+    std::atomic<int>        mLastRelocBackboneFeatures{-1};
+    std::atomic<int>        mLastRelocBackboneMatches{-1};
+    std::atomic<int>        mLastRelocBackboneInliers{-1};
     cv::Mat                 mRelocColorFrame;
 };

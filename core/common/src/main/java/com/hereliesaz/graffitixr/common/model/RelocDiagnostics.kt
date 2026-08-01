@@ -31,6 +31,30 @@ data class RelocDiagnostics(
     val obliquityDeg: Int = -1,
     /** Correspondences the rectification pass contributed on top of the plain and scaled passes. */
     val rectifiedCorrespondences: Int = 0,
+    /**
+     * Stored fingerprint points in `F_out` — the backbone the reloc PnP is allowed to solve against
+     * (`PAPER.md` §5.3) — or -1 when no attempt has got far enough to look.
+     *
+     * An unpartitioned (legacy) fingerprint reports its full point count, because zero-length
+     * regions means all-backbone. **Zero is a real reading**: it says the artwork covers the whole
+     * visible wall, so there is nothing left to bootstrap a pose from. That is the limit of the
+     * domain of applicability the paper names, and the state `ArUiState.backboneTooSmall` warns
+     * about — which is exactly why zero cannot also mean "not measured", and why this follows
+     * [obliquityDeg]'s -1 precedent.
+     */
+    val backboneFeatures: Int = -1,
+    /**
+     * Correspondences built against `F_out` after the partition filter, or -1 when not measured.
+     *
+     * Counted apart from [matches], never in place of it. The same shortfall means different
+     * things: a low total is "the frame is not looking at the registered wall", a low backbone
+     * under a healthy total is "everything it can see is under the artwork", and those call for
+     * opposite advice. The gap between the two is the map-reloc path's contribution, which Φ never
+     * classified.
+     */
+    val backboneMatches: Int = -1,
+    /** RANSAC inliers that came from `F_out` points, or -1 when PnP produced no inlier set. */
+    val backboneInliers: Int = -1,
 ) {
     /** Inlier ratio of the last attempt, or 0 when it produced no correspondences. */
     val inlierRatio: Float get() = if (matches > 0) inliers.toFloat() / matches else 0f

@@ -106,13 +106,17 @@ class SlamManager @Inject constructor(
 
     /**
      * Why the last relocalization attempt did not publish a pose, and how far it got. See
-     * [RelocDiagnostics]; the native side packs SIX values into one int[] so the read is a
-     * consistent snapshot rather than six racing getters. (Three separate comments used to say
-     * three, four and six; the array has always been six wide.)
+     * [RelocDiagnostics]; the native side packs NINE values into one int[] so the read is a
+     * consistent snapshot rather than nine racing getters. (Three separate comments used to say
+     * three, four and six; the array was six wide until 2.11 added the three backbone counts.)
+     *
+     * A short array falls back to the default [RelocDiagnostics] — whose backbone fields are the -1
+     * "not measured" sentinel, not 0 — rather than to a partially-filled one, so an old .so paired
+     * with this build reads as unmeasured instead of as an empty backbone.
      */
     fun getRelocDiagnostics(): RelocDiagnostics {
         val v = nativeGetRelocDiagnostics()
-        if (v == null || v.size < 6) return RelocDiagnostics()
+        if (v == null || v.size < 9) return RelocDiagnostics()
         return RelocDiagnostics(
             reject = RelocReject.entries.getOrElse(v[0]) { RelocReject.UNKNOWN },
             matches = v[1],
@@ -120,6 +124,9 @@ class SlamManager @Inject constructor(
             detected = v[3],
             obliquityDeg = v[4],
             rectifiedCorrespondences = v[5],
+            backboneFeatures = v[6],
+            backboneMatches = v[7],
+            backboneInliers = v[8],
         )
     }
 

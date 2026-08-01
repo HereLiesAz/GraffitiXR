@@ -32,6 +32,9 @@ class EvalSampleLogTest {
         relocDetected = reloc?.detected ?: EvalSampleLog.NOT_SAMPLED,
         relocObliquityDeg = reloc?.obliquityDeg ?: EvalSampleLog.NOT_SAMPLED,
         relocRectifiedCorr = reloc?.rectifiedCorrespondences ?: EvalSampleLog.NOT_SAMPLED,
+        relocBackboneFeatures = reloc?.backboneFeatures ?: EvalSampleLog.NOT_SAMPLED,
+        relocBackboneMatches = reloc?.backboneMatches ?: EvalSampleLog.NOT_SAMPLED,
+        relocBackboneInliers = reloc?.backboneInliers ?: EvalSampleLog.NOT_SAMPLED,
     )
 
     @Test
@@ -41,6 +44,7 @@ class EvalSampleLogTest {
                 "voxelUpdateMs,voxelKeyframeMs,surfaceMeshMs,drawMs,pnpRelocMs,cpuPct,batteryMa,tempC," +
                 "nativeHeapKb,relocReject,relocMatches,relocInliers,relocDetected," +
                 "relocObliquityDeg,relocRectifiedCorr," +
+                "relocBackboneFeatures,relocBackboneMatches,relocBackboneInliers," +
                 "captureRotationNeededDeg,liveRotationNeededDeg",
             EvalSampleLog.CSV_HEADER,
         )
@@ -56,7 +60,7 @@ class EvalSampleLogTest {
         )
         assertEquals(
             "12,dual,true,1.5,0.25,3.0,1.0,2.0,0.0,4.0,1.0,8.0,30.0,-450.0,31.0,20480," +
-                "-1,-1,-1,-1,-1,-1,-1,-1",
+                "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1",
             EvalSampleLog.toCsvRow(row),
         )
     }
@@ -263,6 +267,64 @@ class EvalSampleLogTest {
         assertEquals("0", landscape[i])
         assertEquals("-1", unsampled[i])
         assertTrue("the control condition must not read as absent", landscape[i] != unsampled[i])
+    }
+
+    /**
+     * `IMPLEMENTATION.md` 2.11 — the backbone counts get their own columns, beside the totals.
+     * Reusing `relocMatches` for the backbone count would have made the two shortfalls E5 needs to
+     * tell apart the same number.
+     */
+    @Test
+    fun `backbone counts reach their own columns, beside the totals`() {
+        val d = RelocDiagnostics(
+            RelocReject.OK, matches = 40, inliers = 24, detected = 1400,
+            backboneFeatures = 300, backboneMatches = 31, backboneInliers = 19,
+        )
+        val fields = EvalSampleLog.fields(sample(reloc = d))
+        assertEquals("300", fields[EvalSampleLog.COLUMNS.indexOf("relocBackboneFeatures")])
+        assertEquals("31", fields[EvalSampleLog.COLUMNS.indexOf("relocBackboneMatches")])
+        assertEquals("19", fields[EvalSampleLog.COLUMNS.indexOf("relocBackboneInliers")])
+        assertEquals("40", fields[EvalSampleLog.COLUMNS.indexOf("relocMatches")])
+        assertEquals("24", fields[EvalSampleLog.COLUMNS.indexOf("relocInliers")])
+    }
+
+    /**
+     * The trap this trio could most easily fall into, and the one Phase 2 created.
+     *
+     * An empty `F_out` — the artwork covers the whole visible wall, so reloc has nothing to
+     * bootstrap from — is a **real** measurement of zero, and it is the specific failure Phase 2's
+     * risk section says the implementation must make legible. Had 0 doubled as the not-sampled
+     * marker, every row recording that failure would have been indistinguishable from a row where
+     * the reloc thread simply had not run, and the experiment could not report it.
+     */
+    @Test
+    fun `an empty backbone logs as zero, distinct from not sampled`() {
+        val wallFilling = RelocDiagnostics(
+            RelocReject.FEW_MATCHES, matches = 2, inliers = 0, detected = 1400,
+            backboneFeatures = 0, backboneMatches = 0, backboneInliers = 0,
+        )
+        val measured = EvalSampleLog.fields(sample(reloc = wallFilling))
+        val unsampled = EvalSampleLog.fields(sample(reloc = null))
+        for (col in listOf("relocBackboneFeatures", "relocBackboneMatches", "relocBackboneInliers")) {
+            val i = EvalSampleLog.COLUMNS.indexOf(col)
+            assertEquals("0", measured[i])
+            assertEquals("-1", unsampled[i])
+            assertTrue("$col: an empty backbone must not read as absent", measured[i] != unsampled[i])
+        }
+    }
+
+    /**
+     * A legacy fingerprint carries no partition and is therefore all backbone, so its count is the
+     * whole point set. It must not arrive as 0 (which would say the opposite) nor as -1.
+     */
+    @Test
+    fun `a legacy all-backbone fingerprint logs its full point count`() {
+        val legacy = RelocDiagnostics(
+            RelocReject.OK, matches = 40, inliers = 24, detected = 1400,
+            backboneFeatures = 512, backboneMatches = 40, backboneInliers = 24,
+        )
+        val fields = EvalSampleLog.fields(sample(reloc = legacy))
+        assertEquals("512", fields[EvalSampleLog.COLUMNS.indexOf("relocBackboneFeatures")])
     }
 
     /**

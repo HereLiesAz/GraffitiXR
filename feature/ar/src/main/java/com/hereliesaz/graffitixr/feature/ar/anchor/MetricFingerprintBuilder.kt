@@ -1,7 +1,6 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
 import android.graphics.Bitmap
-import android.opengl.Matrix
 import com.hereliesaz.graffitixr.common.model.Fingerprint
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import org.opencv.android.Utils
@@ -359,23 +358,52 @@ object MetricFingerprintBuilder {
      * the capture's CV camera frame (flat [x,y,z,...]): invert the CV world→camera view to get their
      * mean in world space, then invert [anchorModel] (the anchor's world pose) to express it in the
      * anchor's frame — which survives a reload into a new ARCore session. Returns null if there are
-     * no points or either matrix isn't invertible.
+     * no points or either matrix is degenerate.
+     *
+     * Both operands are rigid — [cvView] is a world→camera view and [anchorModel] comes from
+     * `SlamManager.getAnchorTransform()` — so [PoseMath.rigidInverse] is the correct inverse; the
+     * overlay's scaled model matrix (see [PoseMath.similarityInverse]) never reaches here.
+     *
+     * `internal` rather than private only so a unit test can reach it: the public entry points all
+     * run OpenCV detection and a native `SlamManager`, so there is no unit test seam onto this
+     * arithmetic from outside.
      */
-    private fun marksCentroidLocal(pointsCam: FloatArray, cvView: FloatArray, anchorModel: FloatArray): FloatArray? {
+    internal fun marksCentroidLocal(pointsCam: FloatArray, cvView: FloatArray, anchorModel: FloatArray): FloatArray? {
         val n = pointsCam.size / 3
         if (n == 0) return null
+        // This used to be `Matrix.invertM(...) || return null`, which refused a singular matrix.
+        // rigidInverse cannot refuse anything — it inverts by transposing, so a zeroed or scaled
+        // input comes back as confident garbage instead of a failure. Check the precondition
+        // explicitly so the null contract still holds for the inputs invertM would have rejected
+        // (an all-zero pose from an unset anchor being the one that actually shows up).
+        if (!isRigid(cvView) || !isRigid(anchorModel)) return null
         var sx = 0f; var sy = 0f; var sz = 0f
         for (i in 0 until n) { sx += pointsCam[i * 3]; sy += pointsCam[i * 3 + 1]; sz += pointsCam[i * 3 + 2] }
-        val cam = floatArrayOf(sx / n, sy / n, sz / n, 1f)
-        val invView = FloatArray(16)
-        if (!Matrix.invertM(invView, 0, cvView, 0)) return null
-        val world = FloatArray(4)
-        Matrix.multiplyMV(world, 0, invView, 0, cam, 0)
-        val invAnchor = FloatArray(16)
-        if (!Matrix.invertM(invAnchor, 0, anchorModel, 0)) return null
-        val local = FloatArray(4)
-        Matrix.multiplyMV(local, 0, invAnchor, 0, world, 0)
-        return floatArrayOf(local[0], local[1], local[2])
+        val world = transformPoint(PoseMath.rigidInverse(cvView), sx / n, sy / n, sz / n)
+        return transformPoint(PoseMath.rigidInverse(anchorModel), world[0], world[1], world[2])
+    }
+
+    /** Apply a column-major 4x4 to a point (w=1). */
+    private fun transformPoint(m: FloatArray, x: Float, y: Float, z: Float) = floatArrayOf(
+        m[0] * x + m[4] * y + m[8] * z + m[12],
+        m[1] * x + m[5] * y + m[9] * z + m[13],
+        m[2] * x + m[6] * y + m[10] * z + m[14],
+    )
+
+    /**
+     * True if [m] is finite and its linear part is a pure rotation — the precondition
+     * [PoseMath.rigidInverse] silently assumes. All three columns are checked, not just
+     * [PoseMath.scaleOf]'s first, because a half-written pose (say a zeroed third column) is
+     * exactly the singular input the old `Matrix.invertM` guard caught.
+     */
+    private fun isRigid(m: FloatArray): Boolean {
+        if (m.size < 16) return false
+        for (v in m) if (!v.isFinite()) return false
+        for (c in 0 until 3) {
+            val x = m[c * 4]; val y = m[c * 4 + 1]; val z = m[c * 4 + 2]
+            if (kotlin.math.abs(kotlin.math.sqrt(x * x + y * y + z * z) - 1f) > 1e-3f) return false
+        }
+        return true
     }
 
     private fun toGray(bitmap: Bitmap): Mat {

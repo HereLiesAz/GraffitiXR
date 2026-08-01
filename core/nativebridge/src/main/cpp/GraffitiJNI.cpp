@@ -1311,10 +1311,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCorroborationCo
 }
 
 // Relocalization diagnostics: why the last attempt did not publish, and the counts it reached.
-// Packed into one int[] so the UI reads a consistent snapshot instead of six racing getters.
+// Packed into one int[] so the UI reads a consistent snapshot instead of nine racing getters.
 // [0] = RelocReject code, [1] = correspondences, [2] = RANSAC inliers, [3] = features detected,
 // [4] = obliquity in degrees (-1 when the rectification pass wasn't eligible), [5] = correspondences
-// the rectification pass contributed.
+// the rectification pass contributed, [6] = stored points in F_out, [7] = correspondences built
+// against F_out, [8] = inliers that came from F_out (IMPLEMENTATION.md 2.11; -1 = not measured).
 extern "C" JNIEXPORT jintArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostics(JNIEnv* env, jobject) {
     // NOT {0, ...}: zero is kRelocOk, so a no-engine fallback of 0 reports a SUCCESSFUL LOCK with
@@ -1324,7 +1325,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostic
     // the Kotlin-only code that absorbs anything the native side cannot account for; the counts are
     // -1 (not sampled) rather than 0, because zero matches is a real measurement.
     static constexpr jint kRelocUnknownOrdinal = 7;
-    jint vals[6] = {kRelocUnknownOrdinal, -1, -1, -1, -1, -1};
+    jint vals[9] = {kRelocUnknownOrdinal, -1, -1, -1, -1, -1, -1, -1, -1};
     if (gSlamEngine) {
         vals[0] = gSlamEngine->lastRelocReject();
         vals[1] = gSlamEngine->lastRelocMatches();
@@ -1332,14 +1333,17 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostic
         vals[3] = gSlamEngine->lastRelocDetected();
         vals[4] = gSlamEngine->lastRelocObliquityDeg();
         vals[5] = gSlamEngine->lastRelocRectifiedCorr();
+        vals[6] = gSlamEngine->lastRelocBackboneFeatures();
+        vals[7] = gSlamEngine->lastRelocBackboneMatches();
+        vals[8] = gSlamEngine->lastRelocBackboneInliers();
     }
-    jintArray out = env->NewIntArray(6);
+    jintArray out = env->NewIntArray(9);
     if (!out) return nullptr;
-    env->SetIntArrayRegion(out, 0, 6, vals);
+    env->SetIntArrayRegion(out, 0, 9, vals);
     return out;
 }
 
-extern "C" extern "C" extern "C" JNIEXPORT void JNICALL
+extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetStageTimings(JNIEnv* env, jobject, jfloatArray out) {
     if (!gSlamEngine) return;
     float buf[5] = {0,0,0,0,0};
