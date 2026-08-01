@@ -18,8 +18,12 @@ Phase 0 itself is still unbuilt and still gates Phases 2, 3, 4 and 5b. See
 These are constraints on the engineering, not on the design. They are listed
 first because every phase inherits them.
 
-**No compiler in the dev container.** There is no Android SDK here; `./gradlew`
-dies with "SDK location not found". The only compile check is CI, and CI runs
+**A compiler may or may not be available in the dev container.** This line used to
+read "there is no Android SDK here" flatly; that is no longer reliably true — the
+SDK, NDK and CMake can be installed into a session (`sdkmanager "ndk;29.0.14206865"
+"cmake;3.31.6"`), after which `./gradlew :core:nativebridge:externalNativeBuildDebug`
+builds the native library locally and `llvm-nm` can confirm an exported JNI symbol.
+Do that before claiming a native change compiles. Where it is NOT available, CI runs
 both the Kotlin/JVM unit tests *and* the NDK build. Those are two independent
 gates and one can pass while the other fails — that has already happened once in
 this project's history (`int matches` shadowed a `std::vector<...> matches` in
@@ -718,10 +722,29 @@ order.** Work top to bottom.
       downstream analysis. **[T]**
 - [x] **6a.3** Add the `relocReject` ordinal column — its source already exists.
 - [ ] **6a.4** Add the eval-only fixed RNG seed and the synchronous-reloc mode
-      from `EVALUATION.md` §3.1. Both must be inert in release builds. *(The
-      sidecar already records `rngSeed` and `syncReloc` so a run states which it
-      used; the native plumbing that honours them is still outstanding, and until
-      it lands every replay A/B carries un-quantified RANSAC variance.)*
+      from `EVALUATION.md` §3.1. Both must be inert in release builds.
+      **RNG SEED DONE; SYNC-RELOC MODE STILL OUTSTANDING.**
+
+      The seed is `MobileGS::setEvalRngSeed`, applied to `cv::theRNG().state`
+      immediately before *every* `solvePnPRansac` rather than once at start-up —
+      the reloc thread shares the global RNG with other consumers, so a single
+      seeding would drift as soon as anything else drew from it. Negative means
+      "leave it alone" and is the default, so it is inert unless an eval run turns
+      it on, and `setEvalRngSeedIfDebuggable` puts that gate at the call site. The
+      sidecar now reports the seed **actually in force** (null in release, where the
+      gate declines) rather than a hopeful constant.
+
+      Verified natively, not inferred: `llvm-nm` on `libgraffitixr.so` shows
+      `Java_..._nativeSetEvalRngSeed` exported under exactly the name the Kotlin
+      `external fun` resolves. A JVM test cannot establish that — it is the failure
+      that shows up as `UnsatisfiedLinkError` at runtime.
+
+      Sync-reloc remains open because it needs `relocThreadFunc`'s ~350-line body
+      extracted into a callable unit so it can run inline, which is a refactor of the
+      most feedback-heavy path in the app and wants its own commit under the
+      one-behavioural-change-per-commit rule. Until it lands, thread interleaving is
+      still an uncontrolled source of run-to-run variance and `syncReloc` stays
+      `false` in the sidecar.
 
 ### Phase 0 — rotation convention
 
@@ -748,8 +771,17 @@ order.** Work top to bottom.
       convention. `PoseFusionTest` now pins the factor order with non-commuting
       operands; extend it for the rotation, not with another round-trip (a
       round-trip is order-insensitive and would pass either way). **[T]**
-- [ ] **0.7** Add `captureRotationDeg` to `Fingerprint`; default `-1`; refuse to
+- [x] **0.7** Add `captureRotationDeg` to `Fingerprint`; default `-1`; refuse to
       reload a legacy fingerprint and prompt for re-capture. **[T]**
+      *(DONE. Safe to add to `Fingerprint` after all: JNI constructs through the FROZEN
+      `fromNative` static factory, not the primary constructor, precisely so defaulted
+      fields cannot break the descriptor lookup — the model comment claiming a "fixed
+      constructor signature" is superseded by that factory, and was checked against
+      `JNI_FACTORY_DESCRIPTOR` before the field was added. The refusal keys on
+      `isLegacyFrame()` = metric points present AND no recorded rotation, so a
+      descriptors-only fingerprint — no 3D, nothing to be in the wrong frame — is never
+      refused. `< 0` and not `<= 0`: landscape capture is `rotationNeeded == 0` and is
+      valid. Mutation-tested; `<= 0` fails 2 tests.)*
       *(STILL OPEN — the one Phase 0 item not landed. A fingerprint saved before this
       change stores sensor-frame points; it is no **worse** than it was, because the live
       side was already display-frame and the pair never agreed, but it is not fixed either
@@ -791,7 +823,7 @@ order.** Work top to bottom.
       its own experiment: it changes where the overlay lands, and §8.3's warning about
       getting every sign right applies with full force. Do not fold it into a
       rotation commit. **[T]**
-- [ ] **0.10** `MetricFingerprintBuilder.ingestSingle` stores display-frame
+- [x] **0.10** `MetricFingerprintBuilder.ingestSingle` stores display-frame
       `res.pointsCam` alongside the **un-rotated** `glView` in the same
       `restoreWallFingerprintMetric` call. Native pairs them in
       `computeRectifyHomography` (`viewFp` at `MobileGS.cpp:571`, `mWallKeypoints3D`
@@ -799,11 +831,19 @@ order.** Work top to bottom.
       side. This is a **live** gap in the path Phase 0 just fixed, not a legacy-data
       gap — it was mis-filed under 0.7 in PR #1797. In GL convention the matching
       rotation is `R_z(−θ)`, since `D·R_z(θ)·D = R_z(−θ)` for `D = diag(1,−1,−1)`.
-      **[T]**
-- [ ] **0.11** Persist `captureRotationDeg` in `GraffitiProject` at save time.
+      **[T]** *(Done: `MetricMarks.glViewDisplayOriented`. The sign flip is pinned by
+      asserting `glViewToCv(glViewDisplayOriented(v, θ)) == glViewToCvDisplay(v, θ)`
+      through the literal-matrix-tested CV converter, rather than rebuilding `D·R_z·D`
+      in the test — which would have been the implementation retyped. Mutation-tested:
+      using the same sense as CV fails 2 tests.)*
+- [x] **0.11** Persist `captureRotationDeg` in `GraffitiProject` at save time.
       Without it, projects captured *after* Phase 0 — the correct ones — are
       indistinguishable on disk from legacy ones, so 0.7's "refuse to reload a legacy
       fingerprint" would reject them too.
+      *(DONE, and it caught a second defect: `saveProject` persisted
+      `fingerprintViewMatrix = view.toList()` — the RAW sensor-frame view — so 0.10 was
+      undone the moment a project reloaded. Now persists the display-oriented view,
+      matching both the stored points and what native received at capture.)*
 
 ### Phase 2 — partition the fingerprint
 

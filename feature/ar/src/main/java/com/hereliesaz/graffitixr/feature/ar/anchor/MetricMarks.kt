@@ -71,6 +71,37 @@ object MetricMarks {
     }
 
     /**
+     * The same display rotation as [glViewToCvDisplay], but returning a **GL-convention** view —
+     * for the capture view matrix handed to native, which expects GL (`IMPLEMENTATION.md` 0.10).
+     *
+     * **The sign flips, and that is not a typo.** Writing `D = diag(1,-1,-1)` for the GL↔CV axis
+     * conversion that [glViewToCv] performs, we need `GL_display` such that
+     * `D · GL_display = R_z(θ) · D · GL_sensor`. Since `D` is its own inverse,
+     * `GL_display = D · R_z(θ) · D · GL_sensor`, and
+     *
+     * ```
+     * D · R_z(θ) · D = [[c, s, 0], [-s, c, 0], [0, 0, 1]] = R_z(−θ)
+     * ```
+     *
+     * because negating the Y and Z rows and then the Y and Z columns leaves the diagonal alone and
+     * flips the sign of the `xy` off-diagonal pair. So a physical rotation that is `+θ` about the
+     * optical axis in CV is `−θ` in GL. `MetricMarksDisplayViewTest` asserts the two converters
+     * agree through `glViewToCv` rather than trusting this comment.
+     *
+     * Why it matters: native pairs this matrix with the fingerprint's 3D points in
+     * `computeRectifyHomography` (`viewFp`, `mWallKeypoints3D`) and computes
+     * `T = viewCur · inverse(viewFp)`. `viewCur` is `Camera.getViewMatrix`, which is
+     * display-oriented, and the points are display-oriented after Phase 0 — so a sensor-frame
+     * `viewFp` is the odd one out and the rectifying homography comes out rotated by `R_z`.
+     */
+    fun glViewDisplayOriented(view: FloatArray, rotationDeg: Int): FloatArray {
+        val r = ((rotationDeg % 360) + 360) % 360
+        require(r % 90 == 0) { "rotationDeg must be a multiple of 90, was $rotationDeg" }
+        if (r == 0) return view.copyOf()
+        return rotateZ(view, (360 - r) % 360)      // R_z(−θ)
+    }
+
+    /**
      * Pre-multiply a column-major CV view by `R_z(deg)`, rotating the camera-frame *result*.
      *
      * Only rows 0 and 1 change, and only by the exact integer sine/cosine values — written as

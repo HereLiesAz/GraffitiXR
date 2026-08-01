@@ -485,6 +485,14 @@ void MobileGS::relocThreadFunc() {
             double idata[] = {fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0};
             cv::Mat intr = cv::Mat(3, 3, CV_64F, idata).clone();
             StageTimer _pnpTimer(&mStageAccumMs[4], &mStageSamples[4]);
+            // EVALUATION.md 3.1: solvePnPRansac draws random samples, so two replays of the same
+            // recording can disagree and a parameter A/B reports RANSAC variance as an effect.
+            // Re-seeded immediately before EVERY solve, not once at start-up: the reloc thread is
+            // one of several consumers of the global cv::theRNG(), so a single seeding would drift
+            // as soon as anything else drew from it. Negative = leave it alone, which is the
+            // production default and keeps this inert outside an eval run.
+            const long long evalSeed = mEvalRngSeed.load(std::memory_order_relaxed);
+            if (evalSeed >= 0) cv::theRNG().state = (uint64_t)evalSeed;
             if (!cv::solvePnPRansac(objPts, imgPts, intr, cv::Mat(), rvec, tvec, false, 100, 8.0, 0.99, inliers)) {
                 mLastRelocReject.store(kRelocPnpFailed, std::memory_order_relaxed);
             } else {
@@ -910,6 +918,8 @@ void MobileGS::loadModel(const std::string& p) {}
 bool MobileGS::importModel3D(const std::string& p) { return false; }
 void MobileGS::setViewportSize(int w, int h) { mScreenWidth = w; mScreenHeight = h; }
 void MobileGS::setRelocEnabled(bool e) { mRelocEnabled = e; }
+
+void MobileGS::setEvalRngSeed(long long seed) { mEvalRngSeed.store(seed, std::memory_order_relaxed); }
 void MobileGS::restoreWallFingerprint(const cv::Mat& d, const std::vector<cv::Point3f>& p) {
     std::lock_guard<std::mutex> lock(mMutex);
     mWallDescriptors = d.clone();

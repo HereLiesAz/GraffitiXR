@@ -178,4 +178,61 @@ class MetricMarksDisplayViewTest {
         assertTrue("expected an exact value, got ${at(out, 0, 0)}", at(out, 0, 0) == 2.0f)
         assertTrue("expected an exact value, got ${at(out, 1, 0)}", at(out, 1, 0) == 1.0f)
     }
+
+    // ---------------------------------------------------------------------------------------
+    // IMPLEMENTATION.md 0.10 — the GL-convention sibling, whose rotation sign is NEGATED.
+    // ---------------------------------------------------------------------------------------
+
+    /**
+     * The defining property, asserted rather than argued: converting the GL-oriented result to CV
+     * must land on exactly what [MetricMarks.glViewToCvDisplay] produces.
+     *
+     * This is the check that makes the `R_z(−θ)` claim safe. It does NOT re-derive the sign here —
+     * it pins the *relationship* `glViewToCv(glViewDisplayOriented(v, θ)) == glViewToCvDisplay(v, θ)`
+     * through the existing, literal-matrix-tested converter. A hand-rebuilt `D·R_z·D` in the test
+     * would just be the implementation retyped.
+     */
+    @Test
+    fun `the GL-oriented view converts to exactly the CV-oriented one`() {
+        for (deg in intArrayOf(0, 90, 180, 270)) {
+            val viaGl = MetricMarks.glViewToCv(MetricMarks.glViewDisplayOriented(GL_VIEW, deg))
+            val direct = MetricMarks.glViewToCvDisplay(GL_VIEW, deg)
+            assertArrayEquals("mismatch at ${deg}deg", direct, viaGl, EPS)
+        }
+    }
+
+    /**
+     * The sign really does flip between the two conventions — pinned explicitly, because a reader
+     * seeing `glViewDisplayOriented(v, 90)` next to `glViewToCvDisplay(v, 90)` will reasonably
+     * assume they rotate the same way, and silently "fixing" that would reintroduce 0.10.
+     */
+    @Test
+    fun `the GL rotation is the opposite sense to the CV rotation`() {
+        val gl90 = MetricMarks.glViewDisplayOriented(GL_VIEW, 90)
+        val gl270 = MetricMarks.glViewDisplayOriented(GL_VIEW, 270)
+        // R_z(-90) == R_z(270): rotating the GL view by "90" must equal rotating a CV view by 270.
+        val cvOf90 = MetricMarks.glViewToCv(gl90)
+        val cv270Direct = MetricMarks.glViewToCvDisplay(GL_VIEW, 90)
+        assertArrayEquals(cv270Direct, cvOf90, EPS)
+        assertTrue(
+            "90 and 270 must not produce the same GL view",
+            !gl90.contentEquals(gl270),
+        )
+    }
+
+    /** 0 is a no-op in both conventions, and must not alias the input array. */
+    @Test
+    fun `zero degrees returns an equal but independent copy`() {
+        val out = MetricMarks.glViewDisplayOriented(GL_VIEW, 0)
+        assertArrayEquals(GL_VIEW, out, EPS)
+        out[0] = 99f
+        assertEquals("must not alias the caller's array", 1f, GL_VIEW[0], EPS)
+    }
+
+    @Test
+    fun `the GL variant rejects a non-quadrant rotation`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            MetricMarks.glViewDisplayOriented(GL_VIEW, 45)
+        }
+    }
 }

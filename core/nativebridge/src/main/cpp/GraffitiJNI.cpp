@@ -391,6 +391,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetSelfGrowEnabled
     if (gSlamEngine) gSlamEngine->setSelfGrowEnabled(enabled);
 }
 
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetEvalRngSeed(JNIEnv* env, jobject thiz, jlong seed) {
+    if (gSlamEngine) gSlamEngine->setEvalRngSeed((long long)seed);
+}
+
 JNIEXPORT jint JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetWallKeypointCount(JNIEnv* env, jobject thiz) {
     return gSlamEngine ? gSlamEngine->getWallKeypointCount() : 0;

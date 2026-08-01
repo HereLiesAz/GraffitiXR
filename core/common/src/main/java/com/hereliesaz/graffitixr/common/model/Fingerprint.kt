@@ -24,6 +24,22 @@ data class Fingerprint(
     // on the marks after a project reload (when the builder doesn't run). Empty when unavailable;
     // defaulted so older saved projects deserialize unchanged.
     val markCenterLocal: List<Float> = emptyList(),
+    /**
+     * `rotationNeeded` the capture was taken under — 0/90/180/270 — or **-1 when unknown**
+     * (`IMPLEMENTATION.md` 0.7).
+     *
+     * `-1` means the fingerprint predates Phase 0, so its 3D points are in the *sensor* camera
+     * frame while everything that consumes them now assumes *display*. That is the `PAPER.md` §8
+     * mismatch, frozen into a saved file: the points cannot be repaired after the fact because the
+     * rotation that produced them was never recorded. Such a fingerprint must be re-captured, not
+     * silently reloaded — see [isLegacyFrame].
+     *
+     * Adding this field is safe for the native path specifically because JNI constructs through the
+     * frozen [fromNative] factory rather than the primary constructor, so a new defaulted field does
+     * not change the descriptor JNI looks up. The depth path supplies no rotation and therefore gets
+     * `-1`, which is honest: it never applied one.
+     */
+    val captureRotationDeg: Int = -1,
 ) {
     init {
         // Defensive: a corrupt or truncated project file must never construct a Fingerprint whose
@@ -53,6 +69,15 @@ data class Fingerprint(
             }
         }
     }
+
+    /**
+     * True when this fingerprint carries metric 3D points but no record of the rotation they were
+     * built under — i.e. it was saved before Phase 0 and its geometry is skewed by `PAPER.md` §8.
+     *
+     * Keyed on [points3d] being non-empty deliberately: a descriptors-only fingerprint has no 3D to
+     * be wrong about, so it is not legacy in this sense and must not be refused.
+     */
+    fun isLegacyFrame(): Boolean = points3d.isNotEmpty() && captureRotationDeg < 0
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

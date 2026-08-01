@@ -238,6 +238,39 @@ class SlamManager @Inject constructor(
     fun setSelfGrowEnabled(enabled: Boolean) = nativeSetSelfGrowEnabled(enabled)
 
     /**
+     * `EVALUATION.md` §3.1 / `IMPLEMENTATION.md` 6a.4 — fix OpenCV's RNG so a replayed eval run is
+     * reproducible. **Evaluation only.**
+     *
+     * `solvePnPRansac` draws random samples, so two replays of the same recording can disagree, and
+     * an A/B of two parameter values then reports RANSAC variance as a parameter effect. §3.1 calls
+     * this out as "the single most common way a tuning exercise produces confident nonsense".
+     *
+     * A **negative** seed means "leave the RNG alone" and is the default, so this is inert unless an
+     * eval run turns it on. [setEvalRngSeedIfDebuggable] is the safer entry point; call this one
+     * only from code that has already established it is not a release build.
+     *
+     * Note the seed is applied immediately before every PnP solve rather than once at start-up: the
+     * reloc thread shares the global `cv::theRNG()` with other consumers, so a single seeding would
+     * drift as soon as anything else drew from it.
+     */
+    fun setEvalRngSeed(seed: Long) = nativeSetEvalRngSeed(seed)
+
+    /**
+     * [setEvalRngSeed], but a no-op unless [debuggable] is true — the guard that keeps 6a.4's
+     * "must be inert in release builds" true at the call site rather than by convention.
+     *
+     * Pass `BuildConfig.DEBUG` (or the app's own debuggable check). A fixed RANSAC seed shipped to
+     * users would make every device draw the identical sample sequence forever, which is a
+     * behaviour change and not an evaluation affordance.
+     */
+    fun setEvalRngSeedIfDebuggable(seed: Long, debuggable: Boolean) {
+        if (debuggable) nativeSetEvalRngSeed(seed)
+    }
+
+    /** Restore production behaviour: stop seeding, let RANSAC draw freely again. */
+    fun clearEvalRngSeed() = nativeSetEvalRngSeed(-1L)
+
+    /**
      * SuperPoint detect+describe on [bitmap] (gray + CLAHE applied natively). Returns the packed array
      * [n, dim, (u,v)*n, descriptors row-major (n*dim)], or null if the model isn't loaded / nothing
      * found. Caller unpacks (kept here as a raw array to avoid an OpenCV dependency in this module).
@@ -626,6 +659,7 @@ class SlamManager @Inject constructor(
     )
     private external fun nativeSetRelocEnabled(enabled: Boolean)
     private external fun nativeSetSelfGrowEnabled(enabled: Boolean)
+    private external fun nativeSetEvalRngSeed(seed: Long)
     private external fun nativeDetectSuperPoint(bitmap: Bitmap): FloatArray?
     private external fun nativeGetWallKeypointCount(): Int
     private external fun nativeSetWallPatch(bitmap: Bitmap)
