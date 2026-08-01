@@ -950,6 +950,16 @@ class ArViewModel @Inject constructor(
         // Drop the marks-centering override so a later AR re-entry (or a different project) doesn't
         // center the overlay on a stale target's marks before a new one is built/restored.
         slamManager.overlayMarkCenterLocal = null
+        // Same argument, for the anchor. The ARCore session and its anchors do not survive this, so
+        // "an anchor has been established" must not either — otherwise the next capture's
+        // `awaitAnchorTransform` returns immediately with the previous session's pose, which is the
+        // identity-shaped bug it was written to prevent, wearing different numbers.
+        slamManager.clearAnchorEverSet()
+        // The partition's in-memory state belongs to the session that built it: the retained design
+        // footprint is expressed relative to an anchor that is about to stop existing.
+        latestDesignFootprint = null
+        lastPartitionedPose = null
+        liveFingerprint = null
         // Cancel any in-flight session update (including a running stereo probe) so it stops pumping
         // the camera and releases the session mutex before cleanup tries to acquire it.
         sessionUpdateJob?.cancel()
