@@ -791,7 +791,7 @@ order.** Work top to bottom.
       its own experiment: it changes where the overlay lands, and §8.3's warning about
       getting every sign right applies with full force. Do not fold it into a
       rotation commit. **[T]**
-- [ ] **0.10** `MetricFingerprintBuilder.ingestSingle` stores display-frame
+- [x] **0.10** `MetricFingerprintBuilder.ingestSingle` stores display-frame
       `res.pointsCam` alongside the **un-rotated** `glView` in the same
       `restoreWallFingerprintMetric` call. Native pairs them in
       `computeRectifyHomography` (`viewFp` at `MobileGS.cpp:571`, `mWallKeypoints3D`
@@ -799,7 +799,11 @@ order.** Work top to bottom.
       side. This is a **live** gap in the path Phase 0 just fixed, not a legacy-data
       gap — it was mis-filed under 0.7 in PR #1797. In GL convention the matching
       rotation is `R_z(−θ)`, since `D·R_z(θ)·D = R_z(−θ)` for `D = diag(1,−1,−1)`.
-      **[T]**
+      **[T]** *(Done: `MetricMarks.glViewDisplayOriented`. The sign flip is pinned by
+      asserting `glViewToCv(glViewDisplayOriented(v, θ)) == glViewToCvDisplay(v, θ)`
+      through the literal-matrix-tested CV converter, rather than rebuilding `D·R_z·D`
+      in the test — which would have been the implementation retyped. Mutation-tested:
+      using the same sense as CV fails 2 tests.)*
 - [ ] **0.11** Persist `captureRotationDeg` in `GraffitiProject` at save time.
       Without it, projects captured *after* Phase 0 — the correct ones — are
       indistinguishable on disk from legacy ones, so 0.7's "refuse to reload a legacy

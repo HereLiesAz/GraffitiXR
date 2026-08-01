@@ -194,7 +194,7 @@ object MetricFingerprintBuilder {
                 var i = 0
                 while (i + 1 < pos.size) { pixels.add(PlaneMarks.Pixel(pos[i], pos[i + 1])); i += 2 }
                 val fp = ingestSingle(slam, descs, pixels, cvView, intr,
-                    planePointWorld, planeNormalWorld, anchorModel, minPoints, glView)
+                    planePointWorld, planeNormalWorld, anchorModel, minPoints, glView, rotationDeg)
                 if (fp != null) return fp
             } finally {
                 descs.release()
@@ -213,7 +213,7 @@ object MetricFingerprintBuilder {
             if (d.empty()) return null
             val pixels = kp.toArray().map { PlaneMarks.Pixel(it.pt.x.toFloat(), it.pt.y.toFloat()) }
             return ingestSingle(slam, d, pixels, cvView, intr,
-                planePointWorld, planeNormalWorld, anchorModel, minPoints, glView)
+                planePointWorld, planeNormalWorld, anchorModel, minPoints, glView, rotationDeg)
         } finally {
             gray.release(); norm.release(); kp.release(); d.release()
         }
@@ -230,6 +230,8 @@ object MetricFingerprintBuilder {
         // GL-convention capture view, handed to native so the reloc thread can pre-cancel
         // oblique-vs-frontal distortion. Null on the two-keyframe path, which has no single view.
         glView: FloatArray? = null,
+        /** rotationNeeded for this capture; rotates [glView] to match the points. See 0.10. */
+        rotationDeg: Int = 0,
     ): Fingerprint? {
         val res = PlaneMarks.backProject(
             pixels, cvView, planePointWorld, planeNormalWorld,
@@ -267,9 +269,15 @@ object MetricFingerprintBuilder {
         }
         keptDesc.release()
 
+        // IMPLEMENTATION.md 0.10 — the stored capture view must be in the SAME frame as
+        // res.pointsCam, which glViewToCvDisplay has already moved to display orientation.
+        // Native pairs the two in computeRectifyHomography (viewFp / mWallKeypoints3D) against a
+        // display-oriented viewCur, so handing it the raw sensor-frame view leaves the rectifying
+        // homography rotated by R_z. Note the GL sign is NEGATED — see glViewDisplayOriented.
         slam.restoreWallFingerprintMetric(
             bytes, rows, cols, type, res.pointsCam, anchorModel, intr,
-            viewMatrix = glView ?: FloatArray(0),
+            viewMatrix = glView?.let { MetricMarks.glViewDisplayOriented(it, rotationDeg) }
+                ?: FloatArray(0),
         )
         return Fingerprint(
             keypoints, res.pointsCam.toList(), bytes, rows, cols, type,
