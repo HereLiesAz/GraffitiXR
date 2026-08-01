@@ -444,47 +444,28 @@ class ArRenderer(
     private val overlayComposedScratch = FloatArray(16)
     private val overlayRigidScratch = FloatArray(16)
 
-    // Where the artwork sits, published for the capture path (IMPLEMENTATION.md 2.3/2.4).
+    // Where the artwork sits (IMPLEMENTATION.md 2.3/2.4), assembled here and handed out through
+    // onDesignFootprintChanged.
     //
-    // Guarded rather than @Volatile: the four values are only meaningful together, and the capture
-    // block reads them a few statements after the draw block wrote them. A torn read here would
-    // partition a whole fingerprint against half of one design's pose and half of another's, and the
-    // result would look entirely plausible. The lock is uncontended in practice — both sides are the
-    // GL thread — and costs nothing next to the frame it sits inside.
-    // A millimetre. Below this a "resize" is float noise in the composed transform, and firing on it
-    // would reclassify the whole fingerprint every frame the artist rests a finger on the screen.
-    // A millimetre of pan, and a tenth of a degree of spin. Below these a "move" is float noise in
-    // the compose chain, and firing on it would repartition the fingerprint and write the project
-    // file every frame the artist rests a finger on the screen. Recorded in `PARAMETERS.md` §6.
-    private val DESIGN_EXTENT_EPS = 1e-3f
-    private val DESIGN_PAN_EPS_M = 1e-3f
-    private val DESIGN_ROT_EPS_DEG = 0.1f
+    // The lock is now GL-thread-only on both sides: the capture-path reader it originally guarded
+    // went with `designFootprint()`. It is kept because the four values are only meaningful
+    // together, so a future reader from another thread inherits the guarantee rather than having to
+    // rediscover the need for it; uncontended, it costs nothing.
+
+    // A millimetre of extent or pan, and a tenth of a degree of spin. Below these a "change" is
+    // float noise in the compose chain, and firing on it would repartition the fingerprint and
+    // rewrite the project file every frame the artist rests a finger on the screen. Recorded in
+    // `PARAMETERS.md` §6.
     private val designFootprintLock = Any()
     private val designRigidModel = FloatArray(16)
     private val designAnchorInvScratch = FloatArray(16)
 
-    // Last in-plane design transform the footprint was published for: pan X/Y in metres and spin in
-    // degrees. NaN until the first publish, so the first comparison always reports movement.
-    private var lastDesignPanX = Float.NaN
-    private var lastDesignPanY = Float.NaN
-    private var lastDesignRotDeg = Float.NaN
+    // Extracted so the two rules it has to obey — compare against the last PUBLISH not the last
+    // frame, and take only drift-immune inputs — are pinned by tests instead of comments. Each was
+    // violated once here, and neither was reachable from a test while it lived inside onDrawFrame.
+    private val designMoveDetector =
+        com.hereliesaz.graffitixr.feature.ar.anchor.DesignMoveDetector()
 
-    /**
-     * True when the artist's in-plane placement of the design has moved since the last publish.
-     *
-     * Deliberately reads the USER's inputs rather than the composed model matrix. Every quantity
-     * here is drift-immune: pan and spin are set from gestures, and the marks-centering offset is
-     * recomputed from the anchor-local mark centroid, so none of them moves when ARCore corrects the
-     * anchor underneath. Also updates the remembered values, so the caller must invoke it exactly
-     * once per frame.
-     */
-    private fun designLocalMoved(panX: Float, panY: Float, rotDeg: Float): Boolean {
-        val moved = !(kotlin.math.abs(panX - lastDesignPanX) <= DESIGN_PAN_EPS_M &&
-            kotlin.math.abs(panY - lastDesignPanY) <= DESIGN_PAN_EPS_M &&
-            kotlin.math.abs(rotDeg - lastDesignRotDeg) <= DESIGN_ROT_EPS_DEG)
-        lastDesignPanX = panX; lastDesignPanY = panY; lastDesignRotDeg = rotDeg
-        return moved
-    }
     private var designEffectiveHalfW = -1f
     private var designEffectiveHalfH = -1f
     private var designPlaced = false
@@ -1997,9 +1978,12 @@ class ArRenderer(
             // artist drags the artwork across the wall far more often than they pinch it. Watching
             // the extents alone left every one of those moves silently unpartitioned, against a
             // footprint the artwork had left.
-            val extentMoved = placed &&
-                (kotlin.math.abs(newHalfW - designEffectiveHalfW) > DESIGN_EXTENT_EPS ||
-                    kotlin.math.abs(newHalfH - designEffectiveHalfH) > DESIGN_EXTENT_EPS)
+            // Size AND placement, in one detector. Φ asks where a feature sits relative to the
+            // artwork, and dragging or spinning the design changes that answer as much as resizing
+            // does — artists drag far more often than they pinch.
+            val designMoved = placed && designMoveDetector.moved(
+                overlayPanX, overlayPanY, overlayRotationDeg, newHalfW, newHalfH,
+            )
             // Anchor-RELATIVE, not world — see FingerprintPartition.DesignFootprint. The live anchor
             // drifts and is corrected by reloc, so its world pose at two moments is not the same
             // physical place, and pairing this with the fingerprint's capture-time anchor pose is
@@ -2012,7 +1996,10 @@ class ArRenderer(
             // the anchor's orientation estimate does. That is a real residual and it is why the
             // repartition trigger below reads the artist's inputs instead of this matrix. For Φ
             // itself the residual is tolerable: a fraction of a degree moves a design edge by
-            // millimetres, well inside the BAND the partition already discards.
+            // millimetres. Note that is an argument about SMALL corrections, and PoseFusion also
+            // performs cold snaps that are not small — a 3° relock at a one-metre lever arm moves an
+            // edge ~5 cm, past DEFAULT_INNER_MARGIN. Nothing bounds that today; E8 is where the
+            // margins and this interaction get measured rather than asserted.
             var footprint: com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.DesignFootprint? = null
             synchronized(designFootprintLock) {
                 val invertible =
@@ -2022,25 +2009,10 @@ class ArRenderer(
                         designRigidModel, 0, designAnchorInvScratch, 0, overlayRigidScratch, 0,
                     )
                 }
-                // Compared against the USER's in-plane transform, not against the composed pose.
-                //
-                // The composed one looks like the obvious choice and is a trap: overlayBaseScratch
-                // copies anchorMatrix's translation but OVERWRITES its rotation with a world-fixed
-                // frame, so `anchorMatrix⁻¹ · overlayRigid` cancels the translation and *injects*
-                // R_anchorᵀ. anchorMatrix is the FUSED pose, re-corrected every frame, so a
-                // 1e-3 element threshold on that product fires on drift with the phone sitting
-                // still — replacing a drift-immune trigger with a drift-coupled one and paying a
-                // repartition, a native re-push and a project write each time.
-                //
-                // Pan, spin and the marks-centering offset are what the artist actually controls,
-                // and they are drift-immune for the same reason the extents are.
-                val poseMoved = placed && designLocalMoved(
-                    markOffsetX + overlayPanX, markOffsetY + overlayPanY, overlayRotationDeg,
-                )
                 designEffectiveHalfW = newHalfW
                 designEffectiveHalfH = newHalfH
                 designPlaced = placed && invertible
-                if (designPlaced && (extentMoved || poseMoved)) {
+                if (designPlaced && designMoved) {
                     footprint = com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
                         .DesignFootprint(designRigidModel.copyOf(), newHalfW, newHalfH)
                 }

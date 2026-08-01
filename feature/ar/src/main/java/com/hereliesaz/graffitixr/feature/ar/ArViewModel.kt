@@ -48,6 +48,7 @@ import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.data.ProjectManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -1525,19 +1526,23 @@ class ArViewModel @Inject constructor(
      * Lets a newer partition request cancel an in-flight older one.
      *
      * **It does not serialize them, and an earlier version of this comment claimed it did.**
-     * `cancel()` does not join, `Dispatchers.Default` is multi-threaded, and the body runs a pure
-     * classify loop and a blocking JNI call with no cancellation point between them — so a cancelled
-     * job can still finish its native push. What cancellation buys is that the newest design wins
-     * the *common* case, which matters because a drag moves the design every frame and each firing
-     * costs a repartition, a native replace and a project write.
+     * `cancel()` does not join and `Dispatchers.Default` is multi-threaded, so a cancelled job can
+     * still finish. There IS an `ensureActive()` between the classify pass and the native push, so
+     * the common cancellation lands there — but nothing checks between that call and
+     * `restoreWallFingerprintMetric`, so a cancel arriving in that window still completes its push.
+     * What cancellation buys is that the newest design wins the usual case, which matters because a
+     * drag fires every frame and each firing costs a repartition, a native replace and a write.
      *
      * The real protection against an out-of-order write is the idempotence check in the job body:
      * a partition that computes the same regions and extents makes no write at all.
      */
-    // @Volatile because this stopped being single-threaded: the GL thread reaches it through
-    // onDesignFootprintChanged and the IO dispatcher through partitionLiveFingerprintIfNeeded. A
-    // torn read-modify-write here drops a cancel and lets two partition jobs run into native at once.
-    @Volatile private var partitionJob: Job? = null
+    // AtomicReference, not @Volatile. This stopped being single-threaded when partition-on-arrival
+    // landed: the GL thread reaches it through onDesignFootprintChanged and the IO dispatcher
+    // through partitionLiveFingerprintIfNeeded. @Volatile gives visibility but NOT atomicity, so a
+    // plain `cancel(); assign` still interleaves into "both threads cancel the same job, one
+    // assignment is lost, and the orphan runs to completion alongside its replacement" — two jobs
+    // pushing into native at once, which is precisely what the swap exists to prevent.
+    private val partitionJob = java.util.concurrent.atomic.AtomicReference<Job?>(null)
 
     /**
      * The most recent design footprint the renderer published, or null before the artwork is placed.
@@ -1560,7 +1565,43 @@ class ArViewModel @Inject constructor(
      */
     @Volatile private var lastPartitionedPose: FloatArray? = null
 
-    /** Element-wise, with the same millimetre/milliradian threshold the renderer's edge uses. */
+    /**
+     * Raise or clear the "artwork leaves too little bare wall" warning, and toast on the rising edge.
+     *
+     * Extracted so the fresh-partition and already-up-to-date paths share one implementation: they
+     * diverged once, and the reload path — where a project reopens already in that state and the
+     * artist has no memory of being told — was the half that lost the message.
+     *
+     * Edge-triggered so a slow pinch through the threshold does not toast every frame. Saying it at
+     * all matters: a `uiState` boolean nothing reads is the same failure as an operator nothing
+     * calls, and its neighbour `legacyFingerprintRefused` shipped exactly that way, with a KDoc
+     * claiming it was "surfaced".
+     */
+    private fun publishBackboneWarning(backbone: Int) {
+        val tooSmall = backbone in 0 until FingerprintPartition.MIN_BACKBONE
+        val wasTooSmall = _uiState.value.backboneTooSmall
+        _uiState.update { it.copy(backboneTooSmall = tooSmall) }
+        if (tooSmall && !wasTooSmall) {
+            _feedback.tryEmit(
+                com.hereliesaz.graffitixr.common.model.FeedbackEvent.Toast(
+                    "The artwork covers nearly all the wall in view — only $backbone tracked " +
+                        "features sit outside it. Make it smaller or step back, or the target " +
+                        "may not lock.",
+                ),
+            )
+        }
+    }
+
+    /**
+     * Element-wise, at a millimetre.
+     *
+     * Note this DOES walk the anchor-relative model matrix, which carries `R_anchorᵀ` and is
+     * therefore drift-coupled — the very property that made the renderer's old trigger misfire. It
+     * is harmless only because it never sees an unpublished value: every footprint reaching here was
+     * one the renderer already decided to emit, so this compares a published pose against a copy of
+     * a published pose. If it ever gains a caller that feeds it live per-frame poses, it becomes the
+     * same bug.
+     */
     private fun poseDiffers(pose: FloatArray, previous: FloatArray?): Boolean {
         if (previous == null || previous.size != pose.size) return true
         for (i in pose.indices) if (kotlin.math.abs(pose[i] - previous[i]) > 1e-3f) return true
@@ -1615,8 +1656,9 @@ class ArViewModel @Inject constructor(
         if (!needsPartition) return
         // Cancel rather than skip: the newest design size is the correct one, and an older in-flight
         // partition can only write a size the artist has already left behind.
-        partitionJob?.cancel()
-        partitionJob = viewModelScope.launch(Dispatchers.Default) {
+        // LAZY so the job exists to be stored before it can run: started only after getAndSet has
+        // published it, so a job can never be cancelled by a successor that has not yet seen it.
+        val next = viewModelScope.launch(Dispatchers.Default, start = CoroutineStart.LAZY) {
             val current = liveFingerprint ?: return@launch
             val updated = FingerprintPartition.partition(current.fingerprint, design)
             // Identity, not equality: `partition` returns the RECEIVER when it refuses (no points, no
@@ -1640,6 +1682,11 @@ class ArViewModel @Inject constructor(
                 // Still record the pose: the partition is genuinely up to date for it, and not
                 // recording it would re-enter here on every subsequent frame of a drag.
                 lastPartitionedPose = design.rigidModelAnchorLocal.copyOf()
+                // ...and still raise the warning. Skipping it here lost the "artwork covers nearly
+                // all the wall" message on the RELOAD path — a project saved in that state reopened
+                // silently, which is the one case where the artist has no memory of being told.
+                // The partition is unchanged, not absent; its backbone count is just as real.
+                publishBackboneWarning(FingerprintPartition.backboneCount(updated))
                 return@launch
             }
             ensureActive()
@@ -1662,23 +1709,7 @@ class ArViewModel @Inject constructor(
             // to measure — so it is raised here, where the artwork's size is what made it true. A
             // warning rather than a refusal for the same reason: by this point the target exists and
             // the honest advice is "make the artwork smaller or step back", not "that never worked".
-            val tooSmall = backbone in 0 until FingerprintPartition.MIN_BACKBONE
-            val wasTooSmall = _uiState.value.backboneTooSmall
-            _uiState.update { it.copy(backboneTooSmall = tooSmall) }
-            // Say it, don't just record it. A `uiState` boolean that nothing reads is the same
-            // failure as an operator that nothing calls — and this codebase already had one of these
-            // sitting next to it (`legacyFingerprintRefused`, set with a KDoc claiming it was
-            // "surfaced", read by nothing). Emitted on the EDGE so a slow pinch through the
-            // threshold does not toast every frame.
-            if (tooSmall && !wasTooSmall) {
-                _feedback.tryEmit(
-                    com.hereliesaz.graffitixr.common.model.FeedbackEvent.Toast(
-                        "The artwork covers nearly all the wall in view — only $backbone tracked " +
-                            "features sit outside it. Make it smaller or step back, or the target " +
-                            "may not lock.",
-                    ),
-                )
-            }
+            publishBackboneWarning(backbone)
 
             // Persist so the next load starts from the size the artist settled on. Merged through
             // the repository transform rather than a full-object write, for the save-race reason
@@ -1689,6 +1720,8 @@ class ArViewModel @Inject constructor(
                 design.halfW, design.halfH, updated.points3d.size / 3, backbone,
             )
         }
+        partitionJob.getAndSet(next)?.cancel()
+        next.start()
     }
 
     /**
@@ -1815,6 +1848,17 @@ class ArViewModel @Inject constructor(
                 // aid and must not register anything beyond that flow.
                 slamManager.clearWallFingerprint()
                 slamManager.overlayMarkCenterLocal = null
+                // Native now holds nothing, so neither cache may keep claiming it does.
+                //
+                // `restoredFingerprint` left set means switching BACK to the project that owned it
+                // hits the suppression guard and never re-pushes — native empty, Kotlin believing
+                // otherwise, reloc silently dead for the rest of the process and looking exactly
+                // like bad tracking. `liveFingerprint` left set is worse: a design move would
+                // partition the PREVIOUS project's map and `updateProject` would write it into this
+                // project's file.
+                restoredFingerprint = null
+                liveFingerprint = null
+                lastPartitionedPose = null
             }
             // Restore the persistent wall feature map (Phase 2a: stored in native; matched in Phase 2b).
             // Independent of the marks fingerprint above and co-registered to the same anchor. Null on

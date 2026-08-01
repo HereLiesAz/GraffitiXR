@@ -66,62 +66,71 @@ class SlamManager @Inject constructor(
     fun getLastSplatTrace(): String = nativeGetLastSplatTrace()
 
     /**
-     * True once the renderer has ESTABLISHED the primary anchor — not merely written a pose.
+     * How many times the renderer has ESTABLISHED the primary anchor this session — not how many
+     * times an anchor pose has been written, and not merely whether one ever was.
      *
-     * The distinction is the whole point, and getting it wrong is what a first attempt at this did.
-     * `mAnchorMatrix` is constructed as the identity, but it does **not** stay that way until
-     * establishment: `refineAnchorFromBestPlane` runs every 30 frames *while the anchor is
-     * unestablished* and writes a provisional plane pose, as does the depth fallback. So a flag set
-     * by `updateAnchorTransform` flips within the first second of scanning, and a capture waiting on
-     * it would not wait at all — it would read the plane refiner's pose.
+     * Two distinctions, each of which a simpler design got wrong.
      *
-     * That is not a near-miss. The refiner builds its basis with the plane normal in **Z**, while
-     * establishment takes ARCore's `hitPose` verbatim, whose local **+Y** is the normal. The two
-     * differ by ~90° by construction, so reading one where the other is meant is a frame error, not
-     * drift.
+     * **Establishment, not any write.** `mAnchorMatrix` is constructed as the identity but does not
+     * stay that way: `refineAnchorFromBestPlane` runs every 30 frames *while the anchor is
+     * unestablished* and writes a provisional plane pose, as does the depth fallback. A flag set by
+     * `updateAnchorTransform` therefore flips within a second of scanning. Worse, the refiner builds
+     * its basis with the wall normal in **Z** while establishment takes ARCore's `hitPose`, whose
+     * normal is **+Y** — reading one where the other is meant is a ~90° frame error, not drift.
      *
-     * Hence [markAnchorEstablished], called from the one place that sets the renderer's
-     * `anchorEstablished`, rather than from the pose writer.
+     * **A counter, not a latch.** Every target confirmation re-establishes the anchor, so a boolean
+     * "has one ever been established" is permanently true after the first capture and every capture
+     * after it resolves instantly against the *previous* anchor's pose — the same off-by-an-anchor
+     * bug the flag existed to prevent. A caller snapshots this before requesting establishment and
+     * waits for it to advance.
      */
-    private val _anchorEstablished = kotlinx.coroutines.flow.MutableStateFlow(false)
-    val anchorEstablished: kotlinx.coroutines.flow.StateFlow<Boolean> = _anchorEstablished
+    private val _anchorGeneration = kotlinx.coroutines.flow.MutableStateFlow(0)
+    val anchorGeneration: kotlinx.coroutines.flow.StateFlow<Int> = _anchorGeneration
 
     fun updateAnchorTransform(transform: FloatArray) = nativeUpdateAnchorTransform(transform)
 
     /**
-     * Announce that the primary anchor now exists. Call from the renderer at the moment it sets its
-     * own `anchorEstablished`, and nowhere else — every other anchor write is provisional.
+     * Announce that the primary anchor has been (re-)established. Call from the renderer at the
+     * moment it sets its own `anchorEstablished`, and nowhere else — every other anchor write is
+     * provisional.
      */
-    fun markAnchorEstablished() { _anchorEstablished.value = true }
+    fun markAnchorEstablished() { _anchorGeneration.value = _anchorGeneration.value + 1 }
 
     /**
-     * The anchor pose, waiting up to [timeoutMs] for the anchor to be established if it is not yet.
+     * The anchor pose, waiting up to [timeoutMs] for an establishment **newer than**
+     * [sinceGeneration] — which the caller must snapshot from [anchorGeneration] before asking for
+     * one.
      *
-     * Returns null on timeout rather than a pose, because every candidate fallback here is a
-     * well-formed matrix that means the wrong thing: the identity reads as a real pose at the world
-     * origin, and the plane refiner's provisional pose is in a different frame convention entirely.
+     * Returns null on timeout rather than a pose, because every candidate fallback is a well-formed
+     * matrix that means the wrong thing: the identity reads as a real pose at the world origin, the
+     * plane refiner's provisional pose is in a different frame convention, and the previous
+     * anchor's pose is a plausible answer to a question about a different anchor.
      */
-    suspend fun awaitAnchorTransform(timeoutMs: Long = ANCHOR_WAIT_MS): FloatArray? {
-        if (!_anchorEstablished.value) {
+    suspend fun awaitAnchorTransform(
+        sinceGeneration: Int,
+        timeoutMs: Long = ANCHOR_WAIT_MS,
+    ): FloatArray? {
+        if (_anchorGeneration.value <= sinceGeneration) {
             kotlinx.coroutines.withTimeoutOrNull(timeoutMs) {
-                _anchorEstablished.first { it }
+                _anchorGeneration.first { it > sinceGeneration }
             } ?: return null
         }
         val m = nativeGetAnchorTransform()
         // Native hands back a freshly ZEROED array when the engine is gone, which passes a bare
         // size check and yields a singular matrix — strictly worse than the identity this exists to
-        // avoid. A real anchor pose has a unit-length first rotation column.
+        // avoid. A real anchor pose has a unit-length first rotation column; all three writers
+        // produce orthonormal matrices, so this rejects only genuinely broken input.
         if (m == null || m.size != 16) return null
         val c0 = kotlin.math.sqrt(m[0] * m[0] + m[1] * m[1] + m[2] * m[2])
         return if (kotlin.math.abs(c0 - 1f) < 1e-3f) m else null
     }
 
     /**
-     * Forget that the anchor was established. Call when tearing the AR session down: the ARCore
-     * session and its anchors do not survive that, so "established" must not either, or the next
-     * capture resolves instantly against the previous session's pose.
+     * Reset the establishment counter. Call when tearing the AR session down: the ARCore session and
+     * its anchors do not survive that, so a generation from the old session must not satisfy a wait
+     * in the new one.
      */
-    fun clearAnchorEstablished() { _anchorEstablished.value = false }
+    fun clearAnchorEstablished() { _anchorGeneration.value = 0 }
 
     /**
      * Centroid of the matched fingerprint marks, expressed in the FINGERPRINT ANCHOR's local frame

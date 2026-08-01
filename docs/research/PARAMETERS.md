@@ -166,15 +166,25 @@ if repartition cost or missed repartitions ever show up in a run, start here.
 | `DESIGN_EXTENT_EPS` | `ArRenderer.kt` | `1e-3` m | guessed — a millimetre of effective half-extent; below this a "resize" is float noise in the compose chain |
 | `DESIGN_PAN_EPS_M` | `ArRenderer.kt` | `1e-3` m | guessed — likewise for in-plane pan |
 | `DESIGN_ROT_EPS_DEG` | `ArRenderer.kt` | `0.1`° | guessed — a tenth of a degree of in-plane spin |
-| `ANCHOR_WAIT_MS` | `SlamManager.kt` | `2000` ms | derived — the anchor is established on the GL frame after confirm (&lt;35 ms at 30 fps); this is a stall ceiling, not an expected duration, and timing out REFUSES rather than falling back |
+| `ANCHOR_WAIT_MS` | `SlamManager.kt` | `2000` ms | derived — the anchor is established on the GL frame after confirm (under 35 ms at 30 fps); this is a stall ceiling, not an expected duration, and timing out REFUSES rather than falling back |
 
-**The repartition trigger reads the artist's inputs, not the composed pose**, and
-that is a correctness requirement rather than a tuning choice. `anchorMatrix` is
-the *fused* pose, re-corrected every frame, and
-`anchorMatrix⁻¹ · overlayRigid` carries `R_anchorᵀ` — so any threshold on that
-product fires on drift with the phone sitting still. Pan, spin and the extents
-are drift-immune. An earlier cut keyed on the composed matrix at `1e-3` per
-element (~0.057°) and would have repartitioned continuously.
+**The repartition trigger reads the artist's gesture inputs only**, and that is a
+correctness requirement rather than a tuning choice. `anchorMatrix` is the
+*fused* pose, re-corrected every frame, and `anchorMatrix⁻¹ · overlayRigid`
+carries `R_anchorᵀ` — so any threshold on that product fires on drift with the
+phone sitting still. Two successive cuts got this wrong: the first keyed on the
+composed matrix (~0.057° at `1e-3` per element), the second added the
+marks-centering offset, which is `X_world · (R_anchor · markCenterLocal)` and is
+drift-coupled at `DESIGN_PAN_EPS_M / |markCenterLocal|` — the same 0.057° at a
+one-metre lever arm. Only `overlayPanX/Y`, `overlayRotationDeg` and the extents
+are genuinely immune, because they are set from gestures and nothing else.
+
+**The thresholds compare against the last PUBLISH, not the last frame.** Advancing
+the remembered values on a frame that reported no movement makes a slow drag
+invisible: 15 cm over 3 s is 0.08 mm per frame, under threshold every frame, and
+the delta never accumulates. That cut shipped too, and it is the more dangerous
+failure of the two — a trigger that fires too often wastes work, one that never
+fires leaves Φ answering against a design that has left.
 
 
 
