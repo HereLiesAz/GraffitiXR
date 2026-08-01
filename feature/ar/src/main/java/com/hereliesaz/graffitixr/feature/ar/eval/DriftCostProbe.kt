@@ -117,6 +117,12 @@ class DriftCostProbe(
             relocDetected = reloc?.detected ?: EvalSampleLog.NOT_SAMPLED,
             relocObliquityDeg = reloc?.obliquityDeg ?: EvalSampleLog.NOT_SAMPLED,
             relocRectifiedCorr = reloc?.rectifiedCorrespondences ?: EvalSampleLog.NOT_SAMPLED,
+            // Already -1 when native has not measured them, so the elvis only covers "no
+            // diagnostics read this tick at all". Both routes must land on -1, never 0: an empty
+            // F_out is a real result and is the one this column exists to catch.
+            relocBackboneFeatures = reloc?.backboneFeatures ?: EvalSampleLog.NOT_SAMPLED,
+            relocBackboneMatches = reloc?.backboneMatches ?: EvalSampleLog.NOT_SAMPLED,
+            relocBackboneInliers = reloc?.backboneInliers ?: EvalSampleLog.NOT_SAMPLED,
             captureRotationNeededDeg = captureRotationNeededDeg,
             liveRotationNeededDeg = liveRotationNeededDeg,
         )

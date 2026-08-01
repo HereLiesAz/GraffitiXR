@@ -2170,6 +2170,25 @@ private fun RelocDiagnosticsOverlay(
             if (d.obliquityDeg < 0) "off" else "${d.obliquityDeg}° +${d.rectifiedCorrespondences} corr",
             androidx.compose.ui.graphics.Color.White,
         )
+        // The partition, read off the device (IMPLEMENTATION.md 2.11). "FP pts" is the whole
+        // fingerprint; this row is the part reloc is actually allowed to solve against, plus how
+        // much of it survived matching and RANSAC. A backbone of 0 with a healthy FP pts is the
+        // wall-filling design — the one failure the totals above describe as ordinary bad luck.
+        // "—" means the reloc thread has not got far enough to measure it, which is a different
+        // state from having measured zero.
+        DiagnosticRow(
+            "Backbone",
+            if (d.backboneFeatures < 0) "—" else buildString {
+                append("${d.backboneFeatures} pts")
+                if (d.backboneMatches >= 0) append(" · ${d.backboneMatches} corr")
+                if (d.backboneInliers >= 0) append(" · ${d.backboneInliers} in")
+            },
+            if (d.backboneFeatures == 0) {
+                androidx.compose.ui.graphics.Color.Red
+            } else {
+                androidx.compose.ui.graphics.Color.White
+            },
+        )
         DiagnosticRow("FP pts", fingerprintPoints.toString(), androidx.compose.ui.graphics.Color.Cyan)
         DiagnosticRow("Corroborated", "${(paintingProgress * 100).toInt()}%", androidx.compose.ui.graphics.Color.White)
     }

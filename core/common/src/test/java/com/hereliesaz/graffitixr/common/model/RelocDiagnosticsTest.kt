@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.common.model
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RelocDiagnosticsTest {
@@ -42,6 +43,85 @@ class RelocDiagnosticsTest {
         // "rectification wasn't eligible" state needs its own value.
         assertEquals(-1, RelocDiagnostics().obliquityDeg)
         assertEquals(0, RelocDiagnostics().rectifiedCorrespondences)
+    }
+
+    /**
+     * The backbone counts follow [RelocDiagnostics.obliquityDeg]'s -1 precedent, and they have to.
+     *
+     * Before Phase 2 there was no partition and a zero backbone was meaningless, so 0 would have
+     * been a harmless default. With the partition landed it is the single most important reading
+     * these fields ever carry: `F_out` empty means the artwork covers the whole visible wall and
+     * reloc has nothing to bootstrap a pose from (`PAPER.md` §5.3, Phase 2's risk section). Had 0
+     * doubled as "not measured", the one condition the counters exist to expose would read exactly
+     * like a reloc thread that has never run.
+     */
+    @Test
+    fun `unmeasured backbone counts are minus one, never a real zero`() {
+        val unmeasured = RelocDiagnostics()
+        assertEquals(-1, unmeasured.backboneFeatures)
+        assertEquals(-1, unmeasured.backboneMatches)
+        assertEquals(-1, unmeasured.backboneInliers)
+
+        // The wall-filling design: measured, and the measurement is zero.
+        val wallFilling = RelocDiagnostics(
+            RelocReject.FEW_MATCHES, matches = 0, inliers = 0, detected = 1400,
+            backboneFeatures = 0, backboneMatches = 0, backboneInliers = 0,
+        )
+        assertEquals(0, wallFilling.backboneFeatures)
+        assertTrue(
+            "an empty backbone must not read as an unsampled one",
+            wallFilling.backboneFeatures != unmeasured.backboneFeatures,
+        )
+        assertTrue(wallFilling.backboneMatches != unmeasured.backboneMatches)
+        assertTrue(wallFilling.backboneInliers != unmeasured.backboneInliers)
+    }
+
+    /**
+     * `IMPLEMENTATION.md` 2.11 — the backbone counts are reported *beside* the totals, not in place
+     * of them, because the same shortfall means different things. Forty correspondences of which
+     * three are backbone is "the frame is looking at the artwork, not at the wall around it";
+     * three correspondences of which three are backbone is "the frame is barely seeing the wall at
+     * all". A single `matches` column collapses those into one row.
+     */
+    @Test
+    fun `total and backbone counts are separately readable`() {
+        val underTheArtwork = RelocDiagnostics(
+            RelocReject.OK, matches = 40, inliers = 24, detected = 1400,
+            backboneFeatures = 300, backboneMatches = 3, backboneInliers = 2,
+        )
+        val barelySeeingTheWall = RelocDiagnostics(
+            RelocReject.FEW_MATCHES, matches = 3, inliers = 0, detected = 1400,
+            backboneFeatures = 300, backboneMatches = 3, backboneInliers = 0,
+        )
+        assertEquals(
+            "the backbone shortfall is identical in both",
+            underTheArtwork.backboneMatches, barelySeeingTheWall.backboneMatches,
+        )
+        assertTrue(
+            "and only the total tells them apart",
+            underTheArtwork.matches != barelySeeingTheWall.matches,
+        )
+        assertEquals(40, underTheArtwork.matches)
+        assertEquals(3, underTheArtwork.backboneMatches)
+        assertEquals(24, underTheArtwork.inliers)
+        assertEquals(2, underTheArtwork.backboneInliers)
+        // The ratio PoseFusion gates on still uses the TOTAL. Reusing `matches` for the backbone
+        // count would have silently changed it.
+        assertEquals(24f / 40f, underTheArtwork.inlierRatio, 1e-4f)
+    }
+
+    /**
+     * A legacy (unpartitioned) fingerprint is the all-backbone case, so it reports its full point
+     * count — not zero, and not the sentinel. The native side computes it; this pins the
+     * three-way distinction the field has to carry.
+     */
+    @Test
+    fun `legacy all-backbone, empty backbone and unmeasured are three distinct readings`() {
+        val legacy = RelocDiagnostics(RelocReject.OK, backboneFeatures = 512)
+        val empty = RelocDiagnostics(RelocReject.FEW_MATCHES, backboneFeatures = 0)
+        val unmeasured = RelocDiagnostics()
+        assertEquals(3, setOf(legacy, empty, unmeasured).map { it.backboneFeatures }.toSet().size)
+        assertTrue("a legacy fingerprint is all backbone, not none", legacy.backboneFeatures > 0)
     }
 
     /**
