@@ -35,7 +35,7 @@ class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
     // Last arg is the camera→point distance (meters) at the tapped pixel, or -1f when unavailable.
-    private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int, Float, FloatArray?, com.hereliesaz.graffitixr.common.model.CaptureEnvironment, com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.DesignFootprint?) -> Unit,
+    private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int, Float, FloatArray?, com.hereliesaz.graffitixr.common.model.CaptureEnvironment) -> Unit,
     private val onTrackingUpdated: (Boolean, Int, Int, Boolean, Float, Float, Triple<Float, Float, Float>?, Boolean, Boolean, Float, Float, Float) -> Unit,
     private val onLightUpdated: (Float) -> Unit,
     private val onDiag: (String) -> Unit = {},
@@ -60,15 +60,17 @@ class ArRenderer(
     // camera config that can't drive one), so the UI can drop the toggle instead of latching a
     // light that never came on.
     private val onFlashlightUnavailable: () -> Unit = {},
-    // Fired from the GL thread when the artwork's EFFECTIVE (scale-included) half-extents change —
-    // i.e. the artist pinched the design. IMPLEMENTATION.md 2.2: the stored fingerprint's partition
-    // was computed against the old size and is now stale, so the regions get recomputed from the
-    // stored 3D points rather than the artist being made to re-capture.
+    // Fired from the GL thread when the artwork's footprint appears or changes size — the artist
+    // placed a design, or pinched one. IMPLEMENTATION.md 2.2/2.4: this is where the fingerprint
+    // actually gets partitioned, because target creation is what establishes the anchor the artwork
+    // sits on, so a capture has no footprint to partition against.
     //
-    // Edge-triggered, not per-frame: the renderer knows when the number moved and the ViewModel does
-    // not, so debouncing here costs one float compare a frame and saves a listener that would
-    // otherwise have to poll.
-    private val onDesignExtentChanged: (Float, Float) -> Unit = { _, _ -> },
+    // Edge-triggered on the EFFECTIVE (scale-included) half-extents: the renderer knows when the
+    // number moved and the ViewModel does not, so filtering here costs one float compare a frame and
+    // saves a listener that would otherwise have to poll. It is a FILTER, not a debounce — a live
+    // pinch still fires every frame, and collapsing that is the consumer's job.
+    private val onDesignFootprintChanged:
+        (com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.DesignFootprint) -> Unit = {},
 ) : GLSurfaceView.Renderer {
 
     /**
@@ -454,6 +456,7 @@ class ArRenderer(
     private val DESIGN_EXTENT_EPS = 1e-3f
     private val designFootprintLock = Any()
     private val designRigidModel = FloatArray(16)
+    private val designAnchorInvScratch = FloatArray(16)
     private var designEffectiveHalfW = -1f
     private var designEffectiveHalfH = -1f
     private var designPlaced = false
@@ -579,6 +582,11 @@ class ArRenderer(
         overlayRenderer.setBorderExtent(halfW, halfH)
         // Image quad is always large so artwork is never spatially confined.
         overlayRenderer.setExtent(OverlayRenderer.QUAD_HALF_EXTENT, OverlayRenderer.QUAD_HALF_EXTENT)
+        // Re-arm the one-shot screen fit. This call OVERWRITES whatever the fit last set with a 10 m
+        // placeholder; without re-arming, the fit never restores a real size, the published design
+        // footprint stays that placeholder, and Φ swallows every feature in view — reporting zero
+        // backbone, and repartitioning the live fingerprint into one that can never relocalize.
+        quadInitialFitApplied = false
     }
 
     /**
@@ -1575,11 +1583,6 @@ class ArRenderer(
                             intrArr, mappingViewMatrix.copyOf(),
                             rotationNeeded, tapDistanceMeters,
                             wallPlane, captureEnvironment,
-                            // IMPLEMENTATION.md 2.3 — where the artwork is, so the fingerprint can
-                            // be partitioned into backbone and corroboration at the moment its
-                            // geometry is frozen. Null until the overlay has an anchor and a
-                            // texture, which leaves the capture unpartitioned (= all backbone).
-                            designFootprint(),
                         )
                     }
                 } catch (e: Exception) {
@@ -1974,19 +1977,34 @@ class ArRenderer(
             // `quadInitialFitApplied` is part of the precondition, not an optimisation. Until the
             // screen-fit above has run, the quad's extents are still QUAD_HALF_EXTENT — a 10 m
             // square placeholder chosen so artwork is never spatially confined. Publishing that as
-            // the design's size would make Φ swallow every feature in view, report a backbone of
-            // zero, and refuse every capture with "the artwork covers almost the whole wall".
+            // the design's size would make Φ swallow every feature in view and report zero backbone
+            // — "the artwork covers the whole wall" on a design the artist has only just opened.
             val placed = anchorEstablished && overlayRenderer.hasTexture && quadInitialFitApplied
             val extentMoved = placed &&
                 (kotlin.math.abs(newHalfW - designEffectiveHalfW) > DESIGN_EXTENT_EPS ||
                     kotlin.math.abs(newHalfH - designEffectiveHalfH) > DESIGN_EXTENT_EPS)
+            // Anchor-RELATIVE, not world — see FingerprintPartition.DesignFootprint. The live anchor
+            // drifts and gets corrected by reloc, so its world pose at two different moments is not
+            // the same physical place; expressing the design against it cancels that out, and the
+            // fingerprint's stored half of the composition is anchor-relative for the same reason.
+            var footprint: com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.DesignFootprint? = null
             synchronized(designFootprintLock) {
-                System.arraycopy(overlayRigidScratch, 0, designRigidModel, 0, 16)
+                val invertible =
+                    android.opengl.Matrix.invertM(designAnchorInvScratch, 0, anchorMatrix, 0)
+                if (placed && invertible) {
+                    android.opengl.Matrix.multiplyMM(
+                        designRigidModel, 0, designAnchorInvScratch, 0, overlayRigidScratch, 0,
+                    )
+                }
                 designEffectiveHalfW = newHalfW
                 designEffectiveHalfH = newHalfH
-                designPlaced = placed
+                designPlaced = placed && invertible
+                if (extentMoved && designPlaced) {
+                    footprint = com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
+                        .DesignFootprint(designRigidModel.copyOf(), newHalfW, newHalfH)
+                }
             }
-            if (extentMoved) onDesignExtentChanged(newHalfW, newHalfH)
+            footprint?.let(onDesignFootprintChanged)
             android.opengl.Matrix.scaleM(overlayLocalScratch, 0, overlayScale, overlayScale, 1f)
             android.opengl.Matrix.multiplyMM(
                 overlayComposedScratch, 0, overlayBaseScratch, 0, overlayLocalScratch, 0

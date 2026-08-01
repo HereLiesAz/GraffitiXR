@@ -34,7 +34,7 @@ class FingerprintPartitionPersistenceTest {
         regions: ByteArray = ByteArray(0),
         halfW: Float = -1f,
         halfH: Float = -1f,
-        designModel: List<Float> = emptyList(),
+        anchorCam: List<Float> = emptyList(),
     ) = Fingerprint(
         keypoints = List(3) { KeyPoint(it.toFloat(), 2f, 7f) },
         points3d = listOf(0f, 0f, 0f, 1f, 0f, 0f, 2f, 0f, 0f),
@@ -46,7 +46,7 @@ class FingerprintPartitionPersistenceTest {
         regions = regions,
         captureHalfW = halfW,
         captureHalfH = halfH,
-        captureDesignModel = designModel,
+        captureAnchorCam = anchorCam,
     )
 
     private val identity16 = listOf(
@@ -58,16 +58,30 @@ class FingerprintPartitionPersistenceTest {
      * `assertEquals(original, decoded)` proves nothing about a field `equals` ignores.
      */
     @Test
-    fun `two fingerprints differing only in their partition are not equal`() {
+    fun `equality notices each new field on its own`() {
+        // One field at a time. A single assertNotEquals between a bare and a fully-populated
+        // fingerprint differs in four places at once, so it would still pass with three of the four
+        // missing from `equals` — and every round-trip assertion below leans on `equals`.
         val partitioned = fingerprint(byteArrayOf(INSIDE, BAND, OUTSIDE), 1f, 0.5f, identity16)
-        assertNotEquals(fingerprint(), partitioned)
         assertNotEquals(
-            "the extents are part of what the regions mean",
+            "regions: the partition itself",
+            partitioned, partitioned.copy(regions = byteArrayOf(OUTSIDE, OUTSIDE, OUTSIDE)),
+        )
+        assertNotEquals(
+            "captureHalfW: the design size the regions mean",
             partitioned, partitioned.copy(captureHalfW = 2f),
         )
         assertNotEquals(
-            "the design model is what a later reclassify replays",
-            partitioned, partitioned.copy(captureDesignModel = emptyList()),
+            "captureHalfH: likewise, and separately",
+            partitioned, partitioned.copy(captureHalfH = 2f),
+        )
+        assertNotEquals(
+            "captureAnchorCam: the frame a later partition composes through",
+            partitioned, partitioned.copy(captureAnchorCam = emptyList()),
+        )
+        assertNotEquals(
+            "captureRotationDeg: which display frame the points are in",
+            partitioned, partitioned.copy(captureRotationDeg = 180),
         )
     }
 
@@ -80,7 +94,7 @@ class FingerprintPartitionPersistenceTest {
         assertArrayEquals(byteArrayOf(INSIDE, BAND, OUTSIDE), decoded.regions)
         assertEquals(1.25f, decoded.captureHalfW, 0f)
         assertEquals(0.75f, decoded.captureHalfH, 0f)
-        assertEquals(identity16, decoded.captureDesignModel)
+        assertEquals(identity16, decoded.captureAnchorCam)
         assertFalse(decoded.isUnpartitioned())
     }
 
@@ -107,7 +121,7 @@ class FingerprintPartitionPersistenceTest {
         assertEquals(0, decoded.regions.size)
         assertEquals(-1f, decoded.captureHalfW, 0f)
         assertEquals(-1f, decoded.captureHalfH, 0f)
-        assertTrue(decoded.captureDesignModel.isEmpty())
+        assertTrue(decoded.captureAnchorCam.isEmpty())
         assertFalse("nothing to be stale against", decoded.isPartitionStale(1f, 1f))
     }
 
@@ -123,8 +137,8 @@ class FingerprintPartitionPersistenceTest {
 
     /** Same argument for the stored matrix: 16 floats or nothing, never a short prefix. */
     @Test(expected = IllegalArgumentException::class)
-    fun `a design model that is not a 4x4 is refused at construction`() {
-        fingerprint(designModel = listOf(1f, 0f, 0f))
+    fun `an anchor-cam matrix that is not a 4x4 is refused at construction`() {
+        fingerprint(anchorCam = listOf(1f, 0f, 0f))
     }
 
     /**
@@ -141,6 +155,6 @@ class FingerprintPartitionPersistenceTest {
 
         assertArrayEquals(byteArrayOf(OUTSIDE, OUTSIDE, INSIDE), decoded.fingerprint!!.regions)
         assertEquals(2f, decoded.fingerprint!!.captureHalfW, 0f)
-        assertEquals(identity16, decoded.fingerprint!!.captureDesignModel)
+        assertEquals(identity16, decoded.fingerprint!!.captureAnchorCam)
     }
 }

@@ -56,20 +56,6 @@ data class ArUiState(
     // [pointX,pointY,pointZ, normalX,normalY,normalZ] in world space. Null when the tap wasn't on a
     // qualifying (MATCH/green) plane — single-capture target creation requires one (back-projection).
     val targetWallPlane: FloatArray? = null,
-    /**
-     * Where the artwork sat at capture (`IMPLEMENTATION.md` 2.3): its **rigid** world model matrix
-     * (column-major 4x4) and its **effective**, scale-included half-extents in metres. Null/-1 when
-     * the overlay had no placement to take a footprint of, which leaves the fingerprint
-     * unpartitioned — the legacy all-backbone reading.
-     *
-     * Carried as three loose values rather than the `DesignFootprint` the builder takes, because
-     * that type lives in `feature/ar` and this module is below it in the graph. Reassembled at the
-     * one place that consumes it (`MainViewModel.handleSingleCapture`) so the loose form never
-     * spreads past this boundary.
-     */
-    val targetDesignModel: FloatArray? = null,
-    val targetDesignHalfW: Float = -1f,
-    val targetDesignHalfH: Float = -1f,
     val capturedTargetUris: List<Uri> = emptyList(),
     val capturedTargetImages: List<Bitmap> = emptyList(),
     val gpsData: GpsData? = null,
@@ -124,6 +110,16 @@ data class ArUiState(
      * locks onto a target the app appears to have loaded.
      */
     val legacyFingerprintRefused: Boolean = false,
+    /**
+     * Set when the artwork's footprint leaves too little bare wall around it for the reloc PnP to
+     * localize against (`IMPLEMENTATION.md` 2.8, `PARAMETERS.md` §4 `MIN_BACKBONE`).
+     *
+     * Raised when the partition is computed — i.e. when the artwork is placed or resized — and not
+     * at capture, because a capture is what *establishes* the anchor the artwork sits on and so has
+     * no footprint to measure. Cleared the moment a resize brings the backbone back above the floor,
+     * which is why it is recomputed on every partition rather than latched.
+     */
+    val backboneTooSmall: Boolean = false,
 
     // Physical half-extents of the overlay quad in meters (computed from depth center pixel).
     // OverlayRenderer sizes its textured quad to (halfW*2) × (halfH*2) meters.

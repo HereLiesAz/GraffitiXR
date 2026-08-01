@@ -27,6 +27,9 @@ class FingerprintPartitionTest {
         val INSIDE = Footprint.Region.INSIDE.ordinal.toByte()
         val BAND = Footprint.Region.BAND.ordinal.toByte()
         val OUTSIDE = Footprint.Region.OUTSIDE.ordinal.toByte()
+        val IDENTITY_16 = listOf(
+            1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f,
+        )
     }
 
     /** Identity model matrix: design centred on the world origin, spanning ±HALF_W by ±HALF_H. */
@@ -39,7 +42,13 @@ class FingerprintPartitionTest {
         s, 0f, 0f, 0f, 0f, s, 0f, 0f, 0f, 0f, s, 0f, 0f, 0f, 0f, 1f,
     )
 
-    private fun fp(points: List<Float>, regions: ByteArray = ByteArray(0), hw: Float = -1f, hh: Float = -1f): Fingerprint {
+    private fun fp(
+        points: List<Float>,
+        regions: ByteArray = ByteArray(0),
+        hw: Float = -1f,
+        hh: Float = -1f,
+        anchorCam: List<Float> = IDENTITY_16,
+    ): Fingerprint {
         val rows = points.size / 3
         return Fingerprint(
             keypoints = List(rows) { KeyPoint(1f, 1f, 7f) },
@@ -51,6 +60,7 @@ class FingerprintPartitionTest {
             regions = regions,
             captureHalfW = hw,
             captureHalfH = hh,
+            captureAnchorCam = anchorCam,
         )
     }
 
@@ -131,54 +141,192 @@ class FingerprintPartitionTest {
     }
 
     // -------------------------------------------------------------------------------------
-    // reclassify + the legacy reading
+    // partition + the legacy reading
     // -------------------------------------------------------------------------------------
 
-    @Test
-    fun `reclassify tags a previously unpartitioned fingerprint and records the extents`() {
-        val before = fp(listOf(0f, 0f, 0f, 5f, 0f, 0f))
-        assertTrue(before.isUnpartitioned())
-
-        val after = FingerprintPartition.reclassify(before, identity(), HALF_W, HALF_H)
-        assertFalse(after.isUnpartitioned())
-        assertEquals(2, after.regions.size)
-        assertEquals(INSIDE, after.regions[0])
-        assertEquals(OUTSIDE, after.regions[1])
-        assertEquals(HALF_W, after.captureHalfW, 1e-6f)
-        assertEquals(HALF_H, after.captureHalfH, 1e-6f)
+    /**
+     * A deliberately awkward rigid transform: 30° about Z composed with a translation, standing in
+     * for `captureAnchorCam` (the anchor's pose in the capture camera frame).
+     */
+    private fun rigid30(): FloatArray {
+        val c = kotlin.math.cos(Math.toRadians(30.0)).toFloat()
+        val sn = kotlin.math.sin(Math.toRadians(30.0)).toFloat()
+        // Written out rather than built with android.opengl.Matrix: that class is a STUB under a
+        // plain JVM unit test — `setIdentityM` leaves the array all zeros and does not throw — so
+        // building fixtures with it makes every point land at the origin and every assertion below
+        // pass for the wrong reason. Verified by probe, not assumed.
+        return floatArrayOf(
+            c, sn, 0f, 0f,
+            -sn, c, 0f, 0f,
+            0f, 0f, 1f, 0f,
+            0.3f, -1.7f, 4.0f, 1f,
+        )
     }
 
     /**
-     * Growing the design must move points from backbone into the footprint. If `reclassify` silently
-     * kept the old bytes, this would pass only by accident of the fixture — so the point chosen is
-     * one whose region genuinely changes.
+     * A design pose that is NOT the identity and NOT a pure translation.
+     *
+     * This matters more than it looks. `partition` computes `captureAnchorCam · designAnchorLocal`,
+     * and with an identity design the two operands commute — so the single most likely defect,
+     * writing the multiply the other way round, is invisible. An earlier version of this file used
+     * the identity here and passed with the operands swapped.
+     */
+    private fun designPose(): FloatArray {
+        val c = kotlin.math.cos(Math.toRadians(50.0)).toFloat()
+        val sn = kotlin.math.sin(Math.toRadians(50.0)).toFloat()
+        return floatArrayOf(
+            c, sn, 0f, 0f,
+            -sn, c, 0f, 0f,
+            0f, 0f, 1f, 0f,
+            1f, 2f, -0.5f, 1f,
+        )
+    }
+
+    private fun apply(m: FloatArray, x: Float, y: Float, z: Float) = floatArrayOf(
+        m[0] * x + m[4] * y + m[8] * z + m[12],
+        m[1] * x + m[5] * y + m[9] * z + m[13],
+        m[2] * x + m[6] * y + m[10] * z + m[14],
+    )
+
+    /**
+     * The composition `partition` rests on, checked against an independently-constructed
+     * expectation rather than by re-deriving its own arithmetic.
+     *
+     * Points are placed at known positions in the DESIGN's own frame, pushed out to the capture
+     * camera frame through the same chain the app builds them with, and the regions that come back
+     * must be the ones the design-frame positions imply. A composition applied in the wrong order,
+     * or with either factor inverted, moves the points somewhere else entirely.
      */
     @Test
-    fun `growing the design converts backbone into corroboration`() {
-        val pts = listOf(1.5f, 0f, 0f)
-        val small = FingerprintPartition.reclassify(fp(pts), identity(), HALF_W, HALF_H)
+    fun `partition composes the capture and design frames in the right order`() {
+        val anchorCam = rigid30()
+        val design = designPose()
+        // Design-frame positions: centre, exactly on the +X edge, far outside, outside via +Y.
+        val local = listOf(
+            Triple(0f, 0f, 0f),
+            Triple(HALF_W, 0f, 0f),
+            Triple(5f, 0f, 0f),
+            Triple(0.5f, 1.5f, 0f),
+        )
+        // design-local -> anchor-local -> capture camera frame.
+        val pts = ArrayList<Float>()
+        for ((x, y, z) in local) {
+            val inAnchor = apply(design, x, y, z)
+            val inCam = apply(anchorCam, inAnchor[0], inAnchor[1], inAnchor[2])
+            pts.add(inCam[0]); pts.add(inCam[1]); pts.add(inCam[2])
+        }
+
+        val out = FingerprintPartition.partition(
+            fp(pts, anchorCam = anchorCam.toList()),
+            FingerprintPartition.DesignFootprint(design, HALF_W, HALF_H),
+        )
+        assertEquals(INSIDE, out.regions[0])
+        assertEquals(BAND, out.regions[1])
+        assertEquals(OUTSIDE, out.regions[2])
+        assertEquals(OUTSIDE, out.regions[3])
+        assertEquals(HALF_W, out.captureHalfW, 1e-6f)
+        assertEquals(HALF_H, out.captureHalfH, 1e-6f)
+    }
+
+    /**
+     * The negative half. Swapping the two factors — `design · anchorCam` instead of
+     * `anchorCam · design` — must produce a different answer, or the order is untested and the test
+     * above proves only that the code runs.
+     */
+    @Test
+    fun `the two frame factors do not commute on this fixture`() {
+        val anchorCam = rigid30()
+        val design = designPose()
+        val pts = floatArrayOf(0f, 0f, 0f, 1.5f, 0.2f, 0f, 3f, 0f, 0f)
+        val right = FingerprintPartition.classify(
+            pts, PoseMath.multiply(anchorCam, design), HALF_W, HALF_H,
+        )
+        val wrong = FingerprintPartition.classify(
+            pts, PoseMath.multiply(design, anchorCam), HALF_W, HALF_H,
+        )
+        assertFalse(
+            "the fixture must distinguish the operand order, or the test above is blind to it",
+            right.contentEquals(wrong),
+        )
+    }
+
+    @Test
+    fun `partition records the design size it used, and a resize changes the answer`() {
+        val anchorCam = rigid30()
+        val design = designPose()
+        // 1.5 along the design's own +X: outside a half-width of 1.0, inside a half-width of 2.0.
+        val inAnchor = apply(design, 1.5f, 0f, 0f)
+        val inCam = apply(anchorCam, inAnchor[0], inAnchor[1], inAnchor[2])
+        val base = fp(inCam.toList(), anchorCam = anchorCam.toList())
+
+        val small = FingerprintPartition.partition(
+            base, FingerprintPartition.DesignFootprint(design, HALF_W, HALF_H),
+        )
         assertEquals(OUTSIDE, small.regions[0])
 
-        val big = FingerprintPartition.reclassify(small, identity(), 2f, 1f)
+        val big = FingerprintPartition.partition(
+            small, FingerprintPartition.DesignFootprint(design, 2f, 1f),
+        )
         assertEquals("a wider design must swallow the point", INSIDE, big.regions[0])
         assertEquals(2f, big.captureHalfW, 1e-6f)
+        assertTrue("the old size must now read as stale", small.isPartitionStale(2f, 1f))
+    }
+
+    /**
+     * Every refusal returns the RECEIVER, so a caller can skip a native re-push by identity. Each is
+     * a case where partitioning would mean guessing a frame or a size, and a guessed partition is a
+     * complete, plausible, wrong answer — whereas leaving it alone reproduces `main` exactly.
+     */
+    @Test
+    fun `partition refuses rather than guesses`() {
+        val design = FingerprintPartition.DesignFootprint(designPose(), HALF_W, HALF_H)
+
+        val noAnchorCam = fp(listOf(0f, 0f, 0f), anchorCam = emptyList())
+        assertSame("no captureAnchorCam: no frame to compose through",
+            noAnchorCam, FingerprintPartition.partition(noAnchorCam, design))
+
+        val noPoints = fp(emptyList())
+        assertSame("no points: nothing to classify",
+            noPoints, FingerprintPartition.partition(noPoints, design))
+
+        val ok = fp(listOf(0f, 0f, 0f))
+        assertSame("degenerate extents: Φ is undefined",
+            ok, FingerprintPartition.partition(
+                ok, FingerprintPartition.DesignFootprint(designPose(), 0f, 1f)))
+    }
+
+    /**
+     * The case that must work and did not in the first cut of this phase: a fingerprint captured
+     * before any artwork was placed. Target creation is what establishes the anchor the artwork sits
+     * on, so EVERY first capture is unpartitioned — and if `partition` refused those, the feature
+     * would be inert on the only target the artist actually paints against.
+     */
+    @Test
+    fun `an unpartitioned fingerprint is exactly what partition is for`() {
+        val anchorCam = rigid30()
+        val design = designPose()
+        val inAnchor = apply(design, 0f, 0f, 0f)
+        val inCam = apply(anchorCam, inAnchor[0], inAnchor[1], inAnchor[2])
+        val fresh = fp(inCam.toList(), anchorCam = anchorCam.toList())
+
+        assertTrue("a fresh capture carries no partition", fresh.isUnpartitioned())
+        assertFalse("...and is therefore never 'stale'", fresh.isPartitionStale(HALF_W, HALF_H))
+
+        val out = FingerprintPartition.partition(
+            fresh, FingerprintPartition.DesignFootprint(design, HALF_W, HALF_H),
+        )
+        assertFalse("partition must not gate on staleness", out.isUnpartitioned())
+        assertEquals(INSIDE, out.regions[0])
     }
 
     @Test
     fun `staleness tracks the recorded extents`() {
-        val f = FingerprintPartition.reclassify(fp(listOf(0f, 0f, 0f)), identity(), HALF_W, HALF_H)
+        val f = FingerprintPartition.partition(
+            fp(listOf(0f, 0f, 0f)),
+            FingerprintPartition.DesignFootprint(designPose(), HALF_W, HALF_H),
+        )
         assertFalse("same size is not stale", f.isPartitionStale(HALF_W, HALF_H))
         assertTrue("a resize is stale", f.isPartitionStale(HALF_W * 1.5f, HALF_H))
-    }
-
-    /**
-     * An unpartitioned fingerprint is never "stale" — there is nothing to recompute against, and
-     * reporting it as stale would send every legacy project through a reclassify with extents it
-     * was never built for.
-     */
-    @Test
-    fun `an unpartitioned fingerprint is never stale`() {
-        assertFalse(fp(listOf(0f, 0f, 0f)).isPartitionStale(99f, 99f))
     }
 
     /**
@@ -194,113 +342,26 @@ class FingerprintPartitionTest {
 
     @Test
     fun `backboneCount counts only OUTSIDE once partitioned`() {
-        val f = FingerprintPartition.reclassify(
-            fp(listOf(0f, 0f, 0f, 5f, 0f, 0f, HALF_W, 0f, 0f)), identity(), HALF_W, HALF_H,
+        val anchorCam = rigid30()
+        val design = designPose()
+        val pts = ArrayList<Float>()
+        for ((x, y) in listOf(0f to 0f, 5f to 0f, HALF_W to 0f)) {
+            val a = apply(design, x, y, 0f)
+            val c = apply(anchorCam, a[0], a[1], a[2])
+            pts.add(c[0]); pts.add(c[1]); pts.add(c[2])
+        }
+        val f = FingerprintPartition.partition(
+            fp(pts, anchorCam = anchorCam.toList()),
+            FingerprintPartition.DesignFootprint(design, HALF_W, HALF_H),
         )
         // inside, outside, band -> exactly one backbone point.
         assertEquals(1, FingerprintPartition.backboneCount(f))
     }
 
-    /** The 1:1 invariant is enforced by the model, so a mismatched partition cannot be constructed. */
-    @Test(expected = IllegalArgumentException::class)
-    fun `a regions array that disagrees with the point count is rejected`() {
-        fp(listOf(0f, 0f, 0f, 1f, 1f, 1f), regions = ByteArray(1))
-    }
-
-    // -------------------------------------------------------------------------------------
-    // The frame reconciliation — DesignFootprint.inFrameOf
-    // -------------------------------------------------------------------------------------
-
-    /**
-     * A deliberately awkward rigid world→camera view: a 30° rotation about Z composed with a
-     * translation, so neither the rotation nor the translation can cancel out by accident and a
-     * dropped factor changes the answer.
-     */
-    private fun view(): FloatArray {
-        // Written out rather than built with android.opengl.Matrix: that class is a stub under a
-        // plain JVM unit test and returns zeros without complaining, which would make every point
-        // land at the origin and every assertion below pass for the wrong reason.
-        val c = kotlin.math.cos(Math.toRadians(30.0)).toFloat()
-        val s = kotlin.math.sin(Math.toRadians(30.0)).toFloat()
-        return floatArrayOf(
-            c, s, 0f, 0f,
-            -s, c, 0f, 0f,
-            0f, 0f, 1f, 0f,
-            0.3f, -1.7f, 4.0f, 1f,
-        )
-    }
-
-    /** Apply a column-major 4x4 to a point, returning [x,y,z]. */
-    private fun apply(m: FloatArray, p: FloatArray): FloatArray = floatArrayOf(
-        m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12],
-        m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13],
-        m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14],
-    )
-
-    /**
-     * The claim `inFrameOf` rests on, checked end to end rather than by re-deriving its algebra:
-     * classifying camera-frame points against the view-premultiplied design gives the SAME bytes as
-     * classifying the corresponding world-frame points against the world design.
-     *
-     * This is the assertion that catches the bug the whole design is arranged to avoid — Φ applied
-     * across two frames. `Fingerprint.points3d` are camera-frame and the renderer's design pose is
-     * world-frame, and mixing them produces a full, plausible, entirely wrong partition.
-     */
-    @Test
-    fun `classifying in the camera frame agrees with classifying in world`() {
-        val v = view()
-        // World points chosen to land in all three regions against a design at the world origin.
-        val world = floatArrayOf(
-            0f, 0f, 0f,            // inside
-            HALF_W, 0f, 0f,        // on the edge -> band
-            5f, 0f, 0f,            // outside
-            0.5f, 1.5f, 0f,        // outside via the SHORT axis
-        )
-        val designWorld = FingerprintPartition.DesignFootprint(identity(), HALF_W, HALF_H)
-
-        val inWorld = FingerprintPartition.classify(world, designWorld.rigidModel, HALF_W, HALF_H)
-
-        // The same points, expressed in the camera frame, against the design moved into that frame.
-        val cam = FloatArray(world.size)
-        for (i in 0 until world.size / 3) {
-            val p = apply(v, floatArrayOf(world[i * 3], world[i * 3 + 1], world[i * 3 + 2]))
-            p.copyInto(cam, i * 3)
-        }
-        val designCam = designWorld.inFrameOf(v)
-        val inCam = FingerprintPartition.classify(cam, designCam.rigidModel, designCam.halfW, designCam.halfH)
-
-        assertArrayEquals("the frame must not change the partition", inWorld, inCam)
-        // ...and the fixture is not degenerate: all three regions are represented, so an
-        // everything-is-OUTSIDE bug could not produce this.
-        assertEquals(INSIDE, inWorld[0]); assertEquals(BAND, inWorld[1])
-        assertEquals(OUTSIDE, inWorld[2]); assertEquals(OUTSIDE, inWorld[3])
-    }
-
-    /**
-     * The negative half of the test above. Classifying camera-frame points against the *world*
-     * design — the mistake `inFrameOf` exists to prevent — must give a different answer, or the
-     * reconciliation is decorative and this whole mechanism could be deleted.
-     */
-    @Test
-    fun `skipping the frame reconciliation changes the answer`() {
-        val v = view()
-        val world = floatArrayOf(0f, 0f, 0f, 5f, 0f, 0f)
-        val cam = FloatArray(world.size)
-        for (i in 0 until world.size / 3) {
-            apply(v, floatArrayOf(world[i * 3], world[i * 3 + 1], world[i * 3 + 2])).copyInto(cam, i * 3)
-        }
-        val correct = FingerprintPartition.classify(
-            cam, FingerprintPartition.DesignFootprint(identity(), HALF_W, HALF_H).inFrameOf(v).rigidModel,
-            HALF_W, HALF_H,
-        )
-        val wrong = FingerprintPartition.classify(cam, identity(), HALF_W, HALF_H)
-        assertFalse("mixing frames must be detectable", correct.contentEquals(wrong))
-    }
-
     /**
      * The capture-time `F_out` floor (2.8) counts through this overload, so the distinction it draws
-     * has to be pinned: the BAND is **not** backbone. A "step back, not enough wall" refusal that
-     * counted the band would let a design covering everything but its own border pass.
+     * has to be pinned: the BAND is **not** backbone. A "not enough bare wall" warning that counted
+     * the band would stay silent on a design covering everything but its own border.
      */
     @Test
     fun `the raw backbone count excludes the band as well as the inside`() {
@@ -318,40 +379,9 @@ class FingerprintPartitionTest {
         assertTrue(FingerprintPartition.DesignFootprint(identity(), 1f, 1f).isUsable)
     }
 
-    // -------------------------------------------------------------------------------------
-    // The self-contained reclassify
-    // -------------------------------------------------------------------------------------
-
-    /**
-     * The reload-safe form: no matrix passed in, so no matrix can be passed in wrong. It must reach
-     * the same answer as the explicit form given the model the fingerprint already carries.
-     */
-    @Test
-    fun `reclassify without a matrix uses the stored design model`() {
-        val explicit = FingerprintPartition.reclassify(
-            fp(listOf(0f, 0f, 0f, 5f, 0f, 0f)), identity(), HALF_W, HALF_H,
-        )
-        assertEquals("the explicit form must store what it used", 16, explicit.captureDesignModel.size)
-
-        val implicit = FingerprintPartition.reclassify(explicit, 2f, 1f)
-        assertEquals(2f, implicit.captureHalfW, 1e-6f)
-        assertArrayEquals(
-            FingerprintPartition.reclassify(explicit, identity(), 2f, 1f).regions,
-            implicit.regions,
-        )
-    }
-
-    /**
-     * A fingerprint with no stored model must be returned untouched. Guessing a frame here would
-     * produce a complete and completely wrong partition; the legacy all-backbone reading is what
-     * `main` already does and is the safe refusal.
-     */
-    @Test
-    fun `reclassify without a matrix refuses a fingerprint that has no stored model`() {
-        val legacy = fp(listOf(0f, 0f, 0f))
-        assertTrue(legacy.captureDesignModel.isEmpty())
-        val out = FingerprintPartition.reclassify(legacy, 1f, 1f)
-        assertSame("must be the same object, not a silently-partitioned copy", legacy, out)
-        assertTrue(out.isUnpartitioned())
+    /** The 1:1 invariant is enforced by the model, so a mismatched partition cannot be constructed. */
+    @Test(expected = IllegalArgumentException::class)
+    fun `a regions array that disagrees with the point count is rejected`() {
+        fp(listOf(0f, 0f, 0f, 1f, 1f, 1f), regions = ByteArray(1))
     }
 }

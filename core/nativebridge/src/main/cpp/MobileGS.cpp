@@ -157,8 +157,6 @@ void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float
 void MobileGS::clearMap() {}                            // voxel/splat map deleted
 void MobileGS::pruneByConfidence(float threshold) {}   // voxel/splat map deleted
 
-void MobileGS::setArScanMode(int mode) { mScanMode = mode; }
-void MobileGS::setMuralMethod(int method) { mMuralMethod = method; }
 void MobileGS::setParallaxMinDegrees(float deg) {}   // voxel/splat map deleted
 void MobileGS::setVoxelSize(float size) { mVoxelSize = size; }
 
@@ -1030,6 +1028,12 @@ std::vector<uint8_t> MobileGS::exportFingerprint() {
     std::lock_guard<std::mutex> lock(mMutex);
     if (mWallDescriptors.empty() || mWallKeypoints3D.empty()) return {};
 
+    // NOTE: the co-op wire format carries no Phase-2 partition, deliberately. It is a fixed,
+    // unversioned layout shared with peers that may be running an older build, so appending
+    // mWallRegions here would be read as descriptor bytes on the other end. The receiving side
+    // (alignToFingerprint) clears mWallRegions for the same reason, so a shared fingerprint is
+    // all-backbone on arrival — degraded, but correct, and the peer partitions its own once it
+    // places its own artwork. Adding a version field is what would let this change.
     uint32_t numPoints = static_cast<uint32_t>(mWallKeypoints3D.size());
     uint32_t descRows = static_cast<uint32_t>(mWallDescriptors.rows);
     uint32_t descCols = static_cast<uint32_t>(mWallDescriptors.cols);

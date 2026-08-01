@@ -1339,17 +1339,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostic
     return out;
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArScanMode(JNIEnv* env, jobject, jint mode) {
-    if (gSlamEngine) gSlamEngine->setArScanMode(mode);
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMuralMethod(JNIEnv* env, jobject, jint method) {
-    if (gSlamEngine) gSlamEngine->setMuralMethod(method);
-}
-
-extern "C" JNIEXPORT void JNICALL
+extern "C" extern "C" extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetStageTimings(JNIEnv* env, jobject, jfloatArray out) {
     if (!gSlamEngine) return;
     float buf[5] = {0,0,0,0,0};

@@ -76,3 +76,15 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
+
+// `NativeMethodAritySignatureTest` reads GraffitiJNI.cpp and SlamManager.kt as *text* at test time,
+// because the thing it checks — that a JNI entry point and its `external fun` agree on parameter
+// count — exists in neither compiled artifact. Gradle cannot infer that, so without these
+// declarations the task stays UP-TO-DATE when only the C++ changes: the exact scenario the guard
+// exists for is the one that would silently skip it. (C++ sources are not otherwise inputs to a
+// unit-test task.)
+tasks.withType<Test>().configureEach {
+    inputs.file("src/main/cpp/GraffitiJNI.cpp")
+        .withPropertyName("jniSourceForAritySignatureTest")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}

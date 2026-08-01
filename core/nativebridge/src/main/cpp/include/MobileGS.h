@@ -188,8 +188,6 @@ public:
     bool loadLowLightEnhancer(const std::vector<uchar>& onnxBytes);
     void clearMap();
     void pruneByConfidence(float threshold);
-    void setArScanMode(int mode);
-    void setMuralMethod(int method);
     void setViewportSize(int width, int height);
     // Eval: fill out[kStageCount] with average ms/stage since last reset, then reset accumulators.
     void getStageTimingsAndReset(float* out);
@@ -254,7 +252,7 @@ public:
 
     void draw(bool debugTint = false);
     // Debug perception view: draws the requested representations explicitly, regardless of
-    // mMuralMethod or mSplatsVisible. Voxels are confidence-tinted; depth-off so nothing occludes.
+    // mSplatsVisible. Voxels are confidence-tinted; depth-off so nothing occludes.
     void drawDebugLayers(bool voxels, bool mesh);
     // Voxel-method colour-mask: draws splats as a confidence-graded colour wash over the grayscale camera.
     void drawCoverage();
@@ -411,8 +409,6 @@ private:
     float mVoxelSize = 0.02f;
     std::atomic<bool> mMappingPaused{false};
     bool mSplatsVisible{false};
-    int mScanMode = 0; // 0=CLOUD, 1=MURAL
-    int mMuralMethod = 0; // 0=VOXEL_HASH, 1=SURFACE_MESH
 
     // --- Evaluation instrumentation (Sub-project A) ---
     // Accumulated wall-time per stage and a sample count, for averaging. Indexes match the Kotlin

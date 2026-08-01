@@ -109,22 +109,29 @@ one is still a **prior**, not a measurement: E8 is the experiment that sets them
 |---|---|---|---|---|---|
 | `DEFAULT_INNER_MARGIN` | `FingerprintPartition.kt` | `0.04` | `0.05` | guessed — a few per cent of the design's half-extent, of the order of a brush width at mural scale | E8 |
 | `DEFAULT_OUTER_MARGIN` | `FingerprintPartition.kt` | `0.10` | `0.15` | guessed — wider than inner, because overspray extends past the design and a doomed feature in `F_out` is worse than a discarded one | E8 |
-| `MIN_BACKBONE` | `MetricFingerprintBuilder.kt` | `40` | `40` | guessed — 5× the native PnP correspondence floor of 8, leaving room for the match rate | E8 |
+| `MIN_BACKBONE` | `FingerprintPartition.kt` | `40` | `40` | guessed — 5× the native PnP correspondence floor of 8, leaving room for the match rate | E8 |
 
-**The margins shipped at values this table did not predict.** Phase 1 landed
-`0.04` / `0.10` while this file said `0.05` / `0.15`; the discrepancy went
-unnoticed until Phase 2 was wired. The landed values are recorded above rather
-than the code being changed to match, because altering an already-landed phase's
-behaviour to satisfy a prior is the wrong way round — but the pre-registered
-numbers are kept in their own column so E8 can report against both. Note the
-ratio also changed: 3.0× inner as pre-registered, 2.5× as shipped.
+**The margins shipped at values this table did not predict, and the reason is not
+flattering.** They came in at `0.04` / `0.10` against a pre-registered `0.05` /
+`0.15`. There is no history to appeal to here: `Footprint.classify` takes its
+margins as required parameters with no defaults, so Phase 1 landed no values at
+all — `DEFAULT_INNER_MARGIN` / `DEFAULT_OUTER_MARGIN` were introduced by Phase 2
+itself, in `6965cef`, and simply did not match the priors sitting in this file.
+Nobody noticed until an audit checked. Both columns are kept so E8 reports
+against the pre-registered numbers rather than the ones that happened to be
+typed. Note the ratio moved too: 3.0× inner as pre-registered, 2.5× as shipped.
 
-`MIN_BACKBONE` drives the capture refusal ("the artwork covers almost the whole
-wall in view — step back so there's some bare wall around the design to lock
-onto"). Setting it too high refuses valid captures; too low ships a fingerprint
-that cannot relocalize. E8 measures both sides. It is deliberately independent of
-`MetricFingerprintBuilder`'s `minPoints` floor of 20 — those two ask different
-questions, and a capture can pass one while failing the other.
+`MIN_BACKBONE` raises `ArUiState.backboneTooSmall` ("the artwork leaves too
+little bare wall to lock onto"). Set too high it cries wolf; too low it stays
+silent on a target that cannot work. E8 measures both sides.
+
+It is checked **when the artwork is placed or resized, not at capture**. Target
+creation is what establishes the anchor the artwork sits on, so a capture has no
+footprint to measure and cannot answer the question at all — an earlier cut of
+Phase 2 put the check there and it could never fire. For the same reason it is
+independent of `MetricFingerprintBuilder`'s `minPoints` floor of 20: "did enough
+features land on the wall" and "is enough of what landed outside the artwork" are
+different questions asked at different moments.
 
 ---
 
