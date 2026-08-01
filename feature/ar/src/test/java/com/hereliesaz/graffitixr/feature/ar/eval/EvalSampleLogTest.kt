@@ -47,6 +47,7 @@ class EvalSampleLogTest {
                 "relocObliquityDeg,relocRectifiedCorr," +
                 "relocBackboneFeatures,relocBackboneMatches,relocBackboneInliers," +
                 "corrobPredicted,corrobMatched,corrobLoneSkips,searchRadiusPx,relocReprojPx," +
+                "inlierSpread," +
                 "captureRotationNeededDeg,liveRotationNeededDeg",
             EvalSampleLog.CSV_HEADER,
         )
@@ -66,7 +67,7 @@ class EvalSampleLogTest {
             // columns. The float spelling is part of the contract a consumer parses, not an
             // incidental formatting detail, so it is written out here literally.
             "12,dual,true,1.5,0.25,3.0,1.0,2.0,0.0,4.0,1.0,8.0,30.0,-450.0,31.0,20480," +
-                "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1.0,-1.0,-1,-1",
+                "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1.0,-1.0,-1.0,-1,-1",
             EvalSampleLog.toCsvRow(row),
         )
     }

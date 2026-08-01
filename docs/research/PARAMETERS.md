@@ -272,6 +272,54 @@ fixtures remains the right fix and is not done.
 
 ---
 
+## 7. Geometric promotion — landed, gated off
+
+From Phase 3. These govern the only mechanism in the engine that **permanently
+mutates** the reloc fingerprint, so a wrong value here is not a transient error —
+it is written into the map and compounds. The whole phase ships behind
+`setSelfGrowEnabled`, default **off**, until E5 shows a positive effect on a
+replayed dataset.
+
+Each number exists twice, in `PromotionGate.kt` and in `MobileGS::growTrusted`;
+`CorroborationTranslitTest` pins the two together by reading the header as text.
+
+| Parameter | Location | Current | Prior | Basis | Set by |
+|---|---|---|---|---|---|
+| `BIG_LOCK_INLIERS` / `kBigLockInliers` | `PromotionGate.kt`, `MobileGS.h` | `20` | `20` | the value that shipped — an absolute count that overrides the ratio | E5 |
+| `MIN_INLIERS` / `kMinInliers` | same | `10` | `10` | the value that shipped — below this the ratio is PnP noise | E5 |
+| `MIN_INLIER_RATIO` / `kMinInlierRatio` | same | `0.6` | `0.6` | the value that shipped — above `PoseFusion`'s 0.5 trust bar | E5 |
+| `MIN_INLIER_SPREAD` / `kMinInlierSpread` | same | `0.04` | *added in 3.2* | guessed — a 20% × 20% box; see below | **E5** |
+
+**Why a spread term exists at all.** `growTrusted` measured the *match* — how many
+correspondences survived RANSAC and what fraction they were — and a pose is fitted
+to the *geometry* of its inliers, not their count. Twenty inliers clustered in one
+textured corner produce a confident-looking pose with a badly conditioned
+rotation: the correspondences pin the camera along the viewing ray but let the
+wall rotate about the cluster at almost no reprojection cost. Everything in a
+cluster agrees with everything else, so the inlier **ratio is high** in exactly
+that state — the match test does not merely miss it, it endorses it.
+
+`MIN_INLIER_SPREAD` at 0.04 is the smallest span that cannot be a single textured
+object — a poster, a window frame, a patch of graffiti — at typical painting
+distance, while still admitting the legitimate close-up where the artist is
+working on one part of a large design. It is a guess, and the number matters less
+than the term existing: without it that failure is invisible to every other gate.
+
+**Not-measured FAILS here**, which is the opposite of §5's convention for
+`SearchRadius`. The asymmetry is deliberate and both sides are "fail toward the
+recoverable outcome": there a missing drift reading must not *narrow* a search,
+because a too-tight search reads as "the wall does not corroborate" and looks
+unrecoverable; here a missing spread must not *authorise* a permanent map
+mutation. Recoverable simply lies in opposite directions.
+
+**The bounding box over-reports for two distant clusters**, scoring a full frame
+for two tight groups at opposite corners. That is accepted rather than fixed: two
+clusters genuinely *do* condition the rotation well, which is what the term is
+asking about. The case it must never miss is the single compact cluster, and a box
+cannot miss that.
+
+---
+
 ## 6. Rendering and interaction — set, not swept
 
 Three of these gate the Phase-2 repartition, which costs a classify pass, a

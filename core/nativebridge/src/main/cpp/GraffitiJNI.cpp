@@ -1372,19 +1372,22 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostic
 // IMPLEMENTATION.md 4.6 — the two float diagnostics from the corroboration path, which cannot ride
 // the int[] above. Packed together for the same reason it is packed: one call, one snapshot.
 // [0] = search radius the last gated attempt used, in pixels; [1] = mean reprojection error over the
-// last lock's PnP inliers, also in pixels. Both -1 for "not measured", never 0 — a perfectly
-// tracking pose really does have a near-zero reprojection error, so zero cannot double as the
-// default.
+// last lock's PnP inliers, also in pixels; [2] = the last lock's inlier bounding box as a fraction
+// of frame area (IMPLEMENTATION.md 3.3). All -1 for "not measured", never 0 — a perfectly tracking
+// pose really does have a near-zero reprojection error, and a spread of 0 is a real reading meaning
+// every inlier landed on one pixel, which is the worst-conditioned state the gate exists to reject.
+// Neither can double as the default.
 extern "C" JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCorroborationDiagnostics(JNIEnv* env, jobject) {
-    jfloat vals[2] = {-1.0f, -1.0f};
+    jfloat vals[3] = {-1.0f, -1.0f, -1.0f};
     if (gSlamEngine) {
         vals[0] = gSlamEngine->corrobSearchRadiusPx();
         vals[1] = gSlamEngine->lastRelocReprojPx();
+        vals[2] = gSlamEngine->lastRelocInlierSpread();
     }
-    jfloatArray out = env->NewFloatArray(2);
+    jfloatArray out = env->NewFloatArray(3);
     if (!out) return nullptr;
-    env->SetFloatArrayRegion(out, 0, 2, vals);
+    env->SetFloatArrayRegion(out, 0, 3, vals);
     return out;
 }
 

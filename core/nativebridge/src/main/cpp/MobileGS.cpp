@@ -263,6 +263,10 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
     // Leaving a previous lock's value in place would widen or narrow the corroboration search
     // on the strength of a pose that is no longer the one being predicted from.
     mLastRelocReprojPx.store(-1.0f, std::memory_order_relaxed);
+    // 3.2, same rule: the spread describes ONE attempt's inlier set. A stale value would let a
+    // previous frame's well-spread lock authorise a promotion from this frame's clustered one,
+    // which is the permanent-mutation version of the mistake the counters above guard against.
+    mLastRelocInlierSpread.store(kPromotionNotMeasured, std::memory_order_relaxed);
     // ...and the same rule again for the corroboration counters (IMPLEMENTATION.md 4.6). These
     // are written only on a GATED attempt, so without a reset here one gated attempt's numbers
     // stayed live across every subsequent tick that fell back to the global search — a red
@@ -601,6 +605,16 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
                     std::vector<cv::Point3f> inObj; std::vector<cv::Point2f> inImg;
                     inObj.reserve(inliers.size()); inImg.reserve(inliers.size());
                     for (int idx : inliers) { inObj.push_back(objPts[idx]); inImg.push_back(imgPts[idx]); }
+                    // IMPLEMENTATION.md 3.2 — how much of the frame the inliers span, published
+                    // here because this is the only scope that has them. The self-grow gate runs in
+                    // tryUpdateFingerprint, which sees the inlier COUNT through an atomic and never
+                    // the points, so without this the spread term could not exist at all.
+                    //
+                    // Measured against the frame the correspondences were found in (`gray`), not the
+                    // fingerprint's capture frame: the box is a statement about this view's geometry.
+                    mLastRelocInlierSpread.store(
+                        inlierSpreadOf(inImg, (float)gray.cols, (float)gray.rows),
+                        std::memory_order_relaxed);
                     auto reproj = [&](const cv::Mat& rv, const cv::Mat& tv) {
                         std::vector<cv::Point2f> pr;
                         cv::projectPoints(inObj, rv, tv, intr, cv::Mat(), pr);
@@ -1177,6 +1191,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     // although Phase 4 moved it inside the global-fallback branch the reason to keep them apart
     // stands — one counts descriptor correspondences, the other counts the PnP's.
     cv::Matx33d R; cv::Vec3d t; double fx, fy, cx, cy; int inliers; int pnpMatches; long seq;
+    float spread = kPromotionNotMeasured; bool trusted = false;
     std::vector<cv::Point3f> wall;
     {
         std::lock_guard<std::mutex> lock(mMutex);
@@ -1190,9 +1205,15 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         fx = mFingerprintIntrinsics[0]; fy = mFingerprintIntrinsics[1];
         cx = mFingerprintIntrinsics[2]; cy = mFingerprintIntrinsics[3];
         wall = mWallKeypoints3D;
-        if (growTrusted(inliers, pnpMatches)) mLastGrowSeq = seq; // claim it (yield or not)
+        // 3.2 — read ONCE and reuse, rather than evaluating the same predicate on both sides of the
+        // lock as this did before. With a third input that moves per attempt, the reloc thread can
+        // rewrite it between the two calls, which opens a window where the seq is claimed and the
+        // promotion then refused — or, worse, the reverse.
+        spread = mLastRelocInlierSpread.load(std::memory_order_relaxed);
+        trusted = growTrusted(inliers, pnpMatches, spread);
+        if (trusted) mLastGrowSeq = seq;          // claim it (yield or not)
     }
-    if (!growTrusted(inliers, pnpMatches) || fx <= 0 || fy <= 0 ||
+    if (!trusted || fx <= 0 || fy <= 0 ||
         wall.size() < 12 || wall.size() >= kMaxWallMarks) return;
 
     // Wall plane (n·X = pdist, pdist>0) in the fingerprint frame, fit to the existing marks.
@@ -1233,6 +1254,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     if (newPts.empty()) return;
 
     size_t promoted = 0, wallNow = 0;
+    int outsideN = 0, insideN = 0, bandN = 0;
     {
         std::lock_guard<std::mutex> lock(mMutex);
         if (mWallDescriptors.type() != newDescs.type() || mWallDescriptors.cols != newDescs.cols ||
@@ -1242,24 +1264,49 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         // ceiling + batch.
         const size_t room = kMaxWallMarks - mWallKeypoints3D.size();
         const size_t take = std::min(room, newPts.size());
+        // IMPLEMENTATION.md 3.4 — classify each promotion candidate with Φ, HERE, at promotion time.
+        //
+        // Until this landed every promoted mark was tagged BAND: correct as a refusal (an
+        // unclassified feature must never join the backbone) but it meant self-grow could not
+        // enlarge F_out at all, which is most of what self-grow is for. The placement Phase 4
+        // pushed for the corroboration search is the same matrix Φ needs, so the classification is
+        // now available at exactly the moment a point is being written into the authoritative map.
+        //
+        // No placement means no answer, and no answer still means BAND. That is not a fallback to
+        // the old behaviour by accident — it is the same refusal, for the same reason.
+        const bool canClassify = mHasDesignPlacement && mDesignHalfW > 0.0f && mDesignHalfH > 0.0f;
+        int promotedOutside = 0, promotedInside = 0, promotedBand = 0;
         for (size_t i = 0; i < take; ++i) {
             mWallKeypoints3D.push_back(newPts[i]);
             mWallDescriptors.push_back(newDescs.row((int)i));
             // Keep the partition 1:1 with the points it indexes, or the reloc filter silently
             // switches itself off (its length check fails) and the whole map goes back to being
-            // undifferentiated. Promoted marks are tagged BAND — trusted by NEITHER set — because
-            // nothing here has run Φ on them: admitting an unclassified feature to the backbone is
-            // precisely the corruption the band exists to prevent. IMPLEMENTATION.md 3.4 is the item
-            // that classifies promotion candidates properly; until then self-grow (default OFF)
-            // cannot enlarge F_out.
-            if (!mWallRegions.empty()) mWallRegions.push_back(kRegionBand);
+            // undifferentiated.
+            if (!mWallRegions.empty()) {
+                const uint8_t region = canClassify
+                    ? classifyInFingerprintFrame(mDesignFpFromDesign, mDesignHalfW, mDesignHalfH,
+                                                 newPts[i])
+                    : kRegionBand;
+                // 3.5 — an INSIDE promotion is wet paint: it sits under the artwork and is going to
+                // change again as the artist works over it. Tagged INSIDE, which puts it in F_in,
+                // where the reloc filter already refuses to see it and corroboration can. Whether
+                // those should additionally EXPIRE is 3.5's open half, and IMPLEMENTATION.md is
+                // explicit that it be decided from E5's result rather than in advance — so nothing
+                // here invents a lifetime.
+                if (region == kRegionOutside) ++promotedOutside;
+                else if (region == kRegionInside) ++promotedInside;
+                else ++promotedBand;
+                mWallRegions.push_back(region);
+            }
         }
         // Snapshot inside the lock: these feed a log line below, and reading the containers after
         // the guard released races a concurrent restoreWallFingerprintMetric on the JNI thread.
         promoted = take;
         wallNow = mWallKeypoints3D.size();
+        outsideN = promotedOutside; insideN = promotedInside; bandN = promotedBand;
     }
-    LOGI("Teleological self-grow: promoted %zu marks (wall now %zu)", promoted, wallNow);
+    LOGI("Teleological self-grow: promoted %zu marks (wall now %zu; F_out +%d, F_in +%d, band +%d)",
+         promoted, wallNow, outsideN, insideN, bandN);
 }
 void MobileGS::setArCoreTrackingState(bool t) { mIsArCoreTracking.store(t, std::memory_order_relaxed); }
 

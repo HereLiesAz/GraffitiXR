@@ -174,6 +174,88 @@ class CorroborationTranslitTest {
         )
     }
 
+    /**
+     * `IMPLEMENTATION.md` **3.1 / 3.2** — the promotion gate exists twice too, and its stakes are
+     * higher than the search radius': it guards the only mechanism that permanently mutates the
+     * reloc fingerprint. A constant edited on one side and not the other silently changes what gets
+     * written into the map forever.
+     */
+    @Test
+    fun `the native promotion gate constants are the Kotlin ones`() {
+        val header = source("core/nativebridge/src/main/cpp/include/MobileGS.h")
+        val native = constants(header)
+        assertEquals("ratio", PromotionGate.MIN_INLIER_RATIO, native.getValue("kMinInlierRatio"), 0f)
+        assertEquals("spread", PromotionGate.MIN_INLIER_SPREAD, native.getValue("kMinInlierSpread"), 0f)
+        assertEquals("sentinel", PromotionGate.NOT_MEASURED, native.getValue("kPromotionNotMeasured"), 0f)
+
+        val ints = Regex("constexpr int\\s+(\\w+)\\s*=\\s*(-?\\d+)").findAll(header.readText())
+            .associate { it.groupValues[1] to it.groupValues[2].toInt() }
+        assertEquals("big lock", PromotionGate.BIG_LOCK_INLIERS, ints["kBigLockInliers"])
+        assertEquals("min inliers", PromotionGate.MIN_INLIERS, ints["kMinInliers"])
+    }
+
+    /**
+     * The two structural choices in the gate that a plausible rewrite would invert, both silently.
+     */
+    @Test
+    fun `the native gate refuses an unmeasured spread and keeps the two halves ordered`() {
+        val src = source("core/nativebridge/src/main/cpp/include/MobileGS.h").readText()
+        // Not-measured must FAIL, which is the opposite of SearchRadius's convention. A
+        // transliteration that "harmonised" the two would authorise permanent map mutations on every
+        // frame where the spread happened not to be computed.
+        assertTrue(
+            "an unmeasured or non-finite spread must refuse",
+            src.contains("if (!(inlierSpread >= 0.0f) || !std::isfinite(inlierSpread)) return false;"),
+        )
+        // The spread test must come BEFORE the big-lock override, or a 20-inlier cluster — the exact
+        // case 3.2 exists for — returns true from the count branch and never reaches the geometry.
+        val spreadAt = src.indexOf("if (inlierSpread < kMinInlierSpread) return false;")
+        val bigLockAt = src.indexOf("if (inliers >= kBigLockInliers) return true;")
+        assertTrue("the spread gate must precede the big-lock override", spreadAt in 0 until bigLockAt)
+    }
+
+    /**
+     * `IMPLEMENTATION.md` **3.4** — Φ at promotion time, and the refusal when it cannot run.
+     *
+     * Without the classification every promoted mark was tagged BAND: a correct refusal, but it
+     * meant self-grow could never enlarge `F_out`, which is most of what self-grow is for. With it,
+     * the fallback when no design placement exists must STILL be BAND — admitting an unclassified
+     * feature to the backbone is the corruption the band exists to prevent, and "we could not ask"
+     * is not evidence of "outside".
+     */
+    @Test
+    fun `promotions are classified at promotion time and refuse to guess without a placement`() {
+        val src = source("core/nativebridge/src/main/cpp/MobileGS.cpp").readText()
+        assertTrue(
+            "the promotion append must run the footprint operator on each candidate",
+            src.contains("classifyInFingerprintFrame(mDesignFpFromDesign, mDesignHalfW, mDesignHalfH,"),
+        )
+        assertTrue(
+            "no placement must fall back to BAND, never to OUTSIDE",
+            src.contains(": kRegionBand;"),
+        )
+    }
+
+    /**
+     * `IMPLEMENTATION.md` **3.6** — self-grow stays OFF, in the native initializer AND in the eval
+     * overlay's toggle. Pinned because these disagreed with the header's own comment for months: the
+     * comment said "stays OFF unless explicitly enabled" while the initializer shipped ON, so every
+     * release build promoted unsupervised with no user-facing switch to stop it.
+     */
+    @Test
+    fun `self-grow is defaulted off on both sides`() {
+        assertTrue(
+            "the native initializer must be false",
+            source("core/nativebridge/src/main/cpp/include/MobileGS.h").readText()
+                .contains("mSelfGrowEnabled{false}"),
+        )
+        assertTrue(
+            "the overlay toggle must start false",
+            source("app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt").readText()
+                .contains("mutableStateOf(false) }"),
+        )
+    }
+
     /** `NAME = <number>f` pairs from a C++ header, floats only. */
     private fun constants(file: File): Map<String, Float> =
         Regex("""constexpr float (\w+)\s*=\s*(-?[\d.]+)f""")

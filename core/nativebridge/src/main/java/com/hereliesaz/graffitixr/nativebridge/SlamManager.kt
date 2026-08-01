@@ -284,7 +284,14 @@ class SlamManager @Inject constructor(
     fun getCorroborationDiagnostics(): CorroborationDiagnostics {
         val v = nativeGetCorroborationDiagnostics()
         if (v == null || v.size < 2) return CorroborationDiagnostics()
-        return CorroborationDiagnostics(searchRadiusPx = v[0], relocReprojPx = v[1])
+        return CorroborationDiagnostics(
+            searchRadiusPx = v[0],
+            relocReprojPx = v[1],
+            // Width guard stays at `< 2`, not `< 3`: a Phase-4-era .so provides the first two, and
+            // refusing the record whole for missing the third would discard two good diagnostics to
+            // avoid one absent one. Same reasoning as getRelocDiagnostics'.
+            inlierSpread = if (v.size > 2) v[2] else -1f,
+        )
     }
 
     /**
