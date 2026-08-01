@@ -1097,11 +1097,33 @@ order.** Work top to bottom.
 
 ### Phase 5b — the predicted-visible denominator
 
-- [ ] **5b.1** Switch `corroborationConfidence`'s denominator from
+- [x] **5b.1** Switch `corroborationConfidence`'s denominator from
       `artDescs.rows` to the Phase 4 predicted-visible count, so a close-up of
       one corner is no longer capped by framing rather than by agreement. **[N]**
+      *(Landed inside 4.5 rather than as its own change, because it could not be
+      separated: the gated match's `predicted` counter IS the predicted-visible
+      count, and writing the gated path without also switching the denominator
+      would have meant computing the number and then deliberately ignoring it.
+      `MobileGS.cpp` — `predicted > 0 ? matched/predicted : kCorroborationUnmeasured`.*
+      *Scope worth being exact about: the switch applies on the GATED path only.
+      With no design placement Phase 4 is off, and confidence stays the
+      whole-design ratio — which is correct, not a shortfall. There is no
+      predicted-visible count when nothing predicts.*
+      *Ticked here rather than left open because the code has shipped it; an
+      unticked item whose implementation is already merged is the same class of
+      lie as a comment that describes what the code used to do.)*
 - [ ] **5b.2** Re-derive `CONF_FLOOR` against the new denominator. Its current
       0.5 was reasoned against the old one and does not transfer unexamined. **[T]**
+      *(BLOCKED by X.3, not by difficulty. This is a live change to `PoseFusion`,
+      so landing it on the Phase 4 branch would put two phases in one CI run —
+      exactly what X.3 forbids, and the reason is that E11 cannot attribute a
+      change in correction behaviour to the denominator or to the floor if both
+      moved together. Waits for #1807 to merge.*
+      *One thing to know before starting: `PoseFusionTest`'s `corroboration scales
+      correction strength` asserts `painted[12] / bare[12] == 2f` exactly, and that
+      2 is `1 / CONF_FLOOR`. It is not an incidental number — moving the floor moves
+      that assertion, and a re-derivation that leaves the test green has almost
+      certainly not changed anything.)*
 
 ### Phase 3 — geometric promotion
 
