@@ -744,7 +744,7 @@ order.** Work top to bottom.
       `targetCaptureViewMatrix` in `ArViewModel`, `fingerprintViewMatrix` in
       `MainViewModel`, and `restoreWallFingerprintMetric`'s `viewMatrix16`.
       List each site in the commit message with its verdict.
-- [x] **0.6** Confirm `PoseFusion.composeCorrected` is consistent under the chosen
+- [ ] **0.6** Confirm `PoseFusion.composeCorrected` is consistent under the chosen
       convention. `PoseFusionTest` now pins the factor order with non-commuting
       operands; extend it for the rotation, not with another round-trip (a
       round-trip is order-insensitive and would pass either way). **[T]**
@@ -759,6 +759,51 @@ order.** Work top to bottom.
       obliquities × four rotations, through the real converter rather than a hand-built
       mismatch, with a negative control asserting the old wiring still fails on the same
       fixture. The rotation direction is mutation-tested: transposing `R_z` fails 8 tests.
+
+      **0.6 WAS TICKED AND IS NOW UN-TICKED.** The rotation half of it is settled —
+      `vCurrent` is `Camera.getViewMatrix`, documented as display-oriented, so
+      convention B genuinely does align the two sides *for rotation*. But the audit
+      found `composeCorrected` is missing two further factors that have nothing to do
+      with rotation, and the original tick declared the whole expression sound on the
+      strength of checking the one thing it went looking for. Trace of
+      `inv(vCurrent) · pnpMat · fpAnchor`:
+
+      - `vCurrent` — world → live camera, **GL** convention (−Z forward).
+      - `pnpMat` — raw `solvePnPRansac` output (`MobileGS.cpp:528-535`), **CV**
+        convention (+Z), mapping `objPts` → live camera.
+      - `objPts` = `mWallKeypoints3D` = `PlaneMarks.backProject`'s `pointsCam`, which
+        are in the **capture camera's** frame, not a world frame — despite the native
+        field being named `mPnpCamFromFpWorld`.
+      - `fpAnchor` = `mFingerprintAnchorMatrix` = `getAnchorTransform()`, which
+        `MobileGS.cpp:525`'s own comment calls "a world-space MODEL matrix".
+
+      So world coordinates are fed into a map whose domain is capture-camera
+      coordinates, and CV camera coordinates into a GL camera-to-world inverse. The
+      chain needs `inv(V_cur_gl) · C · pnpMat · V_capture_cv · fpAnchor` with
+      `C = diag(1,−1,−1)`. Both `C` and `V_capture_cv` are absent. The codebase knows
+      about `C`: `MobileGS.cpp:600-604` applies exactly it in `computeRectifyHomography`,
+      commented *"Without this the homography is meaningless."*
+
+      This is **pre-existing**, not introduced by Phase 0, and it is not a rotation
+      problem — which is why looking only for rotation missed it.
+
+- [ ] **0.9** Fix `composeCorrected`'s GL/CV and capture-view factors (see 0.6). Needs
+      its own experiment: it changes where the overlay lands, and §8.3's warning about
+      getting every sign right applies with full force. Do not fold it into a
+      rotation commit. **[T]**
+- [ ] **0.10** `MetricFingerprintBuilder.ingestSingle` stores display-frame
+      `res.pointsCam` alongside the **un-rotated** `glView` in the same
+      `restoreWallFingerprintMetric` call. Native pairs them in
+      `computeRectifyHomography` (`viewFp` at `MobileGS.cpp:571`, `mWallKeypoints3D`
+      at `:576`), so the rectifying homography is off by `R_z` on the fingerprint
+      side. This is a **live** gap in the path Phase 0 just fixed, not a legacy-data
+      gap — it was mis-filed under 0.7 in PR #1797. In GL convention the matching
+      rotation is `R_z(−θ)`, since `D·R_z(θ)·D = R_z(−θ)` for `D = diag(1,−1,−1)`.
+      **[T]**
+- [ ] **0.11** Persist `captureRotationDeg` in `GraffitiProject` at save time.
+      Without it, projects captured *after* Phase 0 — the correct ones — are
+      indistinguishable on disk from legacy ones, so 0.7's "refuse to reload a legacy
+      fingerprint" would reject them too.
 
 ### Phase 2 — partition the fingerprint
 

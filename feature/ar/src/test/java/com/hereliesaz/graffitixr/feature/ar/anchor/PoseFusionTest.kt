@@ -44,58 +44,49 @@ class PoseFusionTest {
     }
 
     /**
-     * `IMPLEMENTATION.md` **0.6** — `composeCorrected` under convention B.
+     * `IMPLEMENTATION.md` **0.6**, honestly scoped.
      *
-     * The finding that settles it: `vCurrent` is `Camera.getViewMatrix`, which ARCore documents as
-     * *"incorporates the display orientation … equivalent to
-     * `camera.getDisplayOrientedPose().inverse().asMatrix()`"*. So the LIVE side of this
-     * composition was always in the display frame, while capture stored its 3D points in the
-     * sensor frame (`camera.pose.inverse()`). The two sides never agreed; Phase 0 moves capture to
-     * display and they now do. `composeCorrected` itself therefore needs no change — this pins that
-     * conclusion rather than asserting it in a comment.
+     * An earlier version of this file had two tests here claiming to "pin" that `composeCorrected`
+     * is consistent under convention B. They did not, and the way they failed is worth recording:
+     * one asserted `composeCorrected(R, R, A) == composeCorrected(I, I, A)`, which is
+     * `inv(R)·R·A == A` — true by associativity for **every** invertible `R`, transposed or
+     * mirrored or a shear. The other asserted that inserting a rotation into the middle of a matrix
+     * product changes the product. Neither referenced ARCore, the capture path, or `rotationNeeded`;
+     * neither could tell convention A from convention B; and neither would have failed under the
+     * missing-factor defect described in 0.6/0.9. The claim lived in the KDoc, not the assertions.
      *
-     * Deliberately **not** a round trip. `IMPLEMENTATION.md` 0.6 calls that out: a round trip is
-     * order- and sign-insensitive and would pass under either convention, which is exactly how this
-     * defect survived. Instead: feed a `pnpMat` carrying a residual `R_z` — the pre-Phase-0
-     * situation — and assert the error lands in the output, at full size and in a known direction.
+     * What is genuinely testable here is the factor ORDER, which the test above already covers with
+     * non-commuting operands. Whether the three operands are in mutually consistent FRAMES is not a
+     * property of this function — it is a property of its four callers' data, and it is currently
+     * **false**: `vCurrent` is GL-convention, `pnpMat` is CV-convention, `pnpMat`'s domain is the
+     * capture camera frame, and `fpAnchor` is a world-space model matrix. See 0.9.
+     *
+     * So this file deliberately asserts nothing about frames. A test that cannot fail is worse than
+     * no test, because it is counted as coverage.
      */
-    @Test fun `a residual rotation between the pnp and live frames lands in the anchor`() {
+    @Test fun `composeCorrected is frame-agnostic — the convention lives in its callers`() {
+        // Pinned as executable documentation of the above: the function is pure composition, so it
+        // cannot detect a frame error and must not be credited with doing so.
         val rotZ90 = floatArrayOf(0f,1f,0f,0f, -1f,0f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
         val fpAnchor = trans(1f, 0f, 0f)
+        val bothRotated = PoseFusion.composeCorrected(rotZ90, rotZ90, fpAnchor)
+        val neitherRotated = PoseFusion.composeCorrected(identity(), identity(), fpAnchor)
+        for (i in 0 until 16) assertEquals("element $i", neitherRotated[i], bothRotated[i], 1e-4f)
 
-        // Frames agree (post-Phase-0): pnp in the same display frame as vCurrent.
-        val matched = PoseFusion.composeCorrected(identity(), identity(), fpAnchor)
-        assertEquals("anchor must sit where the fingerprint put it", 1f, matched[12], 1e-4f)
-        assertEquals(0f, matched[13], 1e-4f)
+        // ...and it holds just as well for transforms that are nothing to do with a display
+        // rotation — a rotation about a DIFFERENT axis, and a pure translation. That is the point:
+        // the cancellation is associativity over `rigidInverse`, not evidence about `R_z`.
+        //
+        // (Both stay RIGID deliberately. `composeCorrected` inverts via `PoseMath.rigidInverse`,
+        // which is only an inverse for rotation+translation; feeding it a shear breaks the identity
+        // for that reason and not for any reason about frames.)
+        val rotX90 = floatArrayOf(1f,0f,0f,0f, 0f,0f,1f,0f, 0f,-1f,0f,0f, 0f,0f,0f,1f)
+        val bothRotX = PoseFusion.composeCorrected(rotX90, rotX90, fpAnchor)
+        for (i in 0 until 16) assertEquals("rotX element $i", neitherRotated[i], bothRotX[i], 1e-4f)
 
-        // Frames disagree by R_z(90) (pre-Phase-0): the anchor swings a quarter turn, a full metre
-        // at this radius. Not a subtle bias — which is why "the overlay limps" was the symptom.
-        val mismatched = PoseFusion.composeCorrected(identity(), rotZ90, fpAnchor)
-        assertEquals(0f, mismatched[12], 1e-4f)
-        assertEquals(1f, mismatched[13], 1e-4f)
-
-        val dx = matched[12] - mismatched[12]
-        val dy = matched[13] - mismatched[13]
-        assertEquals(
-            "a 90deg frame mismatch must displace a 1 m anchor by sqrt(2) m",
-            kotlin.math.sqrt(2f), kotlin.math.sqrt(dx * dx + dy * dy), 1e-4f,
-        )
-    }
-
-    /**
-     * The rotation enters through `pnpMat` only. If a future change also rotated `vCurrent`, the
-     * two would cancel and the mismatch above would silently stop being detectable — so pin that
-     * rotating BOTH is the identity case, distinguishing "consistent" from "both wrong the same
-     * way" would-be fixes.
-     */
-    @Test fun `rotating both sides together cancels, as a consistent convention must`() {
-        val rotZ90 = floatArrayOf(0f,1f,0f,0f, -1f,0f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
-        val fpAnchor = trans(1f, 0f, 0f)
-        val both = PoseFusion.composeCorrected(rotZ90, rotZ90, fpAnchor)
-        val neither = PoseFusion.composeCorrected(identity(), identity(), fpAnchor)
-        for (i in 0 until 16) {
-            assertEquals("element $i", neither[i], both[i], 1e-4f)
-        }
+        val move = trans(3f, -2f, 7f)
+        val bothMoved = PoseFusion.composeCorrected(move, move, fpAnchor)
+        for (i in 0 until 16) assertEquals("trans element $i", neitherRotated[i], bothMoved[i], 1e-4f)
     }
 
     @Test fun `blend alpha 0 returns current, alpha 1 returns target`() {

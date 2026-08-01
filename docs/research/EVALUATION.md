@@ -333,6 +333,22 @@ in landscape, then in portrait, same wall, same obliquity; then attempt
 relocalization from the same standing positions for each. Compare inlier ratio
 and lock rate.
 
+> [!CAUTION]
+> **E0b is no longer runnable on `main`.** Phase 0 landed (PR #1797) and removed the
+> landscape-vs-portrait difference that *is* E0b's independent variable. Run on
+> tip-of-tree, E0b now returns "identical behaviour in both orientations" — which
+> the **Falsifies** clause below instructs the reader to read as a refutation of
+> §8. It would be nothing of the sort; it would be the fix working.
+>
+> To run E0b as designed, check out a build from **before** Phase 0 (`main` at
+> `e9de3c5` or earlier, i.e. any commit preceding the `glViewToCvDisplay` routing
+> in `MetricFingerprintBuilder.buildSingle`).
+>
+> This is the cost of landing Phase 0 ahead of its own go/no-go, which was a
+> deliberate call — but it was not recorded when the call was made, and a device
+> session spent on tip-of-tree would have produced a confident falsification of a
+> defect that had just been repaired.
+
 **Precondition — turn the Depth API OFF, or E0b does not test §8 at all.**
 `MainViewModel.onConfirmTargetCreation` branches on whether a depth buffer was
 captured, and the two branches do not share a line of geometry:

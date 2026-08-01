@@ -1312,8 +1312,8 @@ class ArRenderer(
                         val rotationNeeded = (sensorOrientation - displayDegrees + 360) % 360
                         // Recorded HERE, where the capture's geometry is decided, because this is
                         // the angle that gets baked into the fingerprint: backProject runs once
-                        // per target inside MetricFingerprintBuilder.build, against these rotated
-                        // intrinsics and an unrotated camera.pose view matrix. However the device
+                        // per target inside MetricFingerprintBuilder.buildSingle, against these rotated
+                        // intrinsics and a view matrix now rotated to match (Phase 0). However the device
                         // is held afterwards, the skew in those 3D points does not change.
                         lastCaptureRotationNeededDeg = rotationNeeded
 

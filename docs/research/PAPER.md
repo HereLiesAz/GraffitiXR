@@ -679,10 +679,24 @@ experiment gating it, and §8.3 applies to it as much as to the main defect.
 ### 8.3 Why the correction is not local
 
 Rotating the capture view moves $F$ into the rotated frame, while `PoseFusion`
-composes $V_{\text{cur}}^{-1} \cdot \text{pnp} \cdot T$ with $V_{\text{cur}}$
-unrotated — so the composition needs the matching change, and every rotation
-sign must be right or the overlay lands worse than today. This is a system-wide
-convention change.
+composes $V_{\text{cur}}^{-1} \cdot \text{pnp} \cdot T$. **Correction, from
+Phase 0:** this section asserted $V_{\text{cur}}$ was *unrotated*, and it is not.
+$V_{\text{cur}}$ is `Camera.getViewMatrix`, which ARCore documents as
+*"incorporates the display orientation … equivalent to
+`getDisplayOrientedPose().inverse()`"*. The live side was **already** in the
+display frame; capture was the odd one out. That is what makes convention B the
+consistent choice rather than merely a self-consistent one, and it means the
+composition needed no rotation change.
+
+It does, however, need other changes this section did not see. Tracing every
+operand found `pnpMat` in OpenCV convention against a GL-convention
+$V_{\text{cur}}$, and `pnpMat`'s domain the *capture camera* frame against an
+`fpAnchor` that is a world-space model matrix — so two factors are missing that
+have nothing to do with rotation. See `IMPLEMENTATION.md` 0.6/0.9. The warning
+below still stands and now applies to those.
+
+Every rotation sign must be right or the overlay lands worse than today. This is
+a system-wide convention change.
 
 **It is a prerequisite, not a parallel task.** Every 3D quantity in Approach B —
 $\Phi$, the partition, geometric stability, the offset fit — is built on
