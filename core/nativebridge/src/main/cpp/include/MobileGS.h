@@ -189,6 +189,18 @@ public:
     void getStageTimingsAndReset(float* out);
     void setStageEnabled(int stage, bool enabled);
     void setRelocEnabled(bool enabled);
+
+    /**
+     * EVALUATION.md 3.1 / IMPLEMENTATION.md 6a.4 — fix OpenCV's RNG so a replayed run is
+     * reproducible. `solvePnPRansac` draws random samples, so two replays of the same recording can
+     * differ and an A/B of two parameter values reports scheduling noise as an effect.
+     *
+     * A NEGATIVE seed (the default) means "do not touch the RNG", which is the production path:
+     * the feature is inert unless an eval run explicitly turns it on. It is an evaluation
+     * affordance, not a behaviour change — a fixed seed in production would make every user's
+     * RANSAC draw the identical sample sequence forever.
+     */
+    void setEvalRngSeed(long long seed);
     void setVoxelSize(float size);
     void setParallaxMinDegrees(float deg);
     void setMappingPaused(bool paused) { mMappingPaused = paused; }
@@ -358,6 +370,9 @@ private:
     // explicitly enabled"; the initializer said otherwise and the header won, which meant every
     // release build promoted unsupervised with no user-facing switch to stop it.
     std::atomic<bool> mSelfGrowEnabled{false};
+
+    /** Fixed RANSAC seed for reproducible replay, or <0 for "leave the RNG alone" (default). */
+    std::atomic<long long> mEvalRngSeed{-1};
     long mLastGrowSeq = 0;
     cv::Mat mWallPatch; // raw 256x256 gray canonical patch for the distortion head (desc_fp source)
     // VIO view snapshot captured alongside the reloc frame, so the rectifying warp matches that frame.

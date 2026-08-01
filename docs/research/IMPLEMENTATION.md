@@ -18,8 +18,12 @@ Phase 0 itself is still unbuilt and still gates Phases 2, 3, 4 and 5b. See
 These are constraints on the engineering, not on the design. They are listed
 first because every phase inherits them.
 
-**No compiler in the dev container.** There is no Android SDK here; `./gradlew`
-dies with "SDK location not found". The only compile check is CI, and CI runs
+**A compiler may or may not be available in the dev container.** This line used to
+read "there is no Android SDK here" flatly; that is no longer reliably true — the
+SDK, NDK and CMake can be installed into a session (`sdkmanager "ndk;29.0.14206865"
+"cmake;3.31.6"`), after which `./gradlew :core:nativebridge:externalNativeBuildDebug`
+builds the native library locally and `llvm-nm` can confirm an exported JNI symbol.
+Do that before claiming a native change compiles. Where it is NOT available, CI runs
 both the Kotlin/JVM unit tests *and* the NDK build. Those are two independent
 gates and one can pass while the other fails — that has already happened once in
 this project's history (`int matches` shadowed a `std::vector<...> matches` in
@@ -718,10 +722,29 @@ order.** Work top to bottom.
       downstream analysis. **[T]**
 - [x] **6a.3** Add the `relocReject` ordinal column — its source already exists.
 - [ ] **6a.4** Add the eval-only fixed RNG seed and the synchronous-reloc mode
-      from `EVALUATION.md` §3.1. Both must be inert in release builds. *(The
-      sidecar already records `rngSeed` and `syncReloc` so a run states which it
-      used; the native plumbing that honours them is still outstanding, and until
-      it lands every replay A/B carries un-quantified RANSAC variance.)*
+      from `EVALUATION.md` §3.1. Both must be inert in release builds.
+      **RNG SEED DONE; SYNC-RELOC MODE STILL OUTSTANDING.**
+
+      The seed is `MobileGS::setEvalRngSeed`, applied to `cv::theRNG().state`
+      immediately before *every* `solvePnPRansac` rather than once at start-up —
+      the reloc thread shares the global RNG with other consumers, so a single
+      seeding would drift as soon as anything else drew from it. Negative means
+      "leave it alone" and is the default, so it is inert unless an eval run turns
+      it on, and `setEvalRngSeedIfDebuggable` puts that gate at the call site. The
+      sidecar now reports the seed **actually in force** (null in release, where the
+      gate declines) rather than a hopeful constant.
+
+      Verified natively, not inferred: `llvm-nm` on `libgraffitixr.so` shows
+      `Java_..._nativeSetEvalRngSeed` exported under exactly the name the Kotlin
+      `external fun` resolves. A JVM test cannot establish that — it is the failure
+      that shows up as `UnsatisfiedLinkError` at runtime.
+
+      Sync-reloc remains open because it needs `relocThreadFunc`'s ~350-line body
+      extracted into a callable unit so it can run inline, which is a refactor of the
+      most feedback-heavy path in the app and wants its own commit under the
+      one-behavioural-change-per-commit rule. Until it lands, thread interleaving is
+      still an uncontrolled source of run-to-run variance and `syncReloc` stays
+      `false` in the sidecar.
 
 ### Phase 0 — rotation convention
 

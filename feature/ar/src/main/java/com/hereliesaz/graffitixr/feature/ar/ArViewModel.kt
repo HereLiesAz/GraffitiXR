@@ -321,6 +321,15 @@ class ArViewModel @Inject constructor(
         // serializer with no caller — a run-identity feature that produced zero run identities,
         // ticked as done. EVALUATION.md 3.2's rule is that a CSV without a sidecar is not evidence,
         // so the call site has to supply one or the whole thing is decoration.
+        // 6a.4 — seed RANSAC before the run so a replay A/B is a controlled comparison. Applied
+        // BEFORE start() so the identity written to the sidecar and the seed actually in force are
+        // the same value; setting it afterwards would leave a window where rows were produced under
+        // a different RNG than the sidecar claims.
+        //
+        // Debug-gated at the call site rather than inside the engine: a fixed seed shipped to users
+        // would make every device draw the identical RANSAC sample sequence forever, which is a
+        // behaviour change and not an evaluation affordance.
+        slamManager.setEvalRngSeedIfDebuggable(EVAL_RNG_SEED, BuildConfig.DEBUG)
         evalProbe.start(buildEvalRunIdentity())
         renderer?.driftCostProbe = evalProbe
         evalLogging = true
@@ -330,10 +339,14 @@ class ArViewModel @Inject constructor(
      * Snapshot of everything needed to reconstruct this run: build, device, and the tunables whose
      * values the numbers depend on.
      *
-     * `rngSeed` and `syncReloc` are reported as "not set" because the native plumbing that would
-     * honour them does not exist yet (IMPLEMENTATION.md todo 6a.4). That is deliberately stated
-     * rather than defaulted: `solvePnPRansac` draws random samples, so an unseeded replay A/B is not
-     * a controlled comparison, and the reader can only know that if the field says so.
+     * `rngSeed` reports the seed that is actually in force, not a hopeful constant: it is null in a
+     * release build, because [SlamManager.setEvalRngSeedIfDebuggable] declines to seed there, and a
+     * sidecar claiming a seed the engine never applied would be worse than one admitting it has
+     * none. `solvePnPRansac` draws random samples, so an unseeded replay A/B is not a controlled
+     * comparison and the reader can only know that if the field says so.
+     *
+     * `syncReloc` is still false: that half of 6a.4 (an eval-only inline reloc mode) is outstanding,
+     * so thread interleaving remains an uncontrolled source of run-to-run variance.
      */
     private fun buildEvalRunIdentity() = com.hereliesaz.graffitixr.feature.ar.eval.EvalRunIdentity(
         gitCommit = BuildConfig.GIT_COMMIT,
@@ -342,7 +355,7 @@ class ArViewModel @Inject constructor(
         deviceModel = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
         androidRelease = android.os.Build.VERSION.RELEASE ?: "unknown",
         deviceClass = if (_uiState.value.isHardwareStereoActive) "dual" else "mono",
-        rngSeed = null,
+        rngSeed = if (BuildConfig.DEBUG) EVAL_RNG_SEED else null,
         syncReloc = false,
         parameters = mapOf(
             "MIN_INLIER_RATIO" to
@@ -2083,6 +2096,16 @@ class ArViewModel @Inject constructor(
 
     // --- Doodle demo: headless fingerprint build ---
     internal companion object {
+        /**
+         * Fixed RANSAC seed for eval runs (`IMPLEMENTATION.md` 6a.4, `EVALUATION.md` §3.1).
+         *
+         * The value is arbitrary; what matters is that it is a CONSTANT and that it is recorded in
+         * the run-identity sidecar, so two runs being compared drew the same RANSAC sample sequence
+         * and a reader can tell which sequence that was. Changing it invalidates comparisons against
+         * previously recorded runs, so treat it as part of the run identity rather than a knob.
+         */
+        const val EVAL_RNG_SEED = 20260801L
+
         const val DOODLE_CAPTURE_INTERVAL_MS = 2500L
         // After this long without a relocalization lock (featureless wall), place on the plain anchor.
         // Measured from the point an anchor + wall plane exist, i.e. from when detection can start.
