@@ -25,13 +25,17 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
  * plane point and normal are in ARCore **world** space (e.g. `plane.centerPose` translation and its
  * local +Y axis); they are moved into the camera frame here.
  *
- * CAUTION — unresolved convention mismatch. Callers pass pixels and intrinsics that have been rotated
- * to DISPLAY orientation, but a view matrix that has not. The rays built here therefore live in a
- * frame rotated about the optical axis relative to the plane they are intersected with, which skews
- * the depths for anything but a head-on wall (a normal of (0,0,±1) is invariant under that rotation,
- * which is why it is not obvious). Fixing it properly also requires the matching change in
- * PoseFusion's pose composition — see "Open question: the display-rotation convention" in
- * docs/TELEOLOGICAL_SLAM.md before changing anything here.
+ * **Frame contract (IMPLEMENTATION.md Phase 0, convention B — RESOLVED).** The rays built here come
+ * from [pixels] and the intrinsics, so [cvView] MUST be in the same frame those are in. The capture
+ * path works in DISPLAY orientation — it rotates both the bitmap and the intrinsics by
+ * `rotationNeeded` — so its callers must convert with [MetricMarks.glViewToCvDisplay], NOT
+ * [MetricMarks.glViewToCv]. Passing the unrotated view alongside rotated pixels is the defect
+ * PAPER.md §8 describes: display-frame rays intersected with a sensor-frame plane, which skews every
+ * recovered depth for anything but a head-on wall (a normal of (0,0,±1) is invariant under a rotation
+ * about the optical axis, which is why it survived so long).
+ *
+ * This function is agnostic and stays that way — it faithfully intersects whatever frame it is
+ * handed, which is what makes it testable. The obligation is the caller's.
  */
 object PlaneMarks {
 
@@ -49,7 +53,9 @@ object PlaneMarks {
      * to the plane (no intersection) or the hit is behind the camera / outside [minDepthM]..[maxDepthM].
      *
      * @param pixels detected feature pixels in the captured image.
-     * @param cvView CV-convention world→camera view of the capture (see [MetricMarks.glViewToCv]).
+     * @param cvView CV-convention world→camera view of the capture, in the SAME frame as [pixels]
+     *   and the intrinsics. For the display-oriented capture path that is
+     *   [MetricMarks.glViewToCvDisplay]; see the frame contract on this object.
      * @param planePointWorld a point on the plane in world space (3 floats) — e.g. plane centre.
      * @param planeNormalWorld the plane normal in world space (3 floats) — need not be unit length.
      */

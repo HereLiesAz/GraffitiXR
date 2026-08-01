@@ -226,96 +226,176 @@ class PlaneMarksObliquityTest {
     }
 
     // ---------------------------------------------------------------------------------------
-    // Characterization of the CURRENT defect. INVERT THESE WHEN PHASE 0 LANDS.
+    // Phase 0 regression guards. These were CHARACTERIZATION tests that passed BECAUSE the defect
+    // was present; they are now inverted, and they go through the real converter rather than a
+    // hand-built mismatch.
+    //
+    // The distinction matters. `backProject` was never the buggy component — it faithfully
+    // intersects whatever frame it is handed, which the permanent tests above pin. The defect lived
+    // in its CALLER, which handed it display-frame rays and a sensor-frame plane. So asserting
+    // `backProject` is now exact under `rzView(90)` would assert nothing: it would still be a
+    // deliberately mismatched frame, and it would still be wrong. What has to be exercised is the
+    // path `MetricFingerprintBuilder.buildSingle` actually takes.
     // ---------------------------------------------------------------------------------------
 
     /**
-     * The headline number. Portrait on a typical phone gives `rotationNeeded == 90`, and at a
-     * modest 20 degrees off-square the recovered marks are hundreds of millimetres out.
-     *
-     * PHASE 0: change to `assertTrue(mean < TOLERANCE_MM)`.
+     * The GL view whose CV conversion is the identity — i.e. the world frame IS the sensor camera
+     * frame. `glViewToCv` negates rows 1 and 2, so its pre-image is `diag(1,-1,-1,1)`.
      */
-    @Test
-    fun `CHARACTERIZATION portrait rotation skews depths badly off-square`() {
-        val mean20 = meanMm(errorsMm(20f, rzView(90f)))
-        val mean40 = meanMm(errorsMm(40f, rzView(90f)))
-        // Wall-uniform sampling gives ~328mm and ~1148mm here; PAPER.md 8.1's pixel-uniform 40x40
-        // grid gives 267mm and 834mm for the same defect. Assert the band both live in, so neither
-        // sampling choice is silently baked in as the definition of the bug.
-        assertTrue("expected hundreds of mm at 20deg, got $mean20", mean20 in 150f..700f)
-        assertTrue("expected ~metre-scale at 40deg, got $mean40", mean40 in 500f..2500f)
-        assertTrue("error must grow with obliquity", mean40 > mean20)
+    private fun glViewForSensorAtOrigin() = floatArrayOf(
+        1f, 0f, 0f, 0f,
+        0f, -1f, 0f, 0f,
+        0f, 0f, -1f, 0f,
+        0f, 0f, 0f, 1f,
+    )
+
+    /** `R_z(deg)^T v`, for taking a display-frame vector back to the sensor/world frame. */
+    private fun rzTranspose(deg: Float, v: FloatArray): FloatArray {
+        val c = cos(Math.toRadians(deg.toDouble())).toFloat()
+        val s = sin(Math.toRadians(deg.toDouble())).toFloat()
+        return floatArrayOf(c * v[0] + s * v[1], -s * v[0] + c * v[1], v[2])
     }
 
     /**
-     * Holding the phone the other way round gives `rotationNeeded == 180`, which is a different
-     * rotation but still a mismatch — so "just use landscape" only helps in ONE of the two landscape
-     * orientations. Worth pinning: it is the kind of asymmetry a fix can easily half-solve.
+     * End-to-end through the fix, exactly as the capture path now runs it.
      *
-     * PHASE 0: change to `assertTrue(mean < TOLERANCE_MM)`.
-     */
-    @Test
-    fun `CHARACTERIZATION half-turn rotation is also a mismatch`() {
-        val mean = meanMm(errorsMm(20f, rzView(180f)))
-        assertTrue("expected a real error at 180deg, got $mean", mean > 100f)
-        assertTrue("...but bounded; a runaway here means the model changed, got $mean", mean < 700f)
-    }
-
-    /**
-     * The distortion is NON-RIGID — the depth scale factor varies across the image. This is the
-     * property that makes it damaging rather than merely offset: a rigid error would be absorbed by
-     * the reloc PnP's pose solve, and this one cannot be, which is why it shows up as a low inlier
-     * ratio alongside a healthy match count.
+     * The wall and the pixels are constructed in the DISPLAY frame (that is what [samplesOn]
+     * produces, since it projects through the display-oriented intrinsics). The plane is then
+     * expressed in WORLD coordinates — here the sensor frame — because that is the frame
+     * `buildSingle` receives it in from ARCore. `glViewToCvDisplay` is left to reconcile the two.
      *
-     * PHASE 0: the spread collapses to zero along with the error, so this becomes redundant with
-     * the headline test above and can be deleted.
+     * If the rotation direction in the converter were reversed, or applied as a post-multiply, the
+     * plane would arrive in the wrong frame and these errors would be as large as the ones this
+     * file used to assert.
      */
-    @Test
-    fun `CHARACTERIZATION the distortion is non-rigid, not a constant offset`() {
-        val e = errorsMm(40f, rzView(90f))
-        val mean = meanMm(e)
-        val spread = e.maxOrNull()!! - e.minOrNull()!!
-        assertTrue(
-            "a rigid offset would have near-zero spread; spread=$spread mean=$mean",
-            spread > 0.5f * mean,
+    private fun errorsMmThroughCapturePath(obliquityDeg: Float, rotationDeg: Int): List<Float> {
+        val samples = samplesOn(obliquityDeg)
+        val nDisplay = wallNormalCam(obliquityDeg)
+        val pDisplay = floatArrayOf(
+            nDisplay[0] * DIST_M, nDisplay[1] * DIST_M, nDisplay[2] * DIST_M,
         )
-    }
+        // What ARCore would have supplied: the same plane, in the sensor-aligned world frame.
+        val nWorld = rzTranspose(rotationDeg.toFloat(), nDisplay)
+        val pWorld = rzTranspose(rotationDeg.toFloat(), pDisplay)
 
-    /**
-     * Mis-scaled depths fall outside `backProject`'s 0.1-10 m trust range and are dropped, so the
-     * mismatch does not only distort points — it silently loses them. That is the mechanism behind
-     * the "found N features but only M landed on the wall surface" refusal, and it means a user hits
-     * a capture failure rather than a visibly wrong overlay.
-     *
-     * PHASE 0: retention returns to 100% and this becomes an equality assertion.
-     */
-    @Test
-    fun `CHARACTERIZATION steep obliquity silently discards marks`() {
-        val samples = samplesOn(60f)
-        val pixels = samples.map { it.pixel }
-        val n = wallNormalCam(60f)
-        val p = floatArrayOf(n[0] * DIST_M, n[1] * DIST_M, n[2] * DIST_M)
-        val kept = PlaneMarks.backProject(pixels, rzView(90f), p, n, FX, FY, CX, CY).count
-        val keptTruth = PlaneMarks.backProject(pixels, identityView(), p, n, FX, FY, CX, CY).count
-        assertEquals("control must keep every forward-constructed point", pixels.size, keptTruth)
-        assertTrue("expected the mismatch to drop marks at 60deg, kept $kept of ${pixels.size}", kept < keptTruth)
-    }
-
-    /**
-     * Error is monotone in obliquity — zero square-on, worse the further off you stand. Pins the
-     * SHAPE of the defect rather than any single magnitude, which is what E0 on device compares
-     * against. A device result that is flat, or worst at 0 degrees, falsifies the diagnosis in
-     * PAPER.md 8 rather than merely disagreeing about a constant.
-     *
-     * PHASE 0: the curve flattens to zero; assert every entry `< TOLERANCE_MM`.
-     */
-    @Test
-    fun `CHARACTERIZATION error grows monotonically with obliquity`() {
-        val curve = floatArrayOf(0f, 10f, 20f, 30f, 40f).map { meanMm(errorsMm(it, rzView(90f))) }
-        assertEquals("square-on must be exact", 0f, curve[0], TOLERANCE_MM)
-        for (i in 1 until curve.size) {
-            assertTrue("error must not decrease as obliquity grows: $curve", curve[i] > curve[i - 1])
+        val cvView = MetricMarks.glViewToCvDisplay(glViewForSensorAtOrigin(), rotationDeg)
+        val actual = PlaneMarks.backProject(
+            samples.map { it.pixel }, cvView, pWorld, nWorld, FX, FY, CX, CY,
+        )
+        val out = ArrayList<Float>(actual.count)
+        for ((slot, src) in actual.kept.withIndex()) {
+            val truth = samples[src].world          // forward-constructed, in the display frame
+            val o = slot * 3
+            out.add(
+                hypot(
+                    hypot(actual.pointsCam[o] - truth[0], actual.pointsCam[o + 1] - truth[1]),
+                    actual.pointsCam[o + 2] - truth[2],
+                ) * 1000f,
+            )
         }
-        assertTrue("10deg should already be measurable, was ${curve[1]}", abs(curve[1]) > 10f)
+        return out
+    }
+
+    /**
+     * `IMPLEMENTATION.md` **0.8** — the headline. Was "portrait rotation skews depths badly
+     * off-square", asserting 150–700 mm at 20° and 500–2500 mm at 40°. Now exact.
+     */
+    @Test
+    fun `portrait capture recovers the truth exactly through the fixed path`() {
+        for (obliquity in floatArrayOf(0f, 20f, 40f, 60f)) {
+            val e = errorsMmThroughCapturePath(obliquity, 90)
+            assertTrue("expected samples at ${obliquity}deg", e.isNotEmpty())
+            assertTrue(
+                "portrait capture must be exact at ${obliquity}deg, mean was ${meanMm(e)}mm",
+                e.all { it < TOLERANCE_MM },
+            )
+        }
+    }
+
+    /**
+     * All four orientations, which is `0.8`'s actual wording. Was two separate characterization
+     * tests, one of which only covered 180° because "just use landscape" half-solved it.
+     */
+    @Test
+    fun `every quadrant rotation recovers the truth exactly`() {
+        for (rotation in intArrayOf(0, 90, 180, 270)) {
+            for (obliquity in floatArrayOf(0f, 20f, 40f, 60f)) {
+                val e = errorsMmThroughCapturePath(obliquity, rotation)
+                assertTrue("expected samples at ${obliquity}deg/${rotation}deg", e.isNotEmpty())
+                assertTrue(
+                    "rotation=$rotation obliquity=$obliquity must be exact, " +
+                        "mean was ${meanMm(e)}mm",
+                    e.all { it < TOLERANCE_MM },
+                )
+            }
+        }
+    }
+
+    /**
+     * Was "the distortion is NON-RIGID, not a constant offset", asserting the spread exceeded half
+     * the mean. With the frames reconciled the spread collapses along with the error.
+     *
+     * Kept rather than deleted (the old comment proposed deleting it) because it fails on a
+     * *different* mutation than the mean does: a converter that rotated by a constant but wrong
+     * amount could still leave a small mean while the spread across the image stayed wide.
+     */
+    @Test
+    fun `the recovered cloud is not distorted across the image`() {
+        val e = errorsMmThroughCapturePath(40f, 90)
+        val spread = e.maxOrNull()!! - e.minOrNull()!!
+        assertTrue("residual spread must vanish with the error, was ${spread}mm", spread < TOLERANCE_MM)
+    }
+
+    /**
+     * Was "steep obliquity silently discards marks" — mis-scaled depths fell outside the 0.1–10 m
+     * trust range and were dropped, which is what produced the "found N features but only M landed
+     * on the wall surface" refusals. Retention returns to 100%.
+     */
+    @Test
+    fun `steep obliquity no longer discards marks`() {
+        val samples = samplesOn(60f)
+        val nDisplay = wallNormalCam(60f)
+        val pDisplay = floatArrayOf(nDisplay[0] * DIST_M, nDisplay[1] * DIST_M, nDisplay[2] * DIST_M)
+        val cvView = MetricMarks.glViewToCvDisplay(glViewForSensorAtOrigin(), 90)
+        val kept = PlaneMarks.backProject(
+            samples.map { it.pixel }, cvView,
+            rzTranspose(90f, pDisplay), rzTranspose(90f, nDisplay),
+            FX, FY, CX, CY,
+        ).count
+        assertEquals("every forward-constructed point must survive", samples.size, kept)
+    }
+
+    /**
+     * Was "error grows monotonically with obliquity" — the SHAPE of the defect. The curve is now
+     * flat at zero, so the assertion is that nothing grows.
+     *
+     * This one is the guard with teeth: a partial fix (right at 90°, wrong at 180°, say) shows up
+     * here as a curve that is exact in one place and not another, rather than as a single number
+     * that happens to land inside a band.
+     */
+    @Test
+    fun `the error curve is flat at zero across obliquity`() {
+        for (rotation in intArrayOf(0, 90, 180, 270)) {
+            val curve = floatArrayOf(0f, 10f, 20f, 30f, 40f)
+                .map { meanMm(errorsMmThroughCapturePath(it, rotation)) }
+            for ((i, mean) in curve.withIndex()) {
+                assertEquals("rotation=$rotation, curve point $i: $curve", 0f, mean, TOLERANCE_MM)
+            }
+        }
+    }
+
+    /**
+     * The defect is genuinely gone rather than hidden by a slack tolerance — the OLD wiring, on the
+     * identical fixture, still produces the error this file used to record.
+     *
+     * Without this a converter that returned a zero matrix, or a fixture that degenerated to no
+     * samples, would sail through every assertion above. It is the negative control.
+     */
+    @Test
+    fun `the old convention still fails on the same fixture`() {
+        val old = meanMm(errorsMm(20f, rzView(90f)))
+        val fixed = meanMm(errorsMmThroughCapturePath(20f, 90))
+        assertTrue("the pre-Phase-0 wiring should still be hundreds of mm out, was $old", old > 150f)
+        assertTrue("the fixed path must be exact, was $fixed", fixed < TOLERANCE_MM)
     }
 }

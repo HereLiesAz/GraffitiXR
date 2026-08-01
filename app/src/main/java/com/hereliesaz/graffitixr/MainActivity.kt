@@ -1225,7 +1225,11 @@ class MainActivity : ComponentActivity() {
                                             arUiState.targetDepthStride,
                                             arUiState.targetIntrinsics,
                                             arUiState.targetCaptureViewMatrix,
-                                            arUiState.targetWallPlane
+                                            arUiState.targetWallPlane,
+                                            // rotationNeeded, as recorded at capture. The bitmap
+                                            // and intrinsics above were already rotated by it; the
+                                            // view matrix now follows (Phase 0, convention B).
+                                            arUiState.targetDisplayRotation,
                                         )
                                     },
                                     onRetake = {

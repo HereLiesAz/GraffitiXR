@@ -2165,7 +2165,9 @@ class ArViewModel @Inject constructor(
                 _uiState.update { it.copy(doodleWallStats = wallStats) }
 
                 val fp = MetricFingerprintBuilder.buildSingle(
-                    slamManager, rotated, viewMatrix, intr, planePoint, planeNormal, anchor
+                    slamManager, rotated, viewMatrix, intr, planePoint, planeNormal, anchor,
+                    // The same angle `rotated` and `intr` were built with, a dozen lines above.
+                    rotationDeg = displayRotation,
                 )
                 if (fp != null) doodleFingerprintBuilt = true
             } catch (t: Throwable) {

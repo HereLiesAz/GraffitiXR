@@ -166,15 +166,25 @@ object MetricFingerprintBuilder {
     @Volatile var lastRequired: Int = 0
         private set
 
+    /**
+     * @param rotationDeg `rotationNeeded` for this capture — the angle the caller already applied
+     *   to [bitmap] and to [intr]. The view is rotated to match (`IMPLEMENTATION.md` Phase 0,
+     *   convention B); passing 0 while handing in rotated pixels reinstates the `PAPER.md` §8
+     *   defect, which is why it has no default.
+     */
     fun buildSingle(
         slam: SlamManager,
         bitmap: Bitmap, glView: FloatArray, intr: FloatArray,
         planePointWorld: FloatArray, planeNormalWorld: FloatArray,
         anchorModel: FloatArray,
+        rotationDeg: Int,
         minPoints: Int = 20,
     ): Fingerprint? {
         lastDetected = 0; lastPlaced = 0; lastRequired = minPoints
-        val cvView = MetricMarks.glViewToCv(glView)
+        // Convention B: the bitmap and intrinsics arrived in display orientation, so the view goes
+        // there too. This is the fix for PAPER.md §8 — previously `glViewToCv(glView)`, which left
+        // display-frame rays intersecting a sensor-frame plane.
+        val cvView = MetricMarks.glViewToCvDisplay(glView, rotationDeg)
 
         val sp = unpackSuperPoint(slam.detectSuperPoint(bitmap))
         if (sp != null) {
