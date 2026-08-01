@@ -1339,30 +1339,21 @@ class ArRenderer(
                             }
                         }
 
-                        var fx = intrinsics.focalLength[0]
-                        var fy = intrinsics.focalLength[1]
-                        var cx = intrinsics.principalPoint[0]
-                        var cy = intrinsics.principalPoint[1]
+                        val fx = intrinsics.focalLength[0]
+                        val fy = intrinsics.focalLength[1]
+                        val cx = intrinsics.principalPoint[0]
+                        val cy = intrinsics.principalPoint[1]
                         val dims = intrinsics.imageDimensions
                         val rawW = dims[0].toFloat()
                         val rawH = dims[1].toFloat()
 
-                        when (rotationNeeded) {
-                            90 -> {
-                                val t_fx = fx; fx = fy; fy = t_fx
-                                val t_cx = cx; cx = rawH - cy; cy = t_cx
-                            }
-                            180 -> {
-                                cx = rawW - cx
-                                cy = rawH - cy
-                            }
-                            270 -> {
-                                val t_fx = fx; fx = fy; fy = t_fx
-                                val t_cx = cx; cx = cy; cy = rawW - t_cx
-                            }
-                        }
-
-                        val intrArr = floatArrayOf(fx, fy, cx, cy)
+                        // Extracted to CaptureRotation so the convention is testable AT ITS ORIGIN.
+                        // Phase 0's correctness argument is that this transform, paired with the
+                        // bitmap rotation, turns a sensor ray into R_z(+rotationNeeded) * itself —
+                        // and while it lived inline here nothing could drive a pixel through it, so
+                        // the derivation and the tests both rested on one reading of these lines.
+                        val intrArr = com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation
+                            .rotateIntrinsics(fx, fy, cx, cy, rawW, rawH, rotationNeeded)
 
                         // Camera→point distance at the tapped pixel (Sub-project C). Map the tap from
                         // view pixels to the depth image via ARCore's rotation/crop-aware transform,

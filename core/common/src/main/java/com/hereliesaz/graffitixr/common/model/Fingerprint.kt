@@ -40,6 +40,36 @@ data class Fingerprint(
      * `-1`, which is honest: it never applied one.
      */
     val captureRotationDeg: Int = -1,
+    /**
+     * `IMPLEMENTATION.md` Phase 2 — one byte per 3D point, holding `Footprint.Region.ordinal`:
+     * the point's position relative to the design's projected footprint at capture.
+     *
+     * **Empty means legacy "all backbone"**, not "all inside". A fingerprint saved before Phase 2
+     * has no partition, and the safe reading is that every point is load-bearing — treating them as
+     * corroboration-only would exclude the entire map from the reloc PnP and the target would never
+     * lock at all. Consumers must branch on `regions.isEmpty()` rather than indexing blindly.
+     *
+     * A parallel array rather than a struct-of-arrays rewrite, matching how the descriptors (an
+     * opaque row-major blob) and the points (a flat float list) are already stored, and cheap to
+     * serialize. The invariant that it is 1:1 with the points is enforced in `init`, for the same
+     * reason the points/descriptor-rows check is: the reloc path indexes these by row, so a
+     * disagreement reads past the end of a vector rather than failing.
+     */
+    val regions: ByteArray = ByteArray(0),
+    /**
+     * The design's **effective** (scale-included) half-extents in metres at the moment [regions]
+     * was computed, or `-1` when unknown.
+     *
+     * Stored because the regions are only meaningful against the design size that produced them.
+     * Folding the overlay scale in — rather than storing raw extents and a separate scale — makes
+     * the staleness check a single float comparison per axis, and sidesteps the trap
+     * `IMPLEMENTATION.md` Phase 2 flags: `OverlayRenderer.setExtent`'s two call sites are a fixed
+     * constant and a one-shot screen-fit, **neither driven by the user**. The user's resize is
+     * `overlayScale`, which enters the model matrix, so a staleness check watching the extents alone
+     * would compare two numbers that never move.
+     */
+    val captureHalfW: Float = -1f,
+    val captureHalfH: Float = -1f,
 ) {
     init {
         // Defensive: a corrupt or truncated project file must never construct a Fingerprint whose
@@ -68,6 +98,31 @@ data class Fingerprint(
                     "the reloc path indexes points by descriptor row, so they must be 1:1"
             }
         }
+        // Same argument, third array. Native filters the reloc correspondence build by
+        // `mWallRegions[i]` for the row it just matched, so a regions array shorter than the point
+        // list indexes past the end of a vector. Empty is the legacy "no partition" case and is
+        // explicitly allowed; anything else must be exactly 1:1.
+        require(regions.isEmpty() || regions.size == points3d.size / 3) {
+            "regions holds ${regions.size} tags but ${points3d.size / 3} points were supplied; " +
+                "the partition is indexed per point, so they must be 1:1 (or regions empty for legacy)"
+        }
+    }
+
+    /** True when this fingerprint carries no partition — a pre-Phase-2 capture. See [regions]. */
+    fun isUnpartitioned(): Boolean = regions.isEmpty()
+
+    /**
+     * True when [regions] was computed against a different design size than [halfW]/[halfH].
+     *
+     * The artist pinching the design mid-session is normal, and the right response is to recompute
+     * the regions from the stored 3D points (a cheap pure-Kotlin pass) rather than force a
+     * re-capture. An unpartitioned or extent-less fingerprint is never "stale" — there is nothing to
+     * recompute against.
+     */
+    fun isPartitionStale(halfW: Float, halfH: Float, eps: Float = 1e-4f): Boolean {
+        if (regions.isEmpty() || captureHalfW < 0f || captureHalfH < 0f) return false
+        return kotlin.math.abs(captureHalfW - halfW) > eps ||
+            kotlin.math.abs(captureHalfH - halfH) > eps
     }
 
     /**
