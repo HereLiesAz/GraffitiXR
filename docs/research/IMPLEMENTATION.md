@@ -948,9 +948,22 @@ order.** Work top to bottom.
       `regions`, `usePartition` is therefore false, and the correspondence loop is
       byte-identical. That is an argument, not the measurement the item asks for,
       and it is not a substitute.)*
-- [ ] **2.11** (6b) Add `backboneFeatures` / `backboneMatches` / `backboneInliers`
+- [x] **2.11** (6b) Add `backboneFeatures` / `backboneMatches` / `backboneInliers`
       to `RelocDiagnostics`, the CSV, and the overlay. Defaults encode "not
       measured", not zero — follow the `obliquityDeg = -1` precedent. **[T][N]**
+      *(All three default to -1 and are reset to -1 at the TOP of each reloc
+      iteration, before the disabled/no-fingerprint early-outs, so a stalled
+      attempt never shows the previous one's numbers. `backboneFeatures` reports
+      the FULL point count on an unpartitioned fingerprint rather than 0 —
+      reporting 0 there would fire the empty-`F_out` alarm on every pre-Phase-2
+      project. `usePartition` was hoisted out of `buildCorr` so the filter and
+      the count cannot disagree about which fingerprint is partitioned. Matches
+      and inliers travel on a `corrFromBackbone` array parallel to the
+      correspondences; the Phase-2b map path pushes 0, because those points were
+      never classified by Φ. `backboneInliers` stays -1 on `PNP_FAILED`: there is
+      no inlier set to attribute. The JNI array went 6 → 9 ints and
+      `SlamManager`'s short-array guard moved with it, so an old `.so` yields the
+      all -1 default rather than a partially-filled object.)*
 
 ### Phase 4 — spatially-constrained corroboration
 
@@ -1004,6 +1017,13 @@ order.** Work top to bottom.
       so the eval has a per-phase baseline rather than one before/after pair.
 - [ ] **X.3** Never land two phases in one CI run. The relocalizer is a feedback
       loop and overlapping changes make the measurements uninterpretable.
+      *(Watch item, not yet violated but close. 2.11 landed in the same commit as
+      the `PoseMath` testability conversion. That conversion is not a phase and
+      changes no relocalizer arithmetic — but it DOES change
+      `marksCentroidLocal`'s null contract (an `isRigid` precondition replacing
+      `Matrix.invertM`'s singularity check), and that function positions the
+      overlay. Anything measured across this commit should treat the two as
+      confounded.)*
 
 ---
 
