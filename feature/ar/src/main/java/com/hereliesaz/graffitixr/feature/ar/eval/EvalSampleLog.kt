@@ -37,6 +37,61 @@ data class EvalSample(
     val relocBackboneMatches: Int = -1,
     val relocBackboneInliers: Int = -1,
     /**
+     * `IMPLEMENTATION.md` **4.6** — design features the pose predicts should be visible in this
+     * frame, and how many of them the wall answered for. -1 = no gated corroboration attempt was
+     * measured this tick.
+     *
+     * These are logged beside the reloc counts rather than folded into them because Phase 4 changed
+     * what a corroboration number means: the pre-Phase-4 global fallback matched the whole design,
+     * including the half behind the camera, so its count and a spatially-gated count are different
+     * quantities and must not share a column.
+     *
+     * **-1, never 0.** Zero predicted-visible is a real reading — the artist has turned away from
+     * the design, so there is nothing to corroborate against and a low ratio means nothing. That is
+     * a different row from one where the corroboration path never ran, and collapsing the two would
+     * put the "looking away" rows into the same bucket as the "gate never fired" rows, which is the
+     * exact confusion 4.8 has to be able to resolve. The pairing matters too: zero predicted with
+     * zero matched is benign, whereas a healthy predicted with zero matched is the wall failing to
+     * corroborate, and only distinct columns can tell those apart.
+     */
+    val corrobPredicted: Int = -1,
+    val corrobMatched: Int = -1,
+    /**
+     * The radius the last gated corroboration search used, and the mean reprojection error over the
+     * last lock's PnP inliers, both in pixels. -1f = not measured.
+     *
+     * Floats, and carried on their own channel out of native for that reason: rounding these to
+     * integers to share the int[] would flatten every sub-pixel reading to 0 or 1 at precisely the
+     * tight radii Phase 4 exists to measure, so the column would be widest-open exactly where it
+     * needs to be sharpest.
+     *
+     * **-1f, never 0f.** A near-zero reprojection error is what a perfect lock actually reports —
+     * it is the *best* outcome this column can carry, not the absence of one — so zero cannot double
+     * as the not-measured marker without making every ideal row indistinguishable from a row where
+     * nothing was measured, and turning the healthiest evidence Phase 4 can produce into missing
+     * data.
+     *
+     * The radius is a different case and an earlier version of this note got it wrong: it can
+     * **never** be 0. `SearchRadius.pixels` clamps every path into `[MIN_PX, MAX_PX]` = `[4, 120]`,
+     * and its degenerate branch returns the ceiling. So a `0` in this column is not a degenerate
+     * reading to interpret — it is corrupt data, and should be treated as one.
+     */
+    val searchRadiusPx: Float = -1f,
+    val relocReprojPx: Float = -1f,
+    /**
+     * Predicted-visible features the gated match **refused to test**, because their neighbourhood
+     * held a single candidate and Lowe's ratio needs two. -1 = not sampled; 0 is a real reading and
+     * the one that says the radius is comfortable.
+     *
+     * This column is why the phase is falsifiable. Skips deflate [corrobMatched] without touching
+     * [corrobPredicted], so a radius too tight to find two candidates produces the same CSV
+     * signature as a wall that has stopped corroborating — and the two call for opposite responses
+     * (raise ρ vs. investigate the paint). At the `MIN_PX` floor a sparse frame can skip most of
+     * what it predicted, so without this column E6 could report a confidence collapse and attribute
+     * it to the wrong cause with no way to tell.
+     */
+    val corrobLoneSkips: Int = -1,
+    /**
      * `rotationNeeded` **at the moment the active target was captured** — 0, 90, 180 or 270, or -1
      * when no target has been captured this session (a project restored from disk reads -1; see
      * below).
@@ -95,10 +150,19 @@ object EvalSampleLog {
         "relocReject", "relocMatches", "relocInliers", "relocDetected",
         "relocObliquityDeg", "relocRectifiedCorr",
         "relocBackboneFeatures", "relocBackboneMatches", "relocBackboneInliers",
+        "corrobPredicted", "corrobMatched", "corrobLoneSkips", "searchRadiusPx", "relocReprojPx",
         "captureRotationNeededDeg", "liveRotationNeededDeg",
     )
 
     const val NOT_SAMPLED = -1
+
+    /**
+     * The same sentinel for the pixel-valued columns. Spelled as its own constant rather than a bare
+     * `-1f` at each use site so a reader can see that [searchRadiusPx][EvalSample.searchRadiusPx]
+     * and [relocReprojPx][EvalSample.relocReprojPx] are absent for the same reason as every Int
+     * column beside them, and so a later change to the convention has one place to change.
+     */
+    const val NOT_SAMPLED_PX = -1f
 
     val CSV_HEADER: String = COLUMNS.joinToString(",")
 
@@ -115,6 +179,9 @@ object EvalSampleLog {
             s.relocObliquityDeg.toString(), s.relocRectifiedCorr.toString(),
             s.relocBackboneFeatures.toString(), s.relocBackboneMatches.toString(),
             s.relocBackboneInliers.toString(),
+            s.corrobPredicted.toString(), s.corrobMatched.toString(),
+            s.corrobLoneSkips.toString(),
+            s.searchRadiusPx.toString(), s.relocReprojPx.toString(),
             s.captureRotationNeededDeg.toString(), s.liveRotationNeededDeg.toString(),
         )
     }

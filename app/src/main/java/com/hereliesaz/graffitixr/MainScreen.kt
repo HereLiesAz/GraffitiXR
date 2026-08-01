@@ -267,7 +267,30 @@ fun MainScreen(
                             compositeLayersForAr(visibleLayers, arOverlayAdj)
                         }
                         rendererRef.value?.updateOverlayBitmap(composite)
-                        arViewModel.updatePaintingGuide(composite)
+                    }
+
+                    // Split from the effect above, and NOT keyed on the tone: brightness, contrast,
+                    // saturation, opacity and invert are how the artist wants the overlay to LOOK on
+                    // screen, not what the artwork is. Registering the toned composite as the
+                    // validator meant nudging the opacity slider re-ran the detector and re-registered
+                    // the design, which resets painting progress — cheap before Phase 4, when the
+                    // published value was the current frame's ratio and reappeared on the next reloc
+                    // tick, and expensive after it, when progress accumulates over confirmed features
+                    // and has to climb back one feature at a time. A tone slider must not cost the
+                    // artist their progress bar.
+                    //
+                    // Composites a second time rather than sharing the bitmap above, because the two
+                    // now legitimately differ. Only on a layer change, which is rare — the recompose
+                    // storm this file worries about elsewhere is driven by the tone key, and that no
+                    // longer reaches here.
+                    LaunchedEffect(visibleLayers, arUiState.isAnchorEstablished) {
+                        if (!arUiState.isAnchorEstablished || visibleLayers.isEmpty()) {
+                            return@LaunchedEffect
+                        }
+                        val guide = withContext(Dispatchers.Default) {
+                            compositeLayersForAr(visibleLayers)
+                        }
+                        arViewModel.updatePaintingGuide(guide)
                     }
 
                     AndroidView(

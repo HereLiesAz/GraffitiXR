@@ -55,10 +55,61 @@ data class RelocDiagnostics(
     val backboneMatches: Int = -1,
     /** RANSAC inliers that came from `F_out` points, or -1 when PnP produced no inlier set. */
     val backboneInliers: Int = -1,
+    /**
+     * `IMPLEMENTATION.md` **4.6** — design features the current pose predicts are visible in the
+     * frame, or -1 when no *gated* corroboration attempt has run.
+     *
+     * The global fallback match deliberately does not fill this in. It measures the whole design
+     * including the parts behind the camera, so reporting its count here would put two different
+     * quantities in one column and make a Phase-4 run look comparable to a pre-Phase-4 one.
+     *
+     * **Zero is a real reading** — the artist is looking away from the design — and it is the state
+     * `4.8` exists to keep distinct from a zero [corrobMatched].
+     */
+    val corrobPredicted: Int = -1,
+    /**
+     * How many of [corrobPredicted] the wall answered for, or -1 when no gated attempt has run.
+     *
+     * `corrobMatched / corrobPredicted` is the corroboration confidence `PoseFusion` scales by;
+     * `corrobMatched` against the whole design is *not* — painting progress has its own, cumulative
+     * denominator, and conflating the two is the defect Phase 5 exists to undo.
+     */
+    val corrobMatched: Int = -1,
+    /**
+     * `IMPLEMENTATION.md` **4.6** — predicted-visible features the gated match **refused to test**,
+     * because their neighbourhood held a single candidate and Lowe's ratio has nothing to divide
+     * by. -1 when no gated attempt has run.
+     *
+     * This is the number that says whether the search radius is usable. A skip deflates
+     * [corrobMatched] without touching [corrobPredicted], so a radius that is too tight does not
+     * announce itself — it announces itself as a wall that has stopped corroborating, which looks
+     * exactly like an unpainted one. And the deflation is not harmless: lower confidence means a
+     * smaller correction blend in `PoseFusion`, so a too-tight radius trades false snapping for
+     * accumulated drift, which is the thing corroboration exists to prevent.
+     */
+    val corrobLoneSkips: Int = -1,
 ) {
     /** Inlier ratio of the last attempt, or 0 when it produced no correspondences. */
     val inlierRatio: Float get() = if (matches > 0) inliers.toFloat() / matches else 0f
 }
+
+/**
+ * `IMPLEMENTATION.md` **4.6** — the corroboration path's pixel-valued readings.
+ *
+ * Separate from [RelocDiagnostics] only because that channel is an `int[]`: rounding a sub-pixel
+ * radius to an integer to share it would destroy the reading at exactly the tight radii Phase 4 is
+ * trying to measure.
+ *
+ * @param searchRadiusPx the radius the last gated corroboration attempt used, or -1 when none has
+ *   run. Derived from `ρ`, the design's on-screen scale and the measured drift — see `SearchRadius`.
+ * @param relocReprojPx the mean reprojection error over the last lock's PnP inliers, or -1 when not
+ *   measured. **Zero cannot be the sentinel here**: a perfectly tracking pose really does report a
+ *   near-zero residual, and that is the reading this column exists to show.
+ */
+data class CorroborationDiagnostics(
+    val searchRadiusPx: Float = -1f,
+    val relocReprojPx: Float = -1f,
+)
 
 /**
  * Mirrors `MobileGS::RelocReject`, ordinal for ordinal — the native side reports an int. Ordered by

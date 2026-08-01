@@ -721,9 +721,8 @@ order.** Work top to bottom.
       field count. This is the class of bug that silently corrupts every
       downstream analysis. **[T]**
 - [x] **6a.3** Add the `relocReject` ordinal column — its source already exists.
-- [ ] **6a.4** Add the eval-only fixed RNG seed and the synchronous-reloc mode
+- [x] **6a.4** Add the eval-only fixed RNG seed and the synchronous-reloc mode
       from `EVALUATION.md` §3.1. Both must be inert in release builds.
-      **RNG SEED DONE; SYNC-RELOC MODE STILL OUTSTANDING.**
 
       The seed is `MobileGS::setEvalRngSeed`, applied to `cv::theRNG().state`
       immediately before *every* `solvePnPRansac` rather than once at start-up —
@@ -733,6 +732,49 @@ order.** Work top to bottom.
       it on, and `setEvalRngSeedIfDebuggable` puts that gate at the call site. The
       sidecar now reports the seed **actually in force** (null in release, where the
       gate declines) rather than a hopeful constant.
+
+      The **sync-reloc mode** is `MobileGS::setEvalSyncReloc(enabled, everyN)`, gated
+      at the call site by `setEvalSyncRelocIfDebuggable` for the same reason the seed
+      is — and it is the larger release hazard of the two. A fixed RANSAC seed shipped
+      to users is a behaviour change nobody feels; inline relocalization shipped to
+      users moves a whole detect-match-solve pass onto the render thread several times
+      a second, which is a dropped-frame bug with no obvious path back to an eval
+      affordance somebody left on.
+
+      Landing it required extracting `relocThreadFunc`'s body into `runRelocPass`.
+      That extraction is **mechanical and was verified as such**: a
+      whitespace-insensitive diff of the whole file against `HEAD` shows the only
+      changes inside those 433 lines are three loop-level `continue`s becoming
+      `return`s, each of which meant "this attempt is over" and never "skip to the
+      next frame". Anything else would have been a relocalizer change smuggled in
+      behind an eval affordance, which is what X.3 exists to prevent.
+
+      In sync mode `scheduleRelocCheck` runs the pass on the caller's thread and never
+      sets `mRelocRequested`, so the worker stays parked rather than racing for the
+      same frame. The counter resets on every mode transition, so two runs in one
+      process start their cadence from the same phase — otherwise "every 5th frame"
+      means a different five frames per run, which is the non-determinism the mode
+      exists to remove.
+
+      **One accepted cost, written down rather than fixed.** `relocWantsFrame` does
+      not filter by cadence, so in sync mode the caller pays a YUV→RGB conversion plus
+      a rotate for frames the every-N test then discards. The obvious fix — peek
+      `(counter + 1) % everyN` there — **deadlocks**, and looks correct while doing
+      it: the counter advances only inside `scheduleRelocCheck`, which the caller
+      invokes only when `relocWantsFrame` returned true, so at `everyN=5` the peek
+      sees 1, refuses, and sees 1 forever. Sync mode would report itself ON and never
+      relocalize. Moving the increment into `relocWantsFrame` instead would make the
+      cadence depend on that function having been called first — a cross-file coupling
+      the next call site would break silently. Correct cadence beats a saved
+      conversion on a path whose whole purpose is comparable measurements.
+
+      `EvalRunIdentity.syncReloc` is **read back from the engine**, not remembered from
+      what was requested, so a release build (where the gate declines) reports async —
+      which is the truth. §3.2 says a CSV without a truthful sidecar is not evidence.
+
+      §3.1's **third** source of non-determinism — `DriftCostProbe` stamping wall-clock
+      `tsMs` instead of the recording's frame timestamp — is NOT covered by 6a.4 and
+      remains open. 6a.4 names only the seed and the sync mode.
 
       Verified natively, not inferred: `llvm-nm` on `libgraffitixr.so` shows
       `Java_..._nativeSetEvalRngSeed` exported under exactly the name the Kotlin
@@ -767,10 +809,35 @@ order.** Work top to bottom.
       `targetCaptureViewMatrix` in `ArViewModel`, `fingerprintViewMatrix` in
       `MainViewModel`, and `restoreWallFingerprintMetric`'s `viewMatrix16`.
       List each site in the commit message with its verdict.
-- [ ] **0.6** Confirm `PoseFusion.composeCorrected` is consistent under the chosen
+- [x] **0.6** Confirm `PoseFusion.composeCorrected` is consistent under the chosen
       convention. `PoseFusionTest` now pins the factor order with non-commuting
       operands; extend it for the rotation, not with another round-trip (a
       round-trip is order-insensitive and would pass either way). **[T]**
+      *(CONFIRMED for the rotation. `composeCorrected rotation block matches a
+      hand-derived product` composes Rx(30°), Ry(40°) and Rz(50°) — three mutually
+      non-commuting axes, so no permutation of the factors survives — and asserts
+      against the symbolic product multiplied out in closed form, NOT against
+      `PoseMath.multiply`, which would have made it an identity. No
+      `android.opengl.Matrix` anywhere in it, so it cannot pass vacuously against the
+      stub's zero arrays.*
+      *Mutation-checked numerically against eight plausible defects: three wrong
+      factor orders, an un-inverted `vCurrent`, `C = diag(1,-1,-1)` inserted on either
+      side of `pnp`, a wrong-handed `C`, and an inverse taken by negation rather than
+      transpose. Tolerance is 1e-5; the smallest discrepancy any of them produces is
+      0.246. The pass has content.*
+      *Reasoning behind the expected value: `vCurrent` is `Camera.getViewMatrix`,
+      which ARCore documents as already display-oriented, and Convention B put the
+      capture side in that same frame (0.2–0.4, 0.8). The two therefore already agree
+      **for rotation**, so the correct composition needs no `R_z` inserted and no
+      handedness flip.*
+      *Scope deliberately NOT claimed: this says nothing about whether the three
+      operands are in mutually consistent frames. They are not — `pnpMat` is
+      CV-convention against a GL `vCurrent`, and its domain is the capture-camera
+      frame against an `fpAnchor` that is a world-space model matrix, so `C` and
+      `V_capture_cv` are both missing. That is **0.9**, which is a real behaviour
+      change with its own experiment gating it and is untouched. The test pins the
+      three-factor form as it stands, so 0.9 has to change it deliberately rather
+      than by accident.)*
 - [x] **0.7** Add `captureRotationDeg` to `Fingerprint`; default `-1`; refuse to
       reload a legacy fingerprint and prompt for re-capture. **[T]**
       *(DONE. Safe to add to `Fingerprint` after all: JNI constructs through the FROZEN
@@ -967,30 +1034,163 @@ order.** Work top to bottom.
 
 ### Phase 4 — spatially-constrained corroboration
 
-- [ ] **4.1** Create `feature/ar/.../anchor/SearchRadius.kt`; compute `r` from
+- [x] **4.1** Create `feature/ar/.../anchor/SearchRadius.kt`; compute `r` from
       `ρ`, half-extents, wall distance, focal length. Floor and ceiling it. **[T]**
-- [ ] **4.2** `SearchRadiusTest` — assert scaling relationships, not absolutes. **[T]**
-- [ ] **4.3** Feed the measured `errMm` from `DriftCostProbe` into `r` so the
+      *(Two asymmetries are deliberate. Degenerate geometry returns the CEILING —
+      a too-wide search costs precision the ratio test still filters, a too-tight
+      one returns nothing and reads as "the wall does not corroborate the design",
+      indistinguishable from an unpainted wall. And the design's anisotropy enters
+      as a geometric mean, not a max: the radius bounds how wrong a POSE is, and
+      that error is isotropic in the image whatever the artwork's aspect ratio.)*
+- [x] **4.2** `SearchRadiusTest` — assert scaling relationships, not absolutes. **[T]**
+      *(Ratios only, because every constant here is a prior E6/E7/E11 are expected
+      to move; a test pinning an absolute would encode a guess as a requirement.
+      The priors themselves are pinned separately and literally, so a silent edit
+      shows up as a test change rather than a number that quietly moved.)*
+- [x] **4.3** Feed the measured `errMm` from `DriftCostProbe` into `r` so the
       radius widens when the pose is known to be drifting. **[T]**
-- [ ] **4.4** Implement uniform-grid keypoint bucketing in Kotlin as the
+      *(`errMm < 0` is "not measured" and contributes nothing — not a confident
+      zero, and not an invented widening either. Mutation-verified: dropping the
+      drift term fails two tests.)*
+- [x] **4.4** Implement uniform-grid keypoint bucketing in Kotlin as the
       reference implementation, with a brute-force equivalence test. **[T]**
-- [ ] **4.5** Transliterate the grid into `MobileGS.cpp`; replace the global
+      *(Equivalence is asserted one-directionally — every true neighbour must be
+      returned, extras are allowed — because that is the contract the grid
+      actually offers; asserting set equality would assert a contract it does not.
+      The tests caught a real defect in the first cut: out-of-range queries were
+      CLAMPED into the grid, so on a one-cell grid a query nowhere near any
+      keypoint returned all of them, turning the local search back into a global
+      one. Mutation-verified against a hard-coded 3x3 sweep, which is the error
+      the native transliteration is most likely to reintroduce.)*
+- [x] **4.5** Transliterate the grid into `MobileGS.cpp`; replace the global
       `knnMatch` against `artDescs` with the gated match. **[N]**
-- [ ] **4.6** Publish `corrobPredicted` / `corrobMatched` / `searchRadiusPx`
+      *(Landed as `include/KeypointGrid.h` + `include/SearchRadius.h`, one C++ file
+      per Kotlin reference so a reviewer can diff them side by side, plus the gated
+      branch in `tryUpdateFingerprint`. NDK build verified for both ABIs.*
+      ***The plan's premise did not survive contact with the code.** 4.5 says to
+      project each `F_in` 3D point through the current pose, but the corroboration
+      match compares the frame against `mArtworkDescriptors` — the DESIGN's
+      features — and those have no position in the fingerprint frame.
+      `mArtworkKeypoints3D` is empty on the shipping path (the design composite
+      carries no depth) and, when depth exists, is expressed in the artwork
+      capture camera's frame, which has no relation to the fingerprint's. So the
+      prediction goes through the design's PLACEMENT instead: a new
+      `setDesignPlacement` carries `captureAnchorCam · rigidModelAnchorLocal` —
+      the exact composition Φ is classified with, passed rather than re-derived so
+      the two cannot disagree — and each artwork feature's composite pixel maps
+      parametrically onto the design plane before projecting. Missing placement,
+      missing pose, or a 2D/descriptor length mismatch falls back to the global
+      search, which is Phase 4 off rather than Phase 4 guessing.*
+      *Two consequences worth naming. The match direction INVERTS — the gated path
+      asks each design feature which frame keypoint it is, because that is the
+      direction a predicted location exists in. And painting progress had to become
+      cumulative (`mArtworkCorroborated`, guarded by an artwork generation counter):
+      a gated match only ever looks at the part of the design in frame, so the
+      instantaneous ratio the old code published would have become a statement
+      about where the artist is standing. Cumulative is also what
+      `getPaintingProgress()` already promised — "hours, roughly monotonic, never
+      decayed".*
+      *The one recall cost is deliberate and MEASURED: a neighbourhood holding a
+      single candidate is SKIPPED, because Lowe's ratio has nothing to divide by
+      and accepting unconditionally would corroborate any keypoint that lands near
+      a prediction regardless of what it looks like — a confidence signal measuring
+      the wall's texture density, feeding `PoseFusion`'s correction strength. It
+      deflates `matched` without touching `predicted`. That is conservative against
+      false snapping and ANTI-conservative against drift, since lower confidence
+      means a smaller correction blend, so "the cost is only lower confidence" is
+      not the whole story. The rate rides its own diagnostic channel
+      (`corrobLoneSkips`), the overlay and the eval CSV; E6 sets ρ against it.)*
+      *Six defects found by the adversarial audit of this commit and fixed in the
+      follow-up: (1) the native design placement was cleared on one of three
+      project-switch branches, so opening a second project with a saved metric
+      fingerprint left the gated search predicting at the PREVIOUS project's design
+      location — the seventh instance of the "cleared in one branch, not its
+      sibling" family, now fixed structurally by clearing before the `when` rather
+      than inside it; (2) painting progress ratcheted with no false-positive bound
+      and accumulated from the unconstrained global path too — accumulation is now
+      gated-path-only and needs `kCorrobConfirmations` separate attempts;
+      (3) a tone slider re-registered the artwork and zeroed progress, fixed at the
+      call site so the design guide is no longer keyed on the AR tone adjustment;
+      (4) the three corroboration counters were never reset per attempt, breaking
+      the rule stated 780 lines above them and copying one measurement into every
+      eval row; (5) a comment claimed a `PoseFusion` consequence the wiring makes
+      impossible; (6) `KeypointGrid.kt`'s KDoc cited a native test that does not
+      exist and described a fixed nine-cell sweep the file does not implement.)*
+- [x] **4.6** Publish `corrobPredicted` / `corrobMatched` / `searchRadiusPx`
       through the Phase 6 channels. **[N]**
-- [ ] **4.7** Make the Lowe ratio for the *corroboration* match a separate
+      *(Plus `corrobLoneSkips` and `relocReprojPx`, neither of which 4.6 names and
+      both of which the phase cannot be evaluated without.)*
+      *(Two ints widen the packed `nativeGetRelocDiagnostics` array to 11 —
+      `getRelocDiagnostics`'s width guard stays at `< 9` on purpose, so a 2.11-era
+      `.so` still yields its nine good diagnostics instead of being refused whole
+      for missing two. The floats could not ride an `int[]` without rounding a
+      sub-pixel radius to zero at exactly the tight radii the phase is measuring,
+      so they get their own `CorroborationDiagnostics` channel — which also carries
+      `relocReprojPx`, a fourth number 4.6 did not name but 4.3 needs (see below).
+      All four reach the eval CSV and the on-device overlay. The overlay's
+      "Corroborated" row was fed `paintingProgress`, a label for a different
+      number; it is now "Painted", with a real "Corrob" row beside it showing
+      `matched/predicted · r=NNpx`.)*
+- [x] **4.7** Make the Lowe ratio for the *corroboration* match a separate
       constant from the reloc ratio, so E7 can sweep it independently.
-- [ ] **4.8** Guard: if the predicted-visible count is zero, publish confidence as
+      *(`kCorrobLoweRatio = 0.85` against `kRelocLoweRatio = 0.75`. The literal
+      `0.75f` appeared at FOUR sites, not two: the reloc wall match, the reloc map
+      match, the map association in `growMapFromReloc`, and corroboration. The
+      first three are all global searches with no prior and keep the reloc
+      constant. `CorroborationTranslitTest` asserts the corroboration ratio is
+      strictly looser, that the gated match actually applies it, and that no bare
+      Lowe literal survives — a separate constant nothing reads is an antipattern
+      this project has already shipped once.)*
+- [x] **4.8** Guard: if the predicted-visible count is zero, publish confidence as
       "not measured" rather than 0.0 — those are different states and
       `PoseFusion` must not read the second as the first.
+      *(`predicted > 0 ? matched/predicted : kCorroborationUnmeasured`, pinned by
+      source-text assertion because the two differ by one ternary and the wrong one
+      is the shorter expression. Note the two states are numerically identical by
+      the time they reach `PoseFusion` — `ArRenderer` coerces the negative to 0f
+      and `CONF_FLOOR` absorbs both — so the value of this guard is entirely in the
+      diagnostics and the eval CSV, which is where E6 has to tell "looking away"
+      apart from "looked, found nothing".)*
+- [x] **4.3b** Feed the reloc PnP's mean inlier reprojection error into the radius.
+      *(Not in the original list, and it is the honest half of 4.3.
+      `DriftCostProbe.errMm` — the signal 4.3 nominates — needs a ground-truth pose
+      and returns -1 without one, so on every non-eval run the drift term was dead
+      code and the phase's stated risk mitigation was unimplemented. The
+      reprojection residual is measured on every lock and is already in pixels.
+      Added as a second term with its own gain (`REPROJ_GAIN = 2.0`, deliberately
+      not neutral: it is a residual over the points the pose was fitted to, and
+      RANSAC's 8 px threshold caps what it can report) rather than converted into
+      the first, and published as its own diagnostic.)*
 
 ### Phase 5b — the predicted-visible denominator
 
-- [ ] **5b.1** Switch `corroborationConfidence`'s denominator from
+- [x] **5b.1** Switch `corroborationConfidence`'s denominator from
       `artDescs.rows` to the Phase 4 predicted-visible count, so a close-up of
       one corner is no longer capped by framing rather than by agreement. **[N]**
+      *(Landed inside 4.5 rather than as its own change, because it could not be
+      separated: the gated match's `predicted` counter IS the predicted-visible
+      count, and writing the gated path without also switching the denominator
+      would have meant computing the number and then deliberately ignoring it.
+      `MobileGS.cpp` — `predicted > 0 ? matched/predicted : kCorroborationUnmeasured`.*
+      *Scope worth being exact about: the switch applies on the GATED path only.
+      With no design placement Phase 4 is off, and confidence stays the
+      whole-design ratio — which is correct, not a shortfall. There is no
+      predicted-visible count when nothing predicts.*
+      *Ticked here rather than left open because the code has shipped it; an
+      unticked item whose implementation is already merged is the same class of
+      lie as a comment that describes what the code used to do.)*
 - [ ] **5b.2** Re-derive `CONF_FLOOR` against the new denominator. Its current
       0.5 was reasoned against the old one and does not transfer unexamined. **[T]**
+      *(BLOCKED by X.3, not by difficulty. This is a live change to `PoseFusion`,
+      so landing it on the Phase 4 branch would put two phases in one CI run —
+      exactly what X.3 forbids, and the reason is that E11 cannot attribute a
+      change in correction behaviour to the denominator or to the floor if both
+      moved together. Waits for #1807 to merge.*
+      *One thing to know before starting: `PoseFusionTest`'s `corroboration scales
+      correction strength` asserts `painted[12] / bare[12] == 2f` exactly, and that
+      2 is `1 / CONF_FLOOR`. It is not an incidental number — moving the floor moves
+      that assertion, and a re-derivation that leaves the test green has almost
+      certainly not changed anything.)*
 
 ### Phase 3 — geometric promotion
 

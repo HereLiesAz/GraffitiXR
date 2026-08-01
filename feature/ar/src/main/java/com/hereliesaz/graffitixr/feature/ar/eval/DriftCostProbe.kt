@@ -64,6 +64,10 @@ class DriftCostProbe(
      * @param reloc          last relocalization diagnostics, or null when not sampled. Logged so a
      *   null relocalization becomes a diagnosis rather than an absence: NO_FEATURES and FEW_INLIERS
      *   call for opposite fixes and the aggregate error number cannot tell them apart.
+     * @param corrob        last corroboration diagnostics, or null when not sampled. Read from
+     *   `SlamManager.getCorroborationDiagnostics()`, which is a separate call from the reloc
+     *   diagnostics only because these two readings are floats; pass it alongside [reloc] so both
+     *   describe the same tick rather than two samples taken at different times.
      * @param captureRotationNeededDeg `rotationNeeded` at the moment the ACTIVE TARGET was
      *   captured, or -1 if unknown. **E0b's independent variable** — the frame mismatch is baked
      *   into the fingerprint at capture, so this and not [liveRotationNeededDeg] is what results
@@ -78,6 +82,7 @@ class DriftCostProbe(
         stageMs: FloatArray,
         cpuPct: Float,
         reloc: com.hereliesaz.graffitixr.common.model.RelocDiagnostics? = null,
+        corrob: com.hereliesaz.graffitixr.common.model.CorroborationDiagnostics? = null,
         captureRotationNeededDeg: Int = EvalSampleLog.NOT_SAMPLED,
         liveRotationNeededDeg: Int = EvalSampleLog.NOT_SAMPLED,
     ) {
@@ -123,6 +128,17 @@ class DriftCostProbe(
             relocBackboneFeatures = reloc?.backboneFeatures ?: EvalSampleLog.NOT_SAMPLED,
             relocBackboneMatches = reloc?.backboneMatches ?: EvalSampleLog.NOT_SAMPLED,
             relocBackboneInliers = reloc?.backboneInliers ?: EvalSampleLog.NOT_SAMPLED,
+            // Same two routes as the backbone counts, and the same rule: native already reports -1
+            // for a quantity it has not measured, so the elvis only covers "no diagnostics were
+            // read this tick at all". Neither route may land on 0. A zero predicted count is the
+            // artist looking away from the design — a real state 4.8 has to keep separate from a
+            // gate that never fired — and a zero reprojection error is what a perfect lock reports,
+            // so writing 0 for absent data would file the best rows and the empty rows together.
+            corrobPredicted = reloc?.corrobPredicted ?: EvalSampleLog.NOT_SAMPLED,
+            corrobMatched = reloc?.corrobMatched ?: EvalSampleLog.NOT_SAMPLED,
+            corrobLoneSkips = reloc?.corrobLoneSkips ?: EvalSampleLog.NOT_SAMPLED,
+            searchRadiusPx = corrob?.searchRadiusPx ?: EvalSampleLog.NOT_SAMPLED_PX,
+            relocReprojPx = corrob?.relocReprojPx ?: EvalSampleLog.NOT_SAMPLED_PX,
             captureRotationNeededDeg = captureRotationNeededDeg,
             liveRotationNeededDeg = liveRotationNeededDeg,
         )

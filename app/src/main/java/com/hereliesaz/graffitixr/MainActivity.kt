@@ -1109,6 +1109,7 @@ class MainActivity : ComponentActivity() {
                                 !showLibrary && !showSettings && !mainUiState.isCapturingTarget) {
                                 RelocDiagnosticsOverlay(
                                     diagnostics = arUiState.relocDiagnostics,
+                                    corroboration = arUiState.corroborationDiagnostics,
                                     fingerprintPoints = arUiState.evalLiveMetrics.wallCount,
                                     paintingProgress = arUiState.paintingProgress,
                                 )
@@ -2116,6 +2117,7 @@ private const val FEW_FEATURES_IN_FRAME = 100
 @Composable
 private fun RelocDiagnosticsOverlay(
     diagnostics: RelocDiagnostics,
+    corroboration: com.hereliesaz.graffitixr.common.model.CorroborationDiagnostics,
     fingerprintPoints: Int,
     paintingProgress: Float,
 ) {
@@ -2190,7 +2192,48 @@ private fun RelocDiagnosticsOverlay(
             },
         )
         DiagnosticRow("FP pts", fingerprintPoints.toString(), androidx.compose.ui.graphics.Color.Cyan)
-        DiagnosticRow("Corroborated", "${(paintingProgress * 100).toInt()}%", androidx.compose.ui.graphics.Color.White)
+        // IMPLEMENTATION.md 4.6 — the corroboration match's own numbers, which are NOT the row
+        // below. "Corrob" is instantaneous: of the design features this pose says are in view, how
+        // many the wall backs right now, and the radius the gated search used to decide. "Painted"
+        // is cumulative over the whole design and moves over hours. They were one number until
+        // Phase 4/5b split them, and this row existing separately is what makes the split visible.
+        //
+        // "—" is the gated match never having run — no design placement, or no pose this frame — and
+        // is a different state from `0/0`, which says the artist is looking away from the design.
+        DiagnosticRow(
+            "Corrob",
+            if (d.corrobPredicted < 0) "—" else buildString {
+                append("${d.corrobMatched}/${d.corrobPredicted}")
+                val r = corroboration.searchRadiusPx
+                if (r >= 0f) append(" · r=${r.toInt()}px")
+                // The skips are shown only when there are any, because on a healthy frame the
+                // number is 0 and a permanent "· 0 skip" trains the eye to ignore the field. When
+                // it IS non-zero it is the most important thing in the row: those are predicted
+                // features the match declined to test, so the ratio to its left is understated by
+                // exactly that much and a low reading may be the radius rather than the wall.
+                if (d.corrobLoneSkips > 0) append(" · ${d.corrobLoneSkips} skip")
+            },
+            // Amber, not red: zero predicted is the artist looking elsewhere, which is ordinary and
+            // self-correcting. Red is reserved for the states that do not fix themselves.
+            if (d.corrobPredicted == 0) {
+                androidx.compose.ui.graphics.Color(0xFFFFC107)
+            } else {
+                androidx.compose.ui.graphics.Color.White
+            },
+        )
+        // The residual the search radius' drift term is derived from — and the fastest read on
+        // whether a "locked" state is actually a good lock. A green LOCKED with a large reprojection
+        // error is a pose that solved and is wrong, which nothing else on this overlay distinguishes.
+        if (corroboration.relocReprojPx >= 0f) {
+            DiagnosticRow(
+                "Reproj",
+                String.format(java.util.Locale.US, "%.1f px", corroboration.relocReprojPx),
+                androidx.compose.ui.graphics.Color.White,
+            )
+        }
+        // Painting progress, labelled as such. It was labelled "Corroborated" while being fed
+        // paintingProgress — a name for the value one row up, on a number that is not it.
+        DiagnosticRow("Painted", "${(paintingProgress * 100).toInt()}%", androidx.compose.ui.graphics.Color.White)
     }
 }
 

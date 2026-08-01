@@ -125,6 +125,44 @@ public:
      */
     static constexpr float kCorroborationDecay = 0.9f;
 
+    /**
+     * IMPLEMENTATION.md 4.7 — the two Lowe ratios, named apart so E7 can sweep them independently.
+     *
+     * They were the same literal `0.75f` written at four call sites, which made them look like one
+     * decision. They are not. The reloc match is a GLOBAL search over the backbone with no prior — as
+     * are the two map matches, which is why those keep `kRelocLoweRatio` — where a
+     * loose ratio admits false correspondences that RANSAC then has to reject; the corroboration
+     * match after Phase 4 searches a candidate set roughly 0.2% the size, where the false-positive
+     * population has already collapsed and the same threshold throws away true matches for nothing.
+     * Phase 4's entire justification is that the constraint lets this one be LOOSENED — so it has to
+     * be a separate number, or the effect cannot be measured.
+     *
+     * Both are pre-registered priors (PARAMETERS.md section 5). `kRelocLoweRatio` is the value that
+     * shipped; `kCorrobLoweRatio` is the paper's suggested 0.85, and E7 sets it for real.
+     */
+    static constexpr float kRelocLoweRatio = 0.75f;
+    static constexpr float kCorrobLoweRatio = 0.85f;
+
+    /**
+     * How many separate gated attempts must corroborate a design feature before it counts toward
+     * painting progress.
+     *
+     * Progress accumulates and never decays, which is what the channel promises — but a
+     * monotone counter with no false-positive bound saturates on noise given enough ticks. The
+     * reloc loop runs at 5 Hz locked, so even one spurious match per attempt would walk a
+     * 1500-feature design to "100% painted" in minutes on a bare wall.
+     *
+     * Two, not one, and not five. One is the unbounded case. Two costs a genuinely painted feature
+     * nothing — it corroborates on every attempt it is in view for, so it confirms on the next tick
+     * — while removing the entire class of TRANSIENT false positives, which is the class that
+     * ratchets. It does not defend against a persistent false positive: a wall feature that really
+     * does sit near a design feature's prediction and really does win the ratio test will confirm,
+     * and no counter threshold changes that. That is a limit of descriptor corroboration, not of
+     * this constant, and it is why E6 measures progress against ground truth rather than trusting
+     * it.
+     */
+    static constexpr uint8_t kCorrobConfirmations = 2;
+
     /** Last [RelocReject]. */
     int lastRelocReject() const { return mLastRelocReject.load(std::memory_order_relaxed); }
     /** Correspondences built by the last attempt, successful or not. */
@@ -151,6 +189,59 @@ public:
     int lastRelocBackboneMatches() const { return mLastRelocBackboneMatches.load(std::memory_order_relaxed); }
     /** RANSAC inliers that came from F_out points; -1 when PnP never produced an inlier set. */
     int lastRelocBackboneInliers() const { return mLastRelocBackboneInliers.load(std::memory_order_relaxed); }
+
+    /**
+     * IMPLEMENTATION.md 4.6 — the corroboration match's own counts, so the effect Phase 4 claims can
+     * be seen rather than argued about.
+     *
+     * `corrobPredicted` is how many design features the current pose puts inside the frame;
+     * `corrobMatched` is how many of those the wall answered for. Both -1 until a GATED attempt has
+     * run: the global fallback path measures a different thing (every descriptor of the design,
+     * framing included) and reporting its numbers here would make the two look comparable.
+     *
+     * Zero predicted is a real reading — the artist is looking away from the design — and is the
+     * state 4.8 exists to keep distinct from zero matched.
+     */
+    int corrobPredicted() const { return mCorrobPredicted.load(std::memory_order_relaxed); }
+    int corrobMatched() const { return mCorrobMatched.load(std::memory_order_relaxed); }
+    /**
+     * Predicted-visible features the gated match REFUSED to test, because their neighbourhood held
+     * a single candidate and Lowe's ratio has nothing to divide by. -1 when no gated attempt ran.
+     *
+     * Published rather than logged because it is the number that decides whether the phase works.
+     * These skips deflate `corrobMatched` without touching `corrobPredicted`, so a radius that is
+     * too tight does not announce itself as an error — it announces itself as a wall that has
+     * stopped corroborating, which is indistinguishable from an unpainted one. At the `MIN_PX`
+     * floor a sparse frame can skip most of what it predicted; with this on the channel that is a
+     * reading E6 can act on instead of an unknown.
+     */
+    int corrobLoneSkips() const { return mCorrobLoneSkips.load(std::memory_order_relaxed); }
+    /** Search radius the last gated attempt used, in pixels, or -1 when no gated attempt has run. */
+    float corrobSearchRadiusPx() const { return mCorrobSearchRadiusPx.load(std::memory_order_relaxed); }
+    /**
+     * Mean reprojection error over the last lock's PnP inliers, in pixels, or -1 when not measured.
+     *
+     * Feeds the search radius' drift term (SearchRadius.h) and is a diagnostic in its own right.
+     * Bounded above by the RANSAC inlier threshold by construction, which is why the gain applied to
+     * it is not 1.0 — see `SearchRadius.REPROJ_GAIN`.
+     */
+    float lastRelocReprojPx() const { return mLastRelocReprojPx.load(std::memory_order_relaxed); }
+
+    /**
+     * IMPLEMENTATION.md 4.5 — where the design sits, so the corroboration match can predict where
+     * each of its features should appear.
+     *
+     * @param fpFromDesign16 the design's model matrix expressed in the WALL FINGERPRINT frame,
+     *   column-major. This is exactly `FingerprintPartition.partition`'s `designInPointFrame`
+     *   (`captureAnchorCam * rigidModelAnchorLocal`) — the same composition Phi is classified with,
+     *   deliberately, because a second derivation of the same quantity is a second chance to get the
+     *   frame wrong. RIGID: the overlay's scale is folded into the extents, not this matrix.
+     * @param halfW,halfH the design's effective (scale-included) half-extents in metres.
+     *
+     * Pass a null pointer or a non-positive extent to clear the placement, which returns the
+     * corroboration match to the global search it did before Phase 4.
+     */
+    void setDesignPlacement(const float* fpFromDesign16, float halfW, float halfH);
 
     void scheduleRelocCheck(const cv::Mat& colorFrame);
     /**
@@ -215,6 +306,25 @@ public:
      * RANSAC draw the identical sample sequence forever.
      */
     void setEvalRngSeed(long long seed);
+    /**
+     * EVALUATION.md 3.1 — enable inline relocalization at one pass per [everyN] frames.
+     *
+     * @param everyN clamped to at least 1. Pass 0 or negative and you would get either a divide by
+     *   zero or a mode that never runs; both are worse than the honest floor, and a silent
+     *   never-runs would look exactly like relocalization being broken.
+     *
+     * Disabling resets the frame counter, so two runs in one process start their cadence from the
+     * same phase rather than wherever the previous run left off — otherwise "every 5th frame" would
+     * mean a different five frames per run, which is the non-determinism this exists to remove.
+     */
+    void setEvalSyncReloc(bool enabled, int everyN);
+    /** True when inline relocalization is active — for the run-identity sidecar's sync/async field. */
+    bool isEvalSyncReloc() const { return mEvalSyncReloc.load(std::memory_order_relaxed); }
+    /** The cadence in force, or 0 when sync mode is off. Reported alongside the flag. */
+    int evalSyncEveryN() const {
+        return mEvalSyncReloc.load(std::memory_order_relaxed)
+            ? mEvalSyncEveryN.load(std::memory_order_relaxed) : 0;
+    }
     void setVoxelSize(float size);
     void setParallaxMinDegrees(float deg);
     void setMappingPaused(bool paused) { mMappingPaused = paused; }
@@ -290,6 +400,11 @@ private:
     std::atomic<bool> mMapRunning{false};
 
     void relocThreadFunc();
+    /**
+     * EVALUATION.md 3.1 — one relocalization attempt over one frame, callable either from the
+     * background worker or inline from the caller in eval sync mode.
+     */
+    void runRelocPass(const cv::Mat& frame, const float* relocView);
     // Teleological self-grow (gatekeeper stage): measure how much of the registered artwork base is now
     // corroborated by real wall content in the clean camera frame -> mPaintingProgress. Read-only on the
     // reloc fingerprint; the promotion step (adding validated new marks) is staged separately.
@@ -340,6 +455,34 @@ private:
     static constexpr uint8_t kRegionOutside = 2;
     cv::Mat mArtworkDescriptors;
     std::vector<cv::Point3f> mArtworkKeypoints3D;
+    // IMPLEMENTATION.md 4.5 — the artwork features' 2D positions in the composite the descriptors
+    // were detected on, kept 1:1 with mArtworkDescriptors THROUGH the depth-path row filter in
+    // setArtworkFingerprint. mArtworkKeypoints3D is not usable for this: it is empty on the shipping
+    // path (the design composite carries no depth) and, when depth does exist, it is expressed in
+    // the artwork CAPTURE camera's frame, which has no relation to the wall fingerprint frame the
+    // reloc pose is in. Predicting where a design feature should appear goes through the design's
+    // placement instead, which is a frame the app actually knows.
+    std::vector<cv::Point2f> mArtworkKeypoints2D;
+    // Pixel size of that composite; the design-plane mapping is parametric in it, so a design
+    // re-registered at a different resolution stays correct without rescaling the keypoints.
+    int mArtworkImageW = 0;
+    int mArtworkImageH = 0;
+    // One flag per artwork descriptor: has the wall EVER answered for this feature? Painting
+    // progress is the popcount over this, not the current frame's match count.
+    //
+    // Before Phase 4 the instantaneous ratio was already the whole design's, so a frame that saw
+    // everything reported everything. The gated match only ever looks at the part of the design in
+    // view, so the instantaneous ratio would become a statement about where the artist is standing.
+    // Accumulating is also closer to what getPaintingProgress() already promises — "on the timescale
+    // of hours, roughly monotonic. Never decayed." Cleared whenever a new artwork is registered,
+    // because every prior reading was against a different target.
+    std::vector<uint8_t> mArtworkCorroborated;
+    // Bumped whenever the artwork is replaced or cleared. tryUpdateFingerprint snapshots the
+    // descriptors under the lock, spends milliseconds matching outside it, and then merges its
+    // result back in; without this it would merge into whatever artwork is registered by then. The
+    // sizes alone are not enough — a design swapped for one with the same feature count would pass a
+    // length check and corrupt the accumulator with another target's hits.
+    long mArtworkGeneration = 0;
     std::atomic<float> mPaintingProgress{0.0f};
     // -1 = never measured, which is NOT the same as 0.0 = measured and found nothing. Zero is a
     // legitimate reading here, so it cannot double as the "no data yet" sentinel.
@@ -382,6 +525,14 @@ private:
     float mFingerprintAnchorMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     // fx,fy,cx,cy the wall fingerprint's 3D points were built with; {0,..} => unset (use a default).
     float mFingerprintIntrinsics[4] = {0,0,0,0};
+    // IMPLEMENTATION.md 4.5 — the design's rigid pose in the FINGERPRINT frame plus its
+    // scale-included half-extents. Guarded by mMutex like everything else here, and false until
+    // Kotlin has pushed a placement: absent means the corroboration match falls back to the global
+    // search, which is Phase 4 turned off rather than Phase 4 guessing.
+    float mDesignFpFromDesign[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    float mDesignHalfW = 0.0f;
+    float mDesignHalfH = 0.0f;
+    bool mHasDesignPlacement = false;
     // VIO view matrix at fingerprint-capture time + flag; used to rectify oblique live views to the
     // fingerprint's frontal frame before matching (perspective-robust matching). False for fingerprints
     // restored without a capture view (rectification is then skipped — plain matching still runs).
@@ -396,6 +547,30 @@ private:
     // explicitly enabled"; the initializer said otherwise and the header won, which meant every
     // release build promoted unsupervised with no user-facing switch to stop it.
     std::atomic<bool> mSelfGrowEnabled{false};
+
+    /**
+     * EVALUATION.md 3.1 — run relocalization INLINE on the calling thread, one pass every Nth
+     * frame, instead of handing frames to the background worker.
+     *
+     * The second of the three named sources of replay non-determinism. RANSAC's RNG is seeded
+     * (mEvalRngSeed) and the frame order is fixed by the recording, but the worker's
+     * `locked ? 200 : 60` ms sleep means WHICH frames it receives is a scheduling outcome. Two
+     * replays of one recording therefore sample it differently, and a parameter A/B silently
+     * becomes a comparison of two different frame subsets.
+     *
+     * Off by default and gated at the JNI call site to debuggable builds, because this is an
+     * evaluation affordance and not a behaviour change: run inline and the reloc cost lands on the
+     * caller's thread at a cadence no real device would choose. EVALUATION.md is explicit that both
+     * are reported — the async numbers are what users get, the sync numbers are what is comparable.
+     */
+    std::atomic<bool>     mEvalSyncReloc{false};
+    std::atomic<int>      mEvalSyncEveryN{1};
+    /**
+     * Frames seen since sync mode was enabled, for the every-Nth decision. Not atomic-incremented
+     * for correctness across threads — scheduleRelocCheck is called from the one render thread —
+     * but atomic so enabling the mode from another thread cannot tear it.
+     */
+    std::atomic<long long> mEvalSyncFrameCounter{0};
 
     /** Fixed RANSAC seed for reproducible replay, or <0 for "leave the RNG alone" (default). */
     std::atomic<long long> mEvalRngSeed{-1};
@@ -465,5 +640,15 @@ private:
     std::atomic<int>        mLastRelocBackboneFeatures{-1};
     std::atomic<int>        mLastRelocBackboneMatches{-1};
     std::atomic<int>        mLastRelocBackboneInliers{-1};
+    // IMPLEMENTATION.md 4.6 — the corroboration match's counts and the radius it used. All -1 for
+    // "no gated attempt has run", following the same rule as the trio above: zero predicted is a
+    // real reading (the artist is not looking at the design) and cannot double as the default.
+    std::atomic<int>        mCorrobPredicted{-1};
+    std::atomic<int>        mCorrobMatched{-1};
+    std::atomic<int>        mCorrobLoneSkips{-1};
+    std::atomic<float>      mCorrobSearchRadiusPx{-1.0f};
+    // Mean reprojection error over the last lock's PnP inliers, in pixels. -1 = not measured, and it
+    // stays -1 on every path that does not reach a refined inlier set.
+    std::atomic<float>      mLastRelocReprojPx{-1.0f};
     cv::Mat                 mRelocColorFrame;
 };

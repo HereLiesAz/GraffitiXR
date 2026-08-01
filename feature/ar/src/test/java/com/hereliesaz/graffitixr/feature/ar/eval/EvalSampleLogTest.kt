@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar.eval
 
 import com.hereliesaz.graffitixr.common.model.RelocDiagnostics
+import com.hereliesaz.graffitixr.feature.ar.anchor.SearchRadius
 import com.hereliesaz.graffitixr.common.model.RelocReject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -45,6 +46,7 @@ class EvalSampleLogTest {
                 "nativeHeapKb,relocReject,relocMatches,relocInliers,relocDetected," +
                 "relocObliquityDeg,relocRectifiedCorr," +
                 "relocBackboneFeatures,relocBackboneMatches,relocBackboneInliers," +
+                "corrobPredicted,corrobMatched,corrobLoneSkips,searchRadiusPx,relocReprojPx," +
                 "captureRotationNeededDeg,liveRotationNeededDeg",
             EvalSampleLog.CSV_HEADER,
         )
@@ -59,8 +61,12 @@ class EvalSampleLogTest {
             nativeHeapKb = 20480L,
         )
         assertEquals(
+            // Six reloc, three backbone and three corroboration Int columns default to -1; the two
+            // pixel columns are Floats, so their -1f sentinel prints as -1.0; then the two rotation
+            // columns. The float spelling is part of the contract a consumer parses, not an
+            // incidental formatting detail, so it is written out here literally.
             "12,dual,true,1.5,0.25,3.0,1.0,2.0,0.0,4.0,1.0,8.0,30.0,-450.0,31.0,20480," +
-                "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1",
+                "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1.0,-1.0,-1,-1",
             EvalSampleLog.toCsvRow(row),
         )
     }
@@ -337,5 +343,50 @@ class EvalSampleLogTest {
         val fields = EvalSampleLog.fields(sample(reloc = d))
         assertEquals("0", fields[EvalSampleLog.COLUMNS.indexOf("relocDetected")])
         assertEquals("0", fields[EvalSampleLog.COLUMNS.indexOf("relocMatches")])
+    }
+
+    /**
+     * The Phase 4 twin of the backbone trap, across the corroboration columns.
+     *
+     * Every one of these quantities has a *legitimate* zero, and for `relocReprojPx` the zero is
+     * the good news rather than the bad. A zero `corrobPredicted` means the artist has turned away
+     * from the design — real, expected, and the state `IMPLEMENTATION.md` 4.8 has to keep separate
+     * from "the gated corroboration attempt never ran at all", because a low confidence ratio means
+     * nothing in the first case and something in the second. A zero `corrobLoneSkips` is the
+     * healthy reading: every predicted feature had enough neighbours to test. And a near-zero
+     * `relocReprojPx` is what a *perfect* lock reports: had 0 doubled as the not-measured marker,
+     * the best rows Phase 4 can produce would have been filed as missing data, and the pixel columns
+     * would have been blindest exactly where the result is strongest.
+     *
+     * `searchRadiusPx` is the one column with **no** legitimate zero — `SearchRadius.pixels` clamps
+     * every path into `[MIN_PX, MAX_PX]` — so it is exercised at its floor instead. A 0 in that
+     * column means corrupt data, and a test asserting a "measured zero" for it would have been
+     * pinning a state the code cannot produce.
+     *
+     * Asserted against literal strings, including the `.0` the Float columns print, because those
+     * spellings are what a downstream consumer parses.
+     */
+    @Test
+    fun `a measured corroboration zero is distinct from not sampled`() {
+        val lookingAway = sample().copy(
+            corrobPredicted = 0, corrobMatched = 0, corrobLoneSkips = 0,
+            searchRadiusPx = SearchRadius.MIN_PX, relocReprojPx = 0f,
+        )
+        val measured = EvalSampleLog.fields(lookingAway)
+        val unsampled = EvalSampleLog.fields(sample())
+        val cases = listOf(
+            Triple("corrobPredicted", "0", "-1"),
+            Triple("corrobMatched", "0", "-1"),
+            Triple("corrobLoneSkips", "0", "-1"),
+            Triple("searchRadiusPx", "4.0", "-1.0"),
+            Triple("relocReprojPx", "0.0", "-1.0"),
+        )
+        for ((col, zero, sentinel) in cases) {
+            val i = EvalSampleLog.COLUMNS.indexOf(col)
+            assertTrue("$col is not a column", i >= 0)
+            assertEquals("$col: a measured zero must log as zero", zero, measured[i])
+            assertEquals("$col: an unmeasured tick must log the sentinel", sentinel, unsampled[i])
+            assertTrue("$col: a measured zero must not read as absent", measured[i] != unsampled[i])
+        }
     }
 }

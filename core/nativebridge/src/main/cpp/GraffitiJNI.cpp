@@ -396,6 +396,22 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetEvalRngSeed(JNI
     if (gSlamEngine) gSlamEngine->setEvalRngSeed((long long)seed);
 }
 
+// EVALUATION.md 3.1 / IMPLEMENTATION.md 6a.4 — inline relocalization for deterministic replay.
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetEvalSyncReloc(
+        JNIEnv* env, jobject thiz, jboolean enabled, jint everyN) {
+    if (gSlamEngine) gSlamEngine->setEvalSyncReloc(enabled == JNI_TRUE, (int)everyN);
+}
+
+// The cadence ACTUALLY in force: 0 when sync mode is off, so one int carries both the flag and the
+// N. Read back rather than remembered on the Kotlin side, so the run-identity sidecar reports what
+// the engine is doing and not what the caller asked for -- with no engine there is no sync mode, and
+// a sidecar claiming otherwise would be the kind of evidence that is worse than none.
+JNIEXPORT jint JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetEvalSyncRelocEveryN(JNIEnv* env, jobject thiz) {
+    return gSlamEngine ? (jint)gSlamEngine->evalSyncEveryN() : 0;
+}
+
 JNIEXPORT jint JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetWallKeypointCount(JNIEnv* env, jobject thiz) {
     return gSlamEngine ? gSlamEngine->getWallKeypointCount() : 0;
@@ -1317,7 +1333,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCorroborationCo
 // [0] = RelocReject code, [1] = correspondences, [2] = RANSAC inliers, [3] = features detected,
 // [4] = obliquity in degrees (-1 when the rectification pass wasn't eligible), [5] = correspondences
 // the rectification pass contributed, [6] = stored points in F_out, [7] = correspondences built
-// against F_out, [8] = inliers that came from F_out (IMPLEMENTATION.md 2.11; -1 = not measured).
+// against F_out, [8] = inliers that came from F_out (IMPLEMENTATION.md 2.11; -1 = not measured),
+// [9] = design features the current pose predicts are visible, [10] = how many of those the wall
+// answered for, [11] = how many predicted features the gated match refused to test because their
+// neighbourhood held a single candidate (IMPLEMENTATION.md 4.6; all three -1 until a GATED
+// corroboration attempt has run, and 0 for [9] is a real reading meaning the artist is not looking
+// at the design).
 extern "C" JNIEXPORT jintArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostics(JNIEnv* env, jobject) {
     // NOT {0, ...}: zero is kRelocOk, so a no-engine fallback of 0 reports a SUCCESSFUL LOCK with
@@ -1327,7 +1348,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostic
     // the Kotlin-only code that absorbs anything the native side cannot account for; the counts are
     // -1 (not sampled) rather than 0, because zero matches is a real measurement.
     static constexpr jint kRelocUnknownOrdinal = 7;
-    jint vals[9] = {kRelocUnknownOrdinal, -1, -1, -1, -1, -1, -1, -1, -1};
+    jint vals[12] = {kRelocUnknownOrdinal, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
     if (gSlamEngine) {
         vals[0] = gSlamEngine->lastRelocReject();
         vals[1] = gSlamEngine->lastRelocMatches();
@@ -1338,11 +1359,50 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostic
         vals[6] = gSlamEngine->lastRelocBackboneFeatures();
         vals[7] = gSlamEngine->lastRelocBackboneMatches();
         vals[8] = gSlamEngine->lastRelocBackboneInliers();
+        vals[9] = gSlamEngine->corrobPredicted();
+        vals[10] = gSlamEngine->corrobMatched();
+        vals[11] = gSlamEngine->corrobLoneSkips();
     }
-    jintArray out = env->NewIntArray(9);
+    jintArray out = env->NewIntArray(12);
     if (!out) return nullptr;
-    env->SetIntArrayRegion(out, 0, 9, vals);
+    env->SetIntArrayRegion(out, 0, 12, vals);
     return out;
+}
+
+// IMPLEMENTATION.md 4.6 — the two float diagnostics from the corroboration path, which cannot ride
+// the int[] above. Packed together for the same reason it is packed: one call, one snapshot.
+// [0] = search radius the last gated attempt used, in pixels; [1] = mean reprojection error over the
+// last lock's PnP inliers, also in pixels. Both -1 for "not measured", never 0 — a perfectly
+// tracking pose really does have a near-zero reprojection error, so zero cannot double as the
+// default.
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCorroborationDiagnostics(JNIEnv* env, jobject) {
+    jfloat vals[2] = {-1.0f, -1.0f};
+    if (gSlamEngine) {
+        vals[0] = gSlamEngine->corrobSearchRadiusPx();
+        vals[1] = gSlamEngine->lastRelocReprojPx();
+    }
+    jfloatArray out = env->NewFloatArray(2);
+    if (!out) return nullptr;
+    env->SetFloatArrayRegion(out, 0, 2, vals);
+    return out;
+}
+
+// IMPLEMENTATION.md 4.5 — where the design sits, so the corroboration match can predict where each
+// of its features should appear. A null or wrong-length matrix clears the placement rather than
+// being padded: the corroboration match then falls back to its global search, which is Phase 4 off
+// and not Phase 4 guessing.
+extern "C" JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetDesignPlacement(
+        JNIEnv* env, jobject, jfloatArray fpFromDesign16, jfloat halfW, jfloat halfH) {
+    if (!gSlamEngine) return;
+    if (!fpFromDesign16 || env->GetArrayLength(fpFromDesign16) != 16) {
+        gSlamEngine->setDesignPlacement(nullptr, 0.0f, 0.0f);
+        return;
+    }
+    jfloat* m = env->GetFloatArrayElements(fpFromDesign16, nullptr);
+    gSlamEngine->setDesignPlacement(m, halfW, halfH);
+    env->ReleaseFloatArrayElements(fpFromDesign16, m, JNI_ABORT);
 }
 
 extern "C" JNIEXPORT void JNICALL
