@@ -653,6 +653,29 @@ assumed, or that `rotationNeeded` is not what the device actually computes. Thos
 are the hypotheses to carry into a negative result, and they are not
 interchangeable with the one that was written here.
 
+### 8.2b A second frame inconsistency, on the path §8 does not describe
+
+Everything above concerns the no-depth capture path, the one that reaches
+`PlaneMarks.backProject`. `MainViewModel.onConfirmTargetCreation` branches on
+whether a depth buffer was captured, and the depth branch does not call
+`backProject` at all — it hands the bitmap, the depth image and the intrinsics to
+native `generateFingerprint`, which unprojects keypoints with the supplied
+intrinsics and indexes the depth image by linear scaling. All three must
+therefore share a frame. They do not: the depth buffer is ARCore's raw
+sensor-frame image, the intrinsics are the display-rotated `intrArr` in every
+orientation, and the bitmap is conditionally un-rotated by a hardcoded
+`postRotate(-90f)` gated on `isPortrait && height > width` — correct only when
+$\text{rotationNeeded} = 90$, and leaving the bitmap a half-turn from the sensor
+frame at 180 and 270.
+
+This matters here for one reason: it also makes landscape the only clean
+orientation, by an unrelated mechanism. Any device test that does not first
+disable the Depth API therefore reproduces §8's predicted *signature* without
+exercising §8's *code*. `EVALUATION.md` E0b carries this as a precondition.
+
+It is recorded and not fixed. Correcting it changes capture geometry with no
+experiment gating it, and §8.3 applies to it as much as to the main defect.
+
 ### 8.3 Why the correction is not local
 
 Rotating the capture view moves $F$ into the rotated frame, while `PoseFusion`
