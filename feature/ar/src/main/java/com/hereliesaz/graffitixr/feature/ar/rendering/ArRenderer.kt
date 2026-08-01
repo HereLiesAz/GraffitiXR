@@ -2016,7 +2016,14 @@ class ArRenderer(
                         .DesignFootprint(designRigidModel.copyOf(), newHalfW, newHalfH)
                 }
             }
-            footprint?.let(onDesignFootprintChanged)
+            // Re-checked here, not only at the top of the frame. `isDestroying` is set by
+            // `exitArMode` on the main thread, but a frame that entered the body before that can sit
+            // inside `session.update()` for a whole camera period and arrive here afterwards — with
+            // the anchor generation already bumped by teardown, so `designMoved` is unconditionally
+            // true. Publishing then re-arms `latestDesignFootprint` immediately after teardown nulls
+            // it, and the next session partitions against the dead session's design pose. The
+            // top-of-frame check cannot cover this; only a second one can.
+            if (!isDestroying) footprint?.let(onDesignFootprintChanged)
             android.opengl.Matrix.scaleM(overlayLocalScratch, 0, overlayScale, overlayScale, 1f)
             android.opengl.Matrix.multiplyMM(
                 overlayComposedScratch, 0, overlayBaseScratch, 0, overlayLocalScratch, 0

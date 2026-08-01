@@ -112,6 +112,9 @@ class SlamManager @Inject constructor(
      */
     @Volatile private var sessionEpoch = 0
 
+    /** Readable so a requester can pin it alongside [captureAnchorGenerationBaseline]. */
+    val sessionEpochValue: Int get() = sessionEpoch
+
     /**
      * The anchor generation as of the moment a capture asked for a new anchor.
      *
@@ -120,6 +123,15 @@ class SlamManager @Inject constructor(
      * taken after the request can already include the establishment it was meant to precede.
      */
     @Volatile var captureAnchorGenerationBaseline: Int = 0
+
+    /**
+     * The session epoch as of the same instant [captureAnchorGenerationBaseline] was taken.
+     *
+     * Pinned with the baseline rather than at the start of the wait, for the same reason the
+     * baseline is: the wait begins a dispatcher hop later, and an epoch read there can already
+     * include the teardown it was meant to exclude.
+     */
+    @Volatile var captureSessionEpochBaseline: Int = 0
 
     fun updateAnchorTransform(transform: FloatArray) = nativeUpdateAnchorTransform(transform)
 
@@ -150,10 +162,12 @@ class SlamManager @Inject constructor(
     suspend fun awaitAnchorTransform(
         sinceGeneration: Int,
         timeoutMs: Long = ANCHOR_WAIT_MS,
+        sinceEpoch: Int = captureSessionEpochBaseline,
     ): FloatArray? {
-        // Pinned at entry: an anchor from a LATER session answers a different question than the one
-        // this capture asked, so the wait must expire rather than accept it.
-        val epochAtEntry = sessionEpoch
+        // An anchor from a LATER session answers a different question than the one this capture
+        // asked, so the wait must expire rather than accept it. Defaulted from the requester's
+        // pinned value, not read here — reading here is a dispatcher hop too late.
+        val epochAtEntry = sinceEpoch
         if (!(hasAnchor && _anchorGeneration.value > sinceGeneration)) {
             kotlinx.coroutines.withTimeoutOrNull(timeoutMs) {
                 _anchorGeneration.first { it > sinceGeneration && hasAnchor && sessionEpoch == epochAtEntry }

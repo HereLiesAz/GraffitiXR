@@ -970,6 +970,12 @@ class ArViewModel @Inject constructor(
         // footprint is expressed relative to an anchor that is about to stop existing.
         latestDesignFootprint = null
         dropPartitionState()
+        // The UI's copy of "an anchor exists" is a separate latch, set true in
+        // onPrimaryAnchorEstablished and — until this line — never set false anywhere in the
+        // repository. Left standing it made the NEXT session pause splat mapping on its first
+        // tracking frame (updateAutoMapping gates on it) and report scanPhase COMPLETE on a session
+        // that never scanned. Sixth field to be cleared in one place and not its sibling.
+        _uiState.update { it.copy(isAnchorEstablished = false, backboneTooSmall = false) }
         // Cancel any in-flight session update (including a running stereo probe) so it stops pumping
         // the camera and releases the session mutex before cleanup tries to acquire it.
         sessionUpdateJob?.cancel()
@@ -1649,6 +1655,11 @@ class ArViewModel @Inject constructor(
         // two independent events and neither reliably comes second, so whichever is later has to be
         // able to start the work. Holding only a callback made this a one-shot that the capture
         // session always lost.
+        // Refuse anything arriving after teardown began. The renderer re-checks its own
+        // `isDestroying` before calling, but the two flags are set on different threads and this is
+        // the assignment that matters: it is what teardown nulls two lines after clearing the
+        // anchor, and a late frame re-arming it is the sixth-audit defect in one line.
+        if (isDestroying) return
         latestDesignFootprint = design
         val live = liveFingerprint ?: return
         val fp = live.fingerprint
@@ -1666,6 +1677,11 @@ class ArViewModel @Inject constructor(
         // partition can only write a size the artist has already left behind.
         // LAZY so the job exists to be stored before it can run: started only after getAndSet has
         // published it, so a job can never be cancelled by a successor that has not yet seen it.
+        // Captured at launch, checked before every write. `updateProject` applies to whatever is
+        // current WHEN IT RUNS, not when it was queued, so a project switch during the partition
+        // (a classify pass plus a blocking native replace) would write this fingerprint into the
+        // wrong project's file and leave native holding the wrong map.
+        val forProjectId = loadedFingerprint?.projectId
         val next = viewModelScope.launch(Dispatchers.Default, start = CoroutineStart.LAZY) {
             val current = liveFingerprint ?: return@launch
             val updated = FingerprintPartition.partition(current.fingerprint, design)
@@ -1673,6 +1689,8 @@ class ArViewModel @Inject constructor(
             // captureAnchorCam, no usable extents), and re-pushing an unchanged fingerprint would
             // reset native's reloc state for nothing.
             if (updated === current.fingerprint) return@launch
+            // The project may have changed while this ran; everything below writes.
+            if (loadedFingerprint?.projectId != forProjectId) return@launch
             // Idempotence, and it is load-bearing rather than an optimisation.
             //
             // `partition` returns a fresh copy whenever it CAN partition, so the identity check above
@@ -1710,8 +1728,8 @@ class ArViewModel @Inject constructor(
             liveFingerprint = LiveFingerprint(updated, current.anchor, current.intrinsics, current.view)
             lastPartitionedPose = design.rigidModelAnchorLocal.copyOf()
             // Native now holds exactly this, so the reload our own updateProject is about to trigger
-            // must not push it again.
-            restoredFingerprint = updated
+            // must recognise it and not push it again.
+            forProjectId?.let { loadedFingerprint = LoadedFingerprint(it, updated) }
 
             // IMPLEMENTATION.md 2.8, relocated. The capture cannot raise this — it has no footprint
             // to measure — so it is raised here, where the artwork's size is what made it true. A
@@ -1732,30 +1750,18 @@ class ArViewModel @Inject constructor(
         next.start()
     }
 
-    /**
-     * The fingerprint currently pushed to native, for suppressing redundant restores.
-     *
-     * `loadFingerprintIfExists` runs on EVERY `currentProject` emission, and the partition itself
-     * writes the project — so a partition triggers a reload, which would re-push the identical
-     * fingerprint and reset native's reloc state for nothing. Any other writer of `currentProject`
-     * (`saveWallFeatureMap`, for one) dragged the same cost behind it.
-     */
-    @Volatile private var restoredFingerprint: com.hereliesaz.graffitixr.common.model.Fingerprint? = null
 
     /**
      * Forget the Kotlin-side state describing a partitionable fingerprint.
      *
      * `liveFingerprint` left set is the dangerous one: a design move partitions the PREVIOUS
-     * project's map and `updateProject` writes it into the CURRENT project's file. `restoredFingerprint`
-     * left set arms the suppression guard, so switching back never re-pushes — native holding one
-     * thing, Kotlin believing another, reloc dead for the process and looking like bad tracking.
+     * project's map and `updateProject` writes it into the CURRENT project's file.
      *
      * Call this from any path that leaves no partitionable map loaded, *including* one that leaves a
      * descriptors-only map in native. [dropLoadedFingerprint] is the stronger form for paths that
      * must also empty native.
      */
     private fun dropPartitionState() {
-        restoredFingerprint = null
         liveFingerprint = null
         lastPartitionedPose = null
     }
@@ -1777,135 +1783,161 @@ class ArViewModel @Inject constructor(
         dropPartitionState()
     }
 
+    /**
+     * What is currently loaded into native, and which project it belongs to.
+     *
+     * The project id is the part that matters. Six consecutive audits found the same defect —
+     * state belonging to project A surviving into project B — each in a different branch, each
+     * found immediately after the previous one was patched. Naming the clearing operations was not
+     * enough, because the bug is not "a branch forgot to clear"; it is that nothing tied the loaded
+     * state to the project it described, so every new branch was a fresh chance to forget.
+     *
+     * With the pair stored together, a project switch is a value change rather than a sequence of
+     * assignments somebody has to remember, and the partition job can refuse to write a fingerprint
+     * into a project it was not computed for.
+     */
+    private data class LoadedFingerprint(
+        val projectId: String,
+        val fingerprint: com.hereliesaz.graffitixr.common.model.Fingerprint?,
+    )
+
+    @Volatile private var loadedFingerprint: LoadedFingerprint? = null
+
+    /**
+     * Restore (or clear) the wall fingerprint for the current project.
+     *
+     * **Single exit, and every state write in one place.** There are no early returns past the
+     * idempotence check: the branches decide an OUTCOME and the tail applies it. That shape is the
+     * actual fix for this function's history — the wall-feature-map block below used to be skipped
+     * by the refusal branch's `return`, so a refused project kept the previous project's map in
+     * native and then SAVED it into the refused project's file on teardown. Two branches, one
+     * `return`, and the sixth instance of the same family.
+     */
     private fun loadFingerprintIfExists() {
         viewModelScope.launch(Dispatchers.IO) {
             val project = projectRepository.currentProject.value ?: return@launch
             val fp = project.fingerprint
-            // Value equality, and it is exactly the right comparison: two fingerprints that agree on
-            // points, descriptors, frame and partition ARE the same map, whichever object holds them.
-            if (fp != null && fp == restoredFingerprint) {
-                // Still let the partition re-evaluate — the design may have moved while this
-                // emission was in flight — but do not touch native.
+            val incoming = LoadedFingerprint(project.id, fp)
+            val current = loadedFingerprint
+
+            // Nothing about the map changed: re-evaluate the partition (the design may have moved
+            // while this emission was in flight) and touch native not at all. This guard is what
+            // keeps `loadFingerprintIfExists` — which runs on EVERY currentProject emission,
+            // including the ones the partition itself causes — from re-pushing and, on the refusal
+            // path, from re-wiping native's artwork registration every time a layer is saved.
+            if (current == incoming) {
                 partitionLiveFingerprintIfNeeded()
                 return@launch
             }
-            if (fp != null) {
-                val intr = project.fingerprintIntrinsics
-                val anchor = project.fingerprintAnchor
+            // A different project — and `current != null` is load-bearing, not defensive. On the
+            // FIRST load of a session there is no previous project, and the footprint present is the
+            // one the renderer just published for the artwork now on screen; nulling it there wipes
+            // exactly the value the partition is about to need. (Caught by
+            // `ArViewModelTest.loading an unpartitioned fingerprint partitions it and writes exactly
+            // once`, which is why that test exists.)
+            if (current != null && current.projectId != project.id) latestDesignFootprint = null
 
-                // IMPLEMENTATION.md 0.7 — refuse a pre-Phase-0 metric fingerprint instead of
-                // relocalizing against it.
-                //
-                // Its 3D points were back-projected with display-rotated pixels and intrinsics but a
-                // SENSOR-frame view (PAPER.md §8), so they are skewed by an angle that was never
-                // recorded and cannot be recovered from the file. Restoring it would put the app in
-                // the exact state Phase 0 exists to end, silently, on a wall the artist has already
-                // painted — and the failure would look like poor tracking rather than stale data.
-                //
-                // The check keys on the PROJECT field, not the Fingerprint's, because a project
-                // saved before 0.11 has no rotation on either. Descriptors-only fingerprints are
-                // untouched: with no 3D points there is no frame to be wrong about, which is what
-                // `isLegacyFrame()` encodes.
-                val legacyFrame = fp.isLegacyFrame() && project.fingerprintCaptureRotationDeg < 0
-                if (legacyFrame && intr.size >= 4 && anchor.size == 16) {
-                    Timber.w(
-                        "Refusing a pre-Phase-0 wall fingerprint: its 3D points are in the sensor " +
-                            "frame and the capture rotation was never recorded. Re-capture the target.",
-                    )
-                    _uiState.update { it.copy(legacyFingerprintRefused = true) }
-                    // Same argument as backboneTooSmall above: the flag's own KDoc says it is
-                    // "surfaced so the artist is told to re-capture", and until now nothing read it,
-                    // so the target silently never locked and looked like bad tracking.
-                    _feedback.tryEmit(
-                        com.hereliesaz.graffitixr.common.model.FeedbackEvent.Toast(
-                            "This project's saved target was made by an older version and its 3D " +
-                                "geometry can't be corrected. Create the target again to use it.",
-                        ),
-                    )
-                    // Refusing means this project has no usable map, so nothing may be left loaded
-                    // — in Kotlin OR in native. An earlier cut dropped only the Kotlin caches, so a
-                    // refused project kept relocalizing against the PREVIOUS project's wall and
-                    // centring its overlay on that project's marks.
+            val intr = project.fingerprintIntrinsics
+            val anchor = project.fingerprintAnchor
+            // IMPLEMENTATION.md 0.7 — refuse a pre-Phase-0 metric fingerprint instead of
+            // relocalizing against it.
+            //
+            // Its 3D points were back-projected with display-rotated pixels and intrinsics but a
+            // SENSOR-frame view (PAPER.md §8), so they are skewed by an angle that was never
+            // recorded and cannot be recovered from the file. Restoring it would put the app in the
+            // exact state Phase 0 exists to end, silently, on a wall the artist has already painted
+            // — and the failure would look like poor tracking rather than stale data.
+            //
+            // Keys on the PROJECT field, not the Fingerprint's, because a project saved before 0.11
+            // has no rotation on either. Descriptors-only fingerprints are untouched: with no 3D
+            // points there is no frame to be wrong about, which is what `isLegacyFrame()` encodes.
+            val hasCoRegistration = intr.size >= 4 && anchor.size == 16
+            val legacyFrame = fp != null && fp.isLegacyFrame() &&
+                project.fingerprintCaptureRotationDeg < 0 && hasCoRegistration
+
+            when {
+                fp == null || legacyFrame -> {
+                    if (legacyFrame) {
+                        Timber.w(
+                            "Refusing a pre-Phase-0 wall fingerprint: its 3D points are in the " +
+                                "sensor frame and the capture rotation was never recorded.",
+                        )
+                        _uiState.update { it.copy(legacyFingerprintRefused = true) }
+                        // Surfaced, not merely recorded: the flag's own KDoc said it was, and until
+                        // recently nothing read it, so the target silently never locked and looked
+                        // like bad tracking.
+                        _feedback.tryEmit(
+                            com.hereliesaz.graffitixr.common.model.FeedbackEvent.Toast(
+                                "This project's saved target was made by an older version and its " +
+                                    "3D geometry can't be corrected. Create the target again to use it.",
+                            ),
+                        )
+                    }
+                    // Nothing usable for this project, so nothing may be left loaded — in Kotlin or
+                    // in native. Reached once per project change, not once per emission, which is
+                    // what the idempotence guard above buys: `clearWallFingerprint` also drops the
+                    // artwork descriptors and painting progress, and running it on every emission
+                    // would wipe the registration `updatePaintingGuide` established for the project
+                    // currently open.
                     dropLoadedFingerprint()
-                    return@launch
                 }
 
-                if (intr.size >= 4 && anchor.size == 16) {
+                hasCoRegistration -> {
                     // Metric fingerprint: replay the true capture intrinsics + anchor so PnP reloc
                     // matches the live capture instead of using a default-intrinsics guess.
+                    val view = project.fingerprintViewMatrix
+                        .takeIf { it.size == 16 }?.toFloatArray() ?: FloatArray(0)
                     slamManager.restoreWallFingerprintMetric(
-                        fp.descriptorsData,
-                        fp.descriptorsRows,
-                        fp.descriptorsCols,
-                        fp.descriptorsType,
-                        fp.points3d.toFloatArray(),
-                        anchor.toFloatArray(),
-                        intr.toFloatArray(),
+                        fp.descriptorsData, fp.descriptorsRows, fp.descriptorsCols,
+                        fp.descriptorsType, fp.points3d.toFloatArray(),
+                        anchor.toFloatArray(), intr.toFloatArray(),
                         // Empty on projects saved before the capture view was persisted; native then
                         // skips the rectification pass rather than warping to a stale frontal frame.
-                        viewMatrix = project.fingerprintViewMatrix
-                            .takeIf { it.size == 16 }?.toFloatArray() ?: FloatArray(0),
+                        viewMatrix = view,
                         // IMPLEMENTATION.md 2.6 — the partition travels with the points it indexes.
                         // Empty on a pre-Phase-2 project, which native reads as all-backbone, so the
                         // reload relocalizes exactly as it did before the phase landed.
                         regions = fp.regions,
                     )
-                    // Retained for the repartition-on-resize path (2.2). Stored with exactly the
-                    // values just pushed, so a later re-push cannot drift from what native holds.
-                    liveFingerprint = LiveFingerprint(
-                        fp, anchor.toFloatArray(), intr.toFloatArray(),
-                        project.fingerprintViewMatrix.takeIf { it.size == 16 }?.toFloatArray()
-                            ?: FloatArray(0),
-                    )
-                    restoredFingerprint = fp
-                    // The fingerprint just became available. If the artwork is already placed — which
-                    // it is on every project load, and on every capture session by the time the
-                    // save/load round trip finishes — partition it now rather than waiting for a
-                    // footprint edge that has already been and gone.
-                    //
-                    // `lastPartitionedPose` is cleared because this is a DIFFERENT fingerprint from
-                    // whatever was partitioned before (the guard above returned early otherwise), so
-                    // the remembered pose describes a map that is no longer loaded.
+                    // Retained for the repartition path (2.2), with exactly the values just pushed
+                    // so a later re-push cannot drift from what native holds.
+                    liveFingerprint = LiveFingerprint(fp, anchor.toFloatArray(), intr.toFloatArray(), view)
+                    // A different fingerprint from whatever was partitioned before, so the
+                    // remembered pose describes a map that is no longer loaded.
                     lastPartitionedPose = null
-                    partitionLiveFingerprintIfNeeded()
-                } else {
+                }
+
+                else -> {
                     // Depth-path or pre-existing project: descriptors-only legacy restore.
                     slamManager.restoreWallFingerprint(
-                        fp.descriptorsData,
-                        fp.descriptorsRows,
-                        fp.descriptorsCols,
-                        fp.descriptorsType,
-                        fp.points3d.toFloatArray()
+                        fp.descriptorsData, fp.descriptorsRows, fp.descriptorsCols,
+                        fp.descriptorsType, fp.points3d.toFloatArray(),
                     )
-                    // Native now holds THIS project's map, so it must not be cleared — but the map
-                    // carries no co-registration and cannot be partitioned, so every Kotlin cache
-                    // describing a partitionable fingerprint has to go. Missing this was the fourth
-                    // instance of the same leak: `liveFingerprint` kept describing the PREVIOUS
-                    // project while native held this one, and a design move wrote the previous
-                    // project's partitioned map into this project's file.
+                    // Native holds THIS project's map, so it must not be cleared — but the map has
+                    // no co-registration and cannot be partitioned, so every cache describing a
+                    // partitionable fingerprint has to go.
                     dropPartitionState()
                 }
-                // Restore the distortion-head canonical patch so the head works after reload, not only
-                // in the capture session. 256x256 raw gray (= sqrt(len)); inert if absent/head unloaded.
+            }
+
+            if (fp != null && !legacyFrame) {
+                // Restore the distortion-head canonical patch so the head works after reload, not
+                // only in the capture session. 256x256 raw gray (= sqrt(len)); inert if absent.
                 if (fp.patchData.isNotEmpty()) {
-                    val s = kotlin.math.sqrt(fp.patchData.size.toDouble()).toInt()
-                    if (s * s == fp.patchData.size) slamManager.setWallPatchBytes(fp.patchData, s)
+                    val side = kotlin.math.sqrt(fp.patchData.size.toDouble()).toInt()
+                    if (side * side == fp.patchData.size) slamManager.setWallPatchBytes(fp.patchData, side)
                 }
-                // Re-publish the marks centroid (anchor-local) so the overlay re-centers on the marks
-                // after reload, even though the builder doesn't run on a restored fingerprint.
+                // Re-publish the marks centroid (anchor-local) so the overlay re-centers on the
+                // marks after reload, even though the builder doesn't run on a restored fingerprint.
                 slamManager.overlayMarkCenterLocal =
                     if (fp.markCenterLocal.size >= 3) fp.markCenterLocal.toFloatArray() else null
-            } else {
-                // No fingerprint on this project: drop whatever is left in native from earlier in the
-                // session. The restore calls only ever REPLACE the stored fingerprint, so without this
-                // an un-fingerprinted project silently relocalizes against a previous target — most
-                // visibly the marks built during first-run onboarding, which are a throwaway teaching
-                // aid and must not register anything beyond that flow.
-                dropLoadedFingerprint()
             }
-            // Restore the persistent wall feature map (Phase 2a: stored in native; matched in Phase 2b).
-            // Independent of the marks fingerprint above and co-registered to the same anchor. Null on
-            // every current project until the passive builder (Phase 3) starts producing one.
+
+            loadedFingerprint = incoming
+            // Only after the state above is consistent, because this can launch a partition that
+            // reads it.
+            if (fp != null && !legacyFrame && hasCoRegistration) partitionLiveFingerprintIfNeeded()
+
             val map = project.wallFeatureMap
             if (map != null && map.pointCount > 0) {
                 slamManager.restoreWallFeatureMap(map)
@@ -2494,6 +2526,7 @@ class ArViewModel @Inject constructor(
         // snapshot is already the NEW generation, the wait can never be satisfied, and a capture
         // that succeeded is discarded with "couldn't lock an anchor".
         slamManager.captureAnchorGenerationBaseline = slamManager.anchorGeneration.value
+        slamManager.captureSessionEpochBaseline = slamManager.sessionEpochValue
         renderer?.pendingAnchorEstablishment = true
     }
 
