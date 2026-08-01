@@ -160,9 +160,6 @@ fun MainScreen(
                     // changes, the matching representation defaults on and the other two off.
                     // Keyed on the method, so a user who manually enables another layer keeps it
                     // until the method changes again.
-                    LaunchedEffect(arUiState.muralMethod) {
-                        editorViewModel.applyMethodLayerDefaults(arUiState.muralMethod)
-                    }
 
                     DisposableEffect(lifecycleOwner, glView) {
                         if (glView == null) return@DisposableEffect onDispose {}
@@ -328,8 +325,7 @@ fun MainScreen(
                         },
                         update = { view ->
                             rendererRef.value?.let { r ->
-                                r.scanMode = arUiState.arScanMode
-                                r.muralMethod = arUiState.muralMethod
+                                r.ambientScanEnabled = arUiState.ambientScanEnabled
                                 r.captureRequested = arUiState.isCaptureRequested
                                 r.isCapturingTarget = mainUiState.isCapturingTarget
                                 r.isInPlaneRealignment = mainUiState.isInPlaneRealignment

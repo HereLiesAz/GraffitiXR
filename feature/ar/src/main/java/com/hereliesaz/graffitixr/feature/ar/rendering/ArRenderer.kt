@@ -11,8 +11,6 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.NotYetAvailableException
 import com.google.ar.core.exceptions.SessionPausedException
-import com.hereliesaz.graffitixr.common.model.ArScanMode
-import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.nativebridge.YuvConverter
 import com.hereliesaz.graffitixr.feature.ar.AnchorLockTracker
@@ -213,8 +211,8 @@ class ArRenderer(
     // on this hardware; metric depth comes from triangulation/stereo instead. Set from ArViewModel.
     @Volatile var depthApiEnabled: Boolean = false
 
-    @Volatile var scanMode: ArScanMode = ArScanMode.MURAL
-    @Volatile var muralMethod: MuralMethod = MuralMethod.VOXEL_HASH
+    /** Whether the 360-degree ambient sweep is required. See ArUiState.ambientScanEnabled. */
+    @Volatile var ambientScanEnabled: Boolean = true
 
     // Eval (Sub-project A): null unless dev/eval mode is on. Set from ArViewModel.
     @Volatile var driftCostProbe: com.hereliesaz.graffitixr.feature.ar.eval.DriftCostProbe? = null
@@ -724,7 +722,7 @@ class ArRenderer(
                 // Decides "no data" vs "drawn but invisible" from the diag log alone.
                 val planeCount = activeSession.getAllTrackables(com.google.ar.core.Plane::class.java)
                     .count { it.trackingState == TrackingState.TRACKING && it.subsumedBy == null }
-                onDiag("debugView: feat=${arDebugRenderer.lastPointCount} planes=$planeCount voxels=${slamManager.getSplatCount()} pts=${pointCloudRenderer.accumulatedPointCount} method=$muralMethod fps=${effectivePerceptionFps()}")
+                onDiag("debugView: feat=${arDebugRenderer.lastPointCount} planes=$planeCount pts=${pointCloudRenderer.accumulatedPointCount} fps=${effectivePerceptionFps()}")
             }
         }
     }
@@ -868,7 +866,7 @@ class ArRenderer(
             }
             // During the AMBIENT scan, the camera background renders as a newspaper halftone with full
             // colour bleeding in (like ink) as each yaw sector is mapped — the world-mapping indicator.
-            val scanActive = !anchorEstablished && scanMode == ArScanMode.MURAL && scanPhase == ScanPhase.AMBIENT
+            val scanActive = !anchorEstablished && ambientScanEnabled && scanPhase == ScanPhase.AMBIENT
             // Voxel-method reveal-mask: while scanning in VOXEL_HASH, the camera renders full colour
             // but DIMMED, and the voxel coverage pass (composited below as a mask) reveals the world
             // at full brightness/colour only where it has been mapped — so the user literally sees
@@ -888,7 +886,7 @@ class ArRenderer(
             backgroundRenderer.draw(frame, scanActive && !voxelRevealMaskActive, grayscale = false)
             // Coverage mask is now drawn with the throttled perception layers (see "debugView").
             if (frameCount <= 10 || frameCount % 60 == 0) {
-                Timber.i("ARDIAG drawFrame f=$frameCount tracking=${frame.camera.trackingState} anchor=$anchorEstablished scanMode=$scanMode scanActive=$scanActive")
+                Timber.i("ARDIAG drawFrame f=$frameCount tracking=${frame.camera.trackingState} anchor=$anchorEstablished ambientScan=$ambientScanEnabled scanActive=$scanActive")
                 // On-screen heartbeat. f climbing => render loop alive; ts (camera frame timestamp)
                 // changing => ARCore is streaming camera images; track => PAUSED until ARCore converges.
                 // f stuck at 1 = loop stalled; f climbs + ts frozen = camera not streaming; f climbs +
@@ -1125,9 +1123,6 @@ class ArRenderer(
                 }
             }
 
-            val currentScanMode = scanMode
-            slamManager.setArScanMode(currentScanMode.ordinal)
-            slamManager.setMuralMethod(muralMethod.ordinal)
             
             // --- Democratic Consensus Transformation + smoothed reloc fusion ---
             // Backbone: ARCore consensus once anchored, else the native cached pose (as before).
@@ -1255,11 +1250,23 @@ class ArRenderer(
                 val viewMatrixSnapshot = viewMatrix.copyOf()
 
                 backgroundScope.launch {
-                    val (count, immutableCount) = if (currentScanMode == ArScanMode.CLOUD_POINTS) {
-                        pointCloudRenderer.accumulatedPointCount to 0
-                    } else {
-                        slamManager.getSplatCount() to slamManager.getImmutableSplatCount()
-                    }
+                    // Both modes report the accumulated ARCore point cloud. MURAL used to read
+                    // slamManager.getSplatCount(), which is `return 0;` since the voxel/splat map was
+                    // deleted — so in MURAL, the DEFAULT mode, splatCount was structurally zero and
+                    // four separate decisions silently degraded:
+                    //
+                    //   * co-op hosting refused outright (`splatCount <= 0` gate) no matter how long
+                    //     the artist scanned;
+                    //   * the WALL scan hint pinned to "build the map" forever (`< 5000`), with the
+                    //     "closer" and "higher/lower" hints unreachable;
+                    //   * WALL -> COMPLETE reachable only via the anchor, never via map coverage;
+                    //   * the stereo-stuck recovery trigger vacuously true, since it keys on
+                    //     `splatCount == 0 && MURAL`.
+                    //
+                    // Reading a hardcoded 0 is never the right answer, and the point cloud is now the
+                    // only live map, so both modes read it. That also restores the stereo check to a
+                    // real condition rather than a constant.
+                    val (count, immutableCount) = pointCloudRenderer.accumulatedPointCount to 0
 
                     val visConf = slamManager.getVisibleConfidenceAvg()
                     val globConf = slamManager.getGlobalConfidenceAvg()
@@ -1557,9 +1564,11 @@ class ArRenderer(
                 if (!anchorEstablished) {
                     try {
                         frame.acquirePointCloud().use { pointCloud ->
-                            if (currentScanMode == ArScanMode.CLOUD_POINTS || showPoints) {
-                                pointCloudRenderer.update(pointCloud)
-                            }
+                            // Always accumulate. This count now drives co-op gating, the scan
+                            // hints and phase completion, so it cannot hang off `showPoints` — that
+                            // is a DRAW toggle, and letting a visualization setting decide whether
+                            // the map is built is how turning off a layer silently disables co-op.
+                            pointCloudRenderer.update(pointCloud)
                             
                             // Feed sparse points to Gaussian engine for seeding
                             val pts = FloatArray(pointCloud.points.remaining())

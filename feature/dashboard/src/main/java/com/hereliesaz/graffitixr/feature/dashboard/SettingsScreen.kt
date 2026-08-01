@@ -57,8 +57,6 @@ import androidx.core.content.ContextCompat
 import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.AzLoad
 import com.hereliesaz.graffitixr.common.model.AppLanguage
-import com.hereliesaz.graffitixr.common.model.ArScanMode
-import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.design.theme.AppStrings
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -97,8 +95,8 @@ fun SettingsScreen(
     onThrottleOnLagChanged: (Boolean) -> Unit,
     adaptiveRateEnabled: Boolean,
     onAdaptiveRateEnabledChanged: (Boolean) -> Unit,
-    arScanMode: ArScanMode,
-    onArScanModeChanged: (ArScanMode) -> Unit,
+    ambientScanEnabled: Boolean,
+    onAmbientScanEnabledChanged: (Boolean) -> Unit,
     showAnchorBoundary: Boolean,
     onAnchorBoundaryChanged: (Boolean) -> Unit,
     isImperialUnits: Boolean,
@@ -304,16 +302,12 @@ fun SettingsScreen(
                                 value = if (adaptiveRateEnabled) strings.settings.on else strings.settings.off,
                                 modifier = Modifier.clickable { onAdaptiveRateEnabledChanged(!adaptiveRateEnabled) }
                             )
-                            val modes = ArScanMode.entries
-                            val nextMode = modes[(arScanMode.ordinal + 1) % modes.size]
-                            val scanModeValue = when (arScanMode) {
-                                ArScanMode.CLOUD_POINTS -> strings.nav.canvas
-                                ArScanMode.MURAL -> strings.nav.mural
-                            }
                             SettingsItem(
-                                label = strings.settings.scanMode,
-                                value = scanModeValue,
-                                modifier = Modifier.clickable { onArScanModeChanged(nextMode) }
+                                label = "Ambient scan",
+                                value = if (ambientScanEnabled) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable {
+                                    onAmbientScanEnabledChanged(!ambientScanEnabled)
+                                }
                             )
 
                             SettingsItem(

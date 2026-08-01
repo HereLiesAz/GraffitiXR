@@ -30,8 +30,6 @@ import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.UnavailableException
 import com.hereliesaz.graffitixr.common.model.CameraTargetFps
-import com.hereliesaz.graffitixr.common.model.ArScanMode
-import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.sensor.Vec3
@@ -614,8 +612,8 @@ class ArViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            settingsRepository.arScanMode.collect { mode ->
-                _uiState.update { it.copy(arScanMode = mode) }
+            settingsRepository.ambientScanEnabled.collect { enabled ->
+                _uiState.update { it.copy(ambientScanEnabled = enabled) }
             }
         }
         viewModelScope.launch {
@@ -726,23 +724,21 @@ class ArViewModel @Inject constructor(
     // chosen separately (probe + initArSessionLocked); it must not disable the MURAL *scan mode*.
     // So the scan mode is never auto-downgraded to Canvas; the user picks Canvas explicitly if wanted.
 
-    fun setArScanMode(mode: ArScanMode) {
-        // A user explicitly choosing Mural is a retry: clear the sticky stereo-unstable flag and let
-        // the next session re-evaluate hardware stereo (recovers from any false positive).
-        if (mode == ArScanMode.MURAL && forcedStereoUnstable) {
+    fun setAmbientScanEnabled(enabled: Boolean) {
+        // Turning the sweep back ON is a retry: clear the sticky stereo-unstable flag so the next
+        // session re-evaluates hardware stereo (recovering from a false positive). This used to hang
+        // off "the user explicitly chose Mural", which was the same gesture under the old two-mode
+        // naming — the sweep is what Mural actually meant.
+        if (enabled && forcedStereoUnstable) {
             forcedStereoUnstable = false
             viewModelScope.launch { settingsRepository.setForcedStereoUnstable(false) }
         }
-        // Persist the choice so it survives app restarts (the arScanMode flow re-emits it; the direct
-        // update below just makes the UI reflect it immediately).
-        viewModelScope.launch { settingsRepository.setArScanMode(mode) }
-        _uiState.update { it.copy(arScanMode = mode) }
+        // Persist so it survives restarts (the flow re-emits it; the direct update below just makes
+        // the UI reflect it immediately).
+        viewModelScope.launch { settingsRepository.setAmbientScanEnabled(enabled) }
+        _uiState.update { it.copy(ambientScanEnabled = enabled) }
     }
 
-    fun setMuralMethod(method: MuralMethod) {
-        _uiState.update { it.copy(muralMethod = method) }
-        slamManager.setMuralMethod(method.ordinal)
-    }
 
     fun setShowAnchorBoundary(show: Boolean) {
         _uiState.update { it.copy(showAnchorBoundary = show) }
@@ -819,7 +815,7 @@ class ArViewModel @Inject constructor(
         // A new/destroyed session resets native mapping to running, so drop our cached command and
         // let the next tracking frame re-assert the correct auto-mapping state.
         lastMappingPausedCmd = null
-        Timber.i("ARDIAG setArMode(enabled=$enabled) layers=${projectRepository.currentProject.value?.layers?.size ?: 0} scanMode=${_uiState.value.arScanMode} sessionExists=${session != null}")
+        Timber.i("ARDIAG setArMode(enabled=$enabled) layers=${projectRepository.currentProject.value?.layers?.size ?: 0} ambientScan=${_uiState.value.ambientScanEnabled} sessionExists=${session != null}")
         if (enabled) {
             val now = System.currentTimeMillis()
             arEntryTimestampMs = now
@@ -1595,9 +1591,8 @@ class ArViewModel @Inject constructor(
         _uiState.update { state ->
             val newPhase = when (state.scanPhase) {
                 ScanPhase.AMBIENT -> {
-                    // Task: Canvas mode (CLOUD_POINTS) skips the ambient 360-scan.
-                    // All MURAL modes MUST complete the 360-scan for spatial memory.
-                    if (state.arScanMode == ArScanMode.CLOUD_POINTS || sectorsCovered >= 36) {
+                    // The ambient 360-scan is skippable; when required it needs all 36 yaw sectors.
+                    if (!state.ambientScanEnabled || sectorsCovered >= 36) {
                         ScanPhase.WALL
                     } else {
                         ScanPhase.AMBIENT
@@ -1650,7 +1645,7 @@ class ArViewModel @Inject constructor(
             isHardwareStereo &&
             !isTracking &&
             splatCount == 0 &&
-            _uiState.value.arScanMode == ArScanMode.MURAL &&
+            _uiState.value.ambientScanEnabled &&
             arEntryTimestampMs > 0L &&
             (nowMs - lastTrackingTimestampMs) > STEREO_STUCK_GRACE_MS
         ) {
@@ -1725,7 +1720,7 @@ class ArViewModel @Inject constructor(
      * mono camera config (detach renderer → pause → set mono → resume → re-attach) so the broken
      * motion-stereo disparity stops thrashing the tracker, and persist the flag so future sessions
      * skip stereo entirely. Recoverable: the user re-selecting Mural clears the flag (see
-     * setArScanMode). Runs on Dispatchers.Default — pause()/resume() block on the camera — and
+     * setAmbientScanEnabled). Runs on Dispatchers.Default — pause()/resume() block on the camera — and
      * detaches the renderer first because reconfiguring a Session the GL thread is concurrently
      * driving under a different lock is the not-thread-safe race that crashes ARCore natively.
      */

@@ -167,9 +167,7 @@ data class EditorUiState(
     // Distinct from showDiagOverlay, which governs the text telemetry HUD.
     val showFeaturePoints: Boolean = true,  // ARCore sparse feature dots (tracker landmarks)
     val showPlaneGrids: Boolean = true,     // detected planes as metric grids
-    val showVoxels: Boolean = true,         // SLAM voxel splats (confidence-tinted)
     val showPoints: Boolean = true,         // accumulated sparse point cloud
-    val showMesh: Boolean = true,           // persistent surface mesh
     val canvasBackground: Color = Color.Black,
     // Per-mode whole-design adjustments (transform + tone). Applied to the composited design in
     // that mode only; Design-mode layer edits stay global across all modes.

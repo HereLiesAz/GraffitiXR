@@ -1,7 +1,5 @@
 package com.hereliesaz.graffitixr.domain.repository
 
-import com.hereliesaz.graffitixr.common.model.ArScanMode
-import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.AppLanguage
 import kotlinx.coroutines.flow.Flow
 
@@ -32,15 +30,18 @@ interface SettingsRepository {
      */
     suspend fun setRightHanded(isRight: Boolean)
 
-    /** Which AR depth/mapping mode the user has selected. Defaults to [ArScanMode.MURAL]. */
-    val arScanMode: Flow<ArScanMode>
+    /**
+     * Whether the 360-degree ambient sweep is required before the wall scan begins. Default true.
+     *
+     * Replaces the old Canvas/Mural `arScanMode`: the two modes named two mapping engines (splatting
+     * and surface mesh) that no longer exist, and the only behaviour that still differed between them
+     * was this sweep.
+     */
+    val ambientScanEnabled: Flow<Boolean>
 
-    suspend fun setArScanMode(mode: ArScanMode)
+    suspend fun setAmbientScanEnabled(enabled: Boolean)
     
-    /** The specific engine used when [ArScanMode.MURAL] is active. */
-    val muralMethod: Flow<MuralMethod>
     
-    suspend fun setMuralMethod(method: MuralMethod)
 
     /** Whether to draw an orange boundary rectangle around the AR overlay quad when anchor is active. */
     val showAnchorBoundary: Flow<Boolean>
