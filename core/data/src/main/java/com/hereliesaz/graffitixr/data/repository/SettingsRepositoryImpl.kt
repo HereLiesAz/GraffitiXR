@@ -10,7 +10,6 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.hereliesaz.graffitixr.common.model.AppLanguage
-import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -39,7 +38,6 @@ class SettingsRepositoryImpl @Inject constructor(
      * a string, so the check is against a string.
      */
     private val LEGACY_CANVAS_MODE = "CLOUD_POINTS"
-    private val MURAL_METHOD = stringPreferencesKey("mural_method")
     private val SHOW_ANCHOR_BOUNDARY = booleanPreferencesKey("show_anchor_boundary")
     private val FORCED_STEREO_UNSTABLE = booleanPreferencesKey("forced_stereo_unstable")
     // Key intentionally renamed from "stereo_capability": the probe's meaning changed from "stereo
@@ -94,22 +92,6 @@ class SettingsRepositoryImpl @Inject constructor(
             preferences[AMBIENT_SCAN_ENABLED]
                 ?: (preferences[AR_SCAN_MODE] != LEGACY_CANVAS_MODE)
         }
-
-    override val muralMethod: Flow<MuralMethod> = context.dataStore.data
-        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { preferences ->
-            when (preferences[MURAL_METHOD]) {
-                MuralMethod.SURFACE_MESH.name -> MuralMethod.SURFACE_MESH
-                MuralMethod.CLOUD_OFFSET.name -> MuralMethod.CLOUD_OFFSET
-                else -> MuralMethod.VOXEL_HASH // default
-            }
-        }
-
-    override suspend fun setMuralMethod(method: MuralMethod) {
-        context.dataStore.edit { preferences ->
-            preferences[MURAL_METHOD] = method.name
-        }
-    }
 
     override suspend fun setAmbientScanEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->

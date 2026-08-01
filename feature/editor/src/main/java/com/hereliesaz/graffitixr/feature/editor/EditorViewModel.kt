@@ -549,10 +549,7 @@ class EditorViewModel @Inject constructor(
     fun toggleDiagOverlay() = dispatch(EditorIntent.ToggleDiagOverlay)
     fun toggleFeaturePoints() = dispatch(EditorIntent.ToggleFeaturePoints)
     fun togglePlaneGrids() = dispatch(EditorIntent.TogglePlaneGrids)
-    fun toggleVoxels() = dispatch(EditorIntent.ToggleVoxels)
     fun togglePoints() = dispatch(EditorIntent.TogglePoints)
-    fun toggleMesh() = dispatch(EditorIntent.ToggleMesh)
-    fun applyMethodLayerDefaults(method: MuralMethod) = dispatch(EditorIntent.ApplyMethodLayerDefaults(method))
 
     // ── Placement ─────────────────────────────────────────────────────────────
 

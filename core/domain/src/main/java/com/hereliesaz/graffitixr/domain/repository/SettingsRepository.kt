@@ -1,6 +1,5 @@
 package com.hereliesaz.graffitixr.domain.repository
 
-import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.AppLanguage
 import kotlinx.coroutines.flow.Flow
 
@@ -42,10 +41,7 @@ interface SettingsRepository {
 
     suspend fun setAmbientScanEnabled(enabled: Boolean)
     
-    /** Legacy mural-engine selection; the engines it named were deleted. */
-    val muralMethod: Flow<MuralMethod>
     
-    suspend fun setMuralMethod(method: MuralMethod)
 
     /** Whether to draw an orange boundary rectangle around the AR overlay quad when anchor is active. */
     val showAnchorBoundary: Flow<Boolean>

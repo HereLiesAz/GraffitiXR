@@ -119,7 +119,6 @@ data class ArUiState(
      */
     val ambientScanEnabled: Boolean = true,
     // The specific engine used when MURAL is active.
-    val muralMethod: MuralMethod = MuralMethod.VOXEL_HASH,
 
     // Phase 3 — True once the renderer has confirmed ARCore Depth API is available on this device.
     val isDepthApiSupported: Boolean = false,
@@ -256,14 +255,6 @@ enum class CaptureStep {
 }
 
 
-enum class MuralMethod {
-    /** Gaussian Splatting (Mural v1) */
-    VOXEL_HASH,
-    /** Surface-Aware Mesh / t-SNE Unroller (Mural v2) */
-    SURFACE_MESH,
-    /** Point Cloud Anchor Offset Handoff (Mural v3) */
-    CLOUD_OFFSET
-}
 
 enum class ScanPhase { AMBIENT, WALL, COMPLETE }
 

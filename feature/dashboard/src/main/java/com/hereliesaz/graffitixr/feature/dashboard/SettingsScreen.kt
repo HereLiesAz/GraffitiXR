@@ -57,7 +57,6 @@ import androidx.core.content.ContextCompat
 import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.aznavrail.AzLoad
 import com.hereliesaz.graffitixr.common.model.AppLanguage
-import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.design.theme.AppStrings
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue

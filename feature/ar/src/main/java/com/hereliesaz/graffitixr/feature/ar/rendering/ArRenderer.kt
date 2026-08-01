@@ -11,7 +11,6 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.NotYetAvailableException
 import com.google.ar.core.exceptions.SessionPausedException
-import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.nativebridge.YuvConverter
 import com.hereliesaz.graffitixr.feature.ar.AnchorLockTracker
@@ -214,7 +213,6 @@ class ArRenderer(
 
     /** Whether the 360-degree ambient sweep is required. See ArUiState.ambientScanEnabled. */
     @Volatile var ambientScanEnabled: Boolean = true
-    @Volatile var muralMethod: MuralMethod = MuralMethod.VOXEL_HASH
 
     // Eval (Sub-project A): null unless dev/eval mode is on. Set from ArViewModel.
     @Volatile var driftCostProbe: com.hereliesaz.graffitixr.feature.ar.eval.DriftCostProbe? = null
@@ -724,7 +722,7 @@ class ArRenderer(
                 // Decides "no data" vs "drawn but invisible" from the diag log alone.
                 val planeCount = activeSession.getAllTrackables(com.google.ar.core.Plane::class.java)
                     .count { it.trackingState == TrackingState.TRACKING && it.subsumedBy == null }
-                onDiag("debugView: feat=${arDebugRenderer.lastPointCount} planes=$planeCount voxels=${slamManager.getSplatCount()} pts=${pointCloudRenderer.accumulatedPointCount} method=$muralMethod fps=${effectivePerceptionFps()}")
+                onDiag("debugView: feat=${arDebugRenderer.lastPointCount} planes=$planeCount pts=${pointCloudRenderer.accumulatedPointCount} fps=${effectivePerceptionFps()}")
             }
         }
     }
@@ -1125,7 +1123,6 @@ class ArRenderer(
                 }
             }
 
-            slamManager.setMuralMethod(muralMethod.ordinal)
             
             // --- Democratic Consensus Transformation + smoothed reloc fusion ---
             // Backbone: ARCore consensus once anchored, else the native cached pose (as before).

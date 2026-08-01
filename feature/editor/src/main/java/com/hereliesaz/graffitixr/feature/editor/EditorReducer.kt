@@ -1,7 +1,6 @@
 package com.hereliesaz.graffitixr.feature.editor
 
 import com.hereliesaz.graffitixr.common.model.EditorMode
-import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.EditorPanel
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.Layer
@@ -108,14 +107,7 @@ internal object EditorReducer {
         EditorIntent.ToggleDiagOverlay -> state.copy(showDiagOverlay = !state.showDiagOverlay)
         EditorIntent.ToggleFeaturePoints -> state.copy(showFeaturePoints = !state.showFeaturePoints)
         EditorIntent.TogglePlaneGrids -> state.copy(showPlaneGrids = !state.showPlaneGrids)
-        EditorIntent.ToggleVoxels -> state.copy(showVoxels = !state.showVoxels)
         EditorIntent.TogglePoints -> state.copy(showPoints = !state.showPoints)
-        EditorIntent.ToggleMesh -> state.copy(showMesh = !state.showMesh)
-        is EditorIntent.ApplyMethodLayerDefaults -> state.copy(
-            showVoxels = intent.activeMethod == MuralMethod.VOXEL_HASH,
-            showMesh = intent.activeMethod == MuralMethod.SURFACE_MESH,
-            showPoints = intent.activeMethod == MuralMethod.CLOUD_OFFSET
-        )
         EditorIntent.FeedbackShown -> state.copy(showRotationAxisFeedback = false)
         is EditorIntent.SetLayerWarp -> state.copy(layers = LayerListOps.mapLayer(state.layers, intent.layerId) { it.copy(warpMesh = intent.mesh) })
 

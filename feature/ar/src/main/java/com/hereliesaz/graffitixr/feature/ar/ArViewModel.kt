@@ -30,7 +30,6 @@ import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.UnavailableException
 import com.hereliesaz.graffitixr.common.model.CameraTargetFps
-import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.sensor.Vec3
@@ -740,10 +739,6 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(ambientScanEnabled = enabled) }
     }
 
-    fun setMuralMethod(method: MuralMethod) {
-        _uiState.update { it.copy(muralMethod = method) }
-        slamManager.setMuralMethod(method.ordinal)
-    }
 
     fun setShowAnchorBoundary(show: Boolean) {
         _uiState.update { it.copy(showAnchorBoundary = show) }

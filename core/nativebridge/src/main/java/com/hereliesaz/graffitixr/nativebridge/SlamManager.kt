@@ -422,7 +422,6 @@ class SlamManager @Inject constructor(
     fun loadDistortionHead(assetManager: AssetManager): Boolean = nativeLoadDistortionHead(assetManager)
     fun loadLowLightEnhancer(assetManager: AssetManager) = nativeLoadLowLightEnhancer(assetManager)
 
-    fun setMuralMethod(method: Int) = nativeSetMuralMethod(method)
 
     /** Eval (Sub-project A): average ms/stage since last call, then resets native accumulators.
      *  Indexes: 0=voxelUpdate,1=voxelKeyframe,2=surfaceMesh,3=draw,4=pnpReloc. */
@@ -615,7 +614,6 @@ class SlamManager @Inject constructor(
     private external fun nativeGetPaintingProgress(): Float
     private external fun nativeGetCorroborationConfidence(): Float
     private external fun nativeGetRelocDiagnostics(): IntArray?
-    private external fun nativeSetMuralMethod(method: Int)
     private external fun nativeGetStageTimings(out: FloatArray)
     private external fun nativeSetStageEnabled(stage: Int, enabled: Boolean)
     private external fun nativeGetRelocResult(out: FloatArray)
