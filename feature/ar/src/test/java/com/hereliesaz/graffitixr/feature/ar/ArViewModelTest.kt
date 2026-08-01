@@ -16,6 +16,8 @@ import android.graphics.Matrix
 import android.graphics.Paint
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
+import com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -434,6 +436,142 @@ class ArViewModelTest {
         testDispatcher.scheduler.runCurrent()
 
         assertFalse(viewModel.uiState.value.doodleLocked)
+    }
+
+    // ==================== Fingerprint load / partition cascade ====================
+
+    /**
+     * A fingerprint whose points straddle a 0.5 x 0.5 m design placed at the anchor: three under it,
+     * three well outside. The absolute positions only have to survive Φ's classification; what the
+     * tests below care about is that the partition is non-trivial, so an "already partitioned"
+     * fixture cannot be confused with an empty one.
+     */
+    private val fixturePoints = listOf(
+        0f, 0f, 0f, 0.1f, 0.1f, 0f, -0.2f, 0.05f, 0f,
+        1.0f, 0f, 0f, 0f, -1.2f, 0f, -0.9f, 0.8f, 0f,
+    )
+
+    private val fixtureFootprint = FingerprintPartition.DesignFootprint(
+        rigidModelAnchorLocal = identityMatrix(),
+        halfW = 0.5f,
+        halfH = 0.5f,
+    )
+
+    /** Unpartitioned: `regions` empty, extents unknown. The state a fresh capture is saved in. */
+    private fun unpartitionedFingerprint() = com.hereliesaz.graffitixr.common.model.Fingerprint(
+        keypoints = emptyList(),
+        points3d = fixturePoints,
+        descriptorsData = ByteArray(fixturePoints.size / 3 * 32),
+        descriptorsRows = fixturePoints.size / 3,
+        descriptorsCols = 32,
+        descriptorsType = 0,
+        // Non-negative so `isLegacyFrame` is false and the pre-Phase-0 refusal doesn't short-circuit
+        // the restore this test is measuring.
+        captureRotationDeg = 0,
+        captureAnchorCam = identityMatrix().toList(),
+    )
+
+    private fun projectWith(fp: com.hereliesaz.graffitixr.common.model.Fingerprint) =
+        com.hereliesaz.graffitixr.common.model.GraffitiProject(
+            id = "partition-fixture",
+            fingerprint = fp,
+            // The metric restore is gated on both being present; without them the load takes the
+            // descriptors-only legacy branch and never reaches the partition at all.
+            fingerprintIntrinsics = listOf(500f, 500f, 320f, 240f),
+            fingerprintAnchor = identityMatrix().toList(),
+            fingerprintCaptureRotationDeg = 0,
+        )
+
+    private fun identityMatrix() = floatArrayOf(
+        1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 0f, 1f,
+    )
+
+    /**
+     * `loadFingerprintIfExists` and the partition both run off the test dispatcher — IO and Default
+     * respectively — so the sequence load → partition → (possible) write only completes on real
+     * threads. Interleave scheduler drains with real pauses until it has.
+     */
+    private fun settle(rounds: Int = 6, pauseMs: Long = 150L) {
+        repeat(rounds) {
+            testDispatcher.scheduler.advanceUntilIdle()
+            Thread.sleep(pauseMs)
+        }
+        testDispatcher.scheduler.advanceUntilIdle()
+    }
+
+    private fun viewModelOn(projects: MutableStateFlow<com.hereliesaz.graffitixr.common.model.GraffitiProject?>): ArViewModel {
+        every { projectRepository.currentProject } returns projects
+        return ArViewModel(
+            slamManager, stereoProvider, projectRepository, settingsRepository, projectManager,
+            collaborationManager, wearableManager, context, testDispatchers,
+        )
+    }
+
+    /**
+     * Loading an already-correctly-partitioned fingerprint must push it to native once and write
+     * nothing.
+     *
+     * `loadFingerprintIfExists` runs on EVERY `currentProject` emission and the partition itself
+     * calls `updateProject`, so a partition that writes on load is a cycle: load → partition →
+     * write → emission → load. Before the idempotence check in `onDesignFootprintChanged` that is
+     * exactly what happened — two partitions, two `restoreWallFingerprintMetric` calls (each
+     * resetting native's reloc state) and two full project writes per load. It terminated only
+     * because `Fingerprint.equals` compares `regions` by content and `MutableStateFlow` conflates
+     * equal values, which is an accident of an override written for a serialization test: one
+     * non-value-equal field added to `Fingerprint` turns it into an unbounded write loop.
+     *
+     * The stored regions come from `FingerprintPartition.partition` itself rather than a literal, so
+     * the fixture cannot drift away from what the implementation would compute.
+     */
+    @Test
+    fun `loading an already-partitioned fingerprint pushes once and writes nothing`() = runTest {
+        val stored = FingerprintPartition.partition(unpartitionedFingerprint(), fixtureFootprint)
+        assertNotEquals(
+            "fixture must actually be partitioned, or this test proves nothing",
+            0, stored.regions.size,
+        )
+        val projects = MutableStateFlow<com.hereliesaz.graffitixr.common.model.GraffitiProject?>(null)
+        val vm = viewModelOn(projects)
+        // The footprint edge fires before the fingerprint arrives — the ordering a project load
+        // always has, since the artwork is placed from the saved project.
+        vm.onDesignFootprintChanged(fixtureFootprint)
+
+        projects.value = projectWith(stored)
+        settle()
+
+        verify(exactly = 1) {
+            slamManager.restoreWallFingerprintMetric(
+                any(), any(), any(), any(), any(), any(), any(), any(), any(),
+            )
+        }
+        coVerify(exactly = 0) { projectRepository.updateProject(any<com.hereliesaz.graffitixr.common.model.GraffitiProject>()) }
+        coVerify(exactly = 0) {
+            projectRepository.updateProject(any<(com.hereliesaz.graffitixr.common.model.GraffitiProject) -> com.hereliesaz.graffitixr.common.model.GraffitiProject>())
+        }
+    }
+
+    /**
+     * The other half, without which the test above would also pass if partitioning were broken
+     * outright: an UNpartitioned fingerprint must be partitioned and persisted — once.
+     */
+    @Test
+    fun `loading an unpartitioned fingerprint partitions it and writes exactly once`() = runTest {
+        val projects = MutableStateFlow<com.hereliesaz.graffitixr.common.model.GraffitiProject?>(null)
+        val vm = viewModelOn(projects)
+        vm.onDesignFootprintChanged(fixtureFootprint)
+
+        projects.value = projectWith(unpartitionedFingerprint())
+        settle()
+
+        coVerify(exactly = 1) {
+            projectRepository.updateProject(any<(com.hereliesaz.graffitixr.common.model.GraffitiProject) -> com.hereliesaz.graffitixr.common.model.GraffitiProject>())
+        }
+        // The restore on load, plus the one that hands native the freshly partitioned regions.
+        verify(exactly = 2) {
+            slamManager.restoreWallFingerprintMetric(
+                any(), any(), any(), any(), any(), any(), any(), any(), any(),
+            )
+        }
     }
 
     @Suppress("UNCHECKED_CAST")
