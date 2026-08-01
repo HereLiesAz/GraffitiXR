@@ -396,6 +396,22 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetEvalRngSeed(JNI
     if (gSlamEngine) gSlamEngine->setEvalRngSeed((long long)seed);
 }
 
+// EVALUATION.md 3.1 / IMPLEMENTATION.md 6a.4 — inline relocalization for deterministic replay.
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetEvalSyncReloc(
+        JNIEnv* env, jobject thiz, jboolean enabled, jint everyN) {
+    if (gSlamEngine) gSlamEngine->setEvalSyncReloc(enabled == JNI_TRUE, (int)everyN);
+}
+
+// The cadence ACTUALLY in force: 0 when sync mode is off, so one int carries both the flag and the
+// N. Read back rather than remembered on the Kotlin side, so the run-identity sidecar reports what
+// the engine is doing and not what the caller asked for -- with no engine there is no sync mode, and
+// a sidecar claiming otherwise would be the kind of evidence that is worse than none.
+JNIEXPORT jint JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetEvalSyncRelocEveryN(JNIEnv* env, jobject thiz) {
+    return gSlamEngine ? (jint)gSlamEngine->evalSyncEveryN() : 0;
+}
+
 JNIEXPORT jint JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetWallKeypointCount(JNIEnv* env, jobject thiz) {
     return gSlamEngine ? gSlamEngine->getWallKeypointCount() : 0;

@@ -306,6 +306,25 @@ public:
      * RANSAC draw the identical sample sequence forever.
      */
     void setEvalRngSeed(long long seed);
+    /**
+     * EVALUATION.md 3.1 — enable inline relocalization at one pass per [everyN] frames.
+     *
+     * @param everyN clamped to at least 1. Pass 0 or negative and you would get either a divide by
+     *   zero or a mode that never runs; both are worse than the honest floor, and a silent
+     *   never-runs would look exactly like relocalization being broken.
+     *
+     * Disabling resets the frame counter, so two runs in one process start their cadence from the
+     * same phase rather than wherever the previous run left off — otherwise "every 5th frame" would
+     * mean a different five frames per run, which is the non-determinism this exists to remove.
+     */
+    void setEvalSyncReloc(bool enabled, int everyN);
+    /** True when inline relocalization is active — for the run-identity sidecar's sync/async field. */
+    bool isEvalSyncReloc() const { return mEvalSyncReloc.load(std::memory_order_relaxed); }
+    /** The cadence in force, or 0 when sync mode is off. Reported alongside the flag. */
+    int evalSyncEveryN() const {
+        return mEvalSyncReloc.load(std::memory_order_relaxed)
+            ? mEvalSyncEveryN.load(std::memory_order_relaxed) : 0;
+    }
     void setVoxelSize(float size);
     void setParallaxMinDegrees(float deg);
     void setMappingPaused(bool paused) { mMappingPaused = paused; }
@@ -381,6 +400,11 @@ private:
     std::atomic<bool> mMapRunning{false};
 
     void relocThreadFunc();
+    /**
+     * EVALUATION.md 3.1 — one relocalization attempt over one frame, callable either from the
+     * background worker or inline from the caller in eval sync mode.
+     */
+    void runRelocPass(const cv::Mat& frame, const float* relocView);
     // Teleological self-grow (gatekeeper stage): measure how much of the registered artwork base is now
     // corroborated by real wall content in the clean camera frame -> mPaintingProgress. Read-only on the
     // reloc fingerprint; the promotion step (adding validated new marks) is staged separately.
@@ -523,6 +547,30 @@ private:
     // explicitly enabled"; the initializer said otherwise and the header won, which meant every
     // release build promoted unsupervised with no user-facing switch to stop it.
     std::atomic<bool> mSelfGrowEnabled{false};
+
+    /**
+     * EVALUATION.md 3.1 — run relocalization INLINE on the calling thread, one pass every Nth
+     * frame, instead of handing frames to the background worker.
+     *
+     * The second of the three named sources of replay non-determinism. RANSAC's RNG is seeded
+     * (mEvalRngSeed) and the frame order is fixed by the recording, but the worker's
+     * `locked ? 200 : 60` ms sleep means WHICH frames it receives is a scheduling outcome. Two
+     * replays of one recording therefore sample it differently, and a parameter A/B silently
+     * becomes a comparison of two different frame subsets.
+     *
+     * Off by default and gated at the JNI call site to debuggable builds, because this is an
+     * evaluation affordance and not a behaviour change: run inline and the reloc cost lands on the
+     * caller's thread at a cadence no real device would choose. EVALUATION.md is explicit that both
+     * are reported — the async numbers are what users get, the sync numbers are what is comparable.
+     */
+    std::atomic<bool>     mEvalSyncReloc{false};
+    std::atomic<int>      mEvalSyncEveryN{1};
+    /**
+     * Frames seen since sync mode was enabled, for the every-Nth decision. Not atomic-incremented
+     * for correctness across threads — scheduleRelocCheck is called from the one render thread —
+     * but atomic so enabling the mode from another thread cannot tear it.
+     */
+    std::atomic<long long> mEvalSyncFrameCounter{0};
 
     /** Fixed RANSAC seed for reproducible replay, or <0 for "leave the RNG alone" (default). */
     std::atomic<long long> mEvalRngSeed{-1};

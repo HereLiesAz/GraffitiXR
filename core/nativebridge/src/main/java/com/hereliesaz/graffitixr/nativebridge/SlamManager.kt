@@ -460,6 +460,43 @@ class SlamManager @Inject constructor(
     fun clearEvalRngSeed() = nativeSetEvalRngSeed(-1L)
 
     /**
+     * `EVALUATION.md` §3.1 / `IMPLEMENTATION.md` 6a.4 — run relocalization **inline** on the caller's
+     * thread, one pass every [everyN] frames, instead of handing frames to the background worker.
+     * **Evaluation only**, and a no-op unless [debuggable].
+     *
+     * The second of §3.1's three named sources of replay non-determinism, and the one the fixed RNG
+     * seed does not touch. The worker sleeps `locked ? 200 : 60` ms, so *which* frames of a
+     * recording it receives is a scheduling outcome: replay the same file twice and the reloc thread
+     * samples it differently. An A/B of two parameter values then compares two different frame
+     * subsets, and reports the difference as a parameter effect.
+     *
+     * Gated at the call site rather than by convention, for the same reason the seed is: run inline
+     * and the reloc cost lands on the render thread at a cadence no real device would choose. That
+     * is a behaviour change, not an evaluation affordance. §3.1 is explicit that both are reported —
+     * the async numbers are what users get, the sync numbers are what is comparable.
+     *
+     * @param everyN frames per pass, floored at 1 natively. Zero or negative would either divide by
+     *   zero or produce a mode that is "on" and never relocalizes, which on a replay looks exactly
+     *   like relocalization being broken.
+     */
+    fun setEvalSyncRelocIfDebuggable(enabled: Boolean, everyN: Int, debuggable: Boolean) {
+        if (debuggable) nativeSetEvalSyncReloc(enabled, everyN)
+    }
+
+    /** Restore production behaviour: relocalization back on its own thread. */
+    fun clearEvalSyncReloc() = nativeSetEvalSyncReloc(false, 1)
+
+    /**
+     * The inline cadence **actually in force**, or 0 when relocalization is running asynchronously.
+     *
+     * Read back from the engine rather than remembered here, so the run-identity sidecar records
+     * what the engine is doing and not what someone asked it to do. In a release build the gate
+     * above declines and this reports 0, which is the truth — a sidecar claiming a sync run that
+     * never happened is worse evidence than no sidecar.
+     */
+    fun evalSyncRelocEveryN(): Int = nativeGetEvalSyncRelocEveryN()
+
+    /**
      * SuperPoint detect+describe on [bitmap] (gray + CLAHE applied natively). Returns the packed array
      * [n, dim, (u,v)*n, descriptors row-major (n*dim)], or null if the model isn't loaded / nothing
      * found. Caller unpacks (kept here as a raw array to avoid an OpenCV dependency in this module).
@@ -847,6 +884,8 @@ class SlamManager @Inject constructor(
     private external fun nativeSetRelocEnabled(enabled: Boolean)
     private external fun nativeSetSelfGrowEnabled(enabled: Boolean)
     private external fun nativeSetEvalRngSeed(seed: Long)
+    private external fun nativeSetEvalSyncReloc(enabled: Boolean, everyN: Int)
+    private external fun nativeGetEvalSyncRelocEveryN(): Int
     private external fun nativeDetectSuperPoint(bitmap: Bitmap): FloatArray?
     private external fun nativeGetWallKeypointCount(): Int
     private external fun nativeSetWallPatch(bitmap: Bitmap)

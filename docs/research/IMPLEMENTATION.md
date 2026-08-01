@@ -721,9 +721,8 @@ order.** Work top to bottom.
       field count. This is the class of bug that silently corrupts every
       downstream analysis. **[T]**
 - [x] **6a.3** Add the `relocReject` ordinal column — its source already exists.
-- [ ] **6a.4** Add the eval-only fixed RNG seed and the synchronous-reloc mode
+- [x] **6a.4** Add the eval-only fixed RNG seed and the synchronous-reloc mode
       from `EVALUATION.md` §3.1. Both must be inert in release builds.
-      **RNG SEED DONE; SYNC-RELOC MODE STILL OUTSTANDING.**
 
       The seed is `MobileGS::setEvalRngSeed`, applied to `cv::theRNG().state`
       immediately before *every* `solvePnPRansac` rather than once at start-up —
@@ -733,6 +732,49 @@ order.** Work top to bottom.
       it on, and `setEvalRngSeedIfDebuggable` puts that gate at the call site. The
       sidecar now reports the seed **actually in force** (null in release, where the
       gate declines) rather than a hopeful constant.
+
+      The **sync-reloc mode** is `MobileGS::setEvalSyncReloc(enabled, everyN)`, gated
+      at the call site by `setEvalSyncRelocIfDebuggable` for the same reason the seed
+      is — and it is the larger release hazard of the two. A fixed RANSAC seed shipped
+      to users is a behaviour change nobody feels; inline relocalization shipped to
+      users moves a whole detect-match-solve pass onto the render thread several times
+      a second, which is a dropped-frame bug with no obvious path back to an eval
+      affordance somebody left on.
+
+      Landing it required extracting `relocThreadFunc`'s body into `runRelocPass`.
+      That extraction is **mechanical and was verified as such**: a
+      whitespace-insensitive diff of the whole file against `HEAD` shows the only
+      changes inside those 433 lines are three loop-level `continue`s becoming
+      `return`s, each of which meant "this attempt is over" and never "skip to the
+      next frame". Anything else would have been a relocalizer change smuggled in
+      behind an eval affordance, which is what X.3 exists to prevent.
+
+      In sync mode `scheduleRelocCheck` runs the pass on the caller's thread and never
+      sets `mRelocRequested`, so the worker stays parked rather than racing for the
+      same frame. The counter resets on every mode transition, so two runs in one
+      process start their cadence from the same phase — otherwise "every 5th frame"
+      means a different five frames per run, which is the non-determinism the mode
+      exists to remove.
+
+      **One accepted cost, written down rather than fixed.** `relocWantsFrame` does
+      not filter by cadence, so in sync mode the caller pays a YUV→RGB conversion plus
+      a rotate for frames the every-N test then discards. The obvious fix — peek
+      `(counter + 1) % everyN` there — **deadlocks**, and looks correct while doing
+      it: the counter advances only inside `scheduleRelocCheck`, which the caller
+      invokes only when `relocWantsFrame` returned true, so at `everyN=5` the peek
+      sees 1, refuses, and sees 1 forever. Sync mode would report itself ON and never
+      relocalize. Moving the increment into `relocWantsFrame` instead would make the
+      cadence depend on that function having been called first — a cross-file coupling
+      the next call site would break silently. Correct cadence beats a saved
+      conversion on a path whose whole purpose is comparable measurements.
+
+      `EvalRunIdentity.syncReloc` is **read back from the engine**, not remembered from
+      what was requested, so a release build (where the gate declines) reports async —
+      which is the truth. §3.2 says a CSV without a truthful sidecar is not evidence.
+
+      §3.1's **third** source of non-determinism — `DriftCostProbe` stamping wall-clock
+      `tsMs` instead of the recording's frame timestamp — is NOT covered by 6a.4 and
+      remains open. 6a.4 names only the seed and the sync mode.
 
       Verified natively, not inferred: `llvm-nm` on `libgraffitixr.so` shows
       `Java_..._nativeSetEvalRngSeed` exported under exactly the name the Kotlin
@@ -767,10 +809,35 @@ order.** Work top to bottom.
       `targetCaptureViewMatrix` in `ArViewModel`, `fingerprintViewMatrix` in
       `MainViewModel`, and `restoreWallFingerprintMetric`'s `viewMatrix16`.
       List each site in the commit message with its verdict.
-- [ ] **0.6** Confirm `PoseFusion.composeCorrected` is consistent under the chosen
+- [x] **0.6** Confirm `PoseFusion.composeCorrected` is consistent under the chosen
       convention. `PoseFusionTest` now pins the factor order with non-commuting
       operands; extend it for the rotation, not with another round-trip (a
       round-trip is order-insensitive and would pass either way). **[T]**
+      *(CONFIRMED for the rotation. `composeCorrected rotation block matches a
+      hand-derived product` composes Rx(30°), Ry(40°) and Rz(50°) — three mutually
+      non-commuting axes, so no permutation of the factors survives — and asserts
+      against the symbolic product multiplied out in closed form, NOT against
+      `PoseMath.multiply`, which would have made it an identity. No
+      `android.opengl.Matrix` anywhere in it, so it cannot pass vacuously against the
+      stub's zero arrays.*
+      *Mutation-checked numerically against eight plausible defects: three wrong
+      factor orders, an un-inverted `vCurrent`, `C = diag(1,-1,-1)` inserted on either
+      side of `pnp`, a wrong-handed `C`, and an inverse taken by negation rather than
+      transpose. Tolerance is 1e-5; the smallest discrepancy any of them produces is
+      0.246. The pass has content.*
+      *Reasoning behind the expected value: `vCurrent` is `Camera.getViewMatrix`,
+      which ARCore documents as already display-oriented, and Convention B put the
+      capture side in that same frame (0.2–0.4, 0.8). The two therefore already agree
+      **for rotation**, so the correct composition needs no `R_z` inserted and no
+      handedness flip.*
+      *Scope deliberately NOT claimed: this says nothing about whether the three
+      operands are in mutually consistent frames. They are not — `pnpMat` is
+      CV-convention against a GL `vCurrent`, and its domain is the capture-camera
+      frame against an `fpAnchor` that is a world-space model matrix, so `C` and
+      `V_capture_cv` are both missing. That is **0.9**, which is a real behaviour
+      change with its own experiment gating it and is untouched. The test pins the
+      three-factor form as it stands, so 0.9 has to change it deliberately rather
+      than by accident.)*
 - [x] **0.7** Add `captureRotationDeg` to `Fingerprint`; default `-1`; refuse to
       reload a legacy fingerprint and prompt for re-capture. **[T]**
       *(DONE. Safe to add to `Fingerprint` after all: JNI constructs through the FROZEN

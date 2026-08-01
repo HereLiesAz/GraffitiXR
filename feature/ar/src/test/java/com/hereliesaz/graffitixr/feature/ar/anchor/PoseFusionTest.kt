@@ -1,5 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
+import kotlin.math.cos
+import kotlin.math.sin
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -87,6 +89,77 @@ class PoseFusionTest {
         val move = trans(3f, -2f, 7f)
         val bothMoved = PoseFusion.composeCorrected(move, move, fpAnchor)
         for (i in 0 until 16) assertEquals("trans element $i", neitherRotated[i], bothMoved[i], 1e-4f)
+    }
+
+    /**
+     * `IMPLEMENTATION.md` **0.6**, rotation half.
+     *
+     * The order test above pins the factors with ONE rotation and a translation, which fixes where
+     * the anchor lands but says almost nothing about the 3×3 block — a rotation composed on the
+     * wrong side, or through a wrong-handed frame conversion, can still put the origin in the right
+     * place. This asserts the whole rotation block against a matrix derived by hand.
+     *
+     * What 0.6 settled (`PAPER.md` §8.3): `vCurrent` is `Camera.getViewMatrix`, which ARCore
+     * documents as already display-oriented, and convention B puts the capture side in the same
+     * display frame. So the two sides agree *for rotation* and the composition needs **no** `R_z`
+     * inserted and **no** handedness flip between `inverse(vCurrent)` and `pnpMat`. The expected
+     * rotation is therefore exactly `Rx(−30) · Ry(40) · Rz(50)` and nothing else — which is a claim
+     * with content, because every one of the plausible defects lands somewhere else:
+     *
+     *  - factors reordered → the three axes do not commute, so any permutation moves the block;
+     *  - `vCurrent` not inverted → `sin(30)` changes sign in rows 1 and 2;
+     *  - a `C = diag(1,−1,−1)` inserted between the first two factors → `C·Ry(b)·C = Ry(−b)`, so
+     *    `sin(40)` flips wherever it appears;
+     *  - an inverse taken by negating rather than transposing → mirrored, not rotated.
+     *
+     * The expected entries below are written out from the symbolic product of the three axis
+     * rotations, NOT by calling [PoseMath.multiply] — deriving them the way the code derives them
+     * would make this an identity rather than a check. Nothing here touches `android.opengl.Matrix`,
+     * which is a return-default stub in this source set and would make any assertion built on it
+     * pass against an array of zeros.
+     *
+     * Deliberately NOT in scope: whether the three operands are in mutually consistent frames. They
+     * are not — see the test above and 0.9. This pins the three-factor form as it stands, so 0.9's
+     * two extra factors have to change it on purpose rather than by accident.
+     */
+    @Test fun `composeCorrected rotation block matches a hand-derived product`() {
+        val a = Math.toRadians(30.0).toFloat(); val ca = cos(a); val sa = sin(a)
+        val b = Math.toRadians(40.0).toFloat(); val cb = cos(b); val sb = sin(b)
+        val g = Math.toRadians(50.0).toFloat(); val cg = cos(g); val sg = sin(g)
+        val tx = 1f; val ty = 2f; val tz = 3f
+
+        // Column-major (element [col*4+row]), same layout PoseMath and ARCore use. Right-handed,
+        // matching the existing rotZ fixture above: column 0 of Rz(90) is (0,1,0), i.e. +X → +Y.
+        val vCurrent = floatArrayOf(1f,0f,0f,0f, 0f,ca,sa,0f, 0f,-sa,ca,0f, 0f,0f,0f,1f)   // Rx(30)
+        val pnpMat = floatArrayOf(cb,0f,-sb,0f, 0f,1f,0f,0f, sb,0f,cb,0f, 0f,0f,0f,1f)     // Ry(40)
+        val fpAnchor = floatArrayOf(cg,sg,0f,0f, -sg,cg,0f,0f, 0f,0f,1f,0f, tx,ty,tz,1f)   // Rz(50), t
+
+        // E = Rx(-a)·Ry(b)·Rz(g), multiplied out by hand.
+        //   Rx(-a)·Ry(b) = [ cb      0    sb   ]
+        //                  [-sa·sb   ca   sa·cb]
+        //                  [-ca·sb  -sa   ca·cb]
+        // then right-multiplied by Rz(g), whose third column is (0,0,1) — which is why column 2 of E
+        // is just column 2 of that intermediate.
+        val e = arrayOf(
+            floatArrayOf(cb * cg,                    -cb * sg,                   sb),
+            floatArrayOf(ca * sg - sa * sb * cg,     ca * cg + sa * sb * sg,     sa * cb),
+            floatArrayOf(-ca * sb * cg - sa * sg,    ca * sb * sg - sa * cg,     ca * cb),
+        )
+        // The first two factors carry no translation, so the composed translation is the same
+        // intermediate applied to fpAnchor's t.
+        val et = floatArrayOf(
+            cb * tx + sb * tz,
+            -sa * sb * tx + ca * ty + sa * cb * tz,
+            -ca * sb * tx - sa * ty + ca * cb * tz,
+        )
+
+        val r = PoseFusion.composeCorrected(vCurrent, pnpMat, fpAnchor)
+        for (row in 0 until 3) for (col in 0 until 3) {
+            assertEquals("rotation [$row][$col]", e[row][col], r[col * 4 + row], 1e-5f)
+        }
+        for (i in 0 until 3) assertEquals("translation [$i]", et[i], r[12 + i], 1e-5f)
+        assertEquals(0f, r[3], 1e-6f); assertEquals(0f, r[7], 1e-6f)
+        assertEquals(0f, r[11], 1e-6f); assertEquals(1f, r[15], 1e-6f)
     }
 
     @Test fun `blend alpha 0 returns current, alpha 1 returns target`() {

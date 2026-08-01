@@ -348,8 +348,11 @@ class ArViewModel @Inject constructor(
      * none. `solvePnPRansac` draws random samples, so an unseeded replay A/B is not a controlled
      * comparison and the reader can only know that if the field says so.
      *
-     * `syncReloc` is still false: that half of 6a.4 (an eval-only inline reloc mode) is outstanding,
-     * so thread interleaving remains an uncontrolled source of run-to-run variance.
+     * `syncReloc` is READ BACK from the engine, not remembered from whatever this class asked for.
+     * In a release build `setEvalSyncRelocIfDebuggable` declines and the engine reports 0, so the
+     * sidecar says async — which is the truth. A sidecar claiming a synchronous run that never
+     * happened is worse evidence than no sidecar, because it is the field a reader uses to decide
+     * whether two runs are comparable at all.
      */
     private fun buildEvalRunIdentity() = com.hereliesaz.graffitixr.feature.ar.eval.EvalRunIdentity(
         gitCommit = BuildConfig.GIT_COMMIT,
@@ -359,7 +362,7 @@ class ArViewModel @Inject constructor(
         androidRelease = android.os.Build.VERSION.RELEASE ?: "unknown",
         deviceClass = if (_uiState.value.isHardwareStereoActive) "dual" else "mono",
         rngSeed = if (BuildConfig.DEBUG) EVAL_RNG_SEED else null,
-        syncReloc = false,
+        syncReloc = slamManager.evalSyncRelocEveryN() > 0,
         parameters = mapOf(
             "MIN_INLIER_RATIO" to
                 com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion.MIN_INLIER_RATIO.toString(),

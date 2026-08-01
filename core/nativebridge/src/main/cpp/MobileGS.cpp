@@ -207,6 +207,459 @@ void MobileGS::getConfidenceAvgs(float& outVisible, float& outGlobal) const {
 void MobileGS::updatePersistentMesh(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat) {}
 void MobileGS::getPersistentMesh(std::vector<float>& outVertices, std::vector<float>& outWeights) {}
 
+/**
+ * One relocalization attempt over one frame: snapshot the fingerprint, detect, match, solve, publish.
+ *
+ * EVALUATION.md 3.1 — split out of relocThreadFunc so an eval run can call it INLINE instead of
+ * handing the frame to a background worker. Thread interleaving is one of the three named sources of
+ * replay non-determinism: the worker's sleep is `locked ? 200 : 60` ms, so which frames it happens to
+ * receive depends on scheduling, and two replays of the same recording sample the recording
+ * differently. That turns a parameter A/B into a comparison of two different frame subsets, which is
+ * the single most common way a tuning exercise produces confident nonsense.
+ *
+ * The extraction is deliberately mechanical — the body is unchanged except that the three
+ * loop-level `continue`s became `return`s, since each meant "this attempt is over" and never
+ * "skip to the next frame". Any other edit here would have been a relocalizer change smuggled in
+ * behind an eval affordance.
+ *
+ * @param relocView the VIO view matrix snapshotted alongside the frame, for the rectifying warp.
+ */
+void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
+    cv::Mat wallDescs;
+    std::vector<cv::Point3f> wallKps3d;
+    // Phase 2: parallel to wallKps3d, or empty for a legacy fingerprint (= all backbone).
+    std::vector<uint8_t> wallRegions;
+    cv::Mat wallPatch;
+    float fpIntrinsics[4];
+    bool hasFpView = false;
+    // Phase 2b snapshot: the persistent feature map + the last reloc pose, used (when the flag is on)
+    // as the frustum-gate prior. The map is co-registered to the fingerprint anchor, so its points
+    // share wallKps3d's frame and the prior pose (camera_from_fpWorld) projects them directly.
+    cv::Mat mapDescs;
+    std::vector<cv::Point3f> mapKps3d;
+    float mapPriorPose[16];
+    long mapPriorSeq = 0;
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        wallDescs = mWallDescriptors.clone();
+        wallKps3d = mWallKeypoints3D;
+        wallRegions = mWallRegions;
+        wallPatch = mWallPatch.clone();
+        memcpy(fpIntrinsics, mFingerprintIntrinsics, 4 * sizeof(float));
+        hasFpView = mHasFingerprintView;
+        mapDescs = mMapDescriptors.clone();
+        mapKps3d = mMapPoints3D;
+        memcpy(mapPriorPose, mPnpCamFromFpWorld, 16 * sizeof(float));
+        mapPriorSeq = mPnpResultSeq.load(std::memory_order_relaxed);
+    }
+
+    // 2.11: reset the backbone counters BEFORE the early-outs below, so an attempt that never
+    // reaches the fingerprint publishes "not measured" instead of the previous attempt's numbers.
+    mLastRelocBackboneFeatures.store(-1, std::memory_order_relaxed);
+    mLastRelocBackboneMatches.store(-1, std::memory_order_relaxed);
+    mLastRelocBackboneInliers.store(-1, std::memory_order_relaxed);
+    // Same rule for the reprojection residual (IMPLEMENTATION.md 4.3): it is only meaningful
+    // for the attempt that produced it, and the search radius reads it as a drift measurement.
+    // Leaving a previous lock's value in place would widen or narrow the corroboration search
+    // on the strength of a pose that is no longer the one being predicted from.
+    mLastRelocReprojPx.store(-1.0f, std::memory_order_relaxed);
+    // ...and the same rule again for the corroboration counters (IMPLEMENTATION.md 4.6). These
+    // are written only on a GATED attempt, so without a reset here one gated attempt's numbers
+    // stayed live across every subsequent tick that fell back to the global search — a red
+    // FEW_INLIERS row on the overlay sitting next to a healthy "Corrob 30/40", and, worse, the
+    // same measurement copied into every eval CSV row until the next gated attempt, which turns
+    // any rate E6 computes from these columns into a count of ticks rather than of attempts.
+    // Reset alongside the backbone trio because they are the same kind of number and the
+    // convention has to be one convention.
+    mCorrobPredicted.store(-1, std::memory_order_relaxed);
+    mCorrobMatched.store(-1, std::memory_order_relaxed);
+    mCorrobLoneSkips.store(-1, std::memory_order_relaxed);
+    mCorrobSearchRadiusPx.store(-1.0f, std::memory_order_relaxed);
+
+    if (!mRelocEnabled) {
+        mLastRelocReject.store(kRelocDisabled, std::memory_order_relaxed);
+        return;
+    }
+    if (wallDescs.empty() || wallKps3d.empty()) {
+        // No fingerprint, or one carrying descriptors but no 3D points (the depth-path result when
+        // the depth API is off). Either way PnP has nothing to solve against, so the whole thread
+        // idles here — silently, before this reject code existed.
+        mLastRelocReject.store(kRelocNoFingerprint, std::memory_order_relaxed);
+        return;
+    }
+
+    // IMPLEMENTATION.md 2.7 — honour the partition only when it indexes THIS point set. A
+    // regions array of the wrong length is treated as absent (all backbone) rather than
+    // subscripted, so a legacy or mismatched fingerprint relocalizes exactly as on main.
+    // Hoisted out of buildCorr so the filter below and the count published here cannot drift
+    // apart: they must agree about which fingerprint is partitioned or the diagnostics describe
+    // a different point set from the one PnP saw.
+    const bool usePartition = wallRegions.size() == wallKps3d.size();
+    // 2.11: how many stored points PnP is allowed to draw on. An UNPARTITIONED fingerprint is
+    // 2.7's legacy all-backbone case, so it reports its FULL point count — not zero, and not the
+    // -1 sentinel. Zero here is a real measurement meaning F_out is empty (the artwork covers
+    // the whole wall), which is the one state reloc cannot recover from; reporting a legacy
+    // fingerprint as zero would raise that alarm on every project saved before Phase 2.
+    mLastRelocBackboneFeatures.store(
+        usePartition
+            ? (int)std::count(wallRegions.begin(), wallRegions.end(), kRegionOutside)
+            : (int)wallKps3d.size(),
+        std::memory_order_relaxed);
+
+    if (frame.empty()) return;
+
+    // Optionally enhance the RGB frame under low light before grayscale conversion
+    cv::Mat workFrame = frame;
+    if (mEnhancer.isLoaded() && mLightLevel < kLowLightThreshold) {
+        cv::Mat enhanced;
+        if (mEnhancer.enhance(frame, enhanced)) workFrame = enhanced;
+    }
+    cv::Mat gray;
+    cv::cvtColor(workFrame, gray, cv::COLOR_RGB2GRAY);
+    normalizeForFeatures(gray); // illumination-normalize to match the (also-normalized) fingerprint
+
+    // SuperPoint usable when loaded and the wall fingerprint is float-typed (or empty).
+    const bool spOk = mSuperPoint.isLoaded() &&
+        (wallDescs.empty() || wallDescs.type() == CV_32F);
+
+    // Detect + Lowe-ratio match a gray image against the wall fingerprint. When Hback is non-empty
+    // the matched keypoints are mapped through it (rectified frame -> current image) before being
+    // stored, so the returned 2D points are ALWAYS in the current camera image — exactly what the
+    // PnP below expects.
+    // Detect base-frame features ONCE and reuse them: SuperPoint is an ONNX model, so detecting the
+    // same gray twice (plain pass + map matching) would roughly double per-reloc cost. The scaled and
+    // rectified passes run on different images, so buildCorr still detects internally for those.
+    std::vector<cv::KeyPoint> baseKps; cv::Mat baseDescs;
+    {
+        bool sp = spOk;
+        if (sp && !mSuperPoint.detect(gray, baseKps, baseDescs)) sp = false;
+        if (!sp) mFeatureDetector->detectAndCompute(gray, cv::noArray(), baseKps, baseDescs);
+    }
+    mLastRelocDetected.store((int)baseKps.size(), std::memory_order_relaxed);
+
+    auto buildCorr = [&](const cv::Mat& g, const cv::Mat& Hback,
+                         std::vector<cv::Point2f>& outImg, std::vector<cv::Point3f>& outObj,
+                         std::vector<uint8_t>& outFromBackbone,
+                         const std::vector<cv::KeyPoint>* preKps = nullptr, const cv::Mat* preDescs = nullptr) {
+        std::vector<cv::KeyPoint> localKps; cv::Mat localDescs;
+        if (!(preKps && preDescs)) {
+            bool sp = spOk;
+            if (sp && !mSuperPoint.detect(g, localKps, localDescs)) sp = false;
+            if (!sp) mFeatureDetector->detectAndCompute(g, cv::noArray(), localKps, localDescs);
+        }
+        const std::vector<cv::KeyPoint>& kps = (preKps && preDescs) ? *preKps : localKps;
+        const cv::Mat& descs = (preKps && preDescs) ? *preDescs : localDescs;
+        if (descs.empty() || wallDescs.empty()) return;
+        if (descs.type() != wallDescs.type()) return;
+        // trainIdx indexes wallDescs' ROWS but is used to subscript wallKps3d, so the two must be
+        // the same length. Every in-tree producer keeps them aligned; a truncated or hand-edited
+        // .gxr does not, and the result would be an out-of-bounds vector read feeding garbage 3D
+        // points into solvePnPRansac. The map path (below) already guards this; the wall path did
+        // not. Refuse rather than relocalize against nonsense.
+        if (wallKps3d.size() != (size_t)wallDescs.rows) return;
+
+        cv::Ptr<cv::DescriptorMatcher>& matcher = (descs.type() == CV_32F) ? mL2Matcher : mMatcher;
+        std::vector<std::vector<cv::DMatch>> matches;
+        matcher->knnMatch(descs, wallDescs, matches, 2);
+        for (auto& match : matches) {
+            if (match.size() < 2) continue;
+            if (match[0].distance < kRelocLoweRatio * match[1].distance) {
+                // PAPER.md §5: the reloc PnP solves the GLOBAL problem, with no prior, and must
+                // therefore see only the backbone. Points under the artwork (INSIDE) are the
+                // work surface — they decay as it is painted, which is exactly what makes
+                // accuracy degrade with task progress. BAND straddles the edge and is trusted by
+                // neither side. Corroboration against F_in happens later, once a pose exists.
+                if (usePartition && wallRegions[match[0].trainIdx] != kRegionOutside) continue;
+                cv::Point2f p = kps[match[0].queryIdx].pt;
+                if (!Hback.empty()) {
+                    std::vector<cv::Point2f> in{p}, outp;
+                    cv::perspectiveTransform(in, outp, Hback);
+                    p = outp[0];
+                }
+                outImg.push_back(p);
+                outObj.push_back(wallKps3d[match[0].trainIdx]);
+                // Everything that survives the filter above is F_out: under a partition because
+                // non-OUTSIDE rows were skipped, and without one because 2.7's zero-length rule
+                // makes the whole fingerprint backbone. Recorded per correspondence rather than
+                // counted, because the inlier attribution below indexes back through this.
+                outFromBackbone.push_back(1);
+            }
+        }
+    };
+
+    std::vector<cv::Point2f> imgPts;
+    std::vector<cv::Point3f> objPts;
+    // 2.11: parallel to imgPts/objPts — 1 where the correspondence came from a backbone point.
+    std::vector<uint8_t> corrFromBackbone;
+    buildCorr(gray, cv::Mat(), imgPts, objPts, corrFromBackbone, &baseKps, &baseDescs);
+
+    // Multi-scale matching (distance robustness). SuperPoint isn't scale-invariant, and the marks
+    // shrink in the frame from far away and grow up close, so also match the frame DOWN- and
+    // UP-scaled, mapping the matched points back to full-res with a scale homography (Hback). These
+    // passes share the plain pass's camera geometry, so they only add consistent correspondences
+    // across distance; PnP RANSAC discards any that don't fit. Covers both ORB and SuperPoint
+    // fingerprints, beyond ORB's own pyramid range.
+    for (float s : {0.5f, 2.0f}) {
+        cv::Mat scaled;
+        cv::resize(gray, scaled, cv::Size(), s, s, cv::INTER_LINEAR);
+        double hdata[] = {1.0/(double)s, 0.0, 0.0, 0.0, 1.0/(double)s, 0.0, 0.0, 0.0, 1.0};
+        cv::Mat Hback = cv::Mat(3, 3, CV_64F, hdata).clone();
+        buildCorr(scaled, Hback, imgPts, objPts, corrFromBackbone);
+    }
+
+    // Plane-guided rectification (perspective robustness for oblique views). The marks lie on a
+    // known plane and VIO gives a pose, so the oblique-vs-frontal distortion is a homography we can
+    // pre-cancel: warp the live frame into the fingerprint's frontal frame, match, and ADD the
+    // correspondences mapped back to the current image (RANSAC filters any that don't fit).
+    // Published so the diagnostics can show whether this pass is actually running. It was dead in
+    // practice for a long time (nothing set mHasFingerprintView on the live capture path), so
+    // "did rectification fire, and did it help" is worth being able to read off the device rather
+    // than infer. -1 = the pass was not eligible at all this attempt.
+    mLastRelocObliquityDeg.store(-1, std::memory_order_relaxed);
+    mLastRelocRectifiedCorr.store(0, std::memory_order_relaxed);
+    if (hasFpView && mIsArCoreTracking.load(std::memory_order_relaxed) && wallKps3d.size() >= 12) {
+        cv::Mat Hcur_fp, Hfp_cur; double obliqDeg = 0.0;
+        const bool haveH = computeRectifyHomography(relocView, Hcur_fp, Hfp_cur, obliqDeg);
+        if (haveH) mLastRelocObliquityDeg.store((int)(obliqDeg + 0.5), std::memory_order_relaxed);
+        if (haveH && obliqDeg > 25.0) {
+            cv::Mat grayRect;
+            cv::warpPerspective(gray, grayRect, Hfp_cur, gray.size());
+            size_t before = imgPts.size();
+            buildCorr(grayRect, Hcur_fp, imgPts, objPts, corrFromBackbone);
+            mLastRelocRectifiedCorr.store((int)(imgPts.size() - before), std::memory_order_relaxed);
+            if (imgPts.size() > before)
+                LOGI("Reloc: rectified (obliquity %.0f deg) added %zu corr (total %zu)",
+                     obliqDeg, imgPts.size() - before, imgPts.size());
+        }
+    }
+
+    // --- Persistent feature-map matching (Phase 2b; default OFF via mMapRelocEnabled) ---
+    // When the overlay is larger than the marks, the marks leave frame; the map carries features
+    // across the whole wall so reloc still locks. Hard constraint: NEVER brute-force the whole map —
+    // frustum-gate to the subset the last reloc pose says is in view, then match only those and
+    // APPEND the correspondences (same fingerprint frame + intrinsics) so PnP solves over both.
+    // Requires a prior pose (mapPriorSeq>0, i.e. the fingerprint has locked at least once) and a
+    // matching descriptor type. Default-off, so this is inert until device-validated.
+    if (mMapRelocEnabled.load(std::memory_order_relaxed) && !mapDescs.empty() && mapPriorSeq > 0
+            && mapDescs.type() == wallDescs.type() && mapKps3d.size() == (size_t)mapDescs.rows) {
+        glm::mat4 camFromFp = glm::make_mat4(mapPriorPose);
+        double gfx = (fpIntrinsics[0] > 0.f) ? (double)fpIntrinsics[0] : 1000.0;
+        double gfy = (fpIntrinsics[1] > 0.f) ? (double)fpIntrinsics[1] : 1000.0;
+        double gcx = (fpIntrinsics[0] > 0.f) ? (double)fpIntrinsics[2] : gray.cols * 0.5;
+        double gcy = (fpIntrinsics[1] > 0.f) ? (double)fpIntrinsics[3] : gray.rows * 0.5;
+        std::vector<int> visible;
+        visible.reserve(mapKps3d.size());
+        for (int i = 0; i < (int)mapKps3d.size(); ++i) {
+            glm::vec4 pc = camFromFp * glm::vec4(mapKps3d[i].x, mapKps3d[i].y, mapKps3d[i].z, 1.0f);
+            if (pc.z <= 0.05f) continue; // behind / too close to the camera
+            float u = (float)(gfx * pc.x / pc.z + gcx);
+            float v = (float)(gfy * pc.y / pc.z + gcy);
+            if (u >= 0.f && u < gray.cols && v >= 0.f && v < gray.rows) visible.push_back(i);
+        }
+        if (visible.size() >= 8) {
+            // Preallocate the gated descriptor block with the right size+type and copy rows
+            // (cv::Mat has no usable reserve() on an empty/typeless matrix). Reuse the base detection.
+            cv::Mat gatedDescs((int)visible.size(), mapDescs.cols, mapDescs.type());
+            for (size_t i = 0; i < visible.size(); ++i)
+                mapDescs.row(visible[i]).copyTo(gatedDescs.row((int)i));
+            if (!baseDescs.empty() && baseDescs.type() == gatedDescs.type()) {
+                cv::Ptr<cv::DescriptorMatcher>& matcher = (baseDescs.type() == CV_32F) ? mL2Matcher : mMatcher;
+                std::vector<std::vector<cv::DMatch>> matches;
+                matcher->knnMatch(baseDescs, gatedDescs, matches, 2);
+                size_t before = imgPts.size();
+                for (auto& m : matches) {
+                    if (m.size() < 2) continue;
+                    if (m[0].distance < kRelocLoweRatio * m[1].distance) {
+                        imgPts.push_back(baseKps[m[0].queryIdx].pt);
+                        objPts.push_back(mapKps3d[visible[m[0].trainIdx]]);
+                        // NOT backbone: the persistent map is a separate point set that Φ has
+                        // never classified, so counting it in F_out would report a backbone the
+                        // partition never vouched for — and mask an empty F_out on exactly the
+                        // configuration (large overlay, marks off-frame) the map exists for.
+                        corrFromBackbone.push_back(0);
+                    }
+                }
+                if (imgPts.size() > before)
+                    LOGI("Reloc map: gated %zu/%zu pts, added %zu corr (total %zu)",
+                         visible.size(), mapKps3d.size(), imgPts.size() - before, imgPts.size());
+            }
+        }
+    }
+
+    // Distortion head (optional, docs/DISTORTION_HEAD.md): when the model + canonical patch are
+    // present, compare the live view (cropped around the coarse match centroid) against the
+    // fingerprint patch -> matchability (relock confidence) + coverage (= painting-progress). The
+    // corners/H -> IPPE prior is a later increment; here we consume the cheap signals. Inert unless
+    // the distortion_head.onnx asset is bundled. Uses RAW gray (the head's SuperPoint expects it).
+    if (mDistortionHead.isLoaded() && !wallPatch.empty() && !imgPts.empty()) {
+        float cxs = 0, cys = 0;
+        for (const auto& p : imgPts) { cxs += p.x; cys += p.y; }
+        cxs /= (float)imgPts.size(); cys /= (float)imgPts.size();
+        cv::Mat headGray;
+        cv::cvtColor(workFrame, headGray, cv::COLOR_RGB2GRAY);
+        int side = std::min(headGray.cols, headGray.rows);
+        int x0 = std::max(0, std::min((int)cxs - side / 2, headGray.cols - side));
+        int y0 = std::max(0, std::min((int)cys - side / 2, headGray.rows - side));
+        cv::Mat crop = headGray(cv::Rect(x0, y0, side, side)).clone();
+        std::array<float, 13> dist{};
+        if (mDistortionHead.run(crop, wallPatch, dist)) {
+            const float matchability = dist[11], coverage = dist[12];
+            if (matchability > 0.5f) {
+                // A trusted look at the wall: it measures BOTH channels, and they are different
+                // quantities. Coverage says how much of the design is realized (progress);
+                // matchability says how much to trust this frame (confidence).
+                mPaintingProgress.store(coverage, std::memory_order_relaxed);
+                mCorroborationConfidence.store(matchability, std::memory_order_relaxed);
+            } else {
+                // The head looked and did not recognize the wall. That is a statement about THIS
+                // FRAME, not about the mural, so only confidence decays. Decaying progress here
+                // is what made a three-frame glitch read as the mural being un-painted.
+                decayCorroboration();
+            }
+            LOGI("DistortionHead: match %.2f coverage %.2f tilt %.0f log2scale %.2f",
+                 matchability, coverage, dist[8], dist[9]);
+        } else {
+            decayCorroboration();   // head refused to run — no information either way
+        }
+    } else if (mDistortionHead.isLoaded()) {
+        // Head is loaded but there was no patch or no correspondences to centre the crop on, so
+        // no attempt happened at all. Still a confidence statement, never a progress one.
+        decayCorroboration();
+    }
+
+    // Lowered floors so a close-up PARTIAL view (only a corner of the marks visible) can still
+    // localize: PnP needs only a handful of correspondences. The inlier RATIO (published below) is
+    // the quality gate PoseFusion actually trusts, so being permissive here is safe.
+    mLastRelocMatches.store((int)imgPts.size(), std::memory_order_relaxed);
+    mLastRelocInliers.store(0, std::memory_order_relaxed);
+    // corrFromBackbone is parallel to imgPts by construction, and the inlier attribution below
+    // subscripts it with indices into imgPts. A future pass that appends to one and not the
+    // other would make that read out of bounds, so a length disagreement publishes "not
+    // measured" instead of a wrong number.
+    const bool haveBackboneFlags = corrFromBackbone.size() == imgPts.size();
+    // 2.11: counted SEPARATELY from mLastRelocMatches, never in place of it. The same shortfall
+    // means different things — a low total is "the frame is not looking at the registered wall",
+    // a low backbone under a healthy total is "everything it can see is under the artwork" — and
+    // those call for opposite advice (aim differently vs. shrink the design / step back).
+    mLastRelocBackboneMatches.store(
+        haveBackboneFlags
+            ? (int)std::count(corrFromBackbone.begin(), corrFromBackbone.end(), (uint8_t)1)
+            : -1,
+        std::memory_order_relaxed);
+    if (imgPts.size() < 8) {
+        // Distinguish "the detector found nothing / the descriptors don't even compare" from
+        // "features were found but too few agreed with the fingerprint" — they call for opposite
+        // fixes (light/focus/texture vs. aim at the registered area).
+        mLastRelocReject.store(baseDescs.empty() ? kRelocNoFeatures : kRelocFewMatches,
+                               std::memory_order_relaxed);
+    }
+    if (imgPts.size() >= 8) {
+        cv::Mat rvec, tvec;
+        std::vector<int> inliers;
+        // Camera matrix: reuse the intrinsics the fingerprint's 3D points were built with (keeps
+        // the 2D<->3D correspondence consistent) when available, else a coarse default. The old
+        // hardcoded init supplied only 6 of the 9 entries, leaving the bottom row uninitialised.
+        double fx = 1000.0, fy = 1000.0, cx = 960.0, cy = 540.0;
+        if (fpIntrinsics[0] > 0.0f && fpIntrinsics[1] > 0.0f) {
+            fx = fpIntrinsics[0]; fy = fpIntrinsics[1];
+            cx = fpIntrinsics[2]; cy = fpIntrinsics[3];
+        }
+        double idata[] = {fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0};
+        cv::Mat intr = cv::Mat(3, 3, CV_64F, idata).clone();
+        StageTimer _pnpTimer(&mStageAccumMs[4], &mStageSamples[4]);
+        // EVALUATION.md 3.1: solvePnPRansac draws random samples, so two replays of the same
+        // recording can disagree and a parameter A/B reports RANSAC variance as an effect.
+        // Re-seeded immediately before EVERY solve, not once at start-up: the reloc thread is
+        // one of several consumers of the global cv::theRNG(), so a single seeding would drift
+        // as soon as anything else drew from it. Negative = leave it alone, which is the
+        // production default and keeps this inert outside an eval run.
+        const long long evalSeed = mEvalRngSeed.load(std::memory_order_relaxed);
+        if (evalSeed >= 0) cv::theRNG().state = (uint64_t)evalSeed;
+        if (!cv::solvePnPRansac(objPts, imgPts, intr, cv::Mat(), rvec, tvec, false, 100, 8.0, 0.99, inliers)) {
+            mLastRelocReject.store(kRelocPnpFailed, std::memory_order_relaxed);
+        } else {
+            mLastRelocInliers.store((int)inliers.size(), std::memory_order_relaxed);
+            // 2.11: which of those inliers RANSAC drew from F_out. Left at -1 on the PnP-failed
+            // branch above, because no inlier set exists there to attribute — that is "not
+            // measured", not "no backbone agreed".
+            if (haveBackboneFlags) {
+                int backboneInliers = 0;
+                for (int idx : inliers) {
+                    if (idx >= 0 && idx < (int)corrFromBackbone.size() && corrFromBackbone[idx]) ++backboneInliers;
+                }
+                mLastRelocBackboneInliers.store(backboneInliers, std::memory_order_relaxed);
+            }
+            if (inliers.size() < 6) {
+                mLastRelocReject.store(kRelocFewInliers, std::memory_order_relaxed);
+            }
+            if (inliers.size() >= 6) {
+                // Refine on the RANSAC inliers. The marks lie on the wall plane, so resolve the
+                // planar two-fold (flip) ambiguity with IPPE and keep whichever pose reprojects
+                // best — but only adopt it if it strictly beats the RANSAC pose, so a non-coplanar
+                // inlier set can never make relocalization worse.
+                {
+                    std::vector<cv::Point3f> inObj; std::vector<cv::Point2f> inImg;
+                    inObj.reserve(inliers.size()); inImg.reserve(inliers.size());
+                    for (int idx : inliers) { inObj.push_back(objPts[idx]); inImg.push_back(imgPts[idx]); }
+                    auto reproj = [&](const cv::Mat& rv, const cv::Mat& tv) {
+                        std::vector<cv::Point2f> pr;
+                        cv::projectPoints(inObj, rv, tv, intr, cv::Mat(), pr);
+                        double e = 0; for (size_t k = 0; k < pr.size(); ++k) e += cv::norm(pr[k] - inImg[k]);
+                        return e;
+                    };
+                    double bestErr = reproj(rvec, tvec);
+                    try {
+                        std::vector<cv::Mat> rvecs, tvecs;
+                        int n = cv::solvePnPGeneric(inObj, inImg, intr, cv::Mat(), rvecs, tvecs,
+                                                    false, cv::SOLVEPNP_IPPE);
+                        for (int s = 0; s < n; ++s) {
+                            double e = reproj(rvecs[s], tvecs[s]);
+                            if (e < bestErr) { bestErr = e; rvecs[s].copyTo(rvec); tvecs[s].copyTo(tvec); }
+                        }
+                    } catch (const cv::Exception&) { /* keep RANSAC pose */ }
+                    // IMPLEMENTATION.md 4.3 — publish the MEAN, not the sum `reproj` returns.
+                    // The sum grows with the inlier count, so a better lock would report a worse
+                    // error and the corroboration search would tighten exactly when it has the
+                    // most to gain from staying put. Divided by the same set it was summed over.
+                    if (!inObj.empty()) {
+                        mLastRelocReprojPx.store((float)(bestErr / (double)inObj.size()),
+                                                 std::memory_order_relaxed);
+                    }
+                }
+                cv::Mat R;
+                cv:: Rodrigues(rvec, R);
+
+                // PnP gives T_camera_from_fingerprintWorld (a view matrix). DO NOT write it to
+                // mAnchorMatrix (a world-space MODEL matrix) — that caused overlay teleport.
+                // Publish the raw result; Kotlin composes inverse(V_current)*pnp*fpAnchor with the
+                // FRESH view matrix (see PoseFusion).
+                glm::mat4 pnpMat = glm::mat4(1.0f);
+                for(int i=0; i<3; ++i) {
+                    for(int j=0; j<3; ++j) pnpMat[j][i] = (float)R.at<double>(i,j);
+                    pnpMat[3][i] = (float)tvec.at<double>(i);
+                }
+                {
+                    std::lock_guard<std::mutex> lock(mMutex);
+                    memcpy(mPnpCamFromFpWorld, glm::value_ptr(pnpMat), 16 * sizeof(float));
+                }
+                mPnpInlierCount.store((int)inliers.size(), std::memory_order_relaxed);
+                mPnpMatchCount.store((int)imgPts.size(), std::memory_order_relaxed);
+                mPnpResultSeq.fetch_add(1, std::memory_order_relaxed);
+                mLastRelocReject.store(kRelocOk, std::memory_order_relaxed);
+                LOGI("Relocalization: PnP match published (%zu/%zu inliers)", inliers.size(), imgPts.size());
+                // Phase 3 passive build: grow the feature map from this locked frame (default OFF).
+                if (mMapBuildEnabled.load(std::memory_order_relaxed))
+                    growMapFromReloc(pnpMat, baseKps, baseDescs, fx, fy, cx, cy);
+            }
+        }
+    }
+
+    // Teleological gatekeeper: update painting-progress from how much of the artwork base the clean
+    // frame now corroborates. No-op until an artwork is registered; read-only on the reloc set.
+    // Hands over this frame's detection so it isn't recomputed (see tryUpdateFingerprint).
+    tryUpdateFingerprint(gray, &baseKps, &baseDescs);
+}
+
 void MobileGS::relocThreadFunc() {
     setpriority(PRIO_PROCESS, 0, 10); // Standard background priority
     JniThreadAttacher attacher;
@@ -222,439 +675,11 @@ void MobileGS::relocThreadFunc() {
             mRelocRequested = false;
         }
 
-        cv::Mat wallDescs;
-        std::vector<cv::Point3f> wallKps3d;
-        // Phase 2: parallel to wallKps3d, or empty for a legacy fingerprint (= all backbone).
-        std::vector<uint8_t> wallRegions;
-        cv::Mat wallPatch;
-        float fpIntrinsics[4];
-        bool hasFpView = false;
-        // Phase 2b snapshot: the persistent feature map + the last reloc pose, used (when the flag is on)
-        // as the frustum-gate prior. The map is co-registered to the fingerprint anchor, so its points
-        // share wallKps3d's frame and the prior pose (camera_from_fpWorld) projects them directly.
-        cv::Mat mapDescs;
-        std::vector<cv::Point3f> mapKps3d;
-        float mapPriorPose[16];
-        long mapPriorSeq = 0;
-        {
-            std::lock_guard<std::mutex> lock(mMutex);
-            wallDescs = mWallDescriptors.clone();
-            wallKps3d = mWallKeypoints3D;
-            wallRegions = mWallRegions;
-            wallPatch = mWallPatch.clone();
-            memcpy(fpIntrinsics, mFingerprintIntrinsics, 4 * sizeof(float));
-            hasFpView = mHasFingerprintView;
-            mapDescs = mMapDescriptors.clone();
-            mapKps3d = mMapPoints3D;
-            memcpy(mapPriorPose, mPnpCamFromFpWorld, 16 * sizeof(float));
-            mapPriorSeq = mPnpResultSeq.load(std::memory_order_relaxed);
-        }
-
-        // 2.11: reset the backbone counters BEFORE the early-outs below, so an attempt that never
-        // reaches the fingerprint publishes "not measured" instead of the previous attempt's numbers.
-        mLastRelocBackboneFeatures.store(-1, std::memory_order_relaxed);
-        mLastRelocBackboneMatches.store(-1, std::memory_order_relaxed);
-        mLastRelocBackboneInliers.store(-1, std::memory_order_relaxed);
-        // Same rule for the reprojection residual (IMPLEMENTATION.md 4.3): it is only meaningful
-        // for the attempt that produced it, and the search radius reads it as a drift measurement.
-        // Leaving a previous lock's value in place would widen or narrow the corroboration search
-        // on the strength of a pose that is no longer the one being predicted from.
-        mLastRelocReprojPx.store(-1.0f, std::memory_order_relaxed);
-        // ...and the same rule again for the corroboration counters (IMPLEMENTATION.md 4.6). These
-        // are written only on a GATED attempt, so without a reset here one gated attempt's numbers
-        // stayed live across every subsequent tick that fell back to the global search — a red
-        // FEW_INLIERS row on the overlay sitting next to a healthy "Corrob 30/40", and, worse, the
-        // same measurement copied into every eval CSV row until the next gated attempt, which turns
-        // any rate E6 computes from these columns into a count of ticks rather than of attempts.
-        // Reset alongside the backbone trio because they are the same kind of number and the
-        // convention has to be one convention.
-        mCorrobPredicted.store(-1, std::memory_order_relaxed);
-        mCorrobMatched.store(-1, std::memory_order_relaxed);
-        mCorrobLoneSkips.store(-1, std::memory_order_relaxed);
-        mCorrobSearchRadiusPx.store(-1.0f, std::memory_order_relaxed);
-
-        if (!mRelocEnabled) {
-            mLastRelocReject.store(kRelocDisabled, std::memory_order_relaxed);
-            continue;
-        }
-        if (wallDescs.empty() || wallKps3d.empty()) {
-            // No fingerprint, or one carrying descriptors but no 3D points (the depth-path result when
-            // the depth API is off). Either way PnP has nothing to solve against, so the whole thread
-            // idles here — silently, before this reject code existed.
-            mLastRelocReject.store(kRelocNoFingerprint, std::memory_order_relaxed);
-            continue;
-        }
-
-        // IMPLEMENTATION.md 2.7 — honour the partition only when it indexes THIS point set. A
-        // regions array of the wrong length is treated as absent (all backbone) rather than
-        // subscripted, so a legacy or mismatched fingerprint relocalizes exactly as on main.
-        // Hoisted out of buildCorr so the filter below and the count published here cannot drift
-        // apart: they must agree about which fingerprint is partitioned or the diagnostics describe
-        // a different point set from the one PnP saw.
-        const bool usePartition = wallRegions.size() == wallKps3d.size();
-        // 2.11: how many stored points PnP is allowed to draw on. An UNPARTITIONED fingerprint is
-        // 2.7's legacy all-backbone case, so it reports its FULL point count — not zero, and not the
-        // -1 sentinel. Zero here is a real measurement meaning F_out is empty (the artwork covers
-        // the whole wall), which is the one state reloc cannot recover from; reporting a legacy
-        // fingerprint as zero would raise that alarm on every project saved before Phase 2.
-        mLastRelocBackboneFeatures.store(
-            usePartition
-                ? (int)std::count(wallRegions.begin(), wallRegions.end(), kRegionOutside)
-                : (int)wallKps3d.size(),
-            std::memory_order_relaxed);
-
-        if (frame.empty()) continue;
-
-        // Optionally enhance the RGB frame under low light before grayscale conversion
-        cv::Mat workFrame = frame;
-        if (mEnhancer.isLoaded() && mLightLevel < kLowLightThreshold) {
-            cv::Mat enhanced;
-            if (mEnhancer.enhance(frame, enhanced)) workFrame = enhanced;
-        }
-        cv::Mat gray;
-        cv::cvtColor(workFrame, gray, cv::COLOR_RGB2GRAY);
-        normalizeForFeatures(gray); // illumination-normalize to match the (also-normalized) fingerprint
-
-        // SuperPoint usable when loaded and the wall fingerprint is float-typed (or empty).
-        const bool spOk = mSuperPoint.isLoaded() &&
-            (wallDescs.empty() || wallDescs.type() == CV_32F);
-
-        // Detect + Lowe-ratio match a gray image against the wall fingerprint. When Hback is non-empty
-        // the matched keypoints are mapped through it (rectified frame -> current image) before being
-        // stored, so the returned 2D points are ALWAYS in the current camera image — exactly what the
-        // PnP below expects.
-        // Detect base-frame features ONCE and reuse them: SuperPoint is an ONNX model, so detecting the
-        // same gray twice (plain pass + map matching) would roughly double per-reloc cost. The scaled and
-        // rectified passes run on different images, so buildCorr still detects internally for those.
-        std::vector<cv::KeyPoint> baseKps; cv::Mat baseDescs;
-        {
-            bool sp = spOk;
-            if (sp && !mSuperPoint.detect(gray, baseKps, baseDescs)) sp = false;
-            if (!sp) mFeatureDetector->detectAndCompute(gray, cv::noArray(), baseKps, baseDescs);
-        }
-        mLastRelocDetected.store((int)baseKps.size(), std::memory_order_relaxed);
-
-        auto buildCorr = [&](const cv::Mat& g, const cv::Mat& Hback,
-                             std::vector<cv::Point2f>& outImg, std::vector<cv::Point3f>& outObj,
-                             std::vector<uint8_t>& outFromBackbone,
-                             const std::vector<cv::KeyPoint>* preKps = nullptr, const cv::Mat* preDescs = nullptr) {
-            std::vector<cv::KeyPoint> localKps; cv::Mat localDescs;
-            if (!(preKps && preDescs)) {
-                bool sp = spOk;
-                if (sp && !mSuperPoint.detect(g, localKps, localDescs)) sp = false;
-                if (!sp) mFeatureDetector->detectAndCompute(g, cv::noArray(), localKps, localDescs);
-            }
-            const std::vector<cv::KeyPoint>& kps = (preKps && preDescs) ? *preKps : localKps;
-            const cv::Mat& descs = (preKps && preDescs) ? *preDescs : localDescs;
-            if (descs.empty() || wallDescs.empty()) return;
-            if (descs.type() != wallDescs.type()) return;
-            // trainIdx indexes wallDescs' ROWS but is used to subscript wallKps3d, so the two must be
-            // the same length. Every in-tree producer keeps them aligned; a truncated or hand-edited
-            // .gxr does not, and the result would be an out-of-bounds vector read feeding garbage 3D
-            // points into solvePnPRansac. The map path (below) already guards this; the wall path did
-            // not. Refuse rather than relocalize against nonsense.
-            if (wallKps3d.size() != (size_t)wallDescs.rows) return;
-
-            cv::Ptr<cv::DescriptorMatcher>& matcher = (descs.type() == CV_32F) ? mL2Matcher : mMatcher;
-            std::vector<std::vector<cv::DMatch>> matches;
-            matcher->knnMatch(descs, wallDescs, matches, 2);
-            for (auto& match : matches) {
-                if (match.size() < 2) continue;
-                if (match[0].distance < kRelocLoweRatio * match[1].distance) {
-                    // PAPER.md §5: the reloc PnP solves the GLOBAL problem, with no prior, and must
-                    // therefore see only the backbone. Points under the artwork (INSIDE) are the
-                    // work surface — they decay as it is painted, which is exactly what makes
-                    // accuracy degrade with task progress. BAND straddles the edge and is trusted by
-                    // neither side. Corroboration against F_in happens later, once a pose exists.
-                    if (usePartition && wallRegions[match[0].trainIdx] != kRegionOutside) continue;
-                    cv::Point2f p = kps[match[0].queryIdx].pt;
-                    if (!Hback.empty()) {
-                        std::vector<cv::Point2f> in{p}, outp;
-                        cv::perspectiveTransform(in, outp, Hback);
-                        p = outp[0];
-                    }
-                    outImg.push_back(p);
-                    outObj.push_back(wallKps3d[match[0].trainIdx]);
-                    // Everything that survives the filter above is F_out: under a partition because
-                    // non-OUTSIDE rows were skipped, and without one because 2.7's zero-length rule
-                    // makes the whole fingerprint backbone. Recorded per correspondence rather than
-                    // counted, because the inlier attribution below indexes back through this.
-                    outFromBackbone.push_back(1);
-                }
-            }
-        };
-
-        std::vector<cv::Point2f> imgPts;
-        std::vector<cv::Point3f> objPts;
-        // 2.11: parallel to imgPts/objPts — 1 where the correspondence came from a backbone point.
-        std::vector<uint8_t> corrFromBackbone;
-        buildCorr(gray, cv::Mat(), imgPts, objPts, corrFromBackbone, &baseKps, &baseDescs);
-
-        // Multi-scale matching (distance robustness). SuperPoint isn't scale-invariant, and the marks
-        // shrink in the frame from far away and grow up close, so also match the frame DOWN- and
-        // UP-scaled, mapping the matched points back to full-res with a scale homography (Hback). These
-        // passes share the plain pass's camera geometry, so they only add consistent correspondences
-        // across distance; PnP RANSAC discards any that don't fit. Covers both ORB and SuperPoint
-        // fingerprints, beyond ORB's own pyramid range.
-        for (float s : {0.5f, 2.0f}) {
-            cv::Mat scaled;
-            cv::resize(gray, scaled, cv::Size(), s, s, cv::INTER_LINEAR);
-            double hdata[] = {1.0/(double)s, 0.0, 0.0, 0.0, 1.0/(double)s, 0.0, 0.0, 0.0, 1.0};
-            cv::Mat Hback = cv::Mat(3, 3, CV_64F, hdata).clone();
-            buildCorr(scaled, Hback, imgPts, objPts, corrFromBackbone);
-        }
-
-        // Plane-guided rectification (perspective robustness for oblique views). The marks lie on a
-        // known plane and VIO gives a pose, so the oblique-vs-frontal distortion is a homography we can
-        // pre-cancel: warp the live frame into the fingerprint's frontal frame, match, and ADD the
-        // correspondences mapped back to the current image (RANSAC filters any that don't fit).
-        // Published so the diagnostics can show whether this pass is actually running. It was dead in
-        // practice for a long time (nothing set mHasFingerprintView on the live capture path), so
-        // "did rectification fire, and did it help" is worth being able to read off the device rather
-        // than infer. -1 = the pass was not eligible at all this attempt.
-        mLastRelocObliquityDeg.store(-1, std::memory_order_relaxed);
-        mLastRelocRectifiedCorr.store(0, std::memory_order_relaxed);
-        if (hasFpView && mIsArCoreTracking.load(std::memory_order_relaxed) && wallKps3d.size() >= 12) {
-            cv::Mat Hcur_fp, Hfp_cur; double obliqDeg = 0.0;
-            const bool haveH = computeRectifyHomography(relocView, Hcur_fp, Hfp_cur, obliqDeg);
-            if (haveH) mLastRelocObliquityDeg.store((int)(obliqDeg + 0.5), std::memory_order_relaxed);
-            if (haveH && obliqDeg > 25.0) {
-                cv::Mat grayRect;
-                cv::warpPerspective(gray, grayRect, Hfp_cur, gray.size());
-                size_t before = imgPts.size();
-                buildCorr(grayRect, Hcur_fp, imgPts, objPts, corrFromBackbone);
-                mLastRelocRectifiedCorr.store((int)(imgPts.size() - before), std::memory_order_relaxed);
-                if (imgPts.size() > before)
-                    LOGI("Reloc: rectified (obliquity %.0f deg) added %zu corr (total %zu)",
-                         obliqDeg, imgPts.size() - before, imgPts.size());
-            }
-        }
-
-        // --- Persistent feature-map matching (Phase 2b; default OFF via mMapRelocEnabled) ---
-        // When the overlay is larger than the marks, the marks leave frame; the map carries features
-        // across the whole wall so reloc still locks. Hard constraint: NEVER brute-force the whole map —
-        // frustum-gate to the subset the last reloc pose says is in view, then match only those and
-        // APPEND the correspondences (same fingerprint frame + intrinsics) so PnP solves over both.
-        // Requires a prior pose (mapPriorSeq>0, i.e. the fingerprint has locked at least once) and a
-        // matching descriptor type. Default-off, so this is inert until device-validated.
-        if (mMapRelocEnabled.load(std::memory_order_relaxed) && !mapDescs.empty() && mapPriorSeq > 0
-                && mapDescs.type() == wallDescs.type() && mapKps3d.size() == (size_t)mapDescs.rows) {
-            glm::mat4 camFromFp = glm::make_mat4(mapPriorPose);
-            double gfx = (fpIntrinsics[0] > 0.f) ? (double)fpIntrinsics[0] : 1000.0;
-            double gfy = (fpIntrinsics[1] > 0.f) ? (double)fpIntrinsics[1] : 1000.0;
-            double gcx = (fpIntrinsics[0] > 0.f) ? (double)fpIntrinsics[2] : gray.cols * 0.5;
-            double gcy = (fpIntrinsics[1] > 0.f) ? (double)fpIntrinsics[3] : gray.rows * 0.5;
-            std::vector<int> visible;
-            visible.reserve(mapKps3d.size());
-            for (int i = 0; i < (int)mapKps3d.size(); ++i) {
-                glm::vec4 pc = camFromFp * glm::vec4(mapKps3d[i].x, mapKps3d[i].y, mapKps3d[i].z, 1.0f);
-                if (pc.z <= 0.05f) continue; // behind / too close to the camera
-                float u = (float)(gfx * pc.x / pc.z + gcx);
-                float v = (float)(gfy * pc.y / pc.z + gcy);
-                if (u >= 0.f && u < gray.cols && v >= 0.f && v < gray.rows) visible.push_back(i);
-            }
-            if (visible.size() >= 8) {
-                // Preallocate the gated descriptor block with the right size+type and copy rows
-                // (cv::Mat has no usable reserve() on an empty/typeless matrix). Reuse the base detection.
-                cv::Mat gatedDescs((int)visible.size(), mapDescs.cols, mapDescs.type());
-                for (size_t i = 0; i < visible.size(); ++i)
-                    mapDescs.row(visible[i]).copyTo(gatedDescs.row((int)i));
-                if (!baseDescs.empty() && baseDescs.type() == gatedDescs.type()) {
-                    cv::Ptr<cv::DescriptorMatcher>& matcher = (baseDescs.type() == CV_32F) ? mL2Matcher : mMatcher;
-                    std::vector<std::vector<cv::DMatch>> matches;
-                    matcher->knnMatch(baseDescs, gatedDescs, matches, 2);
-                    size_t before = imgPts.size();
-                    for (auto& m : matches) {
-                        if (m.size() < 2) continue;
-                        if (m[0].distance < kRelocLoweRatio * m[1].distance) {
-                            imgPts.push_back(baseKps[m[0].queryIdx].pt);
-                            objPts.push_back(mapKps3d[visible[m[0].trainIdx]]);
-                            // NOT backbone: the persistent map is a separate point set that Φ has
-                            // never classified, so counting it in F_out would report a backbone the
-                            // partition never vouched for — and mask an empty F_out on exactly the
-                            // configuration (large overlay, marks off-frame) the map exists for.
-                            corrFromBackbone.push_back(0);
-                        }
-                    }
-                    if (imgPts.size() > before)
-                        LOGI("Reloc map: gated %zu/%zu pts, added %zu corr (total %zu)",
-                             visible.size(), mapKps3d.size(), imgPts.size() - before, imgPts.size());
-                }
-            }
-        }
-
-        // Distortion head (optional, docs/DISTORTION_HEAD.md): when the model + canonical patch are
-        // present, compare the live view (cropped around the coarse match centroid) against the
-        // fingerprint patch -> matchability (relock confidence) + coverage (= painting-progress). The
-        // corners/H -> IPPE prior is a later increment; here we consume the cheap signals. Inert unless
-        // the distortion_head.onnx asset is bundled. Uses RAW gray (the head's SuperPoint expects it).
-        if (mDistortionHead.isLoaded() && !wallPatch.empty() && !imgPts.empty()) {
-            float cxs = 0, cys = 0;
-            for (const auto& p : imgPts) { cxs += p.x; cys += p.y; }
-            cxs /= (float)imgPts.size(); cys /= (float)imgPts.size();
-            cv::Mat headGray;
-            cv::cvtColor(workFrame, headGray, cv::COLOR_RGB2GRAY);
-            int side = std::min(headGray.cols, headGray.rows);
-            int x0 = std::max(0, std::min((int)cxs - side / 2, headGray.cols - side));
-            int y0 = std::max(0, std::min((int)cys - side / 2, headGray.rows - side));
-            cv::Mat crop = headGray(cv::Rect(x0, y0, side, side)).clone();
-            std::array<float, 13> dist{};
-            if (mDistortionHead.run(crop, wallPatch, dist)) {
-                const float matchability = dist[11], coverage = dist[12];
-                if (matchability > 0.5f) {
-                    // A trusted look at the wall: it measures BOTH channels, and they are different
-                    // quantities. Coverage says how much of the design is realized (progress);
-                    // matchability says how much to trust this frame (confidence).
-                    mPaintingProgress.store(coverage, std::memory_order_relaxed);
-                    mCorroborationConfidence.store(matchability, std::memory_order_relaxed);
-                } else {
-                    // The head looked and did not recognize the wall. That is a statement about THIS
-                    // FRAME, not about the mural, so only confidence decays. Decaying progress here
-                    // is what made a three-frame glitch read as the mural being un-painted.
-                    decayCorroboration();
-                }
-                LOGI("DistortionHead: match %.2f coverage %.2f tilt %.0f log2scale %.2f",
-                     matchability, coverage, dist[8], dist[9]);
-            } else {
-                decayCorroboration();   // head refused to run — no information either way
-            }
-        } else if (mDistortionHead.isLoaded()) {
-            // Head is loaded but there was no patch or no correspondences to centre the crop on, so
-            // no attempt happened at all. Still a confidence statement, never a progress one.
-            decayCorroboration();
-        }
-
-        // Lowered floors so a close-up PARTIAL view (only a corner of the marks visible) can still
-        // localize: PnP needs only a handful of correspondences. The inlier RATIO (published below) is
-        // the quality gate PoseFusion actually trusts, so being permissive here is safe.
-        mLastRelocMatches.store((int)imgPts.size(), std::memory_order_relaxed);
-        mLastRelocInliers.store(0, std::memory_order_relaxed);
-        // corrFromBackbone is parallel to imgPts by construction, and the inlier attribution below
-        // subscripts it with indices into imgPts. A future pass that appends to one and not the
-        // other would make that read out of bounds, so a length disagreement publishes "not
-        // measured" instead of a wrong number.
-        const bool haveBackboneFlags = corrFromBackbone.size() == imgPts.size();
-        // 2.11: counted SEPARATELY from mLastRelocMatches, never in place of it. The same shortfall
-        // means different things — a low total is "the frame is not looking at the registered wall",
-        // a low backbone under a healthy total is "everything it can see is under the artwork" — and
-        // those call for opposite advice (aim differently vs. shrink the design / step back).
-        mLastRelocBackboneMatches.store(
-            haveBackboneFlags
-                ? (int)std::count(corrFromBackbone.begin(), corrFromBackbone.end(), (uint8_t)1)
-                : -1,
-            std::memory_order_relaxed);
-        if (imgPts.size() < 8) {
-            // Distinguish "the detector found nothing / the descriptors don't even compare" from
-            // "features were found but too few agreed with the fingerprint" — they call for opposite
-            // fixes (light/focus/texture vs. aim at the registered area).
-            mLastRelocReject.store(baseDescs.empty() ? kRelocNoFeatures : kRelocFewMatches,
-                                   std::memory_order_relaxed);
-        }
-        if (imgPts.size() >= 8) {
-            cv::Mat rvec, tvec;
-            std::vector<int> inliers;
-            // Camera matrix: reuse the intrinsics the fingerprint's 3D points were built with (keeps
-            // the 2D<->3D correspondence consistent) when available, else a coarse default. The old
-            // hardcoded init supplied only 6 of the 9 entries, leaving the bottom row uninitialised.
-            double fx = 1000.0, fy = 1000.0, cx = 960.0, cy = 540.0;
-            if (fpIntrinsics[0] > 0.0f && fpIntrinsics[1] > 0.0f) {
-                fx = fpIntrinsics[0]; fy = fpIntrinsics[1];
-                cx = fpIntrinsics[2]; cy = fpIntrinsics[3];
-            }
-            double idata[] = {fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0};
-            cv::Mat intr = cv::Mat(3, 3, CV_64F, idata).clone();
-            StageTimer _pnpTimer(&mStageAccumMs[4], &mStageSamples[4]);
-            // EVALUATION.md 3.1: solvePnPRansac draws random samples, so two replays of the same
-            // recording can disagree and a parameter A/B reports RANSAC variance as an effect.
-            // Re-seeded immediately before EVERY solve, not once at start-up: the reloc thread is
-            // one of several consumers of the global cv::theRNG(), so a single seeding would drift
-            // as soon as anything else drew from it. Negative = leave it alone, which is the
-            // production default and keeps this inert outside an eval run.
-            const long long evalSeed = mEvalRngSeed.load(std::memory_order_relaxed);
-            if (evalSeed >= 0) cv::theRNG().state = (uint64_t)evalSeed;
-            if (!cv::solvePnPRansac(objPts, imgPts, intr, cv::Mat(), rvec, tvec, false, 100, 8.0, 0.99, inliers)) {
-                mLastRelocReject.store(kRelocPnpFailed, std::memory_order_relaxed);
-            } else {
-                mLastRelocInliers.store((int)inliers.size(), std::memory_order_relaxed);
-                // 2.11: which of those inliers RANSAC drew from F_out. Left at -1 on the PnP-failed
-                // branch above, because no inlier set exists there to attribute — that is "not
-                // measured", not "no backbone agreed".
-                if (haveBackboneFlags) {
-                    int backboneInliers = 0;
-                    for (int idx : inliers) {
-                        if (idx >= 0 && idx < (int)corrFromBackbone.size() && corrFromBackbone[idx]) ++backboneInliers;
-                    }
-                    mLastRelocBackboneInliers.store(backboneInliers, std::memory_order_relaxed);
-                }
-                if (inliers.size() < 6) {
-                    mLastRelocReject.store(kRelocFewInliers, std::memory_order_relaxed);
-                }
-                if (inliers.size() >= 6) {
-                    // Refine on the RANSAC inliers. The marks lie on the wall plane, so resolve the
-                    // planar two-fold (flip) ambiguity with IPPE and keep whichever pose reprojects
-                    // best — but only adopt it if it strictly beats the RANSAC pose, so a non-coplanar
-                    // inlier set can never make relocalization worse.
-                    {
-                        std::vector<cv::Point3f> inObj; std::vector<cv::Point2f> inImg;
-                        inObj.reserve(inliers.size()); inImg.reserve(inliers.size());
-                        for (int idx : inliers) { inObj.push_back(objPts[idx]); inImg.push_back(imgPts[idx]); }
-                        auto reproj = [&](const cv::Mat& rv, const cv::Mat& tv) {
-                            std::vector<cv::Point2f> pr;
-                            cv::projectPoints(inObj, rv, tv, intr, cv::Mat(), pr);
-                            double e = 0; for (size_t k = 0; k < pr.size(); ++k) e += cv::norm(pr[k] - inImg[k]);
-                            return e;
-                        };
-                        double bestErr = reproj(rvec, tvec);
-                        try {
-                            std::vector<cv::Mat> rvecs, tvecs;
-                            int n = cv::solvePnPGeneric(inObj, inImg, intr, cv::Mat(), rvecs, tvecs,
-                                                        false, cv::SOLVEPNP_IPPE);
-                            for (int s = 0; s < n; ++s) {
-                                double e = reproj(rvecs[s], tvecs[s]);
-                                if (e < bestErr) { bestErr = e; rvecs[s].copyTo(rvec); tvecs[s].copyTo(tvec); }
-                            }
-                        } catch (const cv::Exception&) { /* keep RANSAC pose */ }
-                        // IMPLEMENTATION.md 4.3 — publish the MEAN, not the sum `reproj` returns.
-                        // The sum grows with the inlier count, so a better lock would report a worse
-                        // error and the corroboration search would tighten exactly when it has the
-                        // most to gain from staying put. Divided by the same set it was summed over.
-                        if (!inObj.empty()) {
-                            mLastRelocReprojPx.store((float)(bestErr / (double)inObj.size()),
-                                                     std::memory_order_relaxed);
-                        }
-                    }
-                    cv::Mat R;
-                    cv:: Rodrigues(rvec, R);
-
-                    // PnP gives T_camera_from_fingerprintWorld (a view matrix). DO NOT write it to
-                    // mAnchorMatrix (a world-space MODEL matrix) — that caused overlay teleport.
-                    // Publish the raw result; Kotlin composes inverse(V_current)*pnp*fpAnchor with the
-                    // FRESH view matrix (see PoseFusion).
-                    glm::mat4 pnpMat = glm::mat4(1.0f);
-                    for(int i=0; i<3; ++i) {
-                        for(int j=0; j<3; ++j) pnpMat[j][i] = (float)R.at<double>(i,j);
-                        pnpMat[3][i] = (float)tvec.at<double>(i);
-                    }
-                    {
-                        std::lock_guard<std::mutex> lock(mMutex);
-                        memcpy(mPnpCamFromFpWorld, glm::value_ptr(pnpMat), 16 * sizeof(float));
-                    }
-                    mPnpInlierCount.store((int)inliers.size(), std::memory_order_relaxed);
-                    mPnpMatchCount.store((int)imgPts.size(), std::memory_order_relaxed);
-                    mPnpResultSeq.fetch_add(1, std::memory_order_relaxed);
-                    mLastRelocReject.store(kRelocOk, std::memory_order_relaxed);
-                    LOGI("Relocalization: PnP match published (%zu/%zu inliers)", inliers.size(), imgPts.size());
-                    // Phase 3 passive build: grow the feature map from this locked frame (default OFF).
-                    if (mMapBuildEnabled.load(std::memory_order_relaxed))
-                        growMapFromReloc(pnpMat, baseKps, baseDescs, fx, fy, cx, cy);
-                }
-            }
-        }
-
-        // Teleological gatekeeper: update painting-progress from how much of the artwork base the clean
-        // frame now corroborates. No-op until an artwork is registered; read-only on the reloc set.
-        // Hands over this frame's detection so it isn't recomputed (see tryUpdateFingerprint).
-        tryUpdateFingerprint(gray, &baseKps, &baseDescs);
+        // The whole attempt. In EVAL SYNC MODE this worker never gets here: scheduleRelocCheck runs
+        // the pass on the caller's thread and never sets mRelocRequested, so the wait above simply
+        // parks. (Switching modes mid-run can let one already-queued request through; the flag is an
+        // eval affordance set before a run starts, not a live toggle.)
+        runRelocPass(frame, relocView);
 
         // Back off only once locked. A flat 200 ms capped every state at 5 Hz, including the one that
         // matters most — hunting for the first lock, or re-acquiring after the artist looks away —
@@ -1258,6 +1283,20 @@ void MobileGS::setViewportSize(int w, int h) { mScreenWidth = w; mScreenHeight =
 void MobileGS::setRelocEnabled(bool e) { mRelocEnabled = e; }
 
 void MobileGS::setEvalRngSeed(long long seed) { mEvalRngSeed.store(seed, std::memory_order_relaxed); }
+
+void MobileGS::setEvalSyncReloc(bool enabled, int everyN) {
+    // Floored at 1. Zero would divide by zero in the cadence test; negative would make `n % everyN`
+    // never zero, so the mode would be "on" and silently never relocalize -- which on a replay looks
+    // exactly like relocalization being broken, and would be blamed on whatever parameter the run
+    // was varying.
+    mEvalSyncEveryN.store(std::max(1, everyN), std::memory_order_relaxed);
+    // Reset on the transition, not only on enable: two runs in one process must start their cadence
+    // from the same phase, or "every 5th frame" means a different five frames per run and the
+    // determinism this exists to provide is not there.
+    mEvalSyncFrameCounter.store(0, std::memory_order_relaxed);
+    mEvalSyncReloc.store(enabled, std::memory_order_relaxed);
+    LOGI("Eval sync-reloc %s (every %d frames)", enabled ? "ON" : "off", std::max(1, everyN));
+}
 void MobileGS::restoreWallFingerprint(const cv::Mat& d, const std::vector<cv::Point3f>& p) {
     std::lock_guard<std::mutex> lock(mMutex);
     mWallDescriptors = d.clone();
@@ -1472,6 +1511,22 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
 }
 bool MobileGS::relocWantsFrame() {
     if (!mRelocEnabled) return false;
+    // EVAL SYNC MODE deliberately does NOT filter by cadence here, and the cost of that is real:
+    // mRelocRequested is never set in sync mode, so the throttle below always answers "yes" and the
+    // caller pays a full-frame YUV->RGB conversion plus a rotate for every frame the every-N test is
+    // about to discard.
+    //
+    // The obvious fix -- peek `(counter + 1) % everyN` here -- DEADLOCKS, and the way it does is
+    // worth writing down because it looks correct. The counter advances only inside
+    // scheduleRelocCheck, which the caller invokes only when this returns true. At everyN=5 the peek
+    // sees 1, refuses, the counter never moves, and the peek sees 1 forever: sync mode is "on" and
+    // never relocalizes. Moving the increment here instead would make scheduleRelocCheck's cadence
+    // depend on this function having been called first -- a coupling across two files that the next
+    // call site to appear would break silently.
+    //
+    // So the waste is accepted, and it is bounded: this is an eval affordance whose own comment
+    // already says the inline cadence is not one a real device would choose. Correct cadence beats a
+    // saved conversion on a path that exists to make measurements comparable.
     if (mRelocRequested) return false; // worker still holds the previous frame
     std::lock_guard<std::mutex> lock(mMutex);
     return !mWallDescriptors.empty();
@@ -1489,6 +1544,28 @@ void MobileGS::scheduleRelocCheck(const cv::Mat& f) {
         // never nests with mRelocMutex below.
         std::lock_guard<std::mutex> lock(mMutex);
         if (mWallDescriptors.empty()) return; // nothing to match against yet
+    }
+    // EVALUATION.md 3.1 — inline mode. Run the pass on THIS thread, one frame in N, and never set
+    // mRelocRequested, so the background worker stays parked on its condition variable rather than
+    // racing us for the same frame.
+    //
+    // The frame is NOT copied into mRelocColorFrame here. Copying it would publish it to a worker
+    // that is not going to read it, and the pass takes the frame by reference anyway; the only thing
+    // that shared buffer buys is the hand-off this mode exists to remove.
+    if (mEvalSyncReloc.load(std::memory_order_relaxed)) {
+        const int everyN = std::max(1, mEvalSyncEveryN.load(std::memory_order_relaxed));
+        const long long n = mEvalSyncFrameCounter.fetch_add(1, std::memory_order_relaxed) + 1;
+        if (n % everyN != 0) return;
+        float view[16];
+        {
+            // Same snapshot the async path takes, under the same lock, so the rectifying warp sees
+            // the view that goes with this frame in both modes. Running inline does not make an
+            // unsynchronized read of mViewMatrix safe -- updateCamera is still another thread.
+            std::lock_guard<std::mutex> lock(mMutex);
+            memcpy(view, mViewMatrix, 16 * sizeof(float));
+        }
+        runRelocPass(f, view);
+        return;
     }
     {
         std::lock_guard<std::mutex> lock(mRelocMutex);
