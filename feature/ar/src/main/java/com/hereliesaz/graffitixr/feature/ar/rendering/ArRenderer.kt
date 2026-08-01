@@ -161,9 +161,7 @@ class ArRenderer(
     // suppressed during target capture. Each governs one layer of "what the AR is seeing".
     @Volatile var showFeaturePoints: Boolean = true  // ARCore tracker landmarks (yellow dots)
     @Volatile var showPlaneGrids: Boolean = true      // detected planes as metric grids
-    @Volatile var showVoxels: Boolean = true          // SLAM voxel splats (confidence-tinted)
     @Volatile var showPoints: Boolean = true          // accumulated sparse point cloud
-    @Volatile var showMesh: Boolean = true            // persistent surface mesh
 
     // --- Throttled perception (FBO-cached) -----------------------------------------------------
     // World-locked perception is redrawn into an offscreen buffer only when the pose moves or the
@@ -688,7 +686,11 @@ class ArRenderer(
             planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose, gridMode = true)
         }
         // Diagnostic perception view: ALL active layers of what the AR is seeing.
-        val anyLayerOn = showFeaturePoints || showPlaneGrids || showVoxels || showPoints || showMesh
+        // showVoxels/showMesh are NOT consulted: the voxel/splat map and SurfaceMesh were deleted, so
+        // neither draws anything, and including them here meant two toggles that render nothing could
+        // still switch on the container for the three that do. Only the layers that actually draw
+        // decide whether the perception view is worth composing.
+        val anyLayerOn = showFeaturePoints || showPlaneGrids || showPoints
         // Show the perception mask (feature points / voxels) on the LIVE camera during scanning —
         // including while aiming a target. The captured frame is the raw camera image (GL overlays
         // aren't baked in), so the mask belongs here, not painted onto the frozen target preview.

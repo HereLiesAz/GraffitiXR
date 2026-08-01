@@ -1370,14 +1370,8 @@ class MainActivity : ComponentActivity() {
                                     onFeaturePointsChanged = { editorViewModel.toggleFeaturePoints() },
                                     showPlaneGrids = editorUiState.showPlaneGrids,
                                     onPlaneGridsChanged = { editorViewModel.togglePlaneGrids() },
-                                    showVoxels = editorUiState.showVoxels,
-                                    onVoxelsChanged = { editorViewModel.toggleVoxels() },
                                     showPoints = editorUiState.showPoints,
                                     onPointsChanged = { editorViewModel.togglePoints() },
-                                    showMesh = editorUiState.showMesh,
-                                    onMeshChanged = { editorViewModel.toggleMesh() },
-                                    parallaxMinDegrees = arUiState.parallaxMinDegrees,
-                                    onParallaxMinDegreesChanged = { arViewModel.setParallaxMinDegrees(it) },
                                     cameraTargetFps = arUiState.cameraTargetFps,
                                     onCameraTargetFpsChanged = { arViewModel.setCameraTargetFps(it) },
                                     throttleOnThermal = arUiState.throttleOnThermal,
@@ -1398,8 +1392,6 @@ class MainActivity : ComponentActivity() {
                                     onImperialUnitsChanged = { arViewModel.setImperialUnits(it) },
                                     backgroundColor = editorUiState.canvasBackground.toArgb(),
                                     onBackgroundColorChanged = { argb -> settingsViewModel.setBackgroundColor(argb) },
-                                    muralMethod = arUiState.muralMethod,
-                                    onMuralMethodChanged = { arViewModel.setMuralMethod(it) },
                                     onCheckForUpdates = { dashboardViewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
                                     onOpenUpdatePage = { dashboardViewModel.openUpdatePage(this@MainActivity) },
                                     onResetTutorials = { settingsViewModel.resetCompletedTutorials() },
@@ -1556,34 +1548,6 @@ class MainActivity : ComponentActivity() {
             // 2. PROJECT FOLDER — directly under Open. Opening it collapses Modes (see host.modes'
             // expandWhen below); its expansion is persisted per-project via onExpandedChange so the two
             // folders coordinate reactively.
-            azRailHostItem(
-                id = "host.project",
-                text = navStrings.project,
-                color = navItemColor,
-                initiallyExpanded = railExpansion["host.project"] ?: false,
-                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.project", it) },
-            )
-            azRailSubItem(id = "proj.new", hostId = "host.project", text = navStrings.new, color = navItemColor, shape = AzButtonShape.NONE) {
-                dashboardViewModel.onNewProjectTriggered()
-            }
-            azRailSubItem(id = "proj.save", hostId = "host.project", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE) {
-                showSaveDialog = true
-            }
-            azRailSubItem(id = "proj.export", hostId = "host.project", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE) {
-                // Export is mode-dispatched by the caller so it has access to the CameraX
-                // controller (Overlay stills) and a coroutine scope (AR/Overlay both suspend on
-                // asynchronous captures). This handler just tells the caller "user pressed Export".
-                onExportRequested()
-            }
-            azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {
-                navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
-            }
-            azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE) {
-                showSettings = true
-            }
-
-            azDivider()
-
             // 3. MODES FOLDER — always expanded, unless the user manually collapses it or opens the
             // Project folder. expandWhen returns false while Project is open (auto-collapsing Modes) and
             // re-expands Modes on the false->true edge when Project closes; a manual collapse is respected
@@ -1714,6 +1678,35 @@ class MainActivity : ComponentActivity() {
                     editorViewModel.onToggleModeTransformLocked(EditorMode.TRACE)
                 }
             }
+
+            azDivider()
+
+            azRailHostItem(
+                id = "host.project",
+                text = navStrings.project,
+                color = navItemColor,
+                initiallyExpanded = railExpansion["host.project"] ?: false,
+                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.project", it) },
+            )
+            azRailSubItem(id = "proj.new", hostId = "host.project", text = navStrings.new, color = navItemColor, shape = AzButtonShape.NONE) {
+                dashboardViewModel.onNewProjectTriggered()
+            }
+            azRailSubItem(id = "proj.save", hostId = "host.project", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE) {
+                showSaveDialog = true
+            }
+            azRailSubItem(id = "proj.export", hostId = "host.project", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE) {
+                // Export is mode-dispatched by the caller so it has access to the CameraX
+                // controller (Overlay stills) and a coroutine scope (AR/Overlay both suspend on
+                // asynchronous captures). This handler just tells the caller "user pressed Export".
+                onExportRequested()
+            }
+            azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {
+                navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
+            }
+            azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE) {
+                showSettings = true
+            }
+
 
             // Help — opens AzNavRail's built-in help overlay (populated by azAdvanced(helpList=...)).
             // Registering it as azHelpRailItem is what makes the overlay reachable: the library toggles

@@ -29,6 +29,7 @@ import com.google.ar.core.Session
 import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.UnavailableException
+import com.hereliesaz.graffitixr.common.model.CameraTargetFps
 import com.hereliesaz.graffitixr.common.model.ArScanMode
 import com.hereliesaz.graffitixr.common.model.MuralMethod
 import com.hereliesaz.graffitixr.common.model.ArUiState
@@ -1080,29 +1081,56 @@ class ArViewModel @Inject constructor(
                     appendDiag("camera: SAFE MODE — ARCore default config (stream stalled previously, no fps swap)")
                     Timber.w("ARDIAG mono config: SAFE MODE default cam=${s.cameraConfig.cameraId} (forceSafeCameraConfig)")
                 } else {
-                    // Pin the camera frame rate (default 30, user-selectable 30/60). Under battery
-                    // pressure (tier ≥ medium) cap to 30fps even if 60 was chosen. Done here at session
-                    // build only — a mid-session CameraConfig swap resets tracking.
-                    val effectiveCameraFps =
-                        if (_uiState.value.adaptiveRateEnabled && _uiState.value.batteryTier >= 1) 30
+                    // Pin the camera frame rate. Four choices, two of them fixed and two resolved
+                    // from the device (CameraTargetFps): 30, 60, DEVICE_DEFAULT and DEVICE_MAX.
+                    // Under battery pressure (tier ≥ medium) cap to 30 fps whatever was chosen —
+                    // including MAX, which is the one most likely to cook the phone. Done here at
+                    // session build only: a mid-session CameraConfig swap resets tracking.
+                    val chosenFps =
+                        if (_uiState.value.adaptiveRateEnabled && _uiState.value.batteryTier >= 1)
+                            CameraTargetFps.FPS_30
                         else _uiState.value.cameraTargetFps
-                    val targetFps = if (effectiveCameraFps == 60)
-                        CameraConfig.TargetFps.TARGET_FPS_60 else CameraConfig.TargetFps.TARGET_FPS_30
                     val defaultCfg = s.cameraConfig
                     val fpsConfig = try {
-                        s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
-                            facingDirection = CameraConfig.FacingDirection.BACK
-                            this.targetFps = EnumSet.of(targetFps)
-                        }).firstOrNull { it.cameraId == defaultCfg.cameraId }
+                        when (chosenFps) {
+                            // DEVICE_DEFAULT: don't filter at all. ARCore's own choice is the
+                            // broadest-compatible config it offers, and asking for it explicitly is
+                            // different from asking for 30 and happening to get it.
+                            CameraTargetFps.DEVICE_DEFAULT -> null
+                            // DEVICE_MAX: every config for this camera, highest frame rate wins.
+                            // Compared on the range's upper bound because a config advertising
+                            // 15-60 outranks a fixed 30 for a user who asked for maximum.
+                            CameraTargetFps.DEVICE_MAX ->
+                                s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
+                                    facingDirection = CameraConfig.FacingDirection.BACK
+                                }).filter { it.cameraId == defaultCfg.cameraId }
+                                    .maxByOrNull { it.fpsRange.upper }
+                            else ->
+                                s.getSupportedCameraConfigs(CameraConfigFilter(s).apply {
+                                    facingDirection = CameraConfig.FacingDirection.BACK
+                                    this.targetFps = EnumSet.of(
+                                        if (chosenFps == CameraTargetFps.FPS_60)
+                                            CameraConfig.TargetFps.TARGET_FPS_60
+                                        else CameraConfig.TargetFps.TARGET_FPS_30,
+                                    )
+                                }).firstOrNull { it.cameraId == defaultCfg.cameraId }
+                        }
                     } catch (e: Exception) {
                         Timber.w(e, "camera fps config query failed")
                         null
                     }
                     if (fpsConfig != null) {
                         s.cameraConfig = fpsConfig
-                        appendDiag("camera fps: pinned ${_uiState.value.cameraTargetFps} (matched default cfg)")
+                        appendDiag(
+                            "camera fps: ${CameraTargetFps.label(chosenFps)} -> " +
+                                "${fpsConfig.fpsRange.lower}-${fpsConfig.fpsRange.upper}",
+                        )
+                    } else if (chosenFps == CameraTargetFps.DEVICE_DEFAULT) {
+                        appendDiag("camera fps: device default (${defaultCfg.fpsRange.upper} max) — no swap")
                     } else {
-                        appendDiag("camera fps: no ${_uiState.value.cameraTargetFps} match for default cfg — using default")
+                        appendDiag(
+                            "camera fps: no ${CameraTargetFps.label(chosenFps)} match for default cfg — using default",
+                        )
                     }
                     Timber.i("ARDIAG dual-lens: mono config cam=${s.cameraConfig.cameraId} fps=${_uiState.value.cameraTargetFps} (stereoCapable=$isStereoCapable)")
                 }

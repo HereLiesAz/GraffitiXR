@@ -83,14 +83,8 @@ fun SettingsScreen(
     onFeaturePointsChanged: () -> Unit,
     showPlaneGrids: Boolean,
     onPlaneGridsChanged: () -> Unit,
-    showVoxels: Boolean,
-    onVoxelsChanged: () -> Unit,
     showPoints: Boolean,
     onPointsChanged: () -> Unit,
-    showMesh: Boolean,
-    onMeshChanged: () -> Unit,
-    parallaxMinDegrees: Float,
-    onParallaxMinDegreesChanged: (Float) -> Unit,
     cameraTargetFps: Int,
     onCameraTargetFpsChanged: (Int) -> Unit,
     throttleOnThermal: Boolean,
@@ -111,8 +105,6 @@ fun SettingsScreen(
     onImperialUnitsChanged: (Boolean) -> Unit,
     backgroundColor: Int,
     onBackgroundColorChanged: (Int) -> Unit,
-    muralMethod: MuralMethod,
-    onMuralMethodChanged: (MuralMethod) -> Unit,
     onCheckForUpdates: () -> Unit,
     onOpenUpdatePage: () -> Unit,
     onResetTutorials: () -> Unit,
@@ -267,39 +259,19 @@ fun SettingsScreen(
                                 modifier = Modifier.clickable { onPlaneGridsChanged() }
                             )
                             SettingsItem(
-                                label = strings.settings.layerVoxels,
-                                value = if (showVoxels) strings.settings.on else strings.settings.off,
-                                modifier = Modifier.clickable { onVoxelsChanged() }
-                            )
-                            SettingsItem(
                                 label = strings.settings.layerPoints,
                                 value = if (showPoints) strings.settings.on else strings.settings.off,
                                 modifier = Modifier.clickable { onPointsChanged() }
                             )
                             SettingsItem(
-                                label = strings.settings.layerMesh,
-                                value = if (showMesh) strings.settings.on else strings.settings.off,
-                                modifier = Modifier.clickable { onMeshChanged() }
-                            )
-                            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(text = strings.settings.parallaxThreshold, fontWeight = FontWeight.Medium)
-                                    Text(text = "${"%.1f".format(parallaxMinDegrees)}°", color = Color.Gray)
-                                }
-                                Slider(
-                                    value = parallaxMinDegrees,
-                                    onValueChange = onParallaxMinDegreesChanged,
-                                    valueRange = 1f..15f
-                                )
-                            }
-                            SettingsItem(
                                 label = strings.settings.cameraFps,
-                                value = "$cameraTargetFps",
+                                value = com.hereliesaz.graffitixr.common.model.CameraTargetFps
+                                    .label(cameraTargetFps),
                                 modifier = Modifier.clickable {
-                                    onCameraTargetFpsChanged(if (cameraTargetFps == 30) 60 else 30)
+                                    onCameraTargetFpsChanged(
+                                        com.hereliesaz.graffitixr.common.model.CameraTargetFps
+                                            .next(cameraTargetFps),
+                                    )
                                 }
                             )
                             // Perception throttle triggers: each drops perception 60→30 fps to save
@@ -344,20 +316,6 @@ fun SettingsScreen(
                                 modifier = Modifier.clickable { onArScanModeChanged(nextMode) }
                             )
 
-                            if (arScanMode == ArScanMode.MURAL) {
-                                val methods = MuralMethod.entries
-                                val nextMethod = methods[(muralMethod.ordinal + 1) % methods.size]
-                                val muralMethodValue = when (muralMethod) {
-                                    MuralMethod.VOXEL_HASH -> strings.settings.voxelHash
-                                    MuralMethod.SURFACE_MESH -> strings.settings.surfaceMesh
-                                    MuralMethod.CLOUD_OFFSET -> strings.settings.cloudOffset
-                                }
-                                SettingsItem(
-                                    label = strings.settings.muralMethod,
-                                    value = muralMethodValue,
-                                    modifier = Modifier.clickable { onMuralMethodChanged(nextMethod) }
-                                )
-                            }
                             SettingsItem(
                                 label = strings.settings.anchorBoundary,
                                 value = if (showAnchorBoundary) strings.settings.on else strings.settings.off,
