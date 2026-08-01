@@ -87,6 +87,26 @@ class SlamManager @Inject constructor(
     private val _anchorGeneration = kotlinx.coroutines.flow.MutableStateFlow(0)
     val anchorGeneration: kotlinx.coroutines.flow.StateFlow<Int> = _anchorGeneration
 
+    /**
+     * Whether an anchor exists right now, as distinct from how many have existed.
+     *
+     * Needed because the counter must be **monotonic**. Resetting it to 0 on teardown lets it go
+     * backwards, which strands any capture already waiting for `> N`: the next establishment
+     * produces 1, which is not greater than 1, so the wait burns its whole budget and reports
+     * "couldn't lock an anchor" for what was actually a torn-down session. Advancing the generation
+     * on teardown and clearing this flag says the same thing without lying about ordering.
+     */
+    @Volatile private var hasAnchor = false
+
+    /**
+     * The anchor generation as of the moment a capture asked for a new anchor.
+     *
+     * Lives here rather than being snapshotted by the waiter because only the requester can take it
+     * without racing: the request and the establishment are on different threads, and a snapshot
+     * taken after the request can already include the establishment it was meant to precede.
+     */
+    @Volatile var captureAnchorGenerationBaseline: Int = 0
+
     fun updateAnchorTransform(transform: FloatArray) = nativeUpdateAnchorTransform(transform)
 
     /**
@@ -94,7 +114,13 @@ class SlamManager @Inject constructor(
      * moment it sets its own `anchorEstablished`, and nowhere else — every other anchor write is
      * provisional.
      */
-    fun markAnchorEstablished() { _anchorGeneration.value = _anchorGeneration.value + 1 }
+    @Synchronized
+    fun markAnchorEstablished() {
+        // Synchronized because this is a read-modify-write on the GL thread racing teardown on the
+        // main thread; @Volatile alone would let one of the two updates be lost.
+        hasAnchor = true
+        _anchorGeneration.value = _anchorGeneration.value + 1
+    }
 
     /**
      * The anchor pose, waiting up to [timeoutMs] for an establishment **newer than**
@@ -110,9 +136,9 @@ class SlamManager @Inject constructor(
         sinceGeneration: Int,
         timeoutMs: Long = ANCHOR_WAIT_MS,
     ): FloatArray? {
-        if (_anchorGeneration.value <= sinceGeneration) {
+        if (!(hasAnchor && _anchorGeneration.value > sinceGeneration)) {
             kotlinx.coroutines.withTimeoutOrNull(timeoutMs) {
-                _anchorGeneration.first { it > sinceGeneration }
+                _anchorGeneration.first { it > sinceGeneration && hasAnchor }
             } ?: return null
         }
         val m = nativeGetAnchorTransform()
@@ -126,11 +152,18 @@ class SlamManager @Inject constructor(
     }
 
     /**
-     * Reset the establishment counter. Call when tearing the AR session down: the ARCore session and
-     * its anchors do not survive that, so a generation from the old session must not satisfy a wait
-     * in the new one.
+     * Record that the anchor is gone. Call when tearing the AR session down: the ARCore session and
+     * its anchors do not survive it.
+     *
+     * Advances the generation rather than resetting it, so the counter only ever moves forwards. A
+     * reset to 0 makes old snapshots compare as *larger* than new generations — the opposite of the
+     * ordering the wait depends on — and strands any capture already inside it.
      */
-    fun clearAnchorEstablished() { _anchorGeneration.value = 0 }
+    @Synchronized
+    fun clearAnchorEstablished() {
+        hasAnchor = false
+        _anchorGeneration.value = _anchorGeneration.value + 1
+    }
 
     /**
      * Centroid of the matched fingerprint marks, expressed in the FINGERPRINT ANCHOR's local frame

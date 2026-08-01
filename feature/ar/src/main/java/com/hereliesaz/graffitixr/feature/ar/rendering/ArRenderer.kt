@@ -452,10 +452,9 @@ class ArRenderer(
     // together, so a future reader from another thread inherits the guarantee rather than having to
     // rediscover the need for it; uncontended, it costs nothing.
 
-    // A millimetre of extent or pan, and a tenth of a degree of spin. Below these a "change" is
-    // float noise in the compose chain, and firing on it would repartition the fingerprint and
-    // rewrite the project file every frame the artist rests a finger on the screen. Recorded in
-    // `PARAMETERS.md` §6.
+    // Guards the design pose while it is composed and copied out. GL-thread-only on both sides now
+    // that the capture-path reader is gone, so it states an invariant more than it contends: the
+    // pose and the extents handed to onDesignFootprintChanged must come from the same frame.
     private val designFootprintLock = Any()
     private val designRigidModel = FloatArray(16)
     private val designAnchorInvScratch = FloatArray(16)
@@ -466,8 +465,6 @@ class ArRenderer(
     private val designMoveDetector =
         com.hereliesaz.graffitixr.feature.ar.anchor.DesignMoveDetector()
 
-    private var designEffectiveHalfW = -1f
-    private var designEffectiveHalfH = -1f
     private var designPlaced = false
 
     // Scratch for the 2D perspective content rotation matrix (X/Y axes).
@@ -1981,8 +1978,15 @@ class ArRenderer(
             // Size AND placement, in one detector. Φ asks where a feature sits relative to the
             // artwork, and dragging or spinning the design changes that answer as much as resizing
             // does — artists drag far more often than they pinch.
+            // Forget the last publish whenever the design is not placed, so the first placed frame
+            // afterwards always republishes rather than comparing against a footprint from before
+            // the gap. Note this is a weak guard on its own: `anchorEstablished` is a one-way latch,
+            // so `placed` does not drop on a re-capture — the anchor generation below is what
+            // carries that case.
+            if (!placed) designMoveDetector.reset()
             val designMoved = placed && designMoveDetector.moved(
                 overlayPanX, overlayPanY, overlayRotationDeg, newHalfW, newHalfH,
+                slamManager.anchorGeneration.value,
             )
             // Anchor-RELATIVE, not world — see FingerprintPartition.DesignFootprint. The live anchor
             // drifts and is corrected by reloc, so its world pose at two moments is not the same
@@ -2009,8 +2013,6 @@ class ArRenderer(
                         designRigidModel, 0, designAnchorInvScratch, 0, overlayRigidScratch, 0,
                     )
                 }
-                designEffectiveHalfW = newHalfW
-                designEffectiveHalfH = newHalfH
                 designPlaced = placed && invertible
                 if (designPlaced && designMoved) {
                     footprint = com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition

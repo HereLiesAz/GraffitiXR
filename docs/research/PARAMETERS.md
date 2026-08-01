@@ -163,9 +163,9 @@ if repartition cost or missed repartitions ever show up in a run, start here.
 
 | Parameter | Location | Current | Basis |
 |---|---|---|---|
-| `DESIGN_EXTENT_EPS` | `ArRenderer.kt` | `1e-3` m | guessed — a millimetre of effective half-extent; below this a "resize" is float noise in the compose chain |
-| `DESIGN_PAN_EPS_M` | `ArRenderer.kt` | `1e-3` m | guessed — likewise for in-plane pan |
-| `DESIGN_ROT_EPS_DEG` | `ArRenderer.kt` | `0.1`° | guessed — a tenth of a degree of in-plane spin |
+| `DEFAULT_EXTENT_EPS_M` | `DesignMoveDetector.kt` | `1e-3` m | guessed — a millimetre of effective half-extent; below this a "resize" is float noise in the compose chain |
+| `DEFAULT_PAN_EPS_M` | `DesignMoveDetector.kt` | `1e-3` m | guessed — likewise for in-plane pan |
+| `DEFAULT_ROT_EPS_DEG` | `DesignMoveDetector.kt` | `0.1`° | guessed — a tenth of a degree of in-plane spin |
 | `ANCHOR_WAIT_MS` | `SlamManager.kt` | `2000` ms | derived — the anchor is established on the GL frame after confirm (under 35 ms at 30 fps); this is a stall ceiling, not an expected duration, and timing out REFUSES rather than falling back |
 
 **The repartition trigger reads the artist's gesture inputs only**, and that is a
@@ -175,14 +175,25 @@ carries `R_anchorᵀ` — so any threshold on that product fires on drift with t
 phone sitting still. Two successive cuts got this wrong: the first keyed on the
 composed matrix (~0.057° at `1e-3` per element), the second added the
 marks-centering offset, which is `X_world · (R_anchor · markCenterLocal)` and is
-drift-coupled at `DESIGN_PAN_EPS_M / |markCenterLocal|` — the same 0.057° at a
-one-metre lever arm. Only `overlayPanX/Y`, `overlayRotationDeg` and the extents
-are genuinely immune, because they are set from gestures and nothing else.
+drift-coupled at `DEFAULT_PAN_EPS_M / |markCenterLocal|` — the same 0.057° at a
+one-metre lever arm.
+
+`overlayPanX/Y` and `overlayRotationDeg` are gestures, so they are immune. The
+extents are `extentHalfW * overlayScale`, and only the scale is a gesture —
+`extentHalfW` comes from a screen fit. They are safe for a different reason,
+worth stating precisely in a parameter set whose history is a drift-immunity
+argument being wrong twice: the fit is **one-shot per arming**, so the extents
+are a step function rather than a per-frame signal.
+
+Removing the marks offset also removed the only input that moved when a
+**re-capture** replaced the anchor, which silently stopped the footprint being
+republished on exactly the path that most needs it. The anchor generation — a
+discrete counter, compared exactly with no threshold — carries that signal now.
 
 **The thresholds compare against the last PUBLISH, not the last frame.** Advancing
 the remembered values on a frame that reported no movement makes a slow drag
-invisible: 15 cm over 3 s is 0.08 mm per frame, under threshold every frame, and
-the delta never accumulates. That cut shipped too, and it is the more dangerous
+invisible: 15 cm over 3 s at 60 fps is 0.83 mm per frame, under the 1 mm
+threshold on every frame, and the delta never accumulates. That cut shipped too, and it is the more dangerous
 failure of the two — a trigger that fires too often wastes work, one that never
 fires leaves Φ answering against a design that has left.
 

@@ -959,9 +959,7 @@ class ArViewModel @Inject constructor(
         // The partition's in-memory state belongs to the session that built it: the retained design
         // footprint is expressed relative to an anchor that is about to stop existing.
         latestDesignFootprint = null
-        lastPartitionedPose = null
-        liveFingerprint = null
-        restoredFingerprint = null
+        dropLoadedFingerprintState()
         // Cancel any in-flight session update (including a running stereo probe) so it stops pumping
         // the camera and releases the session mutex before cleanup tries to acquire it.
         sessionUpdateJob?.cancel()
@@ -1734,6 +1732,26 @@ class ArViewModel @Inject constructor(
      */
     @Volatile private var restoredFingerprint: com.hereliesaz.graffitixr.common.model.Fingerprint? = null
 
+    /**
+     * Forget everything that describes a fingerprint loaded into native.
+     *
+     * Every path that leaves native holding no usable map must call this, and there are three of
+     * them: no fingerprint at all, a pre-Phase-0 fingerprint that is refused, and session teardown.
+     * They were fixed one at a time and the refusal path was missed, which is why this is a function
+     * rather than three copies of the same three assignments.
+     *
+     * `restoredFingerprint` left set means switching BACK to the project that owned it hits the
+     * suppression guard and never re-pushes — native empty, Kotlin believing otherwise, reloc dead
+     * for the rest of the process and looking exactly like bad tracking. `liveFingerprint` left set
+     * is worse: a design move partitions the PREVIOUS project's map and `updateProject` writes it
+     * into the current project's file.
+     */
+    private fun dropLoadedFingerprintState() {
+        restoredFingerprint = null
+        liveFingerprint = null
+        lastPartitionedPose = null
+    }
+
     private fun loadFingerprintIfExists() {
         viewModelScope.launch(Dispatchers.IO) {
             val project = projectRepository.currentProject.value ?: return@launch
@@ -1779,6 +1797,12 @@ class ArViewModel @Inject constructor(
                                 "geometry can't be corrected. Create the target again to use it.",
                         ),
                     )
+                    // Refusing is a no-map outcome, so it must drop the caches exactly as the
+                    // no-fingerprint branch below does. Leaving them meant a design move would
+                    // partition the PREVIOUS project's map and `updateProject` would write it into
+                    // THIS project's file — the same leak that branch was fixed for, sitting
+                    // untouched sixty lines above it.
+                    dropLoadedFingerprintState()
                     return@launch
                 }
 
@@ -1848,17 +1872,7 @@ class ArViewModel @Inject constructor(
                 // aid and must not register anything beyond that flow.
                 slamManager.clearWallFingerprint()
                 slamManager.overlayMarkCenterLocal = null
-                // Native now holds nothing, so neither cache may keep claiming it does.
-                //
-                // `restoredFingerprint` left set means switching BACK to the project that owned it
-                // hits the suppression guard and never re-pushes — native empty, Kotlin believing
-                // otherwise, reloc silently dead for the rest of the process and looking exactly
-                // like bad tracking. `liveFingerprint` left set is worse: a design move would
-                // partition the PREVIOUS project's map and `updateProject` would write it into this
-                // project's file.
-                restoredFingerprint = null
-                liveFingerprint = null
-                lastPartitionedPose = null
+                dropLoadedFingerprintState()
             }
             // Restore the persistent wall feature map (Phase 2a: stored in native; matched in Phase 2b).
             // Independent of the marks fingerprint above and co-registered to the same anchor. Null on
@@ -2445,6 +2459,12 @@ class ArViewModel @Inject constructor(
     }
 
     fun setInitialAnchorFromCapture() {
+        // Snapshot BEFORE raising the flag, and publish it, because this is the only point at which
+        // "the generation before the anchor this capture asked for" is knowable. A caller that takes
+        // its own snapshot afterwards races the GL thread: if establishment lands first, the
+        // snapshot is already the NEW generation, the wait can never be satisfied, and a capture
+        // that succeeded is discarded with "couldn't lock an anchor".
+        slamManager.captureAnchorGenerationBaseline = slamManager.anchorGeneration.value
         renderer?.pendingAnchorEstablishment = true
     }
 

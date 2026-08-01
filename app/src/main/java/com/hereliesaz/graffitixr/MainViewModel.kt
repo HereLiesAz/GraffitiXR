@@ -288,11 +288,11 @@ class MainViewModel @Inject constructor(
             return
         }
         resetCaptureUi()
-        // Snapshot BEFORE the coroutine, and before the renderer can act on the establishment
-        // request the caller just made. Waiting for an establishment newer than this is what makes a
-        // re-capture correct: the flag-shaped version of this was permanently satisfied after the
-        // first capture, so every later one resolved instantly against the previous anchor.
-        val anchorGenBefore = slamManager.anchorGeneration.value
+        // Taken by setInitialAnchorFromCapture at the instant it raised the request, which is the
+        // only point where it does not race the GL thread's establishment. Waiting for a generation
+        // newer than this is what makes a RE-capture correct: a boolean "has one ever been
+        // established" is permanently true after the first, so every later capture resolved
+        // instantly against the previous anchor's pose.
         val planePoint = floatArrayOf(wallPlane[0], wallPlane[1], wallPlane[2])
         val planeNormal = floatArrayOf(wallPlane[3], wallPlane[4], wallPlane[5])
         // Clear any prior marks-centering override; the builder re-publishes it on a successful build.
@@ -307,7 +307,7 @@ class MainViewModel @Inject constructor(
             // indistinguishable from a real pose at the world origin. That identity became the
             // fingerprint's co-registration frame, `markCenterLocal`'s frame, and (since Phase 2)
             // `captureAnchorCam`, leaving the partition composed through a stray `A_est⁻¹`.
-            val anchor = slamManager.awaitAnchorTransform(anchorGenBefore)
+            val anchor = slamManager.awaitAnchorTransform(slamManager.captureAnchorGenerationBaseline)
             if (anchor == null || anchor.size != 16) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
