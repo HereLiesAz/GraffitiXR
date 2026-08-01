@@ -66,44 +66,62 @@ class SlamManager @Inject constructor(
     fun getLastSplatTrace(): String = nativeGetLastSplatTrace()
 
     /**
-     * True once an anchor pose has actually been written, as opposed to the identity the native
-     * engine starts with.
+     * True once the renderer has ESTABLISHED the primary anchor — not merely written a pose.
      *
-     * `getAnchorTransform()` cannot express "no anchor yet" — `mAnchorMatrix` is constructed as the
-     * identity and stays that way until the renderer establishes one, so a caller that reads it too
-     * early gets a perfectly well-formed matrix that means nothing. That is not hypothetical: target
-     * creation *is* what establishes the anchor (`setInitialAnchorFromCapture` only raises a flag,
-     * and the renderer acts on it a frame later), so the capture path read the identity and used it
-     * as the fingerprint's co-registration frame.
+     * The distinction is the whole point, and getting it wrong is what a first attempt at this did.
+     * `mAnchorMatrix` is constructed as the identity, but it does **not** stay that way until
+     * establishment: `refineAnchorFromBestPlane` runs every 30 frames *while the anchor is
+     * unestablished* and writes a provisional plane pose, as does the depth fallback. So a flag set
+     * by `updateAnchorTransform` flips within the first second of scanning, and a capture waiting on
+     * it would not wait at all — it would read the plane refiner's pose.
+     *
+     * That is not a near-miss. The refiner builds its basis with the plane normal in **Z**, while
+     * establishment takes ARCore's `hitPose` verbatim, whose local **+Y** is the normal. The two
+     * differ by ~90° by construction, so reading one where the other is meant is a frame error, not
+     * drift.
+     *
+     * Hence [markAnchorEstablished], called from the one place that sets the renderer's
+     * `anchorEstablished`, rather than from the pose writer.
      */
-    private val _anchorEverSet = kotlinx.coroutines.flow.MutableStateFlow(false)
-    val anchorEverSet: kotlinx.coroutines.flow.StateFlow<Boolean> = _anchorEverSet
+    private val _anchorEstablished = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val anchorEstablished: kotlinx.coroutines.flow.StateFlow<Boolean> = _anchorEstablished
 
-    fun updateAnchorTransform(transform: FloatArray) {
-        nativeUpdateAnchorTransform(transform)
-        _anchorEverSet.value = true
+    fun updateAnchorTransform(transform: FloatArray) = nativeUpdateAnchorTransform(transform)
+
+    /**
+     * Announce that the primary anchor now exists. Call from the renderer at the moment it sets its
+     * own `anchorEstablished`, and nowhere else — every other anchor write is provisional.
+     */
+    fun markAnchorEstablished() { _anchorEstablished.value = true }
+
+    /**
+     * The anchor pose, waiting up to [timeoutMs] for the anchor to be established if it is not yet.
+     *
+     * Returns null on timeout rather than a pose, because every candidate fallback here is a
+     * well-formed matrix that means the wrong thing: the identity reads as a real pose at the world
+     * origin, and the plane refiner's provisional pose is in a different frame convention entirely.
+     */
+    suspend fun awaitAnchorTransform(timeoutMs: Long = ANCHOR_WAIT_MS): FloatArray? {
+        if (!_anchorEstablished.value) {
+            kotlinx.coroutines.withTimeoutOrNull(timeoutMs) {
+                _anchorEstablished.first { it }
+            } ?: return null
+        }
+        val m = nativeGetAnchorTransform()
+        // Native hands back a freshly ZEROED array when the engine is gone, which passes a bare
+        // size check and yields a singular matrix — strictly worse than the identity this exists to
+        // avoid. A real anchor pose has a unit-length first rotation column.
+        if (m == null || m.size != 16) return null
+        val c0 = kotlin.math.sqrt(m[0] * m[0] + m[1] * m[1] + m[2] * m[2])
+        return if (kotlin.math.abs(c0 - 1f) < 1e-3f) m else null
     }
 
     /**
-     * The anchor pose, waiting up to [timeoutMs] for one to be established if none has been.
-     *
-     * Returns null on timeout rather than the identity, because the identity is exactly the wrong
-     * answer to fall back to — it is indistinguishable from a real pose at the world origin, and
-     * every frame composed through it is silently off by the anchor's true transform.
+     * Forget that the anchor was established. Call when tearing the AR session down: the ARCore
+     * session and its anchors do not survive that, so "established" must not either, or the next
+     * capture resolves instantly against the previous session's pose.
      */
-    suspend fun awaitAnchorTransform(timeoutMs: Long = 2_000L): FloatArray? {
-        if (!_anchorEverSet.value) {
-            val arrived = kotlinx.coroutines.withTimeoutOrNull(timeoutMs) {
-                _anchorEverSet.first { it }
-            }
-            if (arrived == null) return null
-        }
-        return nativeGetAnchorTransform()
-    }
-
-    /** Forget that an anchor was ever set. Call when tearing a session down, or the next project
-     *  inherits this one's "established" answer while native has been reset under it. */
-    fun clearAnchorEverSet() { _anchorEverSet.value = false }
+    fun clearAnchorEstablished() { _anchorEstablished.value = false }
 
     /**
      * Centroid of the matched fingerprint marks, expressed in the FINGERPRINT ANCHOR's local frame
@@ -744,5 +762,15 @@ class SlamManager @Inject constructor(
 
     private companion object {
         private const val TAG = "SlamManager"
+
+        /**
+         * How long a capture waits for the anchor to be established before giving up.
+         *
+         * The anchor is established on the GL frame after the artist confirms, so the realistic wait
+         * is one frame — under 35 ms at 30 fps. Two seconds is a generous ceiling for a stalled or
+         * dropped frame, not an expected duration, and timing out is a refusal rather than a
+         * fallback. Recorded in `PARAMETERS.md` §6.
+         */
+        const val ANCHOR_WAIT_MS = 2_000L
     }
 }

@@ -954,12 +954,13 @@ class ArViewModel @Inject constructor(
         // "an anchor has been established" must not either — otherwise the next capture's
         // `awaitAnchorTransform` returns immediately with the previous session's pose, which is the
         // identity-shaped bug it was written to prevent, wearing different numbers.
-        slamManager.clearAnchorEverSet()
+        slamManager.clearAnchorEstablished()
         // The partition's in-memory state belongs to the session that built it: the retained design
         // footprint is expressed relative to an anchor that is about to stop existing.
         latestDesignFootprint = null
         lastPartitionedPose = null
         liveFingerprint = null
+        restoredFingerprint = null
         // Cancel any in-flight session update (including a running stereo probe) so it stops pumping
         // the camera and releases the session mutex before cleanup tries to acquire it.
         sessionUpdateJob?.cancel()
@@ -1521,16 +1522,22 @@ class ArViewModel @Inject constructor(
     @Volatile private var liveFingerprint: LiveFingerprint? = null
 
     /**
-     * Serializes the partition work and lets a newer request cancel an in-flight older one.
+     * Lets a newer partition request cancel an in-flight older one.
      *
-     * Both properties matter and neither is cosmetic. A pinch gesture moves the design every frame,
-     * so without cancellation this launches a coroutine per frame, each of which replaces the native
-     * fingerprint and writes the project file to disk. Without serialization those coroutines finish
-     * out of order, and the LAST write can be the partition for an intermediate size — leaving
-     * native and disk describing a design the artist has already resized past, with nothing to
-     * correct it because the renderer's own extent tracking has moved on.
+     * **It does not serialize them, and an earlier version of this comment claimed it did.**
+     * `cancel()` does not join, `Dispatchers.Default` is multi-threaded, and the body runs a pure
+     * classify loop and a blocking JNI call with no cancellation point between them — so a cancelled
+     * job can still finish its native push. What cancellation buys is that the newest design wins
+     * the *common* case, which matters because a drag moves the design every frame and each firing
+     * costs a repartition, a native replace and a project write.
+     *
+     * The real protection against an out-of-order write is the idempotence check in the job body:
+     * a partition that computes the same regions and extents makes no write at all.
      */
-    private var partitionJob: Job? = null
+    // @Volatile because this stopped being single-threaded: the GL thread reaches it through
+    // onDesignFootprintChanged and the IO dispatcher through partitionLiveFingerprintIfNeeded. A
+    // torn read-modify-write here drops a cancel and lets two partition jobs run into native at once.
+    @Volatile private var partitionJob: Job? = null
 
     /**
      * The most recent design footprint the renderer published, or null before the artwork is placed.
@@ -1616,6 +1623,25 @@ class ArViewModel @Inject constructor(
             // captureAnchorCam, no usable extents), and re-pushing an unchanged fingerprint would
             // reset native's reloc state for nothing.
             if (updated === current.fingerprint) return@launch
+            // Idempotence, and it is load-bearing rather than an optimisation.
+            //
+            // `partition` returns a fresh copy whenever it CAN partition, so the identity check above
+            // only catches refusals. Without this second check, `loadFingerprintIfExists` →
+            // partition → `updateProject` → a new `currentProject` emission →
+            // `loadFingerprintIfExists` again is a cycle: every project load paid for two partitions,
+            // two native fingerprint replaces (each resetting reloc state) and two full project
+            // writes. It terminated only because `Fingerprint.equals` compares `regions` by content
+            // and `MutableStateFlow` conflates equal values — an accident of an override written for
+            // a serialization test, one non-value-equal field away from an unbounded write loop.
+            if (updated.regions.contentEquals(current.fingerprint.regions) &&
+                updated.captureHalfW == current.fingerprint.captureHalfW &&
+                updated.captureHalfH == current.fingerprint.captureHalfH
+            ) {
+                // Still record the pose: the partition is genuinely up to date for it, and not
+                // recording it would re-enter here on every subsequent frame of a drag.
+                lastPartitionedPose = design.rigidModelAnchorLocal.copyOf()
+                return@launch
+            }
             ensureActive()
 
             val backbone = FingerprintPartition.backboneCount(updated)
@@ -1628,6 +1654,9 @@ class ArViewModel @Inject constructor(
             )
             liveFingerprint = LiveFingerprint(updated, current.anchor, current.intrinsics, current.view)
             lastPartitionedPose = design.rigidModelAnchorLocal.copyOf()
+            // Native now holds exactly this, so the reload our own updateProject is about to trigger
+            // must not push it again.
+            restoredFingerprint = updated
 
             // IMPLEMENTATION.md 2.8, relocated. The capture cannot raise this — it has no footprint
             // to measure — so it is raised here, where the artwork's size is what made it true. A
@@ -1662,10 +1691,28 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    /**
+     * The fingerprint currently pushed to native, for suppressing redundant restores.
+     *
+     * `loadFingerprintIfExists` runs on EVERY `currentProject` emission, and the partition itself
+     * writes the project — so a partition triggers a reload, which would re-push the identical
+     * fingerprint and reset native's reloc state for nothing. Any other writer of `currentProject`
+     * (`saveWallFeatureMap`, for one) dragged the same cost behind it.
+     */
+    @Volatile private var restoredFingerprint: com.hereliesaz.graffitixr.common.model.Fingerprint? = null
+
     private fun loadFingerprintIfExists() {
         viewModelScope.launch(Dispatchers.IO) {
             val project = projectRepository.currentProject.value ?: return@launch
             val fp = project.fingerprint
+            // Value equality, and it is exactly the right comparison: two fingerprints that agree on
+            // points, descriptors, frame and partition ARE the same map, whichever object holds them.
+            if (fp != null && fp == restoredFingerprint) {
+                // Still let the partition re-evaluate — the design may have moved while this
+                // emission was in flight — but do not touch native.
+                partitionLiveFingerprintIfNeeded()
+                return@launch
+            }
             if (fp != null) {
                 val intr = project.fingerprintIntrinsics
                 val anchor = project.fingerprintAnchor
@@ -1729,10 +1776,15 @@ class ArViewModel @Inject constructor(
                         project.fingerprintViewMatrix.takeIf { it.size == 16 }?.toFloatArray()
                             ?: FloatArray(0),
                     )
+                    restoredFingerprint = fp
                     // The fingerprint just became available. If the artwork is already placed — which
                     // it is on every project load, and on every capture session by the time the
                     // save/load round trip finishes — partition it now rather than waiting for a
                     // footprint edge that has already been and gone.
+                    //
+                    // `lastPartitionedPose` is cleared because this is a DIFFERENT fingerprint from
+                    // whatever was partitioned before (the guard above returned early otherwise), so
+                    // the remembered pose describes a map that is no longer loaded.
                     lastPartitionedPose = null
                     partitionLiveFingerprintIfNeeded()
                 } else {

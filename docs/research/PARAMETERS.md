@@ -156,6 +156,28 @@ P2 is falsified.
 
 ## 6. Rendering and interaction — set, not swept
 
+Three of these gate the Phase-2 repartition, which costs a classify pass, a
+native fingerprint replace and a project write each time it fires. They are
+guesses with stated reasoning, not measurements, and no experiment sets them —
+if repartition cost or missed repartitions ever show up in a run, start here.
+
+| Parameter | Location | Current | Basis |
+|---|---|---|---|
+| `DESIGN_EXTENT_EPS` | `ArRenderer.kt` | `1e-3` m | guessed — a millimetre of effective half-extent; below this a "resize" is float noise in the compose chain |
+| `DESIGN_PAN_EPS_M` | `ArRenderer.kt` | `1e-3` m | guessed — likewise for in-plane pan |
+| `DESIGN_ROT_EPS_DEG` | `ArRenderer.kt` | `0.1`° | guessed — a tenth of a degree of in-plane spin |
+| `ANCHOR_WAIT_MS` | `SlamManager.kt` | `2000` ms | derived — the anchor is established on the GL frame after confirm (&lt;35 ms at 30 fps); this is a stall ceiling, not an expected duration, and timing out REFUSES rather than falling back |
+
+**The repartition trigger reads the artist's inputs, not the composed pose**, and
+that is a correctness requirement rather than a tuning choice. `anchorMatrix` is
+the *fused* pose, re-corrected every frame, and
+`anchorMatrix⁻¹ · overlayRigid` carries `R_anchorᵀ` — so any threshold on that
+product fires on drift with the phone sitting still. Pan, spin and the extents
+are drift-immune. An earlier cut keyed on the composed matrix at `1e-3` per
+element (~0.057°) and would have repartitioned continuously.
+
+
+
 Listed for completeness. These are UX constants with no bearing on
 relocalization accuracy; they are here so a future session does not mistake them
 for tuning targets.

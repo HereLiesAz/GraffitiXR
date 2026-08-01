@@ -453,54 +453,42 @@ class ArRenderer(
     // GL thread — and costs nothing next to the frame it sits inside.
     // A millimetre. Below this a "resize" is float noise in the composed transform, and firing on it
     // would reclassify the whole fingerprint every frame the artist rests a finger on the screen.
+    // A millimetre of pan, and a tenth of a degree of spin. Below these a "move" is float noise in
+    // the compose chain, and firing on it would repartition the fingerprint and write the project
+    // file every frame the artist rests a finger on the screen. Recorded in `PARAMETERS.md` §6.
     private val DESIGN_EXTENT_EPS = 1e-3f
-    private val DESIGN_POSE_EPS = 1e-3f
+    private val DESIGN_PAN_EPS_M = 1e-3f
+    private val DESIGN_ROT_EPS_DEG = 0.1f
     private val designFootprintLock = Any()
     private val designRigidModel = FloatArray(16)
     private val designAnchorInvScratch = FloatArray(16)
-    private val designPoseScratch = FloatArray(16)
+
+    // Last in-plane design transform the footprint was published for: pan X/Y in metres and spin in
+    // degrees. NaN until the first publish, so the first comparison always reports movement.
+    private var lastDesignPanX = Float.NaN
+    private var lastDesignPanY = Float.NaN
+    private var lastDesignRotDeg = Float.NaN
 
     /**
-     * True when the freshly-computed design pose differs from the published one by more than a
-     * millimetre of translation or the rotational equivalent.
+     * True when the artist's in-plane placement of the design has moved since the last publish.
      *
-     * A flat element-wise comparison, which is the right test here precisely because it is crude: it
-     * catches translation, in-plane spin and the wall-frame re-orthonormalisation alike, and every
-     * one of those changes what Φ answers. The rotation columns are unit-length, so an element
-     * threshold of 1e-3 is roughly a milliradian — comfortably below anything a hand does and
-     * comfortably above float noise in the compose chain.
+     * Deliberately reads the USER's inputs rather than the composed model matrix. Every quantity
+     * here is drift-immune: pan and spin are set from gestures, and the marks-centering offset is
+     * recomputed from the anchor-local mark centroid, so none of them moves when ARCore corrects the
+     * anchor underneath. Also updates the remembered values, so the caller must invoke it exactly
+     * once per frame.
      */
-    private fun designPoseMoved(): Boolean {
-        for (i in 0 until 16) {
-            if (kotlin.math.abs(designPoseScratch[i] - designRigidModel[i]) > DESIGN_POSE_EPS) return true
-        }
-        return false
+    private fun designLocalMoved(panX: Float, panY: Float, rotDeg: Float): Boolean {
+        val moved = !(kotlin.math.abs(panX - lastDesignPanX) <= DESIGN_PAN_EPS_M &&
+            kotlin.math.abs(panY - lastDesignPanY) <= DESIGN_PAN_EPS_M &&
+            kotlin.math.abs(rotDeg - lastDesignRotDeg) <= DESIGN_ROT_EPS_DEG)
+        lastDesignPanX = panX; lastDesignPanY = panY; lastDesignRotDeg = rotDeg
+        return moved
     }
     private var designEffectiveHalfW = -1f
     private var designEffectiveHalfH = -1f
     private var designPlaced = false
 
-    /**
-     * The design's placement as of the last drawn frame, or null when there is no placed artwork to
-     * take a footprint of.
-     *
-     * Null is the honest answer before the overlay has an anchor and a texture, and it leaves the
-     * capture unpartitioned — the legacy all-backbone reading, i.e. exactly `main`'s behaviour. The
-     * alternative, inventing an identity pose, would partition every point against a design sitting
-     * at the world origin and produce a full, confident, meaningless answer.
-     *
-     * One frame stale by construction: the capture block runs before the overlay is composed for
-     * this frame, so these are the previous frame's values. At 30–60 fps that is 16–33 ms of device
-     * motion on a shot the artist has just framed and confirmed, and it is the same transform the
-     * artist was looking at when they tapped — which is the one the partition should be against.
-     */
-    fun designFootprint(): com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.DesignFootprint? =
-        synchronized(designFootprintLock) {
-            if (!designPlaced || designEffectiveHalfW <= 0f || designEffectiveHalfH <= 0f) return null
-            com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.DesignFootprint(
-                designRigidModel.copyOf(), designEffectiveHalfW, designEffectiveHalfH,
-            )
-        }
     // Scratch for the 2D perspective content rotation matrix (X/Y axes).
     private val contentRotationScratch = FloatArray(16)
     private val contentRotationTemp = FloatArray(16)
@@ -1147,6 +1135,11 @@ class ArRenderer(
                     }
                     setPrimaryAnchor(anchor) // non-null: the fallback branch always creates one
                     anchorEstablished = true
+                    // Announce it beyond the GL thread. This is the ONLY anchor write that counts as
+                    // establishment — the plane refiner and the depth fallback both write poses
+                    // before this point, in a different frame convention, and a capture that
+                    // resolved against one of those would be co-registered ~90° out.
+                    slamManager.markAnchorEstablished()
                     hideVisualization = true
                     onAnchorEstablished()
 
@@ -2008,25 +2001,42 @@ class ArRenderer(
                 (kotlin.math.abs(newHalfW - designEffectiveHalfW) > DESIGN_EXTENT_EPS ||
                     kotlin.math.abs(newHalfH - designEffectiveHalfH) > DESIGN_EXTENT_EPS)
             // Anchor-RELATIVE, not world — see FingerprintPartition.DesignFootprint. The live anchor
-            // drifts and gets corrected by reloc, so its world pose at two different moments is not
-            // the same physical place; expressing the design against it cancels that out, and the
-            // fingerprint's stored half of the composition is anchor-relative for the same reason.
+            // drifts and is corrected by reloc, so its world pose at two moments is not the same
+            // physical place, and pairing this with the fingerprint's capture-time anchor pose is
+            // what makes the two ends comparable at all.
+            //
+            // It cancels the anchor's TRANSLATION exactly: overlayBaseScratch takes its translation
+            // from anchorMatrix, so that factor divides out. It does NOT cancel the rotation —
+            // overlayBaseScratch overwrites the anchor's 3x3 with a world-fixed frame built from the
+            // captured surface normal and world-up, so this product carries R_anchorᵀ and moves when
+            // the anchor's orientation estimate does. That is a real residual and it is why the
+            // repartition trigger below reads the artist's inputs instead of this matrix. For Φ
+            // itself the residual is tolerable: a fraction of a degree moves a design edge by
+            // millimetres, well inside the BAND the partition already discards.
             var footprint: com.hereliesaz.graffitixr.feature.ar.anchor.FingerprintPartition.DesignFootprint? = null
             synchronized(designFootprintLock) {
                 val invertible =
                     android.opengl.Matrix.invertM(designAnchorInvScratch, 0, anchorMatrix, 0)
                 if (placed && invertible) {
                     android.opengl.Matrix.multiplyMM(
-                        designPoseScratch, 0, designAnchorInvScratch, 0, overlayRigidScratch, 0,
+                        designRigidModel, 0, designAnchorInvScratch, 0, overlayRigidScratch, 0,
                     )
                 }
-                // Compared BEFORE designRigidModel is overwritten below, and only against the model
-                // that was actually published — comparing against the scratch would compare a value
-                // with itself.
-                val poseMoved = placed && invertible && designPoseMoved()
-                if (placed && invertible) {
-                    System.arraycopy(designPoseScratch, 0, designRigidModel, 0, 16)
-                }
+                // Compared against the USER's in-plane transform, not against the composed pose.
+                //
+                // The composed one looks like the obvious choice and is a trap: overlayBaseScratch
+                // copies anchorMatrix's translation but OVERWRITES its rotation with a world-fixed
+                // frame, so `anchorMatrix⁻¹ · overlayRigid` cancels the translation and *injects*
+                // R_anchorᵀ. anchorMatrix is the FUSED pose, re-corrected every frame, so a
+                // 1e-3 element threshold on that product fires on drift with the phone sitting
+                // still — replacing a drift-immune trigger with a drift-coupled one and paying a
+                // repartition, a native re-push and a project write each time.
+                //
+                // Pan, spin and the marks-centering offset are what the artist actually controls,
+                // and they are drift-immune for the same reason the extents are.
+                val poseMoved = placed && designLocalMoved(
+                    markOffsetX + overlayPanX, markOffsetY + overlayPanY, overlayRotationDeg,
+                )
                 designEffectiveHalfW = newHalfW
                 designEffectiveHalfH = newHalfH
                 designPlaced = placed && invertible

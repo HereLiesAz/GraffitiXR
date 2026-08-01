@@ -483,7 +483,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateLightLevel(J
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateAnchorTransform(JNIEnv* env, jobject thiz, jfloatArray transform) {
     if (gSlamEngine) {
-        // updateAnchorTransform memcpy's 16 floats out of this.
+        // updateAnchorTransform memcpy's 16 floats out of this. A short or null array is dropped
+        // here — the Kotlin side must not read that as "an anchor was written", which is why the
+        // established-anchor signal is raised at establishment rather than by this setter.
         if (!transform || env->GetArrayLength(transform) < 16) return;
         jfloat* mat = env->GetFloatArrayElements(transform, nullptr);
         gSlamEngine->updateAnchorTransform(mat);
