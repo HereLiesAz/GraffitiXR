@@ -35,10 +35,14 @@ data class EvalSample(
      *
      * **This is the independent variable of `EVALUATION.md` E0b**, and the distinction from
      * [liveRotationNeededDeg] is the whole point of having two columns. `PlaneMarks.backProject`
-     * runs exactly once per target, inside `MetricFingerprintBuilder.build`, against the capture's
-     * rotated intrinsics and its *unrotated* `camera.pose` view matrix. The frame mismatch
-     * `PAPER.md` §8 describes is therefore **baked into the fingerprint's 3D points at capture** and
-     * cannot change afterwards, however the device is subsequently held.
+     * runs exactly once per target, inside `MetricFingerprintBuilder.buildSingle`, so whatever frame
+     * relationship holds at capture is **baked into the fingerprint's 3D points** and cannot change
+     * afterwards, however the device is subsequently held. That is why the capture rotation, not the
+     * live one, is the variable to group by.
+     *
+     * Note the §8 mismatch this column was built to measure is **fixed as of Phase 0** — the capture
+     * view is now rotated to match the intrinsics. The column is still the right one: it records the
+     * condition a fingerprint was built under, which is what any before/after comparison needs.
      *
      * A first version of this column logged the live per-tick rotation instead, which is a
      * different quantity and mislabels the experiment: capture in portrait (skewed fingerprint),

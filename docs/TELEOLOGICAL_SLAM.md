@@ -115,13 +115,22 @@ Two details make this fit the observed "never locks" behaviour:
 - The onboarding doodle path (`buildDoodleFingerprint`) uses the identical
   convention, so it would fail the same way.
 
-Why it was not simply fixed: rotating the capture view is not sufficient on its
-own. The 3D points would then live in the rotated camera frame, while
-`PoseFusion.composeCorrected` composes `inverse(V_current) · pnp · fpAnchor` with
-`V_current` in ARCore's **unrotated** frame — so the composition needs the same
-treatment, and the sign of every rotation has to be right or the overlay lands
-worse than it does now. That is a system-wide convention change and wants device
-evidence first.
+**RESOLVED — Phase 0 (PR #1797).** The description above is of the pre-fix code;
+the algebra in it is correct and matches the fix's independently-derived direction
+(`d' = R_z(+90)·d`). `MetricMarks.glViewToCvDisplay` now rotates the capture view
+to match the pixels and intrinsics, and `MetricFingerprintBuilder.buildSingle`
+routes through it.
+
+The reason given here for not simply fixing it was wrong on its central point.
+It claimed `V_current` is in ARCore's *unrotated* frame; it is not —
+`Camera.getViewMatrix` is documented as incorporating display orientation. The
+live side was already display-oriented, so the composition needed no rotation
+change, and the fix was one matrix at one site rather than the system-wide
+rotation change feared here.
+
+`composeCorrected` does still have frame defects, but they are GL-vs-CV
+convention and a missing capture-view factor, not rotation — see
+`docs/research/IMPLEMENTATION.md` 0.6/0.9.
 
 **How to tell:** with the Diagnostic Overlay on, a healthy match count and a
 **low inlier ratio** points here. `NO TARGET` / `NO FEATURES` / a low in-frame
