@@ -100,7 +100,17 @@ class CorroborationTranslitTest {
         // -1, and the reject above would never fire on that side.
         assertTrue(
             "cellFloor must use std::floor, not an int cast",
-            src.contains("std::floor((double)(v - minV) / (double)mCell)"),
+            src.contains("std::floor((double)q)"),
+        )
+        // ...and the DIVISION must stay in float, matching the Kotlin reference's Float operands.
+        // Computing the quotient in double is more accurate and therefore different: at a boundary
+        // where the float quotient rounds up to an exact integer and the double one does not, the
+        // two implementations disagree about the cell and the out-of-range reject fires on one side
+        // only. This assertion previously pinned the double form, i.e. the test whose job is proving
+        // the two agree was pinning the one expression where they could not.
+        assertTrue(
+            "the cell quotient must be computed in float, as the Kotlin reference does",
+            src.contains("const float q = (v - minV) / mCell;"),
         )
         // A cell RANGE, not a fixed 3x3 — the caller queries one grid at several radii.
         assertTrue(

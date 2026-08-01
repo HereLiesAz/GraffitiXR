@@ -4,28 +4,31 @@ package com.hereliesaz.graffitixr.feature.ar.anchor
  * `IMPLEMENTATION.md` **Phase 4** — a uniform grid over a frame's keypoints, so the corroboration
  * match can gather candidates near a predicted pixel instead of comparing against every descriptor.
  *
- * This is the pure-Kotlin **reference implementation**. `MobileGS.cpp` transliterates it, and
- * `KeypointGridTest` holds it to a brute-force equivalence check on random points across a range of
- * radii — the same fixture the native smoke assertion uses. Writing it here first is deliberate: the
- * matching change is the part of Phase 4 that lives in C++, where a subtle off-by-one in the cell
- * sweep would show up as slightly fewer corroborated features and nothing else, which is exactly the
- * kind of defect that survives a code review and a device test alike.
+ * This is the pure-Kotlin **reference implementation**; `KeypointGrid.h` transliterates it and is
+ * what actually runs. `KeypointGridTest` holds this copy to a brute-force equivalence check on
+ * random points across a range of radii, and `CorroborationTranslitTest` pins the structural
+ * choices of the C++ against it. There is **no native test harness in this project**, so nothing
+ * executes the transliteration under test — a limit recorded in `PARAMETERS.md` §5, not one this
+ * file can fix. Writing the reference first is still worth it: the matching change lives in C++,
+ * where a subtle off-by-one in the cell sweep shows up as slightly fewer corroborated features and
+ * nothing else, which is exactly the kind of defect that survives a code review and a device test
+ * alike.
  *
  * ## Why a grid and not a k-d tree or FLANN
  *
  * The frame has on the order of 1500 keypoints and the query is a fixed-radius neighbourhood, not a
- * k-nearest search. A uniform grid sized to the radius is `O(n)` to build, allocation-free to query,
- * and touches nine cells regardless of `n`. `cv::flann` would add a dependency, a build cost per
- * frame, and an approximate answer to a question that has an exact one.
+ * k-nearest search. A uniform grid sized to the radius is `O(n)` to build and touches a number of
+ * cells that depends on the query radius rather than on `n`. `cv::flann` would add a dependency, a
+ * build cost per frame, and an approximate answer to a question that has an exact one.
  *
  * ## The contract that matters
  *
  * [candidatesWithin] returns a superset guarantee only in one direction: **every** keypoint within
- * `radius` of the query is returned. It may also return keypoints slightly outside it — the nine
- * cells cover a square of side `3 * cellSize`, not a circle — and callers must apply the exact
- * distance test themselves if they need it. That is the correct division of labour: the grid exists
- * to make the candidate set small, and the ratio test that follows is what decides matches. A grid
- * that pre-filtered exactly would do the same arithmetic twice.
+ * `radius` of the query is returned. It may also return keypoints outside it — the swept cells
+ * cover a rectangle, not a circle — and callers must apply the exact distance test themselves if
+ * they need it. That is the correct division of labour: the grid exists to make the candidate set
+ * small, and the ratio test that follows is what decides matches. A grid that pre-filtered exactly
+ * would do the same arithmetic twice.
  */
 class KeypointGrid private constructor(
     private val cellSize: Float,

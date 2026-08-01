@@ -1023,16 +1023,36 @@ order.** Work top to bottom.
       about where the artist is standing. Cumulative is also what
       `getPaintingProgress()` already promised — "hours, roughly monotonic, never
       decayed".*
-      *The one recall cost is deliberate and logged: a neighbourhood holding a
+      *The one recall cost is deliberate and MEASURED: a neighbourhood holding a
       single candidate is SKIPPED, because Lowe's ratio has nothing to divide by
       and accepting unconditionally would corroborate any keypoint that lands near
       a prediction regardless of what it looks like — a confidence signal measuring
       the wall's texture density, feeding `PoseFusion`'s correction strength. It
-      deflates `matched` without touching `predicted`, so the cost surfaces as
-      lower confidence rather than a wrong one. E6 must report that skip rate; a
-      high one means ρ is too tight.)*
+      deflates `matched` without touching `predicted`. That is conservative against
+      false snapping and ANTI-conservative against drift, since lower confidence
+      means a smaller correction blend, so "the cost is only lower confidence" is
+      not the whole story. The rate rides its own diagnostic channel
+      (`corrobLoneSkips`), the overlay and the eval CSV; E6 sets ρ against it.)*
+      *Six defects found by the adversarial audit of this commit and fixed in the
+      follow-up: (1) the native design placement was cleared on one of three
+      project-switch branches, so opening a second project with a saved metric
+      fingerprint left the gated search predicting at the PREVIOUS project's design
+      location — the seventh instance of the "cleared in one branch, not its
+      sibling" family, now fixed structurally by clearing before the `when` rather
+      than inside it; (2) painting progress ratcheted with no false-positive bound
+      and accumulated from the unconstrained global path too — accumulation is now
+      gated-path-only and needs `kCorrobConfirmations` separate attempts;
+      (3) a tone slider re-registered the artwork and zeroed progress, fixed at the
+      call site so the design guide is no longer keyed on the AR tone adjustment;
+      (4) the three corroboration counters were never reset per attempt, breaking
+      the rule stated 780 lines above them and copying one measurement into every
+      eval row; (5) a comment claimed a `PoseFusion` consequence the wiring makes
+      impossible; (6) `KeypointGrid.kt`'s KDoc cited a native test that does not
+      exist and described a fixed nine-cell sweep the file does not implement.)*
 - [x] **4.6** Publish `corrobPredicted` / `corrobMatched` / `searchRadiusPx`
       through the Phase 6 channels. **[N]**
+      *(Plus `corrobLoneSkips` and `relocReprojPx`, neither of which 4.6 names and
+      both of which the phase cannot be evaluated without.)*
       *(Two ints widen the packed `nativeGetRelocDiagnostics` array to 11 —
       `getRelocDiagnostics`'s width guard stays at `< 9` on purpose, so a 2.11-era
       `.so` still yields its nine good diagnostics instead of being refused whole

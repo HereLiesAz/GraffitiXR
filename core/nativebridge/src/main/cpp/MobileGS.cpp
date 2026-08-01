@@ -260,6 +260,18 @@ void MobileGS::relocThreadFunc() {
         // Leaving a previous lock's value in place would widen or narrow the corroboration search
         // on the strength of a pose that is no longer the one being predicted from.
         mLastRelocReprojPx.store(-1.0f, std::memory_order_relaxed);
+        // ...and the same rule again for the corroboration counters (IMPLEMENTATION.md 4.6). These
+        // are written only on a GATED attempt, so without a reset here one gated attempt's numbers
+        // stayed live across every subsequent tick that fell back to the global search — a red
+        // FEW_INLIERS row on the overlay sitting next to a healthy "Corrob 30/40", and, worse, the
+        // same measurement copied into every eval CSV row until the next gated attempt, which turns
+        // any rate E6 computes from these columns into a count of ticks rather than of attempts.
+        // Reset alongside the backbone trio because they are the same kind of number and the
+        // convention has to be one convention.
+        mCorrobPredicted.store(-1, std::memory_order_relaxed);
+        mCorrobMatched.store(-1, std::memory_order_relaxed);
+        mCorrobLoneSkips.store(-1, std::memory_order_relaxed);
+        mCorrobSearchRadiusPx.store(-1.0f, std::memory_order_relaxed);
 
         if (!mRelocEnabled) {
             mLastRelocReject.store(kRelocDisabled, std::memory_order_relaxed);
@@ -910,6 +922,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     std::vector<int> validQuery;   // clean keypoints that corroborate the artwork (self-grow candidates)
     int matched = 0;
     int predicted = -1;            // -1 = no gated attempt ran; 0 is a real reading
+    int loneSkips = -1;            // likewise: 0 skips is a measurement, not an absence
     float radiusPx = -1.0f;
 
     if (gated) {
@@ -987,10 +1000,17 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
                 // like — a confidence signal that measures the wall's texture density instead of its
                 // agreement with the design, feeding PoseFusion's correction strength.
                 //
-                // Skipping instead deflates `matched` without touching `predicted`, so the cost
-                // shows up as lower confidence rather than as a wrong one. If this count is large,
-                // the radius is too tight and rho wants raising; E6 is where that gets decided
-                // rather than guessed, which is why it is logged.
+                // Skipping deflates `matched` without touching `predicted`, so the cost shows up
+                // as lower confidence — but "lower confidence" is not free: it maps through
+                // PoseFusion's alpha to LESS relocalization correction and therefore more
+                // accumulated drift, which is the failure corroboration exists to prevent. So this
+                // is conservative against false snapping and anti-conservative against drift, and
+                // the only thing that tells you which side you are on is the rate.
+                //
+                // Published on its own diagnostic channel rather than logged, because at the MIN_PX
+                // floor a sparse frame can skip most of what it predicted and the symptom — a wall
+                // that has apparently stopped corroborating — looks identical to an unpainted one.
+                // E6 sets rho against this number.
                 if (cand.size() == 1) ++loneCandidateSkips;
                 continue;
             }
@@ -1008,6 +1028,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
                 validQuery.push_back(bestQ);
             }
         }
+        loneSkips = loneCandidateSkips;
         if (loneCandidateSkips > 0) {
             LOGI("Corroboration (gated): r=%.1fpx predicted=%d matched=%d lone-candidate skips=%d",
                  radiusPx, predicted, matched, loneCandidateSkips);
@@ -1036,19 +1057,30 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     if (gated) {
         mCorrobPredicted.store(predicted, std::memory_order_relaxed);
         mCorrobMatched.store(matched, std::memory_order_relaxed);
+        mCorrobLoneSkips.store(loneSkips, std::memory_order_relaxed);
         mCorrobSearchRadiusPx.store(radiusPx, std::memory_order_relaxed);
     }
 
-    // Fold this attempt's hits into the running "has the wall ever answered for this feature" set,
-    // under the generation check — the artwork may have been replaced while the match ran.
+    // Fold this attempt's hits into the running corroboration counts, under the generation check —
+    // the artwork may have been replaced while the match ran.
+    //
+    // GATED ATTEMPTS ONLY. The fallback branch above is the pre-Phase-4 global search: an
+    // unconstrained descriptor match with no geometric agreement behind it, and feeding a signal
+    // that never decays from a match that was never localized is how a monotone counter saturates
+    // on noise. A gated hit means the wall shows this design feature within a few pixels of where
+    // the design says it should be AND wins the ratio test among its neighbours; that is a
+    // materially stronger claim, and it is the only one allowed to move progress.
     int everCorroborated = -1;
-    {
+    if (gated) {
         std::lock_guard<std::mutex> lock(mMutex);
         if (mArtworkGeneration == artGeneration &&
             mArtworkCorroborated.size() == (size_t)artDescs.rows) {
-            for (int a = 0; a < artDescs.rows; ++a) if (hit[a]) mArtworkCorroborated[(size_t)a] = 1;
-            everCorroborated = (int)std::count(mArtworkCorroborated.begin(),
-                                               mArtworkCorroborated.end(), (uint8_t)1);
+            everCorroborated = 0;
+            for (int a = 0; a < artDescs.rows; ++a) {
+                uint8_t& c = mArtworkCorroborated[(size_t)a];
+                if (hit[a] && c < kCorrobConfirmations) ++c;
+                if (c >= kCorrobConfirmations) ++everCorroborated;
+            }
         }
     }
 
@@ -1065,21 +1097,46 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     // CONFIDENCE is instantaneous over the predicted-visible set: of the design features the current
     // pose says should be in view, how many does the wall back right now. A close-up of one corner
     // is no longer capped by framing rather than by agreement (5b.1).
+    //
+    // Both channels switch definition on `havePlacement`, NOT on `gated`. A design placement is
+    // stable across frames while a lock is not, so keying on the lock would flip progress between
+    // two different measurements every time the artist looked away and back — two definitions
+    // alternating in one readout is worse than either alone.
     if (!mDistortionHead.isLoaded()) {
-        if (everCorroborated >= 0 && artDescs.rows > 0) {
-            mPaintingProgress.store((float)everCorroborated / (float)artDescs.rows,
+        if (havePlacement) {
+            // Phase 4 is active for this project. A tick with no lock publishes nothing and leaves
+            // the last value standing, because the alternative is replacing a cumulative reading
+            // with an instantaneous one from a different denominator.
+            if (everCorroborated >= 0 && artDescs.rows > 0) {
+                mPaintingProgress.store((float)everCorroborated / (float)artDescs.rows,
+                                        std::memory_order_relaxed);
+            }
+        } else if (artDescs.rows > 0) {
+            // No placement ever pushed: Phase 4 is off for this project and this is exactly the
+            // pre-Phase-4 instantaneous whole-design ratio.
+            mPaintingProgress.store((float)matched / (float)artDescs.rows,
                                     std::memory_order_relaxed);
         }
+
         if (gated) {
             // 4.8: zero predicted-visible is "the artist is not looking at the design", NOT "the
-            // wall does not corroborate it". Publishing 0.0 would be a measurement never taken, and
-            // PoseFusion scales its correction strength by this.
+            // wall does not corroborate it". Publishing 0.0 would be a measurement never taken.
+            //
+            // Note what this does and does not buy. PoseFusion cannot tell the two apart —
+            // ArRenderer coerces the negative to 0f and CONF_FLOOR absorbs both, so `effConf` is
+            // byte-identical either way. The value is entirely in the diagnostics and the eval CSV,
+            // which is where E6 has to separate "looking away" from "looked, found nothing".
             mCorroborationConfidence.store(
                 predicted > 0 ? (float)matched / (float)predicted : kCorroborationUnmeasured,
                 std::memory_order_relaxed);
-        } else if (artDescs.rows > 0) {
+        } else if (!havePlacement && artDescs.rows > 0) {
             mCorroborationConfidence.store((float)matched / (float)artDescs.rows,
                                            std::memory_order_relaxed);
+        } else {
+            // Placement exists but this attempt had no pose to predict from. That is an attempt
+            // that ran and produced no usable measurement, which is precisely what the decay is
+            // for — the last reading is getting stale, and saying so beats repeating it.
+            decayCorroboration();
         }
     }
 
@@ -1269,6 +1326,7 @@ void MobileGS::clearWallFingerprint() {
     mCorroborationConfidence.store(kCorroborationUnmeasured, std::memory_order_relaxed);
     mCorrobPredicted.store(-1, std::memory_order_relaxed);
     mCorrobMatched.store(-1, std::memory_order_relaxed);
+    mCorrobLoneSkips.store(-1, std::memory_order_relaxed);
     mCorrobSearchRadiusPx.store(-1.0f, std::memory_order_relaxed);
     mLastGrowSeq = 0;
 }
@@ -1551,6 +1609,7 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
         ++mArtworkGeneration;
         mCorrobPredicted.store(-1, std::memory_order_relaxed);
         mCorrobMatched.store(-1, std::memory_order_relaxed);
+        mCorrobLoneSkips.store(-1, std::memory_order_relaxed);
         mCorrobSearchRadiusPx.store(-1.0f, std::memory_order_relaxed);
         mPaintingProgress.store(0.0f, std::memory_order_relaxed);
         // A new design means every prior corroboration reading was against a different target.

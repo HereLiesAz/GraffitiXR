@@ -2206,6 +2206,12 @@ private fun RelocDiagnosticsOverlay(
                 append("${d.corrobMatched}/${d.corrobPredicted}")
                 val r = corroboration.searchRadiusPx
                 if (r >= 0f) append(" · r=${r.toInt()}px")
+                // The skips are shown only when there are any, because on a healthy frame the
+                // number is 0 and a permanent "· 0 skip" trains the eye to ignore the field. When
+                // it IS non-zero it is the most important thing in the row: those are predicted
+                // features the match declined to test, so the ratio to its left is understated by
+                // exactly that much and a low reading may be the radius rather than the wall.
+                if (d.corrobLoneSkips > 0) append(" · ${d.corrobLoneSkips} skip")
             },
             // Amber, not red: zero predicted is the artist looking elsewhere, which is ordinary and
             // self-correcting. Red is reserved for the states that do not fix themselves.

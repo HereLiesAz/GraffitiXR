@@ -156,6 +156,7 @@ does not buy.
 | `SearchRadius.MAX_PX` / `kMaxPx` | `SearchRadius.kt`, `SearchRadius.h` | `120` | `120` | guessed — above this the "local" search is not local and the argument collapses | **E11** |
 | `SearchRadius.ERR_GAIN` / `kErrGain` | `SearchRadius.kt`, `SearchRadius.h` | `1.0` | `1.0` | guessed — radius scales linearly with measured `errMm`; 1.0 is the neutral prior | **E11** |
 | `SearchRadius.REPROJ_GAIN` / `kReprojGain` | `SearchRadius.kt`, `SearchRadius.h` | `2.0` | *added in 4.5* | guessed — deliberately not neutral; see below | E7 |
+| `kCorrobConfirmations` | `MobileGS.h` | `2` | *added in 4.5* | reasoned, not guessed — the smallest value that bounds a monotone counter; see below | E6 |
 
 All of them landed at their pre-registered priors, which is worth stating
 explicitly given §4's history: the Phase-2 margins shipped at values this file did
@@ -198,6 +199,41 @@ test admits a larger threshold than the global one; 0.85 is where we expect to
 land if P2 holds. If E7's iso-precision contour is flat, this reverts to 0.75 and
 P2 is falsified. It is now genuinely separable from `kRelocLoweRatio`, which is
 what makes that a measurement rather than an argument.
+
+**Why painting progress needs a confirmation threshold.** Phase 4 made progress
+cumulative, because a gated match only ever looks at the part of the design in
+frame and an instantaneous ratio would have become a statement about where the
+artist is standing. But a counter that only ever goes up, with no false-positive
+bound, saturates on noise given enough ticks: the reloc loop runs at 5 Hz locked,
+so one spurious match per attempt walks a 1500-feature design to "100% painted"
+in minutes on a bare wall. `kCorrobConfirmations` requires a design feature to be
+corroborated on two *separate* gated attempts before it counts. Two is the
+smallest value that does anything — one is the unbounded case — and it costs a
+genuinely painted feature nothing, since it corroborates on every attempt it is
+in view for. It does **not** defend against a *persistent* false positive; that
+is a limit of descriptor corroboration, not of this constant, and it is why E6
+measures progress against ground truth rather than trusting it.
+
+Two related decisions are recorded here because they are not obvious from the
+code. Accumulation runs on the **gated path only** — the global fallback is an
+unconstrained descriptor match with no geometric agreement behind it, and a
+never-decaying signal must not be fed from one. And both progress and confidence
+switch definition on whether a design **placement** exists, not on whether this
+particular frame produced a lock: a placement is stable across frames while a
+lock is not, so keying on the lock would alternate two different measurements in
+one readout every time the artist looked away and back.
+
+**The lone-candidate skip rate is published, not logged.** The gated match
+refuses to test a predicted feature whose neighbourhood holds a single candidate,
+because Lowe's ratio has nothing to divide by. Those skips deflate `matched`
+without touching `predicted`, so a radius too tight to find two candidates
+produces the same signature as a wall that has stopped corroborating — and the
+two call for opposite responses. At the `MIN_PX` floor of 4 px a sparse frame can
+skip most of what it predicted. `corrobLoneSkips` therefore rides the diagnostics
+channel, the overlay and the eval CSV, so E6 sets ρ against a measurement instead
+of an assumption. Note the deflation is not harmless in the meantime: lower
+confidence means a smaller correction blend in `PoseFusion`, so a too-tight radius
+trades false snapping for accumulated drift.
 
 **What the transliteration test does not cover.** Every assertion in
 `SearchRadiusTest` and `KeypointGridTest` exercises Kotlin that never runs on a

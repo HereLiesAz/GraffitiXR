@@ -114,7 +114,16 @@ private:
      */
     int cellFloor(float v, float minV) const {
         if (!std::isfinite(v)) return v > 0.0f ? INT32_MAX : INT32_MIN;
-        const double idx = std::floor((double)(v - minV) / (double)mCell);
+        // FLOAT division, matching the Kotlin reference's `(v - min) / cellSize` on Float operands.
+        // Promoting to double here computes a more accurate quotient, which sounds like an
+        // improvement and is a divergence: at a boundary where the float quotient rounds up to
+        // exactly an integer and the double quotient does not, the two implementations return
+        // different cells and the out-of-range reject fires on one side and not the other. The
+        // reference is the specification; being more precise than it is still being different from
+        // it. Widened to double only for the floor and the range clamp, where no such disagreement
+        // is possible.
+        const float q = (v - minV) / mCell;
+        const double idx = std::floor((double)q);
         if (idx > (double)INT32_MAX) return INT32_MAX;
         if (idx < (double)INT32_MIN) return INT32_MIN;
         return (int)idx;

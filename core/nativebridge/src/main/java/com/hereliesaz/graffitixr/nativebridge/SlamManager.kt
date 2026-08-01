@@ -240,10 +240,10 @@ class SlamManager @Inject constructor(
 
     /**
      * Why the last relocalization attempt did not publish a pose, and how far it got. See
-     * [RelocDiagnostics]; the native side packs ELEVEN values into one int[] so the read is a
-     * consistent snapshot rather than eleven racing getters. (Three separate comments used to say
+     * [RelocDiagnostics]; the native side packs TWELVE values into one int[] so the read is a
+     * consistent snapshot rather than twelve racing getters. (Three separate comments used to say
      * three, four and six; the array was six wide until 2.11 added the three backbone counts, and
-     * nine until 4.6 added the two corroboration counts.)
+     * nine until 4.6 added the three corroboration counts.)
      *
      * A short array falls back to the default [RelocDiagnostics] — whose backbone and corroboration
      * fields are the -1 "not measured" sentinel, not 0 — rather than to a partially-filled one, so
@@ -268,6 +268,7 @@ class SlamManager @Inject constructor(
             backboneInliers = v[8],
             corrobPredicted = if (v.size > 9) v[9] else -1,
             corrobMatched = if (v.size > 10) v[10] else -1,
+            corrobLoneSkips = if (v.size > 11) v[11] else -1,
         )
     }
 

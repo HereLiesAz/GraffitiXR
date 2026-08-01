@@ -75,6 +75,19 @@ data class RelocDiagnostics(
      * denominator, and conflating the two is the defect Phase 5 exists to undo.
      */
     val corrobMatched: Int = -1,
+    /**
+     * `IMPLEMENTATION.md` **4.6** — predicted-visible features the gated match **refused to test**,
+     * because their neighbourhood held a single candidate and Lowe's ratio has nothing to divide
+     * by. -1 when no gated attempt has run.
+     *
+     * This is the number that says whether the search radius is usable. A skip deflates
+     * [corrobMatched] without touching [corrobPredicted], so a radius that is too tight does not
+     * announce itself — it announces itself as a wall that has stopped corroborating, which looks
+     * exactly like an unpainted one. And the deflation is not harmless: lower confidence means a
+     * smaller correction blend in `PoseFusion`, so a too-tight radius trades false snapping for
+     * accumulated drift, which is the thing corroboration exists to prevent.
+     */
+    val corrobLoneSkips: Int = -1,
 ) {
     /** Inlier ratio of the last attempt, or 0 when it produced no correspondences. */
     val inlierRatio: Float get() = if (matches > 0) inliers.toFloat() / matches else 0f

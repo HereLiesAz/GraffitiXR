@@ -69,10 +69,28 @@ data class EvalSample(
      * it is the *best* outcome this column can carry, not the absence of one — so zero cannot double
      * as the not-measured marker without making every ideal row indistinguishable from a row where
      * nothing was measured, and turning the healthiest evidence Phase 4 can produce into missing
-     * data. A zero radius is likewise a real (degenerate) reading, not an absence.
+     * data.
+     *
+     * The radius is a different case and an earlier version of this note got it wrong: it can
+     * **never** be 0. `SearchRadius.pixels` clamps every path into `[MIN_PX, MAX_PX]` = `[4, 120]`,
+     * and its degenerate branch returns the ceiling. So a `0` in this column is not a degenerate
+     * reading to interpret — it is corrupt data, and should be treated as one.
      */
     val searchRadiusPx: Float = -1f,
     val relocReprojPx: Float = -1f,
+    /**
+     * Predicted-visible features the gated match **refused to test**, because their neighbourhood
+     * held a single candidate and Lowe's ratio needs two. -1 = not sampled; 0 is a real reading and
+     * the one that says the radius is comfortable.
+     *
+     * This column is why the phase is falsifiable. Skips deflate [corrobMatched] without touching
+     * [corrobPredicted], so a radius too tight to find two candidates produces the same CSV
+     * signature as a wall that has stopped corroborating — and the two call for opposite responses
+     * (raise ρ vs. investigate the paint). At the `MIN_PX` floor a sparse frame can skip most of
+     * what it predicted, so without this column E6 could report a confidence collapse and attribute
+     * it to the wrong cause with no way to tell.
+     */
+    val corrobLoneSkips: Int = -1,
     /**
      * `rotationNeeded` **at the moment the active target was captured** — 0, 90, 180 or 270, or -1
      * when no target has been captured this session (a project restored from disk reads -1; see
@@ -132,7 +150,7 @@ object EvalSampleLog {
         "relocReject", "relocMatches", "relocInliers", "relocDetected",
         "relocObliquityDeg", "relocRectifiedCorr",
         "relocBackboneFeatures", "relocBackboneMatches", "relocBackboneInliers",
-        "corrobPredicted", "corrobMatched", "searchRadiusPx", "relocReprojPx",
+        "corrobPredicted", "corrobMatched", "corrobLoneSkips", "searchRadiusPx", "relocReprojPx",
         "captureRotationNeededDeg", "liveRotationNeededDeg",
     )
 
@@ -162,6 +180,7 @@ object EvalSampleLog {
             s.relocBackboneFeatures.toString(), s.relocBackboneMatches.toString(),
             s.relocBackboneInliers.toString(),
             s.corrobPredicted.toString(), s.corrobMatched.toString(),
+            s.corrobLoneSkips.toString(),
             s.searchRadiusPx.toString(), s.relocReprojPx.toString(),
             s.captureRotationNeededDeg.toString(), s.liveRotationNeededDeg.toString(),
         )

@@ -143,6 +143,26 @@ public:
     static constexpr float kRelocLoweRatio = 0.75f;
     static constexpr float kCorrobLoweRatio = 0.85f;
 
+    /**
+     * How many separate gated attempts must corroborate a design feature before it counts toward
+     * painting progress.
+     *
+     * Progress accumulates and never decays, which is what the channel promises — but a
+     * monotone counter with no false-positive bound saturates on noise given enough ticks. The
+     * reloc loop runs at 5 Hz locked, so even one spurious match per attempt would walk a
+     * 1500-feature design to "100% painted" in minutes on a bare wall.
+     *
+     * Two, not one, and not five. One is the unbounded case. Two costs a genuinely painted feature
+     * nothing — it corroborates on every attempt it is in view for, so it confirms on the next tick
+     * — while removing the entire class of TRANSIENT false positives, which is the class that
+     * ratchets. It does not defend against a persistent false positive: a wall feature that really
+     * does sit near a design feature's prediction and really does win the ratio test will confirm,
+     * and no counter threshold changes that. That is a limit of descriptor corroboration, not of
+     * this constant, and it is why E6 measures progress against ground truth rather than trusting
+     * it.
+     */
+    static constexpr uint8_t kCorrobConfirmations = 2;
+
     /** Last [RelocReject]. */
     int lastRelocReject() const { return mLastRelocReject.load(std::memory_order_relaxed); }
     /** Correspondences built by the last attempt, successful or not. */
@@ -184,6 +204,18 @@ public:
      */
     int corrobPredicted() const { return mCorrobPredicted.load(std::memory_order_relaxed); }
     int corrobMatched() const { return mCorrobMatched.load(std::memory_order_relaxed); }
+    /**
+     * Predicted-visible features the gated match REFUSED to test, because their neighbourhood held
+     * a single candidate and Lowe's ratio has nothing to divide by. -1 when no gated attempt ran.
+     *
+     * Published rather than logged because it is the number that decides whether the phase works.
+     * These skips deflate `corrobMatched` without touching `corrobPredicted`, so a radius that is
+     * too tight does not announce itself as an error — it announces itself as a wall that has
+     * stopped corroborating, which is indistinguishable from an unpainted one. At the `MIN_PX`
+     * floor a sparse frame can skip most of what it predicted; with this on the channel that is a
+     * reading E6 can act on instead of an unknown.
+     */
+    int corrobLoneSkips() const { return mCorrobLoneSkips.load(std::memory_order_relaxed); }
     /** Search radius the last gated attempt used, in pixels, or -1 when no gated attempt has run. */
     float corrobSearchRadiusPx() const { return mCorrobSearchRadiusPx.load(std::memory_order_relaxed); }
     /**
@@ -565,6 +597,7 @@ private:
     // real reading (the artist is not looking at the design) and cannot double as the default.
     std::atomic<int>        mCorrobPredicted{-1};
     std::atomic<int>        mCorrobMatched{-1};
+    std::atomic<int>        mCorrobLoneSkips{-1};
     std::atomic<float>      mCorrobSearchRadiusPx{-1.0f};
     // Mean reprojection error over the last lock's PnP inliers, in pixels. -1 = not measured, and it
     // stays -1 on every path that does not reach a refined inlier set.

@@ -136,6 +136,7 @@ class DriftCostProbe(
             // so writing 0 for absent data would file the best rows and the empty rows together.
             corrobPredicted = reloc?.corrobPredicted ?: EvalSampleLog.NOT_SAMPLED,
             corrobMatched = reloc?.corrobMatched ?: EvalSampleLog.NOT_SAMPLED,
+            corrobLoneSkips = reloc?.corrobLoneSkips ?: EvalSampleLog.NOT_SAMPLED,
             searchRadiusPx = corrob?.searchRadiusPx ?: EvalSampleLog.NOT_SAMPLED_PX,
             relocReprojPx = corrob?.relocReprojPx ?: EvalSampleLog.NOT_SAMPLED_PX,
             captureRotationNeededDeg = captureRotationNeededDeg,

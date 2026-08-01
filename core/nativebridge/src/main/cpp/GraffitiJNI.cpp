@@ -1319,8 +1319,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCorroborationCo
 // the rectification pass contributed, [6] = stored points in F_out, [7] = correspondences built
 // against F_out, [8] = inliers that came from F_out (IMPLEMENTATION.md 2.11; -1 = not measured),
 // [9] = design features the current pose predicts are visible, [10] = how many of those the wall
-// answered for (IMPLEMENTATION.md 4.6; -1 until a GATED corroboration attempt has run, and 0 for
-// [9] is a real reading meaning the artist is not looking at the design).
+// answered for, [11] = how many predicted features the gated match refused to test because their
+// neighbourhood held a single candidate (IMPLEMENTATION.md 4.6; all three -1 until a GATED
+// corroboration attempt has run, and 0 for [9] is a real reading meaning the artist is not looking
+// at the design).
 extern "C" JNIEXPORT jintArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostics(JNIEnv* env, jobject) {
     // NOT {0, ...}: zero is kRelocOk, so a no-engine fallback of 0 reports a SUCCESSFUL LOCK with
@@ -1330,7 +1332,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostic
     // the Kotlin-only code that absorbs anything the native side cannot account for; the counts are
     // -1 (not sampled) rather than 0, because zero matches is a real measurement.
     static constexpr jint kRelocUnknownOrdinal = 7;
-    jint vals[11] = {kRelocUnknownOrdinal, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+    jint vals[12] = {kRelocUnknownOrdinal, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
     if (gSlamEngine) {
         vals[0] = gSlamEngine->lastRelocReject();
         vals[1] = gSlamEngine->lastRelocMatches();
@@ -1343,10 +1345,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostic
         vals[8] = gSlamEngine->lastRelocBackboneInliers();
         vals[9] = gSlamEngine->corrobPredicted();
         vals[10] = gSlamEngine->corrobMatched();
+        vals[11] = gSlamEngine->corrobLoneSkips();
     }
-    jintArray out = env->NewIntArray(11);
+    jintArray out = env->NewIntArray(12);
     if (!out) return nullptr;
-    env->SetIntArrayRegion(out, 0, 11, vals);
+    env->SetIntArrayRegion(out, 0, 12, vals);
     return out;
 }
 

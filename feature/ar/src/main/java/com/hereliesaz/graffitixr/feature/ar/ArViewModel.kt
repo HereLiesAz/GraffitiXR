@@ -1899,6 +1899,28 @@ class ArViewModel @Inject constructor(
             val legacyFrame = fp != null && fp.isLegacyFrame() &&
                 project.fingerprintCaptureRotationDeg < 0 && hasCoRegistration
 
+            // IMPLEMENTATION.md 4.5 — drop the native design placement HERE, before the branches,
+            // not inside them.
+            //
+            // The placement is `captureAnchorCam · rigidModelAnchorLocal`: a design pose expressed
+            // in the frame of the fingerprint it was composed against. The moment a different
+            // fingerprint is loaded, that frame is gone and the matrix describes nowhere. Only one
+            // of the three branches below would have cleared it — `dropLoadedFingerprint` reaches
+            // `clearWallFingerprint`, which does — so switching to a project with a saved metric
+            // fingerprint left the gated corroboration search predicting every design feature at the
+            // PREVIOUS project's design location, expressed in this project's frame. It fails
+            // silently and in the worst possible direction: a confidently wrong place returns no
+            // matches, which reads downstream as "the wall does not corroborate", pinning
+            // confidence and painting progress near zero until the artist happens to drag the
+            // design and trigger a re-push.
+            //
+            // Placed before the `when` rather than repeated in each arm because "cleared in one
+            // branch and not its sibling" is the exact defect family six audits already found in
+            // this function — the reason `LoadedFingerprint` and the single-exit loader exist. The
+            // metric branch re-pushes through `partitionLiveFingerprintIfNeeded()` at the tail; the
+            // descriptors-only branch has no frame to place a design in and correctly stays cleared.
+            slamManager.setDesignPlacement(null, 0f, 0f)
+
             when {
                 fp == null || legacyFrame -> {
                     if (legacyFrame) {
