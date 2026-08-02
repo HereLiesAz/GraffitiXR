@@ -346,6 +346,17 @@ class ArViewModel @Inject constructor(
      */
     @Volatile private var diagnosticCaptureEnabled = false
 
+    /**
+     * Why the last target capture produced no fingerprint, or null if the last one succeeded.
+     *
+     * Carried into the report because it is the answer to the question every empty-fingerprint run
+     * raises and none of them could answer. `wallPoints 0` says the fingerprint is missing; this says
+     * whether the wall had no features at all or had plenty and none of them back-projected onto the
+     * plane — two problems with two different fixes, which the report otherwise leaves the reader to
+     * guess between.
+     */
+    @Volatile private var lastCaptureRefusal: String? = null
+
     private val _captureRequests =
         MutableSharedFlow<com.hereliesaz.graffitixr.feature.ar.eval.CaptureTrigger>(
             extraBufferCapacity = 2,
@@ -604,6 +615,9 @@ class ArViewModel @Inject constructor(
             // hold them rather than from whatever the eval buttons last asked for.
             "fusion" to (renderer?.fusionEnabled?.toString() ?: "no renderer attached"),
             "syncReloc" to slamManager.evalSyncRelocEveryN().let { if (it > 0) "every $it" else "async" },
+            // The reason an empty-fingerprint run is empty. Without it the report can say the
+            // fingerprint is missing and nothing about why, which is where three device runs stalled.
+            "lastCapture" to (lastCaptureRefusal?.let { "REFUSED — $it" } ?: "no refusal recorded"),
         ),
         parameters = diagnosticParameters(),
         captures = captureManifest.toList(),
@@ -3162,7 +3176,26 @@ class ArViewModel @Inject constructor(
         if (doodleBuildInFlight) return
         val plane = renderer?.doodleWallPlane
         val intr = intrinsics
-        if (plane == null || plane.size < 6 || intr == null) {
+        // The preconditions bail, which used to return in silence — BEFORE `buildSingle` and so
+        // before any of its refusal reporting. A run could fail here on every capture tick and the
+        // report would still say "no refusal recorded".
+        //
+        // The normal check is the one that matters. A zero-length normal passes every structural
+        // test — non-null, six floats — and then makes `PlaneMarks.backProject` reject every single
+        // ray, because `n·d` is exactly 0 for every pixel. Guarded at the publisher too
+        // (`ArRenderer.doodleWallPlane`); repeated here because this is the last place it can be
+        // refused with a message attached, and a plane arriving degenerate from anywhere must not
+        // reach the builder.
+        val planeNormalOk = plane != null && plane.size >= 6 &&
+            (plane[3] * plane[3] + plane[4] * plane[4] + plane[5] * plane[5]) > 1e-8f
+        if (!planeNormalOk || intr == null) {
+            lastCaptureRefusal = when {
+                plane == null -> "no wall plane yet — ARCore has not produced a usable surface to project onto"
+                plane.size < 6 -> "wall plane malformed (${plane.size} floats, need 6)"
+                !planeNormalOk -> "wall plane has a degenerate normal — nothing can back-project onto it"
+                else -> "no camera intrinsics for this frame"
+            }
+            Timber.w("ARDIAG doodle capture skipped: $lastCaptureRefusal")
             slamManager.setMappingPaused(false)
             return
         }
@@ -3186,9 +3219,41 @@ class ArViewModel @Inject constructor(
                     // The same angle `rotated` and `intr` were built with, a dozen lines above.
                     rotationDeg = displayRotation,
                 )
-                if (fp != null) doodleFingerprintBuilt = true
+                if (fp != null) {
+                    doodleFingerprintBuilt = true
+                    lastCaptureRefusal = null
+                } else {
+                    // Say which way it fell short, on this path too.
+                    //
+                    // The tap-to-capture path has reported this for a while; the doodle path threw
+                    // the answer away. So a run could go: draw the glyphs, tap "I've drawn it",
+                    // watch the app capture over and over, silently fail every time, fall back to a
+                    // plain anchor, and hand back an overlay with no fingerprint and no explanation.
+                    // A device report showed exactly that — wallPoints 0 across 953 samples, and
+                    // every downstream stage correctly inert, with nothing anywhere saying why.
+                    //
+                    // "Not enough texture" would be the wrong message too: features found but not
+                    // landing on the plane is a different problem with a different fix from no
+                    // features at all, and only the pair of counts tells them apart.
+                    val detected = MetricFingerprintBuilder.lastDetected
+                    val placed = MetricFingerprintBuilder.lastPlaced
+                    val need = MetricFingerprintBuilder.lastRequired
+                    lastCaptureRefusal = if (detected < need) {
+                        "only $detected features detected (need $need) — too dark, too smooth, or out of focus"
+                    } else {
+                        "$detected features detected but only $placed landed on the wall plane " +
+                            "(need $need) — aim square at the middle of the detected wall"
+                    }
+                    Timber.w("ARDIAG target capture refused: $lastCaptureRefusal")
+                }
             } catch (t: Throwable) {
                 android.util.Log.w("ArViewModel", "Doodle fingerprint build failed", t)
+                // A throw is a refusal too, and the field above would otherwise stay null and let
+                // the report say "no refusal recorded" for a capture that blew up. `buildSingle`
+                // has at least one reachable throw of its own — `glViewToCvDisplay` requires a
+                // multiple of 90 — and reporting a crash as an absence is the failure this whole
+                // effort exists to stop.
+                lastCaptureRefusal = "threw ${t.javaClass.simpleName}: ${t.message ?: "no message"}"
             } finally {
                 // Always resume the mapping that requestCapture paused — otherwise a throw would
                 // wedge SLAM with mapping paused for the rest of the session.
