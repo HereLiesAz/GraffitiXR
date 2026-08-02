@@ -139,6 +139,7 @@ class DriftCostProbe(
             corrobLoneSkips = reloc?.corrobLoneSkips ?: EvalSampleLog.NOT_SAMPLED,
             searchRadiusPx = corrob?.searchRadiusPx ?: EvalSampleLog.NOT_SAMPLED_PX,
             relocReprojPx = corrob?.relocReprojPx ?: EvalSampleLog.NOT_SAMPLED_PX,
+            inlierSpread = corrob?.inlierSpread ?: EvalSampleLog.NOT_SAMPLED_PX,
             captureRotationNeededDeg = captureRotationNeededDeg,
             liveRotationNeededDeg = liveRotationNeededDeg,
         )

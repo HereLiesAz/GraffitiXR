@@ -92,6 +92,19 @@ data class EvalSample(
      */
     val corrobLoneSkips: Int = -1,
     /**
+     * `IMPLEMENTATION.md` **3.3** — the last lock's inlier bounding box as a fraction of frame area.
+     * -1f = not sampled.
+     *
+     * E5's column. Self-grow permanently mutates the map, so its gate has to be strict — and a
+     * strict gate that is too strict is indistinguishable from one that never fired, because both
+     * produce the same absence of promotions. This is the only signal that separates them.
+     *
+     * **-1f, never 0f.** A spread of 0 is a real reading: every inlier on one pixel, the
+     * worst-conditioned pose the gate exists to reject. It is the row that matters most, and it must
+     * not be filed as missing data.
+     */
+    val inlierSpread: Float = -1f,
+    /**
      * `rotationNeeded` **at the moment the active target was captured** — 0, 90, 180 or 270, or -1
      * when no target has been captured this session (a project restored from disk reads -1; see
      * below).
@@ -151,6 +164,7 @@ object EvalSampleLog {
         "relocObliquityDeg", "relocRectifiedCorr",
         "relocBackboneFeatures", "relocBackboneMatches", "relocBackboneInliers",
         "corrobPredicted", "corrobMatched", "corrobLoneSkips", "searchRadiusPx", "relocReprojPx",
+        "inlierSpread",
         "captureRotationNeededDeg", "liveRotationNeededDeg",
     )
 
@@ -182,6 +196,7 @@ object EvalSampleLog {
             s.corrobPredicted.toString(), s.corrobMatched.toString(),
             s.corrobLoneSkips.toString(),
             s.searchRadiusPx.toString(), s.relocReprojPx.toString(),
+            s.inlierSpread.toString(),
             s.captureRotationNeededDeg.toString(), s.liveRotationNeededDeg.toString(),
         )
     }

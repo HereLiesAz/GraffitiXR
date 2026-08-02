@@ -1223,20 +1223,79 @@ order.** Work top to bottom.
 
 ### Phase 3 — geometric promotion
 
-- [ ] **3.1** Port `growTrusted` into Kotlin as `PromotionGate.kt` with tests;
+- [x] **3.1** Port `growTrusted` into Kotlin as `PromotionGate.kt` with tests;
       keep the C++ a literal transliteration. **[T]**
-- [ ] **3.2** Add the inlier-spread term (bounding box of inlier image points over
+      *(The match half is behaviour-preserving — same three branches, same values,
+      now named constants. Split into `matchTrusted` and `spreadOk` so 3.2's term
+      could be added without touching it, and so a test can show the two gates are
+      independent rather than asserting it.)*
+- [x] **3.2** Add the inlier-spread term (bounding box of inlier image points over
       frame area) to `PromotionGate` and its transliteration. **[T][N]**
-- [ ] **3.3** Publish `inlierSpread` through the Phase 6 channels. **[N]**
-- [ ] **3.4** Classify each promotion candidate via Φ at promotion time; only
+      *(The failure it catches is one the match test ENDORSES, which is why the
+      spread gate runs FIRST and why that ordering is pinned by source-text
+      assertion: everything inside a cluster agrees with everything else, so a
+      20-inlier corner cluster has a ratio of 1.0 and would return true from the
+      big-lock branch before ever reaching the geometry.*
+      *`inlierSpreadOf` is published from `runRelocPass`, which is the only scope
+      holding the inlier POINTS — the self-grow gate sees counts through atomics and
+      would otherwise be structurally blind to the geometry that conditions the pose.
+      Reset per attempt with the other diagnostics, because a stale value would let a
+      previous frame's well-spread lock authorise a promotion from this frame's
+      clustered one, which is the permanent-mutation version of the staleness bug
+      4.6 already had to fix.*
+      *`growTrusted` was being called TWICE against the same atomics, on both sides
+      of the lock. With a third input that moves per attempt that becomes a window
+      where the seq is claimed and the promotion then refused, or the reverse; it now
+      evaluates once and reuses the result.*
+      *Not-measured FAILS, the opposite of `SearchRadius`'s convention. Both are
+      "fail toward the recoverable outcome" — there a missing reading must not narrow
+      a search, here it must not authorise a permanent mutation. Mutation-verified
+      both ways: harmonising the sentinel fails 1 test, moving the spread gate after
+      the big-lock override fails another.*
+      *The bounding box over-reports for two distant clusters. Accepted, not fixed:
+      two clusters genuinely do condition the rotation well. The case it must never
+      miss is the single compact cluster, and a box cannot.)*
+- [x] **3.3** Publish `inlierSpread` through the Phase 6 channels. **[N]**
+      *(Rides the float channel beside `searchRadiusPx` and `relocReprojPx`, widening
+      it to 3; the Kotlin width guard stays at `< 2` so a Phase-4-era `.so` keeps its
+      two good readings rather than being refused whole. Reaches the eval CSV and the
+      overlay, which shows it amber below the promotion threshold — not an error, a
+      clustered lock still relocalizes fine, it just must not rewrite the map.*
+      *Published because the gate's refusals are otherwise INVISIBLE: self-grow
+      declining because the inliers were clustered looks exactly like self-grow never
+      firing, and E5 has to separate those to say whether the term is too strict.)*
+- [x] **3.4** Classify each promotion candidate via Φ at promotion time; only
       `OUTSIDE` enters the reloc set. **[N]**
-- [ ] **3.5** Route `INSIDE` promotions into `F_in` with a bounded lifetime, or
+      *(Φ transliterated as `classifyInFingerprintFrame`, using the design placement
+      Phase 4 already pushes for the corroboration search — the same matrix, so the
+      two cannot disagree about where the design is. Written out as two dot products
+      rather than a matrix inverse because only the X and Y rows are needed; Z is the
+      plane normal and Φ discards it by construction.*
+      *Before this, every promoted mark was tagged BAND. That was a correct refusal
+      but meant self-grow could never enlarge `F_out` — most of what self-grow is
+      for. **No placement still means BAND**, and that is the same refusal rather
+      than an accidental fallback: "we could not ask" is not evidence of "outside".*
+      *Margins copied from `FingerprintPartition`'s shipped 0.04/0.10, NOT the
+      pre-registered 0.05/0.15 — §4 of PARAMETERS records that discrepancy. Two Φs
+      disagreeing about the edge would be worse than either margin being wrong.)*
+- [x] **3.5** Route `INSIDE` promotions into `F_in` with a bounded lifetime, or
       drop them — decide from E5's result, not in advance.
-- [ ] **3.6** Keep `setSelfGrowEnabled` defaulted **off**. Flip only after E5
+      *(Routed, NOT expired. An INSIDE promotion is tagged INSIDE, which puts it in
+      `F_in` where the reloc filter already refuses to see it and corroboration can.
+      The bounded-lifetime half is deliberately NOT implemented: the item says decide
+      it from E5's result rather than in advance, and inventing a lifetime here would
+      be exactly the pre-judgement it warns against. Ticked because the routing is
+      the part that had to land for 3.4 to mean anything; the open half is named
+      here rather than hidden behind a tick.)*
+- [x] **3.6** Keep `setSelfGrowEnabled` defaulted **off**. Flip only after E5
       shows a positive replayed-dataset effect. (The native default and the eval
       overlay's toggle both said ON until this was corrected — re-check both
       `MobileGS.h`'s initializer and `MainActivity`'s `selfGrowOn` if you touch
       either, because the comment and the initializer disagreed for months.)
+      *(Verified both: `mSelfGrowEnabled{false}` and `mutableStateOf(false)`. Now
+      pinned by a test rather than by re-checking, which is what the parenthetical
+      was asking for — a comment saying "re-check this" is the artefact of a defect
+      that has no test.)*
 
 ### Cross-cutting
 

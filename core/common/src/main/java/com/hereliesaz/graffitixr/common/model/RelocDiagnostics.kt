@@ -109,6 +109,18 @@ data class RelocDiagnostics(
 data class CorroborationDiagnostics(
     val searchRadiusPx: Float = -1f,
     val relocReprojPx: Float = -1f,
+    /**
+     * `IMPLEMENTATION.md` **3.3** — the last lock's inlier bounding box as a fraction of frame area,
+     * or -1 when not measured.
+     *
+     * The gate this feeds gates an **irreversible** map mutation, and its refusals are otherwise
+     * invisible: self-grow declining because the inliers were clustered looks exactly like self-grow
+     * not having fired at all. E5 has to tell those apart to say whether the term is too strict.
+     *
+     * **Zero is a real reading** and the worst one — every inlier on a single pixel, a pose whose
+     * rotation is unconstrained — so it cannot double as the sentinel.
+     */
+    val inlierSpread: Float = -1f,
 )
 
 /**

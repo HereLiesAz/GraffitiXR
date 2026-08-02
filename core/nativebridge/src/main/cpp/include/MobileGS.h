@@ -5,6 +5,8 @@
 #include "SuperPointDetector.h"
 #include "DistortionHead.h"
 #include "LowLightEnhancer.h"
+#include <cmath>
+#include <limits>
 #include <mutex>
 #include <vector>
 #include <unordered_map>
@@ -105,10 +107,113 @@ public:
      * at a lower absolute count, while a weak ratio still cannot qualify at any count. RANSAC in the
      * reloc PnP remains the geometric backstop for anything this lets through.
      */
-    static bool growTrusted(int inliers, int matches) {
-        if (inliers >= 20) return true;                  // unchanged: a big lock always qualifies
-        if (inliers < 10 || matches <= 0) return false;  // absolute floor — PnP noise below this
-        return (float)inliers / (float)matches >= 0.6f;  // above PoseFusion's 0.5 trust bar
+    static bool growTrusted(int inliers, int matches, float inlierSpread = kPromotionNotMeasured) {
+        // IMPLEMENTATION.md 3.2 — the SPREAD gate, and it comes first because it is the one that
+        // catches the state the match test actively endorses. Twenty inliers clustered in one
+        // textured corner produce a confident-looking pose whose rotation is barely constrained: the
+        // correspondences pin the camera along the viewing ray but let the wall rotate about the
+        // cluster at almost no reprojection cost. Everything in a cluster agrees with everything
+        // else, so the inlier RATIO is high in exactly that state.
+        //
+        // Not-measured FAILS here, which is the opposite of SearchRadius's convention, and the
+        // asymmetry is deliberate: there a missing reading must not narrow a search; here a missing
+        // reading must not authorise a permanent map mutation. Both fail toward the recoverable
+        // outcome, which happens to lie in opposite directions.
+        if (!(inlierSpread >= 0.0f) || !std::isfinite(inlierSpread)) return false;
+        if (inlierSpread < kMinInlierSpread) return false;
+        if (inliers >= kBigLockInliers) return true;     // unchanged: a big lock always qualifies
+        if (inliers < kMinInliers || matches <= 0) return false;  // floor — PnP noise below this
+        return (float)inliers / (float)matches >= kMinInlierRatio;  // above PoseFusion's 0.5 bar
+    }
+
+    /**
+     * IMPLEMENTATION.md 3.2 — the inliers' bounding box as a fraction of frame area.
+     *
+     * Bounding box, not convex hull or covariance: the failure being caught is "all the inliers are
+     * in one corner", and a box catches that at a fraction of the cost. It over-reports for two
+     * distant clusters — which is correct rather than a false pass, since two clusters DO condition
+     * the rotation well. The case it must not miss is the single compact cluster, and a box cannot.
+     *
+     * Returns kPromotionNotMeasured, NOT 0, when it cannot compute an answer. Zero is a real reading
+     * meaning every inlier landed on one pixel — the worst-conditioned state this exists to reject —
+     * so absence and worst-case must not share a value.
+     */
+    static float inlierSpreadOf(const std::vector<cv::Point2f>& pts, float frameW, float frameH) {
+        if (pts.empty() || !(frameW > 0.0f) || !(frameH > 0.0f) ||
+            !std::isfinite(frameW) || !std::isfinite(frameH)) {
+            return kPromotionNotMeasured;
+        }
+        float minX = std::numeric_limits<float>::max(), minY = std::numeric_limits<float>::max();
+        float maxX = -std::numeric_limits<float>::max(), maxY = -std::numeric_limits<float>::max();
+        int seen = 0;
+        for (const auto& p : pts) {
+            // A non-finite point would blow the box out to the whole frame and turn the gate into a
+            // rubber stamp on exactly the degenerate input it exists to catch.
+            if (!std::isfinite(p.x) || !std::isfinite(p.y)) continue;
+            if (p.x < minX) minX = p.x;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.y > maxY) maxY = p.y;
+            ++seen;
+        }
+        if (seen == 0) return kPromotionNotMeasured;
+        // Clamped: an inlier can sit fractionally outside the frame after undistortion, and a box
+        // larger than the frame would report a spread above 1, which the threshold's units exclude.
+        const float w = std::min(1.0f, std::max(0.0f, (maxX - minX) / frameW));
+        const float h = std::min(1.0f, std::max(0.0f, (maxY - minY) / frameH));
+        return w * h;
+    }
+
+    /**
+     * PARAMETERS.md section 7. Mirrors `PromotionGate`'s constants; `CorroborationTranslitTest` pins
+     * the two sides together, because a value edited here and not there is a silent divergence
+     * between the tested reference and the code that actually mutates the map.
+     */
+    static constexpr int   kBigLockInliers = 20;
+    static constexpr int   kMinInliers = 10;
+    static constexpr float kMinInlierRatio = 0.6f;
+    static constexpr float kMinInlierSpread = 0.04f;
+    /** Negative, never 0 — a spread of 0 is a real and maximally bad reading. */
+    static constexpr float kPromotionNotMeasured = -1.0f;
+
+    /**
+     * IMPLEMENTATION.md 3.4 — Φ, transliterated from `Footprint.of` + `Footprint.classify`.
+     *
+     * Classifies a point already expressed in the FINGERPRINT frame against the design's placement.
+     * Returns kRegionOutside / kRegionBand / kRegionInside, matching the wire ordinals exactly.
+     *
+     * @param fpFromDesign the design's RIGID model matrix in the fingerprint frame, column-major —
+     *   `mDesignFpFromDesign`. Rigid, so the inverse is a transpose plus a rotated translation; the
+     *   overlay's scale lives in the half-extents instead, which is `Footprint`'s "scale trap" and
+     *   the reason there is no similarity-inverse branch here.
+     *
+     * Margins default to `FingerprintPartition.DEFAULT_INNER_MARGIN` / `DEFAULT_OUTER_MARGIN`. Note
+     * those are the values that SHIPPED, which are not the ones PARAMETERS.md pre-registered (0.05 /
+     * 0.15) — the discrepancy is recorded in §4 there, and copying the shipped values here keeps
+     * promotion classifying against the same footprint the capture partition used. Two Φs that
+     * disagree about the edge would be worse than either margin being wrong.
+     */
+    static uint8_t classifyInFingerprintFrame(const float* fpFromDesign, float halfW, float halfH,
+                                              const cv::Point3f& p,
+                                              float innerMargin = 0.04f,
+                                              float outerMargin = 0.10f) {
+        if (!(halfW > 1e-6f) || !(halfH > 1e-6f)) return kRegionBand;  // degenerate: trust neither set
+        // Rigid inverse: R^T, then -R^T t. Written out rather than built as a matrix because only
+        // the X and Y rows are needed — Z is the plane normal and Φ discards it by construction.
+        const float* m = fpFromDesign;
+        const float tx = m[12], ty = m[13], tz = m[14];
+        // Row 0 of R^T is column 0 of R = (m[0], m[1], m[2]); likewise row 1.
+        const float ix = -(m[0] * tx + m[1] * ty + m[2] * tz);
+        const float iy = -(m[4] * tx + m[5] * ty + m[6] * tz);
+        const float lx = m[0] * p.x + m[1] * p.y + m[2] * p.z + ix;
+        const float ly = m[4] * p.x + m[5] * p.y + m[6] * p.z + iy;
+        const float u = lx / halfW;
+        const float v = ly / halfH;
+        if (!std::isfinite(u) || !std::isfinite(v)) return kRegionBand;
+        const float d = std::max(std::fabs(u), std::fabs(v));
+        if (d <= 1.0f - innerMargin) return kRegionInside;
+        if (d >= 1.0f + outerMargin) return kRegionOutside;
+        return kRegionBand;
     }
 
     /** Hard ceiling on stored wall marks — a memory guard on the self-grow append. */
@@ -216,6 +321,16 @@ public:
      * reading E6 can act on instead of an unknown.
      */
     int corrobLoneSkips() const { return mCorrobLoneSkips.load(std::memory_order_relaxed); }
+    /**
+     * IMPLEMENTATION.md 3.3 — how much of the frame the last lock's inliers spanned, as a fraction
+     * of frame area, or -1 when not measured.
+     *
+     * Published because the promotion it gates is irreversible and otherwise invisible: a refusal
+     * here looks identical to self-grow simply not having fired, and E5 has to tell those apart to
+     * say whether the term is too strict.
+     */
+    float lastRelocInlierSpread() const { return mLastRelocInlierSpread.load(std::memory_order_relaxed); }
+
     /** Search radius the last gated attempt used, in pixels, or -1 when no gated attempt has run. */
     float corrobSearchRadiusPx() const { return mCorrobSearchRadiusPx.load(std::memory_order_relaxed); }
     /**
@@ -650,5 +765,10 @@ private:
     // Mean reprojection error over the last lock's PnP inliers, in pixels. -1 = not measured, and it
     // stays -1 on every path that does not reach a refined inlier set.
     std::atomic<float>      mLastRelocReprojPx{-1.0f};
+    // IMPLEMENTATION.md 3.2 — the last attempt's inlier bounding box as a fraction of frame area,
+    // or -1 for "not measured". Published from runRelocPass, which is the only scope holding the
+    // inlier POINTS; the self-grow gate sees counts through atomics and would otherwise be blind to
+    // the geometry that actually conditions the pose.
+    std::atomic<float>      mLastRelocInlierSpread{kPromotionNotMeasured};
     cv::Mat                 mRelocColorFrame;
 };

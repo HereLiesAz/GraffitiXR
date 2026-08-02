@@ -2221,6 +2221,25 @@ private fun RelocDiagnosticsOverlay(
                 androidx.compose.ui.graphics.Color.White
             },
         )
+        // IMPLEMENTATION.md 3.3 — the promotion gate's geometry term. Shown whenever a lock has
+        // measured it, because a low value is the state that silently blocks self-grow: a clustered
+        // inlier set produces a confident-looking pose with a badly conditioned rotation, and the
+        // gate refusing it is indistinguishable on every other row from self-grow never firing.
+        if (corroboration.inlierSpread >= 0f) {
+            DiagnosticRow(
+                "Spread",
+                String.format(java.util.Locale.US, "%.0f%%", corroboration.inlierSpread * 100f),
+                // Amber below the promotion threshold: not an error — a clustered lock still
+                // relocalizes perfectly well, it just must not be allowed to rewrite the map.
+                if (corroboration.inlierSpread <
+                    com.hereliesaz.graffitixr.feature.ar.anchor.PromotionGate.MIN_INLIER_SPREAD
+                ) {
+                    androidx.compose.ui.graphics.Color(0xFFFFC107)
+                } else {
+                    androidx.compose.ui.graphics.Color.White
+                },
+            )
+        }
         // The residual the search radius' drift term is derived from — and the fastest read on
         // whether a "locked" state is actually a good lock. A green LOCKED with a large reprojection
         // error is a pose that solved and is wrong, which nothing else on this overlay distinguishes.
