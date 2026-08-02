@@ -574,6 +574,49 @@ class ArViewModelTest {
         }
     }
 
+
+    /**
+     * Attaching a renderer re-asserts the standing self-grow intent on the engine.
+     *
+     * Exactly twice: once from the toggle itself, once from the attach. One call would mean the
+     * attach did not re-apply it, which is the whole point.
+     *
+     * ## Why the fusion half of this fix has no test
+     *
+     * `attachSessionToRenderer` also pushes the fusion intent onto the renderer, and that is the
+     * half that actually fixes a user-visible desync — `ArRenderer` is rebuilt when the AR view is,
+     * so a new one starts at its shipped `fusionEnabled = false` while the toggle still reads ON.
+     *
+     * It is not covered because `ArRenderer` cannot be mocked in this harness: `mockk(relaxed = true)`
+     * does not intercept it, so `attachSession` runs its real body and dereferences a `sessionLock`
+     * that a constructor-less mock never initialised. Every route to the assertion goes through that
+     * call. Passing `null` — as this test does — exercises the engine write but skips the renderer
+     * write entirely, since it is behind `renderer?.`.
+     *
+     * So the fusion re-apply is verified by reading, not by a test, and this note exists so nobody
+     * later mistakes the presence of a nearby green test for coverage of it.
+     */
+    @Test
+    fun `attaching re-applies the self-grow intent`() = runTest {
+        viewModel.evalSetSelfGrowEnabled(true)
+        viewModel.attachSessionToRenderer(null)
+        verify(exactly = 2) { slamManager.setSelfGrowEnabled(true) }
+    }
+
+    /**
+     * With no renderer attached there is nothing to switch, and the toggle must say so rather than
+     * report a state it failed to apply.
+     *
+     * This is the read-back discipline paying for itself: `evalSetFusionEnabled` writes to the
+     * renderer and then reports whatever the renderer holds, so a null renderer yields OFF instead
+     * of a cheerful ON with nothing behind it.
+     */
+    @Test
+    fun `enabling fusion with no renderer reports off rather than a state it could not apply`() = runTest {
+        viewModel.evalSetFusionEnabled(true)
+        assertFalse(viewModel.evalFusionEnabled.value)
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun enableArCore() {
         // setArMode(true) early-returns unless ARCore is reported available; flip the flag on the

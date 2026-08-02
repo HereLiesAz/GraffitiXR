@@ -1206,6 +1206,10 @@ class MainActivity : ComponentActivity() {
                                     paintingProgress = arUiState.paintingProgress,
                                     captureCount = diagnosticCaptures,
                                     onShareReport = { shareDiagnosticBundle() },
+                                    fusionEnabled = evalFusionOn,
+                                    onToggleFusion = { arViewModel.evalSetFusionEnabled(it) },
+                                    selfGrowEnabled = evalSelfGrowOn,
+                                    onToggleSelfGrow = { arViewModel.evalSetSelfGrowEnabled(it) },
                                 )
                             }
 
@@ -1219,10 +1223,6 @@ class MainActivity : ComponentActivity() {
                                     onStartLog = { arViewModel.evalStartLog() },
                                     onStopLog = { arViewModel.evalStopLog() },
                                     onInduceLoss = { arViewModel.evalInduceLoss() },
-                                    onToggleFusion = { arViewModel.evalSetFusionEnabled(it) },
-                                    onToggleSelfGrow = { arViewModel.evalSetSelfGrowEnabled(it) },
-                                    fusionOn = evalFusionOn,
-                                    selfGrowOn = evalSelfGrowOn,
                                 )
                             }
 
@@ -2219,6 +2219,18 @@ private fun RelocDiagnosticsOverlay(
     paintingProgress: Float,
     onShareReport: () -> Unit,
     captureCount: Int,
+    // The two experiment switches, moved here from the debug-only eval panel.
+    //
+    // Both ship OFF and both stay off until switched on. Off-by-default is right because neither has
+    // been validated on a device — no E-series experiment has run — but "unvalidated" argues for a
+    // default, not for making them unreachable. Fusion is the correction that stops the overlay
+    // drifting, and self-grow is what keeps relocalization alive as the artist paints over the very
+    // marks it relocalizes against; a release build that can never enable either has no answer to
+    // the two problems the artist actually has.
+    fusionEnabled: Boolean,
+    onToggleFusion: (Boolean) -> Unit,
+    selfGrowEnabled: Boolean,
+    onToggleSelfGrow: (Boolean) -> Unit,
 ) {
     val d = diagnostics
     // What to DO about it, not just what happened.
@@ -2421,6 +2433,34 @@ private fun RelocDiagnosticsOverlay(
         // paintingProgress — a name for the value one row up, on a number that is not it.
         DiagnosticRow("Painted", "${(paintingProgress * 100).toInt()}%", androidx.compose.ui.graphics.Color.White)
 
+        // Drift correction. Off means the overlay rides the raw ARCore anchor and will drift as
+        // tracking does; on means each accepted relocalization pulls it back. The `Fusion` row above
+        // reports what it is actually doing, so the pair reads as control-then-consequence.
+        androidx.compose.material3.TextButton(onClick = { onToggleFusion(!fusionEnabled) }) {
+            androidx.compose.material3.Text(
+                if (fusionEnabled) "Drift correction: ON" else "Drift correction: OFF",
+                color = if (fusionEnabled) androidx.compose.ui.graphics.Color.Green
+                else androidx.compose.ui.graphics.Color.Gray,
+            )
+        }
+        // Self-grow. Promotes newly validated marks into the reloc fingerprint so relocalization
+        // survives the original marks being painted over — the whole point of the teleological
+        // fingerprint, and useless to an artist if it can only be switched on in a debug build.
+        //
+        // Amber rather than green when on: it is the one switch here that WRITES to the map instead
+        // of reading it. A promotion that should not have happened stays in the fingerprint and
+        // compounds, and the remedy is to re-create the target — which replaces the fingerprint
+        // outright (`mWallDescriptors = d.clone()`) rather than merging into it, so the damage is
+        // bounded to one target and is undone by an action the app already asks for when the overlay
+        // misbehaves. Recoverable, then, but not free, and the colour should say so.
+        androidx.compose.material3.TextButton(onClick = { onToggleSelfGrow(!selfGrowEnabled) }) {
+            androidx.compose.material3.Text(
+                if (selfGrowEnabled) "Self-grow: ON (writes the map)" else "Self-grow: OFF",
+                color = if (selfGrowEnabled) androidx.compose.ui.graphics.Color(0xFFFFC107)
+                else androidx.compose.ui.graphics.Color.Gray,
+            )
+        }
+
         // The whole overlay above answers "what is happening now" for someone holding the phone.
         // This button answers it for someone who is not: it copies an aggregated report of the
         // recent window to the clipboard and opens a share sheet with that report, the eval CSVs and
@@ -2445,22 +2485,6 @@ private fun EvalOverlay(
     onStartLog: () -> Unit,
     onStopLog: () -> Unit,
     onInduceLoss: () -> Unit,
-    onToggleFusion: (Boolean) -> Unit,
-    onToggleSelfGrow: (Boolean) -> Unit,
-    // Both switches MIRROR the values they set; neither keeps a copy.
-    //
-    // These were `remember`ed booleans seeded with a guess at each default. The fusion guess said
-    // `true` while `ArRenderer.fusionEnabled` had shipped `false` for 187 commits, so the button
-    // read "Fusion ON" with fusion off and the first press set it to the value it already held —
-    // enabling fusion took two presses, and the intervening state was indistinguishable from the one
-    // being left. Correcting the seed alone would have left the same defect one rotation away: a
-    // `remember` is dropped on configuration change while the renderer's flag is not.
-    //
-    // An A/B switch that can disagree with the arm it selects invalidates the comparison it exists
-    // to run, so neither of these gets to hold its own state — they are read from the view model,
-    // which reads them back from the renderer and the engine.
-    fusionOn: Boolean,
-    selfGrowOn: Boolean,
 ) {
     androidx.compose.foundation.layout.Column(
         androidx.compose.ui.Modifier
@@ -2480,12 +2504,10 @@ private fun EvalOverlay(
             androidx.compose.material3.TextButton(onClick = onInduceLoss) { androidx.compose.material3.Text("Loss") }
             androidx.compose.material3.TextButton(onClick = onStartRecord) { androidx.compose.material3.Text("Rec▶") }
             androidx.compose.material3.TextButton(onClick = onStopRecord) { androidx.compose.material3.Text("Rec■") }
-            androidx.compose.material3.TextButton(onClick = { onToggleFusion(!fusionOn) }) {
-                androidx.compose.material3.Text(if (fusionOn) "Fusion ON" else "Fusion OFF")
-            }
-            androidx.compose.material3.TextButton(onClick = { onToggleSelfGrow(!selfGrowOn) }) {
-                androidx.compose.material3.Text(if (selfGrowOn) "Grow ON" else "Grow OFF")
-            }
+            // Fusion and self-grow used to live here. They are on RelocDiagnosticsOverlay now,
+            // which renders in release behind the same Diagnostic Overlay setting — and which
+            // renders in debug too, so this panel loses nothing by not duplicating them. Two
+            // buttons for one flag is how the last desync got in.
         }
     }
 }
