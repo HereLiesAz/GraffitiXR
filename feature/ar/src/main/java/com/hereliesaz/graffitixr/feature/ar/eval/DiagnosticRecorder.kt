@@ -148,6 +148,26 @@ class DiagnosticRecorder(
 
         // The four questions this report exists to answer, stated as answers rather than left for
         // the reader to derive from the histograms above.
+        // Root cause first, when there is one.
+        //
+        // A device run produced four "never happened" bullets — no lock, no correction, no gated
+        // corroboration, no promotion — which read as four faults and were one: the fingerprint was
+        // empty, so nothing downstream could run. Listing consequences beside their cause, in no
+        // particular order, makes the reader diagnose the report before they can diagnose the app.
+        //
+        // This is the opposite failure from the one the section was written for, and just as costly:
+        // not too few findings, too many.
+        val noFingerprint = ring.all { it.reloc.reject == RelocReject.NO_FINGERPRINT }
+        if (noFingerprint) {
+            sb.appendLine(
+                "**Root cause: there was no wall fingerprint for the entire window.** The target " +
+                    "was never created, or its capture produced no usable points. Relocalization " +
+                    "returns before it even runs its detector in this state, so every finding " +
+                    "below follows from this one and is not a separate fault.",
+            )
+            sb.appendLine()
+        }
+
         sb.appendLine("**Never happened:**")
         val never = buildList {
             if (ring.none { it.reloc.reject == RelocReject.OK }) add("relocalization never locked")
@@ -162,6 +182,13 @@ class DiagnosticRecorder(
                 // constant is not a finding, and the first reader to chase it wastes the trip.
                 if (ring.all { it.fusion.state == FusionState.DISABLED }) {
                     add("fusion was OFF for the whole run (expected — it ships default-off)")
+                } else if (ring.any { it.fusion.state == FusionState.NO_FINGERPRINT }) {
+                    add("fusion had no fingerprint to compose against — a consequence, not a fault")
+                } else if (ring.any { it.fusion.state == FusionState.NO_CAPTURE_POSE }) {
+                    add(
+                        "fusion was skipped because the fingerprint carries no capture pose " +
+                            "(pre-Phase-2 target — re-create it)",
+                    )
                 } else {
                     add("fusion never corrected the overlay")
                 }
@@ -170,7 +197,19 @@ class DiagnosticRecorder(
                 add("the gated corroboration match never ran (Phase 4 inactive for this run)")
             }
             if (ring.none { it.reloc.growOutcome == GrowOutcome.PROMOTED }) {
-                add("self-grow never promoted (expected — it ships default-off)")
+                // "(expected — it ships default-off)" was unconditional, and a device run switched
+                // self-grow ON and still got that parenthetical — telling the one reader who had
+                // deliberately enabled it that its silence was the default behaviour. The engine
+                // distinguishes the two: DISABLED is the switch, NOT_RUN is never reaching the code.
+                add(
+                    when {
+                        ring.all { it.reloc.growOutcome == GrowOutcome.DISABLED } ->
+                            "self-grow never promoted (switched off for this run)"
+                        ring.all { it.reloc.growOutcome == GrowOutcome.NOT_RUN } ->
+                            "self-grow never promoted — it never ran at all, so the switch is not the reason"
+                        else -> "self-grow never promoted"
+                    },
+                )
             }
         }
         if (never.isEmpty()) sb.appendLine("- (nothing — every stage ran at least once)")
@@ -210,8 +249,17 @@ class DiagnosticRecorder(
         stat(sb, "paintingProgress", ring.map { it.progress }) { it >= 0f }
         sb.appendLine()
 
+        // The same sentinel discipline as the table above it, which this line did not follow: it
+        // printed a bare `-1 / -1` on a real device report — the marker for "PoseFusion never
+        // sampled" rendered as though two relocalizations had been counted at minus one.
         val last = ring.last()
-        sb.appendLine("- snaps accepted/refused: ${last.fusion.snapsAccepted} / ${last.fusion.snapsRejected}")
+        sb.appendLine(
+            if (last.fusion.snapsAccepted < 0 || last.fusion.snapsRejected < 0) {
+                "- snaps accepted/refused: never sampled (pose fusion did not run)"
+            } else {
+                "- snaps accepted/refused: ${last.fusion.snapsAccepted} / ${last.fusion.snapsRejected}"
+            },
+        )
         sb.appendLine()
 
         appendParameters(sb, parameters)

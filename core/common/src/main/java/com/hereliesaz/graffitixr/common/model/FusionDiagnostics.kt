@@ -92,4 +92,24 @@ enum class FusionState {
      * is why [FusionDiagnostics.snapsAccepted] and the reloc row have to be read beside it.
      */
     HOLDING,
+
+    /**
+     * There is no wall fingerprint at all, so there is no capture pose to compose against.
+     *
+     * **Out of gate order, and deliberately so.** Every entry above is ordered by how early its gate
+     * sits; this one belongs beside [NO_CAPTURE_POSE], because both mean "no capture pose". It is
+     * appended instead because `EvalSampleLog` writes this enum's **ordinal** into the CSV, and
+     * inserting it in the right place would silently renumber `NO_CAPTURE_POSE` and everything after
+     * it, making every previously logged run incomparable to every later one without a single error.
+     *
+     * ## Why it needs to exist at all
+     *
+     * A device run reported `Reloc: NO TARGET` and `Fusion: OLD TARGET — re-create it` on the same
+     * screen. Both came from one condition — `captureAnchorCam == null` — which is true for a
+     * pre-Phase-2 fingerprint AND for no fingerprint whatsoever. The advice differs completely: one
+     * says re-create a target that exists, the other says create the first one. The overlay
+     * contradicted itself, and the aggregated report showed 54% `NO_CAPTURE_POSE` for a session that
+     * never had a fingerprint to begin with.
+     */
+    NO_FINGERPRINT,
 }

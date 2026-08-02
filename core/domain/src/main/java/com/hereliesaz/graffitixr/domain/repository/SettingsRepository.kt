@@ -49,6 +49,33 @@ interface SettingsRepository {
     suspend fun setShowAnchorBoundary(show: Boolean)
 
     /**
+     * Whether relocalization corrections are fused onto the overlay ("drift correction").
+     *
+     * Persisted, and that is the whole point. It was session-scoped, which cost a real field run:
+     * the artist enabled it, the session ended, and the next run silently reverted to off. The
+     * relocalizer locked on 31% of ticks at a 94% inlier ratio and every one of those corrections
+     * was computed and discarded, so the overlay drifted exactly as if nothing worked — and the
+     * report's own `Fusion: DISABLED ×777 (100%)` was the only place that said why.
+     *
+     * Off by default still: it is unvalidated on a device. But a switch the artist has to remember
+     * to find and re-flip on every launch is not a switch they have.
+     */
+    val driftCorrectionEnabled: Flow<Boolean>
+
+    suspend fun setDriftCorrectionEnabled(on: Boolean)
+
+    /**
+     * Whether self-grow may promote validated new marks into the reloc fingerprint.
+     *
+     * Persisted for the same reason, and still default-off for a stronger one: it is the only
+     * mechanism that permanently rewrites the map. Persistence remembers an explicit choice; it does
+     * not make one.
+     */
+    val selfGrowEnabled: Flow<Boolean>
+
+    suspend fun setSelfGrowEnabled(on: Boolean)
+
+    /**
      * Set once a device proves it can't run forced hardware-stereo (ARCore motion-stereo disparity
      * fails / VIO never tracks): future sessions skip the stereo config and stay on Canvas, so the
      * broken path can't thrash the device. Cleared when the user explicitly re-selects Mural.

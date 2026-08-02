@@ -59,6 +59,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -516,6 +517,32 @@ class ArViewModel @Inject constructor(
     fun evalSetFusionEnabled(on: Boolean) {
         renderer?.fusionEnabled = on
         _evalFusionEnabled.value = renderer?.fusionEnabled ?: false
+        // Remembered across launches. See SettingsRepository.driftCorrectionEnabled — a field run
+        // enabled this, ended, and silently came back off, and the next session discarded 241 good
+        // relocalizations without a word.
+        viewModelScope.launch { settingsRepository.setDriftCorrectionEnabled(on) }
+    }
+
+    /**
+     * Restores both experiment switches from storage.
+     *
+     * Only the view model's intent is set here — `attachSessionToRenderer` is what pushes it onto a
+     * renderer, and it runs on every attach, so a restore that lands before the renderer exists is
+     * still honoured.
+     */
+    private fun restoreExperimentSwitches() {
+        // firstOrNull, not first: `first()` throws NoSuchElementException on a flow that completes
+        // without emitting, and this runs in `init`, so the throw would take the whole view model
+        // down at construction. A store with nothing in it means "never chosen", which is the
+        // default — not an error.
+        viewModelScope.launch {
+            _evalFusionEnabled.value = settingsRepository.driftCorrectionEnabled.firstOrNull() ?: false
+            renderer?.fusionEnabled = _evalFusionEnabled.value
+        }
+        viewModelScope.launch {
+            _evalSelfGrowEnabled.value = settingsRepository.selfGrowEnabled.firstOrNull() ?: false
+            slamManager.setSelfGrowEnabled(_evalSelfGrowEnabled.value)
+        }
     }
 
     private val _evalFusionEnabled = MutableStateFlow(false)
@@ -543,6 +570,7 @@ class ArViewModel @Inject constructor(
     fun evalSetSelfGrowEnabled(on: Boolean) {
         slamManager.setSelfGrowEnabled(on)
         _evalSelfGrowEnabled.value = on
+        viewModelScope.launch { settingsRepository.setSelfGrowEnabled(on) }
     }
 
     /**
@@ -839,6 +867,7 @@ class ArViewModel @Inject constructor(
     init {
         NativeLibLoader.loadAll()
         startSystemThrottleMonitoring()
+        restoreExperimentSwitches()
         viewModelScope.launch(Dispatchers.IO) {
             slamManager.loadSuperPoint(appContext.assets)
             slamManager.loadDistortionHead(appContext.assets) // optional; inert if asset absent

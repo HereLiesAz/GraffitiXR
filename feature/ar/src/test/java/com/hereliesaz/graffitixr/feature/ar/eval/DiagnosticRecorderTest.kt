@@ -197,6 +197,95 @@ class DiagnosticRecorderTest {
         assertTrue(out, out.contains("None captured"))
     }
 
+    /**
+     * Four findings that are one cause must say so, and say it first.
+     *
+     * A device run produced exactly this: no lock, no correction, no gated corroboration, no
+     * promotion — read as four faults, and all four were the empty fingerprint. Relocalization
+     * returns before it runs its detector in that state, so nothing downstream could possibly have
+     * happened. Listing consequences beside their cause in no particular order makes the reader
+     * diagnose the report before they can diagnose the app: the opposite failure from the one this
+     * section was written for, and just as costly.
+     */
+    @Test
+    fun `an empty fingerprint is reported as the root cause of everything below it`() {
+        val r = recorder()
+        repeat(20) {
+            r.tick(
+                reject = RelocReject.NO_FINGERPRINT, gate = CorrobGate.NOT_RUN,
+                grow = GrowOutcome.NOT_RUN, state = FusionState.NO_FINGERPRINT,
+            )
+        }
+        val out = r.report(emptyMap(), emptyMap(), emptyList())
+        assertTrue(out, out.contains("Root cause: there was no wall fingerprint"))
+        assertTrue(out, out.indexOf("Root cause") < out.indexOf("Never happened"))
+        assertTrue(out, out.contains("a consequence, not a fault"))
+    }
+
+    /** A run that did have a fingerprint must not be handed a root cause it did not have. */
+    @Test
+    fun `a run with a fingerprint gets no root-cause claim`() {
+        val r = recorder()
+        repeat(10) { r.tick(reject = RelocReject.FEW_INLIERS) }
+        r.tick(reject = RelocReject.NO_FINGERPRINT)
+        val out = r.report(emptyMap(), emptyMap(), emptyList())
+        assertFalse(out, out.contains("Root cause"))
+    }
+
+    /**
+     * No fingerprint and a pre-Phase-2 fingerprint are opposite instructions.
+     *
+     * One says create the first target, the other says re-create an existing one. They shared a
+     * state until a device screenshot showed the overlay telling an artist to "re-create" a target
+     * one row under its own "NO TARGET".
+     */
+    @Test
+    fun `the two no-capture-pose causes give different instructions`() {
+        val noFp = recorder().apply { repeat(5) { tick(state = FusionState.NO_FINGERPRINT) } }
+            .report(emptyMap(), emptyMap(), emptyList())
+        assertTrue(noFp, noFp.contains("no fingerprint to compose against"))
+
+        val oldFp = recorder().apply { repeat(5) { tick(state = FusionState.NO_CAPTURE_POSE) } }
+            .report(emptyMap(), emptyMap(), emptyList())
+        assertTrue(oldFp, oldFp.contains("pre-Phase-2 target — re-create it"))
+        assertFalse(oldFp, oldFp.contains("no fingerprint to compose against"))
+    }
+
+    /**
+     * Telling someone who deliberately switched self-grow ON that its silence is the default is
+     * worse than saying nothing. The engine distinguishes the switch from never reaching the code.
+     */
+    @Test
+    fun `self-grow silence names the switch only when the switch is the reason`() {
+        val off = recorder().apply { repeat(5) { tick(grow = GrowOutcome.DISABLED) } }
+            .report(emptyMap(), emptyMap(), emptyList())
+        assertTrue(off, off.contains("switched off for this run"))
+
+        val neverRan = recorder().apply { repeat(5) { tick(grow = GrowOutcome.NOT_RUN) } }
+            .report(emptyMap(), emptyMap(), emptyList())
+        assertTrue(neverRan, neverRan.contains("never ran at all, so the switch is not the reason"))
+        assertFalse(neverRan, neverRan.contains("switched off for this run"))
+    }
+
+    /**
+     * The snaps line follows the same sentinel rule as the table above it, which it did not: a real
+     * device report printed a bare `-1 / -1`, the marker for "pose fusion never sampled" rendered as
+     * though two relocalizations had been counted at minus one.
+     */
+    @Test
+    fun `the snaps line does not print the not-sampled sentinel`() {
+        val r = recorder()
+        clock += 66
+        r.record(
+            RelocDiagnostics(), CorroborationDiagnostics(), FusionDiagnostics(),
+            wallPoints = 0, progress = 0f,
+        )
+        val out = r.report(emptyMap(), emptyMap(), emptyList())
+        val line = out.lines().first { it.startsWith("- snaps") }
+        assertFalse(line, line.contains("-1"))
+        assertTrue(line, line.contains("never sampled"))
+    }
+
     @Test
     fun `a healthy run reports nothing as never having happened`() {
         val r = recorder()
