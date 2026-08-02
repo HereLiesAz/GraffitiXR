@@ -2363,6 +2363,22 @@ class ArViewModel @Inject constructor(
         // touches a SensorManager or a location client it does not own.
         renderer?.attitudeSampler = { attitudeProvider?.snapshot() }
         renderer?.locationSampler = { locationFix() }
+        // Re-apply the experiment switches to the FRESH renderer.
+        //
+        // `ArRenderer` is reconstructed whenever the AR view is (leaving and re-entering AR, and
+        // some configuration changes), and a new one starts at its shipped default — `fusionEnabled
+        // = false`. Without this, turning fusion on and then stepping out of AR and back would leave
+        // the renderer off while `evalFusionEnabled` still reported on: the toggle would read ON, the
+        // HUD would read DISABLED, and the two would disagree with no way for the artist to tell
+        // which was lying. That is the same shadow-versus-mirror defect the toggle itself had, one
+        // layer down, and it only became reachable once these moved out of the debug panel.
+        //
+        // The view model holds the INTENT; the renderer is made to match it, never the reverse.
+        renderer?.fusionEnabled = _evalFusionEnabled.value
+        // Self-grow lives in the native engine rather than the renderer, so it does not reset with
+        // a new ArRenderer — but re-asserting it is idempotent and costs one atomic store, and it
+        // means one place re-establishes every experiment switch instead of two rules to remember.
+        slamManager.setSelfGrowEnabled(_evalSelfGrowEnabled.value)
         renderer?.attachSession(session)
         loadCloudPointsIfExists()
     }
