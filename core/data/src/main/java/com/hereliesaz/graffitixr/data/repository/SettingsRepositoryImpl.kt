@@ -39,6 +39,8 @@ class SettingsRepositoryImpl @Inject constructor(
      */
     private val LEGACY_CANVAS_MODE = "CLOUD_POINTS"
     private val SHOW_ANCHOR_BOUNDARY = booleanPreferencesKey("show_anchor_boundary")
+    private val DRIFT_CORRECTION_ENABLED = booleanPreferencesKey("drift_correction_enabled")
+    private val SELF_GROW_ENABLED = booleanPreferencesKey("self_grow_enabled")
     private val FORCED_STEREO_UNSTABLE = booleanPreferencesKey("forced_stereo_unstable")
     // Key intentionally renamed from "stereo_capability": the probe's meaning changed from "stereo
     // tracks" to "dual lenses actually triangulate depth", so pre-existing verdicts must be discarded
@@ -126,6 +128,27 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setShowAnchorBoundary(show: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[SHOW_ANCHOR_BOUNDARY] = show
+        }
+    }
+
+    // Both default false. Persistence remembers an explicit choice; it does not make one.
+    override val driftCorrectionEnabled: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[DRIFT_CORRECTION_ENABLED] ?: false }
+
+    override suspend fun setDriftCorrectionEnabled(on: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[DRIFT_CORRECTION_ENABLED] = on
+        }
+    }
+
+    override val selfGrowEnabled: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[SELF_GROW_ENABLED] ?: false }
+
+    override suspend fun setSelfGrowEnabled(on: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[SELF_GROW_ENABLED] = on
         }
     }
 
