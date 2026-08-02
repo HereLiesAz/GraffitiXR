@@ -346,6 +346,17 @@ class ArViewModel @Inject constructor(
      */
     @Volatile private var diagnosticCaptureEnabled = false
 
+    /**
+     * Why the last target capture produced no fingerprint, or null if the last one succeeded.
+     *
+     * Carried into the report because it is the answer to the question every empty-fingerprint run
+     * raises and none of them could answer. `wallPoints 0` says the fingerprint is missing; this says
+     * whether the wall had no features at all or had plenty and none of them back-projected onto the
+     * plane — two problems with two different fixes, which the report otherwise leaves the reader to
+     * guess between.
+     */
+    @Volatile private var lastCaptureRefusal: String? = null
+
     private val _captureRequests =
         MutableSharedFlow<com.hereliesaz.graffitixr.feature.ar.eval.CaptureTrigger>(
             extraBufferCapacity = 2,
@@ -604,6 +615,9 @@ class ArViewModel @Inject constructor(
             // hold them rather than from whatever the eval buttons last asked for.
             "fusion" to (renderer?.fusionEnabled?.toString() ?: "no renderer attached"),
             "syncReloc" to slamManager.evalSyncRelocEveryN().let { if (it > 0) "every $it" else "async" },
+            // The reason an empty-fingerprint run is empty. Without it the report can say the
+            // fingerprint is missing and nothing about why, which is where three device runs stalled.
+            "lastCapture" to (lastCaptureRefusal?.let { "REFUSED — $it" } ?: "no refusal recorded"),
         ),
         parameters = diagnosticParameters(),
         captures = captureManifest.toList(),
@@ -3186,7 +3200,33 @@ class ArViewModel @Inject constructor(
                     // The same angle `rotated` and `intr` were built with, a dozen lines above.
                     rotationDeg = displayRotation,
                 )
-                if (fp != null) doodleFingerprintBuilt = true
+                if (fp != null) {
+                    doodleFingerprintBuilt = true
+                    lastCaptureRefusal = null
+                } else {
+                    // Say which way it fell short, on this path too.
+                    //
+                    // The tap-to-capture path has reported this for a while; the doodle path threw
+                    // the answer away. So a run could go: draw the glyphs, tap "I've drawn it",
+                    // watch the app capture over and over, silently fail every time, fall back to a
+                    // plain anchor, and hand back an overlay with no fingerprint and no explanation.
+                    // A device report showed exactly that — wallPoints 0 across 953 samples, and
+                    // every downstream stage correctly inert, with nothing anywhere saying why.
+                    //
+                    // "Not enough texture" would be the wrong message too: features found but not
+                    // landing on the plane is a different problem with a different fix from no
+                    // features at all, and only the pair of counts tells them apart.
+                    val detected = MetricFingerprintBuilder.lastDetected
+                    val placed = MetricFingerprintBuilder.lastPlaced
+                    val need = MetricFingerprintBuilder.lastRequired
+                    lastCaptureRefusal = if (detected < need) {
+                        "only $detected features detected (need $need) — too dark, too smooth, or out of focus"
+                    } else {
+                        "$detected features detected but only $placed landed on the wall plane " +
+                            "(need $need) — aim square at the middle of the detected wall"
+                    }
+                    Timber.w("ARDIAG target capture refused: $lastCaptureRefusal")
+                }
             } catch (t: Throwable) {
                 android.util.Log.w("ArViewModel", "Doodle fingerprint build failed", t)
             } finally {
