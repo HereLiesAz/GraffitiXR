@@ -259,6 +259,14 @@ data class ArUiState(
      */
     val corroborationDiagnostics: CorroborationDiagnostics = CorroborationDiagnostics(),
     /**
+     * What pose fusion decided this frame — and, when it did not run, why.
+     *
+     * The other diagnostics report measurements; this reports a decision. Six quite different causes
+     * produce the same artist-visible symptom (the overlay sits on the backbone and drifts), and
+     * until this existed nothing on screen distinguished them. See [FusionDiagnostics].
+     */
+    val fusionDiagnostics: FusionDiagnostics = FusionDiagnostics(),
+    /**
      * How many 3D points the live wall fingerprint holds — 0 when there is none.
      *
      * The direct answer to "did the target actually get built", read straight from the engine

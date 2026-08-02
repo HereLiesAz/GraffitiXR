@@ -47,7 +47,7 @@ class EvalSampleLogTest {
                 "relocObliquityDeg,relocRectifiedCorr," +
                 "relocBackboneFeatures,relocBackboneMatches,relocBackboneInliers," +
                 "corrobPredicted,corrobMatched,corrobLoneSkips,searchRadiusPx,relocReprojPx," +
-                "inlierSpread," +
+                "inlierSpread,corrobGate,growOutcome,fusionState,fusionCorrectionMm," +
                 "captureRotationNeededDeg,liveRotationNeededDeg",
             EvalSampleLog.CSV_HEADER,
         )
@@ -62,12 +62,13 @@ class EvalSampleLogTest {
             nativeHeapKb = 20480L,
         )
         assertEquals(
-            // Six reloc, three backbone and three corroboration Int columns default to -1; the two
-            // pixel columns are Floats, so their -1f sentinel prints as -1.0; then the two rotation
+            // Six reloc, three backbone and three corroboration Int columns default to -1; three
+            // pixel columns are Floats, so their -1f sentinel prints as -1.0; then the two REASON
+            // ordinals, the fusion state ordinal and its correction magnitude; then the two rotation
             // columns. The float spelling is part of the contract a consumer parses, not an
             // incidental formatting detail, so it is written out here literally.
             "12,dual,true,1.5,0.25,3.0,1.0,2.0,0.0,4.0,1.0,8.0,30.0,-450.0,31.0,20480," +
-                "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1.0,-1.0,-1.0,-1,-1",
+                "-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1.0,-1.0,-1.0,-1,-1,-1,-1.0,-1,-1",
             EvalSampleLog.toCsvRow(row),
         )
     }

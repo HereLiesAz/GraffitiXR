@@ -229,6 +229,28 @@ class ArRenderer(
     @Volatile var driftCostProbe: com.hereliesaz.graffitixr.feature.ar.eval.DriftCostProbe? = null
 
     /**
+     * Why pose fusion was skipped this frame, or null when it ran.
+     *
+     * Written on the GL thread and read by the diagnostics tick on another, hence @Volatile. Held as
+     * a nullable rather than folded into `PoseFusion.diagnostics()` because these are precisely the
+     * cases where `PoseFusion` is not called at all and therefore cannot know.
+     */
+    @Volatile var fusionSkipReason: com.hereliesaz.graffitixr.common.model.FusionState? = null
+
+    /**
+     * The last fusion decision, for the overlay and the eval CSV. Combines [fusionSkipReason] — the
+     * states only the renderer can see — with `PoseFusion`'s own record of what it did when it ran.
+     */
+    fun fusionDiagnostics(): com.hereliesaz.graffitixr.common.model.FusionDiagnostics {
+        val skip = fusionSkipReason
+        return if (skip != null) {
+            com.hereliesaz.graffitixr.common.model.FusionDiagnostics(state = skip)
+        } else {
+            poseFusion.diagnostics()
+        }
+    }
+
+    /**
      * Latest physical device attitude, or null when unavailable. Supplied by the ViewModel, which
      * owns the sensor lifecycle — the renderer only reads it, and only at capture.
      */
@@ -1241,6 +1263,19 @@ class ArRenderer(
             // which drifts; correcting in the wrong frame pulls it somewhere confidently wrong, and
             // PAPER.md §8.3 is explicit that the second is worse.
             val captureAnchorCam = slamManager.captureAnchorCam
+            // The three reasons fusion can be skipped are known HERE and nowhere else — PoseFusion
+            // is never called, so it cannot report them. Without this the overlay simply drifts and
+            // every other row on the overlay looks healthy, which is the failure mode this whole
+            // record exists to end. NO_CAPTURE_POSE in particular was introduced by 0.9 and is the
+            // one most likely to be mistaken for a bug: a pre-Phase-2 project relocalizes fine and
+            // is never corrected.
+            fusionSkipReason = when {
+                !fusionEnabled -> com.hereliesaz.graffitixr.common.model.FusionState.DISABLED
+                !anchorEstablished -> com.hereliesaz.graffitixr.common.model.FusionState.NO_ANCHOR
+                captureAnchorCam == null ->
+                    com.hereliesaz.graffitixr.common.model.FusionState.NO_CAPTURE_POSE
+                else -> null
+            }
             val anchorMatrix: FloatArray = if (fusionEnabled && anchorEstablished && captureAnchorCam != null) {
                 poseFusion.currentAnchor(
                     backbone = backbone,
@@ -1341,6 +1376,10 @@ class ArRenderer(
                         // was neither the count nor the mechanism.)
                         reloc = relocDiag,
                         corrob = corrobDiag,
+                        // What fusion actually did with the relock — including "nothing, and here is
+                        // why". A run that drifts because fusion was skipped and one that drifts
+                        // because it corrected wrongly are indistinguishable without this.
+                        fusion = fusionDiagnostics(),
                         // E0b's independent variable is the rotation that was in force AT CAPTURE,
                         // because that is the one baked into the fingerprint's 3D points. Sampling
                         // the live rotation here instead — which an earlier version of this call

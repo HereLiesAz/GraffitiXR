@@ -1,5 +1,8 @@
 package com.hereliesaz.graffitixr.feature.ar.anchor
 
+import com.hereliesaz.graffitixr.common.model.FusionDiagnostics
+import com.hereliesaz.graffitixr.common.model.FusionState
+
 /**
  * Fuses the ARCore-consensus backbone with mark-PnP relocalization into a single rendered anchor
  * model matrix (ARCore world frame).
@@ -178,6 +181,12 @@ class PoseFusion {
         val inlierRatio = if (matchCount > 0f) inliers / matchCount else 0f
         val isNew = seq > 0f && seq != lastSeq
 
+        // Recorded even when the relock is refused below. A relocalization that reached fusion and
+        // was thrown away by MIN_INLIER_RATIO is a different fault from one that never arrived, and
+        // the two look identical from every other channel — the overlay drifts either way.
+        if (isNew) lastInlierRatio = inlierRatio
+        if (isNew && inlierRatio < MIN_INLIER_RATIO) snapsRejected++
+
         if (isNew && inlierRatio >= MIN_INLIER_RATIO) {
             val corrected = composeCorrected(vCurrent, reloc.copyOf(16), captureAnchorCam)
             // World-frame drift correction such that D ∘ backbone == corrected at snap time.
@@ -192,15 +201,71 @@ class PoseFusion {
 
             correction = if (cold && highConf) {
                 coldStart = false
+                lastState = FusionState.COLD_SNAP
+                lastAlpha = -1f          // a snap has no blend rate; -1 says so rather than 1.0
                 newD // instant relock
             } else {
                 val effConf = (CONF_FLOOR + (1f - CONF_FLOOR) * confGlobal.coerceIn(0f, 1f))
                 val alpha = (BASE_ALPHA * inlierRatio * effConf).coerceIn(0f, 1f)
+                lastState = FusionState.BLENDING
+                lastAlpha = alpha
                 blend(correction ?: identity(), newD, alpha)
             }
+            snapsAccepted++
+        } else if (correction != null) {
+            // A correction stands but nothing new arrived. The healthy steady state — and also what
+            // a stale correction looks like, which is why snapsAccepted is published beside it.
+            lastState = FusionState.HOLDING
         }
         lastSeq = seq
         // fused = D ∘ backbone, re-applied every frame (identity drift until the first trusted snap).
         return PoseMath.multiply(correction ?: identity(), backbone)
+    }
+
+    private var lastState = FusionState.WAITING_FOR_LOCK
+    private var lastAlpha = -1f
+    private var lastInlierRatio = -1f
+    private var snapsAccepted = 0
+    private var snapsRejected = 0
+
+    /**
+     * A snapshot of the last decision, for the diagnostic overlay and the eval CSV.
+     *
+     * The magnitudes are computed here rather than stored, because the correction is a matrix and
+     * "how far is it pulling the overlay" is the question a reader actually has. Millimetres and
+     * degrees, both -1 when no correction stands.
+     *
+     * Note this reports what fusion did when it RAN. The states that mean it did not run at all —
+     * disabled, no anchor, no capture pose — are the caller's to report, because only the caller
+     * knows them; see `ArRenderer`.
+     */
+    fun diagnostics(): FusionDiagnostics {
+        val d = correction
+        val mm: Float
+        val deg: Float
+        if (d == null) {
+            mm = -1f; deg = -1f
+        } else {
+            val t = PoseMath.translationOf(d)
+            mm = kotlin.math.sqrt(t[0] * t[0] + t[1] * t[1] + t[2] * t[2]) * 1000f
+            val q = PoseMath.matrixToQuaternion(d)
+            // |w| because q and -q are the same rotation; without it a correction just past 180 deg
+            // would report as a tiny one.
+            val w = kotlin.math.abs(q[3]).coerceIn(0f, 1f)
+            deg = Math.toDegrees(2.0 * kotlin.math.acos(w.toDouble())).toFloat()
+        }
+        return FusionDiagnostics(
+            state = if (d == null && lastState == FusionState.WAITING_FOR_LOCK) {
+                FusionState.WAITING_FOR_LOCK
+            } else {
+                lastState
+            },
+            lastAlpha = lastAlpha,
+            lastInlierRatio = lastInlierRatio,
+            correctionMm = mm,
+            correctionDeg = deg,
+            snapsAccepted = snapsAccepted,
+            snapsRejected = snapsRejected,
+        )
     }
 }

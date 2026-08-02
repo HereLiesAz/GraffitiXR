@@ -2132,6 +2132,11 @@ class ArViewModel @Inject constructor(
         // is acceptable here — these are diagnostics, not numbers PoseFusion acts on — and it is
         // written down so a later reader does not mistake the pair for an atomic snapshot.
         val corrobDiag = slamManager.getCorroborationDiagnostics()
+        // Read from the renderer rather than the engine: fusion is a Kotlin-side decision, and the
+        // states that matter most (disabled, no anchor, no capture pose) are ones where PoseFusion
+        // is never invoked and so has nothing to report.
+        val fusionDiag = renderer?.fusionDiagnostics()
+            ?: com.hereliesaz.graffitixr.common.model.FusionDiagnostics()
         // Read alongside the diagnostics, not on a success path: the state this exists to expose is
         // "the capture produced nothing", which by definition never reaches one.
         val wallPoints = slamManager.getWallKeypointCount()
@@ -2172,6 +2177,7 @@ class ArViewModel @Inject constructor(
                 paintingProgress = progress,
                 relocDiagnostics = relocDiag,
                 corroborationDiagnostics = corrobDiag,
+                fusionDiagnostics = fusionDiag,
                 wallFingerprintPoints = wallPoints,
                 scanPhase = newPhase,
                 ambientSectorsCovered = sectorsCovered / 3, // Keep backward compatibility for 30 degree UI units if needed

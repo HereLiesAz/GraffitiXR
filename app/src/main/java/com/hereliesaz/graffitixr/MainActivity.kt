@@ -1110,6 +1110,7 @@ class MainActivity : ComponentActivity() {
                                 RelocDiagnosticsOverlay(
                                     diagnostics = arUiState.relocDiagnostics,
                                     corroboration = arUiState.corroborationDiagnostics,
+                                    fusion = arUiState.fusionDiagnostics,
                                     fingerprintPoints = arUiState.evalLiveMetrics.wallCount,
                                     paintingProgress = arUiState.paintingProgress,
                                 )
@@ -2118,6 +2119,7 @@ private const val FEW_FEATURES_IN_FRAME = 100
 private fun RelocDiagnosticsOverlay(
     diagnostics: RelocDiagnostics,
     corroboration: com.hereliesaz.graffitixr.common.model.CorroborationDiagnostics,
+    fusion: com.hereliesaz.graffitixr.common.model.FusionDiagnostics,
     fingerprintPoints: Int,
     paintingProgress: Float,
 ) {
@@ -2192,6 +2194,74 @@ private fun RelocDiagnosticsOverlay(
             },
         )
         DiagnosticRow("FP pts", fingerprintPoints.toString(), androidx.compose.ui.graphics.Color.Cyan)
+
+        // Pose fusion: what is actually happening to the overlay, and when nothing is, WHY.
+        //
+        // Every row above reports a measurement. This one reports a decision, and it is the row to
+        // read first when the complaint is "the overlay drifts" — because six quite different causes
+        // produce that same symptom and nothing else on this overlay separates them. A healthy Reloc
+        // row above a DISABLED or NO CAPTURE POSE here means the relocalizer is working perfectly and
+        // its results are being discarded.
+        val fusionState = fusion.state
+        DiagnosticRow(
+            "Fusion",
+            when (fusionState) {
+                com.hereliesaz.graffitixr.common.model.FusionState.NOT_SAMPLED -> "—"
+                com.hereliesaz.graffitixr.common.model.FusionState.DISABLED -> "OFF"
+                com.hereliesaz.graffitixr.common.model.FusionState.NO_ANCHOR -> "no anchor"
+                // Spelled out rather than abbreviated: this one sends the artist to "re-create the
+                // target", which no other state does, and it is the newest and least familiar.
+                com.hereliesaz.graffitixr.common.model.FusionState.NO_CAPTURE_POSE ->
+                    "OLD TARGET — re-create it"
+                com.hereliesaz.graffitixr.common.model.FusionState.WAITING_FOR_LOCK -> "waiting for lock"
+                com.hereliesaz.graffitixr.common.model.FusionState.COLD_SNAP -> "snapped"
+                com.hereliesaz.graffitixr.common.model.FusionState.BLENDING ->
+                    "blending a=" + String.format(java.util.Locale.US, "%.2f", fusion.lastAlpha)
+                com.hereliesaz.graffitixr.common.model.FusionState.HOLDING -> "holding"
+            },
+            when (fusionState) {
+                // Red for the two that mean corrections are being computed and thrown away, or
+                // cannot be computed at all. Amber for the transient waits. White for working.
+                com.hereliesaz.graffitixr.common.model.FusionState.NO_CAPTURE_POSE,
+                com.hereliesaz.graffitixr.common.model.FusionState.DISABLED ->
+                    androidx.compose.ui.graphics.Color.Red
+                com.hereliesaz.graffitixr.common.model.FusionState.NO_ANCHOR,
+                com.hereliesaz.graffitixr.common.model.FusionState.WAITING_FOR_LOCK ->
+                    androidx.compose.ui.graphics.Color(0xFFFFC107)
+                else -> androidx.compose.ui.graphics.Color.White
+            },
+        )
+        // How far the standing correction is pulling the overlay. A few mm is the system working; a
+        // few hundred is either a real relock after real drift or a composition error like the one
+        // 0.9 fixed — and the two are told apart by whether it STAYS large.
+        if (fusion.correctionMm >= 0f) {
+            DiagnosticRow(
+                "Correction",
+                String.format(java.util.Locale.US, "%.0f mm · %.1f°", fusion.correctionMm, fusion.correctionDeg),
+                if (fusion.correctionMm > 500f) {
+                    androidx.compose.ui.graphics.Color(0xFFFFC107)
+                } else {
+                    androidx.compose.ui.graphics.Color.White
+                },
+            )
+        }
+        // Accepted vs rejected relocks. Rejected ones reached fusion and were refused HERE by
+        // MIN_INLIER_RATIO — a different fault from a relocalizer that never locks, and one the
+        // Reloc row above cannot show because from its side those attempts succeeded.
+        if (fusion.snapsAccepted >= 0) {
+            DiagnosticRow(
+                "Snaps",
+                "${fusion.snapsAccepted} ok · ${fusion.snapsRejected} refused" +
+                    if (fusion.lastInlierRatio >= 0f) {
+                        String.format(java.util.Locale.US, " · last %.2f", fusion.lastInlierRatio)
+                    } else "",
+                if (fusion.snapsAccepted == 0 && fusion.snapsRejected > 0) {
+                    androidx.compose.ui.graphics.Color.Red
+                } else {
+                    androidx.compose.ui.graphics.Color.White
+                },
+            )
+        }
         // IMPLEMENTATION.md 4.6 — the corroboration match's own numbers, which are NOT the row
         // below. "Corrob" is instantaneous: of the design features this pose says are in view, how
         // many the wall backs right now, and the radius the gated search used to decide. "Painted"
@@ -2305,6 +2375,32 @@ private fun EvalOverlay(
         }
     }
 }
+
+/**
+ * The `Corrob` row's value when no gated attempt has run: WHY, rather than a dash.
+ *
+ * Four preconditions can fail and until now all four rendered identically. They call for entirely
+ * different responses, which is the whole reason this is a string and not a bare "—".
+ */
+private fun corrobGateReason(gate: com.hereliesaz.graffitixr.common.model.CorrobGate): String =
+    when (gate) {
+        com.hereliesaz.graffitixr.common.model.CorrobGate.NO_ARTWORK -> "no design registered"
+        com.hereliesaz.graffitixr.common.model.CorrobGate.NO_PLACEMENT -> "design not placed"
+        com.hereliesaz.graffitixr.common.model.CorrobGate.NO_POSE -> "no lock this frame"
+        com.hereliesaz.graffitixr.common.model.CorrobGate.BAD_2D -> "BUG: 2D/desc mismatch"
+        com.hereliesaz.graffitixr.common.model.CorrobGate.NO_INTRINSICS -> "no intrinsics"
+        com.hereliesaz.graffitixr.common.model.CorrobGate.NOT_RUN -> "—"
+        com.hereliesaz.graffitixr.common.model.CorrobGate.GATED -> "—"
+        com.hereliesaz.graffitixr.common.model.CorrobGate.UNKNOWN -> "unknown code"
+    }
+
+/**
+ * Appended to a populated `Corrob` row only when the gate says something the counts do not — i.e.
+ * the numbers came from the GLOBAL fallback rather than the gated match. That is a different
+ * measurement with a different denominator and must not be read as a Phase-4 reading.
+ */
+private fun corrobGateSuffix(gate: com.hereliesaz.graffitixr.common.model.CorrobGate): String =
+    if (gate == com.hereliesaz.graffitixr.common.model.CorrobGate.GATED) "" else " (ungated)"
 
 @Composable
 private fun DiagnosticRow(label: String, value: String, color: Color) {

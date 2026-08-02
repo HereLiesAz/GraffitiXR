@@ -1362,6 +1362,56 @@ order.** Work top to bottom.
       was asking for — a comment saying "re-check this" is the artefact of a defect
       that has no test.)*
 
+### Diagnostics — reporting what did NOT happen
+
+- [x] **D.1** Report pose fusion's DECISION, not just its output: `FusionDiagnostics`
+      / `FusionState`, surfaced on the overlay and in the eval CSV.
+      *(Every other diagnostic in this project reports a measurement. The failures
+      that have cost the most time were never wrong numbers — they were stages that
+      silently did not run. Phase 2's partition was inert on every first capture for
+      weeks; self-grow shipped ON while its own comment said OFF; and **0.9 added a
+      null check that turns fusion off entirely for a pre-Phase-2 fingerprint**,
+      which is correct and was completely invisible from outside.*
+      *Six states produce the identical artist-visible symptom — the overlay sits on
+      the backbone and drifts. `DISABLED`, `NO_ANCHOR`, `NO_CAPTURE_POSE`,
+      `WAITING_FOR_LOCK`, `COLD_SNAP`, `BLENDING`, `HOLDING`. The three that mean
+      fusion never ran are reported by `ArRenderer`, because `PoseFusion` is not
+      called in those cases and cannot know.*
+      *Also published: the standing correction's magnitude in mm and degrees — a few
+      mm is the system working, a few hundred is either a real relock or a
+      composition error like 0.9's, told apart by whether it STAYS large — plus
+      accepted-vs-refused snap counts. A refused relock reached fusion and was
+      thrown away by `MIN_INLIER_RATIO`; from the reloc channel's side that attempt
+      SUCCEEDED, so nothing else in the system records it.*
+      *Mutation-verified: counting a refusal as an acceptance fails the test.)*
+- [x] **D.2** Report WHY the gated corroboration match did not run — `CorrobGate`. **[N]**
+      *(Four preconditions, one observable. "No design registered", "design not
+      placed", "no lock this frame" and "2D/descriptor mismatch" all produced the
+      same three `-1`s and the same dash on the overlay, and they call for entirely
+      different responses — one of them is a bug and the others are not. The boolean
+      was decomposed into a reason rather than left as an `&&` chain.*
+      *A populated `Corrob` row now also carries `(ungated)` when the numbers came
+      from the global fallback, because that is a different measurement with a
+      different denominator and must not be read as a Phase-4 reading.)*
+- [x] **D.3** Report what self-grow did or which gate declined — `GrowOutcome`. **[N]**
+      *(Phase 3 was otherwise entirely invisible: default-off, hard-gated, and every
+      refusal silent by construction, so "the map is not growing" had eight causes
+      that looked identical — one being the switch, as intended. `DISABLED`,
+      `NO_CANDIDATES`, `STALE_SEQ`, `UNTRUSTED`, `NO_GEOMETRY`, `NO_NEW_POINTS`,
+      `AT_CAP`, `PROMOTED`. `UNTRUSTED` is the one that means tuning — E5 sets
+      `MIN_INLIER_SPREAD` — and it was previously indistinguishable from the switch
+      being off.)*
+- [x] **D.4** Carry all three through to the eval CSV as ordinals. **[T]**
+      *(Reasons, not measurements, and the eval needs them for the reason the overlay
+      does: a run where corroboration never gated is not a bad result, it is a VOID
+      one, and without these columns it is indistinguishable from a run where the
+      wall genuinely failed to corroborate. Aggregating the two is how a null result
+      gets manufactured.*
+      *The int channel widened 12 → 14 and the two new slots default to their
+      enums' "not run" ordinals rather than -1, because with no engine nothing ran —
+      which is precisely what those values say. Unknown ordinals from a newer `.so`
+      absorb into `UNKNOWN` rather than reading as whichever entry is first.)*
+
 ### Cross-cutting
 
 - [ ] **X.1** Add `docs/research/PARAMETERS.md` entries for every new constant as

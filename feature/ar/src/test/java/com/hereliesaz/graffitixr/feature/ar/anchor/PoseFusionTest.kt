@@ -199,6 +199,72 @@ class PoseFusionTest {
         assertEquals(0f, r[11], 1e-6f); assertEquals(1f, r[15], 1e-6f)
     }
 
+    /**
+     * The diagnostics report a DECISION, and the decisions that matter most are the negative ones.
+     *
+     * Every failure this project has spent real time on was a stage that silently did not run, so a
+     * channel that only ever says "working" would be the same trap one level up. These assert the
+     * states that mean *nothing happened*, and that they are told apart from each other.
+     */
+    @Test fun `fusion reports waiting, rejection and holding as distinct states`() {
+        val f = PoseFusion()
+        assertEquals(
+            "before any relock the state must be WAITING_FOR_LOCK, not a working state",
+            com.hereliesaz.graffitixr.common.model.FusionState.WAITING_FOR_LOCK, f.diagnostics().state,
+        )
+        assertEquals("no correction stands yet", -1f, f.diagnostics().correctionMm, 0f)
+
+        // A relock that reaches fusion and is REFUSED here by MIN_INLIER_RATIO. From the reloc
+        // diagnostics' side this attempt succeeded, so nothing else in the system records it.
+        f.currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(10f,0f,0f), inliers = 10f, matches = 100f, seq = 1f), captureAtOrigin(),
+            confGlobal = 1f)
+        val refused = f.diagnostics()
+        assertEquals("a refused relock must be counted", 1, refused.snapsRejected)
+        assertEquals("...and must not be counted as accepted", 0, refused.snapsAccepted)
+        assertEquals("the ratio that got it refused must be visible", 0.1f, refused.lastInlierRatio, 1e-4f)
+        assertEquals(
+            "a refusal leaves fusion still waiting, not working",
+            com.hereliesaz.graffitixr.common.model.FusionState.WAITING_FOR_LOCK, refused.state,
+        )
+
+        // A confident cold relock is accepted and snaps.
+        f.currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(10f,0f,0f), inliers = 90f, matches = 100f, seq = 2f), captureAtOrigin(),
+            confGlobal = 1f)
+        val snapped = f.diagnostics()
+        assertEquals(com.hereliesaz.graffitixr.common.model.FusionState.COLD_SNAP, snapped.state)
+        assertEquals(1, snapped.snapsAccepted)
+        assertEquals("a snap has no blend rate, and -1 says so rather than 1.0", -1f, snapped.lastAlpha, 0f)
+        // 10 m of correction, reported in mm. The number an operator actually needs: a correction
+        // this large is either a real relock after real drift or a composition error.
+        assertEquals(10_000f, snapped.correctionMm, 1f)
+
+        // No new relock: the correction stands and is re-applied.
+        f.currentAnchor(trans(0f,0f,1f), identity(), FloatArray(19), captureAtOrigin(), confGlobal = 1f)
+        assertEquals(
+            "a standing correction with no new relock is HOLDING, not still snapping",
+            com.hereliesaz.graffitixr.common.model.FusionState.HOLDING, f.diagnostics().state,
+        )
+    }
+
+    /** A small, non-diverging relock blends, and the rate it blended at must be reported. */
+    @Test fun `fusion reports the blend rate it actually used`() {
+        val f = PoseFusion()
+        f.currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(10f,0f,0f), inliers = 90f, matches = 100f, seq = 1f), captureAtOrigin(),
+            confGlobal = 1f)
+        f.currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(10.05f,0f,0f), inliers = 60f, matches = 100f, seq = 2f), captureAtOrigin(),
+            confGlobal = 1f)
+        val d = f.diagnostics()
+        assertEquals(com.hereliesaz.graffitixr.common.model.FusionState.BLENDING, d.state)
+        // BASE_ALPHA(0.25) * inlierRatio(0.6) * effConf(1.0 at confGlobal=1) = 0.15. Written out
+        // rather than recomputed from the constants, so a change to any of them shows up here.
+        assertEquals(0.15f, d.lastAlpha, 1e-4f)
+        assertEquals(2, d.snapsAccepted)
+    }
+
     @Test fun `blend alpha 0 returns current, alpha 1 returns target`() {
         val cur = trans(0f,0f,0f); val tgt = trans(10f,0f,0f)
         assertEquals(0f, PoseFusion.blend(cur, tgt, 0f)[12], 1e-4f)

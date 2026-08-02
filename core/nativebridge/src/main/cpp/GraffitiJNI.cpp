@@ -1338,7 +1338,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCorroborationCo
 // answered for, [11] = how many predicted features the gated match refused to test because their
 // neighbourhood held a single candidate (IMPLEMENTATION.md 4.6; all three -1 until a GATED
 // corroboration attempt has run, and 0 for [9] is a real reading meaning the artist is not looking
-// at the design).
+// at the design), [12] = CorrobGate ordinal (why the gated match did or did not run),
+// [13] = GrowOutcome ordinal (what self-grow did, or which gate declined). The last two are
+// REASONS rather than counts: every one of their values produces the same -1s above, and the
+// responses they call for are completely different.
 extern "C" JNIEXPORT jintArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostics(JNIEnv* env, jobject) {
     // NOT {0, ...}: zero is kRelocOk, so a no-engine fallback of 0 reports a SUCCESSFUL LOCK with
@@ -1348,7 +1351,9 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostic
     // the Kotlin-only code that absorbs anything the native side cannot account for; the counts are
     // -1 (not sampled) rather than 0, because zero matches is a real measurement.
     static constexpr jint kRelocUnknownOrdinal = 7;
-    jint vals[12] = {kRelocUnknownOrdinal, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+    // [12] and [13] default to the "not run" ordinals (kCorrobNotRun = 6, kGrowNotRun = 0) rather
+    // than -1: they are enums, and with no engine nothing ran, which is exactly what those say.
+    jint vals[14] = {kRelocUnknownOrdinal, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 6, 0};
     if (gSlamEngine) {
         vals[0] = gSlamEngine->lastRelocReject();
         vals[1] = gSlamEngine->lastRelocMatches();
@@ -1362,10 +1367,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostic
         vals[9] = gSlamEngine->corrobPredicted();
         vals[10] = gSlamEngine->corrobMatched();
         vals[11] = gSlamEngine->corrobLoneSkips();
+        vals[12] = gSlamEngine->corrobGateReason();
+        vals[13] = gSlamEngine->growOutcome();
     }
-    jintArray out = env->NewIntArray(12);
+    jintArray out = env->NewIntArray(14);
     if (!out) return nullptr;
-    env->SetIntArrayRegion(out, 0, 12, vals);
+    env->SetIntArrayRegion(out, 0, 14, vals);
     return out;
 }
 

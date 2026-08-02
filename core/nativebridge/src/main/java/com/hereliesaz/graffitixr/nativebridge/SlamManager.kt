@@ -4,7 +4,9 @@ package com.hereliesaz.graffitixr.nativebridge
 import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.util.Log
+import com.hereliesaz.graffitixr.common.model.CorrobGate
 import com.hereliesaz.graffitixr.common.model.CorroborationDiagnostics
+import com.hereliesaz.graffitixr.common.model.GrowOutcome
 import com.hereliesaz.graffitixr.common.model.Fingerprint
 import com.hereliesaz.graffitixr.common.model.RelocDiagnostics
 import com.hereliesaz.graffitixr.common.model.RelocReject
@@ -286,6 +288,15 @@ class SlamManager @Inject constructor(
             corrobPredicted = if (v.size > 9) v[9] else -1,
             corrobMatched = if (v.size > 10) v[10] else -1,
             corrobLoneSkips = if (v.size > 11) v[11] else -1,
+            // Enums, so an unknown ordinal from a newer .so absorbs into UNKNOWN rather than
+            // reading as whichever entry happens to be first. Absent (older .so) is NOT_RUN, which
+            // is truthful: that library does not run these stages in a way it can report.
+            corrobGate = if (v.size > 12) {
+                CorrobGate.entries.getOrElse(v[12]) { CorrobGate.UNKNOWN }
+            } else CorrobGate.NOT_RUN,
+            growOutcome = if (v.size > 13) {
+                GrowOutcome.entries.getOrElse(v[13]) { GrowOutcome.UNKNOWN }
+            } else GrowOutcome.NOT_RUN,
         )
     }
 

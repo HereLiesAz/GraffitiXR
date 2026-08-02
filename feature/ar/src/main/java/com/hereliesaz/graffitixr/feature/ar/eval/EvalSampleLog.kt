@@ -105,6 +105,26 @@ data class EvalSample(
      */
     val inlierSpread: Float = -1f,
     /**
+     * Ordinals of the two REASON channels: why the gated corroboration match did or did not run, and
+     * what self-grow did. `CorrobGate` / `GrowOutcome`, -1 when not sampled.
+     *
+     * Reasons rather than measurements, and the eval needs them for the same purpose the overlay
+     * does: a run where corroboration never gated is not a bad result, it is a **void** one, and
+     * without these columns it is indistinguishable from a run where the wall genuinely failed to
+     * corroborate. Aggregating the two together is how a null result gets manufactured.
+     */
+    val corrobGate: Int = -1,
+    val growOutcome: Int = -1,
+    /**
+     * `FusionState` ordinal — what pose fusion did, or why it did not run — and the standing
+     * correction's magnitude in millimetres. -1 when not sampled.
+     *
+     * The correction magnitude is the number to plot against `errMm`: a run where fusion never
+     * corrected and a run where it corrected wrongly both show drift, and only this separates them.
+     */
+    val fusionState: Int = -1,
+    val fusionCorrectionMm: Float = -1f,
+    /**
      * `rotationNeeded` **at the moment the active target was captured** — 0, 90, 180 or 270, or -1
      * when no target has been captured this session (a project restored from disk reads -1; see
      * below).
@@ -164,7 +184,7 @@ object EvalSampleLog {
         "relocObliquityDeg", "relocRectifiedCorr",
         "relocBackboneFeatures", "relocBackboneMatches", "relocBackboneInliers",
         "corrobPredicted", "corrobMatched", "corrobLoneSkips", "searchRadiusPx", "relocReprojPx",
-        "inlierSpread",
+        "inlierSpread", "corrobGate", "growOutcome", "fusionState", "fusionCorrectionMm",
         "captureRotationNeededDeg", "liveRotationNeededDeg",
     )
 
@@ -197,6 +217,8 @@ object EvalSampleLog {
             s.corrobLoneSkips.toString(),
             s.searchRadiusPx.toString(), s.relocReprojPx.toString(),
             s.inlierSpread.toString(),
+            s.corrobGate.toString(), s.growOutcome.toString(),
+            s.fusionState.toString(), s.fusionCorrectionMm.toString(),
             s.captureRotationNeededDeg.toString(), s.liveRotationNeededDeg.toString(),
         )
     }
