@@ -1342,6 +1342,13 @@ class ArRenderer(
                         // ones worth a second look.
                         liveRotationNeededDeg =
                             (sensorOrientation - displayRotationHelper.getRotation() * 90 + 360) % 360,
+                        // EVALUATION.md 3.1 item 3 — the RECORDING's clock, not the wall clock.
+                        // ARCore replays the recorded value during startPlayback, so two replays of
+                        // one file produce rows that align frame-for-frame; wall-clock rows describe
+                        // the same frames at different times and cannot be subtracted. This is the
+                        // third of 3.1's three non-determinism sources; the RNG seed and the
+                        // sync-reloc mode closed the other two.
+                        frameTimestampNs = frame.timestamp,
                     )
                 }
 

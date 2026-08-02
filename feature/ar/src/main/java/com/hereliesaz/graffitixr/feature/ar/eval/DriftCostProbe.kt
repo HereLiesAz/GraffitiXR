@@ -23,6 +23,17 @@ class DriftCostProbe(
     private var relockMs: Long? = null
     private var logFile: File? = null
 
+    /**
+     * `EVALUATION.md` §3.1 — the most recent frame timestamp in milliseconds, or -1 before the first
+     * tick. Held so the two stamps taken OUTSIDE [onTick] can also read the frame clock.
+     *
+     * `markTrackingLoss` is called from an overlay button, between ticks; there is no frame in its
+     * hand. Using the last one the probe saw is the right reading, because what §3.1 is buying is
+     * that two replays of one recording produce the same numbers — and the last frame before a
+     * button press is the same frame in both replays, whereas the wall clock is not the same time.
+     */
+    @Volatile private var lastFrameMs: Long = -1L
+
     @Volatile var lastMetrics = EvalLiveMetrics()
 
     private val batteryManager by lazy {
@@ -46,14 +57,34 @@ class DriftCostProbe(
         }
         logFile = f
         usableFrames = 0; totalFrames = 0; lossMs = null; relockMs = null
+        // Reset with the rest of the run state, or the first tick of run two would be stamped with
+        // the last frame of run one.
+        lastFrameMs = -1L
         recentTranslations.clear()
         return f
     }
 
     fun stop() { logFile = null }
 
-    /** Marks an induced tracking loss (overlay button) so the next re-lock yields recovery time. */
-    fun markTrackingLoss() { lossMs = nowMs(); relockMs = null }
+    /**
+     * Marks an induced tracking loss (overlay button) so the next re-lock yields recovery time.
+     *
+     * Stamped on the FRAME clock, not the wall clock. §3.1 item 3 names only `tsMs`, and this is a
+     * deliberate widening rather than an oversight: `recoveryMs` is `relock - loss`, so leaving both
+     * ends on the wall clock would leave recovery time measuring scheduling — the same defect the
+     * item describes, one field over, in a number `EVALUATION.md` reports per mechanism.
+     */
+    fun markTrackingLoss() { lossMs = evalClockMs(); relockMs = null }
+
+    /**
+     * The frame clock when one has been seen, the wall clock otherwise. See [EvalClock.stampMs] for
+     * why the fallback exists rather than a refusal.
+     */
+    private fun evalClockMs(): Long =
+        EvalClock.stampMs(
+            if (lastFrameMs >= 0L) lastFrameMs * 1_000_000L else EvalClock.NOT_SAMPLED_NS,
+            nowMs,
+        )
 
     /**
      * @param candidatePose 4x4 column-major pose of the mechanism under test (or the active fused pose)
@@ -74,6 +105,9 @@ class DriftCostProbe(
      *   must be grouped by. See [EvalSample.captureRotationNeededDeg].
      * @param liveRotationNeededDeg `rotationNeeded` for this tick — how the device is held right
      *   now. Secondary; see [EvalSample.liveRotationNeededDeg].
+     * @param frameTimestampNs ARCore's `Frame.getTimestamp()` for this frame, or
+     *   [EvalClock.NOT_SAMPLED_NS]. During playback ARCore replays the RECORDED value, which is what
+     *   makes two replays of one file align row-for-row — see [EvalClock].
      */
     fun onTick(
         candidatePose: FloatArray,
@@ -85,13 +119,20 @@ class DriftCostProbe(
         corrob: com.hereliesaz.graffitixr.common.model.CorroborationDiagnostics? = null,
         captureRotationNeededDeg: Int = EvalSampleLog.NOT_SAMPLED,
         liveRotationNeededDeg: Int = EvalSampleLog.NOT_SAMPLED,
+        frameTimestampNs: Long = EvalClock.NOT_SAMPLED_NS,
     ) {
         val file = logFile ?: return
+        // Recorded BEFORE the early return below would have mattered and before anything reads the
+        // clock, so every stamp in this tick — the row, and a relock detected inside it — comes from
+        // the same frame rather than from this frame and the previous one.
+        val stampMs = EvalClock.stampMs(frameTimestampNs, nowMs)
+        if (frameTimestampNs > 0L) lastFrameMs = stampMs
         totalFrames++
         if (isTracking) usableFrames++
 
-        // Recovery: first re-lock after an induced loss.
-        if (lossMs != null && relockMs == null && isTracking) relockMs = nowMs()
+        // Recovery: first re-lock after an induced loss. On the frame clock, matching
+        // markTrackingLoss — a recovery measured with one end on each clock is not a duration.
+        if (lossMs != null && relockMs == null && isTracking) relockMs = stampMs
 
         // Jitter window (translation column of the candidate pose).
         val t = floatArrayOf(candidatePose[12], candidatePose[13], candidatePose[14])
@@ -102,7 +143,11 @@ class DriftCostProbe(
         val err = if (truthPose != null) EvalMetrics.poseError(candidatePose, truthPose) else null
 
         val sample = EvalSample(
-            tsMs = nowMs(),
+            // EVALUATION.md 3.1 item 3: the RECORDING's frame timestamp, so two replays of one file
+            // produce rows that align frame-for-frame and can be subtracted. Falls back to the wall
+            // clock only when there is no frame stamp — a live session, which is not being aligned
+            // against anything.
+            tsMs = stampMs,
             deviceClass = deviceClass,
             marksVisible = marksVisible,
             errMm = err?.translationMm ?: -1f,
