@@ -3229,6 +3229,12 @@ class ArViewModel @Inject constructor(
                 }
             } catch (t: Throwable) {
                 android.util.Log.w("ArViewModel", "Doodle fingerprint build failed", t)
+                // A throw is a refusal too, and the field above would otherwise stay null and let
+                // the report say "no refusal recorded" for a capture that blew up. `buildSingle`
+                // has at least one reachable throw of its own — `glViewToCvDisplay` requires a
+                // multiple of 90 — and reporting a crash as an absence is the failure this whole
+                // effort exists to stop.
+                lastCaptureRefusal = "threw ${t.javaClass.simpleName}: ${t.message ?: "no message"}"
             } finally {
                 // Always resume the mapping that requestCapture paused — otherwise a throw would
                 // wedge SLAM with mapping paused for the rest of the session.
