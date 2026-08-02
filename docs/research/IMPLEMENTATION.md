@@ -773,8 +773,43 @@ order.** Work top to bottom.
       which is the truth. §3.2 says a CSV without a truthful sidecar is not evidence.
 
       §3.1's **third** source of non-determinism — `DriftCostProbe` stamping wall-clock
-      `tsMs` instead of the recording's frame timestamp — is NOT covered by 6a.4 and
-      remains open. 6a.4 names only the seed and the sync mode.
+      `tsMs` instead of the recording's frame timestamp — is NOT named by 6a.4, which
+      covers only the seed and the sync mode. It is nevertheless **now closed**; see
+      6a.5 below, added because a gap found while closing an item should not become
+      invisible for want of a number.
+
+- [x] **6a.5** Stamp eval samples with the recording's frame timestamp, not the wall
+      clock — `EVALUATION.md` §3.1's third and last source of replay
+      non-determinism. **[T]**
+      *(Not in the original checklist. §3.1 names three sources and 6a.4 named two, so
+      this one had no number; it is given one here rather than left as a sentence in
+      another item's annotation.*
+      *`ArRenderer` passes ARCore's `Frame.getTimestamp()` into `probe.onTick`. During
+      `startPlayback` ARCore replays the RECORDED value, so two replays of one file
+      produce rows that align frame-for-frame — which is what a parameter A/B needs
+      before it can subtract one run from another. With the seed and the sync mode
+      already landed, this was the last thing keeping two replays of one recording
+      from being comparable row by row.*
+      *The decision — which clock, and what to do without a frame stamp — lives in
+      `EvalClock` rather than inside the probe, because `DriftCostProbe` needs a
+      `Context` and writes files, so nothing in it is reachable from a JVM test. The
+      headline test asserts the PROPERTY (two replays with disagreeing wall clocks
+      produce identical stamps) rather than restating the division.*
+      *Zero takes the wall-clock fallback, not the frame path. ARCore's timestamps are
+      monotonic nanoseconds so 0 is not a reading — but a caller not yet wired up
+      passes Long's default of 0, and treating that as a frame stamp would file every
+      row of a live session at the epoch: internally consistent, entirely wrong,
+      invisible until someone correlated the CSV with something else.
+      Mutation-verified — relaxing the guard to `>= 0` fails that test.*
+      ***Two deliberate scope decisions, stated rather than slipped in.*** *(1) The CSV
+      FILENAME keeps the wall clock: it is `eval_${deviceClass}_${nowMs()}.csv`, and
+      frame time would make two replays of one recording collide on one filename —
+      destroying the second run's data to gain determinism in a field nothing aligns
+      on. (2) `markTrackingLoss` and the relock stamp ALSO move to the frame clock,
+      which §3.1 item 3 does not ask for. `recoveryMs` is `relock - loss`; leaving both
+      ends on the wall clock would leave a number `EVALUATION.md` reports per mechanism
+      measuring scheduling — the same defect the item describes, one field over. A
+      recovery with one end on each clock is not a duration.)*
 
       Verified natively, not inferred: `llvm-nm` on `libgraffitixr.so` shows
       `Java_..._nativeSetEvalRngSeed` exported under exactly the name the Kotlin
