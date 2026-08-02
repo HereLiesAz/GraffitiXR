@@ -219,6 +219,48 @@ public:
     /** Hard ceiling on stored wall marks — a memory guard on the self-grow append. */
     static constexpr size_t kMaxWallMarks = 5000;
 
+    /**
+     * Why the SPATIALLY-CONSTRAINED corroboration match did or did not run this attempt.
+     *
+     * The gated path has four preconditions and, until this existed, failing any of them produced
+     * exactly the same observable: the corroboration counters read "-1" and the overlay showed a
+     * dash. "Phase 4 is off for this project" and "Phase 4 is on but this frame had no pose" are
+     * completely different situations with completely different fixes.
+     */
+    enum CorrobGate {
+        kCorrobGated = 0,          //!< ran the gated match
+        kCorrobNoArtwork = 1,      //!< no design registered (updatePaintingGuide never fired)
+        kCorrobNoPlacement = 2,    //!< no design placement pushed — Phase 4 inactive for this project
+        kCorrobNoPose = 3,         //!< relocalization did not lock this frame
+        kCorrobBad2d = 4,          //!< artwork 2D positions do not index the descriptors 1:1
+        kCorrobNoIntrinsics = 5,   //!< the fingerprint carries no intrinsics to project through
+        kCorrobNotRun = 6,         //!< no corroboration attempt reached the decision at all
+    };
+
+    /**
+     * What the self-grow promotion did, or the reason it declined.
+     *
+     * Phase 3 is entirely invisible without this. Self-grow is default-OFF, hard-gated, and its
+     * refusals are silent by construction — so "the map is not growing" has eight causes that look
+     * identical from outside, one of which is simply the switch.
+     */
+    enum GrowOutcome {
+        kGrowNotRun = 0,           //!< the promotion block was not reached this attempt
+        kGrowDisabled = 1,         //!< setSelfGrowEnabled(false) — the default, not a fault
+        kGrowNoCandidates = 2,     //!< nothing in the frame corroborated the design
+        kGrowStaleSeq = 3,         //!< no fresh relock since the last promotion; pose would be stale
+        kGrowUntrusted = 4,        //!< the promotion gate refused — inlier spread or match quality
+        kGrowNoGeometry = 5,       //!< intrinsics, wall size or plane fit degenerate
+        kGrowNoNewPoints = 6,      //!< every candidate back-projected behind the camera or deduped
+        kGrowAtCap = 7,            //!< the wall is at kMaxWallMarks
+        kGrowPromoted = 8,         //!< marks were written into the map
+    };
+
+    /** Last [CorrobGate]; see the enum for why this is worth a channel of its own. */
+    int corrobGateReason() const { return mCorrobGate.load(std::memory_order_relaxed); }
+    /** Last [GrowOutcome]. */
+    int growOutcome() const { return mGrowOutcome.load(std::memory_order_relaxed); }
+
     /** Sentinel for "no corroboration attempt has produced a measurement yet". */
     static constexpr float kCorroborationUnmeasured = -1.0f;
 
@@ -770,5 +812,9 @@ private:
     // inlier POINTS; the self-grow gate sees counts through atomics and would otherwise be blind to
     // the geometry that actually conditions the pose.
     std::atomic<float>      mLastRelocInlierSpread{kPromotionNotMeasured};
+    // Why each stage did or did not run. Both default to "not run", which is distinct from every
+    // real outcome — the same rule the -1 counters follow, in enum form.
+    std::atomic<int>        mCorrobGate{kCorrobNotRun};
+    std::atomic<int>        mGrowOutcome{kGrowNotRun};
     cv::Mat                 mRelocColorFrame;
 };

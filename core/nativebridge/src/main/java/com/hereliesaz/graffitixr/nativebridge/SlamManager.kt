@@ -4,7 +4,9 @@ package com.hereliesaz.graffitixr.nativebridge
 import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.util.Log
+import com.hereliesaz.graffitixr.common.model.CorrobGate
 import com.hereliesaz.graffitixr.common.model.CorroborationDiagnostics
+import com.hereliesaz.graffitixr.common.model.GrowOutcome
 import com.hereliesaz.graffitixr.common.model.Fingerprint
 import com.hereliesaz.graffitixr.common.model.RelocDiagnostics
 import com.hereliesaz.graffitixr.common.model.RelocReject
@@ -211,6 +213,23 @@ class SlamManager @Inject constructor(
      */
     @Volatile var overlayMarkCenterLocal: FloatArray? = null
 
+    /**
+     * `IMPLEMENTATION.md` **0.9** — `Fingerprint.captureAnchorCam`, the anchor's pose in the CAPTURE
+     * camera's CV frame (`V_cv(capture) · anchorModel`), or null when the live fingerprint has none.
+     *
+     * Carried here for the same reason [overlayMarkCenterLocal] is: the renderer needs it every
+     * frame and does not hold the `Fingerprint`. It is the third factor of
+     * `PoseFusion.composeCorrected`, and it replaced a world-frame anchor that put the composition
+     * in the wrong frame entirely.
+     *
+     * **Null means do not correct.** A pre-Phase-2 fingerprint has no `captureAnchorCam`, and there
+     * is no way to compose the correction without it — the world-frame anchor that used to be passed
+     * is precisely the defect. Skipping the correction leaves relocalization off for such a project
+     * rather than pulling the overlay toward a pose computed in mixed frames, which is the failure
+     * `PAPER.md` §8.3 says is worse than not correcting at all.
+     */
+    @Volatile var captureAnchorCam: FloatArray? = null
+
     fun updateDeviceMotion(angularVel: FloatArray, linearVel: FloatArray) {
         nativeUpdateDeviceMotion(angularVel, linearVel)
     }
@@ -269,6 +288,15 @@ class SlamManager @Inject constructor(
             corrobPredicted = if (v.size > 9) v[9] else -1,
             corrobMatched = if (v.size > 10) v[10] else -1,
             corrobLoneSkips = if (v.size > 11) v[11] else -1,
+            // Enums, so an unknown ordinal from a newer .so absorbs into UNKNOWN rather than
+            // reading as whichever entry happens to be first. Absent (older .so) is NOT_RUN, which
+            // is truthful: that library does not run these stages in a way it can report.
+            corrobGate = if (v.size > 12) {
+                CorrobGate.entries.getOrElse(v[12]) { CorrobGate.UNKNOWN }
+            } else CorrobGate.NOT_RUN,
+            growOutcome = if (v.size > 13) {
+                GrowOutcome.entries.getOrElse(v[13]) { GrowOutcome.UNKNOWN }
+            } else GrowOutcome.NOT_RUN,
         )
     }
 

@@ -892,6 +892,10 @@ void MobileGS::growMapFromReloc(const glm::mat4& camFromFp, const std::vector<cv
 void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
                                     const std::vector<cv::KeyPoint>* preKps,
                                     const cv::Mat* preDescs) {
+    // Every early return below leaves a reason behind. "Not run" is the default and is distinct
+    // from every real outcome, so a channel reading kCorrobNotRun means the attempt never reached
+    // the decision — not that the decision was negative.
+    mCorrobGate.store(kCorrobNotRun, std::memory_order_relaxed);
     cv::Mat artDescs;
     std::vector<cv::Point2f> artPts2d;
     int artImgW = 0, artImgH = 0;
@@ -903,7 +907,11 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     float fpFx = 0.0f, fpFy = 0.0f, fpCx = 0.0f, fpCy = 0.0f;
     {
         std::lock_guard<std::mutex> lock(mMutex);
-        if (mArtworkDescriptors.empty()) return;
+        if (mArtworkDescriptors.empty()) {
+            // No design registered at all — updatePaintingGuide has never fired for this project.
+            mCorrobGate.store(kCorrobNoArtwork, std::memory_order_relaxed);
+            return;
+        }
         artDescs = mArtworkDescriptors;
         artPts2d = mArtworkKeypoints2D;
         artImgW = mArtworkImageW;
@@ -951,11 +959,18 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     //
     // When any of them is missing this falls back to the global knnMatch below, which is exactly
     // pre-Phase-4 behaviour.
-    const bool gated =
-        havePlacement &&
-        mLastRelocReject.load(std::memory_order_relaxed) == kRelocOk &&
-        (int)artPts2d.size() == artDescs.rows &&
-        artImgW > 0 && artImgH > 0 && fpFx > 0.0f && fpFy > 0.0f;
+    // Decomposed rather than written as one boolean, so the channel can say WHICH precondition
+    // failed. All four produce an identical observable otherwise — the counters read -1 and the
+    // overlay shows a dash — and they call for entirely different responses: "place the design",
+    // "aim at the registered wall", "re-create the target", "this is a bug".
+    const int gateReason =
+        !havePlacement ? kCorrobNoPlacement
+        : (mLastRelocReject.load(std::memory_order_relaxed) != kRelocOk) ? kCorrobNoPose
+        : ((int)artPts2d.size() != artDescs.rows || artImgW <= 0 || artImgH <= 0) ? kCorrobBad2d
+        : (!(fpFx > 0.0f) || !(fpFy > 0.0f)) ? kCorrobNoIntrinsics
+        : kCorrobGated;
+    mCorrobGate.store(gateReason, std::memory_order_relaxed);
+    const bool gated = gateReason == kCorrobGated;
 
     std::vector<char> hit(artDescs.rows, 0);
     std::vector<int> validQuery;   // clean keypoints that corroborate the artwork (self-grow candidates)
@@ -1185,7 +1200,14 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     // feature is placed on the wall plane via the current relocalized pose. Guarded hard (fresh +
     // confident relock, gatekeeper-validated, capped, deduped) and RANSAC in the reloc PnP is the
     // backstop, but it still mutates the authoritative set, so it stays OFF unless explicitly enabled.
-    if (!mSelfGrowEnabled.load(std::memory_order_relaxed) || validQuery.empty()) return;
+    if (!mSelfGrowEnabled.load(std::memory_order_relaxed)) {
+        mGrowOutcome.store(kGrowDisabled, std::memory_order_relaxed);
+        return;
+    }
+    if (validQuery.empty()) {
+        mGrowOutcome.store(kGrowNoCandidates, std::memory_order_relaxed);
+        return;
+    }
 
     // pnpMatches, not `matches`: that name used to be the knnMatch result vector in this scope, and
     // although Phase 4 moved it inside the global-fallback branch the reason to keep them apart
@@ -1196,7 +1218,10 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     {
         std::lock_guard<std::mutex> lock(mMutex);
         seq = mPnpResultSeq.load(std::memory_order_relaxed);
-        if (seq == mLastGrowSeq) return;          // no fresh relock this tick — pose would be stale
+        if (seq == mLastGrowSeq) {                // no fresh relock this tick — pose would be stale
+            mGrowOutcome.store(kGrowStaleSeq, std::memory_order_relaxed);
+            return;
+        }
         inliers = mPnpInlierCount.load(std::memory_order_relaxed);
         pnpMatches = mPnpMatchCount.load(std::memory_order_relaxed);
         const float* M = mPnpCamFromFpWorld;      // camera_from_fpWorld, column-major (OpenCV frame)
@@ -1214,7 +1239,15 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         if (trusted) mLastGrowSeq = seq;          // claim it (yield or not)
     }
     if (!trusted || fx <= 0 || fy <= 0 ||
-        wall.size() < 12 || wall.size() >= kMaxWallMarks) return;
+        wall.size() < 12 || wall.size() >= kMaxWallMarks) {
+        // Split so "the gate refused this pose" is distinguishable from "there is nothing to grow
+        // onto" and from "the map is full". The first is tuning (E5 sets MIN_INLIER_SPREAD), the
+        // second is a capture problem, the third is a hard ceiling and not a fault at all.
+        mGrowOutcome.store(
+            wall.size() >= kMaxWallMarks ? kGrowAtCap : (!trusted ? kGrowUntrusted : kGrowNoGeometry),
+            std::memory_order_relaxed);
+        return;
+    }
 
     // Wall plane (n·X = pdist, pdist>0) in the fingerprint frame, fit to the existing marks.
     cv::Mat data((int)wall.size(), 3, CV_32F);
@@ -1224,8 +1257,13 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     cv::PCA pca(data, cv::Mat(), cv::PCA::DATA_AS_ROW);
     cv::Vec3d n(pca.eigenvectors.at<float>(2,0), pca.eigenvectors.at<float>(2,1), pca.eigenvectors.at<float>(2,2));
     cv::Vec3d cen(pca.mean.at<float>(0,0), pca.mean.at<float>(0,1), pca.mean.at<float>(0,2));
-    double nn = cv::norm(n); if (nn < 1e-6) return; n /= nn;
-    double pdist = n.dot(cen); if (pdist < 0) { n = -n; pdist = -pdist; } if (pdist < 1e-3) return;
+    // A degenerate plane fit is the same class of refusal as degenerate intrinsics: there is
+    // nothing to project promotions onto.
+    double nn = cv::norm(n);
+    if (nn < 1e-6) { mGrowOutcome.store(kGrowNoGeometry, std::memory_order_relaxed); return; }
+    n /= nn;
+    double pdist = n.dot(cen); if (pdist < 0) { n = -n; pdist = -pdist; }
+    if (pdist < 1e-3) { mGrowOutcome.store(kGrowNoGeometry, std::memory_order_relaxed); return; }
 
     // fp_from_cam = [R^T | -R^T t]: camera centre and per-pixel ray in the fingerprint frame.
     cv::Matx33d Rt = R.t();
@@ -1251,14 +1289,24 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         newDescs.push_back(descs.row(q));
         if (newPts.size() >= 30) break;           // cap per relock
     }
-    if (newPts.empty()) return;
+    if (newPts.empty()) {
+        // Candidates existed and every one of them was dropped: back-projected behind the camera,
+        // or deduplicated against a mark already stored.
+        mGrowOutcome.store(kGrowNoNewPoints, std::memory_order_relaxed);
+        return;
+    }
 
     size_t promoted = 0, wallNow = 0;
     int outsideN = 0, insideN = 0, bandN = 0;
     {
         std::lock_guard<std::mutex> lock(mMutex);
         if (mWallDescriptors.type() != newDescs.type() || mWallDescriptors.cols != newDescs.cols ||
-            mWallKeypoints3D.size() >= kMaxWallMarks) return;
+            mWallKeypoints3D.size() >= kMaxWallMarks) {
+            mGrowOutcome.store(
+                mWallKeypoints3D.size() >= kMaxWallMarks ? kGrowAtCap : kGrowNoGeometry,
+                std::memory_order_relaxed);
+            return;
+        }
         // Fill to the cap exactly. Testing the size only BEFORE the loop let a wall sitting at
         // kMaxWallMarks-1 grow by the full per-relock batch, so the documented ceiling was really
         // ceiling + batch.
@@ -1305,6 +1353,7 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
         wallNow = mWallKeypoints3D.size();
         outsideN = promotedOutside; insideN = promotedInside; bandN = promotedBand;
     }
+    mGrowOutcome.store(kGrowPromoted, std::memory_order_relaxed);
     LOGI("Teleological self-grow: promoted %zu marks (wall now %zu; F_out +%d, F_in +%d, band +%d)",
          promoted, wallNow, outsideN, insideN, bandN);
 }

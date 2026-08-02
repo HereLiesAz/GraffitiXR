@@ -117,6 +117,7 @@ class DriftCostProbe(
         cpuPct: Float,
         reloc: com.hereliesaz.graffitixr.common.model.RelocDiagnostics? = null,
         corrob: com.hereliesaz.graffitixr.common.model.CorroborationDiagnostics? = null,
+        fusion: com.hereliesaz.graffitixr.common.model.FusionDiagnostics? = null,
         captureRotationNeededDeg: Int = EvalSampleLog.NOT_SAMPLED,
         liveRotationNeededDeg: Int = EvalSampleLog.NOT_SAMPLED,
         frameTimestampNs: Long = EvalClock.NOT_SAMPLED_NS,
@@ -185,6 +186,13 @@ class DriftCostProbe(
             searchRadiusPx = corrob?.searchRadiusPx ?: EvalSampleLog.NOT_SAMPLED_PX,
             relocReprojPx = corrob?.relocReprojPx ?: EvalSampleLog.NOT_SAMPLED_PX,
             inlierSpread = corrob?.inlierSpread ?: EvalSampleLog.NOT_SAMPLED_PX,
+            // Ordinals, so the CSV stays numeric and a consumer maps them back through the enums.
+            // -1 only for "no diagnostics this tick" — the enums have their own NOT_RUN entries,
+            // which mean something different and must survive the round trip.
+            corrobGate = reloc?.corrobGate?.ordinal ?: EvalSampleLog.NOT_SAMPLED,
+            growOutcome = reloc?.growOutcome?.ordinal ?: EvalSampleLog.NOT_SAMPLED,
+            fusionState = fusion?.state?.ordinal ?: EvalSampleLog.NOT_SAMPLED,
+            fusionCorrectionMm = fusion?.correctionMm ?: EvalSampleLog.NOT_SAMPLED_PX,
             captureRotationNeededDeg = captureRotationNeededDeg,
             liveRotationNeededDeg = liveRotationNeededDeg,
         )

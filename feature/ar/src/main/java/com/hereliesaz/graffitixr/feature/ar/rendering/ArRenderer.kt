@@ -229,6 +229,28 @@ class ArRenderer(
     @Volatile var driftCostProbe: com.hereliesaz.graffitixr.feature.ar.eval.DriftCostProbe? = null
 
     /**
+     * Why pose fusion was skipped this frame, or null when it ran.
+     *
+     * Written on the GL thread and read by the diagnostics tick on another, hence @Volatile. Held as
+     * a nullable rather than folded into `PoseFusion.diagnostics()` because these are precisely the
+     * cases where `PoseFusion` is not called at all and therefore cannot know.
+     */
+    @Volatile var fusionSkipReason: com.hereliesaz.graffitixr.common.model.FusionState? = null
+
+    /**
+     * The last fusion decision, for the overlay and the eval CSV. Combines [fusionSkipReason] — the
+     * states only the renderer can see — with `PoseFusion`'s own record of what it did when it ran.
+     */
+    fun fusionDiagnostics(): com.hereliesaz.graffitixr.common.model.FusionDiagnostics {
+        val skip = fusionSkipReason
+        return if (skip != null) {
+            com.hereliesaz.graffitixr.common.model.FusionDiagnostics(state = skip)
+        } else {
+            poseFusion.diagnostics()
+        }
+    }
+
+    /**
      * Latest physical device attitude, or null when unavailable. Supplied by the ViewModel, which
      * owns the sensor lifecycle — the renderer only reads it, and only at capture.
      */
@@ -1231,12 +1253,35 @@ class ArRenderer(
             }
             // Fuse in the corrected mark-PnP snap (smoothed) when anchored; the flag lets the eval
             // harness A/B fusion vs the old toggle. Off → exact previous behavior.
-            val anchorMatrix: FloatArray = if (fusionEnabled && anchorEstablished) {
+            // IMPLEMENTATION.md 0.9 — the correction needs `captureAnchorCam`, the anchor's pose in
+            // the CAPTURE camera's CV frame. `getFingerprintAnchor()` used to be passed here and is a
+            // WORLD-frame model matrix: composing it against a CV-convention PnP result put the
+            // correction in mixed frames, which the zero-drift invariant measured at 2.92 off.
+            //
+            // Null on a pre-Phase-2 fingerprint, and then fusion is SKIPPED rather than fed a
+            // world-frame anchor. Refusing to correct leaves the overlay on the ARCore backbone,
+            // which drifts; correcting in the wrong frame pulls it somewhere confidently wrong, and
+            // PAPER.md §8.3 is explicit that the second is worse.
+            val captureAnchorCam = slamManager.captureAnchorCam
+            // The three reasons fusion can be skipped are known HERE and nowhere else — PoseFusion
+            // is never called, so it cannot report them. Without this the overlay simply drifts and
+            // every other row on the overlay looks healthy, which is the failure mode this whole
+            // record exists to end. NO_CAPTURE_POSE in particular was introduced by 0.9 and is the
+            // one most likely to be mistaken for a bug: a pre-Phase-2 project relocalizes fine and
+            // is never corrected.
+            fusionSkipReason = when {
+                !fusionEnabled -> com.hereliesaz.graffitixr.common.model.FusionState.DISABLED
+                !anchorEstablished -> com.hereliesaz.graffitixr.common.model.FusionState.NO_ANCHOR
+                captureAnchorCam == null ->
+                    com.hereliesaz.graffitixr.common.model.FusionState.NO_CAPTURE_POSE
+                else -> null
+            }
+            val anchorMatrix: FloatArray = if (fusionEnabled && anchorEstablished && captureAnchorCam != null) {
                 poseFusion.currentAnchor(
                     backbone = backbone,
                     vCurrent = viewMatrix,
                     reloc = slamManager.getRelocResult(),
-                    fpAnchor = slamManager.getFingerprintAnchor(),
+                    captureAnchorCam = captureAnchorCam,
                     // THE teleological input, finally connected. The claim in TELEOLOGICAL_SLAM.md is
                     // that the further along the painting is, the more real-world corroboration the
                     // engine has and the harder the overlay locks. That third stage was never wired:
@@ -1331,6 +1376,10 @@ class ArRenderer(
                         // was neither the count nor the mechanism.)
                         reloc = relocDiag,
                         corrob = corrobDiag,
+                        // What fusion actually did with the relock — including "nothing, and here is
+                        // why". A run that drifts because fusion was skipped and one that drifts
+                        // because it corrected wrongly are indistinguishable without this.
+                        fusion = fusionDiagnostics(),
                         // E0b's independent variable is the rotation that was in force AT CAPTURE,
                         // because that is the one baked into the fingerprint's 3D points. Sampling
                         // the live rotation here instead — which an earlier version of this call

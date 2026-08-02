@@ -965,6 +965,8 @@ class ArViewModel @Inject constructor(
         // Drop the marks-centering override so a later AR re-entry (or a different project) doesn't
         // center the overlay on a stale target's marks before a new one is built/restored.
         slamManager.overlayMarkCenterLocal = null
+        // 0.9 — same lifetime: without it PoseFusion cannot compose a correction at all.
+        slamManager.captureAnchorCam = null
         // Same argument, for the anchor. The ARCore session and its anchors do not survive this, so
         // "an anchor has been established" must not either — otherwise the next capture's
         // `awaitAnchorTransform` returns immediately with the previous session's pose, which is the
@@ -1827,6 +1829,8 @@ class ArViewModel @Inject constructor(
     private fun dropLoadedFingerprint() {
         slamManager.clearWallFingerprint()
         slamManager.overlayMarkCenterLocal = null
+        // 0.9 — same lifetime: without it PoseFusion cannot compose a correction at all.
+        slamManager.captureAnchorCam = null
         dropPartitionState()
     }
 
@@ -2000,6 +2004,11 @@ class ArViewModel @Inject constructor(
                 // marks after reload, even though the builder doesn't run on a restored fingerprint.
                 slamManager.overlayMarkCenterLocal =
                     if (fp.markCenterLocal.size >= 3) fp.markCenterLocal.toFloatArray() else null
+                // IMPLEMENTATION.md 0.9 — the third factor of PoseFusion.composeCorrected. A
+                // pre-Phase-2 fingerprint has none, and null there means "do not correct" rather
+                // than "correct with the world anchor", which is the frame defect 0.9 fixed.
+                slamManager.captureAnchorCam =
+                    if (fp.captureAnchorCam.size == 16) fp.captureAnchorCam.toFloatArray() else null
             }
 
             loadedFingerprint = incoming
@@ -2123,6 +2132,11 @@ class ArViewModel @Inject constructor(
         // is acceptable here — these are diagnostics, not numbers PoseFusion acts on — and it is
         // written down so a later reader does not mistake the pair for an atomic snapshot.
         val corrobDiag = slamManager.getCorroborationDiagnostics()
+        // Read from the renderer rather than the engine: fusion is a Kotlin-side decision, and the
+        // states that matter most (disabled, no anchor, no capture pose) are ones where PoseFusion
+        // is never invoked and so has nothing to report.
+        val fusionDiag = renderer?.fusionDiagnostics()
+            ?: com.hereliesaz.graffitixr.common.model.FusionDiagnostics()
         // Read alongside the diagnostics, not on a success path: the state this exists to expose is
         // "the capture produced nothing", which by definition never reaches one.
         val wallPoints = slamManager.getWallKeypointCount()
@@ -2163,6 +2177,7 @@ class ArViewModel @Inject constructor(
                 paintingProgress = progress,
                 relocDiagnostics = relocDiag,
                 corroborationDiagnostics = corrobDiag,
+                fusionDiagnostics = fusionDiag,
                 wallFingerprintPoints = wallPoints,
                 scanPhase = newPhase,
                 ambientSectorsCovered = sectorsCovered / 3, // Keep backward compatibility for 30 degree UI units if needed
@@ -2734,6 +2749,8 @@ class ArViewModel @Inject constructor(
         if (active) {
             doodleFingerprintBuilt = false
             slamManager.overlayMarkCenterLocal = null
+        // 0.9 — same lifetime: without it PoseFusion cannot compose a correction at all.
+        slamManager.captureAnchorCam = null
             doodleCaptureJob = viewModelScope.launch {
                 // Two budgets, because they bound different failures:
                 //

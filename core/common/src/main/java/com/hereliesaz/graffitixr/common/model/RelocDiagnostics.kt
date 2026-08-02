@@ -88,9 +88,79 @@ data class RelocDiagnostics(
      * accumulated drift, which is the thing corroboration exists to prevent.
      */
     val corrobLoneSkips: Int = -1,
+    /**
+     * `IMPLEMENTATION.md` **4.5** — why the spatially-constrained corroboration match did or did not
+     * run. See [CorrobGate].
+     *
+     * Every failing precondition produces the same observable otherwise: the three counts above read
+     * -1 and the overlay shows a dash. They call for completely different responses — place the
+     * design, aim at the registered wall, re-create the target, file a bug — so collapsing them into
+     * one absence throws away the only information that distinguishes them.
+     */
+    val corrobGate: CorrobGate = CorrobGate.NOT_RUN,
+    /**
+     * `IMPLEMENTATION.md` **Phase 3** — what self-grow did, or which gate declined. See [GrowOutcome].
+     *
+     * Phase 3 is otherwise invisible: self-grow is default-off, hard-gated, and every one of its
+     * refusals is silent by construction, so "the map is not growing" has eight causes that look
+     * identical — one of which is simply the switch being off, as intended.
+     */
+    val growOutcome: GrowOutcome = GrowOutcome.NOT_RUN,
 ) {
     /** Inlier ratio of the last attempt, or 0 when it produced no correspondences. */
     val inlierRatio: Float get() = if (matches > 0) inliers.toFloat() / matches else 0f
+}
+
+/**
+ * Mirrors `MobileGS::CorrobGate`, ordinal for ordinal — the native side reports an int.
+ *
+ * Like `RelocReject`, this is a **wire format** with no compiler checking either side, so the order
+ * is load-bearing. `UNKNOWN` absorbs any value a newer `.so` reports that this build does not know,
+ * rather than throwing or silently reading as the first entry.
+ */
+enum class CorrobGate {
+    /** Ran the gated match. */
+    GATED,
+    /** No design registered — the artwork guide has never been pushed for this project. */
+    NO_ARTWORK,
+    /** No design placement: Phase 4 is inactive here, and the match fell back to a global search. */
+    NO_PLACEMENT,
+    /** Relocalization did not lock this frame, so there is no pose to predict from. */
+    NO_POSE,
+    /** The artwork's 2D positions do not index its descriptors 1:1 — a bug, not a state. */
+    BAD_2D,
+    /** The fingerprint carries no intrinsics to project through. */
+    NO_INTRINSICS,
+    /** No corroboration attempt reached the decision at all. */
+    NOT_RUN,
+    /** A code this build does not know — a newer native library. */
+    UNKNOWN,
+}
+
+/**
+ * Mirrors `MobileGS::GrowOutcome`, ordinal for ordinal. Same wire-format caveat as [CorrobGate].
+ */
+enum class GrowOutcome {
+    /** The promotion block was not reached this attempt. */
+    NOT_RUN,
+    /** Self-grow is switched off. **The default**, and not a fault — Phase 3 ships gated. */
+    DISABLED,
+    /** Nothing in the frame corroborated the design, so there was nothing to promote. */
+    NO_CANDIDATES,
+    /** No fresh relock since the last promotion; the pose would be stale. */
+    STALE_SEQ,
+    /** The promotion gate refused — inlier spread or match quality. Tuning, and E5 sets it. */
+    UNTRUSTED,
+    /** Intrinsics, wall size or the plane fit are degenerate. */
+    NO_GEOMETRY,
+    /** Every candidate back-projected behind the camera or deduplicated against an existing mark. */
+    NO_NEW_POINTS,
+    /** The wall is at its hard ceiling. Not a fault. */
+    AT_CAP,
+    /** Marks were written into the map. */
+    PROMOTED,
+    /** A code this build does not know — a newer native library. */
+    UNKNOWN,
 }
 
 /**
