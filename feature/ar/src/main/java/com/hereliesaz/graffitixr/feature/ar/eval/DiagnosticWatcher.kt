@@ -95,10 +95,18 @@ class DiagnosticWatcher(
         if (requested >= maxCaptures) return null
         val sinceAny = lastAnyMs
         for (t in candidates) {
+            // The sole enforcement of once-ness. There is deliberately no second `!t.once` guard on
+            // the cooldown below: `lastFiredMs` and `firedOnce` are written together and cleared
+            // together, so a once-trigger carrying a cooldown entry has already `continue`d here.
+            // A second check would be unreachable, and unreachable defence reads as though the case
+            // it guards were possible.
             if (t.once && t in firedOnce) continue
+            // Strictly less-than, so the cooldown expires AT its length rather than one tick after.
+            // The loose form refuses silently, which is the one failure mode this class cannot
+            // afford — see `a capture is permitted exactly one cooldown after the last`.
             if (sinceAny != null && nowMs - sinceAny < globalCooldownMs) return null
             val last = lastFiredMs[t]
-            if (!t.once && last != null && nowMs - last < repeatCooldownMs) continue
+            if (last != null && nowMs - last < repeatCooldownMs) continue
             firedOnce.add(t)
             lastFiredMs[t] = nowMs
             lastAnyMs = nowMs

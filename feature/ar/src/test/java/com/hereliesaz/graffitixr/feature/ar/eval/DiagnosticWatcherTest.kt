@@ -122,6 +122,59 @@ class DiagnosticWatcherTest {
     }
 
     /**
+     * The global cooldown expires AT its length, not after it.
+     *
+     * Found by mutation testing: changing `<` to `<=` survived the whole suite, because every other
+     * test sits either well inside the window or well outside it. The one tick that lands on the
+     * boundary is masked — the per-trigger cooldown refuses it under both operators, so the global
+     * cooldown's answer is invisible there.
+     *
+     * It matters in the direction that fails silently. An off-by-one toward refusing produces a
+     * report saying no watched transition occurred, which is indistinguishable from a session where
+     * genuinely nothing happened. So the boundary is pinned with a *different* trigger on the second
+     * tick, which has no repeat history of its own and therefore nothing else that could refuse it.
+     */
+    @Test
+    fun `a capture is permitted exactly one cooldown after the last`() {
+        val w = DiagnosticWatcher()
+        w.tick(0L, reject = RelocReject.NO_FEATURES)
+        assertEquals(CaptureTrigger.LOCK_ACQUIRED, w.tick(1_000L, reject = RelocReject.OK))
+        assertEquals(
+            CaptureTrigger.PROMOTED,
+            w.tick(
+                1_000L + DiagnosticWatcher.GLOBAL_COOLDOWN_MS,
+                reject = RelocReject.OK,
+                grow = GrowOutcome.PROMOTED,
+            ),
+        )
+    }
+
+    /**
+     * A correction parked exactly ON the threshold is a plateau, not a rise.
+     *
+     * Also found by mutation testing: `prevCorrectionMm < spikeMm` survived being loosened to `<=`,
+     * because the spike tests all use values comfortably either side of 150mm and never land on it.
+     *
+     * The consequence of the loose form is not a missed capture but a repeating one — a correction
+     * that settles precisely at `SPIKE_MM` would re-fire on every tick that clears the cooldowns,
+     * and a budget of sixteen would be spent photographing one stationary state.
+     */
+    @Test
+    fun `a correction sitting exactly on the threshold does not re-fire`() {
+        val w = DiagnosticWatcher()
+        w.tick(0L, correctionMm = 5f)
+        // The rise onto the threshold is a real spike and must fire.
+        assertEquals(
+            CaptureTrigger.CORRECTION_SPIKE,
+            w.tick(10_000L, correctionMm = DiagnosticWatcher.SPIKE_MM),
+        )
+        // Staying there, and going higher, is the same event. Spaced past every cooldown so only the
+        // plateau test can be what refuses it.
+        assertNull(w.tick(60_000L, correctionMm = DiagnosticWatcher.SPIKE_MM + 10f))
+        assertNull(w.tick(120_000L, correctionMm = DiagnosticWatcher.SPIKE_MM))
+    }
+
+    /**
      * A suppressed edge is gone, not queued.
      *
      * This is the one that would be easy to get wrong by leaving the previous-state update inside
