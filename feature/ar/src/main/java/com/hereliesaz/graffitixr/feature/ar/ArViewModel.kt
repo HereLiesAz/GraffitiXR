@@ -515,8 +515,20 @@ class ArViewModel @Inject constructor(
 
     /** A/B switch for the pose fusion (Sub-project B): on = corrected snap-back fusion, off = old toggle. */
     fun evalSetFusionEnabled(on: Boolean) {
+        // The INTENT is recorded unconditionally; the renderer is updated if there is one.
+        //
+        // This used to read the value back — `_evalFusionEnabled.value = renderer?.fusionEnabled ?:
+        // false` — so a tap while no renderer was attached silently did nothing AND reported OFF.
+        // Entering AR, a surface rebuild, the moments around a target capture: any of them, and the
+        // artist turns drift correction on and watches the button say it is off. Reported as "I
+        // wasn't the one that turned it off", which is exactly right.
+        //
+        // I defended the read-back as honest mirroring, and it was the opposite. `attachSessionToRenderer`
+        // already pushes this value onto every renderer that attaches, so recording the intent is
+        // not a claim about a state that was never applied — it is a promise this class keeps.
+        // Dropping the request was the lie.
+        _evalFusionEnabled.value = on
         renderer?.fusionEnabled = on
-        _evalFusionEnabled.value = renderer?.fusionEnabled ?: false
         // Remembered across launches. See SettingsRepository.driftCorrectionEnabled — a field run
         // enabled this, ended, and silently came back off, and the next session discarded 241 good
         // relocalizations without a word.

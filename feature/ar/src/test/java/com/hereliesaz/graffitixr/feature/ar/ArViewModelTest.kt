@@ -604,16 +604,32 @@ class ArViewModelTest {
     }
 
     /**
-     * With no renderer attached there is nothing to switch, and the toggle must say so rather than
-     * report a state it failed to apply.
+     * A toggle with no renderer attached still records the intent, and still reports it.
      *
-     * This is the read-back discipline paying for itself: `evalSetFusionEnabled` writes to the
-     * renderer and then reports whatever the renderer holds, so a null renderer yields OFF instead
-     * of a cheerful ON with nothing behind it.
+     * The inverse of this was asserted here, and defended in a comment as honest mirroring: the
+     * setter read the flag back through the renderer, so a tap with none attached silently dropped
+     * the request and reported OFF. Entering AR, a surface rebuild, the moments around a target
+     * capture — any of them and the artist turns drift correction on and watches the button say it
+     * is off. It was reported from the field as "I wasn't the one that turned it off".
+     *
+     * `attachSessionToRenderer` pushes this value onto every renderer that attaches, so recording
+     * the intent is not a claim about something that never happened. It is a promise that gets kept
+     * on the next attach, which for a control only reachable inside AR is immediate.
      */
     @Test
-    fun `enabling fusion with no renderer reports off rather than a state it could not apply`() = runTest {
+    fun `enabling fusion with no renderer still records the intent`() = runTest {
         viewModel.evalSetFusionEnabled(true)
+        assertTrue(
+            "the request must survive the absence of a renderer, not be silently dropped",
+            viewModel.evalFusionEnabled.value,
+        )
+    }
+
+    /** And turning it back off is equally unconditional. */
+    @Test
+    fun `disabling fusion with no renderer records the intent too`() = runTest {
+        viewModel.evalSetFusionEnabled(true)
+        viewModel.evalSetFusionEnabled(false)
         assertFalse(viewModel.evalFusionEnabled.value)
     }
 
