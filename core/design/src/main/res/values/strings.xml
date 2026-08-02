@@ -440,7 +440,7 @@
     <string name="settings_hand_label">Dominant Hand</string>
     <string name="settings_hand_right">Right</string>
     <string name="settings_hand_left">Left</string>
-    <string name="settings_diag_label">Depth Diagnostic Overlay</string>
+    <string name="settings_diag_label">Diagnostics &amp; Auto-Screenshots</string>
     <string name="settings_layer_feature_points">Show Feature Points</string>
     <string name="settings_layer_plane_grids">Show Plane Grids</string>
     <string name="settings_layer_voxels">Show Voxels</string>

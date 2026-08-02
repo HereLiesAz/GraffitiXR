@@ -406,7 +406,7 @@
     <string name="settings_hand_label">Dominant na Kamay</string>
     <string name="settings_hand_right">Tama</string>
     <string name="settings_hand_left">Kaliwa</string>
-    <string name="settings_diag_label">Depth Diagnostic Overlay</string>
+    <string name="settings_diag_label">Diagnostics at Awtomatikong Screenshot</string>
     <string name="settings_on">Naka-on</string>
     <string name="settings_off">Naka-off</string>
     <string name="settings_scan_mode_label">AR Scan Mode</string>

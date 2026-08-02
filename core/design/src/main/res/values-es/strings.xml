@@ -406,7 +406,7 @@
     <string name="settings_hand_label">Mano Dominante</string>
     <string name="settings_hand_right">Derecha</string>
     <string name="settings_hand_left">Izquierda</string>
-    <string name="settings_diag_label">Superposición de Diagnóstico de Profundidad</string>
+    <string name="settings_diag_label">Diagnóstico y capturas automáticas</string>
     <string name="settings_on">Encendido</string>
     <string name="settings_off">Apagado</string>
     <string name="settings_scan_mode_label">Modo de Escaneo AR</string>

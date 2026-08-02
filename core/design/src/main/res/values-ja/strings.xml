@@ -424,7 +424,7 @@
     <string name="settings_hand_label">利き手</string>
     <string name="settings_hand_right">右</string>
     <string name="settings_hand_left">左</string>
-    <string name="settings_diag_label">深度診断オーバーレイ</string>
+    <string name="settings_diag_label">診断と自動スクリーンショット</string>
     <string name="settings_on">オン</string>
     <string name="settings_off">オフ</string>
     <string name="settings_scan_mode_label">ARスキャンモード</string>

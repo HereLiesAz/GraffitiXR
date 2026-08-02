@@ -82,11 +82,35 @@ class DiagnosticRecorder(
      * @param captures filenames of any auto-captured screenshots, so the reader knows what to expect
      *   attached and — more importantly — knows some exist when none are attached.
      */
-    @Synchronized
     fun report(
         header: Map<String, String>,
         parameters: Map<String, String>,
         captures: List<String>,
+        capturesTruncated: Boolean = false,
+    ): String {
+        // Snapshot under the lock, format outside it.
+        //
+        // This used to be @Synchronized as a whole, which meant a report — four histogram groupings
+        // and twelve statistics passes, each boxing and sorting up to 1800 floats — held the same
+        // monitor `record()` needs. `record()` runs on the AR tick, whose call site is careful never
+        // to suspend; handing it a lock held across that much work put a frame drop behind a button
+        // press for no reason. The copy is one array of references.
+        val samples: List<Sample>
+        val total: Long
+        synchronized(this) {
+            samples = ring.toList()
+            total = totalSeen
+        }
+        return format(samples, total, header, parameters, captures, capturesTruncated)
+    }
+
+    private fun format(
+        ring: List<Sample>,
+        totalSeen: Long,
+        header: Map<String, String>,
+        parameters: Map<String, String>,
+        captures: List<String>,
+        capturesTruncated: Boolean,
     ): String {
         val sb = StringBuilder(4096)
         sb.appendLine("## GraffitiXR diagnostic report")
@@ -97,6 +121,12 @@ class DiagnosticRecorder(
             sb.appendLine()
             sb.appendLine("**No samples recorded.** The diagnostics tick never ran — AR mode was not")
             sb.appendLine("entered, or tracking never started. That is itself the finding.")
+            // The parameters and screenshots sections still print. An early return dropped both, so
+            // the one path where "no screenshots" is guaranteed was also the one path that never
+            // said so — and the parameters are what tell the reader which build produced the
+            // nothing.
+            appendParameters(sb, parameters)
+            appendCaptures(sb, captures, capturesTruncated)
             return sb.toString()
         }
 
@@ -124,7 +154,17 @@ class DiagnosticRecorder(
             if (ring.none { it.fusion.state == FusionState.COLD_SNAP ||
                     it.fusion.state == FusionState.BLENDING ||
                     it.fusion.state == FusionState.HOLDING }) {
-                add("fusion never corrected the overlay")
+                // Distinguished from a fusion that was ON and never managed to correct anything.
+                //
+                // `ArRenderer.fusionEnabled` ships FALSE and its only writer sits behind the
+                // debug-only eval panel, so in a release build every sample is DISABLED and the bare
+                // "never corrected" line would print on 100% of field reports — a finding that is a
+                // constant is not a finding, and the first reader to chase it wastes the trip.
+                if (ring.all { it.fusion.state == FusionState.DISABLED }) {
+                    add("fusion was OFF for the whole run (expected — it ships default-off)")
+                } else {
+                    add("fusion never corrected the overlay")
+                }
             }
             if (ring.none { it.reloc.corrobGate == CorrobGate.GATED }) {
                 add("the gated corroboration match never ran (Phase 4 inactive for this run)")
@@ -144,12 +184,19 @@ class DiagnosticRecorder(
         sb.appendLine()
         sb.appendLine("| channel | min | median | max | samples |")
         sb.appendLine("|---|---|---|---|---|")
-        // The one filter here that is not the project's `>= 0` sentinel rule. `inlierRatio` is a
-        // computed getter that returns exactly 0 when there were no matches to divide by, so a 0 in
-        // this channel means "nothing was attempted", not "nothing survived RANSAC". Admitting it
-        // would drag the median of a run that mostly had no fingerprint down toward zero and make it
-        // look like a run that relocalized badly.
-        stat(sb, "inlierRatio", ring.map { it.reloc.inlierRatio }) { it > 0f }
+        // `inlierRatio` has no sentinel of its own — its getter returns a bare 0 both when nothing
+        // was attempted (no matches to divide by) and when everything was attempted and RANSAC
+        // rejected all of it. Those are opposite findings, and the second is the more diagnostic of
+        // the two: forty correspondences a frame with zero inliers is the textbook "aimed at the
+        // wrong wall".
+        //
+        // A previous version filtered on `it > 0f` and a comment claimed 0 could only mean the
+        // first. It meant both, so the run that most needed this row reported `never measured`.
+        // Mapped to the project's -1 sentinel by the condition that actually separates them.
+        stat(
+            sb, "inlierRatio",
+            ring.map { if (it.reloc.matches > 0) it.reloc.inlierRatio else NOT_MEASURED },
+        ) { it >= 0f }
         stat(sb, "backboneFeatures", ring.map { it.reloc.backboneFeatures.toFloat() }) { it >= 0f }
         stat(sb, "corrobPredicted", ring.map { it.reloc.corrobPredicted.toFloat() }) { it >= 0f }
         stat(sb, "corrobMatched", ring.map { it.reloc.corrobMatched.toFloat() }) { it >= 0f }
@@ -167,13 +214,24 @@ class DiagnosticRecorder(
         sb.appendLine("- snaps accepted/refused: ${last.fusion.snapsAccepted} / ${last.fusion.snapsRejected}")
         sb.appendLine()
 
-        // --- Parameters. Every one is an unmeasured prior, and the reader is usually not the person
-        // holding the phone.
+        appendParameters(sb, parameters)
+        appendCaptures(sb, captures, capturesTruncated)
+        return sb.toString()
+    }
+
+    /** Every one is an unmeasured prior, and the reader is usually not the person holding the phone. */
+    private fun appendParameters(sb: StringBuilder, parameters: Map<String, String>) {
         sb.appendLine("### Parameters in force")
         sb.appendLine()
         for ((k, v) in parameters.toSortedMap()) sb.appendLine("- `$k` = $v")
         sb.appendLine()
+    }
 
+    private fun appendCaptures(
+        sb: StringBuilder,
+        captures: List<String>,
+        capturesTruncated: Boolean,
+    ) {
         sb.appendLine("### Screenshots")
         sb.appendLine()
         if (captures.isEmpty()) {
@@ -181,7 +239,16 @@ class DiagnosticRecorder(
         } else {
             captures.forEach { sb.appendLine("- $it") }
         }
-        return sb.toString()
+        // A list that stops at the ceiling reads as "and then nothing else happened". It has to say
+        // which of the two it is, or it reproduces the exact silent-absence confusion this report
+        // was written to end, one section down from where the report says so.
+        if (capturesTruncated) {
+            sb.appendLine()
+            sb.appendLine(
+                "**Capture budget exhausted** — later watched transitions occurred and were NOT " +
+                    "photographed.",
+            )
+        }
     }
 
     /** `name: A x12 (40%), B x18 (60%)`, most frequent first. */
@@ -219,7 +286,18 @@ class DiagnosticRecorder(
         else String.format(java.util.Locale.US, "%.3f", v)
 
     companion object {
-        /** ~2 minutes at the ~15 Hz diagnostics tick. Bounded so a long session cannot grow it. */
+        /**
+         * Samples retained. Bounded so a long session cannot grow it.
+         *
+         * Deliberately expressed in samples and not in minutes: the diagnostics tick is
+         * `frameCount % 4` in `ArRenderer`, a quarter of the *achieved* GL frame rate, so the wall
+         * time this covers floats with load and display — roughly two minutes at 30 fps, half that
+         * on a 90 Hz panel, twice it when SLAM is struggling. The report prints the measured span of
+         * its actual window rather than restating this as a duration.
+         */
         const val DEFAULT_CAPACITY = 1800
+
+        /** The project-wide "not measured" marker. Negative, never 0. */
+        private const val NOT_MEASURED = -1f
     }
 }

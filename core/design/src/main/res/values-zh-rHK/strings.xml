@@ -406,7 +406,7 @@
     <string name="settings_hand_label">慣用手</string>
     <string name="settings_hand_right">正確的</string>
     <string name="settings_hand_left">左邊</string>
-    <string name="settings_diag_label">深度診斷疊加</string>
+    <string name="settings_diag_label">診斷與自動螢幕擷取</string>
     <string name="settings_on">開啟</string>
     <string name="settings_off">關閉</string>
     <string name="settings_scan_mode_label">AR掃描模式</string>

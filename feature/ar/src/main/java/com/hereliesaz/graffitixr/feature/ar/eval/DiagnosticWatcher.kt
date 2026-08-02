@@ -41,6 +41,7 @@ class DiagnosticWatcher(
     private var prevReject: RelocReject? = null
     private var prevFusion: FusionState? = null
     private var prevGate: CorrobGate? = null
+    private var prevGrow: GrowOutcome? = null
     private var prevCorrectionMm: Float = NOT_MEASURED
 
     private val firedOnce = HashSet<CaptureTrigger>()
@@ -58,10 +59,17 @@ class DiagnosticWatcher(
     private var lastAnyMs: Long? = null
     private var requested = 0
 
-    /** How many captures the budget still allows. Surfaced so the report can say the cap was hit. */
+    /** Captures requested so far — the number SPENT, not the number remaining. */
     @get:Synchronized
     val requestCount: Int get() = requested
 
+    /**
+     * Whether the budget is exhausted, meaning later transitions went unphotographed.
+     *
+     * Read into the report, because a Screenshots section that stops at sixteen without saying why
+     * reads as "nothing else happened" — the same silent-absence confusion the whole report exists
+     * to remove, one section down.
+     */
     @get:Synchronized
     val atCap: Boolean get() = requested >= maxCaptures
 
@@ -90,6 +98,7 @@ class DiagnosticWatcher(
         prevReject = reloc.reject
         prevFusion = fusion.state
         prevGate = reloc.corrobGate
+        prevGrow = reloc.growOutcome
         if (fusion.correctionMm >= 0f) prevCorrectionMm = fusion.correctionMm
 
         if (requested >= maxCaptures) return null
@@ -116,11 +125,22 @@ class DiagnosticWatcher(
         return null
     }
 
+    /**
+     * Clears every latch, cooldown and the budget. **Must be called on each AR-mode entry.**
+     *
+     * The view model outlives an AR session — entering and leaving AR is a mode switch inside it —
+     * so without this the edge state persists across sessions. Session one ends with the lock `OK`;
+     * ten minutes later session two's first tick reads `NO_FINGERPRINT`, both cooldowns have long
+     * expired, and a `LOCK_LOST` fires captioned "what the camera was pointed at when the lock died"
+     * for a loss that happened on a different wall in a different session. The once-only triggers
+     * would meanwhile be latched for the life of the process and could never fire again.
+     */
     @Synchronized
     fun reset() {
         prevReject = null
         prevFusion = null
         prevGate = null
+        prevGrow = null
         prevCorrectionMm = NOT_MEASURED
         firedOnce.clear()
         lastFiredMs.clear()
@@ -140,8 +160,20 @@ class DiagnosticWatcher(
         val pReject = prevReject
         val pFusion = prevFusion
         val pGate = prevGate
+        val pGrow = prevGrow
 
-        if (reloc.growOutcome == GrowOutcome.PROMOTED) out.add(CaptureTrigger.PROMOTED)
+        // An EDGE, like everything else here, and it was written as a level test.
+        //
+        // The native `mGrowOutcome` is sticky: `MobileGS::tryUpdateFingerprint` returns early —
+        // without touching it — when no design is registered. So one promotion followed by clearing
+        // the design leaves `PROMOTED` standing on every subsequent tick, forever. As a level test
+        // that re-fired every `repeatCooldownMs`, spending the entire 16-capture budget on ~4
+        // minutes of photographs of one promotion and leaving nothing for the lock failures.
+        if (pGrow != null && pGrow != GrowOutcome.PROMOTED &&
+            reloc.growOutcome == GrowOutcome.PROMOTED
+        ) {
+            out.add(CaptureTrigger.PROMOTED)
+        }
 
         if (pFusion != null && pFusion != FusionState.NO_CAPTURE_POSE &&
             fusion.state == FusionState.NO_CAPTURE_POSE

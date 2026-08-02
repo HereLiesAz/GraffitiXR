@@ -60,6 +60,47 @@ class DiagnosticWatcherTest {
         assertNull(w.tick(0L, reject = RelocReject.OK, state = FusionState.COLD_SNAP))
     }
 
+    /**
+     * `PROMOTED` is an edge like every other trigger, and it was written as a level test.
+     *
+     * The native `mGrowOutcome` is sticky — `MobileGS::tryUpdateFingerprint` returns early without
+     * touching it when no design is registered — so one promotion followed by clearing the design
+     * leaves `PROMOTED` standing on every subsequent tick forever. As a level test it re-fired every
+     * `REPEAT_COOLDOWN_MS`, spending the whole 16-capture budget on about four minutes of
+     * photographs of a single promotion and leaving nothing for the lock failures.
+     *
+     * The class's headline claim is "transitions, never states". This is the trigger that broke it.
+     */
+    @Test
+    fun `a latched promotion is photographed once, not on every tick`() {
+        val w = DiagnosticWatcher()
+        w.tick(0L, grow = GrowOutcome.NO_CANDIDATES)
+        assertEquals(CaptureTrigger.PROMOTED, w.tick(1_000L, grow = GrowOutcome.PROMOTED))
+        // The value sticks. Every later tick still reads PROMOTED, well past both cooldowns, and
+        // none of them is a new promotion.
+        assertNull(w.tick(60_000L, grow = GrowOutcome.PROMOTED))
+        assertNull(w.tick(120_000L, grow = GrowOutcome.PROMOTED))
+        assertNull(w.tick(180_000L, grow = GrowOutcome.PROMOTED))
+        assertEquals(1, w.requestCount)
+    }
+
+    /** A second, genuine promotion — after the outcome moved away and back — is a new edge. */
+    @Test
+    fun `a second genuine promotion is photographed`() {
+        val w = DiagnosticWatcher()
+        w.tick(0L, grow = GrowOutcome.NO_CANDIDATES)
+        assertEquals(CaptureTrigger.PROMOTED, w.tick(1_000L, grow = GrowOutcome.PROMOTED))
+        w.tick(60_000L, grow = GrowOutcome.NO_NEW_POINTS)
+        assertEquals(CaptureTrigger.PROMOTED, w.tick(120_000L, grow = GrowOutcome.PROMOTED))
+    }
+
+    /** A session that opens already latched at PROMOTED must not photograph its first tick. */
+    @Test
+    fun `a promotion already standing on the first tick is not a transition`() {
+        val w = DiagnosticWatcher()
+        assertNull(w.tick(0L, grow = GrowOutcome.PROMOTED))
+    }
+
     @Test
     fun `losing the lock is photographed`() {
         val w = DiagnosticWatcher()

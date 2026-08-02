@@ -96,6 +96,107 @@ class DiagnosticRecorderTest {
         assertTrue(out, out.contains("self-grow never promoted"))
     }
 
+    /**
+     * A finding that is a constant is not a finding.
+     *
+     * `ArRenderer.fusionEnabled` ships `false` and its only writer sits behind the debug-only eval
+     * panel, so in a release build every sample is `DISABLED` and a bare "fusion never corrected the
+     * overlay" would print on 100% of field reports. The first reader to chase it wastes the trip —
+     * so the always-true case has to name itself, the way the self-grow line already does.
+     */
+    @Test
+    fun `fusion being off for the whole run is reported as such, not as a failure`() {
+        val r = recorder()
+        repeat(20) { r.tick(state = FusionState.DISABLED) }
+        val out = r.report(emptyMap(), emptyMap(), emptyList())
+        assertTrue(out, out.contains("fusion was OFF for the whole run"))
+        assertFalse(out, out.contains("fusion never corrected the overlay"))
+    }
+
+    /** Fusion on, and never once correcting, is the real finding and must still be reported. */
+    @Test
+    fun `fusion enabled but never correcting is still a finding`() {
+        val r = recorder()
+        repeat(20) { r.tick(state = FusionState.WAITING_FOR_LOCK) }
+        val out = r.report(emptyMap(), emptyMap(), emptyList())
+        assertTrue(out, out.contains("fusion never corrected the overlay"))
+        assertFalse(out, out.contains("fusion was OFF"))
+    }
+
+    /**
+     * A zero inlier ratio with matches present is the most diagnostic reading in the channel, and
+     * an earlier filter discarded it.
+     *
+     * `RelocDiagnostics.inlierRatio` has no sentinel of its own: it returns a bare `0` both when
+     * nothing was attempted and when everything was attempted and RANSAC rejected all of it. Forty
+     * correspondences a frame with zero inliers is the textbook "aimed at the wrong wall" — and it
+     * used to report `never measured`, telling the reader nothing had been tried.
+     */
+    @Test
+    fun `a zero inlier ratio with matches present is a measurement, not an absence`() {
+        val r = recorder()
+        repeat(10) { r.tick(matches = 40, inliers = 0) }
+        val out = r.report(emptyMap(), emptyMap(), emptyList())
+        val row = out.lines().first { it.startsWith("| inlierRatio") }
+        assertEquals("| inlierRatio | 0 | 0 | 0 | 10 |", row.trim())
+    }
+
+    /** With no matches there was nothing to attempt, and that genuinely is an absence. */
+    @Test
+    fun `a zero inlier ratio with no matches is not a measurement`() {
+        val r = recorder()
+        repeat(10) { r.tick(matches = 0, inliers = 0) }
+        val out = r.report(emptyMap(), emptyMap(), emptyList())
+        val row = out.lines().first { it.startsWith("| inlierRatio") }
+        assertTrue(row, row.contains("never measured"))
+    }
+
+    /** The histogram's percentage arithmetic, on a split that is not trivially 100%. */
+    @Test
+    fun `histogram percentages are computed over the window`() {
+        val r = recorder()
+        repeat(3) { r.tick(reject = RelocReject.OK) }
+        repeat(1) { r.tick(reject = RelocReject.FEW_INLIERS) }
+        val out = r.report(emptyMap(), emptyMap(), emptyList())
+        val row = out.lines().first { it.startsWith("- **Reloc**") }
+        assertEquals("- **Reloc**: OK ×3 (75%), FEW_INLIERS ×1 (25%)", row.trim())
+    }
+
+    /**
+     * The budget ceiling has to announce itself.
+     *
+     * A screenshot list that stops at sixteen reads as "and then nothing else happened" — the same
+     * silent-absence confusion the report exists to remove, one section below where it removes it.
+     */
+    @Test
+    fun `an exhausted capture budget is stated`() {
+        val r = recorder()
+        r.tick()
+        val truncated = r.report(
+            emptyMap(), emptyMap(), listOf("01_LOCK_LOST.png"), capturesTruncated = true,
+        )
+        assertTrue(truncated, truncated.contains("Capture budget exhausted"))
+        val notTruncated = r.report(emptyMap(), emptyMap(), listOf("01_LOCK_LOST.png"))
+        assertFalse(notTruncated, notTruncated.contains("Capture budget exhausted"))
+    }
+
+    /**
+     * An empty report still prints its parameters and its screenshots section.
+     *
+     * The early return dropped both, so the one path where "no screenshots" is guaranteed was also
+     * the only path that never said so — and the parameters are what tell the reader which build
+     * produced the nothing.
+     */
+    @Test
+    fun `an empty report still carries parameters and the screenshots section`() {
+        val out = recorder().report(
+            emptyMap(), linkedMapOf("SearchRadius.RHO" to "0.05"), emptyList(),
+        )
+        assertTrue(out, out.contains("No samples recorded"))
+        assertTrue(out, out.contains("`SearchRadius.RHO` = 0.05"))
+        assertTrue(out, out.contains("None captured"))
+    }
+
     @Test
     fun `a healthy run reports nothing as never having happened`() {
         val r = recorder()

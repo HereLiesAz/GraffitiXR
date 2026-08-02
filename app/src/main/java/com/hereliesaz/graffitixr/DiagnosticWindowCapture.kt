@@ -64,9 +64,14 @@ suspend fun captureWindowToPng(
 
     return withContext(Dispatchers.IO) {
         // Downscaled before encoding, not after: sixteen full-resolution PNGs of a 1080×2400 screen
-        // is tens of megabytes written to a user's phone for a debugging aid. At 1280 on the long
-        // edge the HUD text is still legible and the wall is still identifiable, which is all either
-        // half of the image is read for.
+        // is tens of megabytes written to a user's phone for a debugging aid.
+        //
+        // 1280 on the long edge is chosen for the SCENE, not the HUD. On a 1080×2400 phone that is a
+        // 0.53× reduction, which takes the overlay's 11 sp rows to about six pixels — not reliably
+        // legible, and it does not need to be: every number on that HUD is in the report, at full
+        // precision, aggregated over a window rather than caught at one instant. What only the
+        // image can supply is what the camera was pointed at, and a wall stays identifiable well
+        // below this.
         val scale = maxDim.toFloat() / maxOf(w, h).toFloat()
         val out = if (scale < 1f) {
             Bitmap.createScaledBitmap(full, (w * scale).toInt(), (h * scale).toInt(), true)

@@ -406,7 +406,7 @@
     <string name="settings_hand_label">Доминирующая рука</string>
     <string name="settings_hand_right">Правая</string>
     <string name="settings_hand_left">Левая</string>
-    <string name="settings_diag_label">Наложение диагностики глубины</string>
+    <string name="settings_diag_label">Диагностика и автоскриншоты</string>
     <string name="settings_on">На</string>
     <string name="settings_off">Выключенный</string>
     <string name="settings_scan_mode_label">Режим AR-сканирования</string>

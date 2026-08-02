@@ -335,8 +335,13 @@ class ArViewModel @Inject constructor(
      * Screenshots are the one part that IS gated, on the Diagnostic Overlay setting.
      *
      * Recording numbers into memory is invisible; writing PNGs of the user's camera feed to disk is
-     * not, and must never happen because the app felt like it. Opting into the diagnostic overlay is
-     * the opt-in.
+     * not, and must never happen because the app felt like it.
+     *
+     * The gate is the Diagnostic Overlay setting, which defaults off, is not persisted, and cannot
+     * be reached without a deliberate flip. The setting's own label had to be changed to say what
+     * the flip now authorises — it read "Depth Diagnostic Overlay", which promises a text HUD and
+     * nothing about photographs — because a technically effective gate on a switch whose label
+     * conceals what it does is not consent, it is a defensible-looking accident.
      */
     @Volatile private var diagnosticCaptureEnabled = false
 
@@ -508,10 +513,37 @@ class ArViewModel @Inject constructor(
     }
 
     /** A/B switch for the pose fusion (Sub-project B): on = corrected snap-back fusion, off = old toggle. */
-    fun evalSetFusionEnabled(on: Boolean) { renderer?.fusionEnabled = on }
+    fun evalSetFusionEnabled(on: Boolean) {
+        renderer?.fusionEnabled = on
+        _evalFusionEnabled.value = renderer?.fusionEnabled ?: false
+    }
+
+    private val _evalFusionEnabled = MutableStateFlow(false)
+
+    /**
+     * The A/B switch's ACTUAL position, mirrored rather than shadowed.
+     *
+     * The eval panel held this in a `remember`, seeded with a guess at the renderer's default. The
+     * guess went stale and the button spent 187 commits claiming fusion was on while it was off; the
+     * obvious repair — correct the seed — leaves the same defect one rotation away, because a
+     * `remember` is dropped on configuration change while `ArRenderer.fusionEnabled` is not.
+     *
+     * A switch that can disagree with the thing it switches invalidates the comparison it exists to
+     * run, so it does not get to hold its own copy. Seeded from the renderer's shipped default and
+     * written only through [evalSetFusionEnabled], which reads the value back after setting it.
+     */
+    val evalFusionEnabled: StateFlow<Boolean> = _evalFusionEnabled.asStateFlow()
+
+    private val _evalSelfGrowEnabled = MutableStateFlow(false)
+
+    /** Same arrangement for self-grow, which had the identical shadowing problem. */
+    val evalSelfGrowEnabled: StateFlow<Boolean> = _evalSelfGrowEnabled.asStateFlow()
 
     /** A/B switch for teleological self-grow (default OFF): promote validated new marks into the fingerprint. */
-    fun evalSetSelfGrowEnabled(on: Boolean) { slamManager.setSelfGrowEnabled(on) }
+    fun evalSetSelfGrowEnabled(on: Boolean) {
+        slamManager.setSelfGrowEnabled(on)
+        _evalSelfGrowEnabled.value = on
+    }
 
     /**
      * The pasteable report: what ran, what it measured, and under which constants.
@@ -535,6 +567,7 @@ class ArViewModel @Inject constructor(
         ),
         parameters = diagnosticParameters(),
         captures = captureManifest.toList(),
+        capturesTruncated = diagnosticWatcher.atCap,
     )
 
     /**
@@ -604,7 +637,11 @@ class ArViewModel @Inject constructor(
     }
 
     /**
-     * Where auto-captured screenshots land. Under `eval/` so one FileProvider path covers them.
+     * Where auto-captured screenshots land, beside the eval CSVs they are shared with.
+     *
+     * They are reachable by `FileProvider` because `file_paths.xml` exposes the whole of `filesDir`
+     * (`<files-path path="."/>`), not because `eval/` is called out — worth stating plainly, since
+     * a reader who assumes a scoped entry would also assume moving this directory is safe.
      *
      * **Purged once per view-model lifetime**, on first use. Without it the directory accumulates
      * across every session the app has ever run, and [writeDiagnosticBundle] — which globs the
@@ -1144,6 +1181,12 @@ class ArViewModel @Inject constructor(
             val now = System.currentTimeMillis()
             arEntryTimestampMs = now
             lastTrackingTimestampMs = now
+            // A fresh AR session gets a fresh watcher. This view model outlives the session — AR is
+            // a mode switch inside it — so without this the previous session's edge state, latches
+            // and spent budget carry over: the first tick of session two compares against session
+            // one's last state and photographs a "lost lock" from a different wall, while every
+            // once-only trigger stays latched for the life of the process and can never fire again.
+            diagnosticWatcher.reset()
             if (_uiState.value.trackingFailed) {
                 _uiState.update { it.copy(trackingFailed = false) }
             }
@@ -2363,12 +2406,31 @@ class ArViewModel @Inject constructor(
         // happen" about a period that has already passed, which is impossible if collection has to
         // be armed first.
         diagnosticRecorder.record(relocDiag, corrobDiag, fusionDiag, wallPoints, progress)
-        if (diagnosticCaptureEnabled) {
-            diagnosticWatcher.onTick(nowMs, relocDiag, corrobDiag, fusionDiag)?.let { trigger ->
-                // tryEmit, not emit: this is the AR tick and it must not suspend. A dropped request
-                // when the buffer is full is the correct loss — the buffer only fills if the
-                // Activity is not draining it, and captures it could not take are not evidence.
-                _captureRequests.tryEmit(trigger)
+        // onTick ALWAYS, and only the emit is gated.
+        //
+        // The watcher goes to some trouble to advance its edge state unconditionally so that a
+        // suppressed transition is dropped rather than deferred onto a later, unrelated frame.
+        // Wrapping the whole call in the enable flag — as this did — reintroduced that exact defect
+        // one level up: toggling the overlay off froze `prevReject` at whatever it held, and
+        // toggling it back on five minutes later compared a live state against a stale one and
+        // photographed the wrong moment under the right name.
+        //
+        // elapsedRealtime, not the wall clock beside it: the cooldowns are differences, and an NTP
+        // correction backward makes `nowMs - lastAnyMs` negative — which compares below every
+        // cooldown and silently refuses every capture for the rest of the session. That is the
+        // failure the watcher's own KDoc narrates as fixed, and feeding it a non-monotonic clock
+        // would have handed it straight back.
+        val trigger = diagnosticWatcher.onTick(
+            android.os.SystemClock.elapsedRealtime(), relocDiag, corrobDiag, fusionDiag,
+        )
+        if (trigger != null && diagnosticCaptureEnabled) {
+            // tryEmit, not emit: this is the AR tick and it must not suspend. The watcher has
+            // already spent a budget slot and latched any once-only trigger by this point, so a
+            // dropped emit is a transition that will never be photographed and never be retried —
+            // it has to be recorded, or the report's "none captured" would mean "or the request was
+            // dropped", which is precisely the ambiguity the section exists to remove.
+            if (!_captureRequests.tryEmit(trigger)) {
+                onDiagnosticCaptureFailed(trigger, "request dropped — no collector draining")
             }
         }
 

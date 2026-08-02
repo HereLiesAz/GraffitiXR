@@ -424,7 +424,7 @@
     <string name="settings_hand_label">惯用手</string>
     <string name="settings_hand_right">右手</string>
     <string name="settings_hand_left">左手</string>
-    <string name="settings_diag_label">深度诊断覆盖层</string>
+    <string name="settings_diag_label">诊断与自动截图</string>
     <string name="settings_on">开</string>
     <string name="settings_off">关</string>
     <string name="settings_scan_mode_label">AR 扫描模式</string>

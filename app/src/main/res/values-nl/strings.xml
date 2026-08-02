@@ -406,7 +406,7 @@
     <string name="settings_hand_label">Dominante hand</string>
     <string name="settings_hand_right">Rechts</string>
     <string name="settings_hand_left">Links</string>
-    <string name="settings_diag_label">Dieptediagnostische overlay</string>
+    <string name="settings_diag_label">Diagnostiek en automatische schermafbeeldingen</string>
     <string name="settings_on">Op</string>
     <string name="settings_off">Uit</string>
     <string name="settings_scan_mode_label">AR-scanmodus</string>

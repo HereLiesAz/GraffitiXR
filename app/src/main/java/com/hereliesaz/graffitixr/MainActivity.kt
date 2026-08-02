@@ -201,9 +201,14 @@ class MainActivity : ComponentActivity() {
             val text = withContext(Dispatchers.IO) {
                 runCatching { files.first().readText() }.getOrDefault("")
             }
-            getSystemService(AndroidClipboardManager::class.java)?.setPrimaryClip(
-                ClipData.newPlainText("GraffitiXR diagnostics", text),
-            )
+            // Only if there is something to copy. `getOrDefault("")` on a failed read would
+            // otherwise put an empty string on the clipboard — destroying whatever the user had
+            // there — while the toast below still said "Report copied".
+            if (text.isNotBlank()) {
+                getSystemService(AndroidClipboardManager::class.java)?.setPrimaryClip(
+                    ClipData.newPlainText("GraffitiXR diagnostics", text),
+                )
+            }
             val uris = ArrayList<Uri>()
             for (f in files) {
                 // Per-file, because one unreadable artefact must not cost the share the other
@@ -225,7 +230,8 @@ class MainActivity : ComponentActivity() {
             }
             Toast.makeText(
                 this@MainActivity,
-                "Report copied — ${uris.size} file(s) attached",
+                if (text.isBlank()) "Report unreadable — ${uris.size} file(s) attached"
+                else "Report copied — ${uris.size} file(s) attached",
                 Toast.LENGTH_SHORT,
             ).show()
             runCatching { startActivity(Intent.createChooser(send, "Share diagnostics")) }
@@ -1157,6 +1163,8 @@ class MainActivity : ComponentActivity() {
                             }
                             val diagnosticCaptures by arViewModel.diagnosticCaptureCount
                                 .collectAsState()
+                            val evalFusionOn by arViewModel.evalFusionEnabled.collectAsState()
+                            val evalSelfGrowOn by arViewModel.evalSelfGrowEnabled.collectAsState()
                             // Keyed on Unit: the collector must outlive every recomposition, or a
                             // request raised while the overlay is mid-recompose lands in a
                             // subscriber that no longer exists and the capture is silently lost.
@@ -1213,6 +1221,8 @@ class MainActivity : ComponentActivity() {
                                     onInduceLoss = { arViewModel.evalInduceLoss() },
                                     onToggleFusion = { arViewModel.evalSetFusionEnabled(it) },
                                     onToggleSelfGrow = { arViewModel.evalSetSelfGrowEnabled(it) },
+                                    fusionOn = evalFusionOn,
+                                    selfGrowOn = evalSelfGrowOn,
                                 )
                             }
 
@@ -2412,8 +2422,8 @@ private fun RelocDiagnosticsOverlay(
         DiagnosticRow("Painted", "${(paintingProgress * 100).toInt()}%", androidx.compose.ui.graphics.Color.White)
 
         // The whole overlay above answers "what is happening now" for someone holding the phone.
-        // This button answers it for someone who is not: it copies an aggregated report of the last
-        // two minutes to the clipboard and opens a share sheet with that report, the eval CSVs and
+        // This button answers it for someone who is not: it copies an aggregated report of the
+        // recent window to the clipboard and opens a share sheet with that report, the eval CSVs and
         // every screenshot taken automatically along the way. Shipped in release beside the rest of
         // the overlay, because the person who can reproduce a field failure is the artist, and until
         // now the only way to get anything back from them was a photograph of a phone screen.
@@ -2437,19 +2447,21 @@ private fun EvalOverlay(
     onInduceLoss: () -> Unit,
     onToggleFusion: (Boolean) -> Unit,
     onToggleSelfGrow: (Boolean) -> Unit,
-) {
-    // Local UI state for the A/B switch, defaulting to FALSE to match `ArRenderer.fusionEnabled`,
-    // which ships off.
+    // Both switches MIRROR the values they set; neither keeps a copy.
     //
-    // It defaulted to true, and the comment claimed that matched the renderer. It has not for some
-    // time. The consequence was not cosmetic: the button read "Fusion ON" while fusion was off, and
-    // the first press set it to `false` — the value it already held — so enabling fusion took two
-    // presses and the intervening state was indistinguishable from the one being left. An A/B switch
-    // that lies about which arm is selected invalidates the comparison it exists to run.
-    val fusionOn = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    // Teleological self-grow defaults OFF to match the native default (MobileGS.h). It permanently
-    // mutates the authoritative reloc fingerprint, so it is opt-in per session. Toggle to enable.
-    val selfGrowOn = androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    // These were `remember`ed booleans seeded with a guess at each default. The fusion guess said
+    // `true` while `ArRenderer.fusionEnabled` had shipped `false` for 187 commits, so the button
+    // read "Fusion ON" with fusion off and the first press set it to the value it already held —
+    // enabling fusion took two presses, and the intervening state was indistinguishable from the one
+    // being left. Correcting the seed alone would have left the same defect one rotation away: a
+    // `remember` is dropped on configuration change while the renderer's flag is not.
+    //
+    // An A/B switch that can disagree with the arm it selects invalidates the comparison it exists
+    // to run, so neither of these gets to hold its own state — they are read from the view model,
+    // which reads them back from the renderer and the engine.
+    fusionOn: Boolean,
+    selfGrowOn: Boolean,
+) {
     androidx.compose.foundation.layout.Column(
         androidx.compose.ui.Modifier
             .background(androidx.compose.ui.graphics.Color(0xAA000000))
@@ -2468,17 +2480,11 @@ private fun EvalOverlay(
             androidx.compose.material3.TextButton(onClick = onInduceLoss) { androidx.compose.material3.Text("Loss") }
             androidx.compose.material3.TextButton(onClick = onStartRecord) { androidx.compose.material3.Text("Rec▶") }
             androidx.compose.material3.TextButton(onClick = onStopRecord) { androidx.compose.material3.Text("Rec■") }
-            androidx.compose.material3.TextButton(onClick = {
-                fusionOn.value = !fusionOn.value
-                onToggleFusion(fusionOn.value)
-            }) {
-                androidx.compose.material3.Text(if (fusionOn.value) "Fusion ON" else "Fusion OFF")
+            androidx.compose.material3.TextButton(onClick = { onToggleFusion(!fusionOn) }) {
+                androidx.compose.material3.Text(if (fusionOn) "Fusion ON" else "Fusion OFF")
             }
-            androidx.compose.material3.TextButton(onClick = {
-                selfGrowOn.value = !selfGrowOn.value
-                onToggleSelfGrow(selfGrowOn.value)
-            }) {
-                androidx.compose.material3.Text(if (selfGrowOn.value) "Grow ON" else "Grow OFF")
+            androidx.compose.material3.TextButton(onClick = { onToggleSelfGrow(!selfGrowOn) }) {
+                androidx.compose.material3.Text(if (selfGrowOn) "Grow ON" else "Grow OFF")
             }
         }
     }
