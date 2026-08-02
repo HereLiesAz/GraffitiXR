@@ -104,4 +104,49 @@ class PlaneMarksTest {
         )
         assertTrue(tooFar.count == 0)
     }
+
+    /**
+     * A zero-length plane normal rejects EVERY ray, silently.
+     *
+     * This is not a hypothetical. `ArRenderer` zeroes `anchorSurfaceNormal` on two branches — no
+     * surface geometry, and a cross product too short to normalize — and then published it as
+     * `doodleWallPlane` regardless. The consumer checked the array was non-null and six floats long,
+     * which (0,0,0) passes, and handed it here.
+     *
+     * `nDotD = n·d` is then exactly 0 for every pixel, so every ray trips the parallel test and not
+     * one feature is placed. The fingerprint build fails on every capture, for any wall, in any
+     * lighting, with no error anywhere. A device run detected a full mark set and reported
+     * `wallPoints 0` across 953 samples.
+     *
+     * Pinned at this level because it is the layer where the consequence is total: a slightly wrong
+     * normal loses some points, a zero normal loses all of them, and the difference is invisible from
+     * the count alone.
+     */
+    @Test
+    fun `a degenerate plane normal places no points at all`() {
+        val pixels = (0 until 200).map { PlaneMarks.Pixel(100f + it, 200f + it) }
+        val identityView = floatArrayOf(
+            1f, 0f, 0f, 0f,
+            0f, 1f, 0f, 0f,
+            0f, 0f, 1f, 0f,
+            0f, 0f, 0f, 1f,
+        )
+        val res = PlaneMarks.backProject(
+            pixels, identityView,
+            planePointWorld = floatArrayOf(0f, 0f, 2f),
+            planeNormalWorld = floatArrayOf(0f, 0f, 0f),   // the defect
+            fx = 500f, fy = 500f, cx = 320f, cy = 240f,
+        )
+        assertEquals("a zero normal must place nothing — every ray reads as parallel", 0, res.count)
+
+        // And the same geometry with a real normal places essentially all of them, so the zero is
+        // the cause and not the pixels, the view, or the intrinsics.
+        val ok = PlaneMarks.backProject(
+            pixels, identityView,
+            planePointWorld = floatArrayOf(0f, 0f, 2f),
+            planeNormalWorld = floatArrayOf(0f, 0f, -1f),
+            fx = 500f, fy = 500f, cx = 320f, cy = 240f,
+        )
+        assertTrue("control: a valid normal must place the same rays, got ${ok.count}", ok.count > 190)
+    }
 }

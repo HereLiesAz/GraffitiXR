@@ -1128,10 +1128,28 @@ class ArRenderer(
                     // Doodle demo: publish the wall plane (anchor point + surface normal) so the
                     // ViewModel can build a fingerprint from the drawing and relocalize against it.
                     if (doodleLockActive) {
-                        doodleWallPlane = floatArrayOf(
-                            anchorModelMatrix[12], anchorModelMatrix[13], anchorModelMatrix[14],
-                            anchorSurfaceNormal[0], anchorSurfaceNormal[1], anchorSurfaceNormal[2],
-                        )
+                        // ONLY with a real normal. `anchorSurfaceNormal` is deliberately zeroed on
+                        // two branches above — no surface geometry, and a cross product too short to
+                        // normalize — and publishing (0,0,0) as a plane is worse than publishing
+                        // nothing.
+                        //
+                        // A zero normal is not a bad plane, it is a plane that rejects everything:
+                        // `PlaneMarks.backProject` computes `nDotD = n·d`, which is exactly 0 for
+                        // every pixel, so every ray trips the parallel test and NOT ONE feature is
+                        // ever placed. The fingerprint build then fails on every capture, for any
+                        // wall, in any lighting, silently — a device run detected a full mark set and
+                        // logged `wallPoints 0` across 953 samples because of this.
+                        val n = anchorSurfaceNormal
+                        val nLen2 = n[0] * n[0] + n[1] * n[1] + n[2] * n[2]
+                        doodleWallPlane = if (nLen2 > 1e-8f && nLen2.isFinite()) {
+                            floatArrayOf(
+                                anchorModelMatrix[12], anchorModelMatrix[13], anchorModelMatrix[14],
+                                n[0], n[1], n[2],
+                            )
+                        } else {
+                            Timber.w("ARDIAG doodle wall plane withheld: surface normal is degenerate")
+                            null
+                        }
                     }
                     setPrimaryAnchor(anchor) // non-null: the fallback branch always creates one
                     anchorEstablished = true

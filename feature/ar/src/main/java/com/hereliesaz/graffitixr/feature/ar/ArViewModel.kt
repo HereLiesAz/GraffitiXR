@@ -3176,7 +3176,26 @@ class ArViewModel @Inject constructor(
         if (doodleBuildInFlight) return
         val plane = renderer?.doodleWallPlane
         val intr = intrinsics
-        if (plane == null || plane.size < 6 || intr == null) {
+        // The preconditions bail, which used to return in silence — BEFORE `buildSingle` and so
+        // before any of its refusal reporting. A run could fail here on every capture tick and the
+        // report would still say "no refusal recorded".
+        //
+        // The normal check is the one that matters. A zero-length normal passes every structural
+        // test — non-null, six floats — and then makes `PlaneMarks.backProject` reject every single
+        // ray, because `n·d` is exactly 0 for every pixel. Guarded at the publisher too
+        // (`ArRenderer.doodleWallPlane`); repeated here because this is the last place it can be
+        // refused with a message attached, and a plane arriving degenerate from anywhere must not
+        // reach the builder.
+        val planeNormalOk = plane != null && plane.size >= 6 &&
+            (plane[3] * plane[3] + plane[4] * plane[4] + plane[5] * plane[5]) > 1e-8f
+        if (!planeNormalOk || intr == null) {
+            lastCaptureRefusal = when {
+                plane == null -> "no wall plane yet — ARCore has not produced a usable surface to project onto"
+                plane.size < 6 -> "wall plane malformed (${plane.size} floats, need 6)"
+                !planeNormalOk -> "wall plane has a degenerate normal — nothing can back-project onto it"
+                else -> "no camera intrinsics for this frame"
+            }
+            Timber.w("ARDIAG doodle capture skipped: $lastCaptureRefusal")
             slamManager.setMappingPaused(false)
             return
         }
