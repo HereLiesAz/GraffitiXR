@@ -259,6 +259,9 @@ object MetricFingerprintBuilder {
         // Center the AR overlay on the marks (their centroid), not the screen-center anchor.
         val markCenterLocal = marksCentroidLocal(res.pointsCam, cvView, anchorModel)
         slam.overlayMarkCenterLocal = markCenterLocal
+        // IMPLEMENTATION.md 0.9 — published at capture as well as on reload, or the session that
+        // CREATED the target would relocalize without a correction until the project was reopened.
+        slam.captureAnchorCam = anchorCam.copyOf()
 
         val keptDesc = Mat(res.count, descAll.cols(), descAll.type())
         val keypoints = ArrayList<KeyPoint>(res.count)

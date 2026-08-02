@@ -921,10 +921,40 @@ order.** Work top to bottom.
       This is **pre-existing**, not introduced by Phase 0, and it is not a rotation
       problem — which is why looking only for rotation missed it.
 
-- [ ] **0.9** Fix `composeCorrected`'s GL/CV and capture-view factors (see 0.6). Needs
+- [x] **0.9** Fix `composeCorrected`'s GL/CV and capture-view factors (see 0.6). Needs
       its own experiment: it changes where the overlay lands, and §8.3's warning about
       getting every sign right applies with full force. Do not fold it into a
       rotation commit. **[T]**
+      *(DONE, and landed alone as the item asks. "Needs its own experiment" turned out
+      not to mean "needs a device": there is an invariant that settles it offline.*
+      ***The invariant.** `currentAnchor` computes `newD = corrected · inverse(backbone)`,
+      so if ARCore has not drifted since capture, `backbone` is already right and
+      `corrected` must come back equal to it — the correction must be the identity. Any
+      residual IS the composition error. Against the shipped form the residual was
+      **2.92**: not a rounding artefact, a wholly different pose.*
+      ***Why it is not circular.** The one belief-carrying input is what `solvePnP`
+      returns under zero drift, and that is built from the repo's OWN shipped bridge —
+      `MetricMarks.glViewToCv`, and `MetricFingerprintBuilder`'s
+      `captureAnchorCam = cvView · anchorModel`. The fingerprint frame IS the
+      display-oriented CV capture camera by construction, in code whose fingerprints
+      demonstrably relocalize. Limit, stated: this validates `composeCorrected` against
+      the fingerprint builder and cannot catch an error the two share.*
+      ***The fix.** `corrected = inv(vCurrent) · [D · pnpMat] · captureAnchorCam`.
+      `captureAnchorCam` is a quantity Phase 2 already builds, persists and partitions
+      with, so no new geometry was needed — only a factor the project already had and
+      one existing converter. Residual 4.8e-7.*
+      ***I got it wrong first, and the invariant caught it.** `pnpMat` is a transform,
+      so converting it between conventions is normally the conjugation `D · m · D`. That
+      is wrong here because `captureAnchorCam` carries its own `D`; the trailing factor
+      applies it twice and lands **4.29** from the anchor — worse than the 2.92 defect it
+      was meant to fix. §8.3's warning arriving in person. Both mistakes are pinned.*
+      ***Behaviour change worth knowing:** a pre-Phase-2 fingerprint has no
+      `captureAnchorCam`, and fusion is now SKIPPED for it rather than fed a world-frame
+      anchor. Refusing to correct leaves the overlay on the drifting backbone; correcting
+      in mixed frames pulls it somewhere confidently wrong, and §8.3 says the second is
+      worse.*
+      *Still not device-verified — the invariant proves internal consistency, not that
+      the overlay lands on the wall. That remains E-series work.)*
 - [x] **0.10** `MetricFingerprintBuilder.ingestSingle` stores display-frame
       `res.pointsCam` alongside the **un-rotated** `glView` in the same
       `restoreWallFingerprintMetric` call. Native pairs them in

@@ -11,16 +11,39 @@ class PoseFusionTest {
     private fun trans(x: Float, y: Float, z: Float) =
         floatArrayOf(1f,0f,0f,0f, 0f,1f,0f,0f, 0f,0f,1f,0f, x,y,z,1f)
 
-    /** reloc payload with vCurrent=I, fpAnchor=I so composeCorrected(reloc)=target. */
+    /**
+     * `captureAnchorCam` for the degenerate fixture these tests use: capture camera at the world
+     * origin, anchor at the world origin.
+     *
+     * That is `V_cv(capture) · anchorModel` with both factors identity in GL — and `V_cv = D · V_gl`,
+     * so it is `D = diag(1,-1,-1)`, not the identity. Passing `identity()` here would be passing a
+     * capture view that does not exist, and after 0.9 it shows: the composition would leave `D` in
+     * the rotation and these fixtures would come out mirrored in Y and Z.
+     *
+     * So this is the correct value, not a fudge to make old tests pass — and it is exactly the class
+     * of mistake 0.9 fixed, reproduced in miniature.
+     */
+    private fun captureAtOrigin() =
+        floatArrayOf(1f,0f,0f,0f, 0f,-1f,0f,0f, 0f,0f,-1f,0f, 0f,0f,0f,1f)
+
+    /** reloc payload carrying [target] as the pnp block, plus inlier/match/seq counters. */
     private fun reloc(target: FloatArray, inliers: Float, matches: Float, seq: Float) =
         FloatArray(19).also {
             System.arraycopy(target, 0, it, 0, 16); it[16] = inliers; it[17] = matches; it[18] = seq
         }
 
-    @Test fun `composeCorrected with V=pnp and fpAnchor=I yields identity`() {
+    /**
+     * `IMPLEMENTATION.md` **0.9** made the axis conversion visible here, and this test changed with
+     * it. It used to assert that `V == pnp` cancels to the identity — true only while `pnpMat` was
+     * chained in raw, which was the defect: `pnpMat` is CV-convention and the view is GL, so they
+     * cannot cancel. With the conversion applied what survives is exactly `D = diag(1,-1,-1)`, the
+     * handedness difference, with no translation left over.
+     */
+    @Test fun `composeCorrected with V=pnp leaves exactly the axis conversion`() {
         val v = trans(2f, 0f, 0f)
-        val r = PoseFusion.composeCorrected(vCurrent = v, pnpMat = v, fpAnchor = identity())
-        identity().forEachIndexed { i, e -> assertEquals(e, r[i], 1e-4f) }
+        val r = PoseFusion.composeCorrected(vCurrent = v, pnpMat = v, captureAnchorCam = identity())
+        val d = floatArrayOf(1f,0f,0f,0f, 0f,-1f,0f,0f, 0f,0f,-1f,0f, 0f,0f,0f,1f)
+        d.forEachIndexed { i, e -> assertEquals("element $i", e, r[i], 1e-4f) }
     }
 
     /**
@@ -35,11 +58,13 @@ class PoseFusionTest {
         val rotZ = floatArrayOf(0f,1f,0f,0f, -1f,0f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
         val v = rotZ                       // world -> camera is a pure rotation
         val pnp = identity()               // camera -> fingerprint world is identity
-        val fpAnchor = trans(1f, 0f, 0f)   // anchor sits +1 along the fingerprint frame's X
+        val captureAnchorCam = trans(1f, 0f, 0f)  // anchor sits +1 along the capture frame's X
 
-        // inverse(V)·pnp·fpAnchor = rotZ⁻¹ · I · trans(1,0,0). rotZ⁻¹ maps +X to -Y, so the composed
-        // anchor sits at (0, -1, 0). A composition in any other order does not land there.
-        val r = PoseFusion.composeCorrected(vCurrent = v, pnpMat = pnp, fpAnchor = fpAnchor)
+        // inverse(V)·[D·pnp]·captureAnchorCam = rotZ⁻¹ · D · trans(1,0,0). D leaves a +X translation
+        // alone (its Y and Z components are zero), and rotZ⁻¹ maps +X to -Y, so the composed anchor
+        // sits at (0, -1, 0) — unchanged by 0.9, which is worth knowing: this fixture cannot see the
+        // axis conversion, which is exactly why the test above exists alongside it.
+        val r = PoseFusion.composeCorrected(vCurrent = v, pnpMat = pnp, captureAnchorCam = captureAnchorCam)
         assertEquals(0f, r[12], 1e-4f)
         assertEquals(-1f, r[13], 1e-4f)
         assertEquals(0f, r[14], 1e-4f)
@@ -57,38 +82,39 @@ class PoseFusionTest {
      * neither could tell convention A from convention B; and neither would have failed under the
      * missing-factor defect described in 0.6/0.9. The claim lived in the KDoc, not the assertions.
      *
-     * What is genuinely testable here is the factor ORDER, which the test above already covers with
-     * non-commuting operands. Whether the three operands are in mutually consistent FRAMES is not a
-     * property of this function — it is a property of its four callers' data, and it is currently
-     * **false**: `vCurrent` is GL-convention, `pnpMat` is CV-convention, `pnpMat`'s domain is the
-     * capture camera frame, and `fpAnchor` is a world-space model matrix. See 0.9.
+     * **This test inverted at 0.9, and the inversion is the point.**
      *
-     * So this file deliberately asserts nothing about frames. A test that cannot fail is worse than
-     * no test, because it is counted as coverage.
+     * It used to assert that `composeCorrected` is frame-AGNOSTIC — pure composition, so
+     * `f(R, R, A) == f(I, I, A)` by associativity over `rigidInverse`, for any rigid `R`. That was
+     * true, and it was true because the function made no commitment about conventions at all. The
+     * commitment lived in four callers' data, where it was wrong.
+     *
+     * 0.9 moved the commitment INTO the function: `pnpMat` is now converted from CV to GL on the way
+     * through. So the cancellation no longer holds — `inv(R)·D·R` is not `D` unless `R` commutes
+     * with `D` — and the function is no longer frame-agnostic. Asserting the non-cancellation is
+     * what proves the conversion is actually applied, rather than named in a KDoc.
+     *
+     * The `Rx` case is kept and is the interesting one: `D = diag(1,-1,-1)` restricted to the Y-Z
+     * plane is `-I`, which commutes with every rotation about X. So a rotation about X DOES still
+     * cancel, and a test that only tried that axis would have concluded nothing had changed.
      */
-    @Test fun `composeCorrected is frame-agnostic — the convention lives in its callers`() {
-        // Pinned as executable documentation of the above: the function is pure composition, so it
-        // cannot detect a frame error and must not be credited with doing so.
+    @Test fun `composeCorrected embeds the axis conversion, so it no longer cancels`() {
         val rotZ90 = floatArrayOf(0f,1f,0f,0f, -1f,0f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
-        val fpAnchor = trans(1f, 0f, 0f)
-        val bothRotated = PoseFusion.composeCorrected(rotZ90, rotZ90, fpAnchor)
-        val neitherRotated = PoseFusion.composeCorrected(identity(), identity(), fpAnchor)
-        for (i in 0 until 16) assertEquals("element $i", neitherRotated[i], bothRotated[i], 1e-4f)
+        val anchor = trans(1f, 0f, 0f)
+        val neither = PoseFusion.composeCorrected(identity(), identity(), anchor)
+        val bothRotZ = PoseFusion.composeCorrected(rotZ90, rotZ90, anchor)
+        val worstZ = (0 until 16).maxOf { kotlin.math.abs(neither[it] - bothRotZ[it]) }
+        assertTrue(
+            "a Z rotation must NOT cancel through the conversion, or D is not being applied " +
+                "(worst difference was $worstZ)",
+            worstZ > 1e-3f,
+        )
 
-        // ...and it holds just as well for transforms that are nothing to do with a display
-        // rotation — a rotation about a DIFFERENT axis, and a pure translation. That is the point:
-        // the cancellation is associativity over `rigidInverse`, not evidence about `R_z`.
-        //
-        // (Both stay RIGID deliberately. `composeCorrected` inverts via `PoseMath.rigidInverse`,
-        // which is only an inverse for rotation+translation; feeding it a shear breaks the identity
-        // for that reason and not for any reason about frames.)
+        // X is the axis that still cancels, because D acts as -I on the plane Rx rotates in. Pinned
+        // so nobody "fixes" the test above by switching axes and gets a false pass.
         val rotX90 = floatArrayOf(1f,0f,0f,0f, 0f,0f,1f,0f, 0f,-1f,0f,0f, 0f,0f,0f,1f)
-        val bothRotX = PoseFusion.composeCorrected(rotX90, rotX90, fpAnchor)
-        for (i in 0 until 16) assertEquals("rotX element $i", neitherRotated[i], bothRotX[i], 1e-4f)
-
-        val move = trans(3f, -2f, 7f)
-        val bothMoved = PoseFusion.composeCorrected(move, move, fpAnchor)
-        for (i in 0 until 16) assertEquals("trans element $i", neitherRotated[i], bothMoved[i], 1e-4f)
+        val bothRotX = PoseFusion.composeCorrected(rotX90, rotX90, anchor)
+        for (i in 0 until 16) assertEquals("rotX element $i", neither[i], bothRotX[i], 1e-4f)
     }
 
     /**
@@ -118,9 +144,17 @@ class PoseFusionTest {
      * which is a return-default stub in this source set and would make any assertion built on it
      * pass against an array of zeros.
      *
-     * Deliberately NOT in scope: whether the three operands are in mutually consistent frames. They
-     * are not — see the test above and 0.9. This pins the three-factor form as it stands, so 0.9's
-     * two extra factors have to change it on purpose rather than by accident.
+     * Re-derived at **0.9**, which is the coupling working as intended: this test was written to pin
+     * the three-factor form "as it stands, so 0.9 has to change it on purpose rather than by
+     * accident", and 0.9 duly broke it.
+     *
+     * The composition is now `Rx(-a) · [D · Ry(b)] · Rz(g)`. Multiplying `D · Ry(b)` first negates
+     * rows 1 and 2 of `Ry(b)`, and the product below is written out from there.
+     *
+     * **Cross-check that costs nothing:** `D` acts as `-I` on the Y-Z plane, so it commutes with
+     * `Rx`. The new expectation must therefore be exactly `D ·` the previous one — rows 1 and 2
+     * negated, row 0 untouched — and it is. Two independent routes to the same matrix, neither of
+     * them the code.
      */
     @Test fun `composeCorrected rotation block matches a hand-derived product`() {
         val a = Math.toRadians(30.0).toFloat(); val ca = cos(a); val sa = sin(a)
@@ -132,28 +166,31 @@ class PoseFusionTest {
         // matching the existing rotZ fixture above: column 0 of Rz(90) is (0,1,0), i.e. +X → +Y.
         val vCurrent = floatArrayOf(1f,0f,0f,0f, 0f,ca,sa,0f, 0f,-sa,ca,0f, 0f,0f,0f,1f)   // Rx(30)
         val pnpMat = floatArrayOf(cb,0f,-sb,0f, 0f,1f,0f,0f, sb,0f,cb,0f, 0f,0f,0f,1f)     // Ry(40)
-        val fpAnchor = floatArrayOf(cg,sg,0f,0f, -sg,cg,0f,0f, 0f,0f,1f,0f, tx,ty,tz,1f)   // Rz(50), t
+        val captureAnchorCam = floatArrayOf(cg,sg,0f,0f, -sg,cg,0f,0f, 0f,0f,1f,0f, tx,ty,tz,1f)  // Rz(50), t
 
-        // E = Rx(-a)·Ry(b)·Rz(g), multiplied out by hand.
-        //   Rx(-a)·Ry(b) = [ cb      0    sb   ]
-        //                  [-sa·sb   ca   sa·cb]
-        //                  [-ca·sb  -sa   ca·cb]
+        // E = Rx(-a)·[D·Ry(b)]·Rz(g), multiplied out by hand.
+        //   D·Ry(b)        = [ cb   0   sb ]        (rows 1,2 of Ry(b) negated)
+        //                    [ 0   -1    0 ]
+        //                    [ sb   0  -cb ]
+        //   Rx(-a)·D·Ry(b) = [ cb      0    sb    ]
+        //                    [ sa·sb  -ca  -sa·cb ]
+        //                    [ ca·sb   sa  -ca·cb ]
         // then right-multiplied by Rz(g), whose third column is (0,0,1) — which is why column 2 of E
         // is just column 2 of that intermediate.
         val e = arrayOf(
             floatArrayOf(cb * cg,                    -cb * sg,                   sb),
-            floatArrayOf(ca * sg - sa * sb * cg,     ca * cg + sa * sb * sg,     sa * cb),
-            floatArrayOf(-ca * sb * cg - sa * sg,    ca * sb * sg - sa * cg,     ca * cb),
+            floatArrayOf(sa * sb * cg - ca * sg,     -sa * sb * sg - ca * cg,    -sa * cb),
+            floatArrayOf(ca * sb * cg + sa * sg,     -ca * sb * sg + sa * cg,    -ca * cb),
         )
-        // The first two factors carry no translation, so the composed translation is the same
-        // intermediate applied to fpAnchor's t.
+        // The first three factors carry no translation, so the composed translation is the same
+        // intermediate applied to captureAnchorCam's t.
         val et = floatArrayOf(
             cb * tx + sb * tz,
-            -sa * sb * tx + ca * ty + sa * cb * tz,
-            -ca * sb * tx - sa * ty + ca * cb * tz,
+            sa * sb * tx - ca * ty - sa * cb * tz,
+            ca * sb * tx + sa * ty - ca * cb * tz,
         )
 
-        val r = PoseFusion.composeCorrected(vCurrent, pnpMat, fpAnchor)
+        val r = PoseFusion.composeCorrected(vCurrent, pnpMat, captureAnchorCam)
         for (row in 0 until 3) for (col in 0 until 3) {
             assertEquals("rotation [$row][$col]", e[row][col], r[col * 4 + row], 1e-5f)
         }
@@ -172,21 +209,21 @@ class PoseFusionTest {
     @Test fun `returns backbone when no new reloc result`() {
         val f = PoseFusion()
         val backbone = trans(1f,1f,1f)
-        val out = f.currentAnchor(backbone, identity(), FloatArray(19), identity(), confGlobal = 1f)
+        val out = f.currentAnchor(backbone, identity(), FloatArray(19), captureAtOrigin(), confGlobal = 1f)
         backbone.forEachIndexed { i, e -> assertEquals(e, out[i], 1e-4f) }
     }
 
     @Test fun `ignores low-inlier-ratio snaps`() {
         val f = PoseFusion()
         val out = f.currentAnchor(trans(0f,0f,0f), identity(),
-            reloc(trans(99f,0f,0f), inliers = 1f, matches = 100f, seq = 1f), identity(), confGlobal = 1f)
+            reloc(trans(99f,0f,0f), inliers = 1f, matches = 100f, seq = 1f), captureAtOrigin(), confGlobal = 1f)
         assertEquals(0f, out[12], 1e-3f)
     }
 
     @Test fun `first confident snap hard-snaps to correction`() {
         val f = PoseFusion()
         val out = f.currentAnchor(trans(0f,0f,0f), identity(),
-            reloc(trans(10f,0f,0f), inliers = 90f, matches = 100f, seq = 1f), identity(), confGlobal = 1f)
+            reloc(trans(10f,0f,0f), inliers = 90f, matches = 100f, seq = 1f), captureAtOrigin(), confGlobal = 1f)
         assertEquals(10f, out[12], 1e-3f)
     }
 
@@ -194,7 +231,7 @@ class PoseFusionTest {
         val f = PoseFusion()
         // ratio 0.6: above MIN_INLIER_RATIO but below COLD_SNAP_INLIER_RATIO -> smooth, not snap.
         val out = f.currentAnchor(trans(0f,0f,0f), identity(),
-            reloc(trans(10f,0f,0f), inliers = 60f, matches = 100f, seq = 1f), identity(), confGlobal = 1f)
+            reloc(trans(10f,0f,0f), inliers = 60f, matches = 100f, seq = 1f), captureAtOrigin(), confGlobal = 1f)
         assertTrue("expected partial move, got ${out[12]}", out[12] > 0f && out[12] < 10f)
     }
 
@@ -202,7 +239,7 @@ class PoseFusionTest {
         val f = PoseFusion()
         // The old design multiplied alpha by confGlobal, so conf=0 froze the overlay. The floor fixes it.
         val out = f.currentAnchor(trans(0f,0f,0f), identity(),
-            reloc(trans(10f,0f,0f), inliers = 60f, matches = 100f, seq = 1f), identity(), confGlobal = 0f)
+            reloc(trans(10f,0f,0f), inliers = 60f, matches = 100f, seq = 1f), captureAtOrigin(), confGlobal = 0f)
         assertTrue("expected non-zero correction with depth off, got ${out[12]}", out[12] > 0f)
     }
 
@@ -214,9 +251,9 @@ class PoseFusionTest {
     @Test fun `corroboration scales correction strength`() {
         // Same relock, same inlier ratio; only the corroboration differs.
         val bare = PoseFusion().currentAnchor(trans(0f,0f,0f), identity(),
-            reloc(trans(10f,0f,0f), inliers = 60f, matches = 100f, seq = 1f), identity(), confGlobal = 0f)
+            reloc(trans(10f,0f,0f), inliers = 60f, matches = 100f, seq = 1f), captureAtOrigin(), confGlobal = 0f)
         val painted = PoseFusion().currentAnchor(trans(0f,0f,0f), identity(),
-            reloc(trans(10f,0f,0f), inliers = 60f, matches = 100f, seq = 1f), identity(), confGlobal = 1f)
+            reloc(trans(10f,0f,0f), inliers = 60f, matches = 100f, seq = 1f), captureAtOrigin(), confGlobal = 1f)
         assertTrue(
             "a corroborated wall should pull harder than a bare one: bare=${bare[12]} painted=${painted[12]}",
             painted[12] > bare[12],
@@ -289,9 +326,9 @@ class PoseFusionTest {
         val backbone = trans(0f, 0f, 0f)
         // Warm relock at full confidence.
         f.currentAnchor(backbone, identity(),
-            reloc(trans(10f, 0f, 0f), inliers = 60f, matches = 100f, seq = 1f), identity(), confGlobal = 1f)
+            reloc(trans(10f, 0f, 0f), inliers = 60f, matches = 100f, seq = 1f), captureAtOrigin(), confGlobal = 1f)
         val afterGood = f.currentAnchor(backbone, identity(),
-            reloc(trans(10f, 0f, 0f), inliers = 60f, matches = 100f, seq = 2f), identity(), confGlobal = 1f)[12]
+            reloc(trans(10f, 0f, 0f), inliers = 60f, matches = 100f, seq = 2f), captureAtOrigin(), confGlobal = 1f)[12]
 
         // Three ticks of a decayed reading (0.9^1..0.9^3), same relock quality throughout.
         var last = afterGood
@@ -320,9 +357,9 @@ class PoseFusionTest {
 
     @Test fun `corroboration outside 0-1 is clamped, not extrapolated`() {
         val full = PoseFusion().currentAnchor(trans(0f,0f,0f), identity(),
-            reloc(trans(10f,0f,0f), inliers = 60f, matches = 100f, seq = 1f), identity(), confGlobal = 1f)
+            reloc(trans(10f,0f,0f), inliers = 60f, matches = 100f, seq = 1f), captureAtOrigin(), confGlobal = 1f)
         val over = PoseFusion().currentAnchor(trans(0f,0f,0f), identity(),
-            reloc(trans(10f,0f,0f), inliers = 60f, matches = 100f, seq = 1f), identity(), confGlobal = 5f)
+            reloc(trans(10f,0f,0f), inliers = 60f, matches = 100f, seq = 1f), captureAtOrigin(), confGlobal = 5f)
         assertEquals(full[12], over[12], 1e-4f)
     }
 
@@ -330,9 +367,9 @@ class PoseFusionTest {
         val f = PoseFusion()
         // Confident cold snap establishes D = +10x at backbone origin.
         f.currentAnchor(trans(0f,0f,0f), identity(),
-            reloc(trans(10f,0f,0f), inliers = 90f, matches = 100f, seq = 1f), identity(), confGlobal = 1f)
+            reloc(trans(10f,0f,0f), inliers = 90f, matches = 100f, seq = 1f), captureAtOrigin(), confGlobal = 1f)
         // No new snap, but ARCore's frame drifts the backbone by +1z: D must still apply.
-        val out = f.currentAnchor(trans(0f,0f,1f), identity(), FloatArray(19), identity(), confGlobal = 1f)
+        val out = f.currentAnchor(trans(0f,0f,1f), identity(), FloatArray(19), captureAtOrigin(), confGlobal = 1f)
         assertEquals(10f, out[12], 1e-3f)
         assertEquals(1f, out[14], 1e-3f)
     }
@@ -340,20 +377,20 @@ class PoseFusionTest {
     @Test fun `confident relock that diverges far hard-snaps (pocket case)`() {
         val f = PoseFusion()
         f.currentAnchor(trans(0f,0f,0f), identity(),
-            reloc(trans(10f,0f,0f), inliers = 90f, matches = 100f, seq = 1f), identity(), confGlobal = 1f)
+            reloc(trans(10f,0f,0f), inliers = 90f, matches = 100f, seq = 1f), captureAtOrigin(), confGlobal = 1f)
         // New confident snap puts the anchor 10m away -> beyond COLD_SNAP_DIST_M -> instant relock.
         val out = f.currentAnchor(trans(0f,0f,0f), identity(),
-            reloc(trans(20f,0f,0f), inliers = 90f, matches = 100f, seq = 2f), identity(), confGlobal = 1f)
+            reloc(trans(20f,0f,0f), inliers = 90f, matches = 100f, seq = 2f), captureAtOrigin(), confGlobal = 1f)
         assertEquals(20f, out[12], 1e-3f)
     }
 
     @Test fun `small confident relock smooths instead of teleporting`() {
         val f = PoseFusion()
         f.currentAnchor(trans(0f,0f,0f), identity(),
-            reloc(trans(10f,0f,0f), inliers = 90f, matches = 100f, seq = 1f), identity(), confGlobal = 1f)
+            reloc(trans(10f,0f,0f), inliers = 90f, matches = 100f, seq = 1f), captureAtOrigin(), confGlobal = 1f)
         // 5cm move (< COLD_SNAP_DIST_M) -> not cold -> smoothed, lands just past 10, not snapped to 10.05.
         val out = f.currentAnchor(trans(0f,0f,0f), identity(),
-            reloc(trans(10.05f,0f,0f), inliers = 90f, matches = 100f, seq = 2f), identity(), confGlobal = 1f)
+            reloc(trans(10.05f,0f,0f), inliers = 90f, matches = 100f, seq = 2f), captureAtOrigin(), confGlobal = 1f)
         assertTrue("expected smoothed move, got ${out[12]}", out[12] > 10f && out[12] < 10.05f)
     }
 }

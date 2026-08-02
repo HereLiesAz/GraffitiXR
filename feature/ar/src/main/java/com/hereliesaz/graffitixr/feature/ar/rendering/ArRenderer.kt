@@ -1231,12 +1231,22 @@ class ArRenderer(
             }
             // Fuse in the corrected mark-PnP snap (smoothed) when anchored; the flag lets the eval
             // harness A/B fusion vs the old toggle. Off → exact previous behavior.
-            val anchorMatrix: FloatArray = if (fusionEnabled && anchorEstablished) {
+            // IMPLEMENTATION.md 0.9 — the correction needs `captureAnchorCam`, the anchor's pose in
+            // the CAPTURE camera's CV frame. `getFingerprintAnchor()` used to be passed here and is a
+            // WORLD-frame model matrix: composing it against a CV-convention PnP result put the
+            // correction in mixed frames, which the zero-drift invariant measured at 2.92 off.
+            //
+            // Null on a pre-Phase-2 fingerprint, and then fusion is SKIPPED rather than fed a
+            // world-frame anchor. Refusing to correct leaves the overlay on the ARCore backbone,
+            // which drifts; correcting in the wrong frame pulls it somewhere confidently wrong, and
+            // PAPER.md §8.3 is explicit that the second is worse.
+            val captureAnchorCam = slamManager.captureAnchorCam
+            val anchorMatrix: FloatArray = if (fusionEnabled && anchorEstablished && captureAnchorCam != null) {
                 poseFusion.currentAnchor(
                     backbone = backbone,
                     vCurrent = viewMatrix,
                     reloc = slamManager.getRelocResult(),
-                    fpAnchor = slamManager.getFingerprintAnchor(),
+                    captureAnchorCam = captureAnchorCam,
                     // THE teleological input, finally connected. The claim in TELEOLOGICAL_SLAM.md is
                     // that the further along the painting is, the more real-world corroboration the
                     // engine has and the harder the overlay locks. That third stage was never wired:

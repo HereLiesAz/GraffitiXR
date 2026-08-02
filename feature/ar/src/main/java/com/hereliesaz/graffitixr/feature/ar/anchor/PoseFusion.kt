@@ -90,8 +90,47 @@ class PoseFusion {
         private fun identity() = floatArrayOf(1f,0f,0f,0f, 0f,1f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
 
         /** Corrected anchor model matrix in the CURRENT world frame. All inputs rigid. */
-        fun composeCorrected(vCurrent: FloatArray, pnpMat: FloatArray, fpAnchor: FloatArray): FloatArray =
-            PoseMath.multiply(PoseMath.multiply(PoseMath.rigidInverse(vCurrent), pnpMat), fpAnchor)
+        /**
+         * `IMPLEMENTATION.md` **0.9** — the relocalized anchor pose in the live world frame.
+         *
+         * ```
+         * corrected = inv(vCurrent) · [D · pnpMat] · captureAnchorCam
+         * ```
+         *
+         * Two things were wrong with the form this replaces, `inv(vCurrent) · pnpMat · fpAnchor`:
+         *
+         *  - `pnpMat` comes out of `solvePnP` in the **CV** convention (+Y down, +Z forward) and was
+         *    being chained straight onto a **GL** view inverse, so Y and Z were flipped;
+         *  - its domain is the **fingerprint** frame — the display-oriented CV camera at capture —
+         *    while `fpAnchor` was a world-space model matrix, so the capture view was missing
+         *    entirely.
+         *
+         * [captureAnchorCam] repairs the second and half of the first at once. It is
+         * `V_cv(capture) · anchorModel`, which Phase 2 already builds, persists on the
+         * `Fingerprint`, and partitions the footprint with — so this needs no new geometry, only a
+         * quantity the project already computes for another reason.
+         *
+         * **`D` goes on ONE side, not both.** Converting a *transform* between conventions is
+         * normally the conjugation `D · m · D`, and that is what I wrote first. It is wrong here
+         * because `captureAnchorCam` carries its own `D` (it is a CV view times a model matrix), so
+         * the trailing factor applies it twice — landing 4.29 from the anchor where the original
+         * defect was 2.92, i.e. *worse than doing nothing*. `PAPER.md` §8.3's warning about getting
+         * every sign right is not rhetorical; `ComposeCorrectedFrameTest` pins both mistakes.
+         *
+         * Verified by a zero-drift invariant rather than by inspection: with no drift the correction
+         * must be the identity, so this must return `anchorModel` unchanged. It does, to 4.8e-7.
+         *
+         * @param captureAnchorCam `Fingerprint.captureAnchorCam` — NOT the live anchor pose and NOT
+         *   `getFingerprintAnchor()`. Passing a world-frame anchor here is the defect being fixed.
+         */
+        fun composeCorrected(
+            vCurrent: FloatArray,
+            pnpMat: FloatArray,
+            captureAnchorCam: FloatArray,
+        ): FloatArray = PoseMath.multiply(
+            PoseMath.rigidInverse(vCurrent),
+            PoseMath.multiply(MetricMarks.glViewToCv(pnpMat), captureAnchorCam),
+        )
 
         /** Smoothed interpolation between two rigid poses (translation lerp + quaternion nlerp). */
         fun blend(current: FloatArray, target: FloatArray, alpha: Float): FloatArray {
@@ -116,7 +155,10 @@ class PoseFusion {
      * @param backbone ARCore-consensus model matrix (world frame), the smooth per-frame source
      * @param vCurrent current ARCore view matrix (fresh, GL thread)
      * @param reloc    FloatArray(19): [0..15]=pnpMat, [16]=inlierCount, [17]=matchCount, [18]=seq
-     * @param fpAnchor fingerprint-frame anchor model matrix
+     * @param captureAnchorCam `Fingerprint.captureAnchorCam` — the anchor's pose in the CAPTURE
+     *   camera's CV frame, `V_cv(capture) · anchorModel`. Renamed from `fpAnchor` as part of 0.9:
+     *   the old name and the old value were both a world-frame model matrix, which is the frame
+     *   error that item fixes. See [composeCorrected].
      * @param confGlobal teleological corroboration in [0,1] — the fraction of the registered artwork's
      *        features the real wall currently answers for (MobileGS painting progress). Raises smooth
      *        correction strength from [CONF_FLOOR] at 0% painted to full at 100%, which is the
@@ -127,7 +169,7 @@ class PoseFusion {
         backbone: FloatArray,
         vCurrent: FloatArray,
         reloc: FloatArray,
-        fpAnchor: FloatArray,
+        captureAnchorCam: FloatArray,
         confGlobal: Float,
     ): FloatArray {
         val seq = reloc[18]
@@ -137,7 +179,7 @@ class PoseFusion {
         val isNew = seq > 0f && seq != lastSeq
 
         if (isNew && inlierRatio >= MIN_INLIER_RATIO) {
-            val corrected = composeCorrected(vCurrent, reloc.copyOf(16), fpAnchor)
+            val corrected = composeCorrected(vCurrent, reloc.copyOf(16), captureAnchorCam)
             // World-frame drift correction such that D ∘ backbone == corrected at snap time.
             val newD = PoseMath.multiply(corrected, PoseMath.rigidInverse(backbone))
 

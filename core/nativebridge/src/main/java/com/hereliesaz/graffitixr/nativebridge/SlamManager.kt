@@ -211,6 +211,23 @@ class SlamManager @Inject constructor(
      */
     @Volatile var overlayMarkCenterLocal: FloatArray? = null
 
+    /**
+     * `IMPLEMENTATION.md` **0.9** — `Fingerprint.captureAnchorCam`, the anchor's pose in the CAPTURE
+     * camera's CV frame (`V_cv(capture) · anchorModel`), or null when the live fingerprint has none.
+     *
+     * Carried here for the same reason [overlayMarkCenterLocal] is: the renderer needs it every
+     * frame and does not hold the `Fingerprint`. It is the third factor of
+     * `PoseFusion.composeCorrected`, and it replaced a world-frame anchor that put the composition
+     * in the wrong frame entirely.
+     *
+     * **Null means do not correct.** A pre-Phase-2 fingerprint has no `captureAnchorCam`, and there
+     * is no way to compose the correction without it — the world-frame anchor that used to be passed
+     * is precisely the defect. Skipping the correction leaves relocalization off for such a project
+     * rather than pulling the overlay toward a pose computed in mixed frames, which is the failure
+     * `PAPER.md` §8.3 says is worse than not correcting at all.
+     */
+    @Volatile var captureAnchorCam: FloatArray? = null
+
     fun updateDeviceMotion(angularVel: FloatArray, linearVel: FloatArray) {
         nativeUpdateDeviceMotion(angularVel, linearVel)
     }
