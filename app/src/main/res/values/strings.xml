@@ -406,7 +406,7 @@
     <string name="settings_hand_label">Dominant Hand</string>
     <string name="settings_hand_right">Right</string>
     <string name="settings_hand_left">Left</string>
-    <string name="settings_diag_label">Depth Diagnostic Overlay</string>
+    <string name="settings_diag_label">Diagnostics &amp; Auto-Screenshots</string>
     <string name="settings_on">On</string>
     <string name="settings_off">Off</string>
     <string name="settings_scan_mode_label">AR Scan Mode</string>

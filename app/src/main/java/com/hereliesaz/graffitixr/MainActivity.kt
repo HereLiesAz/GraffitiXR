@@ -185,6 +185,60 @@ class MainActivity : ComponentActivity() {
     // consumed once by the editor as a new overlay layer. Set from the launch intent / onNewIntent.
     private var incomingSharedImage by mutableStateOf<Uri?>(null)
 
+    /**
+     * Copies the diagnostic report to the clipboard and offers the whole bundle to a share sheet.
+     *
+     * Both, not either. The report is what gets pasted into a chat and is the only part most reports
+     * need; the attachments are the CSVs and the screenshots, which cannot be pasted. Doing only the
+     * share sheet would mean the common case — "paste me what it says" — required picking an app,
+     * finding the file and copying out of it.
+     */
+    private fun shareDiagnosticBundle() {
+        lifecycleScope.launch {
+            // Report assembly walks a 1800-sample ring and the writes touch the filesystem; neither
+            // belongs on the frame the button was tapped in.
+            val files = withContext(Dispatchers.IO) { arViewModel.writeDiagnosticBundle() }
+            val text = withContext(Dispatchers.IO) {
+                runCatching { files.first().readText() }.getOrDefault("")
+            }
+            // Only if there is something to copy. `getOrDefault("")` on a failed read would
+            // otherwise put an empty string on the clipboard — destroying whatever the user had
+            // there — while the toast below still said "Report copied".
+            if (text.isNotBlank()) {
+                getSystemService(AndroidClipboardManager::class.java)?.setPrimaryClip(
+                    ClipData.newPlainText("GraffitiXR diagnostics", text),
+                )
+            }
+            val uris = ArrayList<Uri>()
+            for (f in files) {
+                // Per-file, because one unreadable artefact must not cost the share the other
+                // fifteen — and a report that arrives without its screenshots still says what
+                // happened, whereas nothing arriving says nothing.
+                runCatching {
+                    FileProvider.getUriForFile(this@MainActivity, "$packageName.fileprovider", f)
+                }.onSuccess { uris.add(it) }
+                    .onFailure { Timber.w(it, "diagnostic bundle: skipping ${f.name}") }
+            }
+            val send = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                // Mixed markdown, CSV, JSON and PNG. Narrowing this would hide the share targets
+                // that accept everything, which are the ones actually wanted here.
+                type = "*/*"
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+                putExtra(Intent.EXTRA_SUBJECT, "GraffitiXR diagnostics")
+                putExtra(Intent.EXTRA_TEXT, text)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            Toast.makeText(
+                this@MainActivity,
+                if (text.isBlank()) "Report unreadable — ${uris.size} file(s) attached"
+                else "Report copied — ${uris.size} file(s) attached",
+                Toast.LENGTH_SHORT,
+            ).show()
+            runCatching { startActivity(Intent.createChooser(send, "Share diagnostics")) }
+                .onFailure { Timber.w(it, "no share target for diagnostics") }
+        }
+    }
+
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { p ->
         hasCameraPermission = p[Manifest.permission.CAMERA] ?: false
     }
@@ -1100,6 +1154,43 @@ class MainActivity : ComponentActivity() {
                                 AnchorLockFlash(isAnchorEstablished = arUiState.isAnchorEstablished, strings = strings)
                             }
 
+                            // Screenshots follow the overlay's opt-in, and only it. The numeric
+                            // recorder inside the view model runs unconditionally — it is memory —
+                            // but writing PNGs of the user's camera feed to disk is not something to
+                            // do because the app felt like it.
+                            LaunchedEffect(editorUiState.showDiagOverlay) {
+                                arViewModel.setDiagnosticCaptureEnabled(editorUiState.showDiagOverlay)
+                            }
+                            val diagnosticCaptures by arViewModel.diagnosticCaptureCount
+                                .collectAsState()
+                            val evalFusionOn by arViewModel.evalFusionEnabled.collectAsState()
+                            val evalSelfGrowOn by arViewModel.evalSelfGrowEnabled.collectAsState()
+                            // Keyed on Unit: the collector must outlive every recomposition, or a
+                            // request raised while the overlay is mid-recompose lands in a
+                            // subscriber that no longer exists and the capture is silently lost.
+                            LaunchedEffect(Unit) {
+                                arViewModel.captureRequests.collect { trigger ->
+                                    // Naming and counting are the view model's, because this
+                                    // collector is torn down and restarted on every rotation while
+                                    // the session it is numbering is not.
+                                    val dest = arViewModel.nextDiagnosticCaptureFile(trigger)
+                                    try {
+                                        captureWindowToPng(this@MainActivity, dest)
+                                        arViewModel.onDiagnosticCaptureWritten(trigger, dest.name)
+                                    } catch (ce: kotlinx.coroutines.CancellationException) {
+                                        // Disposal, not a failure. Recording it as one would put a
+                                        // "(failed)" line in every report from a session that
+                                        // simply ended.
+                                        throw ce
+                                    } catch (e: Exception) {
+                                        arViewModel.onDiagnosticCaptureFailed(
+                                            trigger, e.message ?: e.javaClass.simpleName,
+                                        )
+                                        Timber.w(e, "diagnostic capture failed for $trigger")
+                                    }
+                                }
+                            }
+
                             // Relocalization state — available in RELEASE too, behind the same opt-in
                             // Diagnostic Overlay setting. The eval panel below is a dev instrument and
                             // stays debug-only, but "is relocalization working, and if not which gate
@@ -1113,6 +1204,8 @@ class MainActivity : ComponentActivity() {
                                     fusion = arUiState.fusionDiagnostics,
                                     fingerprintPoints = arUiState.evalLiveMetrics.wallCount,
                                     paintingProgress = arUiState.paintingProgress,
+                                    captureCount = diagnosticCaptures,
+                                    onShareReport = { shareDiagnosticBundle() },
                                 )
                             }
 
@@ -1128,6 +1221,8 @@ class MainActivity : ComponentActivity() {
                                     onInduceLoss = { arViewModel.evalInduceLoss() },
                                     onToggleFusion = { arViewModel.evalSetFusionEnabled(it) },
                                     onToggleSelfGrow = { arViewModel.evalSetSelfGrowEnabled(it) },
+                                    fusionOn = evalFusionOn,
+                                    selfGrowOn = evalSelfGrowOn,
                                 )
                             }
 
@@ -2122,6 +2217,8 @@ private fun RelocDiagnosticsOverlay(
     fusion: com.hereliesaz.graffitixr.common.model.FusionDiagnostics,
     fingerprintPoints: Int,
     paintingProgress: Float,
+    onShareReport: () -> Unit,
+    captureCount: Int,
 ) {
     val d = diagnostics
     // What to DO about it, not just what happened.
@@ -2323,6 +2420,20 @@ private fun RelocDiagnosticsOverlay(
         // Painting progress, labelled as such. It was labelled "Corroborated" while being fed
         // paintingProgress — a name for the value one row up, on a number that is not it.
         DiagnosticRow("Painted", "${(paintingProgress * 100).toInt()}%", androidx.compose.ui.graphics.Color.White)
+
+        // The whole overlay above answers "what is happening now" for someone holding the phone.
+        // This button answers it for someone who is not: it copies an aggregated report of the
+        // recent window to the clipboard and opens a share sheet with that report, the eval CSVs and
+        // every screenshot taken automatically along the way. Shipped in release beside the rest of
+        // the overlay, because the person who can reproduce a field failure is the artist, and until
+        // now the only way to get anything back from them was a photograph of a phone screen.
+        androidx.compose.material3.TextButton(onClick = onShareReport) {
+            androidx.compose.material3.Text(
+                if (captureCount > 0) "Copy + share report ($captureCount shots)"
+                else "Copy + share report",
+                color = androidx.compose.ui.graphics.Color.Cyan,
+            )
+        }
     }
 }
 
@@ -2336,12 +2447,21 @@ private fun EvalOverlay(
     onInduceLoss: () -> Unit,
     onToggleFusion: (Boolean) -> Unit,
     onToggleSelfGrow: (Boolean) -> Unit,
+    // Both switches MIRROR the values they set; neither keeps a copy.
+    //
+    // These were `remember`ed booleans seeded with a guess at each default. The fusion guess said
+    // `true` while `ArRenderer.fusionEnabled` had shipped `false` for 187 commits, so the button
+    // read "Fusion ON" with fusion off and the first press set it to the value it already held —
+    // enabling fusion took two presses, and the intervening state was indistinguishable from the one
+    // being left. Correcting the seed alone would have left the same defect one rotation away: a
+    // `remember` is dropped on configuration change while the renderer's flag is not.
+    //
+    // An A/B switch that can disagree with the arm it selects invalidates the comparison it exists
+    // to run, so neither of these gets to hold its own state — they are read from the view model,
+    // which reads them back from the renderer and the engine.
+    fusionOn: Boolean,
+    selfGrowOn: Boolean,
 ) {
-    // Local UI state for the A/B switch; defaults to true to match ArRenderer.fusionEnabled.
-    val fusionOn = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
-    // Teleological self-grow defaults OFF to match the native default (MobileGS.h). It permanently
-    // mutates the authoritative reloc fingerprint, so it is opt-in per session. Toggle to enable.
-    val selfGrowOn = androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     androidx.compose.foundation.layout.Column(
         androidx.compose.ui.Modifier
             .background(androidx.compose.ui.graphics.Color(0xAA000000))
@@ -2360,17 +2480,11 @@ private fun EvalOverlay(
             androidx.compose.material3.TextButton(onClick = onInduceLoss) { androidx.compose.material3.Text("Loss") }
             androidx.compose.material3.TextButton(onClick = onStartRecord) { androidx.compose.material3.Text("Rec▶") }
             androidx.compose.material3.TextButton(onClick = onStopRecord) { androidx.compose.material3.Text("Rec■") }
-            androidx.compose.material3.TextButton(onClick = {
-                fusionOn.value = !fusionOn.value
-                onToggleFusion(fusionOn.value)
-            }) {
-                androidx.compose.material3.Text(if (fusionOn.value) "Fusion ON" else "Fusion OFF")
+            androidx.compose.material3.TextButton(onClick = { onToggleFusion(!fusionOn) }) {
+                androidx.compose.material3.Text(if (fusionOn) "Fusion ON" else "Fusion OFF")
             }
-            androidx.compose.material3.TextButton(onClick = {
-                selfGrowOn.value = !selfGrowOn.value
-                onToggleSelfGrow(selfGrowOn.value)
-            }) {
-                androidx.compose.material3.Text(if (selfGrowOn.value) "Grow ON" else "Grow OFF")
+            androidx.compose.material3.TextButton(onClick = { onToggleSelfGrow(!selfGrowOn) }) {
+                androidx.compose.material3.Text(if (selfGrowOn) "Grow ON" else "Grow OFF")
             }
         }
     }

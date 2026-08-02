@@ -406,7 +406,7 @@
     <string name="settings_hand_label">Domináns Kéz</string>
     <string name="settings_hand_right">Jobb</string>
     <string name="settings_hand_left">Bal</string>
-    <string name="settings_diag_label">Mélységdiagnosztikai Rátét</string>
+    <string name="settings_diag_label">Diagnosztika és automatikus képernyőképek</string>
     <string name="settings_on">Be</string>
     <string name="settings_off">Ki</string>
     <string name="settings_scan_mode_label">AR Szkennelési Mód</string>

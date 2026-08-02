@@ -404,7 +404,7 @@
     <string name="settings_hand_label">Main dominante</string>
     <string name="settings_hand_right">Droite</string>
     <string name="settings_hand_left">Gauche</string>
-    <string name="settings_diag_label">Superposition de diagnostic de profondeur</string>
+    <string name="settings_diag_label">Diagnostics et captures automatiques</string>
     <string name="settings_on">Activé</string>
     <string name="settings_off">Désactivé</string>
     <string name="settings_scan_mode_label">Mode de scan AR</string>

@@ -319,6 +319,116 @@ class ArViewModel @Inject constructor(
     // evalProbe (and its BatteryManager) is never instantiated in release / normal use.
     @Volatile private var evalLogging = false
 
+    // ── Self-collecting diagnostics ───────────────────────────────────────────
+    //
+    // Always on, unlike everything above it. The eval probe has to be armed before a run, which is
+    // fine for a planned experiment and useless for the case that actually happens: something looks
+    // wrong, and the evidence needed to say why has already scrolled past. This records the same
+    // channels the HUD displays, continuously, so a report can be produced AFTER the fact.
+    //
+    // The cost is a bounded ring of objects the tick already allocates — see DiagnosticRecorder's
+    // capacity — so there is nothing to gate it on.
+    private val diagnosticRecorder = com.hereliesaz.graffitixr.feature.ar.eval.DiagnosticRecorder()
+    private val diagnosticWatcher = com.hereliesaz.graffitixr.feature.ar.eval.DiagnosticWatcher()
+
+    /**
+     * Screenshots are the one part that IS gated, on the Diagnostic Overlay setting.
+     *
+     * Recording numbers into memory is invisible; writing PNGs of the user's camera feed to disk is
+     * not, and must never happen because the app felt like it.
+     *
+     * The gate is the Diagnostic Overlay setting, which defaults off, is not persisted, and cannot
+     * be reached without a deliberate flip. The setting's own label had to be changed to say what
+     * the flip now authorises — it read "Depth Diagnostic Overlay", which promises a text HUD and
+     * nothing about photographs — because a technically effective gate on a switch whose label
+     * conceals what it does is not consent, it is a defensible-looking accident.
+     */
+    @Volatile private var diagnosticCaptureEnabled = false
+
+    private val _captureRequests =
+        MutableSharedFlow<com.hereliesaz.graffitixr.feature.ar.eval.CaptureTrigger>(
+            extraBufferCapacity = 2,
+        )
+
+    /**
+     * Asks the host Activity to photograph the window. It lives there and not here because the
+     * camera preview and the AR overlay are a `SurfaceView`/GL surface: the view hierarchy's drawing
+     * cache renders them as a black hole, and only `PixelCopy` against the window reads back what is
+     * actually on screen.
+     */
+    val captureRequests:
+        SharedFlow<com.hereliesaz.graffitixr.feature.ar.eval.CaptureTrigger> =
+        _captureRequests.asSharedFlow()
+
+    /** `file name → why it was taken`, in capture order, for the report's Screenshots section. */
+    private val captureManifest = java.util.Collections.synchronizedList(ArrayList<String>())
+
+    private val diagnosticSessionStartMs = System.currentTimeMillis()
+
+    private val _diagnosticCaptureCount = MutableStateFlow(0)
+
+    /**
+     * Screenshots written this session, for the report button's label.
+     *
+     * Held here and not in the Activity because the Activity is destroyed and rebuilt on every
+     * rotation while this is not. A counter on the Activity would reset to zero mid-session and the
+     * button would claim no screenshots existed while the report listed six.
+     */
+    val diagnosticCaptureCount: StateFlow<Int> = _diagnosticCaptureCount.asStateFlow()
+
+    private val captureIndex = AtomicInteger(0)
+    private val capturesPurged = AtomicBoolean(false)
+
+    fun setDiagnosticCaptureEnabled(enabled: Boolean) {
+        diagnosticCaptureEnabled = enabled
+    }
+
+    /**
+     * Reserves the next capture filename. Zero-padded index first, so the files sort in the order
+     * the events happened — which is the order the report lists them in.
+     *
+     * The counter lives here for the same reason the count above does: a `var index` in the Compose
+     * collector restarts at 1 after a rotation, and the second `01_LOCK_LOST.png` of a session
+     * overwrites the first while the report goes on citing both.
+     */
+    fun nextDiagnosticCaptureFile(
+        trigger: com.hereliesaz.graffitixr.feature.ar.eval.CaptureTrigger,
+    ): File {
+        val n = captureIndex.incrementAndGet()
+        return File(
+            diagnosticCapturesDir(),
+            String.format(java.util.Locale.US, "%02d_%s.png", n, trigger.name),
+        )
+    }
+
+    /** Called back by the Activity once a PNG has actually landed on disk. */
+    fun onDiagnosticCaptureWritten(
+        trigger: com.hereliesaz.graffitixr.feature.ar.eval.CaptureTrigger,
+        fileName: String,
+    ) {
+        val atSec = (System.currentTimeMillis() - diagnosticSessionStartMs) / 1000
+        captureManifest.add("`$fileName` — ${trigger.name} at +${atSec}s — ${trigger.whatToLookFor}")
+        // Successes only. The manifest also carries failure lines, and a button counting those would
+        // promise attachments that are not there.
+        _diagnosticCaptureCount.update { it + 1 }
+    }
+
+    /**
+     * Called back when a requested capture failed.
+     *
+     * Recorded rather than swallowed: the report's Screenshots section saying "none captured" has to
+     * mean "no transition occurred", and a silently dropped `PixelCopy` would make it mean "or the
+     * copy failed" — reintroducing exactly the ambiguity the section exists to remove. It also spent
+     * a slot of the watcher's budget, so the reader is entitled to know.
+     */
+    fun onDiagnosticCaptureFailed(
+        trigger: com.hereliesaz.graffitixr.feature.ar.eval.CaptureTrigger,
+        reason: String,
+    ) {
+        val atSec = (System.currentTimeMillis() - diagnosticSessionStartMs) / 1000
+        captureManifest.add("(failed) ${trigger.name} at +${atSec}s — $reason")
+    }
+
     fun evalStartLog() {
         // Every run gets its identity sidecar. Making `identity` optional on start() shipped a
         // serializer with no caller — a run-identity feature that produced zero run identities,
@@ -403,10 +513,153 @@ class ArViewModel @Inject constructor(
     }
 
     /** A/B switch for the pose fusion (Sub-project B): on = corrected snap-back fusion, off = old toggle. */
-    fun evalSetFusionEnabled(on: Boolean) { renderer?.fusionEnabled = on }
+    fun evalSetFusionEnabled(on: Boolean) {
+        renderer?.fusionEnabled = on
+        _evalFusionEnabled.value = renderer?.fusionEnabled ?: false
+    }
+
+    private val _evalFusionEnabled = MutableStateFlow(false)
+
+    /**
+     * The A/B switch's ACTUAL position, mirrored rather than shadowed.
+     *
+     * The eval panel held this in a `remember`, seeded with a guess at the renderer's default. The
+     * guess went stale and the button spent 187 commits claiming fusion was on while it was off; the
+     * obvious repair — correct the seed — leaves the same defect one rotation away, because a
+     * `remember` is dropped on configuration change while `ArRenderer.fusionEnabled` is not.
+     *
+     * A switch that can disagree with the thing it switches invalidates the comparison it exists to
+     * run, so it does not get to hold its own copy. Seeded from the renderer's shipped default and
+     * written only through [evalSetFusionEnabled], which reads the value back after setting it.
+     */
+    val evalFusionEnabled: StateFlow<Boolean> = _evalFusionEnabled.asStateFlow()
+
+    private val _evalSelfGrowEnabled = MutableStateFlow(false)
+
+    /** Same arrangement for self-grow, which had the identical shadowing problem. */
+    val evalSelfGrowEnabled: StateFlow<Boolean> = _evalSelfGrowEnabled.asStateFlow()
 
     /** A/B switch for teleological self-grow (default OFF): promote validated new marks into the fingerprint. */
-    fun evalSetSelfGrowEnabled(on: Boolean) { slamManager.setSelfGrowEnabled(on) }
+    fun evalSetSelfGrowEnabled(on: Boolean) {
+        slamManager.setSelfGrowEnabled(on)
+        _evalSelfGrowEnabled.value = on
+    }
+
+    /**
+     * The pasteable report: what ran, what it measured, and under which constants.
+     *
+     * Assembled here rather than in the recorder because the recorder deliberately knows nothing
+     * about Android or about this project's tunables — it holds samples. The build, the device and
+     * the parameter values live on this side.
+     */
+    fun buildDiagnosticReport(): String = diagnosticRecorder.report(
+        header = linkedMapOf(
+            "build" to (if (BuildConfig.DEBUG) "debug" else "release"),
+            "commit" to BuildConfig.GIT_COMMIT,
+            "device" to "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}",
+            "android" to (android.os.Build.VERSION.RELEASE ?: "unknown"),
+            "session" to "${(System.currentTimeMillis() - diagnosticSessionStartMs) / 1000}s since AR view-model start",
+            // Two flags that change what every number below MEANS, so they belong beside the numbers
+            // and not in a settings screen the reader cannot see. Read back from the objects that
+            // hold them rather than from whatever the eval buttons last asked for.
+            "fusion" to (renderer?.fusionEnabled?.toString() ?: "no renderer attached"),
+            "syncReloc" to slamManager.evalSyncRelocEveryN().let { if (it > 0) "every $it" else "async" },
+        ),
+        parameters = diagnosticParameters(),
+        captures = captureManifest.toList(),
+        capturesTruncated = diagnosticWatcher.atCap,
+    )
+
+    /**
+     * Every tunable the report's numbers were produced under.
+     *
+     * `PARAMETERS.md`'s point is that these are pre-registered priors no experiment has moved, so a
+     * report of behaviour without them cannot be acted on — and the person reading it is usually not
+     * the person holding the phone, and cannot check out the commit to look them up.
+     *
+     * The Kotlin constants are read live. The native ones are not reachable from here without a JNI
+     * accessor per constant, so they are named with the header that defines them: a reader who needs
+     * the value knows exactly where to look, and nothing here can drift into claiming a value the
+     * engine does not hold.
+     */
+    private fun diagnosticParameters(): Map<String, String> {
+        val fusion = com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion
+        val gate = com.hereliesaz.graffitixr.feature.ar.anchor.PromotionGate
+        val radius = com.hereliesaz.graffitixr.feature.ar.anchor.SearchRadius
+        return linkedMapOf(
+            "PoseFusion.MIN_INLIER_RATIO" to fusion.MIN_INLIER_RATIO.toString(),
+            "PoseFusion.BASE_ALPHA" to fusion.BASE_ALPHA.toString(),
+            "PoseFusion.CONF_FLOOR" to fusion.CONF_FLOOR.toString(),
+            "PoseFusion.COLD_SNAP_INLIER_RATIO" to fusion.COLD_SNAP_INLIER_RATIO.toString(),
+            "PoseFusion.COLD_SNAP_MIN_INLIERS" to fusion.COLD_SNAP_MIN_INLIERS.toString(),
+            "PoseFusion.COLD_SNAP_DIST_M" to fusion.COLD_SNAP_DIST_M.toString(),
+            "PoseFusion.COLD_SNAP_ANGLE_DEG" to fusion.COLD_SNAP_ANGLE_DEG.toString(),
+            "PromotionGate.BIG_LOCK_INLIERS" to gate.BIG_LOCK_INLIERS.toString(),
+            "PromotionGate.MIN_INLIERS" to gate.MIN_INLIERS.toString(),
+            "PromotionGate.MIN_INLIER_RATIO" to gate.MIN_INLIER_RATIO.toString(),
+            "PromotionGate.MIN_INLIER_SPREAD" to gate.MIN_INLIER_SPREAD.toString(),
+            "SearchRadius.RHO" to radius.RHO.toString(),
+            "SearchRadius.MIN_PX" to radius.MIN_PX.toString(),
+            "SearchRadius.MAX_PX" to radius.MAX_PX.toString(),
+            "SearchRadius.ERR_GAIN" to radius.ERR_GAIN.toString(),
+            "SearchRadius.REPROJ_GAIN" to radius.REPROJ_GAIN.toString(),
+            "DiagnosticWatcher.SPIKE_MM" to
+                com.hereliesaz.graffitixr.feature.ar.eval.DiagnosticWatcher.SPIKE_MM.toString(),
+            "native kRelocLoweRatio" to "(MobileGS.h)",
+            "native kCorrobLoweRatio" to "(MobileGS.h)",
+            "native kCorrobConfirmations" to "(MobileGS.h)",
+        )
+    }
+
+    /**
+     * Writes the report and returns every file worth attaching, report first.
+     *
+     * Ordered so the reader opens the report before the raw artefacts, and so a share sheet that
+     * only previews the first item previews the thing meant to be read. Anything absent is simply
+     * not in the list — a missing CSV means no eval run was logged, which the report already says
+     * in words.
+     */
+    fun writeDiagnosticBundle(): List<File> {
+        val dir = File(appContext.filesDir, "eval").apply { mkdirs() }
+        val report = File(dir, "diagnostic_report.md")
+        report.writeText(buildDiagnosticReport())
+        val out = ArrayList<File>()
+        out.add(report)
+        // Newest first: a session usually has one run that matters and it is the last one.
+        dir.listFiles { f -> f.isFile && (f.name.endsWith(".csv") || f.name.endsWith(".run.json")) }
+            ?.sortedByDescending { it.lastModified() }
+            ?.take(MAX_BUNDLED_EVAL_FILES)
+            ?.let(out::addAll)
+        diagnosticCapturesDir().listFiles { f -> f.isFile && f.name.endsWith(".png") }
+            ?.sortedBy { it.name }
+            ?.let(out::addAll)
+        return out
+    }
+
+    /**
+     * Where auto-captured screenshots land, beside the eval CSVs they are shared with.
+     *
+     * They are reachable by `FileProvider` because `file_paths.xml` exposes the whole of `filesDir`
+     * (`<files-path path="."/>`), not because `eval/` is called out — worth stating plainly, since
+     * a reader who assumes a scoped entry would also assume moving this directory is safe.
+     *
+     * **Purged once per view-model lifetime**, on first use. Without it the directory accumulates
+     * across every session the app has ever run, and [writeDiagnosticBundle] — which globs the
+     * directory rather than reading the manifest — would attach a dozen screenshots from last week
+     * to a report whose Screenshots section lists one. Wrong attachments are worse than none: the
+     * reader has no way to tell which frame belongs to the run they are being asked about.
+     *
+     * The manifest is the record of what this session took; the directory is made to agree with it.
+     */
+    fun diagnosticCapturesDir(): File {
+        val dir = File(appContext.filesDir, "eval/captures").apply { mkdirs() }
+        if (capturesPurged.compareAndSet(false, true)) {
+            // At most MAX_CAPTURES small files, once per session. Cheap enough not to be worth
+            // dispatching, and every caller either already writes to this directory or is about to.
+            dir.listFiles()?.forEach { it.delete() }
+        }
+        return dir
+    }
 
     // ── Glasses session lifecycle ─────────────────────────────────────────────
 
@@ -928,6 +1181,12 @@ class ArViewModel @Inject constructor(
             val now = System.currentTimeMillis()
             arEntryTimestampMs = now
             lastTrackingTimestampMs = now
+            // A fresh AR session gets a fresh watcher. This view model outlives the session — AR is
+            // a mode switch inside it — so without this the previous session's edge state, latches
+            // and spent budget carry over: the first tick of session two compares against session
+            // one's last state and photographs a "lost lock" from a different wall, while every
+            // once-only trigger stays latched for the life of the process and can never fire again.
+            diagnosticWatcher.reset()
             if (_uiState.value.trackingFailed) {
                 _uiState.update { it.copy(trackingFailed = false) }
             }
@@ -2142,6 +2401,39 @@ class ArViewModel @Inject constructor(
         val wallPoints = slamManager.getWallKeypointCount()
 
         val nowMs = System.currentTimeMillis()
+
+        // Record unconditionally. The report's whole value is being able to answer "did this ever
+        // happen" about a period that has already passed, which is impossible if collection has to
+        // be armed first.
+        diagnosticRecorder.record(relocDiag, corrobDiag, fusionDiag, wallPoints, progress)
+        // onTick ALWAYS, and only the emit is gated.
+        //
+        // The watcher goes to some trouble to advance its edge state unconditionally so that a
+        // suppressed transition is dropped rather than deferred onto a later, unrelated frame.
+        // Wrapping the whole call in the enable flag — as this did — reintroduced that exact defect
+        // one level up: toggling the overlay off froze `prevReject` at whatever it held, and
+        // toggling it back on five minutes later compared a live state against a stale one and
+        // photographed the wrong moment under the right name.
+        //
+        // elapsedRealtime, not the wall clock beside it: the cooldowns are differences, and an NTP
+        // correction backward makes `nowMs - lastAnyMs` negative — which compares below every
+        // cooldown and silently refuses every capture for the rest of the session. That is the
+        // failure the watcher's own KDoc narrates as fixed, and feeding it a non-monotonic clock
+        // would have handed it straight back.
+        val trigger = diagnosticWatcher.onTick(
+            android.os.SystemClock.elapsedRealtime(), relocDiag, corrobDiag, fusionDiag,
+        )
+        if (trigger != null && diagnosticCaptureEnabled) {
+            // tryEmit, not emit: this is the AR tick and it must not suspend. The watcher has
+            // already spent a budget slot and latched any once-only trigger by this point, so a
+            // dropped emit is a transition that will never be photographed and never be retried —
+            // it has to be recorded, or the report's "none captured" would mean "or the request was
+            // dropped", which is precisely the ambiguity the section exists to remove.
+            if (!_captureRequests.tryEmit(trigger)) {
+                onDiagnosticCaptureFailed(trigger, "request dropped — no collector draining")
+            }
+        }
+
         if (isTracking) lastTrackingTimestampMs = nowMs
         val trackingFailed = isInArMode &&
                 !isTracking &&
@@ -2715,6 +3007,15 @@ class ArViewModel @Inject constructor(
          * previously recorded runs, so treat it as part of the run identity rather than a knob.
          */
         const val EVAL_RNG_SEED = 20260801L
+
+        /**
+         * How many eval CSV/sidecar files the diagnostic bundle attaches, newest first.
+         *
+         * Bounded because `eval/` accumulates one pair per logged run for the life of the install,
+         * and a share sheet handed forty attachments is a share sheet nobody sends. Two runs is one
+         * A/B, which is the comparison the bundle is usually for.
+         */
+        const val MAX_BUNDLED_EVAL_FILES = 4
 
         const val DOODLE_CAPTURE_INTERVAL_MS = 2500L
         // After this long without a relocalization lock (featureless wall), place on the plain anchor.
