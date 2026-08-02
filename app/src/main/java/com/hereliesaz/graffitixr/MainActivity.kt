@@ -1202,7 +1202,16 @@ class MainActivity : ComponentActivity() {
                                     diagnostics = arUiState.relocDiagnostics,
                                     corroboration = arUiState.corroborationDiagnostics,
                                     fusion = arUiState.fusionDiagnostics,
-                                    fingerprintPoints = arUiState.evalLiveMetrics.wallCount,
+                                    // `wallFingerprintPoints`, NOT `evalLiveMetrics.wallCount`.
+                                    //
+                                    // evalLiveMetrics is only written while a dev eval log is
+                                    // running (`if (evalLogging)` in setTrackingState); in every
+                                    // release build it keeps its default, so this row displayed a
+                                    // hardcoded 0 forever. It read "FP PTS 0" beside "BACKBONE
+                                    // 1500 PTS · 1042 CORR · 1015 IN" on a locked device — and it
+                                    // is what made me tell the artist their target had never been
+                                    // created when the fingerprint was right there.
+                                    fingerprintPoints = arUiState.wallFingerprintPoints,
                                     paintingProgress = arUiState.paintingProgress,
                                     captureCount = diagnosticCaptures,
                                     onShareReport = { shareDiagnosticBundle() },

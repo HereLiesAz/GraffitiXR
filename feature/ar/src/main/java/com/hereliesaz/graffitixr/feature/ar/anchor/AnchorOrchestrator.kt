@@ -28,6 +28,20 @@ class AnchorOrchestrator {
     private val consensusAnchors = mutableListOf<ConsensusAnchor>()
     private val MAX_CONSENSUS_ANCHORS = 8
 
+    /**
+     * How far a support anchor's suggested artwork position may sit from the median before it is
+     * excluded from the consensus, in metres.
+     *
+     * Half a metre is chosen to sit above honest disagreement and below the failure. Anchors on one
+     * wall agree to within a few centimetres; ARCore drift between two anchors in the same room is
+     * tens of centimetres at worst. The run this was written for went metres, and kept going.
+     *
+     * A prior, not a measurement — no experiment has swept it. Erring large is the safe direction:
+     * too tight discards genuine anchors and reduces the consensus to one vote, which is the state
+     * this class exists to improve on.
+     */
+    private val OUTLIER_RADIUS_M = 0.5f
+
     // The master artwork pose in world space, set when the first anchor is established.
     private var masterArtworkPose: Pose? = null
 
@@ -107,12 +121,50 @@ class AnchorOrchestrator {
             return
         }
 
+        // Every tracking anchor's vote for where the artwork is.
+        val suggestions = tracking.map { it.anchor.pose.compose(it.artworkOffset) }
+
+        // Throw out the anchors that disagree with the rest before averaging.
+        //
+        // Without this, one support anchor is enough to take the artwork with it. ARCore anchors
+        // drift and occasionally jump — in a dim room with weak tracking, routinely — and a weighted
+        // MEAN has no defence against that: a single outlier moves the result in proportion to how
+        // wrong it is. Worse, `weight = 1/(1+dist)` is computed from the offset captured when the
+        // anchor was created, so an anchor that has since flown across the room keeps whatever
+        // authority it had when it was still trustworthy.
+        //
+        // A device run watched the artwork recede 4.6 → 4.8 → 5.6 → 7.2 → 26.3 ft over four seconds
+        // while relocalization held a 97% inlier ratio at 2px reprojection and fusion was off — so
+        // nothing downstream of this function was involved. The overlay "very literally ran away".
+        //
+        // The median is the right centre here precisely because it cannot be dragged: half the votes
+        // would have to be wrong before it moves. Anchors further than [OUTLIER_RADIUS_M] from it
+        // are excluded from the average entirely — they are not consensus, they are the thing
+        // consensus exists to survive.
+        val medianPos = floatArrayOf(
+            medianOf(suggestions.map { it.tx() }),
+            medianOf(suggestions.map { it.ty() }),
+            medianOf(suggestions.map { it.tz() }),
+        )
+        val kept = tracking.filterIndexed { i, _ ->
+            val s = suggestions[i]
+            val dx = s.tx() - medianPos[0]
+            val dy = s.ty() - medianPos[1]
+            val dz = s.tz() - medianPos[2]
+            dx * dx + dy * dy + dz * dz <= OUTLIER_RADIUS_M * OUTLIER_RADIUS_M
+        }.ifEmpty {
+            // Cannot happen with a real median — the median element is always within 0 of itself —
+            // but an empty list here would divide by a zero weight sum and write NaNs into the
+            // artwork matrix, which is a far worse failure than keeping everything.
+            tracking
+        }
+
         // Weighted Average of translation and SLERP for rotation
         var totalX = 0f; var totalY = 0f; var totalZ = 0f
         val quats = mutableListOf<FloatArray>()
         val weights = mutableListOf<Float>()
 
-        for (ca in tracking) {
+        for (ca in kept) {
             val suggestion = ca.anchor.pose.compose(ca.artworkOffset)
 
             // Proximity weight: anchors closer to the artwork (smaller stored offset) are more
@@ -171,6 +223,20 @@ class AnchorOrchestrator {
     }
 
     private fun identity() = floatArrayOf(1f,0f,0f,0f, 0f,1f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
+
+    /**
+     * Median of a non-empty list, by the lower element on an even count.
+     *
+     * Deliberately not the mean of the two middles: this is used per-axis on a set of 3D positions,
+     * and mixing an interpolated value into one axis while the others take real samples produces a
+     * centre that no anchor ever voted for. Picking an actual sample keeps the reference point on
+     * the manifold of things the anchors actually said.
+     */
+    private fun medianOf(values: List<Float>): Float {
+        if (values.isEmpty()) return 0f
+        val sorted = values.sorted()
+        return sorted[(sorted.size - 1) / 2]
+    }
 
     fun getActiveAnchorCount(): Int = synchronized(this) {
         consensusAnchors.count { it.anchor.trackingState == TrackingState.TRACKING }
