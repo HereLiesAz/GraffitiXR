@@ -1272,8 +1272,19 @@ class ArRenderer(
             fusionSkipReason = when {
                 !fusionEnabled -> com.hereliesaz.graffitixr.common.model.FusionState.DISABLED
                 !anchorEstablished -> com.hereliesaz.graffitixr.common.model.FusionState.NO_ANCHOR
+                // Two very different causes, one condition. A pre-Phase-2 fingerprint has points but
+                // no stored capture pose; a session where the target capture failed has no
+                // fingerprint at all. Reported as one state, the overlay told an artist to
+                // "re-create" a target that had never existed, one row under its own "NO TARGET".
+                //
+                // The keypoint count is only read on this branch — i.e. only when fusion is already
+                // skipping — so the healthy path pays nothing for the distinction.
                 captureAnchorCam == null ->
-                    com.hereliesaz.graffitixr.common.model.FusionState.NO_CAPTURE_POSE
+                    if (slamManager.getWallKeypointCount() <= 0) {
+                        com.hereliesaz.graffitixr.common.model.FusionState.NO_FINGERPRINT
+                    } else {
+                        com.hereliesaz.graffitixr.common.model.FusionState.NO_CAPTURE_POSE
+                    }
                 else -> null
             }
             val anchorMatrix: FloatArray = if (fusionEnabled && anchorEstablished && captureAnchorCam != null) {

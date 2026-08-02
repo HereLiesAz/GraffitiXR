@@ -2274,7 +2274,21 @@ private fun RelocDiagnosticsOverlay(
             "Inliers", "${d.inliers}/${d.matches} (${(d.inlierRatio * 100).toInt()}%)",
             androidx.compose.ui.graphics.Color.White,
         )
-        DiagnosticRow("In frame", "${d.detected} features", androidx.compose.ui.graphics.Color.White)
+        // "0 features" is a MEASUREMENT and must not be printed when nothing was measured.
+        //
+        // The native relocalizer early-returns on an empty fingerprint BEFORE it runs the detector,
+        // so `detected` keeps its default 0 and the row read "0 FEATURES" on a device — telling an
+        // artist their wall had no texture, and sending them to fix the lighting, when the real and
+        // only problem was that no target existed to match against. Same for a disabled relocalizer.
+        DiagnosticRow(
+            "In frame",
+            when (d.reject) {
+                RelocReject.NO_FINGERPRINT, RelocReject.DISABLED, RelocReject.UNKNOWN ->
+                    "not sampled"
+                else -> "${d.detected} features"
+            },
+            androidx.compose.ui.graphics.Color.White,
+        )
         // Whether the plane-guided rectification pass is firing. It was dead in practice until the
         // capture view started being stored, so seeing a real angle here is the confirmation that it
         // now runs; "off" means it wasn't eligible (no capture view, not tracking, too few points).
@@ -2322,6 +2336,11 @@ private fun RelocDiagnosticsOverlay(
                 // target", which no other state does, and it is the newest and least familiar.
                 com.hereliesaz.graffitixr.common.model.FusionState.NO_CAPTURE_POSE ->
                     "OLD TARGET — re-create it"
+                // Distinct from the line above, which used to cover this case and sent the artist to
+                // "re-create" a target that had never been created — directly contradicting the
+                // Reloc row's own "NO TARGET" three rows up.
+                com.hereliesaz.graffitixr.common.model.FusionState.NO_FINGERPRINT ->
+                    "NO TARGET — create one"
                 com.hereliesaz.graffitixr.common.model.FusionState.WAITING_FOR_LOCK -> "waiting for lock"
                 com.hereliesaz.graffitixr.common.model.FusionState.COLD_SNAP -> "snapped"
                 com.hereliesaz.graffitixr.common.model.FusionState.BLENDING ->
@@ -2332,6 +2351,7 @@ private fun RelocDiagnosticsOverlay(
                 // Red for the two that mean corrections are being computed and thrown away, or
                 // cannot be computed at all. Amber for the transient waits. White for working.
                 com.hereliesaz.graffitixr.common.model.FusionState.NO_CAPTURE_POSE,
+                com.hereliesaz.graffitixr.common.model.FusionState.NO_FINGERPRINT,
                 com.hereliesaz.graffitixr.common.model.FusionState.DISABLED ->
                     androidx.compose.ui.graphics.Color.Red
                 com.hereliesaz.graffitixr.common.model.FusionState.NO_ANCHOR,
