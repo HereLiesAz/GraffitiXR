@@ -346,16 +346,17 @@ class ArViewModel @Inject constructor(
      */
     @Volatile private var diagnosticCaptureEnabled = false
 
-    /**
-     * Why the last target capture produced no fingerprint, or null if the last one succeeded.
-     *
-     * Carried into the report because it is the answer to the question every empty-fingerprint run
-     * raises and none of them could answer. `wallPoints 0` says the fingerprint is missing; this says
-     * whether the wall had no features at all or had plenty and none of them back-projected onto the
-     * plane — two problems with two different fixes, which the report otherwise leaves the reader to
-     * guess between.
-     */
-    @Volatile private var lastCaptureRefusal: String? = null
+    // This class used to keep its OWN `lastCaptureRefusal` field. It was wrong the moment a second
+    // capture flow existed: `MainViewModel.handleSingleCapture` — the "tap directly on your painted
+    // marks" review flow, which is the ORDINARY way a target gets created — builds a fingerprint
+    // through the exact same `MetricFingerprintBuilder`, on a failure it never touched this field,
+    // and its refusal reached the artist only as an ephemeral `Toast`. A report built from this
+    // class's own field then said "no refusal recorded" for a capture that HAD failed, moments
+    // earlier, through the flow the artist actually used — which is indistinguishable, to the field,
+    // from nothing having been attempted at all.
+    //
+    // `MetricFingerprintBuilder.lastRefusalReason` is the shared answer both flows read and write
+    // now; see its doc. The report below reads that directly.
 
     private val _captureRequests =
         MutableSharedFlow<com.hereliesaz.graffitixr.feature.ar.eval.CaptureTrigger>(
@@ -617,7 +618,8 @@ class ArViewModel @Inject constructor(
             "syncReloc" to slamManager.evalSyncRelocEveryN().let { if (it > 0) "every $it" else "async" },
             // The reason an empty-fingerprint run is empty. Without it the report can say the
             // fingerprint is missing and nothing about why, which is where three device runs stalled.
-            "lastCapture" to (lastCaptureRefusal?.let { "REFUSED — $it" } ?: "no refusal recorded"),
+            "lastCapture" to (com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
+                .lastRefusalReason?.let { "REFUSED — $it" } ?: "no refusal recorded"),
             // The single most direct test for "the overlay is receding": is the ARCore anchor's OWN
             // pose moving, independent of fusion, relocalization, or the consensus average. A device
             // run went 6.2 -> 16.0 ft in four seconds with fusion off and no fingerprint — nothing
@@ -3200,13 +3202,15 @@ class ArViewModel @Inject constructor(
         val planeNormalOk = plane != null && plane.size >= 6 &&
             (plane[3] * plane[3] + plane[4] * plane[4] + plane[5] * plane[5]) > 1e-8f
         if (!planeNormalOk || intr == null) {
-            lastCaptureRefusal = when {
+            val reason = when {
                 plane == null -> "no wall plane yet — ARCore has not produced a usable surface to project onto"
                 plane.size < 6 -> "wall plane malformed (${plane.size} floats, need 6)"
                 !planeNormalOk -> "wall plane has a degenerate normal — nothing can back-project onto it"
                 else -> "no camera intrinsics for this frame"
             }
-            Timber.w("ARDIAG doodle capture skipped: $lastCaptureRefusal")
+            com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
+                .recordPreconditionFailure(reason)
+            Timber.w("ARDIAG doodle capture skipped: $reason")
             slamManager.setMappingPaused(false)
             return
         }
@@ -3232,39 +3236,27 @@ class ArViewModel @Inject constructor(
                 )
                 if (fp != null) {
                     doodleFingerprintBuilt = true
-                    lastCaptureRefusal = null
+                    // No need to clear anything here: `buildSingle` already recorded its own success
+                    // (null) into `MetricFingerprintBuilder.lastRefusalReason` internally.
                 } else {
-                    // Say which way it fell short, on this path too.
-                    //
-                    // The tap-to-capture path has reported this for a while; the doodle path threw
-                    // the answer away. So a run could go: draw the glyphs, tap "I've drawn it",
-                    // watch the app capture over and over, silently fail every time, fall back to a
-                    // plain anchor, and hand back an overlay with no fingerprint and no explanation.
-                    // A device report showed exactly that — wallPoints 0 across 953 samples, and
-                    // every downstream stage correctly inert, with nothing anywhere saying why.
-                    //
-                    // "Not enough texture" would be the wrong message too: features found but not
-                    // landing on the plane is a different problem with a different fix from no
-                    // features at all, and only the pair of counts tells them apart.
-                    val detected = MetricFingerprintBuilder.lastDetected
-                    val placed = MetricFingerprintBuilder.lastPlaced
-                    val need = MetricFingerprintBuilder.lastRequired
-                    lastCaptureRefusal = if (detected < need) {
-                        "only $detected features detected (need $need) — too dark, too smooth, or out of focus"
-                    } else {
-                        "$detected features detected but only $placed landed on the wall plane " +
-                            "(need $need) — aim square at the middle of the detected wall"
-                    }
-                    Timber.w("ARDIAG target capture refused: $lastCaptureRefusal")
+                    // `buildSingle` already recorded WHY, from the same counts this used to
+                    // re-derive by hand — see `MetricFingerprintBuilder.lastRefusalReason`. Read it
+                    // back only to log it; the report reads the shared field directly.
+                    Timber.w(
+                        "ARDIAG target capture refused: " +
+                            "${MetricFingerprintBuilder.lastRefusalReason}",
+                    )
                 }
             } catch (t: Throwable) {
                 android.util.Log.w("ArViewModel", "Doodle fingerprint build failed", t)
-                // A throw is a refusal too, and the field above would otherwise stay null and let
-                // the report say "no refusal recorded" for a capture that blew up. `buildSingle`
-                // has at least one reachable throw of its own — `glViewToCvDisplay` requires a
-                // multiple of 90 — and reporting a crash as an absence is the failure this whole
-                // effort exists to stop.
-                lastCaptureRefusal = "threw ${t.javaClass.simpleName}: ${t.message ?: "no message"}"
+                // A throw is a refusal too, and without this the shared field would otherwise keep
+                // whatever it held before this attempt — success OR failure — and let the report
+                // describe a DIFFERENT capture than the one that just blew up. `buildSingle` has at
+                // least one reachable throw of its own — `glViewToCvDisplay` requires a multiple of
+                // 90 — and reporting a crash as an unrelated result is the failure this whole effort
+                // exists to stop.
+                com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
+                    .recordPreconditionFailure("threw ${t.javaClass.simpleName}: ${t.message ?: "no message"}")
             } finally {
                 // Always resume the mapping that requestCapture paused — otherwise a throw would
                 // wedge SLAM with mapping paused for the rest of the session.

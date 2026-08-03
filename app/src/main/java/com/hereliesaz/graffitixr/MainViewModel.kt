@@ -284,6 +284,15 @@ class MainViewModel @Inject constructor(
     ) {
         if (wallPlane == null || wallPlane.size < 6) {
             resetCaptureUi()
+            // Recorded into the SAME shared field `buildSingle` writes to below, on the OTHER two
+            // preconditions here and in ArViewModel's doodle path — this call never reaches
+            // buildSingle at all, so without this line a diagnostic report would show whatever the
+            // PREVIOUS attempt left behind, or nothing, in place of this refusal. See
+            // MetricFingerprintBuilder.lastRefusalReason: this Toast was the only record this
+            // failure ever had, and a Toast a report can't see is not a record.
+            MetricFingerprintBuilder.recordPreconditionFailure(
+                "no wall plane under the tap — face the wall more squarely, closer, or with more light",
+            )
             Toast.makeText(context, notOnGreenWallMessage, Toast.LENGTH_LONG).show()
             return
         }
@@ -309,6 +318,9 @@ class MainViewModel @Inject constructor(
             // instantly against the previous anchor's pose.
             val anchor = slamManager.awaitAnchorTransform(slamManager.captureAnchorGenerationBaseline)
             if (anchor == null || anchor.size != 16) {
+                MetricFingerprintBuilder.recordPreconditionFailure(
+                    "anchor never established for this capture — held steady long enough?",
+                )
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         context,
@@ -324,6 +336,7 @@ class MainViewModel @Inject constructor(
             // happened — no target, no error, no clue that the missing piece was a project.
             val currentProject = projectRepository.currentProject.value
             if (currentProject == null) {
+                MetricFingerprintBuilder.recordPreconditionFailure("no project open to save the target into")
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         context,
