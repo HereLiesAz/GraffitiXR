@@ -61,7 +61,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@v6.2.0
         env:
           FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
