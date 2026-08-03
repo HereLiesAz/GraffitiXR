@@ -238,6 +238,14 @@ class ArRenderer(
     @Volatile var fusionSkipReason: com.hereliesaz.graffitixr.common.model.FusionState? = null
 
     /**
+     * How far the primary ARCore anchor's own pose has moved since establishment, in metres, or -1
+     * with no established anchor. See `AnchorOrchestrator.primaryAnchorDriftMeters` — added to give
+     * a "the overlay is receding" report a number to check FIRST, before anything downstream of the
+     * anchor (fusion, relocalization) is even considered.
+     */
+    fun primaryAnchorDriftMeters(): Float = anchorOrchestrator.primaryAnchorDriftMeters()
+
+    /**
      * The last fusion decision, for the overlay and the eval CSV. Combines [fusionSkipReason] — the
      * states only the renderer can see — with `PoseFusion`'s own record of what it did when it ran.
      */
@@ -1071,9 +1079,31 @@ class ArRenderer(
                         val dist = Math.sqrt((dx * dx + dy * dy + dz * dz).toDouble())
                         if (dist in 0.1..10.0) {
                             pose.toMatrix(anchorModelMatrix, 0) // full surface pose (position + normal)
-                            // Anchor to the hit's trackable so ARCore keeps it pinned to the wall as the
-                            // artist moves, instead of a free world point at a guessed depth.
-                            anchor = chosen.createAnchor()
+                            // A FIXED world pose, not `chosen.createAnchor()`.
+                            //
+                            // `HitResult.createAnchor()` attaches to the TRACKABLE, so the anchor's
+                            // pose keeps following that Plane as ARCore continues to refine, grow and
+                            // merge it — normally a small correction. In a difficult scene (dim room,
+                            // few real features) the plane can still be actively forming when this
+                            // fires, spanning several unrelated surfaces at once, and each refinement
+                            // shifts its centre by a lot. The anchor rides along.
+                            //
+                            // A device run showed exactly this: the overlay receding 6.2 -> 16.0 ft in
+                            // four seconds, accelerating, with fusion off and no fingerprint — nothing
+                            // downstream of the anchor was even running. A screenshot from the same
+                            // session showed the plane polygon itself spanning a canvas, a doorway and
+                            // the floor as one badly-fit surface — the exact shape of trackable this
+                            // produces the failure on. `getConsensusMatrix` had exactly one vote
+                            // (`setInitialAnchor` always seeds a fresh single anchor), so the
+                            // multi-anchor outlier rejection added earlier could not have caught this;
+                            // it guards disagreement between anchors, and there was only one.
+                            //
+                            // `addSupportAnchor` already creates its anchors this way
+                            // (`session.createAnchor(worldPose)`); the primary anchor was the one
+                            // inconsistent case. The cost is real: the anchor no longer nudges itself
+                            // as ARCore's plane estimate improves in the following second or so. That
+                            // is a small, one-time precision loss against an unbounded runaway.
+                            anchor = activeSession.createAnchor(pose)
                             // Capture the surface normal so the overlay can be laid flat & facing the
                             // user. A plane pose's local +Y is the wall normal; a depth/feature point
                             // has no reliable orientation, so use the anchor→camera direction (a surface

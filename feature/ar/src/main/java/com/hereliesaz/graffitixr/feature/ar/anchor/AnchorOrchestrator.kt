@@ -45,6 +45,26 @@ class AnchorOrchestrator {
     // The master artwork pose in world space, set when the first anchor is established.
     private var masterArtworkPose: Pose? = null
 
+    // The primary anchor's translation at the instant it was established. Compared against its
+    // live translation so a report can state, in metres, exactly how far the anchor itself has
+    // moved — not the consensus average, not the rendered overlay, the raw ARCore Anchor. This is
+    // the number that tells the next reader whether a "runs away" report is this mechanism again or
+    // something new, instead of re-deriving it from a distance HUD and a stopwatch.
+    private var establishedTranslation: FloatArray? = null
+
+    /**
+     * How far the primary anchor's own pose has moved since [setInitialAnchor], in metres, or -1 if
+     * there is no established anchor or it has stopped tracking.
+     */
+    fun primaryAnchorDriftMeters(): Float = synchronized(this) {
+        val e0 = establishedTranslation ?: return -1f
+        val primary = consensusAnchors.firstOrNull() ?: return -1f
+        if (primary.anchor.trackingState != TrackingState.TRACKING) return -1f
+        val t = primary.anchor.pose.translation
+        val dx = t[0] - e0[0]; val dy = t[1] - e0[1]; val dz = t[2] - e0[2]
+        return kotlin.math.sqrt(dx * dx + dy * dy + dz * dz)
+    }
+
     // The last successfully-computed consensus matrix. Held during a (usually brief) tracking loss so
     // the overlay stays put on the wall instead of teleporting to the world origin — this is exactly
     // the "stays stuck even in your pocket" behaviour the app is built around.
@@ -59,6 +79,7 @@ class AnchorOrchestrator {
             consensusAnchors.forEach { it.anchor.detach() }
             consensusAnchors.clear()
             masterArtworkPose = null
+            establishedTranslation = null
             hasLastGood = false
         }
     }
@@ -71,6 +92,7 @@ class AnchorOrchestrator {
             // clear() re-enters this monitor (reentrant), keeping the reset+seed atomic.
             clear()
             masterArtworkPose = anchor.pose
+            establishedTranslation = anchor.pose.translation
             consensusAnchors.add(ConsensusAnchor(anchor, Pose.IDENTITY))
         }
         Timber.d("Initial consensus anchor established at ${anchor.pose}")

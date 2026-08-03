@@ -618,6 +618,17 @@ class ArViewModel @Inject constructor(
             // The reason an empty-fingerprint run is empty. Without it the report can say the
             // fingerprint is missing and nothing about why, which is where three device runs stalled.
             "lastCapture" to (lastCaptureRefusal?.let { "REFUSED — $it" } ?: "no refusal recorded"),
+            // The single most direct test for "the overlay is receding": is the ARCore anchor's OWN
+            // pose moving, independent of fusion, relocalization, or the consensus average. A device
+            // run went 6.2 -> 16.0 ft in four seconds with fusion off and no fingerprint — nothing
+            // downstream of the anchor was even running — traced to the primary anchor being attached
+            // to a still-forming ARCore Plane trackable rather than a fixed world pose, so ARCore's
+            // own plane refinement dragged it along. Fixed by anchoring to a fixed pose instead; this
+            // number is what proves whether that fix held on the NEXT run, rather than requiring a
+            // burst of screenshots and a stopwatch again.
+            "anchorDriftM" to (renderer?.primaryAnchorDriftMeters()?.let {
+                if (it >= 0f) String.format(java.util.Locale.US, "%.3f", it) else "no anchor established"
+            } ?: "no renderer attached"),
         ),
         parameters = diagnosticParameters(),
         captures = captureManifest.toList(),
