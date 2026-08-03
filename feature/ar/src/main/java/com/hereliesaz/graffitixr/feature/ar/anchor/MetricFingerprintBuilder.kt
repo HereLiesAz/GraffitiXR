@@ -165,6 +165,48 @@ object MetricFingerprintBuilder {
     @Volatile var lastRequired: Int = 0
         private set
 
+    /**
+     * Why the last capture attempt through ANY call site failed, or null if the last attempt
+     * succeeded (or none has been made this process).
+     *
+     * It has to live here, on the shared object, rather than on either caller: there are at least
+     * two independent capture flows that reach this class — the doodle demo
+     * (`ArViewModel.buildDoodleFingerprint`) and the "tap directly on your painted marks" review flow
+     * (`MainViewModel.handleSingleCapture`) — and each built its own version of this message from the
+     * same three counts. A refusal-reporting fix landed on the doodle path while `handleSingleCapture`
+     * kept reporting failures through an ephemeral `Toast` with no record anywhere a diagnostic report
+     * could read. An artist placed a target, the capture failed, a message appeared and vanished, and
+     * the report said "no refusal recorded" — true of that one field, false of what had actually
+     * happened on the device. One shared field means a fix here reaches every caller, including ones
+     * not written yet.
+     *
+     * Set two ways: automatically, by [buildSingle]/`ingestSingle` on every exit, from the counts
+     * they already track; or explicitly, via [recordPreconditionFailure], by a caller that refuses
+     * BEFORE ever reaching this class — no wall plane, no anchor, no open project — none of which
+     * [lastDetected] and friends can describe, because no detector ever ran.
+     */
+    @Volatile var lastRefusalReason: String? = null
+        private set
+
+    /**
+     * Records a refusal this class never saw, for a report reading [lastRefusalReason] to still
+     * account for. See the field doc: a missing wall plane or anchor refuses before `buildSingle` is
+     * ever called, and without this call the report would show the PREVIOUS attempt's outcome — or
+     * none — in place of the one that actually happened.
+     */
+    fun recordPreconditionFailure(reason: String) {
+        lastRefusalReason = reason
+    }
+
+    private fun recordAttemptOutcome(succeeded: Boolean) {
+        lastRefusalReason = if (succeeded) null else if (lastDetected < lastRequired) {
+            "only $lastDetected features detected (need $lastRequired) — too dark, too smooth, or out of focus"
+        } else {
+            "$lastDetected features detected but only $lastPlaced landed on the wall plane " +
+                "(need $lastRequired) — aim square at the middle of the detected wall"
+        }
+    }
+
 
     /**
      * @param rotationDeg `rotationNeeded` for this capture — the angle the caller already applied
@@ -215,7 +257,12 @@ object MetricFingerprintBuilder {
         try {
             clahe.apply(gray, norm)
             orb.detectAndCompute(norm, Mat(), kp, d)
-            if (d.empty()) return null
+            if (d.empty()) {
+                // Both detectors produced nothing at all: `lastDetected` is whatever the SuperPoint
+                // pass left it at (0, if it ran and found nothing), which is the honest count.
+                recordAttemptOutcome(succeeded = false)
+                return null
+            }
             val pixels = kp.toArray().map { PlaneMarks.Pixel(it.pt.x.toFloat(), it.pt.y.toFloat()) }
             return ingestSingle(slam, d, pixels, cvView, intr,
                 planePointWorld, planeNormalWorld, anchorModel, minPoints, glView, rotationDeg)
@@ -246,7 +293,14 @@ object MetricFingerprintBuilder {
         // and ORB is the fallback, so keep whichever pass got furthest rather than the last one.
         if (pixels.size > lastDetected) lastDetected = pixels.size
         if (res.count > lastPlaced) lastPlaced = res.count
-        if (res.count < minPoints) return null
+        if (res.count < minPoints) {
+            recordAttemptOutcome(succeeded = false)
+            return null
+        }
+        // Reaching here means this pass will return a Fingerprint below. Set eagerly rather than at
+        // the final `return` so every path through the rest of this function — there is only one —
+        // does not need its own copy of this line.
+        recordAttemptOutcome(succeeded = true)
 
         // IMPLEMENTATION.md 2.4's capture-time half: the anchor's pose in THIS frame, so the
         // partition can be composed later without a world frame. `res.pointsCam` is in the capture
