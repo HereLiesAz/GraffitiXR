@@ -728,7 +728,12 @@ class MainActivity : ComponentActivity() {
                     )
                     azConfig(
                         packButtons = true,
-                        dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT,
+                        // "Thumb Range Only" (docs/UI_UX.md): the rail docks on the side the free
+                        // thumb naturally reaches — right side for a right-handed grip, left for
+                        // left-handed. AzDockingSide.LEFT/RIGHT are screen-relative (visual left/right;
+                        // see docs/AZNAVRAIL_COMPLETE_GUIDE.md's usePhysicalDocking note), so this must
+                        // match handedness directly, not invert it.
+                        dockingSide = if (editorUiState.isRightHanded) AzDockingSide.RIGHT else AzDockingSide.LEFT,
                         noMenu = railMenuDisabled
                     )
                     azAdvanced(
@@ -1668,7 +1673,14 @@ class MainActivity : ComponentActivity() {
             actions = viewModel,
             uiState = uiState,
             isTouchLocked = mainUiState.isTouchLocked,
-            showUnlockInstructions = mainUiState.showUnlockInstructions,
+            // Dead parameter: EditorUi.kt (feature/editor, out of scope here) declares this but never
+            // reads it in its body — the real unlock-instructions popup is MainActivity's own local
+            // `remember`ed state (UnlockInstructionsPopup, near the TouchLockOverlay usage above), not
+            // this one. MainUiState.showUnlockInstructions and MainViewModel.showUnlockInstructions()
+            // were removed as dead state; this call still has to supply the parameter since EditorUi's
+            // signature requires it and that file is out of scope to edit, so a hardcoded false stands
+            // in. Follow-up for whoever owns feature/editor: drop the parameter from EditorUi.kt.
+            showUnlockInstructions = false,
             strings = strings,
             isCapturingTarget = mainUiState.isCapturingTarget
         )

@@ -29,7 +29,6 @@ import javax.inject.Inject
 
 data class MainUiState(
     val isTouchLocked: Boolean = false,
-    val showUnlockInstructions: Boolean = false,
     val isCapturingTarget: Boolean = false,
     // Whether the current project already has a saved target fingerprint. null = not yet resolved
     // (project still loading) so AR entry can wait instead of racing; true/false drives whether AR
@@ -59,6 +58,11 @@ class MainViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
+    // Tracks the previously-seen project id so the currentProject collector below can tell "the same
+    // project reloaded" (e.g. the loadProject() call right after a target capture saves) apart from
+    // "a different project was opened" — only the latter should reset targetCapturedThisSession.
+    private var lastSeenProjectId: String? = null
+
     init {
         // Track whether the loaded project already has a saved target so AR entry knows whether to
         // pre-select the Target button. Updated on confirm via the repository's project re-load.
@@ -68,6 +72,19 @@ class MainViewModel @Inject constructor(
                 // doesn't briefly see "no target" and auto-start target capture by mistake.
                 if (project != null) {
                     _uiState.update { it.copy(hasExistingTarget = project.fingerprint != null) }
+                    // targetCapturedThisSession is meant to read "has THIS project (in this session)
+                    // had a target captured", not "has any project, ever, this process" — otherwise
+                    // capturing a target in one project silently suppressed the pre-selection prompt
+                    // for every other project opened later. Reset it whenever the loaded project
+                    // actually changes. Guarded on a non-null previous id so it doesn't fire on the
+                    // very first project load, and compares ids (not object identity) so the reload
+                    // onConfirmTargetCreation triggers right after setting the flag true — same
+                    // project, same id — does not immediately clobber it.
+                    val previousId = lastSeenProjectId
+                    if (previousId != null && previousId != project.id) {
+                        _uiState.update { it.copy(targetCapturedThisSession = false) }
+                    }
+                    lastSeenProjectId = project.id
                 }
             }
         }
@@ -82,10 +99,6 @@ class MainViewModel @Inject constructor(
 
     fun setTouchLocked(locked: Boolean) {
         _uiState.update { it.copy(isTouchLocked = locked) }
-    }
-
-    fun showUnlockInstructions(show: Boolean) {
-        _uiState.update { it.copy(showUnlockInstructions = show) }
     }
 
     fun startTargetCapture() {

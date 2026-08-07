@@ -20,6 +20,14 @@
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI", __VA_ARGS__)
 
 MobileGS* gSlamEngine = nullptr;
+// Guards every read of gSlamEngine (the null-check-then-use pattern every JNI entry point below
+// does) and its deletion in nativeDestroy. Without this, nativeDestroy's `delete gSlamEngine` races
+// every other entry point that dereferences the same raw pointer with no lock of its own --
+// SlamManager.kt's destroy() holds initLock, but feedYuvFrame/updateCamera/getRelocResult/etc do
+// not, and Kotlin has no way to serialize against destroy() from those call sites. A single mutex,
+// held for the duration of each function's gSlamEngine access (not just the null check -- releasing
+// it before the call would let destroy free the object mid-call), is the simplest correct fix.
+std::mutex gEngineMutex;
 cv::Mat gLastColorFrame; // MANDATE: Kept in Sensor-Native (Landscape) orientation
 JavaVM* gJvm = nullptr;
 
@@ -248,6 +256,7 @@ extern "C" {
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateDeviceMotion(JNIEnv* env, jobject thiz, jfloatArray angularVel, jfloatArray linearVel) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         // updateDeviceMotion memcpy's 3 floats out of each; a shorter array (or a null one) would
         // read past the end. Validate before pinning rather than trusting the Kotlin caller.
@@ -263,6 +272,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateDeviceMotion
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitialize(JNIEnv* env, jobject thiz) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) {
         gSlamEngine = new MobileGS();
         gSlamEngine->initialize(1920, 1080);
@@ -271,31 +281,37 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitialize(JNIEnv*
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDestroy(JNIEnv* env, jobject thiz) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) { delete gSlamEngine; gSlamEngine = nullptr; }
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArCoreTrackingState(JNIEnv* env, jobject thiz, jboolean isTracking) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setArCoreTrackingState(isTracking);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetViewportSize(JNIEnv* env, jobject thiz, jint width, jint height) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setViewportSize(width, height);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetRelocEnabled(JNIEnv* env, jobject thiz, jboolean enabled) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setRelocEnabled(enabled);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetSelfGrowEnabled(JNIEnv* env, jobject thiz, jboolean enabled) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setSelfGrowEnabled(enabled);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetEvalRngSeed(JNIEnv* env, jobject thiz, jlong seed) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setEvalRngSeed((long long)seed);
 }
 
@@ -303,6 +319,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetEvalRngSeed(JNI
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetEvalSyncReloc(
         JNIEnv* env, jobject thiz, jboolean enabled, jint everyN) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setEvalSyncReloc(enabled == JNI_TRUE, (int)everyN);
 }
 
@@ -312,16 +329,19 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetEvalSyncReloc(
 // a sidecar claiming otherwise would be the kind of evidence that is worse than none.
 JNIEXPORT jint JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetEvalSyncRelocEveryN(JNIEnv* env, jobject thiz) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     return gSlamEngine ? (jint)gSlamEngine->evalSyncEveryN() : 0;
 }
 
 JNIEXPORT jint JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetWallKeypointCount(JNIEnv* env, jobject thiz) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     return gSlamEngine ? gSlamEngine->getWallKeypointCount() : 0;
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallPatch(JNIEnv* env, jobject thiz, jobject bitmap) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !bitmap) return;
     cv::Mat img; bitmapToMat(env, bitmap, img);
     gSlamEngine->setWallPatch(img);
@@ -330,6 +350,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallPatch(JNIEn
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallPatchBytes(
         JNIEnv* env, jobject thiz, jbyteArray data, jint size) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !data || size <= 0) return;
     if (env->GetArrayLength(data) < size * size) return; // expect a size x size single-channel gray buffer
     jbyte* p = env->GetByteArrayElements(data, nullptr);
@@ -340,6 +361,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallPatchBytes(
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMappingPaused(JNIEnv* env, jobject thiz, jboolean paused) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setMappingPaused(paused);
 }
 
@@ -349,6 +371,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(
         jfloatArray viewMatrix, jfloatArray projMatrix,
         jfloatArray mappingViewMatrix, jfloatArray mappingProjMatrix,
         jlong timestampNs) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         // All four are memcpy'd as 16 floats below (and read as 4x4 by updateCamera), so a short
         // array would read past the end. Validate every one before pinning any of them.
@@ -362,8 +385,14 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(
         jfloat* mView = env->GetFloatArrayElements(mappingViewMatrix, nullptr);
         jfloat* mProj = env->GetFloatArrayElements(mappingProjMatrix, nullptr);
 
-        gSlamEngine->updateCamera(view, proj);
-        gSlamEngine->updateMappingCamera(mView, mProj);
+        try {
+            gSlamEngine->updateCamera(view, proj);
+            gSlamEngine->updateMappingCamera(mView, mProj);
+        } catch (const std::exception& e) {
+            LOGE("nativeUpdateCamera: exception: %s", e.what());
+        } catch (...) {
+            LOGE("nativeUpdateCamera: unknown exception");
+        }
 
         env->ReleaseFloatArrayElements(viewMatrix, view, JNI_ABORT);
         env->ReleaseFloatArrayElements(projMatrix, proj, JNI_ABORT);
@@ -374,11 +403,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateLightLevel(JNIEnv* env, jobject thiz, jfloat level) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->updateLightLevel(level);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateAnchorTransform(JNIEnv* env, jobject thiz, jfloatArray transform) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         // updateAnchorTransform memcpy's 16 floats out of this. A short or null array is dropped
         // here — the Kotlin side must not read that as "an anchor was written", which is why the
@@ -395,7 +426,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
         JNIEnv* env, jobject thiz, jobject yBuffer, jobject uBuffer, jobject vBuffer,
         jint width, jint height, jint yStride, jint uvStride, jint uvPixelStride, jlong timestampNs, jint cvRotateCode) {
 
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
+
+    try {
 
     uint8_t* yData = static_cast<uint8_t*>(env->GetDirectBufferAddress(yBuffer));
     uint8_t* uData = static_cast<uint8_t*>(env->GetDirectBufferAddress(uBuffer));
@@ -480,6 +514,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
             cv::rotate(relocFrame, relocFrame, cvRotateCode);
         }
         gSlamEngine->scheduleRelocCheck(relocFrame);
+    }
+
+    } catch (const std::exception& e) {
+        LOGE("nativeFeedYuvFrame: exception: %s", e.what());
+    } catch (...) {
+        LOGE("nativeFeedYuvFrame: unknown exception");
     }
 }
 
