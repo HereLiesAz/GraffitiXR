@@ -862,10 +862,24 @@ class ArRenderer(
             // (A3 deletes the native subsystem). ARCore-based perception layers above (feature points,
             // plane grids, accumulated cloud points) remain as the cheap "what am I seeing" indicators.
             if (frameCount % 120 == 0) {
-                // Decides "no data" vs "drawn but invisible" from the diag log alone.
-                val planeCount = activeSession.getAllTrackables(com.google.ar.core.Plane::class.java)
-                    .count { it.trackingState == TrackingState.TRACKING && it.subsumedBy == null }
-                onDiag("debugView: feat=${arDebugRenderer.lastPointCount} planes=$planeCount pts=${pointCloudRenderer.accumulatedPointCount} fps=${effectivePerceptionFps()}")
+                // Decides "no data" vs "drawn but invisible" from the diag log alone. planes=0 with
+                // healthy feat/pts for many seconds used to be a dead end: it doesn't say whether
+                // ARCore's plane finder ever fired at all (rawPlanes=0, a config/pipeline problem) or
+                // fired but the results never reached TRACKING (rawPlanes>0, planes=0 — a scene/motion
+                // problem, e.g. candidates stuck PAUSED or repeatedly discarded). cfg carries the
+                // session settings that change what the plane finder can see, so a capture spanning a
+                // mid-session focus/stereo change is no longer ambiguous about which mode was active
+                // when planes failed to form.
+                val allPlanes = activeSession.getAllTrackables(com.google.ar.core.Plane::class.java)
+                val planeCount = allPlanes.count { it.trackingState == TrackingState.TRACKING && it.subsumedBy == null }
+                val rawPlaneCount = allPlanes.size
+                val cfg = activeSession.config
+                onDiag(
+                    "debugView: feat=${arDebugRenderer.lastPointCount} planes=$planeCount rawPlanes=$rawPlaneCount " +
+                        "pts=${pointCloudRenderer.accumulatedPointCount} fps=${effectivePerceptionFps()} " +
+                        "focus=${cfg.focusMode} depth=${cfg.depthMode} planeMode=${cfg.planeFindingMode} " +
+                        "stereo=${activeSession.cameraConfig.stereoCameraUsage == com.google.ar.core.CameraConfig.StereoCameraUsage.REQUIRE_AND_USE}"
+                )
             }
         }
     }
