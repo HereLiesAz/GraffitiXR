@@ -1,6 +1,6 @@
 package com.hereliesaz.graffitixr
 
-import com.hereliesaz.graffitixr.common.model.Layer
+import com.hereliesaz.graffitixr.common.model.EditorMode
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
@@ -13,24 +13,37 @@ class HelpItemsBuilderTest {
 
     private fun strings() = mockk<com.hereliesaz.graffitixr.design.theme.AppStrings>(relaxed = true).also {
         every { it.help } returns mockk(relaxed = true)
+        every { it.nav } returns mockk(relaxed = true)
     }
 
     @Test
-    fun `result contains every static main-rail key`() {
-        val map = buildHelpItems(strings(), emptyList())
-        // Per AzNavRail HelpOverlay scoping: main Help shows every main-rail item
-        // with a helpList entry. These are the current canonical static keys the
-        // builder emits (host parents, their items, tool groups, and global).
-        // Updated from the legacy mode.host/project.* scheme when the rail key
-        // convention changed; this pins the present contract and catches removals.
+    fun `every help key names a rail item that is actually registered`() {
+        // The contract RailIntegrityCheck enforces at runtime, pinned at build time. The builder
+        // used to carry ~30 keys for a toolbox this app does not have (brush, eraser, liquify,
+        // stencil, text authoring, per-layer nested rails) — help text for controls nobody can
+        // reach. The union across modes is the universe of legal keys.
+        val allRailIds = EditorMode.entries.flatMap { enumerateRailItemIds(it) }.toSet()
+        val orphans = buildHelpItems(strings()).keys - allRailIds
+        assertEquals("help keys with no matching rail item", emptySet<String>(), orphans)
+    }
+
+    @Test
+    fun `every registered rail item has help text`() {
+        // The other direction: an item with no entry is silently absent from the Help overlay.
+        val map = buildHelpItems(strings())
+        val allRailIds = EditorMode.entries.flatMap { enumerateRailItemIds(it) }.toSet()
+        assertEquals("rail items with no help entry", emptySet<String>(), allRailIds - map.keys)
+    }
+
+    @Test
+    fun `result contains the static main-rail keys`() {
+        val map = buildHelpItems(strings())
         listOf(
+            "item.open",
             "host.modes", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace",
-            "target.create", "mockup.wall",
-            "item.open", "mode.trace.freeze",
-            "sub.design.tools", "grp.paint", "tool.brush", "tool.eraser",
-            "grp.retouch", "tool.blur", "tool.liquify",
-            "grp.color", "adj.invert", "adj.balance", "adj.blend", "tool.filter",
-            "host.project", "proj.new", "proj.save", "proj.load", "proj.settings",
+            "target.create", "mockup.wall", "mode.trace.freeze",
+            "host.project", "proj.new", "proj.save", "proj.export", "proj.load", "proj.settings",
+            "proj.extensions",
             "item.help",
         ).forEach { id ->
             assertTrue("expected key '$id' in helpItems", id in map)
@@ -38,42 +51,12 @@ class HelpItemsBuilderTest {
     }
 
     @Test
-    fun `result contains every dynamic key per layer using layerId convention`() {
-        val layers = listOf(Layer(id = "L1", name = "one"), Layer(id = "L2", name = "two"))
-        val map = buildHelpItems(strings(), layers)
-        val toolKeys = listOf(
-            null, "editText", "size.brush", "size.text", "font", "color", "kern",
-            "bold", "italic", "outline", "shadow", "stencil", "blend",
-            "adj", "invert", "balance", "eraser", "blur", "liquify",
-            "dodge", "burn", "iso", "line",
-        )
-        layers.forEach { layer ->
-            toolKeys.forEach { tool ->
-                val expected = when (tool) {
-                    null -> layerId(layer)
-                    else -> layerId(layer, tool)
-                }
-                assertTrue("expected '$expected' in map", expected in map)
-            }
-        }
-    }
-
-    @Test
-    fun `keys are unique`() {
-        val layers = (1..5).map { Layer(id = "L$it", name = "n$it") }
-        val map = buildHelpItems(strings(), layers)
-        assertEquals(map.keys.size, map.keys.toSet().size)
-    }
-
-    @Test
     fun `no value is null`() {
-        val map = buildHelpItems(strings(), listOf(Layer(id = "x", name = "y")))
-        map.entries.forEach { (k, v) -> assertNotNull("null for $k", v) }
+        buildHelpItems(strings()).entries.forEach { (k, v) -> assertNotNull("null for $k", v) }
     }
 
     @Test
-    fun `empty layer list still returns static map`() {
-        val map = buildHelpItems(strings(), emptyList())
-        assertFalse(map.isEmpty())
+    fun `map is not empty`() {
+        assertFalse(buildHelpItems(strings()).isEmpty())
     }
 }

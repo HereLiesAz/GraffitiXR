@@ -37,8 +37,40 @@ Still open, not touched this pass:
 - **Real JNI YUV→RGBA converter.** `ImageProcessingUtils.convertYuvToRgbaDirect` (the fake "zero-copy" path that JPEG-round-tripped every capture) is deleted. Replaced by `nativebridge.YuvConverter` — OpenCV `cvtColor(COLOR_YUV2RGBA_NV21)` on ARM NEON, written directly into a caller-owned `Bitmap`. Now only used by AR target capture (the export site went to `glReadPixels`). Contract test locks the JNI descriptor.
 - **`ArViewModel.requestExport` is finally wired.** The rail's Export in AR mode calls it; it stashes the callback on `renderer.onExportCaptured` and flips `exportRequested = true` (already-correct implementation was just unreachable).
 
+#### Full-codebase audit pass
+
+`docs/AUDIT.md` is the itemised record; the headline items:
+
+- **AR map autosave had never run.** `saveMapNow()` and the 30 s autosave loop both keyed on
+  `slamManager.getSplatCount()`, a hardcoded `0` since the voxel/splat map was deleted, so the
+  accumulated point cloud and the wall feature map were persisted only on AR exit and app
+  background. Both now key on the live accumulated ARCore cloud.
+- **Co-op survives a large edit.** The delta replay buffer refused an oversized op and treated the
+  refusal as fatal, so one Liquify warp — or simply editing while waiting for a guest to join —
+  ended the session. It now coalesces per-layer bitmap replaces, evicts on overflow, and falls back
+  to a bulk re-sync when a reconnect lands in the gap.
+- **Guest edits are no longer dropped in silence.** Co-op is host-broadcast; a guest's edit reached
+  nobody with neither end told. It now says so once per session.
+- **The azphalt marketplace is reachable.** The whole extension/LUT stack had no entry point from
+  the app; it is now **Project ▸ Extensions**, and applying an installed LUT grades the active layer.
+- **The layer list has an opener, and layers can be removed.** Add-a-layer was one-way: nothing could
+  open the panel, and remove/rename/reorder/hide were implemented, tested and unreachable.
+- **The wall feature map can be switched on.** `setMapRelocEnabled`/`setMapBuildEnabled` had no
+  caller, so phases 2b/3 never ran and the `.gxr` map was always empty. Now a persisted switch beside
+  drift-correction and self-grow.
+- **The vestigial native voxel/splat layer is gone** (~20 no-op functions and their callers, the idle
+  map thread, the per-frame depth decode and stereo block-match that fed a no-op, the software-stereo
+  path that advertised depth it could not produce, and the Liquify/ImageWarper subsystem).
+- **`./gradlew detekt` works.** Its config file had never been committed, so the command
+  `docs/contributing.md` asks contributors to run failed for every module. The tree is now clean
+  under it.
+
+Verified by `testDebugUnitTest` (413 tests), `externalNativeBuildDebug`, `detekt` and
+`assembleDebug`. Nothing was device-verified — see the note at the top of `docs/AUDIT.md`.
+
 ### Todo
 
 - _No open security alerts._ (CodeQL #3/#4/#5 SRI and the Bouncy Castle advisories #23/#24/#25 are resolved — see the Done section above.)
 
-(Dead-features and export/YUV items cleared — see the notes under **Done** above. Remaining open items: Glasses AR session, AR freeze-preview.)
+Remaining open items (all in `docs/AUDIT.md` under "Still open"): Glasses AR session, AR
+freeze-preview, bidirectional co-op, and a short list of unreferenced diagnostic/eval knobs.

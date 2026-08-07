@@ -82,14 +82,6 @@ class ProjectManagerTest {
     }
 
     @Test
-    fun `getMapPath returns correct path and creates directory`() = runTest {
-        val path = manager.getMapPath(mockContext, "map_project")
-        val expectedFile = File(tempFilesDir, "projects/map_project/map.bin")
-        assertEquals(expectedFile.absolutePath, path)
-        assertTrue(expectedFile.parentFile.exists())
-    }
-
-    @Test
     fun `deleteProject removes directory`() = runTest {
         val project = GraffitiProject(id = "del_project", name = "To Be Deleted")
         manager.saveProject(mockContext, project)

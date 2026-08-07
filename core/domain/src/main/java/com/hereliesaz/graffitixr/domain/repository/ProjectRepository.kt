@@ -91,13 +91,6 @@ interface ProjectRepository {
     suspend fun updateTargetFingerprint(projectId: String, path: String)
 
     /**
-     * Updates the 3D map path for a project (used by Gaussian Splatting).
-     * @param projectId The project ID.
-     * @param path The file path to the serialized map.
-     */
-    suspend fun updateMapPath(projectId: String, path: String)
-
-    /**
      * Imports a project from a .gxr zip file URI.
      * Extracts and persists the project, then sets it as the current project.
      * @param uri The URI of the .gxr file to import.

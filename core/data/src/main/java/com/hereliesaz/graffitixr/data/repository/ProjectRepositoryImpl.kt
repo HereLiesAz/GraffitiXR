@@ -128,11 +128,6 @@ class ProjectRepositoryImpl @Inject constructor(
         updateProject(project.copy(targetFingerprintPath = path))
     }
 
-    override suspend fun updateMapPath(projectId: String, path: String) {
-        val project = getProject(projectId) ?: return
-        updateProject(project.copy(mapPath = path))
-    }
-
     override suspend fun importProject(uri: android.net.Uri): Result<GraffitiProject> {
         val project = projectManager.importProjectFromUri(context, uri)
             ?: return Result.failure(Exception("Failed to import project from $uri"))

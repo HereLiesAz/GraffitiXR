@@ -29,12 +29,6 @@ internal object EditorReducer {
         is EditorIntent.SetColorBalanceB -> state.mapActive { it.copy(colorBalanceB = intent.value) }
         is EditorIntent.SetScale -> state.mapActive { it.copy(scale = intent.value) }
         is EditorIntent.AddOffset -> state.mapActive { it.copy(offset = it.offset + intent.delta) }
-        is EditorIntent.SetRotationX -> state.mapActive { it.copy(rotationX = intent.value) }.copy(activeRotationAxis = RotationAxis.X)
-        is EditorIntent.SetRotationY -> state.mapActive { it.copy(rotationY = intent.value) }.copy(activeRotationAxis = RotationAxis.Y)
-        is EditorIntent.SetRotationZ -> state.mapActive { it.copy(rotationZ = intent.value) }.copy(activeRotationAxis = RotationAxis.Z)
-        is EditorIntent.SetLayerTransform -> state.mapActive {
-            it.copy(scale = intent.scale, offset = intent.offset, rotationX = intent.rx, rotationY = intent.ry, rotationZ = intent.rz)
-        }
         EditorIntent.ToggleInvert -> state.mapActive { it.copy(isInverted = !it.isInverted) }
         EditorIntent.ToggleImageLock -> state.mapActive { it.copy(isImageLocked = !it.isImageLocked) }
         EditorIntent.CycleRotationAxis -> {
@@ -65,6 +59,8 @@ internal object EditorReducer {
 
         EditorIntent.ToggleAdjustPanel ->
             state.copy(activePanel = if (state.activePanel == EditorPanel.ADJUST) EditorPanel.NONE else EditorPanel.ADJUST)
+        EditorIntent.ToggleLayersPanel ->
+            state.copy(activePanel = if (state.activePanel == EditorPanel.LAYERS) EditorPanel.NONE else EditorPanel.LAYERS)
         EditorIntent.DismissPanel -> state.copy(activePanel = EditorPanel.NONE)
         is EditorIntent.SetGestureInProgress -> state.copy(gestureInProgress = intent.inProgress)
         is EditorIntent.SetEditorMode -> reduceEditorMode(state, intent.mode)
@@ -109,7 +105,6 @@ internal object EditorReducer {
         EditorIntent.TogglePlaneGrids -> state.copy(showPlaneGrids = !state.showPlaneGrids)
         EditorIntent.TogglePoints -> state.copy(showPoints = !state.showPoints)
         EditorIntent.FeedbackShown -> state.copy(showRotationAxisFeedback = false)
-        is EditorIntent.SetLayerWarp -> state.copy(layers = LayerListOps.mapLayer(state.layers, intent.layerId) { it.copy(warpMesh = intent.mesh) })
 
         is EditorIntent.AppendLayer -> state.copy(layers = state.layers + intent.layer)
         is EditorIntent.RemoveLayerById -> state.copy(layers = state.layers.filterNot { it.id == intent.id })

@@ -14,19 +14,12 @@
 #include <cstring>
 #include <cstdint>
 #include "include/MobileGS.h"
-#include "include/StereoProcessor.h"
-#include "include/ImageWarper.h"
 
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "GraffitiJNI", __VA_ARGS__)
 
-static std::string gLastDepthTrace;
-static std::string gLastSplatTrace;
-#define DEPTH_TRACE(fmt, ...) do {     char _buf[256];     snprintf(_buf, sizeof(_buf), fmt, ##__VA_ARGS__);     LOGD("DEPTH_PIPE: %s", _buf);     gLastDepthTrace += std::string(_buf) + "\n"; } while(0)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "GraffitiJNI", __VA_ARGS__)
 
 MobileGS* gSlamEngine = nullptr;
-StereoProcessor* gStereoProcessor = nullptr;
-ImageWarper* gImageWarper = nullptr;
 cv::Mat gLastColorFrame; // MANDATE: Kept in Sensor-Native (Landscape) orientation
 int gFrameCount = 0;
 JavaVM* gJvm = nullptr;
@@ -257,34 +250,6 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 
 extern "C" {
 
-JNIEXPORT jfloatArray JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetAnchorCandidates(
-        JNIEnv* env, jobject thiz, jfloat threshold, jint maxCount) {
-    // Voxel/splat map deleted: no splat-based anchor candidates. Callers handle null.
-    (void) env; (void) thiz; (void) threshold; (void) maxCount;
-    return nullptr;
-}
-
-JNIEXPORT jfloat JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetVisibleConfidenceAvg(JNIEnv* env, jobject thiz) {
-    if (gSlamEngine) {
-        float vis, glob;
-        gSlamEngine->getConfidenceAvgs(vis, glob);
-        return vis;
-    }
-    return 0.0f;
-}
-
-JNIEXPORT jfloat JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetGlobalConfidenceAvg(JNIEnv* env, jobject thiz) {
-    if (gSlamEngine) {
-        float vis, glob;
-        gSlamEngine->getConfidenceAvgs(vis, glob);
-        return glob;
-    }
-    return 0.0f;
-}
-
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateDeviceMotion(JNIEnv* env, jobject thiz, jfloatArray angularVel, jfloatArray linearVel) {
     if (gSlamEngine) {
@@ -306,74 +271,16 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitialize(JNIEnv*
         gSlamEngine = new MobileGS();
         gSlamEngine->initialize(1920, 1080);
     }
-    if (!gImageWarper) {
-        gImageWarper = new ImageWarper();
-    }
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitGl(JNIEnv* env, jobject thiz) {
-    if (gSlamEngine) gSlamEngine->initGl();
-    if (gImageWarper) gImageWarper->init();
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeResetGlContext(JNIEnv* env, jobject thiz) {
-    if (gSlamEngine) gSlamEngine->resetGlContext();
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitVoxelGl(JNIEnv* env, jobject thiz) {
-    if (gSlamEngine) gSlamEngine->initVoxelGl();
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitVoxelGlProgram(JNIEnv* env, jobject thiz) {
-    if (gSlamEngine) gSlamEngine->initVoxelGlProgram();
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitVoxelGlBuffer(JNIEnv* env, jobject thiz) {
-    if (gSlamEngine) gSlamEngine->initVoxelGlBuffer();
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitMeshGl(JNIEnv* env, jobject thiz) {
-    if (gSlamEngine) gSlamEngine->initMeshGl();
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDestroy(JNIEnv* env, jobject thiz) {
     if (gSlamEngine) { delete gSlamEngine; gSlamEngine = nullptr; }
-    if (gStereoProcessor) { delete gStereoProcessor; gStereoProcessor = nullptr; }
-    if (gImageWarper) { delete gImageWarper; gImageWarper = nullptr; }
-}
-
-JNIEXPORT jint JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetSplatCount(JNIEnv* env, jobject thiz) {
-    if (gSlamEngine) return gSlamEngine->getSplatCount();
-    return 0;
-}
-
-JNIEXPORT jint JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetImmutableSplatCount(JNIEnv* env, jobject thiz) {
-    if (gSlamEngine) return gSlamEngine->getImmutableSplatCount();
-    return 0;
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArCoreTrackingState(JNIEnv* env, jobject thiz, jboolean isTracking) {
     if (gSlamEngine) gSlamEngine->setArCoreTrackingState(isTracking);
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearMap(JNIEnv* env, jobject thiz) {
-    if (gSlamEngine) gSlamEngine->clearMap();
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativePruneByConfidence(JNIEnv* env, jobject thiz, jfloat threshold) {
-    if (gSlamEngine) gSlamEngine->pruneByConfidence(threshold);
 }
 
 JNIEXPORT void JNICALL
@@ -433,16 +340,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallPatchBytes(
     cv::Mat gray(size, size, CV_8UC1, reinterpret_cast<uchar*>(p));
     gSlamEngine->setWallPatch(gray); // clones internally; safe to release after
     env->ReleaseByteArrayElements(data, p, JNI_ABORT);
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetVoxelSize(JNIEnv* env, jobject thiz, jfloat size) {
-    if (gSlamEngine) gSlamEngine->setVoxelSize(size);
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetParallaxMinDegrees(JNIEnv* env, jobject thiz, jfloat deg) {
-    if (gSlamEngine) gSlamEngine->setParallaxMinDegrees(deg);
 }
 
 JNIEXPORT void JNICALL
@@ -689,138 +586,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
         cv::rotate(relocFrame, relocFrame, cvRotateCode);
     }
     gSlamEngine->scheduleRelocCheck(relocFrame);
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedPointCloud(JNIEnv* env, jobject thiz, jfloatArray points) {
-    if (gSlamEngine) {
-        jsize len = env->GetArrayLength(points);
-        jfloat* ptr = env->GetFloatArrayElements(points, nullptr);
-        std::vector<float> pts(ptr, ptr + len);
-        gSlamEngine->pushPointCloud(pts);
-        env->ReleaseFloatArrayElements(points, ptr, JNI_ABORT);
-    }
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedArCoreDepth(
-        JNIEnv* env, jobject thiz, jobject depthBuffer, jint width, jint height, jint rowStride, jfloatArray intrArray, jint cpuW, jint cpuH, jint cvRotateCode, jfloat confidence) {
-
-    gLastDepthTrace.clear();
-    if (!gSlamEngine) return;
-    if (gLastColorFrame.empty()) return;
-
-    auto* rawDepthBytes = static_cast<const uint8_t*>(env->GetDirectBufferAddress(depthBuffer));
-    if (!rawDepthBytes) return;
-
-    // MANDATE: Keep depth map in sensor-native (Landscape) orientation to align with Physical pose.
-    cv::Mat depthMap(height, width, CV_32F, cv::Scalar(0.0f));
-
-    int validPixels = 0;
-    for (int r = 0; r < height; r++) {
-        auto* rowPtr = reinterpret_cast<const uint16_t*>(rawDepthBytes + (r * rowStride));
-        for (int c = 0; c < width; c++) {
-            uint16_t raw = rowPtr[c];
-            uint16_t depthMm = raw & 0x1FFFu;
-            uint8_t conf = (raw >> 13u) & 0x7u;
-            if (depthMm > 0 && conf > 0) {
-                depthMap.at<float>(r, c) = (float)depthMm / 1000.0f;
-                validPixels++;
-            }
-        }
-    }
-
-    if (validPixels == 0) return;
-
-    jfloat* intr = env->GetFloatArrayElements(intrArray, nullptr);
-    float fx = intr[0], fy = intr[1], cx = intr[2], cy = intr[3];
-    env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
-
-    // SCALE: Physical intrinsics are for the full CPU resolution (cpuW/cpuH).
-    // They must be scaled to match the sensor-native depth resolution (width/height).
-    if (cpuW > 0 && cpuH > 0) {
-        float scaleX = (float)width / (float)cpuW;
-        float scaleY = (float)height / (float)cpuH;
-        fx *= scaleX; fy *= scaleY;
-        cx *= scaleX; cy *= scaleY;
-    }
-
-    float finalIntrinsics[4] = {fx, fy, cx, cy};
-
-    if (!gHasCameraMatrices) return;
-
-    bool isYuv = (gLastColorFrame.rows == gColorImageHeight + gColorImageHeight / 2);
-
-    // MANDATE: Pass sensor-native depth map with Physical Pose (gLastMappingViewMatrix)
-    gSlamEngine->pushFrame(depthMap, gLastColorFrame, gLastMappingViewMatrix, gLastMappingProjMatrix, finalIntrinsics, isYuv, confidence);
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDraw(JNIEnv* env, jobject thiz, jboolean debugTint) {
-    if (gSlamEngine) gSlamEngine->draw(debugTint == JNI_TRUE);
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDrawDebugLayers(JNIEnv* env, jobject thiz, jboolean voxels, jboolean mesh) {
-    if (gSlamEngine) gSlamEngine->drawDebugLayers(voxels == JNI_TRUE, mesh == JNI_TRUE);
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDrawCoverage(JNIEnv* env, jobject thiz) {
-    if (gSlamEngine) gSlamEngine->drawCoverage();
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedStereoData(
-        JNIEnv* env, jobject thiz, jobject leftBuffer, jobject rightBuffer, jint width, jint height, jlong timestamp) {
-
-    if (!gSlamEngine) return;
-
-    if (!gStereoProcessor) gStereoProcessor = new StereoProcessor();
-
-    auto* leftData = static_cast<int8_t*>(env->GetDirectBufferAddress(leftBuffer));
-    auto* rightData = static_cast<int8_t*>(env->GetDirectBufferAddress(rightBuffer));
-    if (!leftData || !rightData) return;
-
-    gStereoProcessor->processStereo(leftData, rightData, width, height);
-    cv::Mat disparity = gStereoProcessor->getDisparityMap();
-
-    if (!disparity.empty() && !gLastColorFrame.empty() && gHasCameraMatrices) {
-        cv::Mat depthFromStereo;
-        disparity.convertTo(depthFromStereo, CV_32F, 1.0/16.0);
-        bool isYuv = (gLastColorFrame.rows == gColorImageHeight + gColorImageHeight / 2);
-        // Stereo depth gets higher confidence (0.9)
-        gSlamEngine->pushFrame(depthFromStereo, gLastColorFrame, gLastMappingViewMatrix, gLastMappingProjMatrix, nullptr, isYuv, 0.9f);
-    }
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSaveModel(JNIEnv* env, jobject thiz, jstring pathStr) {
-    if (gSlamEngine) {
-        const char* path = env->GetStringUTFChars(pathStr, nullptr);
-        gSlamEngine->saveModel(path);
-        env->ReleaseStringUTFChars(pathStr, path);
-    }
-}
-
-JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadModel(JNIEnv* env, jobject thiz, jstring pathStr) {
-    if (gSlamEngine) {
-        const char* path = env->GetStringUTFChars(pathStr, nullptr);
-        gSlamEngine->loadModel(path);
-        env->ReleaseStringUTFChars(pathStr, path);
-    }
-}
-
-JNIEXPORT jboolean JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeImportModel3D(JNIEnv* env, jobject thiz, jstring pathStr) {
-    if (gSlamEngine) {
-        const char* path = env->GetStringUTFChars(pathStr, nullptr);
-        bool ok = gSlamEngine->importModel3D(path);
-        env->ReleaseStringUTFChars(pathStr, path);
-        return ok ? JNI_TRUE : JNI_FALSE;
-    }
-    return JNI_FALSE;
 }
 
 JNIEXPORT jboolean JNICALL
@@ -1286,21 +1051,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetKeypoints(
 }
 
 
-extern "C" JNIEXPORT jstring JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetLastDepthTrace(JNIEnv* env, jobject) {
-    return env->NewStringUTF(gLastDepthTrace.c_str());
-}
-
-extern "C" JNIEXPORT jstring JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetLastSplatTrace(JNIEnv* env, jobject) {
-    return env->NewStringUTF(gLastSplatTrace.c_str());
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetSplatsVisible(JNIEnv* env, jobject, jboolean visible) {
-    if (gSlamEngine) gSlamEngine->setSplatsVisible(visible);
-}
-
 extern "C" JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetAnchorTransform(JNIEnv* env, jobject) {
     jfloatArray result = env->NewFloatArray(16);
@@ -1444,26 +1194,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintAnch
     env->SetFloatArrayRegion(out, 0, 16, buf);
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPersistentMesh(JNIEnv* env, jobject, jfloatArray vertices, jfloatArray weights) {
-    if (!gSlamEngine) return;
-    std::vector<float> v, w;
-    gSlamEngine->getPersistentMesh(v, w);
-    if (!v.empty()) {
-        jsize vlen = env->GetArrayLength(vertices);
-        jsize wlen = env->GetArrayLength(weights);
-        env->SetFloatArrayRegion(vertices, 0, std::min((jsize)v.size(), vlen), v.data());
-        env->SetFloatArrayRegion(weights, 0, std::min((jsize)w.size(), wlen), w.data());
-    }
-}
-
-extern "C" JNIEXPORT jfloatArray JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUnrollMesh(JNIEnv* env, jobject, jfloatArray vertices) {
-    // Voxel/splat map deleted: SurfaceMesh / unroller removed. Return an empty (non-null) UV array.
-    (void) vertices;
-    return env->NewFloatArray(0);
-}
-
 JNIEXPORT jbyteArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportFingerprint(
         JNIEnv* env, jobject thiz) {
@@ -1487,46 +1217,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAlignToFingerprint
     gSlamEngine->alignToFingerprint((uint8_t*)buffer, size);
 
     env->ReleaseByteArrayElements(data, buffer, JNI_ABORT);
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativePrepareLiquify(JNIEnv* env, jobject, jobject bitmap) {
-    if (!gImageWarper) return;
-    AndroidBitmapInfo info;
-    void* pixels = 0;
-    AndroidBitmap_getInfo(env, bitmap, &info);
-    AndroidBitmap_lockPixels(env, bitmap, &pixels);
-    gImageWarper->setSourceImage(static_cast<uint8_t*>(pixels), info.width, info.height);
-    AndroidBitmap_unlockPixels(env, bitmap);
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeApplyLiquify(JNIEnv* env, jobject, jfloatArray strokeArr, jfloat brushSize, jfloat intensity) {
-    if (!gImageWarper) return;
-    jsize len = env->GetArrayLength(strokeArr);
-    jfloat* ptr = env->GetFloatArrayElements(strokeArr, nullptr);
-    std::vector<glm::vec2> stroke;
-    for (int i = 0; i < len; i += 2) {
-        stroke.push_back({ptr[i], ptr[i+1]});
-    }
-    gImageWarper->applyLiquify(stroke, brushSize, intensity);
-    env->ReleaseFloatArrayElements(strokeArr, ptr, JNI_ABORT);
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDrawLiquify(JNIEnv* env, jobject, jint width, jint height) {
-    if (gImageWarper) gImageWarper->draw(width, height);
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeBakeLiquify(JNIEnv* env, jobject, jobject outBitmap) {
-    if (!gImageWarper) return;
-    AndroidBitmapInfo info;
-    void* pixels = 0;
-    AndroidBitmap_getInfo(env, outBitmap, &info);
-    AndroidBitmap_lockPixels(env, outBitmap, &pixels);
-    gImageWarper->bakeToBitmap(static_cast<uint8_t*>(pixels));
-    AndroidBitmap_unlockPixels(env, outBitmap);
 }
 
 } // extern "C"

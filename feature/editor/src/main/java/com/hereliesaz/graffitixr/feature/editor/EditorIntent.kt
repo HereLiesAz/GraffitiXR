@@ -28,10 +28,6 @@ internal sealed interface EditorIntent {
     data class SetScale(val value: Float) : EditorIntent
     /** Pan is incremental: [delta] is ADDED to the active layer's current offset. */
     data class AddOffset(val delta: Offset) : EditorIntent
-    data class SetRotationX(val value: Float) : EditorIntent
-    data class SetRotationY(val value: Float) : EditorIntent
-    data class SetRotationZ(val value: Float) : EditorIntent
-    data class SetLayerTransform(val scale: Float, val offset: Offset, val rx: Float, val ry: Float, val rz: Float) : EditorIntent
     data object ToggleInvert : EditorIntent
     data object ToggleImageLock : EditorIntent
     data object CycleRotationAxis : EditorIntent
@@ -49,6 +45,8 @@ internal sealed interface EditorIntent {
 
     // ── Panel / mode / gesture ────────────────────────────────────────────────
     data object ToggleAdjustPanel : EditorIntent
+    /** Opens/closes the layer list — the panel's only entry point. */
+    data object ToggleLayersPanel : EditorIntent
     data object DismissPanel : EditorIntent
     data class SetEditorMode(val mode: EditorMode) : EditorIntent
 
@@ -77,7 +75,6 @@ internal sealed interface EditorIntent {
      * may then turn any layer back on manually until the method changes again.
      */
     data object FeedbackShown : EditorIntent
-    data class SetLayerWarp(val layerId: String, val mesh: List<Float>) : EditorIntent
 
     // ── Spectator / remote-op application (by id; no active-layer side effects) ────
     data class AppendLayer(val layer: Layer) : EditorIntent

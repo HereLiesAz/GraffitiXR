@@ -10,7 +10,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -109,9 +112,35 @@ class CollaborationManager @Inject constructor() {
         scope.launch { leaveSession() }
     }
 
+    /**
+     * Signalled when an editor mutation is made in a session that cannot transmit it — i.e. as a
+     * guest, because the protocol is host-broadcast and there is no guest→host channel.
+     *
+     * This exists because the alternative is worse than the limitation itself. `enqueueHostOp` used
+     * to no-op whenever `hostSession` was null, so a guest could change a layer, see it change on
+     * their own screen, and have it reach nobody — with the two canvases now silently diverging and
+     * no signal on either end. Reporting the drop turns an invisible desync into a stated one.
+     *
+     * Conflated (`extraBufferCapacity = 1`, DROP_OLDEST) on purpose: a single gesture emits a burst
+     * of ops, and the user needs to be told once, not once per op.
+     */
+    private val _guestEditDropped = MutableSharedFlow<Unit>(
+        replay = 0,
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val guestEditDropped: SharedFlow<Unit> get() = _guestEditDropped
+
     /** Called by OpEmitterImpl on every editor mutation. */
     internal fun enqueueHostOp(op: Op) {
-        hostSession?.enqueueOp(op)
+        val host = hostSession
+        if (host != null) {
+            host.enqueueOp(op)
+            return
+        }
+        // Not hosting. As a guest that is a dropped edit worth reporting; with no session at all
+        // (solo editing) there is nothing to report — the op simply has nowhere to go by design.
+        if (guestSession != null) _guestEditDropped.tryEmit(Unit)
     }
 
     private fun observe(stateFlow: StateFlow<CoopSessionState>) {

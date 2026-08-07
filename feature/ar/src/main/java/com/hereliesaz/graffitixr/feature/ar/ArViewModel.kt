@@ -45,7 +45,6 @@ import com.hereliesaz.graffitixr.feature.ar.coop.calibration.Mat4
 import com.hereliesaz.graffitixr.feature.ar.coop.calibration.Procrustes
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
-import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.data.ProjectManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -78,7 +77,6 @@ import javax.inject.Inject
 @HiltViewModel
 class ArViewModel @Inject constructor(
     private val slamManager: SlamManager,
-    private val stereoProvider: StereoDepthProvider,
     private val projectRepository: ProjectRepository,
     private val settingsRepository: SettingsRepository,
     private val projectManager: com.hereliesaz.graffitixr.data.ProjectManager,
@@ -184,6 +182,34 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    /** Collector for [CollaborationManager.guestEditDropped]; cancelled alongside [coopStateJob]. */
+    private var guestEditDropJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * Tell a guest, once per session, that an edit they just made is theirs alone.
+     *
+     * The co-op protocol is host-broadcast: a guest receives the host's ops and has no channel to
+     * send its own. That is a real limitation, but the failure mode before this was silence — the
+     * edit applied locally, reached nobody, and the two canvases diverged with neither side told.
+     * Once per session, because the point is to explain the mode, not to nag every gesture.
+     */
+    private fun observeDroppedGuestEdits() {
+        guestEditDropJob?.cancel()
+        guestEditDropJob = viewModelScope.launch {
+            collaborationManager.guestEditDropped.collect {
+                if (reportedGuestEditDrop) return@collect
+                reportedGuestEditDrop = true
+                _feedback.tryEmit(
+                    com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                        "You're viewing the host's project — your changes stay on this device"
+                    )
+                )
+            }
+        }
+    }
+
+    @Volatile private var reportedGuestEditDrop = false
+
     fun startHosting() {
         viewModelScope.launch {
             try {
@@ -273,6 +299,8 @@ class ArViewModel @Inject constructor(
                 )
                 _uiState.update { it.copy(coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.GUEST) }
                 observeCoopState()
+                reportedGuestEditDrop = false
+                observeDroppedGuestEdits()
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 _uiState.update {
@@ -294,6 +322,8 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch {
             coopStateJob?.cancel()
             coopStateJob = null
+            guestEditDropJob?.cancel()
+            guestEditDropJob = null
             collaborationManager.leaveSession()
             _uiState.update { it.copy(coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.NONE, coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.Idle) }
             _hostQrPayload.value = null
@@ -567,6 +597,19 @@ class ArViewModel @Inject constructor(
             _evalSelfGrowEnabled.value = settingsRepository.selfGrowEnabled.firstOrNull() ?: false
             slamManager.setSelfGrowEnabled(_evalSelfGrowEnabled.value)
         }
+        viewModelScope.launch {
+            _evalFeatureMapEnabled.value = settingsRepository.featureMapEnabled.firstOrNull() ?: false
+            applyFeatureMapSwitch(_evalFeatureMapEnabled.value)
+        }
+    }
+
+    /**
+     * Push the feature-map switch to the engine. Build and match move together on purpose: matching
+     * against a map nothing grows finds nothing, and growing one nothing matches only costs memory.
+     */
+    private fun applyFeatureMapSwitch(on: Boolean) {
+        slamManager.setMapBuildEnabled(on)
+        slamManager.setMapRelocEnabled(on)
     }
 
     private val _evalFusionEnabled = MutableStateFlow(false)
@@ -595,6 +638,22 @@ class ArViewModel @Inject constructor(
         slamManager.setSelfGrowEnabled(on)
         _evalSelfGrowEnabled.value = on
         viewModelScope.launch { settingsRepository.setSelfGrowEnabled(on) }
+    }
+
+    private val _evalFeatureMapEnabled = MutableStateFlow(false)
+
+    /** Same arrangement again for the persistent wall feature map (phases 2b/3). */
+    val evalFeatureMapEnabled: StateFlow<Boolean> = _evalFeatureMapEnabled.asStateFlow()
+
+    /**
+     * A/B switch for the persistent wall feature map (default OFF): grow it from locked frames and
+     * match against it. Both native flags had no caller before this, so the map — and the `.gxr`
+     * persistence built for it — could never do anything.
+     */
+    fun evalSetFeatureMapEnabled(on: Boolean) {
+        applyFeatureMapSwitch(on)
+        _evalFeatureMapEnabled.value = on
+        viewModelScope.launch { settingsRepository.setFeatureMapEnabled(on) }
     }
 
     /**
@@ -889,7 +948,11 @@ class ArViewModel @Inject constructor(
     private val STEREO_STUCK_GRACE_MS: Long = 3_000L
 
     private val isSaving = AtomicBoolean(false)
-    private val lastSavedSplatCount = AtomicInteger(0)
+    // Point count of the accumulated ARCore cloud as of the last successful save. The autosave
+    // compares against this so it only rewrites when the map has actually grown. It used to hold
+    // slamManager.getSplatCount(), which has been a hardcoded 0 since the voxel/splat map was
+    // deleted — so the delta was permanently 0 and the autosave never fired once.
+    private val lastSavedMapPointCount = AtomicInteger(0)
     private var autoSaveJob: kotlinx.coroutines.Job? = null
     private var loadedProjectId: String? = null
 
@@ -897,11 +960,6 @@ class ArViewModel @Inject constructor(
     private var pendingTapPosition: Pair<Float, Float>? = null
 
     private val visitedSectors = BooleanArray(36) // 10 degree sectors for higher resolution feedback
-
-    private val eraseUndoStack = ArrayDeque<Bitmap>()
-    private val eraseRedoStack = ArrayDeque<Bitmap>()
-    private val eraseOpMutex = Mutex()
-    private val MAX_ERASE_UNDO = 10
 
     init {
         NativeLibLoader.loadAll()
@@ -942,15 +1000,6 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch {
             settingsRepository.ambientScanEnabled.collect { enabled ->
                 _uiState.update { it.copy(ambientScanEnabled = enabled) }
-            }
-        }
-        viewModelScope.launch {
-            // Parallax-verification threshold (degrees). Pushed to the native engine on every
-            // change and on first collection; the engine holds it on a process-lifetime global, so
-            // re-applying here also covers session rebuilds.
-            settingsRepository.parallaxMinDegrees.collect { deg ->
-                _uiState.update { it.copy(parallaxMinDegrees = deg) }
-                slamManager.setParallaxMinDegrees(deg)
             }
         }
         viewModelScope.launch {
@@ -1071,11 +1120,6 @@ class ArViewModel @Inject constructor(
     fun setShowAnchorBoundary(show: Boolean) {
         _uiState.update { it.copy(showAnchorBoundary = show) }
         renderer?.showAnchorBoundary = show
-    }
-
-    /** Persist the parallax-verification threshold; the settingsRepository collector pushes it to the engine. */
-    fun setParallaxMinDegrees(deg: Float) {
-        viewModelScope.launch { settingsRepository.setParallaxMinDegrees(deg) }
     }
 
     /** Persist the camera target fps (30/60). Takes effect on the next AR entry. */
@@ -1244,7 +1288,11 @@ class ArViewModel @Inject constructor(
         // A new/destroyed session resets native mapping to running, so drop our cached command and
         // let the next tracking frame re-assert the correct auto-mapping state.
         lastMappingPausedCmd = null
-        Timber.i("ARDIAG setArMode(enabled=$enabled) layers=${projectRepository.currentProject.value?.layers?.size ?: 0} ambientScan=${_uiState.value.ambientScanEnabled} sessionExists=${session != null}")
+        Timber.i(
+            "ARDIAG setArMode(enabled=$enabled) " +
+                "layers=${projectRepository.currentProject.value?.layers?.size ?: 0} " +
+                "ambientScan=${_uiState.value.ambientScanEnabled} sessionExists=${session != null}"
+        )
         if (enabled) {
             val now = System.currentTimeMillis()
             arEntryTimestampMs = now
@@ -1597,19 +1645,12 @@ class ArViewModel @Inject constructor(
                 }
             }
 
-            // isDualLensActive / isHardwareStereoActive just reflect the camera config for the diag
-            // panel; the MURAL scan mode stays available regardless (it works on mono).
-            _uiState.update {
-                it.copy(
-                    isDualLensActive = stereoActive,
-                    isHardwareStereoActive = stereoActive
-                )
-            }
+            // isHardwareStereoActive just reflects the camera config for the diag panel; the MURAL
+            // scan mode stays available regardless (it works on mono).
+            _uiState.update { it.copy(isHardwareStereoActive = stereoActive) }
 
             session = s
             _isCameraInUseByAr.value = true
-            // Re-assert the persisted parallax threshold onto the (possibly freshly created) engine.
-            slamManager.setParallaxMinDegrees(_uiState.value.parallaxMinDegrees)
             // Surface the camera-config decision ON SCREEN (not just logcat) so a black-camera report
             // tells us whether the live session is on stereo or mono — the difference between a
             // forced-stereo fault and a deeper camera-feeding fault.
@@ -1681,7 +1722,7 @@ class ArViewModel @Inject constructor(
                         replyTo = replyMessenger
                     }
                     Messenger(binder).send(m)
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     result.complete(false)
                 }
             }
@@ -1697,7 +1738,7 @@ class ArViewModel @Inject constructor(
                 conn,
                 Context.BIND_AUTO_CREATE
             )
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
         if (!bound) {
@@ -1803,21 +1844,21 @@ class ArViewModel @Inject constructor(
 
     fun saveMapBlocking() {
         val projectId = loadedProjectId ?: return
-        val mapPath = projectManager.getMapPath(appContext, projectId)
         val cloudPath = projectManager.getCloudPointsPath(appContext, projectId)
-        
-        // Save both native engine state (Voxel + Mesh) and ARCore Point Cloud
-        slamManager.saveModel(mapPath)
+
+        // The two things a session actually accumulates: the ARCore point cloud (a file of its own)
+        // and the native wall feature map (merged into the project record). The native
+        // saveModel(mapPath) call that used to sit here went with the voxel/splat map — it was a
+        // no-op that made this function LOOK like it persisted more than it did.
         renderer?.saveCloudPoints(cloudPath)
         saveWallFeatureMap() // Phase 3b: persist the passive feature map into the project record
 
-        lastSavedSplatCount.set(slamManager.getSplatCount())
+        lastSavedMapPointCount.set(renderer?.mappedPointCount ?: 0)
         Timber.d("Atomic persistence complete: Saved all mapping components for $projectId")
     }
 
     fun saveMapNow() {
-        val projectId = loadedProjectId ?: return
-        if (slamManager.getSplatCount() <= 0) return
+        loadedProjectId ?: return
         if (isSaving.get()) return
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -2361,42 +2402,40 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Restore this project's accumulated ARCore point cloud, if it saved one.
+     *
+     * This used to also `slamManager.loadModel(mapPath)` and skip the whole restore when
+     * `getSplatCount() > 0`. Both went with the voxel/splat map: `loadModel` is a native no-op, and
+     * the guard read a hardcoded 0 so it never fired. What is left is the one component that really
+     * does persist, and the baseline the autosave compares against.
+     */
     private fun loadMapIfExists() {
         val projectId = loadedProjectId ?: return
-        val mapPath = projectManager.getMapPath(appContext, projectId)
         val cloudPath = projectManager.getCloudPointsPath(appContext, projectId)
-        
-        if (File(mapPath).exists() || File(cloudPath).exists()) {
-            if (projectRepository.currentProject.value?.id == loadedProjectId && slamManager.getSplatCount() > 0) return
-            
-            viewModelScope.launch(Dispatchers.IO) {
-                if (File(mapPath).exists()) {
-                    slamManager.loadModel(mapPath)
-                    lastSavedSplatCount.set(slamManager.getSplatCount())
-                }
-                if (File(cloudPath).exists()) {
-                    renderer?.scheduleCloudPointsLoad(cloudPath)
-                }
-                Timber.d("Atomic persistence complete: Loaded available mapping components for $projectId")
-            }
-        } else {
-            // No saved map for this project — clear any lingering SLAM map left over in native
-            // state from a previous session, so a new AR session doesn't get stuck trying to
-            // relocalize a stale map (kMapTracking with 0 structure matches -> black camera).
-            viewModelScope.launch(Dispatchers.IO) {
-                slamManager.clearMap()
-                lastSavedSplatCount.set(0)
-            }
+
+        if (File(cloudPath).exists()) {
+            renderer?.scheduleCloudPointsLoad(cloudPath)
+            Timber.d("Atomic persistence complete: Loaded available mapping components for $projectId")
         }
+        // Whether or not a cloud was restored, the save baseline starts from what the renderer
+        // currently holds — a fresh renderer holds nothing, and a scheduled load lands on the GL
+        // thread, so the first autosave tick re-reads it anyway.
+        lastSavedMapPointCount.set(renderer?.mappedPointCount ?: 0)
     }
 
     private fun startAutoSave() {
         autoSaveJob?.cancel()
         autoSaveJob = viewModelScope.launch(Dispatchers.IO) {
             while (true) {
-                delay(30000)
-                val current = slamManager.getSplatCount()
-                if (current > 0 && Math.abs(current - lastSavedSplatCount.get()) > 500) {
+                delay(AUTOSAVE_INTERVAL_MS)
+                // The accumulated ARCore cloud, not the deleted splat map. The old reading was a
+                // hardcoded 0, so `current > 0` was never true and this loop woke every 30s to do
+                // nothing for the whole session — the wall feature map and the cloud were persisted
+                // only by the explicit saves on AR exit and app background. A crash or a kill in
+                // between lost everything scanned since.
+                val current = renderer?.mappedPointCount ?: 0
+                if (current > 0 && current - lastSavedMapPointCount.get() >= AUTOSAVE_POINT_DELTA) {
                     saveMapNow()
                 }
             }
@@ -2424,7 +2463,6 @@ class ArViewModel @Inject constructor(
         // TOCTOU) instead created a worse race: it could run AFTER performFullCleanupLocked nulled
         // `renderer`, resurrecting a reference to an already-destroyed renderer.
         renderer = r
-        renderer?.stereoProvider = stereoProvider
         renderer?.onCameraNotFeeding = { onCameraNotFeeding() }
         // The renderer assembles the capture record on the GL thread; these hand it the two pieces
         // whose lifecycles live here. Lambdas rather than direct references so the renderer never
@@ -2447,6 +2485,7 @@ class ArViewModel @Inject constructor(
         // a new ArRenderer — but re-asserting it is idempotent and costs one atomic store, and it
         // means one place re-establishes every experiment switch instead of two rules to remember.
         slamManager.setSelfGrowEnabled(_evalSelfGrowEnabled.value)
+        applyFeatureMapSwitch(_evalFeatureMapEnabled.value)
         renderer?.attachSession(session)
         loadCloudPointsIfExists()
     }
@@ -2454,16 +2493,12 @@ class ArViewModel @Inject constructor(
     fun setTrackingState(
         isTracking: Boolean,
         splatCount: Int,
-        immutableSplatCount: Int,
         isDepthApiSupported: Boolean,
         cameraYaw: Float = 0f,
         distanceToAnchorMeters: Float = -1f,
         anchorRelativeDirection: Triple<Float, Float, Float>? = null,
-        isDualLens: Boolean = false,
         isHardwareStereo: Boolean = false,
         centerDepth: Float = -1f,
-        visConf: Float = 0f,
-        globConf: Float = 0f
     ) {
         val progress = if (isTracking) slamManager.getPaintingProgress() else _uiState.value.paintingProgress
         // Read every tick (~15 Hz) rather than only on a successful lock — the whole point is to show
@@ -2548,7 +2583,6 @@ class ArViewModel @Inject constructor(
                 // Latches true on the first TRACKING frame — "ARCore has finished initializing".
                 isArReady = state.isArReady || isTracking,
                 splatCount = splatCount,
-                immutableSplatCount = immutableSplatCount,
                 isDepthApiSupported = isDepthApiSupported,
                 paintingProgress = progress,
                 relocDiagnostics = relocDiag,
@@ -2568,11 +2602,8 @@ class ArViewModel @Inject constructor(
                 ),
                 distanceToAnchorMeters = distanceToAnchorMeters,
                 anchorRelativeDirection = anchorRelativeDirection,
-                isDualLensActive = isDualLens,
                 isHardwareStereoActive = isHardwareStereo,
                 currentCenterDepth = centerDepth,
-                visibleSplatConfidenceAvg = visConf,
-                globalSplatConfidenceAvg = globConf,
                 trackingFailed = trackingFailed,
                 evalLiveMetrics = if (evalLogging)
                     evalProbe.lastMetrics.copy(wallCount = slamManager.getWallKeypointCount())
@@ -2690,7 +2721,7 @@ class ArViewModel @Inject constructor(
                         targetFps = EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30)
                     })
                     if (monoConfigs.isNotEmpty()) s.cameraConfig = monoConfigs[0]
-                    _uiState.update { it.copy(isDualLensActive = false, isHardwareStereoActive = false) }
+                    _uiState.update { it.copy(isHardwareStereoActive = false) }
                     Timber.w("ARDIAG dual-lens: forced stereo broken -> reconfigured LIVE session to mono")
                 } catch (e: Exception) {
                     Timber.e(e, "ARDIAG stereo->mono live reconfigure failed")
@@ -2872,16 +2903,6 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    private var keypointRecomputeJob: kotlinx.coroutines.Job? = null
-    private fun scheduleKeypointRecompute() {
-        keypointRecomputeJob?.cancel()
-        keypointRecomputeJob = viewModelScope.launch {
-            kotlinx.coroutines.delay(250)
-            computeTargetKeypoints()
-        }
-    }
-
-
     fun onScreenTap(nx: Float, ny: Float) {
         pendingTapPosition = nx to ny
         // Hand the tap to the renderer so it can measure the camera→point distance at that pixel
@@ -2998,7 +3019,6 @@ class ArViewModel @Inject constructor(
     }
 
     fun requestCapture() {
-        slamManager.setSplatsVisible(false)
         slamManager.setMappingPaused(true)
         _uiState.update { it.copy(isCaptureRequested = true) }
     }
@@ -3030,7 +3050,6 @@ class ArViewModel @Inject constructor(
 
     fun onCaptureRequestHandled() {
         _uiState.update { it.copy(isCaptureRequested = false) }
-        slamManager.setSplatsVisible(true)
     }
 
     fun setUnwarpPoints(points: List<Offset>) {
@@ -3082,6 +3101,18 @@ class ArViewModel @Inject constructor(
 
     // --- Doodle demo: headless fingerprint build ---
     internal companion object {
+        /** How often the AR session checks whether the map has grown enough to be worth rewriting. */
+        const val AUTOSAVE_INTERVAL_MS = 30_000L
+
+        /**
+         * How many new cloud points must accumulate since the last save before the autosave rewrites.
+         *
+         * A threshold rather than "any growth" because the save serialises the whole cloud and merges
+         * the project record; doing that on every tick of a slowly-drifting count is churn. 500 is
+         * roughly a few seconds of active scanning, so at most that much work is at risk.
+         */
+        const val AUTOSAVE_POINT_DELTA = 500
+
         /**
          * Fixed RANSAC seed for eval runs (`IMPLEMENTATION.md` 6a.4, `EVALUATION.md` §3.1).
          *
@@ -3261,7 +3292,6 @@ class ArViewModel @Inject constructor(
                 // Always resume the mapping that requestCapture paused — otherwise a throw would
                 // wedge SLAM with mapping paused for the rest of the session.
                 slamManager.setMappingPaused(false)
-                slamManager.setSplatsVisible(true)
                 doodleBuildInFlight = false
             }
         }
@@ -3435,6 +3465,8 @@ class ArViewModel @Inject constructor(
         // own (surviving) scope instead.
         coopStateJob?.cancel()
         coopStateJob = null
+        guestEditDropJob?.cancel()
+        guestEditDropJob = null
         collaborationManager.leaveSessionAsync()
         // setArMode(false) is not guaranteed to run before the ViewModel dies (process death,
         // task removal), and a registered SensorEventListener outlives it.

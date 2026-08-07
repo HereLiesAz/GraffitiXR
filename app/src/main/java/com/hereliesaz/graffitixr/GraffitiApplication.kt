@@ -76,7 +76,7 @@ class GraffitiApplication : Application() {
             }
             if (capturedCrashes.isNotEmpty()) {
                 MainScope().launch(crashUploadErrorHandler) {
-                    val worker = CrashUploadWorker(this@GraffitiApplication)
+                    val worker = CrashUploadWorker()
                     capturedCrashes.forEach { (file, title, report) ->
                         if (worker.uploadCaptured(crashToken, title, report)) {
                             runCatching { file.delete() }

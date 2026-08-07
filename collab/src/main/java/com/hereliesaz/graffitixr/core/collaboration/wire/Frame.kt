@@ -38,7 +38,7 @@ internal object Frame {
         val data = DataInputStream(input)
         val length = try {
             data.readInt()
-        } catch (eof: EOFException) {
+        } catch (_: EOFException) {
             return null
         }
         if (length < HEADER_TYPE_BYTES) {

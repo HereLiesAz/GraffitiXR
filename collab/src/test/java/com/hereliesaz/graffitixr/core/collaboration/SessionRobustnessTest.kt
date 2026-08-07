@@ -118,29 +118,41 @@ class SessionRobustnessTest {
     }
 
     @Test
-    fun `delta buffer overflow by real op bytes ends the session explicitly`() = runBlocking {
+    fun `large bitmap ops do not end the session`() = runBlocking {
         val host = newHost()
         host.startListening()
 
-        // Three ~2MB bitmap ops blow the 5MB DeltaBuffer cap. Under the old 256-bytes-per-op
-        // estimate these were accounted as ~768B total and the host kept buffering toward OOM.
-        repeat(3) { i ->
-            host.enqueueOp(Op.LayerBitmapReplace(layerId = "L$i", png = ByteArray(2 * 1024 * 1024)))
+        // Whole-canvas LayerBitmapReplace ops — one Liquify warp or one undo of a paint stroke
+        // each. These used to blow the 5 MB DeltaBuffer cap, and the cap being exceeded ended the
+        // session: an ordinary edit disconnected a healthy co-op. The buffer now evicts and records
+        // a gap (a reconnect in the gap gets a fresh bulk), so the session survives.
+        repeat(8) { i ->
+            host.enqueueOp(Op.LayerBitmapReplace(layerId = "L$i", png = ByteArray(8 * 1024 * 1024)))
         }
 
-        val end = withTimeout(10_000) { host.state.first { it is CoopSessionState.Ended } }
-        assertTrue(end is CoopSessionState.Ended)
+        delay(500)
+        assertTrue(
+            "large edits must not tear the session down, was ${host.state.value}",
+            host.state.value is CoopSessionState.WaitingForGuest,
+        )
     }
 
     @Test
-    fun `delta buffer op-count overflow ends the session explicitly`() = runBlocking {
+    fun `a long solo editing stretch before a guest joins does not end the session`() = runBlocking {
         val host = newHost()
         host.startListening()
 
-        repeat(1_001) { i -> host.enqueueOp(Op.LayerAdd(Layer(id = "L$i", name = "n$i"))) }
+        // Nothing acks while the host is still WaitingForGuest, so the replay buffer only grows.
+        // Past its op cap that used to end the session — an artist who started sharing and kept
+        // working disconnected themselves before anyone had joined, and the replay history was
+        // worthless anyway (a first-time guest is sent bulk, not a replay).
+        repeat(5_000) { i -> host.enqueueOp(Op.LayerAdd(Layer(id = "L$i", name = "n$i"))) }
 
-        val end = withTimeout(10_000) { host.state.first { it is CoopSessionState.Ended } }
-        assertTrue(end is CoopSessionState.Ended)
+        delay(500)
+        assertTrue(
+            "editing while waiting for a guest must not tear the session down, was ${host.state.value}",
+            host.state.value is CoopSessionState.WaitingForGuest,
+        )
     }
 
     @Test

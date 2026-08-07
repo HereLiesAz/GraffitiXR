@@ -47,7 +47,6 @@ class GraffitiProjectTest {
                 OverlayLayer(
                     id = "layer-1",
                     uri = mockUri,
-                    warpMesh = listOf(0f, 1f, 2f, 3f),
                     isImageLocked = true
                 )
             ),
@@ -57,7 +56,6 @@ class GraffitiProjectTest {
         assertEquals("test-id", project.id)
         assertEquals("Test Project", project.name)
         assertEquals(true, project.layers[0].isImageLocked)
-        assertEquals(listOf(0f, 1f, 2f, 3f), project.layers[0].warpMesh)
 
         // Actually exercise serialization — the test name promised a round-trip but only ever
         // checked the constructed object's fields, so a serialization regression went uncaught.
@@ -65,7 +63,6 @@ class GraffitiProjectTest {
         assertEquals("test-id", decoded.id)
         assertEquals("Test Project", decoded.name)
         assertEquals(true, decoded.layers[0].isImageLocked)
-        assertEquals(listOf(0f, 1f, 2f, 3f), decoded.layers[0].warpMesh)
         assertEquals("/path/to/fingerprint", decoded.targetFingerprintPath)
     }
 

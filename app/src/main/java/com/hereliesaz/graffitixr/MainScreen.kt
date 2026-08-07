@@ -306,10 +306,10 @@ fun MainScreen(
                                         intr, viewMat, rot, tapDist, wallPlane, environment
                                     )
                                 },
-                                onTrackingUpdated = { isTracking, splatCount, immutableSplatCount, isDepthSupported, yaw, distanceMeters, relDir, isDualLens, isHardwareStereo, centerDepth, visConf, globConf ->
+                                onTrackingUpdated = { isTracking, mappedPoints, isDepthSupported, yaw, distanceMeters, relDir, isHardwareStereo, centerDepth ->
                                     arViewModel.setTrackingState(
-                                        isTracking, splatCount, immutableSplatCount, isDepthSupported, yaw, distanceMeters, relDir,
-                                        isDualLens, isHardwareStereo, centerDepth, visConf, globConf
+                                        isTracking, mappedPoints, isDepthSupported, yaw, distanceMeters, relDir,
+                                        isHardwareStereo, centerDepth
                                     )
                                 },
                                 onLightUpdated = { level ->

@@ -31,7 +31,6 @@ data class OverlayLayer(
     val colorBalanceB: Float = 1.0f,
     val isImageLocked: Boolean = false,
     val isVisible: Boolean = true,
-    val warpMesh: List<Float>? = null,
     val isLinked: Boolean = false,
     val isInverted: Boolean = false,
 

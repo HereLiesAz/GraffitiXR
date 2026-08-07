@@ -52,6 +52,7 @@ class EditorViewModelTest {
     private val exportManager: com.hereliesaz.graffitixr.feature.editor.export.ExportManager = mockk(relaxed = true)
     private val slamManager: SlamManager = mockk(relaxed = true)
     private val opEmitter: OpEmitter = mockk(relaxed = true)
+    private val extensions: com.hereliesaz.graffitixr.data.azphalt.ExtensionRepository = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
@@ -112,7 +113,7 @@ class EditorViewModelTest {
 
         viewModel = EditorViewModel(
             projectRepository, settingsRepository, projectManager, exportManager, context,
-            slamManager, testDispatcherProvider, opEmitter
+            slamManager, testDispatcherProvider, opEmitter, extensions
         )
     }
 

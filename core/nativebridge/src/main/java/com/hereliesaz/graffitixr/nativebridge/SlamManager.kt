@@ -55,19 +55,6 @@ class SlamManager @Inject constructor(
         }
     }
 
-    fun prepareLiquify(bitmap: Bitmap) = nativePrepareLiquify(bitmap)
-    fun applyLiquify(stroke: FloatArray, brushSize: Float, intensity: Float) = nativeApplyLiquify(stroke, brushSize, intensity)
-    fun drawLiquify(width: Int, height: Int) = nativeDrawLiquify(width, height)
-    fun bakeLiquify(outBitmap: Bitmap) = nativeBakeLiquify(outBitmap)
-
-    fun getSplatCount(): Int = nativeGetSplatCount()
-    fun getImmutableSplatCount(): Int = nativeGetImmutableSplatCount()
-    fun getVisibleConfidenceAvg(): Float = nativeGetVisibleConfidenceAvg()
-    fun getGlobalConfidenceAvg(): Float = nativeGetGlobalConfidenceAvg()
-    fun setSplatsVisible(visible: Boolean) = nativeSetSplatsVisible(visible)
-    fun getLastDepthTrace(): String = nativeGetLastDepthTrace()
-    fun getLastSplatTrace(): String = nativeGetLastSplatTrace()
-
     /**
      * How many times the renderer has ESTABLISHED the primary anchor this session — not how many
      * times an anchor pose has been written, and not merely whether one ever was.
@@ -433,7 +420,7 @@ class SlamManager @Inject constructor(
             val intrinsics = FloatArray(4) { bb.float }
             val desc = ByteArray(blob.size - bb.position()).also { bb.get(it) }
             WallFeatureMap(points, desc, rows, cols, type, conf, obs, anchor, intrinsics)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -453,9 +440,6 @@ class SlamManager @Inject constructor(
     }
 
     fun setViewportSize(width: Int, height: Int) = nativeSetViewportSize(width, height)
-
-    fun clearMap() = nativeClearMap()
-    fun pruneByConfidence(threshold: Float) = nativePruneByConfidence(threshold)
 
     fun setRelocEnabled(enabled: Boolean) = nativeSetRelocEnabled(enabled)
     /** Teleological self-grow (default ON): promote validated new marks into the live fingerprint. */
@@ -545,44 +529,7 @@ class SlamManager @Inject constructor(
     fun setWallPatch(bitmap: Bitmap) = nativeSetWallPatch(bitmap)
     /** Store the canonical patch from a raw [size]x[size] gray byte buffer (persisted on Fingerprint). */
     fun setWallPatchBytes(data: ByteArray, size: Int) = nativeSetWallPatchBytes(data, size)
-    fun setVoxelSize(size: Float) = nativeSetVoxelSize(size)
-    /** Minimum angular baseline (degrees) for a re-observation to count as a parallax depth check. */
-    fun setParallaxMinDegrees(deg: Float) = nativeSetParallaxMinDegrees(deg)
     fun setMappingPaused(paused: Boolean) = nativeSetMappingPaused(paused)
-
-    fun initGl() {
-        nativeInitGl()
-    }
-
-    fun resetGlContext() {
-        nativeResetGlContext()
-    }
-
-    /** Voxel-only GL init — split out so a caller can localize a GL-init stall on-screen. */
-    fun initVoxelGl() {
-        // Guard so a premature call surfaces as a failure breadcrumb instead of a silent native
-        // no-op (gSlamEngine null) that would falsely print "voxel ok".
-        check(isInitialized) { "SlamManager is not initialized" }
-        nativeInitVoxelGl()
-    }
-
-    /** Voxel program (shader compile/link) GL init — split out to localize a stall on-screen. */
-    fun initVoxelGlProgram() {
-        check(isInitialized) { "SlamManager is not initialized" }
-        nativeInitVoxelGlProgram()
-    }
-
-    /** Voxel buffer (11MB VBO alloc) GL init — split out to localize a stall on-screen. */
-    fun initVoxelGlBuffer() {
-        check(isInitialized) { "SlamManager is not initialized" }
-        nativeInitVoxelGlBuffer()
-    }
-
-    /** Mesh-only GL init — split out so a caller can localize a GL-init stall on-screen. */
-    fun initMeshGl() {
-        check(isInitialized) { "SlamManager is not initialized" }
-        nativeInitMeshGl()
-    }
 
     fun updateCamera(
         viewMatrix: FloatArray,
@@ -592,26 +539,6 @@ class SlamManager @Inject constructor(
         timestampNs: Long
     ) {
         nativeUpdateCamera(viewMatrix, projectionMatrix, mappingViewMatrix, mappingProjectionMatrix, timestampNs)
-    }
-
-    fun feedArCoreDepth(
-        depthBuffer: ByteBuffer,
-        width: Int,
-        height: Int,
-        rowStride: Int,
-        intrinsics: FloatArray,
-        intrW: Int,
-        intrH: Int,
-        cvRotateCode: Int? = null,
-        confidence: Float = 0.5f
-    ) {
-        if (depthBuffer.isDirect) {
-            nativeFeedArCoreDepth(depthBuffer, width, height, rowStride, intrinsics, intrW, intrH, cvRotateCode ?: -1, confidence)
-        }
-    }
-
-    fun feedPointCloud(points: FloatArray) {
-        nativeFeedPointCloud(points)
     }
 
     fun feedYuvFrame(
@@ -637,45 +564,8 @@ class SlamManager @Inject constructor(
         }
     }
 
-    /**
-     * Renders the engine's active representation (voxel splats / surface mesh). [debugTint]
-     * recolours splats by confidence (cyan→magenta) for the perception debug view — raw splats
-     * carry camera colours and are invisible against the very surface they reconstruct.
-     */
-    fun draw(debugTint: Boolean = false) {
-        nativeDraw(debugTint)
-    }
-
-    /**
-     * Debug perception view: draws the requested SLAM representations explicitly, independent of
-     * scan/mural mode. Voxels are confidence-tinted (cyan→magenta) and depth-off. Mesh is the
-     * persistent surface mesh. The accumulated sparse point cloud is a separate Kotlin renderer.
-     */
-    fun drawDebugLayers(voxels: Boolean, mesh: Boolean) = nativeDrawDebugLayers(voxels, mesh)
-
-    /** Voxel-method colour-mask: draws the splats as a confidence-graded colour wash over the grayscale camera. */
-    fun drawCoverage() = nativeDrawCoverage()
-
-    fun feedStereoData(leftBuffer: ByteBuffer, rightBuffer: ByteBuffer, width: Int, height: Int, timestamp: Long) {
-        if (leftBuffer.isDirect && rightBuffer.isDirect) {
-            nativeFeedStereoData(leftBuffer, rightBuffer, width, height, timestamp)
-        }
-    }
-
     fun setArCoreTrackingState(isTracking: Boolean) {
         nativeSetArCoreTrackingState(isTracking)
-    }
-
-    fun saveModel(path: String) {
-        nativeSaveModel(path)
-    }
-
-    fun loadModel(path: String) {
-        nativeLoadModel(path)
-    }
-
-    fun importModel3D(path: String): Boolean {
-        return nativeImportModel3D(path)
     }
 
     fun loadSuperPoint(assetManager: AssetManager): Boolean = nativeLoadSuperPoint(assetManager)
@@ -701,18 +591,11 @@ class SlamManager @Inject constructor(
     /** Pose fusion (B): the anchor model matrix captured in the fingerprint world frame. */
     fun getFingerprintAnchor(): FloatArray { val o = FloatArray(16); nativeGetFingerprintAnchor(o); return o }
 
-    fun getPersistentMesh(vertices: FloatArray, weights: FloatArray) = nativeGetPersistentMesh(vertices, weights)
-    fun unrollMesh(vertices: FloatArray): FloatArray = nativeUnrollMesh(vertices)
-
     fun exportFingerprint(): ByteArray? = nativeExportFingerprint()
     fun alignToFingerprint(data: ByteArray) = nativeAlignToFingerprint(data)
 
     /** Co-op alias: align local SLAM state to the peer's fingerprint bytes. */
     fun alignToPeer(fingerprint: ByteArray) = alignToFingerprint(fingerprint)
-
-    fun getAnchorCandidates(threshold: Float, maxCount: Int): FloatArray? {
-        return nativeGetAnchorCandidates(threshold, maxCount)
-    }
 
     fun startSensorCollection() {
         collectionJob?.cancel()
@@ -835,12 +718,6 @@ class SlamManager @Inject constructor(
     private external fun nativeGetFingerprintKeypoints(bitmap: Bitmap, mask: Bitmap?): FloatArray?
     private external fun nativeInitialize()
 
-    private external fun nativeInitGl()
-    private external fun nativeResetGlContext()
-    private external fun nativeInitVoxelGl()
-    private external fun nativeInitVoxelGlProgram()
-    private external fun nativeInitVoxelGlBuffer()
-    private external fun nativeInitMeshGl()
     private external fun nativeSetViewportSize(width: Int, height: Int)
     private external fun nativeUpdateCamera(
         viewMatrix: FloatArray,
@@ -850,22 +727,7 @@ class SlamManager @Inject constructor(
         timestampNs: Long
     )
     private external fun nativeUpdateLightLevel(level: Float)
-    private external fun nativeDraw(debugTint: Boolean)
-    private external fun nativeDrawDebugLayers(voxels: Boolean, mesh: Boolean)
-    private external fun nativeDrawCoverage()
-    private external fun nativeGetSplatCount(): Int
-    private external fun nativeGetImmutableSplatCount(): Int
-    private external fun nativeGetVisibleConfidenceAvg(): Float
-    private external fun nativeGetGlobalConfidenceAvg(): Float
-    private external fun nativeSetSplatsVisible(visible: Boolean)
-    private external fun nativeGetLastDepthTrace(): String
-    private external fun nativeGetLastSplatTrace(): String
     private external fun nativeSetArCoreTrackingState(isTracking: Boolean)
-    private external fun nativeClearMap()
-    private external fun nativePruneByConfidence(threshold: Float)
-    private external fun nativeSaveModel(path: String)
-    private external fun nativeLoadModel(path: String)
-    private external fun nativeImportModel3D(path: String): Boolean
     private external fun nativeLoadSuperPoint(assetManager: AssetManager): Boolean
     private external fun nativeLoadDistortionHead(assetManager: AssetManager): Boolean
     private external fun nativeLoadLowLightEnhancer(assetManager: AssetManager)
@@ -881,10 +743,7 @@ class SlamManager @Inject constructor(
     private external fun nativeSetStageEnabled(stage: Int, enabled: Boolean)
     private external fun nativeGetRelocResult(out: FloatArray)
     private external fun nativeGetFingerprintAnchor(out: FloatArray)
-    private external fun nativeGetPersistentMesh(vertices: FloatArray, weights: FloatArray)
-    private external fun nativeUnrollMesh(vertices: FloatArray): FloatArray
     private external fun nativeExportFingerprint(): ByteArray?
-    private external fun nativeGetAnchorCandidates(threshold: Float, maxCount: Int): FloatArray?
     private external fun nativeAlignToFingerprint(data: ByteArray)
     private external fun nativeSetWallFingerprint(
         bitmap: Bitmap, mask: Bitmap?,
@@ -925,11 +784,7 @@ class SlamManager @Inject constructor(
     private external fun nativeGetWallKeypointCount(): Int
     private external fun nativeSetWallPatch(bitmap: Bitmap)
     private external fun nativeSetWallPatchBytes(data: ByteArray, size: Int)
-    private external fun nativeSetVoxelSize(size: Float)
-    private external fun nativeSetParallaxMinDegrees(deg: Float)
     private external fun nativeSetMappingPaused(paused: Boolean)
-    private external fun nativeFeedPointCloud(points: FloatArray)
-    private external fun nativeFeedArCoreDepth(depthBuffer: ByteBuffer, width: Int, height: Int, rowStride: Int, intrinsics: FloatArray, intrW: Int, intrH: Int, cvRotateCode: Int, confidence: Float)
     private external fun nativeFeedYuvFrame(
         yBuffer: ByteBuffer,
         uBuffer: ByteBuffer,
@@ -945,12 +800,6 @@ class SlamManager @Inject constructor(
     private external fun nativeFeedColorFrame(colorBuffer: ByteBuffer, width: Int, height: Int, timestampNs: Long, cvRotateCode: Int)
     private external fun nativeDestroy()
     private external fun nativeAnnotateKeypoints(bitmap: Bitmap)
-    private external fun nativeFeedStereoData(leftBuffer: ByteBuffer, rightBuffer: ByteBuffer, width: Int, height: Int, timestamp: Long)
-
-    private external fun nativePrepareLiquify(bitmap: Bitmap)
-    private external fun nativeApplyLiquify(stroke: FloatArray, brushSize: Float, intensity: Float)
-    private external fun nativeDrawLiquify(width: Int, height: Int)
-    private external fun nativeBakeLiquify(outBitmap: Bitmap)
 
     private companion object {
         private const val TAG = "SlamManager"

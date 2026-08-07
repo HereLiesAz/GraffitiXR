@@ -42,12 +42,10 @@ interface EditorActions {
     // Placement.
     fun onScaleChanged(s: Float)
     fun onOffsetChanged(o: Offset)
-    fun onRotationXChanged(d: Float)
-    fun onRotationYChanged(d: Float)
-    fun onRotationZChanged(d: Float)
+    // Rotation is driven by gestures (onTransformGesture / onCycleRotationAxis), not per-axis
+    // setters: the sliders those setters existed for were removed, and the setters outlived them
+    // with no caller.
     fun onCycleRotationAxis()
-    fun setLayerTransform(scale: Float, offset: Offset, rx: Float, ry: Float, rz: Float)
-    fun onLayerWarpChanged(layerId: String, mesh: List<Float>)
 
     fun onGestureStart()
     fun onGestureEnd()

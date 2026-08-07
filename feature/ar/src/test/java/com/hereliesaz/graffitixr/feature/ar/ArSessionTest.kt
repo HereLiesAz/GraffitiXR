@@ -6,7 +6,6 @@ import com.hereliesaz.graffitixr.common.wearable.WearableManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
-import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import io.mockk.every
 import io.mockk.mockk
@@ -33,7 +32,6 @@ class ArSessionTest {
 
     private lateinit var viewModel: ArViewModel
     private val slamManager: SlamManager = mockk(relaxed = true)
-    private val stereoProvider: StereoDepthProvider = mockk(relaxed = true)
     private val projectRepository: ProjectRepository = mockk(relaxed = true)
     private val settingsRepository: SettingsRepository = mockk(relaxed = true)
     private val projectManager: com.hereliesaz.graffitixr.data.ProjectManager = mockk(relaxed = true)
@@ -58,7 +56,7 @@ class ArSessionTest {
         every { settingsRepository.showAnchorBoundary } returns flowOf(false)
         every { projectRepository.currentProject } returns MutableStateFlow(null)
         every { context.filesDir } returns File("/tmp")
-        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, projectManager, collaborationManager, wearableManager, context, testDispatchers)
+        viewModel = ArViewModel(slamManager, projectRepository, settingsRepository, projectManager, collaborationManager, wearableManager, context, testDispatchers)
     }
 
     @After
