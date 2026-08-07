@@ -435,7 +435,15 @@ public:
     bool loadLowLightEnhancer(const std::vector<uchar>& onnxBytes);
     void setViewportSize(int width, int height);
     // Eval: fill out[kStageCount] with average ms/stage since last reset, then reset accumulators.
+    // Only index 4 (pnpReloc) is ever actually timed in this file today -- indices 0-3
+    // (voxelUpdate/voxelKeyframe/surfaceMesh/draw) name stages of a splat-rendering pipeline that
+    // does not exist in this engine, so there is no work here to instrument. Those four report -1.0f
+    // ("not measured"), the same sentinel the rest of this header uses, rather than a fabricated 0.0.
     void getStageTimingsAndReset(float* out);
+    // Deliberately a no-op: no stage's work is actually gated by this flag (see mStageEnabled's
+    // removal below). Kept as a callable, logged no-op rather than deleted so existing JNI/Kotlin
+    // call sites don't need to change; a caller that expects this to skip work will see a warning
+    // in logcat instead of a silently-ignored request.
     void setStageEnabled(int stage, bool enabled);
     void setRelocEnabled(bool enabled);
 
@@ -701,13 +709,11 @@ private:
 
     // --- Evaluation instrumentation (Sub-project A) ---
     // Accumulated wall-time per stage and a sample count, for averaging. Indexes match the Kotlin
-    // stage contract: 0=voxelUpdate,1=voxelKeyframe,2=surfaceMesh,3=draw,4=pnpReloc.
+    // stage contract: 0=voxelUpdate,1=voxelKeyframe,2=surfaceMesh,3=draw,4=pnpReloc. Only index 4 is
+    // ever populated by a real StageTimer -- see getStageTimingsAndReset.
     static constexpr int kStageCount = 5;
     std::atomic<double> mStageAccumMs[kStageCount] = {};
     std::atomic<uint64_t> mStageSamples[kStageCount] = {};
-    // Per-stage A/B enable flags (default on). When off, the stage's work is skipped so cost diffs
-    // are clean. Stage 0 (voxelUpdate) is the relocalization backbone and is NOT gateable.
-    std::atomic<bool> mStageEnabled[kStageCount] = { true, true, true, true, true };
 
     std::thread             mRelocThread;
     std::mutex              mRelocMutex;

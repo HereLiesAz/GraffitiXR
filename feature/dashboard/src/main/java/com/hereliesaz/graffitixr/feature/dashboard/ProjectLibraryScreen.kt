@@ -27,13 +27,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -61,6 +67,13 @@ fun ProjectLibraryScreen(
     ) { uri: Uri? ->
         uri?.let { onImportProject(it) }
     }
+
+    // Deletion is destructive and unrecoverable (it wipes the project's AR wall
+    // fingerprint along with its design artifacts), so the trash icon on a card
+    // never deletes directly — it only stages a project here, and the actual
+    // onDeleteProject call happens solely from the confirm button of the
+    // AlertDialog rendered below.
+    var pendingDeleteProject by remember { mutableStateOf<GraffitiProject?>(null) }
 
     Box(
         modifier = Modifier
@@ -212,7 +225,7 @@ fun ProjectLibraryScreen(
                                         )
                                     }
 
-                                    IconButton(onClick = { onDeleteProject(project.id) }) {
+                                    IconButton(onClick = { pendingDeleteProject = project }) {
                                         Icon(
                                             Icons.Default.Delete,
                                             contentDescription = strings.lib.deleteProjectDesc(project.name),
@@ -225,6 +238,40 @@ fun ProjectLibraryScreen(
                     }
                 }
             }
+        }
+
+        // Delete confirmation. Dismissing (outside tap, system back, or the
+        // Cancel button) only clears the pending state — it never deletes.
+        // Only the destructive "Delete" button below invokes onDeleteProject.
+        pendingDeleteProject?.let { project ->
+            AlertDialog(
+                onDismissRequest = { pendingDeleteProject = null },
+                title = { Text("Delete \"${project.name}\"?") },
+                text = {
+                    Text(
+                        "This will permanently delete this project, including its design " +
+                            "artifacts, thumbnail, and the scanned AR wall data. The wall " +
+                            "data cannot be recreated if the real-world surface changes, and " +
+                            "this action cannot be undone."
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        onDeleteProject(project.id)
+                        pendingDeleteProject = null
+                    }) {
+                        Text(
+                            text = strings.editor.delete,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingDeleteProject = null }) {
+                        Text(strings.common.cancel)
+                    }
+                }
+            )
         }
     }
 }

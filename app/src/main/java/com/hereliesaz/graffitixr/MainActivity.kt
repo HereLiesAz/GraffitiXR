@@ -152,6 +152,14 @@ import kotlin.math.abs
 
 private const val LIBRARY_ROUTE = "library"
 
+// isExporting is only ever cleared by ArRenderer's GL-thread readback callback
+// (onExportCaptured, via ArViewModel.requestExport). If onDrawFrame bails before reaching
+// that readback (session null, isDestroying, SessionPausedException, session.update()
+// throwing — all real ArRenderer conditions), the callback never fires and isExporting
+// would stay true forever, blanking the entire on-screen UI layer with no recovery. This
+// bounds that wait so a stuck export fails visibly instead of hanging the UI.
+private const val EXPORT_TIMEOUT_MS = 7000L
+
 /**
  * Stages of the first-run "drawing in 60 seconds" flow. Split because the two halves need different
  * things from the device: DRAW is a plain screen (no camera), DETECT needs AR.
@@ -776,7 +784,23 @@ class MainActivity : ComponentActivity() {
                             when (editorUiState.editorMode) {
                                 EditorMode.AR -> {
                                     isExporting = true
+                                    // Guards against onExportCaptured never firing (see
+                                    // EXPORT_TIMEOUT_MS doc above) — cancelled below the moment the
+                                    // readback callback or the "not requested" fallback runs, so it
+                                    // never double-fires against a completed/failed export.
+                                    val timeoutJob = exportDispatchScope.launch {
+                                        kotlinx.coroutines.delay(EXPORT_TIMEOUT_MS)
+                                        if (isExporting) {
+                                            isExporting = false
+                                            Toast.makeText(
+                                                context,
+                                                "Export timed out — try again",
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        }
+                                    }
                                     val requested = arViewModel.requestExport { bmp ->
+                                        timeoutJob.cancel()
                                         isExporting = false
                                         editorViewModel.exportImage(backgroundBitmap = bmp, skipLayerComposite = true)
                                     }
@@ -784,6 +808,7 @@ class MainActivity : ComponentActivity() {
                                         // No renderer attached (e.g. AR mode without camera
                                         // permission), so there is no framebuffer to read back.
                                         // Export the layers alone rather than doing nothing.
+                                        timeoutJob.cancel()
                                         isExporting = false
                                         editorViewModel.exportImage()
                                     }
@@ -925,11 +950,6 @@ class MainActivity : ComponentActivity() {
                         }
 
                         var fullSize by remember { mutableStateOf(IntSize.Zero) }
-                        var lockTaps by remember { mutableIntStateOf(0) }
-                        
-                        LaunchedEffect(mainUiState.isTouchLocked) {
-                            if (mainUiState.isTouchLocked) lockTaps = 0
-                        }
 
                         Box(Modifier
                             .fillMaxSize()
@@ -938,13 +958,23 @@ class MainActivity : ComponentActivity() {
                                 if (mainUiState.isTouchLocked) {
                                     Modifier.pointerInput(Unit) {
                                         awaitPointerEventScope {
+                                            // Windowed like TouchLockOverlay in core/design's Overlays.kt:
+                                            // a tap only counts toward the unlock if it follows the
+                                            // previous one within ~500ms, so touches scattered across an
+                                            // entire session (e.g. paper being laid down/pressed/slid
+                                            // while tracing) can't silently accumulate into an unlock.
+                                            var lockTaps = 0
+                                            var lastTapTime = 0L
                                             while (true) {
                                                 val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
                                                 val isDown = event.changes.any { it.pressed && !it.previousPressed }
                                                 event.changes.forEach { it.consume() }
                                                 if (isDown) {
-                                                    lockTaps++
+                                                    val now = System.currentTimeMillis()
+                                                    lockTaps = if (now - lastTapTime < 500) lockTaps + 1 else 1
+                                                    lastTapTime = now
                                                     if (lockTaps >= 4) {
+                                                        lockTaps = 0
                                                         mainViewModel.setTouchLocked(false)
                                                     }
                                                 }

@@ -56,10 +56,14 @@ bool LowLightEnhancer::enhance(const cv::Mat& input, cv::Mat& output) {
         for (int y = 0; y < H; ++y) {
             for (int x = 0; x < W; ++x) {
                 const int idx = y * W + x;
+                // Zero-DCE routinely produces small negative outputs on near-black pixels. A
+                // one-sided std::min(255, ...) leaves those negative, and the narrowing cast to
+                // uchar wraps them to 255 (pure white) -- bright speckle noise injected into
+                // exactly the dark frames this enhancer exists to help. Clamp both sides.
                 result.at<cv::Vec3b>(y, x) = {
-                    (uchar)std::min(255, (int)(data[idx]          * 255.0f)),
-                    (uchar)std::min(255, (int)(data[hw + idx]     * 255.0f)),
-                    (uchar)std::min(255, (int)(data[2 * hw + idx] * 255.0f))
+                    (uchar)std::clamp((int)(data[idx]          * 255.0f), 0, 255),
+                    (uchar)std::clamp((int)(data[hw + idx]     * 255.0f), 0, 255),
+                    (uchar)std::clamp((int)(data[2 * hw + idx] * 255.0f), 0, 255)
                 };
             }
         }

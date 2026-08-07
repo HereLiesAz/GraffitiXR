@@ -28,6 +28,16 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
+/**
+ * Width of the int[] `nativeGetRelocDiagnostics` packs its snapshot into (GraffitiJNI.cpp's
+ * `jint vals[RELOC_DIAGNOSTICS_ARRAY_SIZE]`). Named and referenced from
+ * [SlamManager.getRelocDiagnostics]'s KDoc instead of spelling the count out in prose there: that
+ * count has already gone stale three times (three, four, six, nine, and now fourteen) as the array
+ * grew, and `NativeMethodAritySignatureTest` asserts this constant against the array literal in
+ * GraffitiJNI.cpp, so a fifth drift fails a test instead of just a comment.
+ */
+const val RELOC_DIAGNOSTICS_ARRAY_SIZE = 14
+
 @Singleton
 class SlamManager @Inject constructor(
     private val wearableManager: WearableManager,
@@ -246,10 +256,13 @@ class SlamManager @Inject constructor(
 
     /**
      * Why the last relocalization attempt did not publish a pose, and how far it got. See
-     * [RelocDiagnostics]; the native side packs TWELVE values into one int[] so the read is a
-     * consistent snapshot rather than twelve racing getters. (Three separate comments used to say
-     * three, four and six; the array was six wide until 2.11 added the three backbone counts, and
-     * nine until 4.6 added the three corroboration counts.)
+     * [RelocDiagnostics]; the native side packs [RELOC_DIAGNOSTICS_ARRAY_SIZE] values into one int[]
+     * so the read is a consistent snapshot rather than that many racing getters. (Three separate
+     * comments used to say three, four and six; the array was six wide until 2.11 added the three
+     * backbone counts, nine until 4.6 added the three corroboration counts, and is now fourteen with
+     * the corrobGate/growOutcome reason codes below. [RELOC_DIAGNOSTICS_ARRAY_SIZE] is the number
+     * that must stay in sync with GraffitiJNI.cpp's `jint vals[...]` — see that constant's doc and
+     * `NativeMethodAritySignatureTest` for the guard.)
      *
      * A short array falls back to the default [RelocDiagnostics] — whose backbone and corroboration
      * fields are the -1 "not measured" sentinel, not 0 — rather than to a partially-filled one, so

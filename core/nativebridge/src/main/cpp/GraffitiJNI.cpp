@@ -726,12 +726,19 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFeature
         JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type,
         jfloatArray ptsArray, jfloatArray confArray, jintArray obsArray,
         jfloatArray anchorArray, jfloatArray intrArray) {
-    // Defensive validation (a malformed/old .gxr must never crash native): null refs, a descriptor
-    // blob big enough for rows*cols*elemSize, and parallel arrays of matching length.
+    // Defensive validation (a malformed/old .gxr must never crash native): null refs, a valid OpenCV
+    // type (a bogus one makes the cv::Mat ctor throw a cv::Exception -> hard process crash, since JNI
+    // can't catch C++ exceptions), a descriptor blob big enough for rows*cols*elemSize computed in
+    // 64-bit (a jsize/jint product here would let a hostile rows*cols overflow past the check and
+    // wrap a tiny buffer in a huge cv::Mat -> OOB read), and parallel arrays of matching length.
+    // Mirrors nativeRestoreWallFingerprint / nativeRestoreWallFingerprintMetric above.
     if (!gSlamEngine || !descArray || !ptsArray) return;
     if (rows < 0 || cols < 0) return;
+    int depth = CV_MAT_DEPTH(type);
+    int channels = CV_MAT_CN(type);
+    if (depth < 0 || depth > CV_64F || channels < 1 || channels > 4) return;
     jsize descLen = env->GetArrayLength(descArray);
-    if (descLen < (jsize)(rows * cols * CV_ELEM_SIZE(type))) return;
+    if ((jlong)rows * (jlong)cols * (jlong)CV_ELEM_SIZE(type) > (jlong)descLen) return;
     jsize ptsLen = env->GetArrayLength(ptsArray);
     if (ptsLen != rows * 3) return;
     jsize confLen = confArray ? env->GetArrayLength(confArray) : 0;
