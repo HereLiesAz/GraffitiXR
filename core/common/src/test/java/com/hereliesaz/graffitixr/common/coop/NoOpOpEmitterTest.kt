@@ -9,6 +9,6 @@ class NoOpOpEmitterTest {
     @Test
     fun `emit does not throw and returns Unit`() {
         val emitter: OpEmitter = NoOpOpEmitter()
-        emitter.emit(Op.LayerAdd(Layer(id = "L1", name = "one")))
+        emitter.emit(Op.DesignReplace(Layer(id = "L1", name = "design")))
     }
 }

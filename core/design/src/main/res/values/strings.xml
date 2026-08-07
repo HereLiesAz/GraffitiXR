@@ -412,6 +412,8 @@
     <string name="adj_blue">Blue</string>
     <string name="adj_undo">Undo</string>
     <string name="adj_redo">Redo</string>
+    <string name="adj_reset">Reset placement</string>
+    <string name="adj_restore_placement">Restore placement</string>
     <string name="adj_magic_align">Magic Align</string>
 
     <!-- Overlays & Status -->

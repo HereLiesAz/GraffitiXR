@@ -3,47 +3,45 @@ package com.hereliesaz.graffitixr.common.model
 import kotlinx.serialization.Serializable
 
 /**
- * The set of layer mutations that propagate over the co-op wire from host to guest.
- * Coarse-grained: brush strokes propagate only on completion, not per-sample.
+ * The set of design mutations that propagate over the co-op wire from host to guest.
  *
- * Editor mutations not mapping to one of these are not synced. New mutation types
- * require adding an Op variant.
+ * There is exactly one design, so these carry no layer id: the add/remove/reorder ops that a layer
+ * LIST needed went with the list itself. Coarse-grained: brush strokes propagate only on
+ * completion, not per-sample.
+ *
+ * Editor mutations not mapping to one of these are not synced. New mutation types require adding
+ * an Op variant.
  */
 @Serializable
 sealed class Op {
+    /** The design was chosen or replaced outright — the guest adopts it wholesale. */
     @Serializable
-    data class LayerAdd(val layer: Layer) : Op()
+    data class DesignReplace(val design: Layer) : Op()
 
     @Serializable
-    data class LayerRemove(val layerId: String) : Op()
+    data class DesignTransform(val matrix: List<Float>) : Op()
 
     @Serializable
-    data class LayerReorder(val newOrder: List<String>) : Op()
+    data class DesignProps(val props: LayerProps) : Op()
 
     @Serializable
-    data class LayerTransform(val layerId: String, val matrix: List<Float>) : Op()
+    data class StrokeComplete(val stroke: BrushStroke) : Op()
 
     @Serializable
-    data class LayerPropsChange(val layerId: String, val props: LayerProps) : Op()
-
-    @Serializable
-    data class StrokeComplete(val layerId: String, val stroke: BrushStroke) : Op()
-
-    @Serializable
-    data class TextContentChange(val layerId: String, val text: String) : Op()
+    data class TextContentChange(val text: String) : Op()
 
     /**
-     * Wholesale replacement of a layer's pixels (PNG-encoded), for mutations that don't map to a
-     * replayable [StrokeComplete] — Liquify warps and undo/redo of a layer's bitmap. The guest
-     * decodes [png] and uses it as the layer's new base, dropping any local stroke history.
+     * Wholesale replacement of the design's pixels (PNG-encoded), for mutations that don't map to a
+     * replayable [StrokeComplete] — undo/redo of the bitmap, and any effect applied to it. The
+     * guest decodes [png] and uses it as the new base, dropping any local stroke history.
      */
     @Serializable
-    data class LayerBitmapReplace(val layerId: String, val png: ByteArray) : Op() {
+    data class DesignBitmapReplace(val png: ByteArray) : Op() {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
-            if (other !is LayerBitmapReplace) return false
-            return layerId == other.layerId && png.contentEquals(other.png)
+            if (other !is DesignBitmapReplace) return false
+            return png.contentEquals(other.png)
         }
-        override fun hashCode(): Int = 31 * layerId.hashCode() + png.contentHashCode()
+        override fun hashCode(): Int = png.contentHashCode()
     }
 }

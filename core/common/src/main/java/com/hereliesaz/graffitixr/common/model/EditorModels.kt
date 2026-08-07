@@ -46,8 +46,8 @@ data class Layer(
 )
 
 /**
- * The subset of a layer's visual/aesthetic properties that can be changed without replacing
- * the whole layer. Used by Op.LayerPropsChange to stream property-only mutations over the wire.
+ * The subset of the design's visual/aesthetic properties that can be changed without replacing
+ * the whole design. Used by Op.DesignProps to stream property-only mutations over the wire.
  */
 @Serializable
 data class LayerProps(
@@ -144,13 +144,47 @@ data class ModeAdjustment(
 }
 
 /**
+ * The transform the Reset button put aside, so a second press can put it back.
+ *
+ * Reset is a toggle, not a destructive action: the first press flattens placement to identity, the
+ * second returns the design to exactly where it was. Only transform is captured — tone, colour
+ * balance and effects are deliberately untouched by Reset, so they must survive both presses.
+ *
+ * [mode] records which mode the stash was taken in, because the mode transform is per-mode: after
+ * switching modes the stashed values no longer describe what is on screen, so the next press resets
+ * afresh rather than restoring something the user never reset.
+ */
+data class TransformStash(
+    val mode: EditorMode,
+    val designScale: Float,
+    val designOffset: Offset,
+    val designRotationX: Float,
+    val designRotationY: Float,
+    val designRotationZ: Float,
+    val modeOffsetX: Float,
+    val modeOffsetY: Float,
+    val modeScale: Float,
+    val modeRotation: Float,
+    val modeRotationX: Float,
+    val modeRotationY: Float,
+)
+
+/**
  * The global state for the Editor UI, including AR and Gesture feedback flags.
  */
 data class EditorUiState(
     val projectId: String? = null,
-    val layers: List<Layer> = emptyList(),
+    /**
+     * The one overlay image being placed, or null before one is chosen.
+     *
+     * Singular by design: this app positions a finished image against a wall, and authoring —
+     * including any compositing of several images into one — belongs to the companion design app.
+     * It was a `List<Layer>` with an `activeLayerId`, which cost every consumer a lookup and a
+     * null-or-empty distinction for a collection that in practice held one element. [Layer] keeps
+     * its name because it still carries exactly the per-image state the adjustment knobs drive.
+     */
+    val design: Layer? = null,
     val backgroundBitmap: Bitmap? = null,
-    val activeLayerId: String? = null,
     val activePanel: EditorPanel = EditorPanel.NONE,
     val editorMode: EditorMode = EditorMode.AR,
     val hideUiForCapture: Boolean = false,
@@ -171,5 +205,11 @@ data class EditorUiState(
     // Per-mode whole-design adjustments (transform + tone). Applied to the composited design in
     // that mode only; Design-mode layer edits stay global across all modes.
     val modeAdjustments: Map<EditorMode, ModeAdjustment> = emptyMap(),
+    /**
+     * Non-null while a Reset is in effect: the placement the next Reset press restores. Cleared by
+     * any transform the user makes afterwards, so Reset never puts back a position they have since
+     * moved away from. Runtime-only — a Reset does not survive reopening the project.
+     */
+    val transformStash: TransformStash? = null,
 )
 

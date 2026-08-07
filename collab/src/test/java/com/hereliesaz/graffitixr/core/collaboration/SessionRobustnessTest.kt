@@ -1,5 +1,6 @@
 package com.hereliesaz.graffitixr.core.collaboration
 
+import com.hereliesaz.graffitixr.common.model.BrushStroke
 import com.hereliesaz.graffitixr.common.model.CoopSessionState
 import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.Op
@@ -75,43 +76,65 @@ class SessionRobustnessTest {
         guest.close(CoopSessionState.EndReason.UserLeft)
     }
 
+    /** A stroke tagged with [i], so replay order is checkable. Strokes subsume nothing. */
+    private fun stroke(i: Int) = Op.StrokeComplete(BrushStroke(points = listOf(i.toFloat())))
+
+    private fun strokeIndex(op: Op) = (op as Op.StrokeComplete).stroke.points.first().toInt()
+
+    /** Severs the guest's socket out from under it, without telling it. */
+    private fun severGuest(guest: GuestSession) {
+        val socketField = GuestSession::class.java.getDeclaredField("socket")
+        socketField.isAccessible = true
+        (socketField.get(guest) as? Socket)?.close()
+    }
+
+    private fun newGuest(
+        port: Int,
+        onBulk: () -> Unit,
+        onOp: (Op) -> Unit,
+    ) = GuestSession(
+        host = "127.0.0.1",
+        port = port,
+        token = "tok",
+        protocolVersion = 1,
+        localDeviceName = "guest",
+        onBulkReceived = { _, _ -> onBulk() },
+        onOp = onOp,
+        reconnectWindowMs = 15_000L,
+        reconnectIntervalMs = 300L,
+    )
+
     @Test
-    fun `ops enqueued during a reconnect window all arrive after reconnect`() = runBlocking {
+    fun `incremental ops enqueued during a reconnect window all arrive after reconnect`() = runBlocking {
         val host = newHost()
         val port = host.startListening()
 
         val received = mutableListOf<Op>()
         var bulkOk = false
-        val guest = GuestSession(
-            host = "127.0.0.1",
-            port = port,
-            token = "tok",
-            protocolVersion = 1,
-            localDeviceName = "guest",
-            onBulkReceived = { _, _ -> bulkOk = true },
-            onOp = { op -> synchronized(received) { received.add(op) } },
-            reconnectWindowMs = 15_000L,
-            reconnectIntervalMs = 300L,
-        )
+        val guest = newGuest(port, onBulk = { bulkOk = true }) { op ->
+            synchronized(received) { received.add(op) }
+        }
         guest.connect()
         withTimeout(10_000) { while (!bulkOk) delay(50) }
 
-        repeat(5) { i -> host.enqueueOp(Op.LayerAdd(Layer(id = "L$i", name = "n$i"))) }
+        repeat(5) { i -> host.enqueueOp(stroke(i)) }
         withTimeout(10_000) { while (synchronized(received) { received.size } < 5) delay(50) }
 
-        // Sever the connection out from under the guest.
-        val socketField = GuestSession::class.java.getDeclaredField("socket")
-        socketField.isAccessible = true
-        (socketField.get(guest) as? Socket)?.close()
+        severGuest(guest)
 
         // Keep painting during the outage. Before seq-at-enqueue these overflowed the bounded
         // outbound channel (DROP_OLDEST) without ever reaching the DeltaBuffer and were lost.
-        repeat(20) { i -> host.enqueueOp(Op.LayerAdd(Layer(id = "L${5 + i}", name = "n${5 + i}"))) }
+        //
+        // Strokes because they are incremental — each builds on the last — so nothing here is
+        // eligible for DeltaBuffer coalescing and the assertion is unambiguous. (Coalescing is a
+        // property of the REPLAY path, opsAfter(); ops queued during an outage sit in outQueue and
+        // ship verbatim when the next connection drains it. See DeltaBufferTest for that half.)
+        repeat(20) { i -> host.enqueueOp(stroke(5 + i)) }
 
         withTimeout(20_000) { while (synchronized(received) { received.size } < 25) delay(100) }
 
-        val ids = synchronized(received) { received.map { (it as Op.LayerAdd).layer.id } }
-        assertEquals((0 until 25).map { "L$it" }, ids)
+        val indices = synchronized(received) { received.map(::strokeIndex) }
+        assertEquals((0 until 25).toList(), indices)
 
         host.close(CoopSessionState.EndReason.UserLeft)
         guest.close(CoopSessionState.EndReason.UserLeft)
@@ -127,7 +150,7 @@ class SessionRobustnessTest {
         // session: an ordinary edit disconnected a healthy co-op. The buffer now evicts and records
         // a gap (a reconnect in the gap gets a fresh bulk), so the session survives.
         repeat(8) { i ->
-            host.enqueueOp(Op.LayerBitmapReplace(layerId = "L$i", png = ByteArray(8 * 1024 * 1024)))
+            host.enqueueOp(Op.DesignBitmapReplace(png = ByteArray(8 * 1024 * 1024)))
         }
 
         delay(500)
@@ -146,7 +169,7 @@ class SessionRobustnessTest {
         // Past its op cap that used to end the session — an artist who started sharing and kept
         // working disconnected themselves before anyone had joined, and the replay history was
         // worthless anyway (a first-time guest is sent bulk, not a replay).
-        repeat(5_000) { i -> host.enqueueOp(Op.LayerAdd(Layer(id = "L$i", name = "n$i"))) }
+        repeat(5_000) { i -> host.enqueueOp(Op.DesignReplace(Layer(id = "L$i", name = "n$i"))) }
 
         delay(500)
         assertTrue(
@@ -205,7 +228,7 @@ class SessionRobustnessTest {
                 // Give the guest a nonzero lastAppliedSeq so its next attempt is a resume.
                 writeEnc(
                     FrameType.DELTA,
-                    OpCodec.encode(DeltaPayload(1L, Op.LayerAdd(Layer(id = "X", name = "x")))),
+                    OpCodec.encode(DeltaPayload(1L, Op.DesignReplace(Layer(id = "X", name = "x")))),
                 )
                 Thread.sleep(300)
             }

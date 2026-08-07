@@ -56,7 +56,7 @@ class LocalLoopTest {
 
         // Host emits 50 ops.
         repeat(50) { i ->
-            host.enqueueOp(Op.LayerAdd(Layer(id = "L$i", name = "n$i")))
+            host.enqueueOp(Op.DesignReplace(Layer(id = "L$i", name = "n$i")))
         }
 
         withTimeout(10_000) {
@@ -65,7 +65,7 @@ class LocalLoopTest {
 
         assertEquals(50, received.size)
         received.forEachIndexed { i, op ->
-            assertEquals("L$i", (op as Op.LayerAdd).layer.id)
+            assertEquals("L$i", (op as Op.DesignReplace).design.id)
         }
 
         host.close(CoopSessionState.EndReason.UserLeft)

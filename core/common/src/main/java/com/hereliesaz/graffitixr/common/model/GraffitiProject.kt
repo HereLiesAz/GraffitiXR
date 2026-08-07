@@ -113,7 +113,17 @@ data class GraffitiProject(
     val sensorData: SensorData? = null,
     val calibrationSnapshots: List<CalibrationSnapshot> = emptyList(),
 
-    // Multi-layer support
+    /** The single overlay image this project places. Null before one has been chosen. */
+    val design: OverlayLayer? = null,
+
+    /**
+     * Read-only migration path for projects saved when this app still held a layer LIST.
+     *
+     * Multilayer editing moved to the companion design app; a project now carries one image. Old
+     * `.gxr` files still have the array, so it is kept for reading and collapsed to [design] on
+     * load (see ProjectManager.migrateInMemory). Nothing writes it any more, so it disappears from
+     * a file the first time that project is saved.
+     */
     val layers: List<OverlayLayer> = emptyList(),
 
     // Neural Scan ID

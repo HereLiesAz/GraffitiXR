@@ -202,19 +202,33 @@ class ProjectManager @Inject constructor(
     }
 
     /**
-     * Applies the legacyVisuals→layers migration purely in memory. Returns [project] itself
-     * (same reference) when no migration is needed, so callers can detect change by identity
-     * and decide whether to persist.
+     * Brings an on-disk project up to the current shape, purely in memory. Returns [project] itself
+     * (same reference) when nothing needed migrating, so callers can detect change by identity and
+     * decide whether to persist.
+     *
+     * Two generations of migration now. The older one folds `legacyVisuals` (a single image's
+     * transform and tone, from before layers existed) onto the image itself. The newer one collapses
+     * the layer LIST back to one `design`, because multilayer editing moved to the companion design
+     * app — the first layer wins, which is the one the artist was placing.
      */
     private fun migrateInMemory(project: GraffitiProject): GraffitiProject {
+        val collapsed = when {
+            project.design != null -> project
+            project.layers.isNotEmpty() -> project.copy(design = project.layers.first(), layers = emptyList())
+            else -> project
+        }
+        val migrated = migrateLegacyVisuals(collapsed)
+        return if (migrated === collapsed && collapsed === project) project else migrated
+    }
+
+    private fun migrateLegacyVisuals(project: GraffitiProject): GraffitiProject {
         val lv = project.legacyVisuals
         val defaults = LegacyVisuals()
         if (lv == defaults) return project
 
-        val migratedLayers: List<OverlayLayer> = when {
-            project.layers.isEmpty() && project.overlayImageUri != null -> {
+        val migratedDesign: OverlayLayer? = when {
+            project.design == null && project.overlayImageUri != null -> {
                 val uri = project.overlayImageUri!!
-                listOf(
                     OverlayLayer(
                         uri = uri,
                         name = "Overlay",
@@ -232,10 +246,9 @@ class ProjectManager @Inject constructor(
                         colorBalanceG = lv.colorBalanceG,
                         colorBalanceB = lv.colorBalanceB
                     )
-                )
             }
-            project.layers.isNotEmpty() && project.layers.first().hasDefaultVisuals() -> {
-                val first = project.layers.first().copy(
+            project.design?.hasDefaultVisuals() == true -> {
+                project.design!!.copy(
                     scale = lv.scale,
                     offset = lv.offset,
                     rotationX = lv.rotationX,
@@ -250,12 +263,11 @@ class ProjectManager @Inject constructor(
                     colorBalanceG = lv.colorBalanceG,
                     colorBalanceB = lv.colorBalanceB
                 )
-                listOf(first) + project.layers.drop(1)
             }
-            else -> project.layers
+            else -> project.design
         }
 
-        return project.copy(layers = migratedLayers, legacyVisuals = defaults)
+        return project.copy(design = migratedDesign, legacyVisuals = defaults)
     }
 
     private fun OverlayLayer.hasDefaultVisuals(): Boolean {

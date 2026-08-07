@@ -674,15 +674,10 @@ class MainActivity : ComponentActivity() {
                 // AR anchor establishment. Drawing tools, stroke input, and gesture
                 // feedback all require an active layer; delaying activation forces the
                 // user through a needless intermediate state.
-                LaunchedEffect(editorUiState.layers, editorUiState.activeLayerId) {
-                    if (editorUiState.layers.isNotEmpty() && editorUiState.activeLayerId == null) {
-                        editorViewModel.onLayerActivated(editorUiState.layers.first().id)
-                    }
-                }
 
                 // Show design instructions when anchor is established with no layers.
                 LaunchedEffect(arUiState.isAnchorEstablished) {
-                    if (arUiState.isAnchorEstablished && editorUiState.layers.isEmpty()) {
+                    if (arUiState.isAnchorEstablished && editorUiState.design == null) {
                         showDesignInstructionsDialog = true
                     }
                 }
@@ -1057,7 +1052,7 @@ class MainActivity : ComponentActivity() {
                             // the one screen that could have explained it claimed success instead.
                             // Gate on the thing that actually has to exist.
                             val basePostTargetVisible = arUiState.isAnchorEstablished
-                                    && editorUiState.layers.isEmpty()
+                                    && editorUiState.design == null
                                     && !mainUiState.isCapturingTarget
                                     && editorUiState.editorMode == EditorMode.AR
                                     && !showLibrary && !showSettings
@@ -1809,11 +1804,6 @@ class MainActivity : ComponentActivity() {
                 onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.design", it) },
             )
             azRailSubItem(
-                id = "design.layers", hostId = "host.design", text = strings.editor.layers,
-                color = if (editorUiState.activePanel == EditorPanel.LAYERS) Cyan else navItemColor,
-                shape = AzButtonShape.NONE,
-            ) { editorViewModel.onLayersClicked() }
-            azRailSubItem(
                 id = "design.adjust", hostId = "host.design", text = navStrings.adjust,
                 color = if (editorUiState.activePanel == EditorPanel.ADJUST) Cyan else navItemColor,
                 shape = AzButtonShape.NONE,
@@ -1824,8 +1814,7 @@ class MainActivity : ComponentActivity() {
                 shape = AzButtonShape.NONE,
             ) { editorViewModel.onBalanceClicked() }
             run {
-                val activeInverted = editorUiState.layers
-                    .find { it.id == editorUiState.activeLayerId }?.isInverted == true
+                val activeInverted = editorUiState.design?.isInverted == true
                 azRailSubItem(
                     id = "design.invert", hostId = "host.design", text = navStrings.invert,
                     color = if (activeInverted) Cyan else navItemColor, shape = AzButtonShape.NONE,

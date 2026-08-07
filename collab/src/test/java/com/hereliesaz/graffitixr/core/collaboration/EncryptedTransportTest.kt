@@ -107,9 +107,9 @@ class EncryptedTransportTest {
         guest.connect()
         withTimeout(10_000) { while (!bulkOk) delay(50) }
 
-        host.enqueueOp(Op.LayerAdd(Layer(id = marker, name = "n")))
+        host.enqueueOp(Op.DesignReplace(Layer(id = marker, name = "n")))
         withTimeout(10_000) {
-            while (synchronized(received) { received.none { (it as? Op.LayerAdd)?.layer?.id == marker } }) delay(50)
+            while (synchronized(received) { received.none { (it as? Op.DesignReplace)?.design?.id == marker } }) delay(50)
         }
         // Let the proxy flush the delta bytes it forwarded.
         delay(300)

@@ -115,35 +115,27 @@ class EditorViewModel @Inject constructor(
     }
 
     private fun loadProject(project: GraffitiProject) {
-        val currentLayers = _uiState.value.layers
-        val layers = project.layers.map { overlayLayer ->
-            val existingLayer = currentLayers.find { it.id == overlayLayer.id }
-            val layer = overlayLayer.toLayer()
-            if (existingLayer != null && existingLayer.uri == layer.uri) {
-                layer.copy(bitmap = existingLayer.bitmap)
-            } else {
-                layer
-            }
+        val current = _uiState.value.design
+        val loaded = project.design?.toLayer()?.let { design ->
+            // Carry the live bitmap over when the image is unchanged, so reopening the same project
+            // does not re-decode it off disk.
+            if (current != null && current.uri == design.uri) design.copy(bitmap = current.bitmap) else design
         }
 
-        dispatch(EditorIntent.LoadedProject(project.id, layers))
+        dispatch(EditorIntent.LoadedProject(project.id, loaded))
 
         val loadedModeAdjustments = project.modeAdjustments.mapNotNull { (key, value) ->
             runCatching { EditorMode.valueOf(key) }.getOrNull()?.let { it to value }
         }.toMap()
         dispatch(EditorIntent.SetAllModeAdjustments(loadedModeAdjustments))
 
-        if (layers.any { it.bitmap == null && it.uri != null }) {
+        val pendingUri = loaded?.takeIf { it.bitmap == null }?.uri
+        if (pendingUri != null) {
             viewModelScope.launch(dispatchers.io) {
-                val loadedLayers = layers.map { layer ->
-                    val layerUri = layer.uri
-                    if (layer.bitmap == null && layerUri != null) {
-                        layer.copy(bitmap = ImageUtils.loadBitmapAsync(context, layerUri))
-                    } else {
-                        layer
-                    }
+                val bitmap = ImageUtils.loadBitmapAsync(context, pendingUri)
+                withContext(dispatchers.main) {
+                    dispatch(EditorIntent.RestoreDesign(loaded.copy(bitmap = bitmap)))
                 }
-                withContext(dispatchers.main) { dispatch(EditorIntent.SetLayers(loadedLayers)) }
             }
         }
 
@@ -191,7 +183,7 @@ class EditorViewModel @Inject constructor(
     // ── Undo / redo ───────────────────────────────────────────────────────────
 
     private fun pushHistory() {
-        history.pushProperty(currentLayerSnapshot())
+        history.pushProperty(currentDesignSnapshot())
         updateHistoryCounts()
     }
 
@@ -199,37 +191,36 @@ class EditorViewModel @Inject constructor(
         _uiState.update { it.copy(undoCount = history.undoCount, redoCount = history.redoCount) }
     }
 
-    /** The current layer set, stripped of bitmaps — what we record so an undo can be reverted. */
-    private fun currentLayerSnapshot(): List<Layer> = _uiState.value.layers.map { it.copy(bitmap = null) }
+    /** The design, stripped of its bitmap — what we record so an undo can be reverted. */
+    private fun currentDesignSnapshot(): Layer? = _uiState.value.design?.copy(bitmap = null)
 
-    override fun onUndoClicked() = applyHistory(history.popUndo { EditCommand(currentLayerSnapshot()) })
+    override fun onUndoClicked() = applyHistory(history.popUndo { EditCommand(currentDesignSnapshot()) })
 
-    override fun onRedoClicked() = applyHistory(history.popRedo { EditCommand(currentLayerSnapshot()) })
+    override fun onRedoClicked() = applyHistory(history.popRedo { EditCommand(currentDesignSnapshot()) })
 
     private fun applyHistory(command: EditCommand?) {
         command ?: return
-        // Bitmaps are transient and identical across a property-only change, so carry the live ones
-        // over rather than reloading them from disk.
-        val currentBitmaps = _uiState.value.layers.associate { it.id to it.bitmap }
-        val restoredLayers = command.oldLayers.map { it.copy(bitmap = currentBitmaps[it.id]) }
-        dispatch(EditorIntent.SetLayers(restoredLayers))
+        // The bitmap is transient and identical across a property-only change, so carry the live one
+        // over rather than reloading it from disk.
+        val restored = command.oldDesign?.copy(bitmap = _uiState.value.design?.bitmap)
+        dispatch(EditorIntent.RestoreDesign(restored))
         saveProject()
-        emitLayerStateResync(restoredLayers)
+        emitDesignResync(restored)
         updateHistoryCounts()
     }
 
-    // ── Layers ────────────────────────────────────────────────────────────────
+    // ── The design ────────────────────────────────────────────────────────────
 
     override fun onAddLayer(uri: Uri) {
         pushHistory()
         viewModelScope.launch(dispatchers.io) {
-            // Cap imported layers at a screen-reasonable size. A full 12MP+ photo is ~48MB as ARGB;
+            // Cap the imported image at a screen-reasonable size. A full 12MP+ photo is ~48MB as ARGB;
             // decoding/copying/PNG-encoding it (then rendering it as a texture every frame) is what
             // made the first layer take seconds to appear and the canvas lag. 2048px is ample here.
             val bitmap = ImageUtils.loadBitmapAsync(context, uri, maxDimension = 2048)
             val projectId = _uiState.value.projectId
             if (bitmap != null && projectId != null) {
-                val filename = "layer_${UUID.randomUUID()}.png"
+                val filename = "design_${UUID.randomUUID()}.png"
                 val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(bitmap))
                 val localUri = "file://$path".toUri()
 
@@ -239,9 +230,11 @@ class EditorViewModel @Inject constructor(
                 // Fit the imported image to the screen so it lands somewhere usable.
                 val initialScale = minOf(screenW * 0.9f / bitmap.width, screenH * 0.9f / bitmap.height, 1.0f)
 
-                val newLayer = Layer(
+                // Replaces whatever was there: there is exactly one design, and importing is how
+                // the artist chooses it.
+                val design = Layer(
                     id = UUID.randomUUID().toString(),
-                    name = "Layer ${_uiState.value.layers.size + 1}",
+                    name = "Design",
                     uri = localUri,
                     bitmap = bitmap,
                     isVisible = true,
@@ -249,8 +242,8 @@ class EditorViewModel @Inject constructor(
                 )
 
                 withContext(dispatchers.main) {
-                    dispatch(EditorIntent.AddLayer(newLayer))
-                    opEmitter.emit(Op.LayerAdd(newLayer))
+                    dispatch(EditorIntent.SetDesign(design))
+                    opEmitter.emit(Op.DesignReplace(design))
                     saveProject()
                 }
             } else {
@@ -259,40 +252,6 @@ class EditorViewModel @Inject constructor(
                 }
             }
         }
-    }
-
-    override fun onLayerActivated(id: String) = dispatch(EditorIntent.ActivateLayer(id))
-
-    override fun onLayerRemoved(id: String) {
-        pushHistory()
-        dispatch(EditorIntent.RemoveLayer(id))
-        opEmitter.emit(Op.LayerRemove(id))
-        saveProject()
-    }
-
-    override fun onLayerReordered(newOrder: List<String>) {
-        pushHistory()
-        dispatch(EditorIntent.ReorderLayers(newOrder))
-        opEmitter.emit(Op.LayerReorder(newOrder))
-        saveProject()
-    }
-
-    override fun onLayerRenamed(id: String, name: String) {
-        pushHistory()
-        dispatch(EditorIntent.RenameLayer(id, name))
-        saveProject()
-    }
-
-    override fun onToggleVisibility(layerId: String) {
-        pushHistory()
-        dispatch(EditorIntent.ToggleVisibility(layerId))
-        saveProject()
-        _uiState.value.layers.find { it.id == layerId }?.let { opEmitter.emit(Op.LayerPropsChange(layerId, it.toLayerProps())) }
-    }
-
-    fun setLayers(layers: List<Layer>) {
-        dispatch(EditorIntent.SetLayers(layers))
-        saveProject()
     }
 
     // ── Background (Mockup wall photo) ────────────────────────────────────────
@@ -330,7 +289,7 @@ class EditorViewModel @Inject constructor(
         viewModelScope.launch(dispatchers.io) {
             try {
                 val currentProject = projectRepository.currentProject.value
-                val updatedLayers = _uiState.value.layers.map { it.toOverlayLayer() }
+                val updatedDesign = _uiState.value.design?.toOverlayLayer()
                 val modeAdjustments = _uiState.value.modeAdjustments.mapKeys { it.key.name }
 
                 // Paths derive from the (immutable) project id.
@@ -341,7 +300,7 @@ class EditorViewModel @Inject constructor(
                     manifestToSave = GraffitiProject(
                         id = projectId,
                         name = name ?: "New Project",
-                        layers = updatedLayers,
+                        design = updatedDesign,
                         modeAdjustments = modeAdjustments,
                     )
                     projectRepository.createProject(manifestToSave)
@@ -352,7 +311,7 @@ class EditorViewModel @Inject constructor(
                     projectRepository.updateProject { current ->
                         current.copy(
                             name = name ?: current.name,
-                            layers = updatedLayers,
+                            design = updatedDesign,
                             modeAdjustments = modeAdjustments,
                             lastModified = System.currentTimeMillis(),
                         )
@@ -388,11 +347,11 @@ class EditorViewModel @Inject constructor(
             thumbnailJob = viewModelScope.launch(dispatchers.default) {
                 try {
                     kotlinx.coroutines.delay(2000)
-                    if (_uiState.value.layers.none { it.isVisible && it.bitmap != null }) return@launch
+                    val design = _uiState.value.design?.takeIf { it.isVisible && it.bitmap != null } ?: return@launch
                     val metrics = context.resources.displayMetrics
                     val w = metrics.widthPixels.takeIf { it > 0 } ?: 1080
                     val h = metrics.heightPixels.takeIf { it > 0 } ?: 1920
-                    val composite = exportManager.compositeLayers(_uiState.value.layers, w, h)
+                    val composite = exportManager.composite(design, w, h)
                     // Downscale to a small preview so the file stays tiny and decodes fast.
                     val maxDim = 512
                     val longest = maxOf(composite.width, composite.height).coerceAtLeast(1)
@@ -463,9 +422,9 @@ class EditorViewModel @Inject constructor(
      * @param backgroundBitmap When non-null, used as the export's background (Overlay: the CameraX
      *   still; AR: the composited GL framebuffer readback that already includes the wall-anchored
      *   overlay). When null, per-mode default applies.
-     * @param skipLayerComposite When true, the [backgroundBitmap] IS the export — no layers are
-     *   drawn on top. Set by the AR path because the GL readback already contains the layers as
-     *   the wall-anchored quad; drawing them again would double-draw.
+     * @param skipLayerComposite When true, the [backgroundBitmap] IS the export — the design is
+     *   not drawn on top. Set by the AR path because the GL readback already contains it as the
+     *   wall-anchored quad; drawing it again would double-draw.
      */
     fun exportImage(backgroundBitmap: Bitmap? = null, skipLayerComposite: Boolean = false) {
         viewModelScope.launch(dispatchers.default) {
@@ -477,8 +436,8 @@ class EditorViewModel @Inject constructor(
                     val metrics = context.resources.displayMetrics
                     val bgBmp = backgroundBitmap
                         ?: if (_uiState.value.editorMode == EditorMode.MOCKUP) _uiState.value.backgroundBitmap else null
-                    exportManager.compositeLayers(
-                        _uiState.value.layers,
+                    exportManager.composite(
+                        _uiState.value.design,
                         metrics.widthPixels.takeIf { it > 0 } ?: 1080,
                         metrics.heightPixels.takeIf { it > 0 } ?: 1920,
                         backgroundBitmap = bgBmp,
@@ -507,17 +466,16 @@ class EditorViewModel @Inject constructor(
     }
 
     /**
-     * Composites the current layers to a PNG in `cacheDir/shared` and returns a FileProvider
+     * Composites the design to a PNG in `cacheDir/shared` and returns a FileProvider
      * `content://` Uri suitable for `ACTION_SEND` — the two-app hand-off back to the design app.
      * Returns null if there's nothing to share. The host fires the share intent; the Uri authority
      * is `${applicationId}.fileprovider`, declared in the manifest.
      */
     suspend fun exportForShare(): Uri? = withContext(dispatchers.default) {
-        val layers = _uiState.value.layers
-        if (layers.isEmpty()) return@withContext null
+        val design = _uiState.value.design ?: return@withContext null
         val metrics = context.resources.displayMetrics
-        val composite = exportManager.compositeLayers(
-            layers,
+        val composite = exportManager.composite(
+            design,
             metrics.widthPixels.takeIf { it > 0 } ?: 1080,
             metrics.heightPixels.takeIf { it > 0 } ?: 1920,
             backgroundColor = android.graphics.Color.TRANSPARENT,
@@ -545,25 +503,24 @@ class EditorViewModel @Inject constructor(
         anchorHalfExtentMeters = Pair(halfW, halfH)
     }
 
-    private fun fitActiveLayerToAnchor(halfW: Float, halfH: Float) {
-        val state = _uiState.value
-        val layer = state.layers.find { it.id == state.activeLayerId } ?: return
-        val bmp = layer.bitmap ?: return
+    private fun fitDesignToAnchor(halfW: Float, halfH: Float) {
+        val bmp = _uiState.value.design?.bitmap ?: return
         // QUAD_HALF_EXTENT = 5.0f (matches OverlayRenderer.QUAD_HALF_EXTENT)
         // The composite canvas is 2048×2048. Scale to fill 80% of the anchor extent.
         val scaleW = halfW * 0.8f * 2048f / (bmp.width * 5.0f)
         val scaleH = halfH * 0.8f * 2048f / (bmp.height * 5.0f)
         val scale = minOf(scaleW, scaleH).coerceIn(0.05f, 20f)
-        updateActiveLayer { it.copy(scale = scale, offset = Offset.Zero, rotationX = 0f, rotationY = 0f, rotationZ = 0f) }
+        updateDesign { it.copy(scale = scale, offset = Offset.Zero, rotationX = 0f, rotationY = 0f, rotationZ = 0f) }
     }
 
     override fun onMagicClicked() {
         pushHistory()
+        clearTransformStash()
         val extent = anchorHalfExtentMeters
         if (extent != null) {
-            fitActiveLayerToAnchor(extent.first, extent.second)
+            fitDesignToAnchor(extent.first, extent.second)
         } else {
-            updateActiveLayer { it.copy(brightness = 0.1f, contrast = 1.2f, saturation = 1.1f) }
+            updateDesign { it.copy(brightness = 0.1f, contrast = 1.2f, saturation = 1.1f) }
         }
         saveProject()
     }
@@ -571,14 +528,28 @@ class EditorViewModel @Inject constructor(
     override fun onAdjustClicked() = dispatch(EditorIntent.ToggleAdjustPanel)
     fun onBalanceClicked() = dispatch(EditorIntent.ToggleColorPanel)
 
-    /** Opens/closes the layer list. EditorUi renders it on EditorPanel.LAYERS; nothing set that. */
-    fun onLayersClicked() = dispatch(EditorIntent.ToggleLayersPanel)
     override fun onDismissPanel() = dispatch(EditorIntent.DismissPanel)
 
+    /**
+     * The Reset button. Toggles between "placement flattened to identity" and "placement exactly as
+     * it was before the first press" — see [EditorIntent.ToggleTransformReset]. Recorded in history
+     * like any other placement change, so undo also backs it out.
+     */
+    override fun onResetClicked() {
+        pushHistory()
+        dispatch(EditorIntent.ToggleTransformReset)
+        saveProject()
+        _uiState.value.design?.let { opEmitter.emit(Op.DesignTransform(it.encodeTransform())) }
+    }
+
     fun onTransformGesture(pan: Offset, zoom: Float, rotationDelta: Float) {
-        val activeId = _uiState.value.activeLayerId ?: return
+        // Rotation goes to the axis the double-tap cycle selected — X/Y tilt the design about its
+        // width/height, Z spins it in-plane.
         val axis = _uiState.value.activeRotationAxis
-        updateLinkedGroup(activeId) { layer ->
+        // Repositioning by hand voids any pending Reset restore: "put it back" would put it
+        // somewhere the user has deliberately moved away from.
+        clearTransformStash()
+        updateDesign { layer ->
             val rx = if (axis == RotationAxis.X) layer.rotationX + rotationDelta else layer.rotationX
             val ry = if (axis == RotationAxis.Y) layer.rotationY + rotationDelta else layer.rotationY
             val rz = if (axis == RotationAxis.Z) layer.rotationZ + rotationDelta else layer.rotationZ
@@ -604,14 +575,11 @@ class EditorViewModel @Inject constructor(
     override fun onGestureEnd() {
         saveProject()
         dispatch(EditorIntent.SetGestureInProgress(false))
-        // Emit LayerTransform for the active layer. The editor stores transform as
-        // scale/offset/rotationX/Y/Z rather than a Matrix, so we encode them in the
-        // first 6 slots of a 16-float list (slots 6-15 are zeros).
+        // The editor stores transform as scale/offset/rotationX/Y/Z rather than a Matrix, so we
+        // encode them in the first 6 slots of a 16-float list (slots 6-15 are zeros).
         // applySpectatorOp must decode using the same convention.
-        val state = _uiState.value
-        val activeId = state.activeLayerId ?: return
-        val layer = state.layers.find { it.id == activeId } ?: return
-        opEmitter.emit(Op.LayerTransform(activeId, layer.encodeTransform()))
+        val layer = _uiState.value.design ?: return
+        opEmitter.emit(Op.DesignTransform(layer.encodeTransform()))
     }
 
     override fun toggleImageLock() {
@@ -685,7 +653,7 @@ class EditorViewModel @Inject constructor(
      */
     fun autoTuneActiveLayer(wall: com.hereliesaz.graffitixr.common.util.ImageStats?) {
         if (wall == null) return
-        val bitmap = _uiState.value.layers.find { it.id == _uiState.value.activeLayerId }?.bitmap ?: return
+        val bitmap = _uiState.value.design?.bitmap ?: return
         viewModelScope.launch(dispatchers.default) {
             val t = computeAutoTune(wall, bitmap.imageStats())
             withContext(dispatchers.main) {
@@ -704,19 +672,16 @@ class EditorViewModel @Inject constructor(
 
     // ── Co-op ─────────────────────────────────────────────────────────────────
 
-    /** Re-pushes layer order, props and transforms to guests after an undo/redo. */
-    private fun emitLayerStateResync(layers: List<Layer>) {
-        opEmitter.emit(Op.LayerReorder(layers.map { it.id }))
-        layers.forEach { l ->
-            opEmitter.emit(Op.LayerPropsChange(l.id, l.toLayerProps()))
-            opEmitter.emit(Op.LayerTransform(l.id, l.encodeTransform()))
-        }
+    /** Re-pushes the design's props and transform to guests after an undo/redo. */
+    private fun emitDesignResync(design: Layer?) {
+        design ?: return
+        opEmitter.emit(Op.DesignProps(design.toLayerProps()))
+        opEmitter.emit(Op.DesignTransform(design.encodeTransform()))
     }
 
-    /** Emits a co-op LayerPropsChange for the active layer, if any. */
+    /** Emits a co-op props change for the design, if there is one. */
     private fun emitActiveLayerProps() {
-        val id = _uiState.value.activeLayerId ?: return
-        _uiState.value.layers.find { it.id == id }?.let { opEmitter.emit(Op.LayerPropsChange(id, it.toLayerProps())) }
+        _uiState.value.design?.let { opEmitter.emit(Op.DesignProps(it.toLayerProps())) }
     }
 
     private fun Layer.encodeTransform() = listOf(
@@ -741,41 +706,35 @@ class EditorViewModel @Inject constructor(
     /** Applies a remote Op received from the host, without echoing it back through opEmitter. */
     fun applySpectatorOp(op: Op) {
         when (op) {
-            is Op.LayerAdd -> dispatch(EditorIntent.AppendLayer(op.layer))
-            is Op.LayerRemove -> dispatch(EditorIntent.RemoveLayerById(op.layerId))
-            is Op.LayerReorder -> dispatch(EditorIntent.ReorderLayers(op.newOrder))
-            is Op.LayerTransform -> {
+            is Op.DesignReplace -> dispatch(EditorIntent.RestoreDesign(op.design))
+            is Op.DesignTransform -> {
                 // The host encodes transform as [scale, offsetX, offsetY, rotX, rotY, rotZ, 0...0].
                 if (op.matrix.size >= 6) {
-                    dispatch(EditorIntent.SetLayerTransformById(
-                        op.layerId,
+                    dispatch(EditorIntent.SetDesignTransform(
                         scale = op.matrix[0],
                         offset = Offset(op.matrix[1], op.matrix[2]),
                         rx = op.matrix[3], ry = op.matrix[4], rz = op.matrix[5],
                     ))
                 }
             }
-            is Op.LayerPropsChange -> dispatch(EditorIntent.SetLayerProps(op.layerId, op.props))
-            is Op.LayerBitmapReplace -> {
-                val layerId = op.layerId
-                if (_uiState.value.layers.none { it.id == layerId }) return
+            is Op.DesignProps -> dispatch(EditorIntent.SetDesignProps(op.props))
+            is Op.DesignBitmapReplace -> {
+                if (_uiState.value.design == null) return
                 viewModelScope.launch(dispatchers.default) {
-                    // Cap the decoded bitmap at 2x the longest screen edge — plenty for any layer
-                    // that reasonably rasterises to a screen quad, and prevents a peer accidentally
-                    // shipping a giant PNG from OOMing the guest.
+                    // Cap the decoded bitmap at 2x the longest screen edge — plenty for an image
+                    // that rasterises to a screen quad, and it stops a peer accidentally shipping a
+                    // giant PNG from OOMing the guest.
                     val metrics = context.resources.displayMetrics
                     val maxDim = maxOf(metrics.widthPixels, metrics.heightPixels) * 2
                     val decoded = com.hereliesaz.graffitixr.common.util.decodeBoundedBitmap(op.png, maxDim) ?: run {
                         android.util.Log.w(
                             "EditorViewModel",
-                            "LayerBitmapReplace: skipping op for layer $layerId (decode returned null; bytes=${op.png.size})"
+                            "DesignBitmapReplace: decode returned null (bytes=${op.png.size})"
                         )
                         return@launch
                     }
                     withContext(dispatchers.main) {
-                        _uiState.update { s ->
-                            s.copy(layers = s.layers.map { if (it.id == layerId) it.copy(bitmap = decoded) else it })
-                        }
+                        _uiState.update { s -> s.copy(design = s.design?.copy(bitmap = decoded)) }
                     }
                 }
             }
@@ -789,15 +748,16 @@ class EditorViewModel @Inject constructor(
 
     // ── Internals ─────────────────────────────────────────────────────────────
 
-    private fun updateActiveLayer(transform: (Layer) -> Layer) {
-        _uiState.update { state ->
-            val id = state.activeLayerId ?: return@update state
-            state.copy(layers = LayerListOps.mapLayer(state.layers, id, transform))
-        }
+    private fun updateDesign(transform: (Layer) -> Layer) {
+        _uiState.update { state -> state.copy(design = state.design?.let(transform)) }
     }
 
-    fun updateAllLayers(transform: (Layer) -> Layer) {
-        _uiState.update { state -> state.copy(layers = state.layers.map(transform)) }
+    /**
+     * Voids a pending Reset restore. The reducer does this for the intents it owns; this is for the
+     * paths that mutate the design directly (gesture transform, magic align).
+     */
+    private fun clearTransformStash() {
+        if (_uiState.value.transformStash != null) _uiState.update { it.copy(transformStash = null) }
     }
 
     /**
@@ -809,21 +769,4 @@ class EditorViewModel @Inject constructor(
         _uiState.update { EditorReducer.reduce(it, intent) }
     }
 
-    /** Returns the IDs of all layers in the same link-group as [layerId].
-     *  A group is a contiguous run where each layer above the bottom has isLinked = true. */
-    private fun getLinkedGroupIds(layerId: String): Set<String> {
-        val layers = _uiState.value.layers
-        val idx = layers.indexOfFirst { it.id == layerId }
-        if (idx < 0) return setOf(layerId)
-        var bottom = idx
-        while (bottom > 0 && layers[bottom].isLinked) bottom--
-        var top = idx
-        while (top + 1 < layers.size && layers[top + 1].isLinked) top++
-        return layers.subList(bottom, top + 1).map { it.id }.toSet()
-    }
-
-    private fun updateLinkedGroup(activeId: String, transform: (Layer) -> Layer) {
-        val groupIds = getLinkedGroupIds(activeId)
-        _uiState.update { state -> state.copy(layers = state.layers.map { if (it.id in groupIds) transform(it) else it }) }
-    }
 }

@@ -50,7 +50,7 @@ fun OffscreenIndicators(
     if (screenSize.width <= 0 || screenSize.height <= 0) return
 
     // 1. Indicator for Active Layer (HotPink)
-    val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
+    val activeLayer = uiState.design
     if (activeLayer != null) {
         val centerX = screenSize.width / 2f
         val centerY = screenSize.height / 2f

@@ -3,13 +3,13 @@ package com.hereliesaz.graffitixr.feature.editor
 import com.hereliesaz.graffitixr.common.model.Layer
 
 /**
- * A single undoable step: a snapshot of the layer set with bitmaps stripped.
+ * A single undoable step: a snapshot of the design with its bitmap stripped.
  *
- * Since this app no longer edits pixels — the companion design app owns authoring — every
- * undoable change is a property change (transform, tone, order, visibility, add/remove), so one
- * snapshot type covers the whole history.
+ * Since this app no longer edits pixels — the companion design app owns authoring — every undoable
+ * change is a property change (transform, tone, visibility), so one snapshot type covers the whole
+ * history. Nullable because "no design yet" is a state the user can undo back to.
  */
-internal data class EditCommand(val oldLayers: List<Layer>)
+internal data class EditCommand(val oldDesign: Layer?)
 
 /**
  * Owns the undo/redo stacks for the editor. Pure logic — no Android or Compose dependencies — so
@@ -27,12 +27,12 @@ internal class EditHistory(private val maxStackSize: Int = 20) {
     val redoCount: Int get() = redoStack.size
 
     /**
-     * Records a layer-property snapshot. Deduplicated: a snapshot identical to the most recent
-     * one is ignored (returns false). Pushing clears the redo stack.
+     * Records a design-property snapshot. Deduplicated: a snapshot identical to the most recent one
+     * is ignored (returns false). Pushing clears the redo stack.
      */
-    fun pushProperty(layersWithoutBitmaps: List<Layer>): Boolean {
-        if (undoStack.lastOrNull()?.oldLayers == layersWithoutBitmaps) return false
-        undoStack.addLast(EditCommand(layersWithoutBitmaps))
+    fun pushProperty(designWithoutBitmap: Layer?): Boolean {
+        if (undoStack.isNotEmpty() && undoStack.last().oldDesign == designWithoutBitmap) return false
+        undoStack.addLast(EditCommand(designWithoutBitmap))
         trim()
         redoStack.clear()
         return true
