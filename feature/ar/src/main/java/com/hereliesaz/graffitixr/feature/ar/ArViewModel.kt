@@ -197,6 +197,7 @@ class ArViewModel @Inject constructor(
         guestEditDropJob?.cancel()
         guestEditDropJob = viewModelScope.launch {
             collaborationManager.guestEditDropped.collect {
+                _uiState.update { it.copy(guestEditWasDropped = true) }
                 if (reportedGuestEditDrop) return@collect
                 reportedGuestEditDrop = true
                 _feedback.tryEmit(
@@ -325,7 +326,14 @@ class ArViewModel @Inject constructor(
             guestEditDropJob?.cancel()
             guestEditDropJob = null
             collaborationManager.leaveSession()
-            _uiState.update { it.copy(coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.NONE, coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.Idle) }
+            reportedGuestEditDrop = false
+            _uiState.update {
+                it.copy(
+                    coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.NONE,
+                    coopSessionState = com.hereliesaz.graffitixr.common.model.CoopSessionState.Idle,
+                    guestEditWasDropped = false,
+                )
+            }
             _hostQrPayload.value = null
         }
     }

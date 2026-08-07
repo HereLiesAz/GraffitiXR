@@ -700,12 +700,15 @@ class MainActivity : ComponentActivity() {
                         mode = editorUiState.editorMode,
                         helpList = allHelpItems,
                         guidanceHighlightIds = GUIDANCE_HIGHLIGHT_IDS,
+                        decoratedIds = DECORATED_IDS,
                     )
                 }
 
                 AzHostActivityLayout(navController = navController, currentDestination = currentRoute, initiallyExpanded = false) {
                     azTheme(
                         activeColor = Cyan,
+                        focusColor = Cyan,
+                        secondaryColor = navItemColor,
                         defaultShape = AzButtonShape.RECTANGLE,
                         headerIconShape = AzHeaderIconShape.ROUNDED,
                         translucentBackground = Color.Transparent
@@ -1639,7 +1642,8 @@ class MainActivity : ComponentActivity() {
             azRailItem(
                 id = "item.open",
                 text = navStrings.open,
-                color = if (isDesignMode) Cyan else navItemColor,
+                color = navItemColor,
+                classifiers = setOf("toggle"),
                 onClick = {
                     if (editorUiState.projectId == null) dashboardViewModel.createAndOpenProject()
                     overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -1677,7 +1681,8 @@ class MainActivity : ComponentActivity() {
                         id = "target.create",
                         hostId = "mode.ar",
                         text = navStrings.grid,
-                        color = if (isWaitingForTap) Cyan else navItemColor,
+                        color = navItemColor,
+                        classifiers = setOf("toggle"),
                         shape = AzButtonShape.NONE
                     ) {
                         if (isWaitingForTap) {
@@ -1689,14 +1694,10 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     // Flashlight — illuminate the wall in low light while tracking.
-                    azRailSubItem(id = "mode.ar.light", hostId = "mode.ar", text = navStrings.light, color = if (arUiState.isFlashlightOn) Cyan else navItemColor, shape = AzButtonShape.NONE) {
+                    azRailSubItem(id = "mode.ar.light", hostId = "mode.ar", text = navStrings.light, color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE) {
                         arViewModel.toggleFlashlight()
                     }
-                    // Lock — pin the whole-design position for this mode. The reducer already
-                    // ignores pan/zoom/rotate gestures when isTransformLocked is true; this button
-                    // is the toggle. Cyan when engaged (matches Freeze / Light).
-                    val arLocked = editorUiState.modeAdjustments[EditorMode.AR]?.isTransformLocked == true
-                    azRailSubItem(id = "mode.ar.lock", hostId = "mode.ar", text = "Lock", color = if (arLocked) Cyan else navItemColor, shape = AzButtonShape.NONE) {
+                    azRailSubItem(id = "mode.ar.lock", hostId = "mode.ar", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE) {
                         editorViewModel.onToggleModeTransformLocked(EditorMode.AR)
                     }
                     // Magic — fit the design to the established anchor's extent (falling back to a
@@ -1708,25 +1709,21 @@ class MainActivity : ComponentActivity() {
                     }
                     // Co-op ▸ { Host, Join, Leave } — share this AR coordinate system with a nearby peer.
                     azRailSubHostItem(id = "coop", hostId = "mode.ar", text = navStrings.coop, color = navItemColor, shape = AzButtonShape.NONE)
-                    val canHost = arUiState.isAnchorEstablished && arUiState.splatCount > 0
-                    val isHosting = arUiState.coopRole == CoopRole.HOST
-                    val isGuest = arUiState.coopRole == CoopRole.GUEST
                     azRailSubItem(
                         id = "coop.host", hostId = "coop", text = navStrings.hostCoop,
-                        color = if (isHosting) Cyan else if (canHost) navItemColor else Color.Gray,
-                        shape = AzButtonShape.NONE
+                        color = navItemColor,
+                        classifiers = setOf("toggle"),
+                        shape = AzButtonShape.NONE,
+                        disabled = !(arUiState.isAnchorEstablished && arUiState.splatCount > 0) &&
+                            arUiState.coopRole != CoopRole.HOST
                     ) {
-                        // canHost still drives the colour, but the tap is no longer swallowed when it
-                        // is false: startHosting() re-checks the anchor (and that a project is open)
-                        // and explains which one is missing, rather than the button doing nothing.
-                        if (!isHosting) arViewModel.startHosting()
+                        if (arUiState.coopRole != CoopRole.HOST) arViewModel.startHosting()
                     }
                     azRailSubItem(
                         id = "coop.join", hostId = "coop", text = navStrings.joinCoop,
-                        color = if (isGuest) Cyan else navItemColor, shape = AzButtonShape.NONE
+                        color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE
                     ) {
-                        // Joining scans the host's QR, so the camera must be granted first.
-                        if (!isGuest) {
+                        if (arUiState.coopRole != CoopRole.GUEST) {
                             if (hasCameraPermission) onShowJoinScanner() else requestPermissions()
                         }
                     }
@@ -1741,11 +1738,10 @@ class MainActivity : ComponentActivity() {
             azRailSubHostItem(id = "mode.overlay", hostId = "host.modes", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.RECTANGLE)
             // Flashlight — illuminate the wall in low light while overlaying.
             if (editorUiState.editorMode == EditorMode.OVERLAY) {
-                azRailSubItem(id = "mode.overlay.light", hostId = "mode.overlay", text = navStrings.light, color = if (arUiState.isFlashlightOn) Cyan else navItemColor, shape = AzButtonShape.NONE) {
+                azRailSubItem(id = "mode.overlay.light", hostId = "mode.overlay", text = navStrings.light, color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE) {
                     arViewModel.toggleFlashlight()
                 }
-                val overlayLocked = editorUiState.modeAdjustments[EditorMode.OVERLAY]?.isTransformLocked == true
-                azRailSubItem(id = "mode.overlay.lock", hostId = "mode.overlay", text = "Lock", color = if (overlayLocked) Cyan else navItemColor, shape = AzButtonShape.NONE) {
+                azRailSubItem(id = "mode.overlay.lock", hostId = "mode.overlay", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE) {
                     editorViewModel.onToggleModeTransformLocked(EditorMode.OVERLAY)
                 }
             }
@@ -1771,8 +1767,7 @@ class MainActivity : ComponentActivity() {
                         editorViewModel.clearBackgroundImage()
                     }
                 }
-                val mockupLocked = editorUiState.modeAdjustments[EditorMode.MOCKUP]?.isTransformLocked == true
-                azRailSubItem(id = "mode.mockup.lock", hostId = "mode.mockup", text = "Lock", color = if (mockupLocked) Cyan else navItemColor, shape = AzButtonShape.NONE) {
+                azRailSubItem(id = "mode.mockup.lock", hostId = "mode.mockup", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE) {
                     editorViewModel.onToggleModeTransformLocked(EditorMode.MOCKUP)
                 }
             }
@@ -1780,11 +1775,10 @@ class MainActivity : ComponentActivity() {
             // Trace ▸ { Freeze, Lock } — same mode gating as the others.
             azRailSubHostItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.RECTANGLE)
             if (editorUiState.editorMode == EditorMode.TRACE) {
-                azRailSubItem(id = "mode.trace.freeze", hostId = "mode.trace", text = "Freeze", color = if (isTouchLocked) Cyan else navItemColor, shape = AzButtonShape.NONE) {
+                azRailSubItem(id = "mode.trace.freeze", hostId = "mode.trace", text = "Freeze", color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE) {
                     mainViewModel.setTouchLocked(!isTouchLocked)
                 }
-                val traceLocked = editorUiState.modeAdjustments[EditorMode.TRACE]?.isTransformLocked == true
-                azRailSubItem(id = "mode.trace.lock", hostId = "mode.trace", text = "Lock", color = if (traceLocked) Cyan else navItemColor, shape = AzButtonShape.NONE) {
+                azRailSubItem(id = "mode.trace.lock", hostId = "mode.trace", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE) {
                     editorViewModel.onToggleModeTransformLocked(EditorMode.TRACE)
                 }
             }
@@ -1805,33 +1799,27 @@ class MainActivity : ComponentActivity() {
             )
             azRailSubItem(
                 id = "design.adjust", hostId = "host.design", text = navStrings.adjust,
-                color = if (editorUiState.activePanel == EditorPanel.ADJUST) Cyan else navItemColor,
+                color = navItemColor, classifiers = setOf("toggle", "panel"),
                 shape = AzButtonShape.NONE,
             ) { editorViewModel.onAdjustClicked() }
             azRailSubItem(
                 id = "design.balance", hostId = "host.design", text = navStrings.balance,
-                color = if (editorUiState.activePanel == EditorPanel.COLOR) Cyan else navItemColor,
+                color = navItemColor, classifiers = setOf("toggle", "panel"),
                 shape = AzButtonShape.NONE,
             ) { editorViewModel.onBalanceClicked() }
-            run {
-                val activeInverted = editorUiState.design?.isInverted == true
-                azRailSubItem(
-                    id = "design.invert", hostId = "host.design", text = navStrings.invert,
-                    color = if (activeInverted) Cyan else navItemColor, shape = AzButtonShape.NONE,
-                ) { editorViewModel.onToggleInvert() }
-            }
-            // Outline and Isolate sit here with Invert because they are the same kind of thing: what
-            // the design LOOKS like, as opposed to where it sits. Unlike Invert they re-render the
-            // bitmap, but they are equally reversible — the untouched import is kept and both are
-            // re-derived from it, so turning one off returns the original exactly.
+            azRailSubItem(
+                id = "design.invert", hostId = "host.design", text = navStrings.invert,
+                color = navItemColor, classifiers = setOf("toggle", "effect"),
+                shape = AzButtonShape.NONE,
+            ) { editorViewModel.onToggleInvert() }
             azRailSubItem(
                 id = "design.outline", hostId = "host.design", text = navStrings.outline,
-                color = if (editorUiState.design?.isSketch == true) Cyan else navItemColor,
+                color = navItemColor, classifiers = setOf("toggle", "effect"),
                 shape = AzButtonShape.NONE,
             ) { editorViewModel.onToggleOutline() }
             azRailSubItem(
                 id = "design.isolate", hostId = "host.design", text = navStrings.isolate,
-                color = if (editorUiState.design?.isSubjectIsolated == true) Cyan else navItemColor,
+                color = navItemColor, classifiers = setOf("toggle", "effect"),
                 shape = AzButtonShape.NONE,
             ) { editorViewModel.onToggleSubjectIsolation() }
 
@@ -1875,6 +1863,44 @@ class MainActivity : ComponentActivity() {
                 text = navStrings.help,
                 color = navItemColor,
             )
+
+            // ── Post-hoc decorators ────────────────────────────────────────────
+            // State-driven highlights live here instead of inline on each item.
+            // azHighlight overrides the item's registered color; items whose
+            // condition is false keep their registration colour (navItemColor).
+
+            if (isDesignMode) azHighlight("item.open", active = Cyan)
+            if (editorUiState.editorMode == EditorMode.AR) {
+                if (isWaitingForTap) azHighlight("target.create", active = Cyan)
+                if (arUiState.isFlashlightOn) azHighlight("mode.ar.light", active = Cyan)
+                if (editorUiState.modeAdjustments[EditorMode.AR]?.isTransformLocked == true)
+                    azHighlight("mode.ar.lock", active = Cyan)
+                if (arUiState.coopRole == CoopRole.HOST) azHighlight("coop.host", active = Cyan)
+                if (arUiState.coopRole == CoopRole.GUEST) azHighlight("coop.join", active = Cyan)
+            }
+            if (editorUiState.editorMode == EditorMode.OVERLAY) {
+                if (arUiState.isFlashlightOn) azHighlight("mode.overlay.light", active = Cyan)
+                if (editorUiState.modeAdjustments[EditorMode.OVERLAY]?.isTransformLocked == true)
+                    azHighlight("mode.overlay.lock", active = Cyan)
+            }
+            if (editorUiState.editorMode == EditorMode.MOCKUP) {
+                if (editorUiState.modeAdjustments[EditorMode.MOCKUP]?.isTransformLocked == true)
+                    azHighlight("mode.mockup.lock", active = Cyan)
+            }
+            if (editorUiState.editorMode == EditorMode.TRACE) {
+                if (isTouchLocked) azHighlight("mode.trace.freeze", active = Cyan)
+                if (editorUiState.modeAdjustments[EditorMode.TRACE]?.isTransformLocked == true)
+                    azHighlight("mode.trace.lock", active = Cyan)
+            }
+            if (editorUiState.activePanel == EditorPanel.ADJUST) azHighlight("design.adjust", active = Cyan)
+            if (editorUiState.activePanel == EditorPanel.COLOR) azHighlight("design.balance", active = Cyan)
+            if (editorUiState.design?.isInverted == true) azHighlight("design.invert", active = Cyan)
+            if (editorUiState.design?.isSketch == true) azHighlight("design.outline", active = Cyan)
+            if (editorUiState.design?.isSubjectIsolated == true) azHighlight("design.isolate", active = Cyan)
+
+            // State badges: surface important conditions as rail-item alerts.
+            if (arUiState.guestEditWasDropped) azItemState("coop", alert = AzItemAlert.NOTICE)
+            if (arUiState.trackingFailed) azItemState("mode.ar", alert = AzItemAlert.WARNING)
         }
     }
 }

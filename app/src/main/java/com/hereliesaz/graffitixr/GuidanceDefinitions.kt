@@ -27,6 +27,22 @@ internal val GUIDANCE_HIGHLIGHT_IDS =
     setOf("item.open", "mockup.wall", "target.create")
 
 /**
+ * Rail-item ids addressed by [azHighlight] and [azItemState] post-hoc decorators in
+ * [ConfigureRailItems]. Validated by [RailIntegrityCheck] so a renamed item is caught at debug time
+ * rather than silently losing its highlight or badge.
+ */
+internal val DECORATED_IDS = setOf(
+    "item.open",
+    "target.create", "mode.ar.light", "mode.ar.lock",
+    "coop", "coop.host", "coop.join",
+    "mode.ar",
+    "mode.overlay.light", "mode.overlay.lock",
+    "mode.mockup.lock",
+    "mode.trace.freeze", "mode.trace.lock",
+    "design.adjust", "design.balance", "design.invert", "design.outline", "design.isolate",
+)
+
+/**
  * Declares the reactive status-driven guidance graph (AzNavRail 10.18) that replaces the old
  * hand-built adaptive coach and the removed scripted-tutorial API. The graph reproduces
  * `rememberCoachStep`'s behaviour one-to-one:

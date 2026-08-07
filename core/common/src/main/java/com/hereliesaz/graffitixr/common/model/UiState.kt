@@ -236,6 +236,15 @@ data class ArUiState(
     // pipelines are stuck and the main thread is starved.
     val trackingFailed: Boolean = false,
 
+    /**
+     * Sticky for the session once a guest edit has been dropped — the co-op protocol is
+     * host-broadcast, so a guest's own edits never reach anyone. The one-shot toast
+     * ([ArViewModel.observeDroppedGuestEdits]) explains this the first time it happens; this field
+     * keeps a NOTICE badge on the co-op rail item after the toast is gone, since a toast is easy to
+     * miss mid-gesture and the badge is the durable record that it happened this session.
+     */
+    val guestEditWasDropped: Boolean = false,
+
     val evalLiveMetrics: EvalLiveMetrics = EvalLiveMetrics(),
 
     // Live relocalization state: locked, or which gate the last attempt missed. Surfaced by the
