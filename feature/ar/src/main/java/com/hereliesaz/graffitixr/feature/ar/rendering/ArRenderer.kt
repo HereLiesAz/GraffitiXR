@@ -461,7 +461,17 @@ class ArRenderer(
     // next computed, to capture [overlayRotationCorrection] against that frame's rotation. Deferred
     // because anchorMatrix (the consensus/fused pose) isn't available yet inside the establishment
     // block itself — it's computed later in the same frame.
+    //
+    // NOT unconditionally consumed on the first attempt: the freshly-created anchor may not have
+    // reached TrackingState.TRACKING yet on this exact frame, in which case anchorMatrix is
+    // AnchorOrchestrator's no-tracking-anchor fallback (a PREVIOUS anchor's lastGoodMatrix, or
+    // identity) rather than this anchor's own pose — see the validation where this flag is consumed.
     private var overlayRotationCorrectionPending: Boolean = false
+    // How many consecutive frames [overlayRotationCorrectionPending] has been retried because the
+    // candidate correction failed validation. Reset whenever a NEW establishment arms the pending
+    // flag, and again once a candidate is accepted. Capped by MAX_OVERLAY_CORRECTION_RETRY_FRAMES so
+    // an anchor that never starts tracking doesn't leave the flag pending for the rest of the session.
+    private var overlayRotationCorrectionRetryFrames: Int = 0
 
     /**
      * One-time rotation correction, computed the instant an anchor is established and never touched
@@ -489,6 +499,12 @@ class ArRenderer(
     private val overlayTargetBasisScratch = FloatArray(16)
     private val overlayRotScratch = FloatArray(16)
     private val overlayRotScratch2 = FloatArray(16)
+    // Trial correction, built fresh each attempt while [overlayRotationCorrectionPending] is set.
+    // Kept separate from [overlayRotationCorrection] (the LIVE value overlayDraw reads every frame)
+    // so a failed validation this attempt cannot clobber whatever the previous good value was —
+    // identity, on the very first attempt, which matches "use the raw anchor frame" for the frames
+    // spent retrying.
+    private val overlayRotationCorrectionCandidate = FloatArray(16)
 
     @Volatile var exportRequested: Boolean = false
     var onExportCaptured: ((Bitmap) -> Unit)? = null
@@ -1148,7 +1164,13 @@ class ArRenderer(
                     camera.getViewMatrix(viewMat, 0)
                     
                     val hitX = 0.5f; val hitY = 0.5f
-                    val hits = frame.hitTest(hitX * context.resources.displayMetrics.widthPixels.toFloat(), hitY * context.resources.displayMetrics.heightPixels.toFloat())
+                    // Frame.hitTest expects coordinates in the space passed to
+                    // Session.setDisplayGeometry — the GLSurfaceView's actual size (surfaceWidth/
+                    // surfaceHeight, set in onSurfaceChanged) — NOT android.resources.displayMetrics,
+                    // which is a different quantity (e.g. under multi-window, different DPI scaling
+                    // paths, or a GL surface that isn't full-screen). This only "worked" before because
+                    // hitX/hitY are both 0.5 (screen center), where both coordinate spaces agree.
+                    val hits = frame.hitTest(hitX * surfaceWidth.toFloat(), hitY * surfaceHeight.toFloat())
                     
                     var anchorModelMatrix = FloatArray(16)
                     android.opengl.Matrix.setIdentityM(anchorModelMatrix, 0)
@@ -1293,6 +1315,15 @@ class ArRenderer(
                         }
                     }
                     setPrimaryAnchor(anchor) // non-null: the fallback branch always creates one
+                    // A new anchor/fingerprint reference point exists now. PoseFusion's standing
+                    // `correction` was solved against the OLD anchor's drift (if this is a re-capture
+                    // within the same session, not the session's first anchor) and is now WRONG, not
+                    // merely stale — applying it to the NEW anchor's pose would offset the overlay and
+                    // only ease back out over many relock cycles. markRelocalizing() (called below on
+                    // tracking loss) deliberately does NOT clear it, because a plain tracking loss is a
+                    // different event from the anchor itself changing. Reset unconditionally; a no-op
+                    // on the session's first anchor, since correction starts null anyway.
+                    poseFusion.reset()
                     anchorEstablished = true
                     // Announce it beyond the GL thread. This is the ONLY anchor write that counts as
                     // establishment — the plane refiner and the depth fallback both write poses
@@ -1482,7 +1513,7 @@ class ArRenderer(
                     var yX = upX - dot * nx; var yY = upY - dot * ny; var yZ = upZ - dot * nz
                     var yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
                     if (yLen <= 1e-4f) {
-                        upX = viewMatrix[2]; upY = viewMatrix[6]; upZ = viewMatrix[10] // camera forward
+                        upX = viewMatrix[2]; upY = viewMatrix[6]; upZ = viewMatrix[10] // camera backward (GL/ARCore look down -Z)
                         dot = upX * nx + upY * ny + upZ * nz
                         yX = upX - dot * nx; yY = upY - dot * ny; yZ = upZ - dot * nz
                         yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)

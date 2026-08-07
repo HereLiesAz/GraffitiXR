@@ -707,6 +707,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
     // wraps the descriptor blob (valid OpenCV type + 64-bit overflow-safe size check), and only pass
     // anchor/intrinsics when correctly sized (native copies a fixed 16 / 4 floats and tolerates null),
     // else leave the native defaults.
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !descArray || !ptsArray) return;
     if (rows < 0 || cols < 0) return;
     int depth = CV_MAT_DEPTH(type);
@@ -742,7 +743,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
                  (int)regLen, points3d.size());
         }
     }
-    gSlamEngine->restoreWallFingerprintMetric(descriptors, points3d, anchor, intr, view, regions);
+    try {
+        gSlamEngine->restoreWallFingerprintMetric(descriptors, points3d, anchor, intr, view, regions);
+    } catch (const std::exception& e) {
+        LOGE("nativeRestoreWallFingerprintMetric: exception: %s", e.what());
+    } catch (...) {
+        LOGE("nativeRestoreWallFingerprintMetric: unknown exception");
+    }
     env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
     env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
     if (anchor) env->ReleaseFloatArrayElements(anchorArray, anchor, JNI_ABORT);
@@ -764,6 +771,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFeature
     // 64-bit (a jsize/jint product here would let a hostile rows*cols overflow past the check and
     // wrap a tiny buffer in a huge cv::Mat -> OOB read), and parallel arrays of matching length.
     // Mirrors nativeRestoreWallFingerprint / nativeRestoreWallFingerprintMetric above.
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !descArray || !ptsArray) return;
     if (rows < 0 || cols < 0) return;
     int depth = CV_MAT_DEPTH(type);
@@ -802,7 +810,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFeature
     jfloat* anchor = (anchorArray && env->GetArrayLength(anchorArray) == 16) ? env->GetFloatArrayElements(anchorArray, nullptr) : nullptr;
     jfloat* intr   = (intrArray && env->GetArrayLength(intrArray) == 4)    ? env->GetFloatArrayElements(intrArray, nullptr)   : nullptr;
 
-    gSlamEngine->restoreWallFeatureMap(descriptors, points3d, conf, obs, anchor, intr);
+    try {
+        gSlamEngine->restoreWallFeatureMap(descriptors, points3d, conf, obs, anchor, intr);
+    } catch (const std::exception& e) {
+        LOGE("nativeRestoreWallFeatureMap: exception: %s", e.what());
+    } catch (...) {
+        LOGE("nativeRestoreWallFeatureMap: unknown exception");
+    }
 
     env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
     env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
@@ -812,31 +826,37 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFeature
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearWallFeatureMap(JNIEnv*, jobject) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->clearWallFeatureMap();
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearWallFingerprint(JNIEnv*, jobject) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->clearWallFingerprint();
 }
 
 JNIEXPORT jint JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetMapPointCount(JNIEnv*, jobject) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     return gSlamEngine ? gSlamEngine->getMapPointCount() : 0;
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMapRelocEnabled(JNIEnv*, jobject, jboolean enabled) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setMapRelocEnabled(enabled == JNI_TRUE);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMapBuildEnabled(JNIEnv*, jobject, jboolean enabled) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setMapBuildEnabled(enabled == JNI_TRUE);
 }
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportWallFeatureMap(JNIEnv* env, jobject) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
     std::vector<uint8_t> blob = gSlamEngine->exportWallFeatureMap();
     if (blob.empty()) return nullptr;
@@ -939,6 +959,7 @@ JNIEXPORT jobject JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallFingerprint(
         JNIEnv* env, jobject thiz, jobject bitmap, jobject mask, jobject depthBuffer, jint depthW, jint depthH, jint depthStride, jfloatArray intrArray, jfloatArray viewMatArray) {
 
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
     // generateFingerprint dereferences intr[0..3] and viewMat[0..15] unconditionally (unlike the
     // optional-pointer restore paths above), so a null or short array here is an OOB read past
@@ -957,7 +978,14 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallFingerprint
     jfloat* intr = env->GetFloatArrayElements(intrArray, nullptr);
     jfloat* view = env->GetFloatArrayElements(viewMatArray, nullptr);
 
-    MobileGS::FingerprintData fd = gSlamEngine->generateFingerprint(image, maskMat, depthData, depthW, depthH, depthStride, intr, view);
+    MobileGS::FingerprintData fd;
+    try {
+        fd = gSlamEngine->generateFingerprint(image, maskMat, depthData, depthW, depthH, depthStride, intr, view);
+    } catch (const std::exception& e) {
+        LOGE("nativeSetWallFingerprint: exception: %s", e.what());
+    } catch (...) {
+        LOGE("nativeSetWallFingerprint: unknown exception");
+    }
 
     env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
     env->ReleaseFloatArrayElements(viewMatArray, view, JNI_ABORT);
