@@ -457,16 +457,38 @@ class ArRenderer(
     // (x,y,z); zero-length until an anchor is established, in which case the raw anchor frame is used.
     private val anchorSurfaceNormal = FloatArray(3)
 
-    // World-space camera up/forward axes, captured ONCE at anchor establishment for use ONLY when
-    // world-up (0,1,0) is unusable to build the overlay's in-plane frame (surface ~horizontal, or the
-    // rare edge-on-horizontal case). overlayDraw used to read the LIVE camera axes (viewMatrix rows)
-    // for this every frame, which quietly turned those two cases into a billboard: since the surface
-    // normal is fixed but the disambiguating "up" tracked the live camera, rolling/tilting the phone
-    // spun the artwork on-screen in lockstep with the tilt — "the image spins around the wall-normal
-    // needle exactly when and how my phone does". Freezing these at establishment, like
-    // [anchorSurfaceNormal] already is, makes the whole in-plane frame world-fixed again.
-    private val anchorFallbackUp = floatArrayOf(0f, 1f, 0f)
-    private val anchorFallbackForward = floatArrayOf(0f, 0f, 1f)
+    // Set true the frame an anchor is established; consumed (and cleared) the moment anchorMatrix is
+    // next computed, to capture [overlayRotationCorrection] against that frame's rotation. Deferred
+    // because anchorMatrix (the consensus/fused pose) isn't available yet inside the establishment
+    // block itself — it's computed later in the same frame.
+    private var overlayRotationCorrectionPending: Boolean = false
+
+    /**
+     * One-time rotation correction, computed the instant an anchor is established and never touched
+     * again until the next one. ARCore tracks and drift-corrects an anchor's pose continuously, and
+     * once a fingerprint exists PoseFusion refines it further — that rotation is already the
+     * correctly-tracked orientation ARCore/the consensus system produced; this app's only real job is
+     * choosing which way is "up, facing the user" for the artwork, which is a one-time framing
+     * decision, not something that needs re-solving every frame.
+     *
+     * overlayDraw composes this with the LIVE anchorMatrix rotation (correction * liveRotation) rather
+     * than rebuilding the in-plane frame from scratch each frame, so ARCore's/PoseFusion's ongoing
+     * corrections keep flowing into the artwork's orientation instead of being frozen out of it. That
+     * rebuild-every-frame approach is also what caused the artwork to visibly spin in sync with phone
+     * tilt on near-horizontal anchors: the disambiguating "up" vector it fell back on was read from
+     * the live camera each frame instead of fixed once.
+     *
+     * 4x4 column-major, rotation only (zero translation); identity until an anchor is established.
+     */
+    private val overlayRotationCorrection = floatArrayOf(
+        1f, 0f, 0f, 0f,
+        0f, 1f, 0f, 0f,
+        0f, 0f, 1f, 0f,
+        0f, 0f, 0f, 1f,
+    )
+    private val overlayTargetBasisScratch = FloatArray(16)
+    private val overlayRotScratch = FloatArray(16)
+    private val overlayRotScratch2 = FloatArray(16)
 
     @Volatile var exportRequested: Boolean = false
     var onExportCaptured: ((Bitmap) -> Unit)? = null
@@ -1240,17 +1262,9 @@ class ArRenderer(
                     } else {
                         anchorSurfaceNormal[0] = 0f; anchorSurfaceNormal[1] = 0f; anchorSurfaceNormal[2] = 0f
                     }
-                    // Freeze this frame's camera up/forward as the fallback disambiguation axes (see
-                    // the field comment) — a one-time snapshot, not the live camera read overlayDraw
-                    // used to take every frame.
-                    run {
-                        val upAxis = FloatArray(3)
-                        camPose.getTransformedAxis(1, 1f, upAxis, 0)
-                        anchorFallbackUp[0] = upAxis[0]; anchorFallbackUp[1] = upAxis[1]; anchorFallbackUp[2] = upAxis[2]
-                        val fwdAxis = FloatArray(3)
-                        camPose.getTransformedAxis(2, 1f, fwdAxis, 0)
-                        anchorFallbackForward[0] = fwdAxis[0]; anchorFallbackForward[1] = fwdAxis[1]; anchorFallbackForward[2] = fwdAxis[2]
-                    }
+                    // [overlayRotationCorrection] can't be computed here — it needs anchorMatrix (the
+                    // consensus/fused pose), which isn't built until later this same frame. Defer.
+                    overlayRotationCorrectionPending = true
                     slamManager.updateAnchorTransform(anchorModelMatrix)
                     // Doodle demo: publish the wall plane (anchor point + surface normal) so the
                     // ViewModel can build a fingerprint from the drawing and relocalize against it.
@@ -1446,6 +1460,54 @@ class ArRenderer(
                     confGlobal = slamManager.getCorroborationConfidence().coerceAtLeast(0f),
                 )
             } else backbone
+
+            // Capture [overlayRotationCorrection] the first frame anchorMatrix exists after
+            // establishment — at this point getConsensusMatrix has exactly one vote (setInitialAnchor
+            // always seeds a fresh single anchor), so anchorMatrix's rotation IS still just the
+            // freshly-created anchor's own pose. Define the correction relative to THAT, once: no
+            // assumption needed about what convention createAnchor used internally, since this reads
+            // back whatever the tracking/consensus pipeline actually reports.
+            if (overlayRotationCorrectionPending) {
+                overlayRotationCorrectionPending = false
+                val nx = anchorSurfaceNormal[0]; val ny = anchorSurfaceNormal[1]; val nz = anchorSurfaceNormal[2]
+                android.opengl.Matrix.setIdentityM(overlayRotationCorrection, 0)
+                if (nx != 0f || ny != 0f || nz != 0f) {
+                    // Pick an up reference that isn't parallel to the normal — same choice overlayDraw
+                    // used to remake every frame, made here exactly once.
+                    var upX = 0f; var upY = 1f; var upZ = 0f
+                    if (kotlin.math.abs(ny) > 0.95f) {
+                        upX = viewMatrix[1]; upY = viewMatrix[5]; upZ = viewMatrix[9] // camera up
+                    }
+                    var dot = upX * nx + upY * ny + upZ * nz
+                    var yX = upX - dot * nx; var yY = upY - dot * ny; var yZ = upZ - dot * nz
+                    var yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
+                    if (yLen <= 1e-4f) {
+                        upX = viewMatrix[2]; upY = viewMatrix[6]; upZ = viewMatrix[10] // camera forward
+                        dot = upX * nx + upY * ny + upZ * nz
+                        yX = upX - dot * nx; yY = upY - dot * ny; yZ = upZ - dot * nz
+                        yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
+                    }
+                    if (yLen > 1e-4f) {
+                        yX /= yLen; yY /= yLen; yZ /= yLen
+                        // +X = +Y × +Z (right-handed: width axis, horizontal across the surface).
+                        val xX = yY * nz - yZ * ny
+                        val xY = yZ * nx - yX * nz
+                        val xZ = yX * ny - yY * nx
+                        android.opengl.Matrix.setIdentityM(overlayTargetBasisScratch, 0)
+                        overlayTargetBasisScratch[0] = xX; overlayTargetBasisScratch[1] = xY; overlayTargetBasisScratch[2] = xZ
+                        overlayTargetBasisScratch[4] = yX; overlayTargetBasisScratch[5] = yY; overlayTargetBasisScratch[6] = yZ
+                        overlayTargetBasisScratch[8] = nx; overlayTargetBasisScratch[9] = ny; overlayTargetBasisScratch[10] = nz
+
+                        // correction = targetBasis * nativeRotation⁻¹ (transpose: rotations are
+                        // orthonormal). Composing this with anchorMatrix's rotation every frame
+                        // (overlayDraw) then reproduces targetBasis right now and tracks from there.
+                        System.arraycopy(anchorMatrix, 0, overlayRotScratch, 0, 16)
+                        overlayRotScratch[12] = 0f; overlayRotScratch[13] = 0f; overlayRotScratch[14] = 0f
+                        android.opengl.Matrix.transposeM(overlayRotScratch2, 0, overlayRotScratch, 0)
+                        android.opengl.Matrix.multiplyMM(overlayRotationCorrection, 0, overlayTargetBasisScratch, 0, overlayRotScratch2, 0)
+                    }
+                }
+            }
 
             // First-run doodle demo: feed the anchor's world translation to the lock tracker while the
             // overlay holds. Once it has held steady past the min-draw dwell, fire the swap once.
@@ -2032,59 +2094,25 @@ class ArRenderer(
             val hasMeshData = false
 
             lastStep = "overlayDraw"
-            // Base overlay frame: ALWAYS lay the artwork FLAT against the selected surface and facing
-            // the user, for every anchor type. The quad's surface normal is its local +Z, so build an
-            // orthonormal frame at the live anchor position whose +Z = the captured surface normal
-            // (already oriented toward the camera). +Y = world-up projected ⟂ to +Z so the artwork is
-            // upright; +X = +Y × +Z (= width, horizontal). If the surface is near-horizontal (normal
-            // ≈ world-up, e.g. floor/ceiling) world-up is degenerate, so fall back to the camera's up
-            // AS CAPTURED AT ESTABLISHMENT ([anchorFallbackUp]) — not the live camera. Reading the live
-            // camera here rotated the artwork in lockstep with every phone tilt/roll on these surfaces.
-            // A zero stored normal (no anchor yet) leaves the raw anchor frame.
+            // Base overlay frame: the anchor's LIVE rotation (already tracked/drift-corrected by
+            // ARCore, and once fusion has a fingerprint, further refined by PoseFusion) with the
+            // one-time [overlayRotationCorrection] composed on top — see that field's comment. Nothing
+            // gets rebuilt from scratch here; ARCore/the consensus system keep doing the tracking.
+            // A zero stored normal (no anchor yet) leaves the raw anchor frame, uncorrected.
             System.arraycopy(anchorMatrix, 0, overlayBaseScratch, 0, 16)
-            run {
-                // Clear any stale normal on the GL thread once the anchor is gone (reset/rescan), so a
-                // later preview/draw can't reuse the previous anchor's orientation. A zero normal makes
-                // the block below fall through to the raw anchor frame.
-                if (!anchorEstablished) {
-                    anchorSurfaceNormal[0] = 0f; anchorSurfaceNormal[1] = 0f; anchorSurfaceNormal[2] = 0f
-                }
-                val nx = anchorSurfaceNormal[0]; val ny = anchorSurfaceNormal[1]; val nz = anchorSurfaceNormal[2]
-                if (nx != 0f || ny != 0f || nz != 0f) {
-                    // Pick an up reference that isn't parallel to the normal.
-                    var upX = 0f; var upY = 1f; var upZ = 0f
-                    if (kotlin.math.abs(ny) > 0.95f) {
-                        // Surface ≈ horizontal: world-up ∥ normal is unusable. Use the camera's up as
-                        // captured at anchor establishment — frozen, so it doesn't track the live
-                        // camera and spin the artwork as the phone tilts.
-                        upX = anchorFallbackUp[0]; upY = anchorFallbackUp[1]; upZ = anchorFallbackUp[2]
-                    }
-                    // +Y = up projected onto the plane ⟂ to the normal, normalized.
-                    val dot = upX * nx + upY * ny + upZ * nz
-                    var yX = upX - dot * nx; var yY = upY - dot * ny; var yZ = upZ - dot * nz
-                    var yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
-                    if (yLen <= 1e-4f) {
-                        // Up reference parallel to the normal (e.g. a level camera edge-on to a
-                        // horizontal surface): fall back to the camera's forward axis, also frozen at
-                        // establishment, so the in-plane frame is still well-defined instead of
-                        // reverting to raw — and still doesn't track the live camera.
-                        upX = anchorFallbackForward[0]; upY = anchorFallbackForward[1]; upZ = anchorFallbackForward[2]
-                        val dot2 = upX * nx + upY * ny + upZ * nz
-                        yX = upX - dot2 * nx; yY = upY - dot2 * ny; yZ = upZ - dot2 * nz
-                        yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
-                    }
-                    if (yLen > 1e-4f) {
-                        yX /= yLen; yY /= yLen; yZ /= yLen
-                        // +X = +Y × +Z (right-handed: width axis, horizontal across the surface).
-                        val xX = yY * nz - yZ * ny
-                        val xY = yZ * nx - yX * nz
-                        val xZ = yX * ny - yY * nx
-                        overlayBaseScratch[0] = xX; overlayBaseScratch[1] = xY; overlayBaseScratch[2] = xZ;  overlayBaseScratch[3] = 0f
-                        overlayBaseScratch[4] = yX; overlayBaseScratch[5] = yY; overlayBaseScratch[6] = yZ;  overlayBaseScratch[7] = 0f
-                        overlayBaseScratch[8] = nx; overlayBaseScratch[9] = ny; overlayBaseScratch[10] = nz; overlayBaseScratch[11] = 0f
-                        // Translation stays the live anchor position (cols 12-14 already copied above).
-                    }
-                }
+            // Clear any stale normal on the GL thread once the anchor is gone (reset/rescan), so a
+            // later preview/draw can't reuse the previous anchor's orientation.
+            if (!anchorEstablished) {
+                anchorSurfaceNormal[0] = 0f; anchorSurfaceNormal[1] = 0f; anchorSurfaceNormal[2] = 0f
+            }
+            if (anchorSurfaceNormal[0] != 0f || anchorSurfaceNormal[1] != 0f || anchorSurfaceNormal[2] != 0f) {
+                System.arraycopy(anchorMatrix, 0, overlayRotScratch, 0, 16)
+                overlayRotScratch[12] = 0f; overlayRotScratch[13] = 0f; overlayRotScratch[14] = 0f
+                android.opengl.Matrix.multiplyMM(overlayRotScratch2, 0, overlayRotationCorrection, 0, overlayRotScratch, 0)
+                overlayBaseScratch[0] = overlayRotScratch2[0]; overlayBaseScratch[1] = overlayRotScratch2[1]; overlayBaseScratch[2] = overlayRotScratch2[2]
+                overlayBaseScratch[4] = overlayRotScratch2[4]; overlayBaseScratch[5] = overlayRotScratch2[5]; overlayBaseScratch[6] = overlayRotScratch2[6]
+                overlayBaseScratch[8] = overlayRotScratch2[8]; overlayBaseScratch[9] = overlayRotScratch2[9]; overlayBaseScratch[10] = overlayRotScratch2[10]
+                // Translation stays the live anchor position (cols 12-14 already copied above).
             }
 
             // Center the overlay on the matched-marks centroid instead of the screen-center anchor.
