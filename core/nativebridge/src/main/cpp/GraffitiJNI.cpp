@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
+#include <exception>
 #include "include/MobileGS.h"
 
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "GraffitiJNI", __VA_ARGS__)
@@ -600,14 +601,23 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
     uint8_t* buffer = static_cast<uint8_t*>(env->GetDirectBufferAddress(colorBuffer));
     if (!buffer || !gSlamEngine) return;
 
-    cv::Mat frame(height, width, CV_8UC4, buffer);
-    cv::cvtColor(frame, gLastColorFrame, cv::COLOR_RGBA2RGB);
+    try {
+        cv::Mat frame(height, width, CV_8UC4, buffer);
+        cv::cvtColor(frame, gLastColorFrame, cv::COLOR_RGBA2RGB);
 
-    cv::Mat relocFrame = gLastColorFrame.clone();
-    if (cvRotateCode >= 0) {
-        cv::rotate(relocFrame, relocFrame, cvRotateCode);
+        cv::Mat relocFrame = gLastColorFrame.clone();
+        if (cvRotateCode >= 0) {
+            cv::rotate(relocFrame, relocFrame, cvRotateCode);
+        }
+        // In EVAL SYNC MODE, scheduleRelocCheck runs the reloc pass (solvePnPRansac and friends)
+        // inline on this thread rather than handing off to the background worker -- same exception
+        // hazard nativeFeedYuvFrame guards against.
+        gSlamEngine->scheduleRelocCheck(relocFrame);
+    } catch (const std::exception& e) {
+        LOGE("nativeFeedColorFrame: exception: %s", e.what());
+    } catch (...) {
+        LOGE("nativeFeedColorFrame: unknown exception");
     }
-    gSlamEngine->scheduleRelocCheck(relocFrame);
 }
 
 JNIEXPORT jboolean JNICALL
@@ -1000,13 +1010,20 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArtworkFingerpr
     // intr[0..3] / viewMat[0..15] unconditionally. Validate before touching either array.
     if (!intrArray || env->GetArrayLength(intrArray) < 4) return;
     if (!viewMatArray || env->GetArrayLength(viewMatArray) < 16) return;
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         cv::Mat composite;
         bitmapToMat(env, bitmap, composite);
         auto* depthData = static_cast<const uint8_t*>(env->GetDirectBufferAddress(depthBuffer));
         jfloat* intr = env->GetFloatArrayElements(intrArray, nullptr);
         jfloat* view = env->GetFloatArrayElements(viewMatArray, nullptr);
-        gSlamEngine->setArtworkFingerprint(composite, depthData, depthW, depthH, depthStride, intr, view);
+        try {
+            gSlamEngine->setArtworkFingerprint(composite, depthData, depthW, depthH, depthStride, intr, view);
+        } catch (const std::exception& e) {
+            LOGE("nativeSetArtworkFingerprint: exception: %s", e.what());
+        } catch (...) {
+            LOGE("nativeSetArtworkFingerprint: unknown exception");
+        }
         env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
         env->ReleaseFloatArrayElements(viewMatArray, view, JNI_ABORT);
     }
@@ -1015,6 +1032,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArtworkFingerpr
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
         JNIEnv* env, jobject thiz, jobject bitmap) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
     cv::Mat frame;
     bitmapToMat(env, bitmap, frame);
@@ -1031,8 +1049,14 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
         // Scoped lock so an exception from detectAndCompute can't leak the mutex
         // and permanently deadlock every other JNI entry point.
         std::lock_guard<std::mutex> lock(gSlamEngine->getMutex());
-        // Use consistent feature detection for visualization
-        cv::ORB::create(500)->detectAndCompute(gray, cv::noArray(), kps, descs);
+        try {
+            // Use consistent feature detection for visualization
+            cv::ORB::create(500)->detectAndCompute(gray, cv::noArray(), kps, descs);
+        } catch (const std::exception& e) {
+            LOGE("nativeAnnotateKeypoints: exception: %s", e.what());
+        } catch (...) {
+            LOGE("nativeAnnotateKeypoints: unknown exception");
+        }
     }
 
     // Convert frame to RGBA if it isn't already for drawing
@@ -1049,13 +1073,22 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
 JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDetectSuperPoint(
         JNIEnv* env, jobject thiz, jobject bitmap) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
     cv::Mat image; bitmapToMat(env, bitmap, image);
     if (image.empty()) return nullptr;
     std::vector<cv::KeyPoint> kps; cv::Mat descs;
     {
         std::lock_guard<std::mutex> lock(gSlamEngine->getMutex());
-        if (!gSlamEngine->getSuperPointFeatures(image, kps, descs)) return nullptr;
+        bool ok = false;
+        try {
+            ok = gSlamEngine->getSuperPointFeatures(image, kps, descs);
+        } catch (const std::exception& e) {
+            LOGE("nativeDetectSuperPoint: exception: %s", e.what());
+        } catch (...) {
+            LOGE("nativeDetectSuperPoint: unknown exception");
+        }
+        if (!ok) return nullptr;
     }
     const int n = (int)kps.size();
     const int d = descs.cols;
@@ -1076,6 +1109,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDetectSuperPoint(
 JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintKeypoints(
         JNIEnv* env, jobject thiz, jobject bitmap, jobject mask) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
     cv::Mat image; bitmapToMat(env, bitmap, image);
     if (image.empty()) return nullptr;
@@ -1084,7 +1118,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintKeyp
     std::vector<cv::Point2f> pts;
     {
         std::lock_guard<std::mutex> lock(gSlamEngine->getMutex());
-        gSlamEngine->getFingerprintKeypoints(image, maskMat, pts);
+        try {
+            gSlamEngine->getFingerprintKeypoints(image, maskMat, pts);
+        } catch (const std::exception& e) {
+            LOGE("nativeGetFingerprintKeypoints: exception: %s", e.what());
+        } catch (...) {
+            LOGE("nativeGetFingerprintKeypoints: unknown exception");
+        }
     }
     jfloatArray result = env->NewFloatArray((jsize)(pts.size() * 2));
     if (!result) return nullptr;
@@ -1098,6 +1138,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintKeyp
 JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetKeypoints(
         JNIEnv* env, jobject thiz, jobject bitmap) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
     cv::Mat frame;
     bitmapToMat(env, bitmap, frame);
@@ -1111,7 +1152,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetKeypoints(
     std::vector<cv::KeyPoint> kps;
     if (gSlamEngine) {
         std::lock_guard<std::mutex> lock(gSlamEngine->getMutex());
-        cv::ORB::create(500)->detect(gray, kps);
+        try {
+            cv::ORB::create(500)->detect(gray, kps);
+        } catch (const std::exception& e) {
+            LOGE("nativeGetKeypoints: exception: %s", e.what());
+        } catch (...) {
+            LOGE("nativeGetKeypoints: unknown exception");
+        }
     }
 
     jfloatArray result = env->NewFloatArray((jsize)(kps.size() * 2));
@@ -1132,6 +1179,7 @@ extern "C" JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetAnchorTransform(JNIEnv* env, jobject) {
     jfloatArray result = env->NewFloatArray(16);
     if (!result) return nullptr;
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         float mat[16];
         gSlamEngine->getAnchorTransform(mat);
@@ -1142,6 +1190,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetAnchorTransform
 
 extern "C" JNIEXPORT jfloat JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPaintingProgress(JNIEnv* env, jobject) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) return gSlamEngine->getPaintingProgress();
     return 0.0f;
 }
@@ -1151,6 +1200,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPaintingProgres
 // there is certainly no measurement, so the fallback is the sentinel and not a confident zero.
 extern "C" JNIEXPORT jfloat JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCorroborationConfidence(JNIEnv* env, jobject) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) return gSlamEngine->getCorroborationConfidence();
     return -1.0f;
 }
@@ -1181,6 +1231,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostic
     // [12] and [13] default to the "not run" ordinals (kCorrobNotRun = 6, kGrowNotRun = 0) rather
     // than -1: they are enums, and with no engine nothing ran, which is exactly what those say.
     jint vals[14] = {kRelocUnknownOrdinal, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 6, 0};
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         vals[0] = gSlamEngine->lastRelocReject();
         vals[1] = gSlamEngine->lastRelocMatches();
@@ -1214,6 +1265,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostic
 extern "C" JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCorroborationDiagnostics(JNIEnv* env, jobject) {
     jfloat vals[3] = {-1.0f, -1.0f, -1.0f};
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         vals[0] = gSlamEngine->corrobSearchRadiusPx();
         vals[1] = gSlamEngine->lastRelocReprojPx();
@@ -1232,6 +1284,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCorroborationDi
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetDesignPlacement(
         JNIEnv* env, jobject, jfloatArray fpFromDesign16, jfloat halfW, jfloat halfH) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
     if (!fpFromDesign16 || env->GetArrayLength(fpFromDesign16) != 16) {
         gSlamEngine->setDesignPlacement(nullptr, 0.0f, 0.0f);
@@ -1244,6 +1297,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetDesignPlacement
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetStageTimings(JNIEnv* env, jobject, jfloatArray out) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
     float buf[5] = {0,0,0,0,0};
     gSlamEngine->getStageTimingsAndReset(buf);
@@ -1252,11 +1306,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetStageTimings(JN
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetStageEnabled(JNIEnv* env, jobject, jint stage, jboolean enabled) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setStageEnabled((int) stage, enabled == JNI_TRUE);
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocResult(JNIEnv* env, jobject, jfloatArray out) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
     float buf[19];
     gSlamEngine->getRelocResult(buf);
@@ -1265,6 +1321,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocResult(JNI
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintAnchor(JNIEnv* env, jobject, jfloatArray out) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
     float buf[16];
     gSlamEngine->getFingerprintAnchor(buf);
@@ -1274,6 +1331,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintAnch
 JNIEXPORT jbyteArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportFingerprint(
         JNIEnv* env, jobject thiz) {
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
     std::vector<uint8_t> fingerprint = gSlamEngine->exportFingerprint();
     if (fingerprint.empty()) return nullptr;
@@ -1287,11 +1345,18 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportFingerprint(
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAlignToFingerprint(
         JNIEnv* env, jobject thiz, jbyteArray data) {
-    if (!gSlamEngine) return;
+    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine || !data) return;
     jsize size = env->GetArrayLength(data);
     jbyte* buffer = env->GetByteArrayElements(data, nullptr);
 
-    gSlamEngine->alignToFingerprint((uint8_t*)buffer, size);
+    try {
+        gSlamEngine->alignToFingerprint((uint8_t*)buffer, size);
+    } catch (const std::exception& e) {
+        LOGE("nativeAlignToFingerprint: exception: %s", e.what());
+    } catch (...) {
+        LOGE("nativeAlignToFingerprint: unknown exception");
+    }
 
     env->ReleaseByteArrayElements(data, buffer, JNI_ABORT);
 }

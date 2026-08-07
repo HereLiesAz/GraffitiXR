@@ -76,7 +76,13 @@ class AnchorOrchestrator {
      */
     fun clear() {
         synchronized(this) {
-            consensusAnchors.forEach { it.anchor.detach() }
+            // Teardown path (ArRenderer.destroy()) races ArViewModel.performFullCleanupLocked's
+            // session.close() on a separate coroutine with no ordering between them, so a detach here
+            // can land on an anchor whose session is already gone. The sibling cloud-anchor detach in
+            // ArRenderer.kt guards the exact same call the same way, for the exact same reason.
+            consensusAnchors.forEach {
+                try { it.anchor.detach() } catch (_: Exception) { /* session already gone */ }
+            }
             consensusAnchors.clear()
             masterArtworkPose = null
             establishedTranslation = null

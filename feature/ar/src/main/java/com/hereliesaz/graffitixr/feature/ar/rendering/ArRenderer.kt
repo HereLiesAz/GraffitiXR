@@ -31,6 +31,18 @@ import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.concurrent.withLock
 
+/** Result of [ArRenderer.requestResume]/[ArRenderer.requestPause]. */
+sealed class SessionLifecycleOutcome {
+    /** Session.resume()/pause() ran to completion. */
+    object Applied : SessionLifecycleOutcome()
+    /** No live session to act on (never attached, or detached) — not an error. */
+    object NoSession : SessionLifecycleOutcome()
+    /** The GL thread held [ArRenderer]'s session lock (wedged inside onDrawFrame) past the timeout. */
+    object LockTimeout : SessionLifecycleOutcome()
+    /** ARCore itself rejected the call (e.g. CameraNotAvailableException). */
+    data class Failed(val error: Exception) : SessionLifecycleOutcome()
+}
+
 class ArRenderer(
     private val context: Context,
     private val slamManager: SlamManager,
@@ -128,13 +140,46 @@ class ArRenderer(
         while (true) {
             val req = hitTestQueue.poll() ?: break
             val translation = try {
-                frame.hitTest(req.x, req.y).firstOrNull()?.hitPose?.translation
+                selectHitTestTranslation(frame, req.x, req.y)
             } catch (e: Exception) {
                 Timber.w(e, "queued hitTest failed")
                 null
             }
             req.result.complete(translation)
         }
+    }
+
+    /**
+     * Picks the best `Frame.hitTest` result at ([x], [y]) instead of blindly taking `hits[0]`: prefer
+     * a `Plane` hit inside its polygon, else a `DepthPoint`/`Point` hit, else the nearest hit — same
+     * preference order as the anchor-establishment hit-test below, and for the same reason: `hits[0]`
+     * is the closest result, which is usually a stray feature point in front of the wall rather than
+     * the wall itself. Also rejects anything outside a sane 0.1-10 m range, matching the bound used
+     * there. Returns null when nothing qualifies (no hits, or the chosen hit is out of range).
+     *
+     * This feeds [requestHitTest] → `ArViewModel.arCoreHitTestToWorld` → calibration-tap point
+     * collection, so a bad hit here doesn't corrupt data (there's a downstream sanity check on the
+     * collected points) — it just makes calibration silently fail and forces a re-tap.
+     */
+    private fun selectHitTestTranslation(frame: Frame, x: Float, y: Float): FloatArray? {
+        val hits = frame.hitTest(x, y)
+        var chosen: com.google.ar.core.HitResult? = null
+        for (h in hits) {
+            val t = h.trackable
+            if (t is com.google.ar.core.Plane && t.isPoseInPolygon(h.hitPose)) { chosen = h; break }
+            if (chosen == null && (t is com.google.ar.core.DepthPoint || t is com.google.ar.core.Point)) chosen = h
+        }
+        if (chosen == null) chosen = hits.firstOrNull()
+        val hit = chosen ?: return null
+
+        val pose = hit.hitPose
+        val camPose = frame.camera.pose
+        val dx = pose.tx() - camPose.tx()
+        val dy = pose.ty() - camPose.ty()
+        val dz = pose.tz() - camPose.tz()
+        val dist = Math.sqrt((dx * dx + dy * dy + dz * dz).toDouble())
+        if (dist !in 0.1..10.0) return null
+        return pose.translation
     }
 
     private fun failPendingHitTests() {
@@ -267,6 +312,22 @@ class ArRenderer(
     private val MIN_TRUTH_INLIERS = 6
 
     @Volatile var showAnchorBoundary: Boolean = false
+    // ONE-WAY LATCH, currently: grep confirms the only assignment anywhere in the repo is
+    // `anchorEstablished = true` (in onDrawFrame's establishment block) — nothing ever sets this
+    // false, so the `!value` branch below never runs today. It is not dead by accident: it is what a
+    // future "clear target / rescan mid-session" action would need (AnchorOrchestrator reset, the
+    // screen-fit re-armed, the perception map un-hidden), and is kept ready rather than deleted.
+    //
+    // Investigated for this fix: ArViewModel's existing capture-retry paths
+    // (clearCaptureForRetry/clearTapHighlights) looked like candidates, but both run BEFORE an anchor
+    // is ever established — they discard a rejected TAP so the artist can re-aim, on the path that
+    // runs prior to `setInitialAnchorFromCapture()`/`pendingAnchorEstablishment`. Wiring a reset
+    // there would be a no-op on the normal path and actively wrong on the (currently unreachable)
+    // path where they fire after a real anchor exists, tearing one down that nothing asked to clear.
+    // No other "clear target"/"retake" action exists in ArViewModel today; the only real reset is
+    // the full teardown in `ArViewModel.exitArMode()`, which drops the whole renderer/session rather
+    // than flipping this flag. `ArUiState.isAnchorEstablished` (the UI-facing mirror of this) is the
+    // same shape: set true once in `onPrimaryAnchorEstablished()`, set false only in `exitArMode()`.
     @Volatile var anchorEstablished: Boolean = false
         set(value) {
             field = value
@@ -1287,6 +1348,7 @@ class ArRenderer(
                     // [overlayRotationCorrection] can't be computed here — it needs anchorMatrix (the
                     // consensus/fused pose), which isn't built until later this same frame. Defer.
                     overlayRotationCorrectionPending = true
+                    overlayRotationCorrectionRetryFrames = 0
                     slamManager.updateAnchorTransform(anchorModelMatrix)
                     // Doodle demo: publish the wall plane (anchor point + surface normal) so the
                     // ViewModel can build a fingerprint from the drawing and relocalize against it.
@@ -1493,15 +1555,23 @@ class ArRenderer(
             } else backbone
 
             // Capture [overlayRotationCorrection] the first frame anchorMatrix exists after
-            // establishment — at this point getConsensusMatrix has exactly one vote (setInitialAnchor
-            // always seeds a fresh single anchor), so anchorMatrix's rotation IS still just the
-            // freshly-created anchor's own pose. Define the correction relative to THAT, once: no
-            // assumption needed about what convention createAnchor used internally, since this reads
-            // back whatever the tracking/consensus pipeline actually reports.
+            // establishment — at this point getConsensusMatrix is EXPECTED to have exactly one vote
+            // (setInitialAnchor always seeds a fresh single anchor), so anchorMatrix's rotation would
+            // be just the freshly-created anchor's own pose. Define the correction relative to THAT,
+            // once: no assumption needed about what convention createAnchor used internally, since
+            // this reads back whatever the tracking/consensus pipeline actually reports.
+            //
+            // But if the anchor has not reached TrackingState.TRACKING yet on this exact frame,
+            // AnchorOrchestrator.getConsensusMatrix's tracking set is empty and anchorMatrix is its
+            // no-tracking-anchor fallback instead — a PREVIOUS anchor's lastGoodMatrix (on a
+            // re-capture) or identity (a brand-new orchestrator) — NOT this anchor's own pose. A
+            // correction solved against that wrong rotation is not merely off: it is baked in once and
+            // composed with the REAL anchor's rotation every later frame, so the misorientation is
+            // permanent, not something that eases out. Validated below before being accepted.
             if (overlayRotationCorrectionPending) {
-                overlayRotationCorrectionPending = false
                 val nx = anchorSurfaceNormal[0]; val ny = anchorSurfaceNormal[1]; val nz = anchorSurfaceNormal[2]
-                android.opengl.Matrix.setIdentityM(overlayRotationCorrection, 0)
+                android.opengl.Matrix.setIdentityM(overlayRotationCorrectionCandidate, 0)
+                var haveCandidate = false
                 if (nx != 0f || ny != 0f || nz != 0f) {
                     // Pick an up reference that isn't parallel to the normal — same choice overlayDraw
                     // used to remake every frame, made here exactly once.
@@ -1529,14 +1599,61 @@ class ArRenderer(
                         overlayTargetBasisScratch[4] = yX; overlayTargetBasisScratch[5] = yY; overlayTargetBasisScratch[6] = yZ
                         overlayTargetBasisScratch[8] = nx; overlayTargetBasisScratch[9] = ny; overlayTargetBasisScratch[10] = nz
 
-                        // correction = targetBasis * nativeRotation⁻¹ (transpose: rotations are
+                        // candidate = targetBasis * nativeRotation⁻¹ (transpose: rotations are
                         // orthonormal). Composing this with anchorMatrix's rotation every frame
-                        // (overlayDraw) then reproduces targetBasis right now and tracks from there.
+                        // (overlayDraw) then reproduces targetBasis right now and tracks from there —
+                        // PROVIDED anchorMatrix here really is the anchor's own pose; see validation.
                         System.arraycopy(anchorMatrix, 0, overlayRotScratch, 0, 16)
                         overlayRotScratch[12] = 0f; overlayRotScratch[13] = 0f; overlayRotScratch[14] = 0f
                         android.opengl.Matrix.transposeM(overlayRotScratch2, 0, overlayRotScratch, 0)
-                        android.opengl.Matrix.multiplyMM(overlayRotationCorrection, 0, overlayTargetBasisScratch, 0, overlayRotScratch2, 0)
+                        android.opengl.Matrix.multiplyMM(overlayRotationCorrectionCandidate, 0, overlayTargetBasisScratch, 0, overlayRotScratch2, 0)
+                        haveCandidate = true
                     }
+                }
+
+                // Validate before accepting. Two checks, because they catch different failures:
+                //
+                //  - getActiveAnchorCount() > 0: the anchor setInitialAnchor just seeded is actually
+                //    TRACKING right now, i.e. anchorMatrix above really is its own pose and not
+                //    AnchorOrchestrator's no-tracking-anchor fallback. This is the check that matters:
+                //    the candidate above is ALWAYS algebraically solved to reproduce anchorSurfaceNormal
+                //    against whatever anchorMatrix it was handed, so a wrong anchorMatrix at capture
+                //    time cannot be detected from the candidate's own math — it can only be detected by
+                //    asking whether that anchorMatrix was trustworthy in the first place.
+                //  - composed Z-axis close to anchorSurfaceNormal: reproduces (up to fp error) by
+                //    construction whenever `haveCandidate` is true, so in practice this only catches
+                //    the degenerate up-vector fallback above leaving the candidate at identity. Kept as
+                //    a cheap, always-correct invariant rather than relied on as the primary guard.
+                val normalIsDegenerate = nx == 0f && ny == 0f && nz == 0f
+                var reproducesNormal = normalIsDegenerate // no surface normal -> identity IS the intended answer
+                if (!normalIsDegenerate && haveCandidate) {
+                    System.arraycopy(anchorMatrix, 0, overlayRotScratch, 0, 16)
+                    overlayRotScratch[12] = 0f; overlayRotScratch[13] = 0f; overlayRotScratch[14] = 0f
+                    android.opengl.Matrix.multiplyMM(overlayRotScratch2, 0, overlayRotationCorrectionCandidate, 0, overlayRotScratch, 0)
+                    val composedDot = overlayRotScratch2[8] * nx + overlayRotScratch2[9] * ny + overlayRotScratch2[10] * nz
+                    reproducesNormal = composedDot >= 0.99f
+                }
+                val anchorTracking = normalIsDegenerate || anchorOrchestrator.getActiveAnchorCount() > 0
+                val giveUp = overlayRotationCorrectionRetryFrames >= MAX_OVERLAY_CORRECTION_RETRY_FRAMES
+                val valid = anchorTracking && reproducesNormal
+
+                if (valid || giveUp) {
+                    if (giveUp && !valid) {
+                        Timber.w(
+                            "ARDIAG overlayRotationCorrection: accepting an unvalidated capture after " +
+                                "$overlayRotationCorrectionRetryFrames retries " +
+                                "(anchorTracking=$anchorTracking reproducesNormal=$reproducesNormal)"
+                        )
+                    }
+                    System.arraycopy(overlayRotationCorrectionCandidate, 0, overlayRotationCorrection, 0, 16)
+                    overlayRotationCorrectionPending = false
+                    overlayRotationCorrectionRetryFrames = 0
+                } else {
+                    // Leave [overlayRotationCorrectionPending] set: retry against next frame's
+                    // anchorMatrix, which is more likely to be the real anchor's own tracked pose.
+                    // overlayRotationCorrection is untouched — it stays whatever it was (identity, on
+                    // the very first attempt), which draws as "use the raw anchor frame" while retrying.
+                    overlayRotationCorrectionRetryFrames++
                 }
             }
 
@@ -1623,12 +1740,17 @@ class ArRenderer(
                         // ones worth a second look.
                         liveRotationNeededDeg =
                             (sensorOrientation - displayRotationHelper.getRotation() * 90 + 360) % 360,
-                        // EVALUATION.md 3.1 item 3 — the RECORDING's clock, not the wall clock.
-                        // ARCore replays the recorded value during startPlayback, so two replays of
-                        // one file produce rows that align frame-for-frame; wall-clock rows describe
-                        // the same frames at different times and cannot be subtracted. This is the
-                        // third of 3.1's three non-determinism sources; the RNG seed and the
-                        // sync-reloc mode closed the other two.
+                        // EVALUATION.md 3.1 item 3 — the RECORDING's clock, not the wall clock. IF a
+                        // run is played back via ArRecordingController.startPlayback, ARCore replays
+                        // this recorded value, so two replays of one file would produce rows that
+                        // align frame-for-frame where wall-clock rows describe the same frames at
+                        // different times and cannot be subtracted. That determinism argument is not
+                        // currently exercised end-to-end: nothing in the app calls startPlayback today
+                        // (grep confirms zero callers outside ArRecordingController itself) — only
+                        // evalStartRecording/evalStopRecording are wired to UI. Logging frame.timestamp
+                        // is still the right choice for a LIVE run (it is the recording's own clock
+                        // either way), but "aligns frame-for-frame across replays" is a property of a
+                        // playback path that exists in the class and is not yet invoked anywhere.
                         frameTimestampNs = frame.timestamp,
                     )
                 }
@@ -1652,9 +1774,19 @@ class ArRenderer(
                 } catch (_: Exception) { /* ignore */ }
                 // Snapshot the smoothed value (kept across invalid/dropped frames) for the readout.
                 val centerDepth = smoothedCenterDepth
-                // The view matrix is GL-thread scratch that the next frame overwrites in place, so
-                // the coroutine below gets its own copy rather than a live reference.
+                // Both the view matrix AND anchorMatrix are GL-thread scratch/live values: viewMatrix
+                // is viewMatrixScratch, refilled in place every frame; anchorMatrix, when fusion is
+                // off, IS backboneScratch (the same object), similarly refilled every frame. The
+                // comment here used to claim a snapshot avoided staleness while only copying the
+                // camera POSITION (for distanceMeters' invertM) and leaving the coroutine body below
+                // to read the live viewMatrix/anchorMatrix directly for camera ROTATION and the
+                // anchor's position — a background coroutine dispatched via Dispatchers.Default is
+                // NOT guaranteed to run before the next GL frame refills those arrays, so those reads
+                // could be torn or several frames stale relative to this snapshot. Copy BOTH matrices
+                // in full here, on the GL thread, and use only these copies below — never the live
+                // viewMatrix/anchorMatrix/scratch arrays.
                 val viewMatrixSnapshot = viewMatrix.copyOf()
+                val anchorMatrixSnapshot = anchorMatrix.copyOf()
 
                 backgroundScope.launch {
                     // Both modes report the accumulated ARCore point cloud. MURAL used to read
@@ -1680,9 +1812,9 @@ class ArRenderer(
                         if (!anchorEstablished) return@run -1f
                         val camPose = FloatArray(16)
                         android.opengl.Matrix.invertM(camPose, 0, viewMatrixSnapshot, 0)
-                        val dx = anchorMatrix[12] - camPose[12]
-                        val dy = anchorMatrix[13] - camPose[13]
-                        val dz = anchorMatrix[14] - camPose[14]
+                        val dx = anchorMatrixSnapshot[12] - camPose[12]
+                        val dy = anchorMatrixSnapshot[13] - camPose[13]
+                        val dz = anchorMatrixSnapshot[14] - camPose[14]
                         val len = kotlin.math.sqrt((dx * dx + dy * dy + dz * dz).toDouble()).toFloat()
 
                         if (len > 0.01f) {
@@ -1692,9 +1824,9 @@ class ArRenderer(
                             // not 1. The old stride-1 indexing computed R^T · delta — correct only
                             // when the camera is world-aligned; as soon as the phone yaws it maps
                             // the target vector onto the wrong axis and the indicator points off.
-                            val localX = dx * viewMatrix[0] + dy * viewMatrix[4] + dz * viewMatrix[8]
-                            val localY = dx * viewMatrix[1] + dy * viewMatrix[5] + dz * viewMatrix[9]
-                            val localZ = dx * viewMatrix[2] + dy * viewMatrix[6] + dz * viewMatrix[10]
+                            val localX = dx * viewMatrixSnapshot[0] + dy * viewMatrixSnapshot[4] + dz * viewMatrixSnapshot[8]
+                            val localY = dx * viewMatrixSnapshot[1] + dy * viewMatrixSnapshot[5] + dz * viewMatrixSnapshot[9]
+                            val localZ = dx * viewMatrixSnapshot[2] + dy * viewMatrixSnapshot[6] + dz * viewMatrixSnapshot[10]
                             relDir = Triple(localX / len, localY / len, localZ / len)
                         }
 
@@ -1702,7 +1834,7 @@ class ArRenderer(
                         // is the world-space direction the camera looks along, so dot(delta, -row2)
                         // is positive iff the anchor is in front of the camera. Same column-major
                         // stride fix as above.
-                        val fwdDot = dx * (-viewMatrix[2]) + dy * (-viewMatrix[6]) + dz * (-viewMatrix[10])
+                        val fwdDot = dx * (-viewMatrixSnapshot[2]) + dy * (-viewMatrixSnapshot[6]) + dz * (-viewMatrixSnapshot[10])
                         if (len > 0.01f && fwdDot > 0f) len else -1f
                     }
 
@@ -2484,6 +2616,89 @@ class ArRenderer(
     }
 
     /**
+     * Runs ARCore [Session] calls that must originate off the GL thread (Session.resume()/pause() are
+     * lifecycle calls the ViewModel drives; recording start/stop are a debug/eval-only control on a
+     * Compose onClick) while holding [sessionLock] — the same lock [onDrawFrame] holds for the whole
+     * frame body. Session.resume()/pause() were previously called directly from the ViewModel's own
+     * coroutine with no synchronization against the GL thread — which is inside onDrawFrame calling
+     * session.update() and other Session methods under sessionLock concurrently — the exact class of
+     * race that produced a native SIGSEGV on ARCore's MTC_vio thread elsewhere in this app (see
+     * [updateFlashlight]'s doc). Unlike [updateFlashlight]/[updateAutoFocus] (which defer to a flag
+     * consumed at the top of the NEXT frame), this cannot wait for "the next frame": the host can stop
+     * feeding [onDrawFrame] (e.g. the GLSurfaceView's render thread paused) around the very lifecycle
+     * event that triggers a resume/pause, so a flag would sit unconsumed. Instead this takes
+     * [sessionLock] directly with the same bounded tryLock [detachSessionBounded] uses, so [block]
+     * still cannot run concurrently with a frame in progress, but a wedged GL thread (blocked inside a
+     * native call in session.update()) cannot hang the caller forever either.
+     *
+     * Returns null — without invoking [block] — when there is no live session or the lock could not be
+     * acquired within [timeoutMs]; otherwise returns [block]'s result.
+     */
+    fun <T> withLockedSession(timeoutMs: Long = 1500L, block: (Session) -> T): T? {
+        val locked = try {
+            sessionLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)
+        } catch (_: InterruptedException) {
+            false
+        }
+        if (!locked) return null
+        try {
+            val s = session ?: return null
+            return block(s)
+        } finally {
+            sessionLock.unlock()
+        }
+    }
+
+    /**
+     * Resume the ARCore session, serialized against [onDrawFrame] with the same bounded-lock
+     * discipline as [withLockedSession] (see its doc for why this can't use the
+     * flag-consumed-in-onDrawFrame pattern [updateFlashlight] uses). Implemented separately from
+     * [withLockedSession] rather than in terms of it so a lock timeout is distinguishable from "no
+     * session" in the result — callers care about that distinction here, but not for recording start/
+     * stop, which is the only other [withLockedSession] caller.
+     */
+    fun requestResume(timeoutMs: Long = 1500L): SessionLifecycleOutcome {
+        val locked = try {
+            sessionLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)
+        } catch (_: InterruptedException) {
+            false
+        }
+        if (!locked) return SessionLifecycleOutcome.LockTimeout
+        try {
+            val s = session ?: return SessionLifecycleOutcome.NoSession
+            s.resume()
+            return SessionLifecycleOutcome.Applied
+        } catch (e: Exception) {
+            return SessionLifecycleOutcome.Failed(e)
+        } finally {
+            sessionLock.unlock()
+        }
+    }
+
+    /**
+     * Pause the ARCore session, serialized against [onDrawFrame] with the same bounded-lock
+     * discipline as [withLockedSession]. See [requestResume]'s doc for why this is not simply
+     * implemented in terms of [withLockedSession].
+     */
+    fun requestPause(timeoutMs: Long = 1500L): SessionLifecycleOutcome {
+        val locked = try {
+            sessionLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)
+        } catch (_: InterruptedException) {
+            false
+        }
+        if (!locked) return SessionLifecycleOutcome.LockTimeout
+        try {
+            val s = session ?: return SessionLifecycleOutcome.NoSession
+            s.pause()
+            return SessionLifecycleOutcome.Applied
+        } catch (e: Exception) {
+            return SessionLifecycleOutcome.Failed(e)
+        } finally {
+            sessionLock.unlock()
+        }
+    }
+
+    /**
      * Non-GL teardown: stops the render loop, cancels the background coroutine
      * scope (previously never cancelled — a coroutine leak), detaches the session,
      * and drops retained references. Safe to call from any thread — including the
@@ -2536,6 +2751,14 @@ class ArRenderer(
         // Planes whose centring differs by less than this count as equally centred, and the larger
         // one wins — so the anchor settles on the whole wall instead of the nearest-centred fragment.
         const val PLANE_PICK_DOT_TIE = 0.05f
+
+        // Bound on how many frames [overlayRotationCorrectionPending] is retried while its candidate
+        // fails validation (anchor not yet TRACKING, or a degenerate up-vector fallback), before it is
+        // accepted anyway with a warning logged. At a typical 30-60fps this is well under a second —
+        // long enough for a freshly-created anchor to reach TRACKING, short enough that a persistently
+        // non-tracking anchor doesn't leave the artwork's orientation undecided for the rest of the
+        // session.
+        const val MAX_OVERLAY_CORRECTION_RETRY_FRAMES = 15
 
         const val PERCEPTION_FULL_FPS = 60
         const val PERCEPTION_FLOOR_FPS = 30
