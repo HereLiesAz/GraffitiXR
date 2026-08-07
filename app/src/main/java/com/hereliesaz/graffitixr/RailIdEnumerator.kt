@@ -54,13 +54,15 @@ internal fun enumerateRailItemIdRegistrations(mode: EditorMode): List<String> {
         ids += listOf("mode.trace.freeze", "mode.trace.lock")
     }
 
-    // Design menu (per-design controls: the layer list, adjust/colour panels, invert)
-    ids += listOf("host.design", "design.layers", "design.adjust", "design.balance", "design.invert")
+    // Design menu (per-design controls: the adjust/colour panels and invert)
+    ids += listOf(
+        "host.design", "design.adjust", "design.balance", "design.invert",
+        "design.outline", "design.isolate",
+    )
 
     // Project menu
     ids += listOf(
         "host.project", "proj.new", "proj.save", "proj.export", "proj.load", "proj.settings",
-        "proj.extensions",
     )
 
     // Global tools

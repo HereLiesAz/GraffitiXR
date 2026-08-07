@@ -27,6 +27,8 @@ fun Layer.toOverlayLayer(): OverlayLayer {
         isVisible = isVisible,
         isLinked = isLinked,
         isInverted = isInverted,
+        isSketch = isSketch,
+        isSubjectIsolated = isSubjectIsolated,
     )
 }
 
@@ -52,6 +54,8 @@ fun OverlayLayer.toLayer(): Layer {
         isVisible = isVisible,
         isLinked = isLinked,
         isInverted = isInverted,
+        isSketch = isSketch,
+        isSubjectIsolated = isSubjectIsolated,
     )
 }
 

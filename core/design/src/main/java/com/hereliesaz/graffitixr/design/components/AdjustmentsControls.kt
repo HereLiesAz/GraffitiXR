@@ -9,6 +9,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.SettingsBackupRestore
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,7 +34,15 @@ fun UndoRedoRow(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     strings: AppStrings,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Reset is only meaningful once there is a design to reposition. */
+    canReset: Boolean = false,
+    /**
+     * True when the first Reset press has already flattened placement, so this press restores it.
+     * Drives the icon so the button says which of the two it will do.
+     */
+    isResetActive: Boolean = false,
+    onReset: () -> Unit = {},
 ) {
     Row(
         modifier = modifier
@@ -63,6 +73,21 @@ fun UndoRedoRow(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(start = 4.dp)
+                )
+            }
+        }
+
+        // Reset sits between undo and redo: a placement escape hatch that is itself reversible.
+        Surface(
+            shape = CircleShape,
+            color = if (canReset) HotPink else HotPink.copy(alpha = 0.3f),
+            shadowElevation = 4.dp
+        ) {
+            IconButton(onClick = onReset, enabled = canReset) {
+                Icon(
+                    if (isResetActive) Icons.Filled.SettingsBackupRestore else Icons.Filled.RestartAlt,
+                    contentDescription = if (isResetActive) strings.adj.restorePlacement else strings.adj.reset,
+                    tint = if (canReset) Color.White else Color.White.copy(alpha = 0.38f)
                 )
             }
         }

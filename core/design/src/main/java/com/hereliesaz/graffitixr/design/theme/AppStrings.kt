@@ -192,6 +192,8 @@ fun rememberAppStrings(): AppStrings {
             blue = stringResource(R.string.adj_blue),
             undo = stringResource(R.string.adj_undo),
             redo = stringResource(R.string.adj_redo),
+            reset = stringResource(R.string.adj_reset),
+            restorePlacement = stringResource(R.string.adj_restore_placement),
             magicAlign = stringResource(R.string.adj_magic_align)
         )
     )
@@ -389,6 +391,10 @@ data class AppStrings(
         val blue: String,
         val undo: String,
         val redo: String,
+        /** First press of the Reset toggle: flatten placement. */
+        val reset: String,
+        /** Second press of the same button: put the stashed placement back. */
+        val restorePlacement: String,
         val magicAlign: String
     )
 }

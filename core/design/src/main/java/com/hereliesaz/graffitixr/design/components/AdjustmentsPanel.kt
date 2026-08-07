@@ -25,6 +25,8 @@ data class AdjustmentsState(
     val hasHistory: Boolean = false,
     val undoCount: Int = 0,
     val redoCount: Int = 0,
+    /** True once a Reset press has flattened placement, so the next press restores it. */
+    val isResetActive: Boolean = false,
     val isRightHanded: Boolean = true,
     val isCapturingTarget: Boolean = false,
     val activeLayer: OverlayLayer? = null,
@@ -53,6 +55,7 @@ fun AdjustmentsPanel(
     onColorBalanceBChange: (Float) -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
+    onReset: () -> Unit,
     onAdjustmentStart: () -> Unit,
     onAdjustmentEnd: () -> Unit,
     strings: AppStrings,
@@ -152,7 +155,10 @@ fun AdjustmentsPanel(
                 onUndo = onUndo,
                 onRedo = onRedo,
                 strings = strings,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                canReset = hasImage,
+                isResetActive = state.isResetActive,
+                onReset = onReset,
             )
         }
     }

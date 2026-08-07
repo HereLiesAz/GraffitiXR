@@ -7,7 +7,6 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.ui.geometry.Offset
-import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
@@ -20,7 +19,6 @@ import io.mockk.every
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -35,7 +33,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.io.ByteArrayInputStream
-import java.io.InputStream
 
 import com.hereliesaz.graffitixr.common.DispatcherProvider
 import kotlinx.coroutines.CoroutineDispatcher
@@ -52,7 +49,7 @@ class EditorViewModelTest {
     private val exportManager: com.hereliesaz.graffitixr.feature.editor.export.ExportManager = mockk(relaxed = true)
     private val slamManager: SlamManager = mockk(relaxed = true)
     private val opEmitter: OpEmitter = mockk(relaxed = true)
-    private val extensions: com.hereliesaz.graffitixr.data.azphalt.ExtensionRepository = mockk(relaxed = true)
+    private val subjectIsolator: SubjectIsolator = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @Before
@@ -67,7 +64,7 @@ class EditorViewModelTest {
         currentProjectFlow.value = testProject
         every { projectRepository.currentProject } returns currentProjectFlow
         every { settingsRepository.backgroundColor } returns kotlinx.coroutines.flow.flowOf(0xFF000000.toInt())
-        
+
         // Mock static methods for Bitmap, Uri, and Toast
         mockkStatic(BitmapFactory::class)
         mockkStatic(android.graphics.Bitmap::class)
@@ -113,7 +110,7 @@ class EditorViewModelTest {
 
         viewModel = EditorViewModel(
             projectRepository, settingsRepository, projectManager, exportManager, context,
-            slamManager, testDispatcherProvider, opEmitter, extensions
+            slamManager, testDispatcherProvider, opEmitter, subjectIsolator
         )
     }
 
@@ -128,12 +125,17 @@ class EditorViewModelTest {
         unmockkObject(NativeLibLoader)
     }
 
+    /** Imports an image, which is the only way a design comes into being. */
+    private fun addDesign() {
+        viewModel.onAddLayer(Uri.parse("content://test/image.png"))
+        testDispatcher.scheduler.advanceUntilIdle()
+    }
+
     @Test
     fun `initial state is correct`() {
         val state = viewModel.uiState.value
         assertEquals(EditorMode.AR, state.editorMode)
-        assertTrue(state.layers.isEmpty())
-        assertNull(state.activeLayerId)
+        assertNull(state.design)
     }
 
     @Test
@@ -143,165 +145,126 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `onAddLayer adds a layer`() = runTest {
-        val uri = Uri.parse("content://test/image.png")
-        viewModel.onAddLayer(uri)
-        
-        testDispatcher.scheduler.advanceUntilIdle()
-        
-        val state = viewModel.uiState.value
-        assertEquals(1, state.layers.size)
-        assertNotNull(state.activeLayerId)
-        assertEquals(state.layers.first().id, state.activeLayerId)
+    fun `onAddLayer sets the design`() = runTest {
+        addDesign()
+        assertNotNull(viewModel.uiState.value.design)
     }
 
     @Test
-    fun `onLayerActivated updates activeLayerId`() = runTest {
-        val uri = Uri.parse("content://test/image.png")
-        viewModel.onAddLayer(uri)
-        testDispatcher.scheduler.advanceUntilIdle()
-        
-        val layerId = viewModel.uiState.value.layers.first().id
-        viewModel.onLayerActivated(layerId)
-        
-        assertEquals(layerId, viewModel.uiState.value.activeLayerId)
+    fun `onAddLayer replaces the previous design rather than accumulating`() = runTest {
+        // There is exactly one design. Importing a second image is how the artist changes it, not
+        // how they add to it — the old multi-layer model is gone.
+        addDesign()
+        val first = viewModel.uiState.value.design!!.id
+        addDesign()
+        val second = viewModel.uiState.value.design!!.id
+        assertNotEqualsId(first, second)
     }
 
+    private fun assertNotEqualsId(a: String, b: String) =
+        assertTrue("expected a fresh design id, both were '$a'", a != b)
+
     @Test
-    fun `onScaleChanged updates active layer`() = runTest {
-        val uri = Uri.parse("content://test/image.png")
-        viewModel.onAddLayer(uri)
-        testDispatcher.scheduler.advanceUntilIdle()
-        
-        val layerId = viewModel.uiState.value.layers.first().id
-        viewModel.onLayerActivated(layerId)
-        
+    fun `onScaleChanged updates the design`() = runTest {
+        addDesign()
         viewModel.onScaleChanged(2.0f)
-        assertEquals(2.0f, viewModel.uiState.value.layers.first().scale)
+        assertEquals(2.0f, viewModel.uiState.value.design!!.scale)
     }
 
     @Test
-    fun `onOffsetChanged updates active layer`() = runTest {
-        val uri = Uri.parse("content://test/image.png")
-        viewModel.onAddLayer(uri)
-        testDispatcher.scheduler.advanceUntilIdle()
-        
-        val layerId = viewModel.uiState.value.layers.first().id
-        viewModel.onLayerActivated(layerId)
-        
-        val newOffset = Offset(10f, 20f)
-        viewModel.onOffsetChanged(newOffset)
-        assertEquals(newOffset, viewModel.uiState.value.layers.first().offset)
+    fun `onOffsetChanged accumulates onto the design offset`() = runTest {
+        addDesign()
+        viewModel.onOffsetChanged(Offset(10f, 20f))
+        assertEquals(Offset(10f, 20f), viewModel.uiState.value.design!!.offset)
     }
 
     @Test
     fun `toggleImageLock updates state`() = runTest {
-        val uri = Uri.parse("content://test/image.png")
-        viewModel.onAddLayer(uri)
-        testDispatcher.scheduler.advanceUntilIdle()
-        
-        val layerId = viewModel.uiState.value.layers.first().id
-        viewModel.onLayerActivated(layerId)
-        
-        assertFalse(viewModel.uiState.value.layers.first().isImageLocked)
+        addDesign()
+        assertFalse(viewModel.uiState.value.design!!.isImageLocked)
         viewModel.toggleImageLock()
-        assertTrue(viewModel.uiState.value.layers.first().isImageLocked)
+        assertTrue(viewModel.uiState.value.design!!.isImageLocked)
+    }
+
+    @Test
+    fun `onCycleRotationAxis walks the axis and raises feedback`() = runTest {
+        addDesign()
+        val start = viewModel.uiState.value.activeRotationAxis
+        viewModel.onCycleRotationAxis()
+        assertTrue(viewModel.uiState.value.activeRotationAxis != start)
+        assertTrue(viewModel.uiState.value.showRotationAxisFeedback)
+        viewModel.onFeedbackShown()
+        assertFalse(viewModel.uiState.value.showRotationAxisFeedback)
     }
 
     @Test
     fun `saveProject calls createProject when no project exists`() = runTest {
         currentProjectFlow.value = null
-        val uri = Uri.parse("content://test/image.png")
-        viewModel.onAddLayer(uri)
-        testDispatcher.scheduler.advanceUntilIdle()
-        
+        addDesign()
+
         viewModel.saveProject()
         testDispatcher.scheduler.advanceUntilIdle()
-        
+
         coVerify { projectRepository.createProject(any<GraffitiProject>()) }
     }
 
     @Test
-    fun `onLayerRemoved removes layer and clears active ID if necessary`() = runTest {
-        val uri = Uri.parse("content://test/image.png")
-        viewModel.onAddLayer(uri)
-        testDispatcher.scheduler.advanceUntilIdle()
-        
-        val layerId = viewModel.uiState.value.layers.first().id
-        viewModel.onLayerRemoved(layerId)
-        
-        assertTrue(viewModel.uiState.value.layers.isEmpty())
-        assertNull(viewModel.uiState.value.activeLayerId)
-    }
-
-    @Test
     fun `saveProject calls updateProject when project exists`() = runTest {
-        val uri = Uri.parse("content://test/image.png")
-        viewModel.onAddLayer(uri)
-        testDispatcher.scheduler.advanceUntilIdle()
+        addDesign()
 
         viewModel.saveProject()
         testDispatcher.scheduler.advanceUntilIdle()
 
         // Updates now go through the atomic transform overload (read-modify-write) so a concurrent
-        // AR wall-map save can't clobber the layer edits — see the save-race fix.
+        // AR wall-map save can't clobber the design edits — see the save-race fix.
         coVerify { projectRepository.updateProject(any<(GraffitiProject) -> GraffitiProject>()) }
     }
 
     @Test
     fun `undo restores previous state`() = runTest {
-        val uri = Uri.parse("content://test/image.png")
-        viewModel.onAddLayer(uri)
-        testDispatcher.scheduler.advanceUntilIdle()
-        
-        assertEquals(1, viewModel.uiState.value.layers.size)
-        
+        addDesign()
+        assertNotNull(viewModel.uiState.value.design)
+
         viewModel.onUndoClicked()
-        assertEquals(0, viewModel.uiState.value.layers.size)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.design)
     }
 
     @Test
     fun `redo restores undone state`() = runTest {
-        val uri = Uri.parse("content://test/image.png")
-        viewModel.onAddLayer(uri)
-        testDispatcher.scheduler.advanceUntilIdle()
-        
+        addDesign()
+
         viewModel.onUndoClicked()
-        assertEquals(0, viewModel.uiState.value.layers.size)
-        
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.design)
+
         viewModel.onRedoClicked()
-        assertEquals(1, viewModel.uiState.value.layers.size)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertNotNull(viewModel.uiState.value.design)
     }
 
     @Test
     fun `gesture undo restores state`() = runTest {
-        val uri = Uri.parse("content://test/image.png")
-        viewModel.onAddLayer(uri)
-        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.setEditorMode(EditorMode.DESIGN)
+        addDesign()
 
-        val initialScale = viewModel.uiState.value.layers.first().scale
-        
-        // Start gesture
+        val initialScale = viewModel.uiState.value.design!!.scale
+
         viewModel.onGestureStart()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        // Transform
         viewModel.onTransformGesture(Offset.Zero, 2.0f, 0f)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        val modifiedScale = viewModel.uiState.value.layers.first().scale
-        assertEquals(initialScale * 2.0f, modifiedScale, 0.01f)
+        assertEquals(initialScale * 2.0f, viewModel.uiState.value.design!!.scale, 0.01f)
 
-        // End gesture
         viewModel.onGestureEnd()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        // Undo
         viewModel.onUndoClicked()
         testDispatcher.scheduler.advanceUntilIdle()
 
-        val restoredScale = viewModel.uiState.value.layers.first().scale
-        assertEquals(initialScale, restoredScale, 0.01f)
+        assertEquals(initialScale, viewModel.uiState.value.design!!.scale, 0.01f)
     }
 
     @Test
@@ -313,92 +276,90 @@ class EditorViewModelTest {
         val state = viewModel.uiState.value
         assertEquals(0, state.undoCount)
         assertEquals(0, state.redoCount)
-        assertTrue(state.layers.isEmpty())
+        assertNull(state.design)
     }
 
-    @Test
-    fun `onLayerRemoved with unknown id does not modify state`() = runTest {
-        val uri = Uri.parse("content://test/image.png")
-        viewModel.onAddLayer(uri)
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        val layerCountBefore = viewModel.uiState.value.layers.size
-        assertEquals(1, layerCountBefore)
-
-        // Removing a non-existent ID should leave the layer list unchanged.
-        viewModel.onLayerRemoved("non-existent-id")
-        testDispatcher.scheduler.advanceUntilIdle()
-
-        assertEquals(layerCountBefore, viewModel.uiState.value.layers.size)
-    }
-
-    // ==================== Layer-state characterization (refactor safety net) ====================
-    // These pin the observable behavior of the layer-management operations a future LayerManager
-    // extraction must preserve. They seed state via setLayers() and avoid OpenCV, so they run in
-    // plain JVM. If an extraction changes behavior, these go red. advanceUntilIdle() runs FIRST so
-    // the init currentProject-collect (which seeds layers from the empty test project) settles
-    // before setLayers() seeds the real fixture.
-
-    private fun lyr(id: String, name: String = id) = Layer(id = id, name = name)
+    // ==================== Adjustment knobs: design vs mode ====================
+    // The knobs behave differently depending on the mode: in DESIGN they tone the design itself, in
+    // any projected mode they tone that mode's whole-design ModeAdjustment. Both paths must keep
+    // working now that there is only one design.
 
     @Test
-    fun `characterize onLayerReordered reorders layers by the given id order`() = runTest {
-        testDispatcher.scheduler.advanceUntilIdle()
-        viewModel.setLayers(listOf(lyr("a"), lyr("b"), lyr("c")))
-        viewModel.onLayerReordered(listOf("c", "a", "b"))
-        testDispatcher.scheduler.advanceUntilIdle()
-        assertEquals(listOf("c", "a", "b"), viewModel.uiState.value.layers.map { it.id })
-    }
-
-    @Test
-    fun `characterize onLayerRenamed renames only the target layer`() = runTest {
-        testDispatcher.scheduler.advanceUntilIdle()
-        viewModel.setLayers(listOf(lyr("a", "Alpha"), lyr("b", "Beta")))
-        viewModel.onLayerRenamed("a", "Renamed")
-        testDispatcher.scheduler.advanceUntilIdle()
-        val layers = viewModel.uiState.value.layers
-        assertEquals("Renamed", layers.first { it.id == "a" }.name)
-        assertEquals("Beta", layers.first { it.id == "b" }.name)
-    }
-
-    @Test
-    fun `characterize onToggleVisibility flips only the target layer`() = runTest {
-        testDispatcher.scheduler.advanceUntilIdle()
-        viewModel.setLayers(listOf(lyr("a"), lyr("b")))
-        viewModel.onToggleVisibility("a")
-        testDispatcher.scheduler.advanceUntilIdle()
-        val layers = viewModel.uiState.value.layers
-        assertFalse(layers.first { it.id == "a" }.isVisible)
-        assertTrue(layers.first { it.id == "b" }.isVisible)
-    }
-
-    @Test
-    fun `onOpacityChanged in Design updates only the active layer`() = runTest {
-        testDispatcher.scheduler.advanceUntilIdle()
+    fun `onOpacityChanged in Design updates the design`() = runTest {
         viewModel.setEditorMode(EditorMode.DESIGN)
-        viewModel.setLayers(listOf(lyr("a"), lyr("b")))
-        viewModel.onLayerActivated("a")
-        testDispatcher.scheduler.advanceUntilIdle()
+        addDesign()
         viewModel.onOpacityChanged(0.25f)
         testDispatcher.scheduler.advanceUntilIdle()
-        val layers = viewModel.uiState.value.layers
-        assertEquals(0.25f, layers.first { it.id == "a" }.opacity)
-        assertEquals(1.0f, layers.first { it.id == "b" }.opacity)
+        assertEquals(0.25f, viewModel.uiState.value.design!!.opacity)
     }
 
     @Test
-    fun `onOpacityChanged in a Mode updates the mode adjustment, not the layer`() = runTest {
-        testDispatcher.scheduler.advanceUntilIdle()
+    fun `onOpacityChanged in a Mode updates the mode adjustment, not the design`() = runTest {
         viewModel.setEditorMode(EditorMode.OVERLAY)
-        viewModel.setLayers(listOf(lyr("a")))
-        viewModel.onLayerActivated("a")
-        testDispatcher.scheduler.advanceUntilIdle()
+        addDesign()
         viewModel.onOpacityChanged(0.4f)
         testDispatcher.scheduler.advanceUntilIdle()
         val st = viewModel.uiState.value
-        // Whole-design mode opacity is updated; the active layer's own opacity is untouched.
         assertEquals(0.4f, st.modeAdjustments[EditorMode.OVERLAY]?.opacity)
-        assertEquals(1.0f, st.layers.first { it.id == "a" }.opacity)
+        assertEquals(1.0f, st.design!!.opacity)
     }
 
+    @Test
+    fun `onBrightnessChanged in Design updates the design`() = runTest {
+        viewModel.setEditorMode(EditorMode.DESIGN)
+        addDesign()
+        viewModel.onBrightnessChanged(0.3f)
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(0.3f, viewModel.uiState.value.design!!.brightness)
+    }
+
+    @Test
+    fun `color balance knobs always tone the design`() = runTest {
+        // Unlike opacity/brightness/contrast/saturation, colour balance has no per-mode equivalent,
+        // so it goes to the design regardless of the mode in view.
+        viewModel.setEditorMode(EditorMode.OVERLAY)
+        addDesign()
+        viewModel.onColorBalanceRChanged(1.5f)
+        viewModel.onColorBalanceGChanged(0.5f)
+        viewModel.onColorBalanceBChanged(0.75f)
+        testDispatcher.scheduler.advanceUntilIdle()
+        val d = viewModel.uiState.value.design!!
+        assertEquals(1.5f, d.colorBalanceR)
+        assertEquals(0.5f, d.colorBalanceG)
+        assertEquals(0.75f, d.colorBalanceB)
+    }
+
+    @Test
+    fun `reset flattens placement and a second press restores it`() = runTest {
+        viewModel.setEditorMode(EditorMode.DESIGN)
+        addDesign()
+        viewModel.onScaleChanged(2.5f)
+        viewModel.onOffsetChanged(Offset(30f, 40f))
+        viewModel.onOpacityChanged(0.4f)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onResetClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        var d = viewModel.uiState.value.design!!
+        assertEquals(1f, d.scale)
+        assertEquals(Offset.Zero, d.offset)
+        assertEquals("reset must not touch the knobs", 0.4f, d.opacity)
+
+        viewModel.onResetClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        d = viewModel.uiState.value.design!!
+        assertEquals(2.5f, d.scale)
+        assertEquals(Offset(30f, 40f), d.offset)
+        assertEquals(0.4f, d.opacity)
+    }
+
+    @Test
+    fun `knob changes before an image is chosen do not crash`() = runTest {
+        viewModel.setEditorMode(EditorMode.DESIGN)
+        viewModel.onOpacityChanged(0.5f)
+        viewModel.onToggleInvert()
+        viewModel.toggleImageLock()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.design)
+    }
 }

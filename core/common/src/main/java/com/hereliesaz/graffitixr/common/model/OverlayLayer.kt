@@ -33,5 +33,7 @@ data class OverlayLayer(
     val isVisible: Boolean = true,
     val isLinked: Boolean = false,
     val isInverted: Boolean = false,
-
+    /** See [Layer.isSketch] — the effects persist as flags and are re-derived from [uri] on load. */
+    val isSketch: Boolean = false,
+    val isSubjectIsolated: Boolean = false,
 )

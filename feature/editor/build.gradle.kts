@@ -61,6 +61,9 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.play.services)
 
+    // Subject segmentation, for the isolation effect (SubjectIsolator).
+    implementation(libs.mlkit.subject.segmentation)
+
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 

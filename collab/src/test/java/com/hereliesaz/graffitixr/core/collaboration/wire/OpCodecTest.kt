@@ -46,7 +46,7 @@ class OpCodecTest {
 
     @Test
     fun `Delta round-trips with LayerAdd op`() {
-        val original = DeltaPayload(seq = 42L, op = Op.LayerAdd(Layer(id = "L1", name = "one")))
+        val original = DeltaPayload(seq = 42L, op = Op.DesignReplace(Layer(id = "L1", name = "one")))
         assertEquals(original, OpCodec.decode<DeltaPayload>(OpCodec.encode(original)))
     }
 

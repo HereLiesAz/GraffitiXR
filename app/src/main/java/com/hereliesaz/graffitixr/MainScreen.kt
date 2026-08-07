@@ -75,7 +75,7 @@ fun MainScreen(
     // artwork throughout. Defaulted off — no effect on the normal path.
     doodleDetectActive: Boolean = false
 ) {
-    val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
+    val activeLayer = uiState.design
     val isImageLocked = activeLayer?.isImageLocked ?: false
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -220,7 +220,7 @@ fun MainScreen(
                         }
                     }
 
-                    val visibleLayers = uiState.layers.filter { it.isVisible && it.bitmap != null }
+                    val visibleDesign = uiState.design?.takeIf { it.isVisible && it.bitmap != null }
 
                     // Push the AR whole-design adjustment (set via the rail's "Layer" item) to the
                     // renderer, which applies it as an in-plane move/scale/rotate of the overlay along
@@ -257,14 +257,14 @@ fun MainScreen(
                             listOf(it.brightness, it.contrast, it.saturation, it.opacity, it.isInverted)
                         }
                     }
-                    LaunchedEffect(visibleLayers, arUiState.isAnchorEstablished, arToneKey) {
-                        if (!arUiState.isAnchorEstablished || visibleLayers.isEmpty()) {
+                    LaunchedEffect(visibleDesign, arUiState.isAnchorEstablished, arToneKey) {
+                        if (!arUiState.isAnchorEstablished || visibleDesign == null) {
                             rendererRef.value?.updateOverlayBitmap(null)
                             return@LaunchedEffect
                         }
 
                         val composite = withContext(Dispatchers.Default) {
-                            compositeLayersForAr(visibleLayers, arOverlayAdj)
+                            compositeDesignForAr(visibleDesign, arOverlayAdj)
                         }
                         rendererRef.value?.updateOverlayBitmap(composite)
                     }
@@ -283,12 +283,12 @@ fun MainScreen(
                     // now legitimately differ. Only on a layer change, which is rare — the recompose
                     // storm this file worries about elsewhere is driven by the tone key, and that no
                     // longer reaches here.
-                    LaunchedEffect(visibleLayers, arUiState.isAnchorEstablished) {
-                        if (!arUiState.isAnchorEstablished || visibleLayers.isEmpty()) {
+                    LaunchedEffect(visibleDesign, arUiState.isAnchorEstablished) {
+                        if (!arUiState.isAnchorEstablished || visibleDesign == null) {
                             return@LaunchedEffect
                         }
                         val guide = withContext(Dispatchers.Default) {
-                            compositeLayersForAr(visibleLayers)
+                            compositeDesignForAr(visibleDesign)
                         }
                         arViewModel.updatePaintingGuide(guide)
                     }
@@ -471,7 +471,7 @@ fun MainScreen(
                         transformOrigin = TransformOrigin.Center
                     }
             ) {
-                uiState.layers.filter { it.isVisible }.forEach { layer ->
+                uiState.design?.takeIf { it.isVisible }?.let { layer ->
                     androidx.compose.runtime.key(layer.id) {
                         layer.bitmap?.let { displayBmp ->
                             val imageBitmap = remember(displayBmp) { displayBmp.asImageBitmap() }
@@ -537,7 +537,7 @@ fun MainScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(uiState.activeLayerId, isImageLocked, isWaitingForTap, isTouchLocked, isGuest, uiState.editorMode) {
+                    .pointerInput(uiState.design?.id, isImageLocked, isWaitingForTap, isTouchLocked, isGuest, uiState.editorMode) {
                         if (isGuest) return@pointerInput // Block ALL guest interaction with layers
 
                         // Outside Design there is only ONE layer (the whole design), so transform
@@ -562,7 +562,7 @@ fun MainScreen(
                             )
                         }
                     }
-                    .pointerInput(uiState.activeLayerId, isImageLocked, isWaitingForTap, isTouchLocked, uiState.editorMode) {
+                    .pointerInput(uiState.design?.id, isImageLocked, isWaitingForTap, isTouchLocked, uiState.editorMode) {
                         // Outside Design the whole design is the single layer, so transform gestures
                         // always drive the mode adjustment instead of a per-layer transform.
                         val editingMode = uiState.editorMode != EditorMode.DESIGN
@@ -633,7 +633,8 @@ fun MainScreen(
  * Mockup/Trace paths do it (see the `graphicsLayer{alpha}` + per-Image ColorFilter block above).
  * Passing null means "no whole-design tone" (Design mode baseline).
  */
-internal fun compositeLayersForAr(layers: List<Layer>, modeAdj: ModeAdjustment? = null): AndroidBitmap {
+internal fun compositeDesignForAr(design: Layer?, modeAdj: ModeAdjustment? = null): AndroidBitmap {
+    val layers = listOfNotNull(design)
     if (layers.isEmpty()) return createBitmap(1, 1, AndroidBitmap.Config.ARGB_8888)
 
     var minX = Float.MAX_VALUE
@@ -693,8 +694,8 @@ internal fun compositeLayersForAr(layers: List<Layer>, modeAdj: ModeAdjustment? 
 
     for (layer in layers) {
         val bmp = layer.bitmap ?: continue
-        // This composite runs on Dispatchers.Default; a layer bitmap could be recycled on the
-        // main thread (delete-layer, mode transition) after we captured our reference but before
+        // This composite runs on Dispatchers.Default; the bitmap could be recycled on the main
+        // thread (design replaced, mode transition) after we captured our reference but before
         // the draw. Skip a recycled bitmap instead of crashing with
         // "Canvas: trying to use a recycled bitmap".
         if (bmp.isRecycled) continue

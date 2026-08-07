@@ -13,9 +13,8 @@ import com.hereliesaz.graffitixr.common.model.Op
  * was full, and `HostSession.enqueueOp` treated a refusal as fatal — so a single ordinary edit could
  * kill a healthy session. Two ways, both routine:
  *
- *  * **One big op.** `Op.LayerBitmapReplace` carries a full-canvas PNG. One Liquify warp or one
- *    undo of a paint stroke on a large layer is megabytes, and a 5 MB ceiling made "the artist used
- *    the warp tool" a disconnect.
+ *  * **One big op.** `Op.DesignBitmapReplace` carries a full-canvas PNG. One undo of a bitmap
+ *    edit is megabytes, and a 5 MB ceiling made an ordinary edit a disconnect.
  *  * **No guest yet.** The buffer is only trimmed by a guest's DELTA_ACK. While the host is sitting
  *    in `WaitingForGuest` nothing acks, so an artist who starts sharing and keeps working fills the
  *    budget and tears down their own session before anyone has joined — and the replay history was
@@ -23,10 +22,9 @@ import com.hereliesaz.graffitixr.common.model.Op
  *
  * So the buffer now degrades instead of failing. Two mechanisms:
  *
- *  * [supersede] drops the entries a newer full-layer replacement makes redundant. An
- *    `Op.LayerBitmapReplace` defines that layer's pixels outright, so every earlier buffered op
- *    targeting the same layer is already baked into it. This bounds the common heavy case: repeated
- *    warps on one layer coalesce to the latest instead of accumulating.
+ *  * [supersede] drops the entries a newer op makes redundant — see there for which subsumes
+ *    which. This bounds the common heavy case: repeated bitmap replacements, and repeated slider
+ *    drags, coalesce to the latest instead of accumulating.
  *  * When even that is not enough, [append] evicts the oldest entries and records that the history
  *    now has a hole ([hasGap]). A gapped buffer cannot answer a replay, and [opsAfter] says so by
  *    returning null — which the caller turns into a full bulk re-sync, the same path a first-time
@@ -38,7 +36,7 @@ import com.hereliesaz.graffitixr.common.model.Op
 internal class DeltaBuffer(
     /**
      * Total retained bytes before eviction starts. Sized for whole-canvas PNGs rather than for
-     * small ops: at 5 MB a single [Op.LayerBitmapReplace] could exceed the entire budget on its own,
+     * small ops: at 5 MB a single [Op.DesignBitmapReplace] could exceed the entire budget on its own,
      * which is what made one warp fatal.
      */
     private val maxBytes: Long = 48L * 1024 * 1024,
@@ -65,7 +63,7 @@ internal class DeltaBuffer(
     @Synchronized
     fun append(seq: Long, op: Op, sizeBytes: Int) {
         if (sizeBytes < 0) return
-        // A newer full-layer replacement subsumes everything buffered for that layer.
+        // A newer op may subsume ones already buffered.
         supersede(op)
         ring.addLast(Entry(seq, op, sizeBytes))
         totalBytes += sizeBytes
@@ -82,33 +80,37 @@ internal class DeltaBuffer(
     /**
      * Drop buffered entries that [incoming] makes redundant.
      *
-     * Only [Op.LayerBitmapReplace] supersedes, and only for its own layer: it replaces that layer's
-     * pixels wholesale, so any earlier buffered op scoped to the same layer is already reflected in
-     * it. Ops on other layers, and ops whose effect is not layer-scoped (reordering), are untouched.
+     * There is one design, so every op is scoped to it and the question is only which ops SUBSUME
+     * which. Three do:
+     *
+     *  * [Op.DesignReplace] replaces the whole design object — pixels, transform and tone — so
+     *    nothing buffered before it can still matter.
+     *  * [Op.DesignBitmapReplace] defines the pixels outright, so it subsumes earlier pixel ops
+     *    (another bitmap replace, or a completed stroke) but NOT transform or tone, which are
+     *    separate state a replacement does not carry.
+     *  * [Op.DesignTransform] and [Op.DesignProps] each carry an ABSOLUTE value rather than a
+     *    delta, so the newest one is the only one worth replaying.
+     *
+     * This is what bounds the heavy case: repeated warps or repeated slider drags coalesce to the
+     * latest instead of accumulating a megabyte apiece.
      */
     private fun supersede(incoming: Op) {
-        if (incoming !is Op.LayerBitmapReplace) return
-        val layerId = incoming.layerId
+        val subsumes: (Op) -> Boolean = when (incoming) {
+            is Op.DesignReplace -> { _ -> true }
+            is Op.DesignBitmapReplace -> { op -> op is Op.DesignBitmapReplace || op is Op.StrokeComplete }
+            is Op.DesignTransform -> { op -> op is Op.DesignTransform }
+            is Op.DesignProps -> { op -> op is Op.DesignProps }
+            // A completed stroke is incremental: it builds on what came before and subsumes nothing.
+            is Op.StrokeComplete, is Op.TextContentChange -> return
+        }
         val it = ring.iterator()
         while (it.hasNext()) {
             val entry = it.next()
-            if (entry.op.layerScope() == layerId) {
+            if (subsumes(entry.op)) {
                 totalBytes -= entry.sizeBytes
                 it.remove()
             }
         }
-    }
-
-    /** The layer an op is scoped to, or null when it affects more than one (or none). */
-    private fun Op.layerScope(): String? = when (this) {
-        is Op.LayerBitmapReplace -> layerId
-        is Op.LayerTransform -> layerId
-        is Op.LayerPropsChange -> layerId
-        is Op.StrokeComplete -> layerId
-        is Op.TextContentChange -> layerId
-        // LayerAdd introduces the layer the later ops depend on, and LayerRemove/LayerReorder
-        // change the layer SET rather than one layer's contents. None may be dropped.
-        is Op.LayerAdd, is Op.LayerRemove, is Op.LayerReorder -> null
     }
 
     /** Discard all entries with seq <= upTo. */

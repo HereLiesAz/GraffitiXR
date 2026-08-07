@@ -51,31 +51,8 @@ fun EditorUi(
             modifier = Modifier.align(Alignment.BottomCenter),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 1. Layer List Panel (Conditional)
-            if (uiState.activePanel == EditorPanel.LAYERS) {
-                Box(
-                    modifier = Modifier
-                        .padding(horizontal = 16.dp)
-                        .background(Color.Black.copy(alpha = 0.8f), RoundedCornerShape(16.dp))
-                        .padding(16.dp)
-                ) {
-                    LayersPanel(
-                        layers = uiState.layers,
-                        activeLayerId = uiState.activeLayerId,
-                        onSelectLayer = actions::onLayerActivated,
-                        onToggleVisibility = actions::onToggleVisibility,
-                        onRename = actions::onLayerRenamed,
-                        onRemove = actions::onLayerRemoved,
-                        onReorder = actions::onLayerReordered,
-                        onClose = { actions.onDismissPanel() },
-                        strings = strings
-                    )
-                }
-            }
-
-            // 2. Integrated Adjustments Panel (Knobs + Undo/Redo/Magic)
-            val activeLayer = uiState.layers.find { it.id == uiState.activeLayerId }
-            val overlayLayer = activeLayer?.let {
+            // Integrated Adjustments Panel (Knobs + Undo/Redo)
+            val overlayLayer = uiState.design?.let {
                 OverlayLayer(
                     id = it.id,
                     name = it.name,
@@ -102,11 +79,12 @@ fun EditorUi(
                 state = AdjustmentsState(
                     hideUiForCapture = uiState.hideUiForCapture,
                     isTouchLocked = isTouchLocked,
-                    hasImage = uiState.layers.isNotEmpty(),
+                    hasImage = uiState.design != null,
                     isArMode = uiState.editorMode == EditorMode.AR,
                     hasHistory = uiState.undoCount > 0 || uiState.redoCount > 0,
                     undoCount = uiState.undoCount,
                     redoCount = uiState.redoCount,
+                    isResetActive = uiState.transformStash != null,
                     isRightHanded = uiState.isRightHanded,
                     isCapturingTarget = isCapturingTarget,
                     activeLayer = overlayLayer,
@@ -116,7 +94,7 @@ fun EditorUi(
                 // they're rail-triggered via the Adjust panel. Hidden while capturing a target so they
                 // don't overlap the target-creation dialog.
                 showKnobs = !isCapturingTarget &&
-                    (uiState.activePanel == EditorPanel.ADJUST || (inMode && uiState.layers.isNotEmpty())),
+                    (uiState.activePanel == EditorPanel.ADJUST || (inMode && uiState.design != null)),
                 showColorBalance = uiState.activePanel == EditorPanel.COLOR,
                 isLandscape = isLandscape,
                 screenHeight = screenHeight,
@@ -129,6 +107,7 @@ fun EditorUi(
                 onColorBalanceBChange = actions::onColorBalanceBChanged,
                 onUndo = actions::onUndoClicked,
                 onRedo = actions::onRedoClicked,
+                onReset = actions::onResetClicked,
                 onAdjustmentStart = actions::onAdjustmentStart,
                 onAdjustmentEnd = actions::onAdjustmentEnd,
                 strings = strings,
@@ -139,127 +118,4 @@ fun EditorUi(
             )
         }
     }
-}
-
-@Composable
-fun LayersPanel(
-    layers: List<Layer>,
-    activeLayerId: String?,
-    onSelectLayer: (String) -> Unit,
-    onToggleVisibility: (String) -> Unit,
-    onRename: (String, String) -> Unit,
-    onRemove: (String) -> Unit,
-    onReorder: (List<String>) -> Unit,
-    onClose: () -> Unit,
-    strings: AppStrings
-) {
-    // Every control here drives an EditorViewModel action that already existed, was already
-    // covered by tests, and had no way to be invoked: a layer could be added but never removed,
-    // renamed, reordered, or hidden — onToggleVisibility was even passed into this panel and then
-    // never attached to anything.
-    var renaming by remember { mutableStateOf<Layer?>(null) }
-
-    Column(Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(strings.editor.layers, style = MaterialTheme.typography.titleMedium, color = Color.White)
-            Text(
-                strings.common.close,
-                color = Color.Gray,
-                modifier = Modifier.clickable { onClose() }.padding(8.dp)
-            )
-        }
-        LazyColumn(Modifier.fillMaxWidth()) {
-            // Topmost layer first on screen, which is the reverse of the draw order the model
-            // stores. The index maths below converts back before reordering.
-            itemsIndexed(layers.reversed()) { displayIndex, layer ->
-                val modelIndex = layers.lastIndex - displayIndex
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(if (layer.id == activeLayerId) Color.Gray.copy(alpha = 0.3f) else Color.Transparent)
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = layer.name,
-                        color = if (layer.isVisible) Color.White else Color.White.copy(alpha = 0.4f),
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { onSelectLayer(layer.id) }
-                            .padding(8.dp),
-                    )
-                    LayerAction(
-                        label = if (layer.isVisible) strings.editor.hideLayer else strings.editor.showLayer,
-                        enabled = true,
-                    ) { onToggleVisibility(layer.id) }
-                    LayerAction(label = "\u2191", enabled = modelIndex < layers.lastIndex) {
-                        onReorder(layers.map { it.id }.swapped(modelIndex, modelIndex + 1))
-                    }
-                    LayerAction(label = "\u2193", enabled = modelIndex > 0) {
-                        onReorder(layers.map { it.id }.swapped(modelIndex, modelIndex - 1))
-                    }
-                    LayerAction(label = strings.editor.renameHint, enabled = true) { renaming = layer }
-                    LayerAction(label = strings.editor.delete, enabled = true) { onRemove(layer.id) }
-                }
-            }
-        }
-    }
-
-    renaming?.let { target ->
-        var draft by remember(target.id) { mutableStateOf(target.name) }
-        AlertDialog(
-            onDismissRequest = { renaming = null },
-            title = { Text(strings.editor.renameHint) },
-            text = {
-                OutlinedTextField(
-                    value = draft,
-                    onValueChange = { draft = it },
-                    singleLine = true,
-                )
-            },
-            confirmButton = {
-                Text(
-                    text = strings.common.done,
-                    modifier = Modifier
-                        .clickable {
-                            // A blank name would render as an unclickable empty row.
-                            if (draft.isNotBlank()) onRename(target.id, draft.trim())
-                            renaming = null
-                        }
-                        .padding(8.dp),
-                )
-            },
-            dismissButton = {
-                Text(
-                    text = strings.common.cancel,
-                    modifier = Modifier.clickable { renaming = null }.padding(8.dp),
-                )
-            },
-        )
-    }
-}
-
-/** Swap two indices, returning a new list. Out-of-range indices return the list unchanged. */
-private fun List<String>.swapped(a: Int, b: Int): List<String> {
-    if (a !in indices || b !in indices || a == b) return this
-    val out = toMutableList()
-    out[a] = this[b]
-    out[b] = this[a]
-    return out
-}
-
-@Composable
-private fun LayerAction(label: String, enabled: Boolean, onClick: () -> Unit) {
-    Text(
-        text = label,
-        color = if (enabled) Color.White else Color.White.copy(alpha = 0.3f),
-        style = MaterialTheme.typography.labelMedium,
-        modifier = Modifier
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 6.dp, vertical = 8.dp),
-    )
 }

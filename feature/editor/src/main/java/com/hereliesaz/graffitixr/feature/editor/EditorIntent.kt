@@ -32,21 +32,19 @@ internal sealed interface EditorIntent {
     data object ToggleImageLock : EditorIntent
     data object CycleRotationAxis : EditorIntent
 
-    // ── Layer list ────────────────────────────────────────────────────────────
-    data class ReorderLayers(val order: List<String>) : EditorIntent
-    data class RenameLayer(val id: String, val name: String) : EditorIntent
-    data class ToggleVisibility(val id: String) : EditorIntent
-    data class ActivateLayer(val id: String) : EditorIntent
-
-    /** Appends [layer] and makes it active. [resetActivePanel] dismisses any open panel. */
-    data class AddLayer(val layer: Layer, val resetActivePanel: Boolean = true) : EditorIntent
-    /** Removes [id]; if it was active, activates the first remaining layer. */
-    data class RemoveLayer(val id: String) : EditorIntent
+    // ── The design ────────────────────────────────────────────────────────────
+    /** Replaces the design with [layer]. [resetActivePanel] dismisses any open panel. */
+    data class SetDesign(val layer: Layer, val resetActivePanel: Boolean = true) : EditorIntent
 
     // ── Panel / mode / gesture ────────────────────────────────────────────────
+    /**
+     * The Reset button. First press flattens placement — the design's own transform and the current
+     * mode's whole-design transform — to identity, stashing what was there. Second press puts the
+     * stash back. Tone, colour balance and effects are never touched by either press.
+     */
+    data object ToggleTransformReset : EditorIntent
+
     data object ToggleAdjustPanel : EditorIntent
-    /** Opens/closes the layer list — the panel's only entry point. */
-    data object ToggleLayersPanel : EditorIntent
     data object DismissPanel : EditorIntent
     data class SetEditorMode(val mode: EditorMode) : EditorIntent
 
@@ -76,18 +74,16 @@ internal sealed interface EditorIntent {
      */
     data object FeedbackShown : EditorIntent
 
-    // ── Spectator / remote-op application (by id; no active-layer side effects) ────
-    data class AppendLayer(val layer: Layer) : EditorIntent
-    data class RemoveLayerById(val id: String) : EditorIntent
-    data class SetLayerTransformById(val id: String, val scale: Float, val offset: Offset, val rx: Float, val ry: Float, val rz: Float) : EditorIntent
-    data class SetLayerProps(val id: String, val props: LayerProps) : EditorIntent
+    // ── Spectator / remote-op application (no panel or gesture side effects) ──
+    data class SetDesignTransform(val scale: Float, val offset: Offset, val rx: Float, val ry: Float, val rz: Float) : EditorIntent
+    data class SetDesignProps(val props: LayerProps) : EditorIntent
 
     // ── Panels / gestures / layer set / project lifecycle ─────────────────────
     data object ToggleColorPanel : EditorIntent
     /** A transform gesture begins: flags it and dismisses any open panel. */
     data object BeginGesture : EditorIntent
-    /** Replaces just the layer list, leaving active id untouched (undo restore, reload). */
-    data class SetLayers(val layers: List<Layer>) : EditorIntent
-    data class LoadedProject(val projectId: String, val layers: List<Layer>) : EditorIntent
+    /** Replaces the design outright (undo restore, reload). Null clears it. */
+    data class RestoreDesign(val design: Layer?) : EditorIntent
+    data class LoadedProject(val projectId: String, val design: Layer?) : EditorIntent
     data object ClearProject : EditorIntent
 }

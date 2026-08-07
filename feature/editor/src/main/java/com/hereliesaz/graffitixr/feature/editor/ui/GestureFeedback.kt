@@ -23,7 +23,7 @@ import com.hereliesaz.graffitixr.common.model.RotationAxis
 @Composable
 fun GestureFeedback(state: EditorUiState, modifier: Modifier = Modifier) {
     val showFeedback = state.gestureInProgress || state.showRotationAxisFeedback
-    val activeLayer = state.layers.find { it.id == state.activeLayerId }
+    val activeLayer = state.design
     val isLocked = activeLayer?.isImageLocked ?: false
 
     if (showFeedback && !isLocked) {

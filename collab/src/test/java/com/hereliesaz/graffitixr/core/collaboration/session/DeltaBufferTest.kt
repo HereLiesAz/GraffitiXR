@@ -11,11 +11,11 @@ import org.junit.Test
 
 class DeltaBufferTest {
 
-    private fun op(id: String) = Op.LayerAdd(Layer(id = id, name = id))
-    private fun bitmap(layerId: String, marker: Byte) =
-        Op.LayerBitmapReplace(layerId, byteArrayOf(marker))
-    private fun stroke(layerId: String) =
-        Op.LayerTransform(layerId, listOf(1f, 0f, 0f, 1f))
+    // TextContentChange subsumes nothing and is subsumed by nothing, so it is the stand-in for
+    // "an ordinary op that must survive coalescing".
+    private fun op(id: String) = Op.TextContentChange(id)
+    private fun bitmap(marker: Byte) = Op.DesignBitmapReplace(byteArrayOf(marker))
+    private fun transform(scale: Float) = Op.DesignTransform(listOf(scale, 0f, 0f, 1f))
 
     @Test
     fun `append + opsAfter returns ops with seq greater than threshold`() {
@@ -75,13 +75,13 @@ class DeltaBufferTest {
 
     @Test
     fun `a single op larger than the whole budget is still retained`() {
-        // The case that used to end a live session: one Liquify warp emits a whole-canvas
-        // LayerBitmapReplace, which exceeded the cap on its own and was refused.
+        // The case that used to end a live session: a whole-canvas DesignBitmapReplace exceeded
+        // the cap on its own and was refused.
         val buf = DeltaBuffer(maxBytes = 100)
-        buf.append(1, bitmap("layer", 1), 200)
+        buf.append(1, bitmap(1), 200)
 
         assertEquals(1, buf.size())
-        assertEquals(listOf<Pair<Long, Op>>(1L to bitmap("layer", 1)), buf.opsAfter(0))
+        assertEquals(listOf<Pair<Long, Op>>(1L to bitmap(1)), buf.opsAfter(0))
     }
 
     @Test
@@ -112,47 +112,48 @@ class DeltaBufferTest {
     // --- Coalescing -------------------------------------------------------------------------
 
     @Test
-    fun `a full-layer replace supersedes earlier ops on the same layer`() {
+    fun `a bitmap replace supersedes earlier pixel ops but not transform or tone`() {
         val buf = DeltaBuffer()
-        buf.append(1, bitmap("A", 1), 1_000)
-        buf.append(2, stroke("A"), 10)
-        buf.append(3, bitmap("A", 2), 1_000)
+        buf.append(1, bitmap(1), 1_000)
+        buf.append(2, transform(2f), 10)
+        buf.append(3, bitmap(2), 1_000)
 
-        // Only the latest replace survives for layer A: it already contains both earlier states.
-        assertEquals(listOf<Pair<Long, Op>>(3L to bitmap("A", 2)), buf.opsAfter(0))
-        assertEquals(1_000L, buf.bytes())
-    }
-
-    @Test
-    fun `a full-layer replace leaves other layers alone`() {
-        val buf = DeltaBuffer()
-        buf.append(1, bitmap("A", 1), 10)
-        buf.append(2, bitmap("B", 1), 10)
-        buf.append(3, bitmap("A", 2), 10)
-
+        // The transform survives: replacing the pixels says nothing about where the design sits.
         assertEquals(
-            listOf<Pair<Long, Op>>(2L to bitmap("B", 1), 3L to bitmap("A", 2)),
+            listOf<Pair<Long, Op>>(2L to transform(2f), 3L to bitmap(2)),
             buf.opsAfter(0),
         )
     }
 
     @Test
-    fun `a full-layer replace does not drop layer-set ops`() {
-        // LayerAdd introduces the layer the replace targets, and LayerRemove/LayerReorder change
-        // the layer SET — none of them are subsumed by a pixel replacement.
+    fun `an absolute transform supersedes earlier transforms only`() {
         val buf = DeltaBuffer()
-        buf.append(1, op("A"), 10)
-        buf.append(2, Op.LayerReorder(listOf("A", "B")), 10)
-        buf.append(3, bitmap("A", 1), 10)
+        buf.append(1, transform(1f), 10)
+        buf.append(2, bitmap(1), 10)
+        buf.append(3, transform(3f), 10)
 
-        assertEquals(3, buf.size())
+        assertEquals(
+            listOf<Pair<Long, Op>>(2L to bitmap(1), 3L to transform(3f)),
+            buf.opsAfter(0),
+        )
     }
 
     @Test
-    fun `repeated warps on one layer stay bounded`() {
+    fun `replacing the design supersedes everything before it`() {
+        val buf = DeltaBuffer()
+        buf.append(1, bitmap(1), 10)
+        buf.append(2, transform(2f), 10)
+        val replacement = Op.DesignReplace(Layer(id = "d", name = "design"))
+        buf.append(3, replacement, 10)
+
+        assertEquals(listOf<Pair<Long, Op>>(3L to replacement), buf.opsAfter(0))
+    }
+
+    @Test
+    fun `repeated bitmap replacements stay bounded`() {
         // The scenario the old cap turned into a disconnect: many whole-canvas replaces in a row.
         val buf = DeltaBuffer(maxBytes = 10_000)
-        repeat(50) { i -> buf.append(i + 1L, bitmap("A", i.toByte()), 4_000) }
+        repeat(50) { i -> buf.append(i + 1L, bitmap(i.toByte()), 4_000) }
 
         assertEquals(1, buf.size())
         assertFalse("coalescing kept it in budget, so no history was lost", buf.hasGap())

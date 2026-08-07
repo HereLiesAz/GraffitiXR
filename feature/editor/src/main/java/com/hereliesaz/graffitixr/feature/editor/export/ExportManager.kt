@@ -15,12 +15,13 @@ import com.hereliesaz.graffitixr.feature.editor.createColorMatrix
 import javax.inject.Inject
 
 /**
- * Handles compositing and exporting of project layers.
+ * Renders the design onto an export canvas.
  */
 class ExportManager @Inject constructor() {
 
-    fun compositeLayers(
-        layers: List<Layer>,
+    /** Draws [design] (with its tone and transform applied) over the background, if there is one. */
+    fun composite(
+        design: Layer?,
         width: Int,
         height: Int,
         backgroundBitmap: Bitmap? = null,
@@ -58,7 +59,7 @@ class ExportManager @Inject constructor() {
             canvas.drawBitmap(bg, matrix, null)
         }
 
-        layers.filter { it.isVisible }.forEach { layer ->
+        design?.takeIf { it.isVisible }?.let { layer ->
             layer.bitmap?.let { b ->
                 val cm = createColorMatrix(
                     saturation = layer.saturation,
@@ -79,73 +80,6 @@ class ExportManager @Inject constructor() {
 
                 val matrix = getLayerScreenMatrix(layer, screenWidth, screenHeight)
                 canvas.drawBitmap(b, matrix, paint)
-            }
-        }
-        return result
-    }
-
-    /**
-     * Composites [linkedLayers] into the local coordinate space of the [anchor] layer.
-     * The resulting bitmap is capped to a maximum dimension of 2048px to prevent OOM.
-     */
-    fun compositeToLayerSpace(anchor: Layer, linkedLayers: List<Layer>, screenWidth: Int, screenHeight: Int): Bitmap {
-        val anchorBitmap = anchor.bitmap ?: return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
-        
-        // Cap target dimensions to 2048px to avoid OOM
-        val maxDim = 2048
-        var targetWidth = anchorBitmap.width
-        var targetHeight = anchorBitmap.height
-        val aspect = targetWidth.toFloat() / targetHeight.toFloat()
-        
-        if (targetWidth > maxDim || targetHeight > maxDim) {
-            if (aspect > 1f) {
-                targetWidth = maxDim
-                targetHeight = (maxDim / aspect).toInt()
-            } else {
-                targetHeight = maxDim
-                targetWidth = (maxDim * aspect).toInt()
-            }
-        }
-
-        val result = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(result)
-
-        val anchorMatrix = getLayerScreenMatrix(anchor, screenWidth, screenHeight)
-        val anchorMatrixInv = Matrix()
-        if (!anchorMatrix.invert(anchorMatrixInv)) {
-            return result
-        }
-
-        // Scale factor from original anchor pixels to capped target pixels
-        val canvasScale = targetWidth.toFloat() / anchorBitmap.width.toFloat()
-
-        linkedLayers.filter { it.isVisible }.forEach { layer ->
-            layer.bitmap?.let { b ->
-                val cm = createColorMatrix(
-                    saturation = layer.saturation,
-                    contrast = layer.contrast,
-                    brightness = layer.brightness,
-                    colorBalanceR = layer.colorBalanceR,
-                    colorBalanceG = layer.colorBalanceG,
-                    colorBalanceB = layer.colorBalanceB,
-                    isInverted = layer.isInverted
-                )
-                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    alpha = (layer.opacity * 255).toInt().coerceIn(0, 255)
-                    applyLayerBlendMode(layer.blendMode)
-                    colorFilter = android.graphics.ColorMatrixColorFilter(
-                        android.graphics.ColorMatrix(cm.values)
-                    )
-                }
-
-                val layerMatrix = getLayerScreenMatrix(layer, screenWidth, screenHeight)
-                val relativeMatrix = Matrix(anchorMatrixInv)
-                relativeMatrix.postConcat(layerMatrix)
-                
-                // Adjust for capped canvas size
-                relativeMatrix.postScale(canvasScale, canvasScale)
-
-                canvas.drawBitmap(b, relativeMatrix, paint)
             }
         }
         return result

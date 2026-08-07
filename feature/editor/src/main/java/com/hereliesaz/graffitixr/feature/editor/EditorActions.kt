@@ -6,10 +6,9 @@ import androidx.compose.ui.geometry.Offset
 /**
  * What the editor UI can ask of [EditorViewModel].
  *
- * Scoped to this app's job: getting an image into place for tracing, by lightbox or by projection.
- * Authoring the image itself belongs to the companion design app, so the painting, stencil, outline,
- * segmentation and text-authoring entry points that used to live here are gone — see the module's
- * README note in EditorViewModel. What remains is placement (transform, lock, layer selection) and
+ * Scoped to this app's job: getting one image into place for tracing, by lightbox or by projection.
+ * Authoring belongs to the companion design app, and so does compositing several images into one —
+ * this app places a single finished design. What remains is placement (transform, lock) and
  * legibility (opacity / brightness / contrast / saturation / colour balance / invert), which are the
  * controls that make an overlay usable against a real wall.
  */
@@ -25,18 +24,26 @@ interface EditorActions {
     fun onColorBalanceBChanged(v: Float)
     fun onToggleInvert()
 
+    /** Outline: render the design as a sketch — the form that is actually traceable. */
+    fun onToggleOutline()
+
+    /** Subject isolation: keep the segmented subject, drop the rest to transparent. */
+    fun onToggleSubjectIsolation()
+
     fun onUndoClicked()
     fun onRedoClicked()
+
+    /**
+     * The Reset button that sits between undo and redo. Press once to flatten placement — the
+     * design's transform and the current mode's whole-design transform — back to identity; press
+     * again to put it back exactly where it was. Adjustments and effects are untouched by both.
+     */
+    fun onResetClicked()
     fun onMagicClicked()
 
     fun toggleImageLock()
 
-    fun onLayerActivated(id: String)
-    fun onLayerRenamed(id: String, name: String)
-    fun onLayerReordered(newOrder: List<String>)
-    fun onLayerRemoved(id: String)
-    fun onToggleVisibility(layerId: String)
-
+    /** Choose (or replace) the design image. */
     fun onAddLayer(uri: Uri)
 
     // Placement.

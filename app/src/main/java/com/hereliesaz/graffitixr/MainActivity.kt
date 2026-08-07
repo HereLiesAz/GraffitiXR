@@ -175,10 +175,6 @@ class MainActivity : ComponentActivity() {
 
     var showSaveDialog by mutableStateOf(false)
     var showSettings by mutableStateOf(false)
-    // The azphalt marketplace panel. Its whole stack (MarketplaceScreen, MarketplaceViewModel,
-    // ExtensionRepository, AzpInstaller, the registry client and the signature/trust checks) was
-    // unreachable: nothing in the app module referenced it, so no rail entry, no route, no way in.
-    var showMarketplace by mutableStateOf(false)
     var hasCameraPermission by mutableStateOf(false)
     var showWallSourceDialog by mutableStateOf(false)
     var isExporting by mutableStateOf(false)
@@ -490,7 +486,6 @@ class MainActivity : ComponentActivity() {
                 }
 
                 BackHandler(enabled = showSettings) { showSettings = false }
-                BackHandler(enabled = showMarketplace) { showMarketplace = false }
                 BackHandler(enabled = mainUiState.isInPlaneRealignment) {
                     mainViewModel.endPlaneRealignment()
                 }
@@ -679,15 +674,10 @@ class MainActivity : ComponentActivity() {
                 // AR anchor establishment. Drawing tools, stroke input, and gesture
                 // feedback all require an active layer; delaying activation forces the
                 // user through a needless intermediate state.
-                LaunchedEffect(editorUiState.layers, editorUiState.activeLayerId) {
-                    if (editorUiState.layers.isNotEmpty() && editorUiState.activeLayerId == null) {
-                        editorViewModel.onLayerActivated(editorUiState.layers.first().id)
-                    }
-                }
 
                 // Show design instructions when anchor is established with no layers.
                 LaunchedEffect(arUiState.isAnchorEstablished) {
-                    if (arUiState.isAnchorEstablished && editorUiState.layers.isEmpty()) {
+                    if (arUiState.isAnchorEstablished && editorUiState.design == null) {
                         showDesignInstructionsDialog = true
                     }
                 }
@@ -849,7 +839,7 @@ class MainActivity : ComponentActivity() {
                         // is that auto overlays (onboarding, AR-unavailable explainer) must
                         // early-return on EVERY modal, not just one — collapsing the repeated
                         // boolean chains here prevents a future overlay from forgetting one.
-                        val anyModalActive = showLibrary || showSettings || showMarketplace || isExporting ||
+                        val anyModalActive = showLibrary || showSettings || isExporting ||
                             mainUiState.isCapturingTarget || showSaveDialog ||
                             dashboardUiState.showNewProjectDialog
 
@@ -1062,7 +1052,7 @@ class MainActivity : ComponentActivity() {
                             // the one screen that could have explained it claimed success instead.
                             // Gate on the thing that actually has to exist.
                             val basePostTargetVisible = arUiState.isAnchorEstablished
-                                    && editorUiState.layers.isEmpty()
+                                    && editorUiState.design == null
                                     && !mainUiState.isCapturingTarget
                                     && editorUiState.editorMode == EditorMode.AR
                                     && !showLibrary && !showSettings
@@ -1513,36 +1503,6 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            if (showMarketplace) {
-                                val marketplaceViewModel: com.hereliesaz.graffitixr.feature.dashboard.MarketplaceViewModel = hiltViewModel()
-                                val scope = rememberCoroutineScope()
-                                com.hereliesaz.graffitixr.feature.dashboard.MarketplaceScreen(
-                                    viewModel = marketplaceViewModel,
-                                    onApplyLut = { extensionId ->
-                                        scope.launch {
-                                            // Say what happened either way: the panel used to close
-                                            // on Apply and the grade silently no-op when there was
-                                            // no active layer or the .cube wouldn't parse, which
-                                            // reads as "the button does nothing".
-                                            val message = when (editorViewModel.applyInstalledLut(extensionId)) {
-                                                EditorViewModel.LutApplyResult.Applied -> "Grade applied"
-                                                EditorViewModel.LutApplyResult.NoActiveLayer ->
-                                                    "Select a layer with an image first"
-                                                EditorViewModel.LutApplyResult.LutUnreadable ->
-                                                    "That extension's colour grade couldn't be read"
-                                            }
-                                            Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
-                                        }
-                                    },
-                                    onClose = {
-                                        showMarketplace = false
-                                        // Drop the one-shot install/uninstall status so reopening
-                                        // the panel doesn't replay a message from last time.
-                                        marketplaceViewModel.clearStatus()
-                                    },
-                                )
-                            }
-
                             if (hostQr != null && coopState is CoopSessionState.WaitingForGuest) {
                                 CoopHostQrOverlay(
                                     qrPayload = hostQr!!,
@@ -1844,11 +1804,6 @@ class MainActivity : ComponentActivity() {
                 onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.design", it) },
             )
             azRailSubItem(
-                id = "design.layers", hostId = "host.design", text = strings.editor.layers,
-                color = if (editorUiState.activePanel == EditorPanel.LAYERS) Cyan else navItemColor,
-                shape = AzButtonShape.NONE,
-            ) { editorViewModel.onLayersClicked() }
-            azRailSubItem(
                 id = "design.adjust", hostId = "host.design", text = navStrings.adjust,
                 color = if (editorUiState.activePanel == EditorPanel.ADJUST) Cyan else navItemColor,
                 shape = AzButtonShape.NONE,
@@ -1859,13 +1814,26 @@ class MainActivity : ComponentActivity() {
                 shape = AzButtonShape.NONE,
             ) { editorViewModel.onBalanceClicked() }
             run {
-                val activeInverted = editorUiState.layers
-                    .find { it.id == editorUiState.activeLayerId }?.isInverted == true
+                val activeInverted = editorUiState.design?.isInverted == true
                 azRailSubItem(
                     id = "design.invert", hostId = "host.design", text = navStrings.invert,
                     color = if (activeInverted) Cyan else navItemColor, shape = AzButtonShape.NONE,
                 ) { editorViewModel.onToggleInvert() }
             }
+            // Outline and Isolate sit here with Invert because they are the same kind of thing: what
+            // the design LOOKS like, as opposed to where it sits. Unlike Invert they re-render the
+            // bitmap, but they are equally reversible — the untouched import is kept and both are
+            // re-derived from it, so turning one off returns the original exactly.
+            azRailSubItem(
+                id = "design.outline", hostId = "host.design", text = navStrings.outline,
+                color = if (editorUiState.design?.isSketch == true) Cyan else navItemColor,
+                shape = AzButtonShape.NONE,
+            ) { editorViewModel.onToggleOutline() }
+            azRailSubItem(
+                id = "design.isolate", hostId = "host.design", text = navStrings.isolate,
+                color = if (editorUiState.design?.isSubjectIsolated == true) Cyan else navItemColor,
+                shape = AzButtonShape.NONE,
+            ) { editorViewModel.onToggleSubjectIsolation() }
 
             azDivider()
 
@@ -1893,9 +1861,6 @@ class MainActivity : ComponentActivity() {
             }
             azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE) {
                 showSettings = true
-            }
-            azRailSubItem(id = "proj.extensions", hostId = "host.project", text = navStrings.extensions, color = navItemColor, shape = AzButtonShape.NONE) {
-                showMarketplace = true
             }
 
 

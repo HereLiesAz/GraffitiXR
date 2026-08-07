@@ -43,7 +43,6 @@ class HelpItemsBuilderTest {
             "host.modes", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace",
             "target.create", "mockup.wall", "mode.trace.freeze",
             "host.project", "proj.new", "proj.save", "proj.export", "proj.load", "proj.settings",
-            "proj.extensions",
             "item.help",
         ).forEach { id ->
             assertTrue("expected key '$id' in helpItems", id in map)

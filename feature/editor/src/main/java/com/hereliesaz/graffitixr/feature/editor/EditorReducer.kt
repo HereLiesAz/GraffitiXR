@@ -1,11 +1,13 @@
 package com.hereliesaz.graffitixr.feature.editor
 
+import androidx.compose.ui.geometry.Offset
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorPanel
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.common.model.RotationAxis
+import com.hereliesaz.graffitixr.common.model.TransformStash
 
 /**
  * The pure state-transition function for the editor — the heart of its MVI design. Given the
@@ -20,17 +22,17 @@ import com.hereliesaz.graffitixr.common.model.RotationAxis
 internal object EditorReducer {
 
     fun reduce(state: EditorUiState, intent: EditorIntent): EditorUiState = when (intent) {
-        is EditorIntent.SetOpacity -> state.mapActive { it.copy(opacity = intent.value) }
-        is EditorIntent.SetBrightness -> state.mapActive { it.copy(brightness = intent.value) }
-        is EditorIntent.SetContrast -> state.mapActive { it.copy(contrast = intent.value) }
-        is EditorIntent.SetSaturation -> state.mapActive { it.copy(saturation = intent.value) }
-        is EditorIntent.SetColorBalanceR -> state.mapActive { it.copy(colorBalanceR = intent.value) }
-        is EditorIntent.SetColorBalanceG -> state.mapActive { it.copy(colorBalanceG = intent.value) }
-        is EditorIntent.SetColorBalanceB -> state.mapActive { it.copy(colorBalanceB = intent.value) }
-        is EditorIntent.SetScale -> state.mapActive { it.copy(scale = intent.value) }
-        is EditorIntent.AddOffset -> state.mapActive { it.copy(offset = it.offset + intent.delta) }
-        EditorIntent.ToggleInvert -> state.mapActive { it.copy(isInverted = !it.isInverted) }
-        EditorIntent.ToggleImageLock -> state.mapActive { it.copy(isImageLocked = !it.isImageLocked) }
+        is EditorIntent.SetOpacity -> state.mapDesign { it.copy(opacity = intent.value) }
+        is EditorIntent.SetBrightness -> state.mapDesign { it.copy(brightness = intent.value) }
+        is EditorIntent.SetContrast -> state.mapDesign { it.copy(contrast = intent.value) }
+        is EditorIntent.SetSaturation -> state.mapDesign { it.copy(saturation = intent.value) }
+        is EditorIntent.SetColorBalanceR -> state.mapDesign { it.copy(colorBalanceR = intent.value) }
+        is EditorIntent.SetColorBalanceG -> state.mapDesign { it.copy(colorBalanceG = intent.value) }
+        is EditorIntent.SetColorBalanceB -> state.mapDesign { it.copy(colorBalanceB = intent.value) }
+        is EditorIntent.SetScale -> state.mapDesign { it.copy(scale = intent.value) }.movedSinceReset()
+        is EditorIntent.AddOffset -> state.mapDesign { it.copy(offset = it.offset + intent.delta) }.movedSinceReset()
+        EditorIntent.ToggleInvert -> state.mapDesign { it.copy(isInverted = !it.isInverted) }
+        EditorIntent.ToggleImageLock -> state.mapDesign { it.copy(isImageLocked = !it.isImageLocked) }
         EditorIntent.CycleRotationAxis -> {
             val next = when (state.activeRotationAxis) {
                 RotationAxis.X -> RotationAxis.Y
@@ -40,27 +42,16 @@ internal object EditorReducer {
             state.copy(activeRotationAxis = next, showRotationAxisFeedback = true)
         }
 
-        is EditorIntent.ReorderLayers -> state.copy(layers = LayerListOps.reorder(state.layers, intent.order))
-        is EditorIntent.RenameLayer -> state.copy(layers = LayerListOps.rename(state.layers, intent.id, intent.name))
-        is EditorIntent.ToggleVisibility -> state.copy(layers = LayerListOps.toggleVisibility(state.layers, intent.id))
-        is EditorIntent.ActivateLayer -> state.copy(activeLayerId = intent.id)
-        is EditorIntent.AddLayer -> state.copy(
-            layers = state.layers + intent.layer,
-            activeLayerId = intent.layer.id,
+        is EditorIntent.SetDesign -> state.copy(
+            design = intent.layer,
             activePanel = if (intent.resetActivePanel) EditorPanel.NONE else state.activePanel,
+            transformStash = null,
         )
-        is EditorIntent.RemoveLayer -> {
-            val remaining = state.layers.filter { it.id != intent.id }
-            state.copy(
-                layers = remaining,
-                activeLayerId = if (state.activeLayerId == intent.id) remaining.firstOrNull()?.id else state.activeLayerId,
-            )
-        }
+
+        EditorIntent.ToggleTransformReset -> reduceTransformReset(state)
 
         EditorIntent.ToggleAdjustPanel ->
             state.copy(activePanel = if (state.activePanel == EditorPanel.ADJUST) EditorPanel.NONE else EditorPanel.ADJUST)
-        EditorIntent.ToggleLayersPanel ->
-            state.copy(activePanel = if (state.activePanel == EditorPanel.LAYERS) EditorPanel.NONE else EditorPanel.LAYERS)
         EditorIntent.DismissPanel -> state.copy(activePanel = EditorPanel.NONE)
         is EditorIntent.SetGestureInProgress -> state.copy(gestureInProgress = intent.inProgress)
         is EditorIntent.SetEditorMode -> reduceEditorMode(state, intent.mode)
@@ -88,6 +79,7 @@ internal object EditorReducer {
                     scale = (rotated.scale * intent.zoom).coerceIn(0.1f, 10f),
                 )
                 state.copy(modeAdjustments = state.modeAdjustments + (intent.mode to updated))
+                    .movedSinceReset()
             }
         }
         is EditorIntent.ToggleModeTransformLocked -> {
@@ -106,12 +98,10 @@ internal object EditorReducer {
         EditorIntent.TogglePoints -> state.copy(showPoints = !state.showPoints)
         EditorIntent.FeedbackShown -> state.copy(showRotationAxisFeedback = false)
 
-        is EditorIntent.AppendLayer -> state.copy(layers = state.layers + intent.layer)
-        is EditorIntent.RemoveLayerById -> state.copy(layers = state.layers.filterNot { it.id == intent.id })
-        is EditorIntent.SetLayerTransformById -> state.copy(layers = LayerListOps.mapLayer(state.layers, intent.id) {
+        is EditorIntent.SetDesignTransform -> state.mapDesign {
             it.copy(scale = intent.scale, offset = intent.offset, rotationX = intent.rx, rotationY = intent.ry, rotationZ = intent.rz)
-        })
-        is EditorIntent.SetLayerProps -> state.copy(layers = LayerListOps.mapLayer(state.layers, intent.id) {
+        }.movedSinceReset()
+        is EditorIntent.SetDesignProps -> state.mapDesign {
             it.copy(
                 isVisible = intent.props.isVisible,
                 opacity = intent.props.opacity,
@@ -125,36 +115,102 @@ internal object EditorReducer {
                 isInverted = intent.props.isInverted,
                 blendMode = intent.props.blendMode,
             )
-        })
+        }
 
         EditorIntent.ToggleColorPanel ->
             state.copy(activePanel = if (state.activePanel == EditorPanel.COLOR) EditorPanel.NONE else EditorPanel.COLOR)
         EditorIntent.BeginGesture -> state.copy(gestureInProgress = true, activePanel = EditorPanel.NONE)
-        is EditorIntent.SetLayers ->
-            state.copy(layers = intent.layers, activeLayerId = state.activeLayerId.stillIn(intent.layers))
-        is EditorIntent.LoadedProject -> state.copy(
-            projectId = intent.projectId,
-            layers = intent.layers,
-            // Opening a different project must not leave activeLayerId pointing at a layer from the
-            // previous one: every `find { it.id == activeLayerId }` in the ViewModel would miss, so
-            // adjustments silently no-op'd. Nulling it lets the UI's auto-activate effect select the
-            // new project's first layer.
-            activeLayerId = state.activeLayerId.stillIn(intent.layers),
-        )
+        is EditorIntent.RestoreDesign -> state.copy(design = intent.design, transformStash = null)
+        is EditorIntent.LoadedProject ->
+            state.copy(projectId = intent.projectId, design = intent.design, transformStash = null)
         EditorIntent.ClearProject -> state.copy(
             projectId = null,
-            layers = emptyList(),
-            activeLayerId = null,
+            design = null,
             backgroundBitmap = null,
+            transformStash = null,
         )
     }
 
-    /** This id if [layers] still contains it, else null — keeps activeLayerId from dangling. */
-    private fun String?.stillIn(layers: List<Layer>): String? =
-        this?.takeIf { id -> layers.any { it.id == id } }
+    /**
+     * Drops any pending Reset stash. Called from every branch that moves the design: once the user
+     * has repositioned, "put it back where it was" would put it somewhere they have deliberately
+     * left, so the next Reset press should reset rather than restore.
+     */
+    private fun EditorUiState.movedSinceReset(): EditorUiState =
+        if (transformStash == null) this else copy(transformStash = null)
 
     /**
-     * Mode is a view, not a container: layers (the document) persist and stay editable, but
+     * The Reset button, which is a toggle rather than a destructive action.
+     *
+     * Placement lives in two places at once: the design carries its own scale/offset/rotation, and
+     * the mode in view carries a whole-design [ModeAdjustment] transform on top of it. Both are what
+     * the user means by "where it is", so Reset flattens both — and neither tone, colour balance nor
+     * the effect flags are part of it, so both presses leave those exactly as they were.
+     *
+     * First press stashes the current placement and goes to identity. Second press restores the
+     * stash. A stash taken in another mode is not restorable (the mode transform it describes is not
+     * the one on screen), so that case resets afresh instead.
+     */
+    private fun reduceTransformReset(state: EditorUiState): EditorUiState {
+        val stash = state.transformStash
+        if (stash != null && stash.mode == state.editorMode) {
+            return state
+                .mapDesign {
+                    it.copy(
+                        scale = stash.designScale,
+                        offset = stash.designOffset,
+                        rotationX = stash.designRotationX,
+                        rotationY = stash.designRotationY,
+                        rotationZ = stash.designRotationZ,
+                    )
+                }
+                .mapModeTransform {
+                    it.copy(
+                        offsetX = stash.modeOffsetX,
+                        offsetY = stash.modeOffsetY,
+                        scale = stash.modeScale,
+                        rotation = stash.modeRotation,
+                        rotationX = stash.modeRotationX,
+                        rotationY = stash.modeRotationY,
+                    )
+                }
+                .copy(transformStash = null)
+        }
+
+        val design = state.design
+        val modeAdj = state.modeAdjustments[state.editorMode] ?: ModeAdjustment()
+        val taken = TransformStash(
+            mode = state.editorMode,
+            designScale = design?.scale ?: 1f,
+            designOffset = design?.offset ?: Offset.Zero,
+            designRotationX = design?.rotationX ?: 0f,
+            designRotationY = design?.rotationY ?: 0f,
+            designRotationZ = design?.rotationZ ?: 0f,
+            modeOffsetX = modeAdj.offsetX,
+            modeOffsetY = modeAdj.offsetY,
+            modeScale = modeAdj.scale,
+            modeRotation = modeAdj.rotation,
+            modeRotationX = modeAdj.rotationX,
+            modeRotationY = modeAdj.rotationY,
+        )
+        return state
+            .mapDesign {
+                it.copy(scale = 1f, offset = Offset.Zero, rotationX = 0f, rotationY = 0f, rotationZ = 0f)
+            }
+            .mapModeTransform {
+                it.copy(offsetX = 0f, offsetY = 0f, scale = 1f, rotation = 0f, rotationX = 0f, rotationY = 0f)
+            }
+            .copy(transformStash = taken)
+    }
+
+    /** Applies [transform] to the current mode's whole-design adjustment, creating it if absent. */
+    private fun EditorUiState.mapModeTransform(transform: (ModeAdjustment) -> ModeAdjustment): EditorUiState {
+        val cur = modeAdjustments[editorMode] ?: ModeAdjustment()
+        return copy(modeAdjustments = modeAdjustments + (editorMode to transform(cur)))
+    }
+
+    /**
+     * Mode is a view, not a container: the design (the document) persists and stays editable, but
      * transient mode-specific overlay state must not bleed into the next mode.
      */
     private fun reduceEditorMode(state: EditorUiState, mode: EditorMode): EditorUiState {
@@ -162,9 +218,7 @@ internal object EditorReducer {
         return state.copy(editorMode = mode)
     }
 
-    /** Applies [transform] to the active layer (no-op when there is no active layer). */
-    private fun EditorUiState.mapActive(transform: (Layer) -> Layer): EditorUiState {
-        val id = activeLayerId ?: return this
-        return copy(layers = LayerListOps.mapLayer(layers, id, transform))
-    }
+    /** Applies [transform] to the design (no-op when no image has been chosen yet). */
+    private fun EditorUiState.mapDesign(transform: (Layer) -> Layer): EditorUiState =
+        design?.let { copy(design = transform(it)) } ?: this
 }

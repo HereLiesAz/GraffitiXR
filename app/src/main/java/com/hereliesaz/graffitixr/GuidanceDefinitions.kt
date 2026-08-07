@@ -67,34 +67,28 @@ internal fun AzNavHostScope.ConfigureGuidance(
     azSuppressGuide(settleMs = 700L) { editorUiState.gestureInProgress }
 
     // --- Milestone statuses: the exact predicates rememberCoachStep derived steps from. ---
-    azStatus("gx.hasLayers") { editorUiState.layers.isNotEmpty() }
-    azStatus("gx.hasActiveLayer") { editorUiState.layers.any { it.id == editorUiState.activeLayerId } }
+    azStatus("gx.hasDesign") { editorUiState.design != null }
     azStatus("gx.hasWallPhoto") { editorUiState.backgroundBitmap != null }
     azStatus("gx.hasTarget") { arUiState.isAnchorEstablished }
 
     // --- DESIGN: add a layer, then tap it to open its tools. ---
     azEdge(
         from = design0,
-        to = "gx.hasActiveLayer",
+        to = "gx.hasDesign",
         text = "",
         steps = listOf(
-            AzInstructionStep(text = ln(design, 1), highlightItemId = "item.open", advanceWhen = "gx.hasLayers"),
-            AzInstructionStep(
-                text = ln(design, 2),
-                highlightSelector = { editorUiState.layers.firstOrNull()?.let { layerId(it) } },
-                advanceWhen = "gx.hasActiveLayer",
-            ),
+            AzInstructionStep(text = ln(design, 1), highlightItemId = "item.open", advanceWhen = "gx.hasDesign"),
         ),
     )
 
     // --- OVERLAY: add a layer. ---
     azEdge(
         from = overlay0,
-        to = "gx.hasLayers",
+        to = "gx.hasDesign",
         text = "",
         steps = listOf(
             AzInstructionStep(text = ln(overlay, 0), highlightItemId = "item.open"),
-            AzInstructionStep(text = ln(overlay, 1), highlightItemId = "item.open", advanceWhen = "gx.hasLayers"),
+            AzInstructionStep(text = ln(overlay, 1), highlightItemId = "item.open", advanceWhen = "gx.hasDesign"),
         ),
     )
 
@@ -108,16 +102,16 @@ internal fun AzNavHostScope.ConfigureGuidance(
             AzInstructionStep(text = ln(mockup, 1), highlightItemId = "mockup.wall", advanceWhen = "gx.hasWallPhoto"),
         ),
     )
-    azEdge(from = "gx.hasWallPhoto", to = "gx.hasLayers", text = ln(mockup, 2), highlightItemId = "item.open")
+    azEdge(from = "gx.hasWallPhoto", to = "gx.hasDesign", text = ln(mockup, 2), highlightItemId = "item.open")
 
     // --- TRACE: add a layer. ---
     azEdge(
         from = trace0,
-        to = "gx.hasLayers",
+        to = "gx.hasDesign",
         text = "",
         steps = listOf(
             AzInstructionStep(text = ln(trace, 0), highlightItemId = "item.open"),
-            AzInstructionStep(text = ln(trace, 1), highlightItemId = "item.open", advanceWhen = "gx.hasLayers"),
+            AzInstructionStep(text = ln(trace, 1), highlightItemId = "item.open", advanceWhen = "gx.hasDesign"),
         ),
     )
 
@@ -133,13 +127,13 @@ internal fun AzNavHostScope.ConfigureGuidance(
             AzInstructionStep(text = ln(ar, 4), highlightItemId = "target.create", advanceWhen = "gx.hasTarget"),
         ),
     )
-    azEdge(from = "gx.hasTarget", to = "gx.hasLayers", text = ln(ar, 3), highlightItemId = "item.open")
+    azEdge(from = "gx.hasTarget", to = "gx.hasDesign", text = ln(ar, 3), highlightItemId = "item.open")
 
     // --- Per-mode goals: NOT auto-started. While a goal is active the engine routes from the current
     // screen to that mode's milestone. ---
-    azGoal(id = "gx.design", target = "gx.hasActiveLayer", label = nav.design)
-    azGoal(id = "gx.overlay", target = "gx.hasLayers", label = nav.overlay)
-    azGoal(id = "gx.mockup", target = "gx.hasLayers", label = nav.mockup)
-    azGoal(id = "gx.trace", target = "gx.hasLayers", label = nav.trace)
+    azGoal(id = "gx.design", target = "gx.hasDesign", label = nav.design)
+    azGoal(id = "gx.overlay", target = "gx.hasDesign", label = nav.overlay)
+    azGoal(id = "gx.mockup", target = "gx.hasDesign", label = nav.mockup)
+    azGoal(id = "gx.trace", target = "gx.hasDesign", label = nav.trace)
     azGoal(id = "gx.ar", target = "gx.hasTarget", label = nav.arMode)
 }

@@ -56,10 +56,11 @@ internal fun buildHelpItems(strings: AppStrings): Map<String, Any> = mapOf(
 
     // Design menu
     "host.design" to strings.nav.adjustInfo,
-    "design.layers" to strings.editor.layers,
     "design.adjust" to strings.nav.adjustInfo,
     "design.balance" to strings.nav.balanceInfo,
     "design.invert" to strings.nav.invertInfo,
+    "design.outline" to strings.nav.outlineInfo,
+    "design.isolate" to strings.nav.isolateInfo,
 
     // Project menu
     "host.project" to strings.help.projectHost,
@@ -68,7 +69,6 @@ internal fun buildHelpItems(strings: AppStrings): Map<String, Any> = mapOf(
     "proj.export" to strings.help.exportImage,
     "proj.load" to strings.help.loadProject,
     "proj.settings" to strings.help.appSettings,
-    "proj.extensions" to strings.nav.extensionsInfo,
 
     // Global
     "item.help" to strings.nav.help,

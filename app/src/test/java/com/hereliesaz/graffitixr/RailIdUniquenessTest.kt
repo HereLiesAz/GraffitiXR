@@ -34,7 +34,7 @@ class RailIdUniquenessTest {
         val alwaysOn = setOf(
             "item.open", "host.modes", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace",
             "host.project", "proj.new", "proj.save", "proj.export", "proj.load", "proj.settings",
-            "proj.extensions", "item.help",
+            "item.help",
         )
         for (mode in EditorMode.entries) {
             val registrations = enumerateRailItemIdRegistrations(mode)
