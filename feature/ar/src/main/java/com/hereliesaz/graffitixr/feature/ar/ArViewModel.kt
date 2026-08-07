@@ -601,6 +601,12 @@ class ArViewModel @Inject constructor(
             _evalFeatureMapEnabled.value = settingsRepository.featureMapEnabled.firstOrNull() ?: false
             applyFeatureMapSwitch(_evalFeatureMapEnabled.value)
         }
+        viewModelScope.launch {
+            // Defaults TRUE (AUTO) — the shipped behaviour — so a store that has never been written
+            // does not silently change the focus mode.
+            _evalAutoFocusEnabled.value = settingsRepository.autoFocusEnabled.firstOrNull() ?: true
+            renderer?.updateAutoFocus(_evalAutoFocusEnabled.value)
+        }
     }
 
     /**
@@ -654,6 +660,26 @@ class ArViewModel @Inject constructor(
         applyFeatureMapSwitch(on)
         _evalFeatureMapEnabled.value = on
         viewModelScope.launch { settingsRepository.setFeatureMapEnabled(on) }
+    }
+
+    private val _evalAutoFocusEnabled = MutableStateFlow(true)
+
+    /** ARCore autofocus: ON is `FocusMode.AUTO`, OFF is `FocusMode.FIXED`. */
+    val evalAutoFocusEnabled: StateFlow<Boolean> = _evalAutoFocusEnabled.asStateFlow()
+
+    /**
+     * A/B switch for the camera focus mode, applied to the LIVE session so the two can be compared
+     * on the same wall without re-entering AR.
+     *
+     * This is the one AR switch that changes what ARCore itself sees rather than what we do with the
+     * result: AUTO's focal-length sweeps are a known source of tracking instability on devices with
+     * sloppy intrinsics, and FIXED's infinity lens is unusable at arm's length in low light. Neither
+     * is correct in general, which is why it is a switch and not a fix.
+     */
+    fun evalSetAutoFocusEnabled(on: Boolean) {
+        renderer?.updateAutoFocus(on)
+        _evalAutoFocusEnabled.value = on
+        viewModelScope.launch { settingsRepository.setAutoFocusEnabled(on) }
     }
 
     /**
@@ -1509,8 +1535,14 @@ class ArViewModel @Inject constructor(
             // triangulation badly enough to segfault its perception threads (MTC_vio,
             // MTC_triangulati) inside libarcore_c. forceSafeCameraConfig is the flag those devices
             // already set after a camera stall, so safe mode keeps the old constant-optics behaviour.
-            config.focusMode =
-                if (forceSafeCameraConfig) Config.FocusMode.FIXED else Config.FocusMode.AUTO
+            // Safe mode still forces FIXED (those devices set the flag precisely because constant
+            // optics is what stopped them crashing). Otherwise the artist's switch decides; it
+            // defaults to AUTO, which is what this line used to hardcode.
+            config.focusMode = when {
+                forceSafeCameraConfig -> Config.FocusMode.FIXED
+                _evalAutoFocusEnabled.value -> Config.FocusMode.AUTO
+                else -> Config.FocusMode.FIXED
+            }
             // LATEST_CAMERA_IMAGE so session.update() never blocks the GL render thread. On this
             // device the BLOCKING mode left the renderer stuck "Waiting for first frame" (the render
             // heartbeat never fired) — update() hung waiting for a frame that never arrived, so the
@@ -2470,6 +2502,7 @@ class ArViewModel @Inject constructor(
         // means one place re-establishes every experiment switch instead of two rules to remember.
         slamManager.setSelfGrowEnabled(_evalSelfGrowEnabled.value)
         applyFeatureMapSwitch(_evalFeatureMapEnabled.value)
+        renderer?.updateAutoFocus(_evalAutoFocusEnabled.value)
         renderer?.attachSession(session)
     }
 

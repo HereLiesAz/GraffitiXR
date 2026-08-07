@@ -1168,6 +1168,7 @@ class MainActivity : ComponentActivity() {
                             val evalFusionOn by arViewModel.evalFusionEnabled.collectAsState()
                             val evalSelfGrowOn by arViewModel.evalSelfGrowEnabled.collectAsState()
                             val evalFeatureMapOn by arViewModel.evalFeatureMapEnabled.collectAsState()
+                            val evalAutoFocusOn by arViewModel.evalAutoFocusEnabled.collectAsState()
                             // Keyed on Unit: the collector must outlive every recomposition, or a
                             // request raised while the overlay is mid-recompose lands in a
                             // subscriber that no longer exists and the capture is silently lost.
@@ -1224,6 +1225,8 @@ class MainActivity : ComponentActivity() {
                                     onToggleSelfGrow = { arViewModel.evalSetSelfGrowEnabled(it) },
                                     featureMapEnabled = evalFeatureMapOn,
                                     onToggleFeatureMap = { arViewModel.evalSetFeatureMapEnabled(it) },
+                                    autoFocusEnabled = evalAutoFocusOn,
+                                    onToggleAutoFocus = { arViewModel.evalSetAutoFocusEnabled(it) },
                                 )
                             }
 
@@ -2284,6 +2287,8 @@ private fun RelocDiagnosticsOverlay(
     onToggleSelfGrow: (Boolean) -> Unit,
     featureMapEnabled: Boolean,
     onToggleFeatureMap: (Boolean) -> Unit,
+    autoFocusEnabled: Boolean,
+    onToggleAutoFocus: (Boolean) -> Unit,
 ) {
     val d = diagnostics
     // What to DO about it, not just what happened.
@@ -2543,6 +2548,19 @@ private fun RelocDiagnosticsOverlay(
         // match against it. Amber for the same reason as self-grow — it is the other switch that
         // writes persistent state, and it is what makes the WallFeatureMap in the project record
         // non-empty. Both native flags had no caller at all before this switch existed.
+        // The only switch here that changes what ARCore ITSELF sees, rather than what we do with
+        // the result — so it is the one to reach for when the whole world is drifting rather than
+        // one overlay. AUTO's focal-length sweeps destabilise triangulation on devices with sloppy
+        // intrinsics; FIXED's infinity lens is unusable at arm's length in low light. Applied to the
+        // live session, so the two can be compared on the same wall without re-entering AR. Cyan,
+        // not amber: unlike the two below it writes no persistent state.
+        androidx.compose.material3.TextButton(onClick = { onToggleAutoFocus(!autoFocusEnabled) }) {
+            androidx.compose.material3.Text(
+                if (autoFocusEnabled) "Focus: AUTO" else "Focus: FIXED (infinity)",
+                color = if (autoFocusEnabled) Cyan else androidx.compose.ui.graphics.Color.Gray,
+            )
+        }
+
         androidx.compose.material3.TextButton(onClick = { onToggleFeatureMap(!featureMapEnabled) }) {
             androidx.compose.material3.Text(
                 if (featureMapEnabled) "Feature map: ON (builds + matches)" else "Feature map: OFF",

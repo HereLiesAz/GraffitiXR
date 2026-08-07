@@ -594,6 +594,9 @@ class ArRenderer(
                 // Apply queued flashlight state immediately upon attachment (sessionLock is held)
                 flashDirty = false
                 applyFlashlightStateLocked(session)
+                // A fresh session is configured from initArSessionLocked's default; re-assert the
+                // artist's choice so it survives AR re-entry and any session rebuild.
+                applyFocusModeLocked(session)
 
                 try {
                     val cameraId = session.cameraConfig.cameraId
@@ -643,6 +646,46 @@ class ArRenderer(
     fun updateFlashlight(isOn: Boolean) {
         isFlashlightRequested = isOn
         flashDirty = true
+    }
+
+    /**
+     * Request an autofocus-mode change, applied on the GL thread like [updateFlashlight] and for the
+     * same reason: `Session.configure()` from the main thread races `update()`, and ARCore's Session
+     * is not thread-safe.
+     *
+     * Exists so `FocusMode.FIXED` vs `AUTO` can be A/B'd on a wall without rebuilding the session.
+     * The two are a genuine trade-off, not a bug with a right answer: FIXED parks the lens at
+     * infinity and keeps the optics constant, which is what ARCore's triangulation wants, but at
+     * arm's length in low light it delivers a blurred frame with no usable texture — no features, no
+     * planes. AUTO fixes the blur and in exchange sweeps the effective focal length mid-stream,
+     * which on devices with sloppy OEM intrinsics is a documented source of tracking instability.
+     * Which one wins depends on the device and on how the artist works, so it is a switch.
+     */
+    fun updateAutoFocus(enabled: Boolean) {
+        isAutoFocusRequested = enabled
+        focusDirty = true
+    }
+
+    @Volatile private var isAutoFocusRequested: Boolean = true
+    @Volatile private var focusDirty: Boolean = false
+
+    /**
+     * Applies the requested focus mode via Session.configure(). MUST be called with [sessionLock]
+     * held, for the same serialisation reason as [applyFlashlightStateLocked].
+     */
+    private fun applyFocusModeLocked(activeSession: Session) {
+        val wanted = if (isAutoFocusRequested) Config.FocusMode.AUTO else Config.FocusMode.FIXED
+        try {
+            val config = activeSession.config
+            if (config.focusMode != wanted) {
+                config.focusMode = wanted
+                activeSession.configure(config)
+                onDiag("focus: ${if (isAutoFocusRequested) "AUTO" else "FIXED"}")
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to set focus mode via ARCore Config")
+            onDiag("focus: change rejected (${e.javaClass.simpleName})")
+        }
     }
 
     /**
@@ -959,6 +1002,11 @@ class ArRenderer(
                 flashDirty = false
                 lastStep = "flash"
                 applyFlashlightStateLocked(activeSession)
+            }
+            if (focusDirty) {
+                focusDirty = false
+                lastStep = "focus"
+                applyFocusModeLocked(activeSession)
             }
             lastStep = "displayGeom"
             displayRotationHelper.updateSessionIfNeeded(activeSession)
