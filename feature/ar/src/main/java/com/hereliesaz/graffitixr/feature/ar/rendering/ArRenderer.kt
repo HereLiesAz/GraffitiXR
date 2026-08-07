@@ -457,6 +457,17 @@ class ArRenderer(
     // (x,y,z); zero-length until an anchor is established, in which case the raw anchor frame is used.
     private val anchorSurfaceNormal = FloatArray(3)
 
+    // World-space camera up/forward axes, captured ONCE at anchor establishment for use ONLY when
+    // world-up (0,1,0) is unusable to build the overlay's in-plane frame (surface ~horizontal, or the
+    // rare edge-on-horizontal case). overlayDraw used to read the LIVE camera axes (viewMatrix rows)
+    // for this every frame, which quietly turned those two cases into a billboard: since the surface
+    // normal is fixed but the disambiguating "up" tracked the live camera, rolling/tilting the phone
+    // spun the artwork on-screen in lockstep with the tilt — "the image spins around the wall-normal
+    // needle exactly when and how my phone does". Freezing these at establishment, like
+    // [anchorSurfaceNormal] already is, makes the whole in-plane frame world-fixed again.
+    private val anchorFallbackUp = floatArrayOf(0f, 1f, 0f)
+    private val anchorFallbackForward = floatArrayOf(0f, 0f, 1f)
+
     @Volatile var exportRequested: Boolean = false
     var onExportCaptured: ((Bitmap) -> Unit)? = null
 
@@ -1228,6 +1239,17 @@ class ArRenderer(
                         }
                     } else {
                         anchorSurfaceNormal[0] = 0f; anchorSurfaceNormal[1] = 0f; anchorSurfaceNormal[2] = 0f
+                    }
+                    // Freeze this frame's camera up/forward as the fallback disambiguation axes (see
+                    // the field comment) — a one-time snapshot, not the live camera read overlayDraw
+                    // used to take every frame.
+                    run {
+                        val upAxis = FloatArray(3)
+                        camPose.getTransformedAxis(1, 1f, upAxis, 0)
+                        anchorFallbackUp[0] = upAxis[0]; anchorFallbackUp[1] = upAxis[1]; anchorFallbackUp[2] = upAxis[2]
+                        val fwdAxis = FloatArray(3)
+                        camPose.getTransformedAxis(2, 1f, fwdAxis, 0)
+                        anchorFallbackForward[0] = fwdAxis[0]; anchorFallbackForward[1] = fwdAxis[1]; anchorFallbackForward[2] = fwdAxis[2]
                     }
                     slamManager.updateAnchorTransform(anchorModelMatrix)
                     // Doodle demo: publish the wall plane (anchor point + surface normal) so the
@@ -2015,7 +2037,9 @@ class ArRenderer(
             // orthonormal frame at the live anchor position whose +Z = the captured surface normal
             // (already oriented toward the camera). +Y = world-up projected ⟂ to +Z so the artwork is
             // upright; +X = +Y × +Z (= width, horizontal). If the surface is near-horizontal (normal
-            // ≈ world-up, e.g. floor/ceiling) world-up is degenerate, so fall back to the camera's up.
+            // ≈ world-up, e.g. floor/ceiling) world-up is degenerate, so fall back to the camera's up
+            // AS CAPTURED AT ESTABLISHMENT ([anchorFallbackUp]) — not the live camera. Reading the live
+            // camera here rotated the artwork in lockstep with every phone tilt/roll on these surfaces.
             // A zero stored normal (no anchor yet) leaves the raw anchor frame.
             System.arraycopy(anchorMatrix, 0, overlayBaseScratch, 0, 16)
             run {
@@ -2030,9 +2054,10 @@ class ArRenderer(
                     // Pick an up reference that isn't parallel to the normal.
                     var upX = 0f; var upY = 1f; var upZ = 0f
                     if (kotlin.math.abs(ny) > 0.95f) {
-                        // Surface ≈ horizontal: world-up ∥ normal is unusable. Use the camera's up
-                        // (viewMatrix row 1 is the camera up axis in world space).
-                        upX = viewMatrix[1]; upY = viewMatrix[5]; upZ = viewMatrix[9]
+                        // Surface ≈ horizontal: world-up ∥ normal is unusable. Use the camera's up as
+                        // captured at anchor establishment — frozen, so it doesn't track the live
+                        // camera and spin the artwork as the phone tilts.
+                        upX = anchorFallbackUp[0]; upY = anchorFallbackUp[1]; upZ = anchorFallbackUp[2]
                     }
                     // +Y = up projected onto the plane ⟂ to the normal, normalized.
                     val dot = upX * nx + upY * ny + upZ * nz
@@ -2040,9 +2065,10 @@ class ArRenderer(
                     var yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
                     if (yLen <= 1e-4f) {
                         // Up reference parallel to the normal (e.g. a level camera edge-on to a
-                        // horizontal surface): fall back to the camera's forward axis (viewMatrix row 2)
-                        // so the in-plane frame is still well-defined instead of reverting to raw.
-                        upX = viewMatrix[2]; upY = viewMatrix[6]; upZ = viewMatrix[10]
+                        // horizontal surface): fall back to the camera's forward axis, also frozen at
+                        // establishment, so the in-plane frame is still well-defined instead of
+                        // reverting to raw — and still doesn't track the live camera.
+                        upX = anchorFallbackForward[0]; upY = anchorFallbackForward[1]; upZ = anchorFallbackForward[2]
                         val dot2 = upX * nx + upY * ny + upZ * nz
                         yX = upX - dot2 * nx; yY = upY - dot2 * ny; yZ = upZ - dot2 * nz
                         yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
