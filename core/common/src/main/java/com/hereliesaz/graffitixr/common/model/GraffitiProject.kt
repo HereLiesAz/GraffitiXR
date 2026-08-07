@@ -119,8 +119,6 @@ data class GraffitiProject(
     // Neural Scan ID
     val cloudAnchorId: String? = null,
 
-    // Path to the point cloud file (.bin) if using cloud-points scan mode
-    val cloudPointsPath: String? = null,
     val targetFingerprint: String? = null,
     val isRightHanded: Boolean = true,
     // Per-mode whole-design adjustments, keyed by EditorMode.name. Defaulted for back-compat with

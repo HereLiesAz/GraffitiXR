@@ -42,6 +42,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val DRIFT_CORRECTION_ENABLED = booleanPreferencesKey("drift_correction_enabled")
     private val SELF_GROW_ENABLED = booleanPreferencesKey("self_grow_enabled")
     private val FEATURE_MAP_ENABLED = booleanPreferencesKey("feature_map_enabled")
+    private val AUTO_FOCUS_ENABLED = booleanPreferencesKey("auto_focus_enabled")
     private val FORCED_STEREO_UNSTABLE = booleanPreferencesKey("forced_stereo_unstable")
     // Key intentionally renamed from "stereo_capability": the probe's meaning changed from "stereo
     // tracks" to "dual lenses actually triangulate depth", so pre-existing verdicts must be discarded
@@ -159,6 +160,18 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setFeatureMapEnabled(on: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[FEATURE_MAP_ENABLED] = on
+        }
+    }
+
+    // Defaults TRUE: AUTO is the shipped behaviour, so an install that has never touched the
+    // switch keeps exactly the focus mode it had.
+    override val autoFocusEnabled: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[AUTO_FOCUS_ENABLED] ?: true }
+
+    override suspend fun setAutoFocusEnabled(on: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[AUTO_FOCUS_ENABLED] = on
         }
     }
 

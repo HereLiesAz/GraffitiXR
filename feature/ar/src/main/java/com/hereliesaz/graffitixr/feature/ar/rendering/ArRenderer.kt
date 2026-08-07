@@ -292,21 +292,55 @@ class ArRenderer(
     // Guards onFlashlightUnavailable so a rejected torch reports once per request, not once a frame.
     private var flashUnsupportedReported: Boolean = false
 
-    fun saveCloudPoints(path: String) {
-        pointCloudRenderer.saveToFile(path)
-    }
-
     /**
-     * How many points the accumulated ARCore cloud currently holds — the only live measure of "the
-     * map grew" left after the voxel/splat map was deleted, and what the autosave keys on.
-     *
-     * Read from any thread (the field is @Volatile); the count only ever increases within a session
-     * and resets with the renderer.
+     * How many points the accumulated ARCore cloud currently holds. Read from any thread (the field
+     * is @Volatile); the count only ever grows within a session and resets with the renderer.
      */
     val mappedPointCount: Int get() = pointCloudRenderer.accumulatedPointCount
 
-    fun scheduleCloudPointsLoad(path: String) {
-        pointCloudRenderer.pendingLoadPath = path
+    /**
+     * The anchor the accumulated point cloud is stored relative to.
+     *
+     * ARCore feature points are reported in the current frame's world estimate, and that estimate
+     * moves: positions are refined continuously and the whole frame is corrected on loop closure.
+     * Content that must stay attached to the real world across those corrections has to hang off an
+     * Anchor, which ARCore re-poses for exactly this reason — the artwork already does this through
+     * AnchorOrchestrator; the cloud did not, which is why it drifted.
+     *
+     * Created lazily on the first TRACKING frame and dropped if it ever stops tracking (see
+     * [cloudAnchorModel]) — an anchor ARCore has given up on can no longer carry a correction, and
+     * points expressed against it are stale in a way nothing downstream can detect.
+     */
+    private var cloudAnchor: com.google.ar.core.Anchor? = null
+    private val cloudAnchorModelScratch = FloatArray(16)
+    private val worldToCloudAnchorScratch = FloatArray(16)
+
+    /**
+     * The live anchor->world matrix for [cloudAnchor], creating the anchor if needed, or null when
+     * the session cannot supply one this frame (not tracking yet).
+     *
+     * Re-read every frame on purpose: caching it would reintroduce precisely the staleness the
+     * anchor exists to remove.
+     */
+    private fun cloudAnchorModel(session: Session, camera: com.google.ar.core.Camera): FloatArray? {
+        if (camera.trackingState != TrackingState.TRACKING) return null
+        val existing = cloudAnchor
+        if (existing != null && existing.trackingState != TrackingState.TRACKING) {
+            // The anchor is gone, so every accumulated point is expressed against a frame ARCore no
+            // longer maintains. Detaching without clearing would leave that stale geometry pinned to
+            // a fresh anchor at a different pose — worse than starting over.
+            try { existing.detach() } catch (_: Exception) { /* already detached */ }
+            cloudAnchor = null
+            pointCloudRenderer.clear()
+        }
+        val anchor = cloudAnchor ?: try {
+            session.createAnchor(camera.pose).also { cloudAnchor = it }
+        } catch (e: Exception) {
+            Timber.w(e, "cloud anchor creation failed")
+            return null
+        }
+        anchor.pose.toMatrix(cloudAnchorModelScratch, 0)
+        return cloudAnchorModelScratch
     }
 
     @Volatile private var pendingOverlayBitmap: Bitmap? = null
@@ -560,6 +594,9 @@ class ArRenderer(
                 // Apply queued flashlight state immediately upon attachment (sessionLock is held)
                 flashDirty = false
                 applyFlashlightStateLocked(session)
+                // A fresh session is configured from initArSessionLocked's default; re-assert the
+                // artist's choice so it survives AR re-entry and any session rebuild.
+                applyFocusModeLocked(session)
 
                 try {
                     val cameraId = session.cameraConfig.cameraId
@@ -609,6 +646,46 @@ class ArRenderer(
     fun updateFlashlight(isOn: Boolean) {
         isFlashlightRequested = isOn
         flashDirty = true
+    }
+
+    /**
+     * Request an autofocus-mode change, applied on the GL thread like [updateFlashlight] and for the
+     * same reason: `Session.configure()` from the main thread races `update()`, and ARCore's Session
+     * is not thread-safe.
+     *
+     * Exists so `FocusMode.FIXED` vs `AUTO` can be A/B'd on a wall without rebuilding the session.
+     * The two are a genuine trade-off, not a bug with a right answer: FIXED parks the lens at
+     * infinity and keeps the optics constant, which is what ARCore's triangulation wants, but at
+     * arm's length in low light it delivers a blurred frame with no usable texture — no features, no
+     * planes. AUTO fixes the blur and in exchange sweeps the effective focal length mid-stream,
+     * which on devices with sloppy OEM intrinsics is a documented source of tracking instability.
+     * Which one wins depends on the device and on how the artist works, so it is a switch.
+     */
+    fun updateAutoFocus(enabled: Boolean) {
+        isAutoFocusRequested = enabled
+        focusDirty = true
+    }
+
+    @Volatile private var isAutoFocusRequested: Boolean = true
+    @Volatile private var focusDirty: Boolean = false
+
+    /**
+     * Applies the requested focus mode via Session.configure(). MUST be called with [sessionLock]
+     * held, for the same serialisation reason as [applyFlashlightStateLocked].
+     */
+    private fun applyFocusModeLocked(activeSession: Session) {
+        val wanted = if (isAutoFocusRequested) Config.FocusMode.AUTO else Config.FocusMode.FIXED
+        try {
+            val config = activeSession.config
+            if (config.focusMode != wanted) {
+                config.focusMode = wanted
+                activeSession.configure(config)
+                onDiag("focus: ${if (isAutoFocusRequested) "AUTO" else "FIXED"}")
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to set focus mode via ARCore Config")
+            onDiag("focus: change rejected (${e.javaClass.simpleName})")
+        }
     }
 
     /**
@@ -773,7 +850,13 @@ class ArRenderer(
                 planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose, gridMode = true)
             }
             if (showPoints) {
-                pointCloudRenderer.draw(viewMatrix, projMatrix)
+                // Through the anchor's CURRENT pose, so every ARCore world correction since the
+                // points were captured is applied to them. Skipped when there is no tracked anchor:
+                // there is no frame to express them in, and drawing them at the identity would put
+                // the whole cloud at the world origin.
+                cloudAnchorModel(activeSession, camera)?.let { model ->
+                    pointCloudRenderer.draw(viewMatrix, projMatrix, model)
+                }
             }
             // A1 (voxel-map removal): voxel/mesh debug draw retired — the dense map is being removed
             // (A3 deletes the native subsystem). ARCore-based perception layers above (feature points,
@@ -919,6 +1002,11 @@ class ArRenderer(
                 flashDirty = false
                 lastStep = "flash"
                 applyFlashlightStateLocked(activeSession)
+            }
+            if (focusDirty) {
+                focusDirty = false
+                lastStep = "focus"
+                applyFocusModeLocked(activeSession)
             }
             lastStep = "displayGeom"
             displayRotationHelper.updateSessionIfNeeded(activeSession)
@@ -1768,12 +1856,23 @@ class ArRenderer(
                 // 1. Point Cloud acquisition (only when scanning in CLOUD_POINTS mode)
                 if (!anchorEstablished) {
                     try {
-                        frame.acquirePointCloud().use { pointCloud ->
-                            // Always accumulate. This count now drives co-op gating, the scan
-                            // hints and phase completion, so it cannot hang off `showPoints` — that
-                            // is a DRAW toggle, and letting a visualization setting decide whether
-                            // the map is built is how turning off a layer silently disables co-op.
-                            pointCloudRenderer.update(pointCloud)
+                        // Points are stored anchor-local, so accumulation needs the anchor. Without
+                        // one (not tracking yet) the frame's points are simply skipped: storing raw
+                        // world coordinates is what made the cloud drift.
+                        // Creates the anchor on the first tracked frame and validates it after
+                        // that. Called here rather than only in the draw path because accumulation
+                        // must not depend on the `showPoints` DRAW toggle.
+                        cloudAnchorModel(activeSession, camera)
+                        val anchorPose = cloudAnchor?.takeIf { it.trackingState == TrackingState.TRACKING }?.pose
+                        if (anchorPose != null) {
+                            anchorPose.inverse().toMatrix(worldToCloudAnchorScratch, 0)
+                            frame.acquirePointCloud().use { pointCloud ->
+                                // Always accumulate. This count drives the scan hints and phase
+                                // completion, so it cannot hang off `showPoints` — that is a DRAW
+                                // toggle, and letting a visualization setting decide whether the map
+                                // is built is how turning off a layer silently disables co-op.
+                                pointCloudRenderer.update(pointCloud, worldToCloudAnchorScratch)
+                            }
                         }
                     } catch (e: Exception) {
                         Timber.w(e, "Failed to acquire point cloud")
@@ -2104,7 +2203,15 @@ class ArRenderer(
                 // count as a reason to redraw. Otherwise holding the phone still — exactly when the
                 // artist is watching the surfaces settle — would freeze the dissolve part-way.
                 val dissolving = nowMs < planeRenderer.dissolveCompletesAtMs
-                val refresh = !havePerceptionCache || (due && (moved || mapGrew || dissolving))
+                // `moved` is deliberately NOT rate-limited. The cache holds world-anchored
+                // geometry and PerceptionFbo.composite() pastes it over the live camera on a fixed
+                // full-screen quad with no reprojection — so between refreshes the overlay is
+                // rendered from an older camera pose than the image beneath it, and every degree the
+                // phone turns in that window shows up as the grids and points sliding across the
+                // wall. Rate-limiting a still scene is free; rate-limiting a moving one is the
+                // artifact. Redraw whenever the pose moved, and keep the interval for the reasons
+                // that are not pose-dependent.
+                val refresh = !havePerceptionCache || moved || (due && (mapGrew || dissolving))
                 if (refresh) {
                     val t0 = android.os.SystemClock.elapsedRealtime()
                     perceptionFbo.bindForRender()
@@ -2244,6 +2351,8 @@ class ArRenderer(
     fun releaseGlResources() {
         backgroundRenderer.release()
         overlayRenderer.release()
+        try { cloudAnchor?.detach() } catch (_: Exception) { /* session already gone */ }
+        cloudAnchor = null
         pointCloudRenderer.release()
         planeRenderer.release()
         arDebugRenderer.release()

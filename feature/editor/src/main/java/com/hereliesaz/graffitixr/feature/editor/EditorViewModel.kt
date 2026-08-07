@@ -338,7 +338,6 @@ class EditorViewModel @Inject constructor(
 
                 // Paths derive from the (immutable) project id.
                 val projectId = currentProject?.id ?: GraffitiProject(name = name ?: "New Project").id
-                val cloudPointsPath = projectManager.getCloudPointsPath(context, projectId)
 
                 val manifestToSave: GraffitiProject
                 if (currentProject == null) {
@@ -347,7 +346,6 @@ class EditorViewModel @Inject constructor(
                         name = name ?: "New Project",
                         layers = updatedLayers,
                         modeAdjustments = modeAdjustments,
-                        cloudPointsPath = cloudPointsPath,
                     )
                     projectRepository.createProject(manifestToSave)
                 } else {
@@ -360,7 +358,6 @@ class EditorViewModel @Inject constructor(
                             layers = updatedLayers,
                             modeAdjustments = modeAdjustments,
                             lastModified = System.currentTimeMillis(),
-                            cloudPointsPath = cloudPointsPath,
                         )
                     }
                     // Export the merged result the repository just persisted (includes any AR wall map).

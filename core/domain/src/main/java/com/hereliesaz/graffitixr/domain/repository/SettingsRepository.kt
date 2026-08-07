@@ -90,6 +90,20 @@ interface SettingsRepository {
     suspend fun setFeatureMapEnabled(on: Boolean)
 
     /**
+     * ARCore camera autofocus. Default ON, which is the shipped behaviour.
+     *
+     * A real trade-off rather than a setting with a right answer. FIXED parks the lens at infinity
+     * and keeps the optics constant, which is what ARCore's triangulation wants; at arm's length in
+     * low light it also delivers a blurred frame with no usable texture, so no features and no
+     * planes. AUTO fixes the blur and in exchange sweeps the effective focal length mid-stream,
+     * which on devices with sloppy OEM intrinsics destabilises tracking. Persisted so an artist who
+     * has found which one their device and their working distance prefer keeps it.
+     */
+    val autoFocusEnabled: Flow<Boolean>
+
+    suspend fun setAutoFocusEnabled(on: Boolean)
+
+    /**
      * Set once a device proves it can't run forced hardware-stereo (ARCore motion-stereo disparity
      * fails / VIO never tracks): future sessions skip the stereo config and stay on Canvas, so the
      * broken path can't thrash the device. Cleared when the user explicitly re-selects Mural.

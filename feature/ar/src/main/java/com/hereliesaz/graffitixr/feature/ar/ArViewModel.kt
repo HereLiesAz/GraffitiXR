@@ -601,6 +601,12 @@ class ArViewModel @Inject constructor(
             _evalFeatureMapEnabled.value = settingsRepository.featureMapEnabled.firstOrNull() ?: false
             applyFeatureMapSwitch(_evalFeatureMapEnabled.value)
         }
+        viewModelScope.launch {
+            // Defaults TRUE (AUTO) — the shipped behaviour — so a store that has never been written
+            // does not silently change the focus mode.
+            _evalAutoFocusEnabled.value = settingsRepository.autoFocusEnabled.firstOrNull() ?: true
+            renderer?.updateAutoFocus(_evalAutoFocusEnabled.value)
+        }
     }
 
     /**
@@ -654,6 +660,26 @@ class ArViewModel @Inject constructor(
         applyFeatureMapSwitch(on)
         _evalFeatureMapEnabled.value = on
         viewModelScope.launch { settingsRepository.setFeatureMapEnabled(on) }
+    }
+
+    private val _evalAutoFocusEnabled = MutableStateFlow(true)
+
+    /** ARCore autofocus: ON is `FocusMode.AUTO`, OFF is `FocusMode.FIXED`. */
+    val evalAutoFocusEnabled: StateFlow<Boolean> = _evalAutoFocusEnabled.asStateFlow()
+
+    /**
+     * A/B switch for the camera focus mode, applied to the LIVE session so the two can be compared
+     * on the same wall without re-entering AR.
+     *
+     * This is the one AR switch that changes what ARCore itself sees rather than what we do with the
+     * result: AUTO's focal-length sweeps are a known source of tracking instability on devices with
+     * sloppy intrinsics, and FIXED's infinity lens is unusable at arm's length in low light. Neither
+     * is correct in general, which is why it is a switch and not a fix.
+     */
+    fun evalSetAutoFocusEnabled(on: Boolean) {
+        renderer?.updateAutoFocus(on)
+        _evalAutoFocusEnabled.value = on
+        viewModelScope.launch { settingsRepository.setAutoFocusEnabled(on) }
     }
 
     /**
@@ -992,7 +1018,6 @@ class ArViewModel @Inject constructor(
                 if (project != null) {
                     loadedProjectId = project.id
                     loadMapIfExists()
-                    loadCloudPointsIfExists()
                     loadFingerprintIfExists()
                 }
             }
@@ -1510,8 +1535,14 @@ class ArViewModel @Inject constructor(
             // triangulation badly enough to segfault its perception threads (MTC_vio,
             // MTC_triangulati) inside libarcore_c. forceSafeCameraConfig is the flag those devices
             // already set after a camera stall, so safe mode keeps the old constant-optics behaviour.
-            config.focusMode =
-                if (forceSafeCameraConfig) Config.FocusMode.FIXED else Config.FocusMode.AUTO
+            // Safe mode still forces FIXED (those devices set the flag precisely because constant
+            // optics is what stopped them crashing). Otherwise the artist's switch decides; it
+            // defaults to AUTO, which is what this line used to hardcode.
+            config.focusMode = when {
+                forceSafeCameraConfig -> Config.FocusMode.FIXED
+                _evalAutoFocusEnabled.value -> Config.FocusMode.AUTO
+                else -> Config.FocusMode.FIXED
+            }
             // LATEST_CAMERA_IMAGE so session.update() never blocks the GL render thread. On this
             // device the BLOCKING mode left the renderer stuck "Waiting for first frame" (the render
             // heartbeat never fired) — update() hung waiting for a frame that never arrived, so the
@@ -1844,17 +1875,20 @@ class ArViewModel @Inject constructor(
 
     fun saveMapBlocking() {
         val projectId = loadedProjectId ?: return
-        val cloudPath = projectManager.getCloudPointsPath(appContext, projectId)
+        // The wall feature map is the only thing here that survives a session meaningfully: it is
+        // re-registered on load through the fingerprint + PnP relocalization, so its coordinates are
+        // recoverable.
+        //
+        // The ARCore point cloud used to be written alongside it and restored on open. That could
+        // not work: the file holds raw ARCore world coordinates, and a new session's world origin is
+        // wherever the device happened to start, so every restored point landed at an arbitrary
+        // rigid offset from the wall it was scanned off — and then appeared to drift as the artist
+        // moved, because nothing re-registered it. It is a scan VISUALISATION (relocalization rides
+        // the fingerprint, not the cloud), so the honest fix is not to persist it at all.
+        saveWallFeatureMap()
 
-        // The two things a session actually accumulates: the ARCore point cloud (a file of its own)
-        // and the native wall feature map (merged into the project record). The native
-        // saveModel(mapPath) call that used to sit here went with the voxel/splat map — it was a
-        // no-op that made this function LOOK like it persisted more than it did.
-        renderer?.saveCloudPoints(cloudPath)
-        saveWallFeatureMap() // Phase 3b: persist the passive feature map into the project record
-
-        lastSavedMapPointCount.set(renderer?.mappedPointCount ?: 0)
-        Timber.d("Atomic persistence complete: Saved all mapping components for $projectId")
+        lastSavedMapPointCount.set(slamManager.getMapPointCount())
+        Timber.d("Atomic persistence complete: saved the wall feature map for $projectId")
     }
 
     fun saveMapNow() {
@@ -2394,34 +2428,16 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    private fun loadCloudPointsIfExists() {
-        val projectId = loadedProjectId ?: return
-        val path = projectManager.getCloudPointsPath(appContext, projectId)
-        if (File(path).exists()) {
-            renderer?.scheduleCloudPointsLoad(path)
-        }
-    }
-
     /**
-     * Restore this project's accumulated ARCore point cloud, if it saved one.
+     * Seed the autosave baseline for a freshly opened project.
      *
-     * This used to also `slamManager.loadModel(mapPath)` and skip the whole restore when
-     * `getSplatCount() > 0`. Both went with the voxel/splat map: `loadModel` is a native no-op, and
-     * the guard read a hardcoded 0 so it never fired. What is left is the one component that really
-     * does persist, and the baseline the autosave compares against.
+     * This used to restore a saved ARCore point cloud too, which could not be correct — see
+     * [saveMapBlocking] — and before that a native `loadModel` that had been a no-op since the
+     * voxel/splat map was deleted. The wall feature map itself is restored by the project load path,
+     * which re-registers it through the fingerprint.
      */
     private fun loadMapIfExists() {
-        val projectId = loadedProjectId ?: return
-        val cloudPath = projectManager.getCloudPointsPath(appContext, projectId)
-
-        if (File(cloudPath).exists()) {
-            renderer?.scheduleCloudPointsLoad(cloudPath)
-            Timber.d("Atomic persistence complete: Loaded available mapping components for $projectId")
-        }
-        // Whether or not a cloud was restored, the save baseline starts from what the renderer
-        // currently holds — a fresh renderer holds nothing, and a scheduled load lands on the GL
-        // thread, so the first autosave tick re-reads it anyway.
-        lastSavedMapPointCount.set(renderer?.mappedPointCount ?: 0)
+        lastSavedMapPointCount.set(slamManager.getMapPointCount())
     }
 
     private fun startAutoSave() {
@@ -2486,8 +2502,8 @@ class ArViewModel @Inject constructor(
         // means one place re-establishes every experiment switch instead of two rules to remember.
         slamManager.setSelfGrowEnabled(_evalSelfGrowEnabled.value)
         applyFeatureMapSwitch(_evalFeatureMapEnabled.value)
+        renderer?.updateAutoFocus(_evalAutoFocusEnabled.value)
         renderer?.attachSession(session)
-        loadCloudPointsIfExists()
     }
 
     fun setTrackingState(
