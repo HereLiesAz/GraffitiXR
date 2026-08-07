@@ -207,11 +207,16 @@ data class EditorUiState(
     val redoCount: Int = 0,
     val isLoading: Boolean = false,
     val showDiagOverlay: Boolean = false,
-    // In-world perception layers, each independently toggleable from Settings (default on).
+    // In-world perception layers, each independently toggleable from Settings.
     // Distinct from showDiagOverlay, which governs the text telemetry HUD.
-    val showFeaturePoints: Boolean = true,  // ARCore sparse feature dots (tracker landmarks)
-    val showPlaneGrids: Boolean = true,     // detected planes as metric grids
-    val showPoints: Boolean = true,         // accumulated sparse point cloud
+    // showFeaturePoints and showPoints are raw engineering/perception-debug visualizations with no
+    // corresponding onboarding explanation anywhere in the app, so they default OFF for ordinary
+    // users. showPlaneGrids defaults ON: the AR onboarding copy (onboarding_ar[1], "Coloured shapes
+    // appear as the engine maps the surface") explicitly promises this one as user-facing scanning
+    // feedback, so leaving it on is intentional, not an oversight.
+    val showFeaturePoints: Boolean = false,  // ARCore sparse feature dots (tracker landmarks)
+    val showPlaneGrids: Boolean = true,      // detected planes as metric grids
+    val showPoints: Boolean = false,         // accumulated sparse point cloud
     val canvasBackground: Color = Color.Black,
     // Per-mode whole-design adjustments (transform + tone). Applied to the composited design in
     // that mode only; Design-mode layer edits stay global across all modes.

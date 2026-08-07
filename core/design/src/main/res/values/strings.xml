@@ -78,10 +78,11 @@
     <!-- Description of the progress tool, used for marking completed parts of a mural. -->
     <string name="nav_update_info">Mark completed areas of your mural to track painting progress.</string>
 
-    <!-- Label for the design and layer management menu. -->
+    <!-- Label for the Design workspace — the default screen you land on after opening or creating a
+         project. There is no separate "Design" menu/button to tap; this just names that screen. -->
     <string name="nav_design">Design</string>
-    <!-- Description of the design menu, where layers are added and managed. -->
-    <string name="nav_design_info">Add and manage design layers. Each layer can be an imported image or a freehand drawing.</string>
+    <!-- Description of the Design workspace, where layers are added and managed. -->
+    <string name="nav_design_info">Your workspace. Layers you add with \'Open\' — and edit with the tools below — carry over into every mode.</string>
 
     <!-- Action label to open or import an image. -->
     <string name="nav_open">Open</string>
@@ -618,7 +619,7 @@
     <!-- Mode onboarding scripts (chromeless tap-to-advance overlay) -->
     <string-array name="onboarding_trace">
         <item>This is Trace mode.</item>
-        <item>Arrange and edit your photos, sketches, and text by pressing the Design button.</item>
+        <item>Tap \'Open\' to add your first layer. Once it\'s in, pinch and drag on the canvas to size and place it.</item>
         <item>When they are where and how you want them, press the Freeze button to turn your phone into a lightbox for tracing onto paper.</item>
         <item>We recommend using either Trace mode or Mockup mode for editing.</item>
         <item>That way your imagery is all ready to go and your phone can focus on augmenting reality when you press the AR button.</item>
@@ -627,12 +628,12 @@
         <item>AR Projection — projects your design onto a real wall using the phone\'s depth sensor and spatial tracking.</item>
         <item>Point at the wall and move slowly side-to-side. Coloured shapes appear as the engine maps the surface. Wait until the wall area is covered.</item>
         <item>Just tap the screen. The app photographs the wall, extracts tracking features, and locks the anchor instantly.</item>
-        <item>Press \'Design\' to access your layer tools. Use \'Image\' to import photos, \'Draw\' to sketch, or \'Text\' to type.</item>
+        <item>Tap \'Open\' to add a design layer — it projects onto the wall using the anchor you just set.</item>
         <item>Tip — blank white walls, smooth concrete, and single-colour surfaces won\'t track. Aim your anchor point at graffiti, rough plaster, or any distinct mark.</item>
     </string-array>
     <string-array name="onboarding_overlay">
         <item>Live Overlay — your design floats over the live camera view, no surface scanning needed.</item>
-        <item>Press \'Design\' to access layer tools. Use \'Image\' to import photos, \'Draw\' to sketch, or \'Text\' to type.</item>
+        <item>Tap \'Open\' to add a layer — pick a photo and it appears here, floating over the live camera view.</item>
         <item>Pinch to scale, drag to reposition. The overlay stays fixed to your screen — step back to see how it fits the wall.</item>
     </string-array>
     <!-- Shown once on first launch on devices where ARCore is not supported. -->
@@ -643,21 +644,20 @@
     </string-array>
     <string-array name="onboarding_mockup">
         <item>Photo Mockup — preview your design on a photo before you ever pick up a brush.</item>
-        <item>Open \'Design\' and tap \'Wall\' to choose or take a photo of your surface. Do this first!</item>
-        <item>Use \'Image\', \'Draw\', or \'Text\' to add layers on top of the wall. Pinch and drag to size and position them.</item>
+        <item>Tap \'Wall\' to choose or take a photo of your surface. Do this first!</item>
+        <item>Tap \'Open\' to add a layer on top of the wall photo. Pinch and drag to size and position it.</item>
     </string-array>
     <string-array name="onboarding_design">
         <item>This is Design — your workspace. Whatever you build here carries over into every other mode.</item>
-        <item>Open \'Design\' and add a layer: \'Image\' to import a photo, \'Sketch\' to draw, or \'Text\' to type.</item>
+        <item>Tap \'Open\' to add your first layer — pick a photo from your gallery and it lands here as your artwork.</item>
         <item>Tap a layer to open its tools — grouped into Paint, Retouch, Adjust and Effects folders. Pinch and drag on the canvas to size and place it.</item>
         <item>When it looks right, choose how to use it: \'Trace\' to turn your phone into a lightbox, \'Mockup\' to preview on a photo, or \'AR\' to project it onto a wall.</item>
     </string-array>
-    <!-- Sub-item walkthrough shown after the Design menu is opened: one line per layer source,
-         each pointing at its own rail button (Open / Sketch / Text). -->
+    <!-- Currently unreferenced by any guidance edge (kept for a possible future walkthrough).
+         Only one rail button adds a layer today — Open, which imports a photo from the gallery;
+         there is no separate Sketch or Text layer source. -->
     <string-array name="onboarding_design_layers">
-        <item>Open — import a photo or artwork; it lands as a new layer.</item>
-        <item>Sketch — start a blank layer and draw your own marks.</item>
-        <item>Text — type words and style them as their own layer.</item>
+        <item>Open — import a photo from your gallery; it lands as a new layer.</item>
     </string-array>
 
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->

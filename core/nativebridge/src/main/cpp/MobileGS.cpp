@@ -52,8 +52,6 @@ struct StageTimer {
 };
 }
 
-std::string gLastSplatTrace = "";
-
 extern JavaVM* gJvm;
 
 struct JniThreadAttacher {

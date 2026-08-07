@@ -21,11 +21,7 @@
 
 MobileGS* gSlamEngine = nullptr;
 cv::Mat gLastColorFrame; // MANDATE: Kept in Sensor-Native (Landscape) orientation
-int gFrameCount = 0;
 JavaVM* gJvm = nullptr;
-
-static int gColorImageWidth  = 0;
-static int gColorImageHeight = 0;
 
 // ── Native crash capture ─────────────────────────────────────────────────────
 // A SIGSEGV/SIGABRT in the AR/SLAM native code kills the process before the JVM
@@ -347,12 +343,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMappingPaused(J
     if (gSlamEngine) gSlamEngine->setMappingPaused(paused);
 }
 
-float gLastViewMatrix[16];
-float gLastProjMatrix[16];
-float gLastMappingViewMatrix[16];
-float gLastMappingProjMatrix[16];
-bool gHasCameraMatrices = false;
-
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(
         JNIEnv* env, jobject thiz,
@@ -374,12 +364,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(
 
         gSlamEngine->updateCamera(view, proj);
         gSlamEngine->updateMappingCamera(mView, mProj);
-
-        memcpy(gLastViewMatrix, view, 16 * sizeof(float));
-        memcpy(gLastProjMatrix, proj, 16 * sizeof(float));
-        memcpy(gLastMappingViewMatrix, mView, 16 * sizeof(float));
-        memcpy(gLastMappingProjMatrix, mProj, 16 * sizeof(float));
-        gHasCameraMatrices = true;
 
         env->ReleaseFloatArrayElements(viewMatrix, view, JNI_ABORT);
         env->ReleaseFloatArrayElements(projMatrix, proj, JNI_ABORT);
@@ -418,9 +402,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     uint8_t* vData = static_cast<uint8_t*>(env->GetDirectBufferAddress(vBuffer));
 
     if (!yData || !uData || !vData) return;
-
-    gColorImageWidth  = width;
-    gColorImageHeight = height;
 
     cv::Mat yMat(height, width, CV_8UC1, yData, yStride);
 
@@ -526,17 +507,20 @@ Java_com_hereliesaz_graffitixr_nativebridge_YuvConverter_nativeYuvToRgbaBitmap(
     yMat.copyTo(nv21(cv::Rect(0, 0, width, height)));
 
     if (uvPixelStride == 1) {
-        // I420 (planar U then V): pack into interleaved VU rows for NV21.
-        cv::Mat uMat(height / 2, width / 2, CV_8UC1, uData, uvRowStride);
-        cv::Mat vMat(height / 2, width / 2, CV_8UC1, vData, uvRowStride);
+        // I420 (planar U then V): pack into interleaved VU rows for NV21. Bounded by the buffer
+        // capacities, same as nativeFeedYuvFrame's I420 branch above: uMat/vMat wrap uData/vData at
+        // uvRowStride without OpenCV knowing the buffer's real length, so a truncated final row (or a
+        // caller-supplied stride wider than the actual allocation) would otherwise read past the end.
+        jlong uCap = env->GetDirectBufferCapacity(uBuffer);
+        jlong vCap = env->GetDirectBufferCapacity(vBuffer);
         cv::Mat vuInterleaved(height / 2, width, CV_8UC1, nv21.ptr(height));
         for (int r = 0; r < height / 2; ++r) {
             uint8_t* row = vuInterleaved.ptr(r);
-            const uint8_t* uRow = uMat.ptr(r);
-            const uint8_t* vRow = vMat.ptr(r);
+            size_t rowOff = (size_t)r * uvRowStride;
             for (int c = 0; c < width / 2; ++c) {
-                row[2 * c]     = vRow[c];   // V first in NV21
-                row[2 * c + 1] = uRow[c];   // then U
+                size_t idx = rowOff + c;
+                row[2 * c]     = (vCap <= 0 || (jlong)idx < vCap) ? vData[idx] : 0; // V first in NV21
+                row[2 * c + 1] = (uCap <= 0 || (jlong)idx < uCap) ? uData[idx] : 0; // then U
             }
         }
     } else if (uvPixelStride == 2) {
@@ -574,9 +558,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
 
     uint8_t* buffer = static_cast<uint8_t*>(env->GetDirectBufferAddress(colorBuffer));
     if (!buffer || !gSlamEngine) return;
-
-    gColorImageWidth  = width;
-    gColorImageHeight = height;
 
     cv::Mat frame(height, width, CV_8UC4, buffer);
     cv::cvtColor(frame, gLastColorFrame, cv::COLOR_RGBA2RGB);
@@ -908,6 +889,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallFingerprint
         JNIEnv* env, jobject thiz, jobject bitmap, jobject mask, jobject depthBuffer, jint depthW, jint depthH, jint depthStride, jfloatArray intrArray, jfloatArray viewMatArray) {
 
     if (!gSlamEngine) return nullptr;
+    // generateFingerprint dereferences intr[0..3] and viewMat[0..15] unconditionally (unlike the
+    // optional-pointer restore paths above), so a null or short array here is an OOB read past
+    // whatever GetFloatArrayElements happens to hand back. Not reachable via current Kotlin call
+    // sites, but every other array-taking function in this file validates before use.
+    if (!intrArray || env->GetArrayLength(intrArray) < 4) return nullptr;
+    if (!viewMatArray || env->GetArrayLength(viewMatArray) < 16) return nullptr;
 
     cv::Mat image;
     bitmapToMat(env, bitmap, image);
@@ -930,6 +917,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallFingerprint
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArtworkFingerprint(
         JNIEnv* env, jobject thiz, jobject bitmap, jobject depthBuffer, jint depthW, jint depthH, jint depthStride, jfloatArray intrArray, jfloatArray viewMatArray) {
+    // Same OOB hazard as nativeSetWallFingerprint above: setArtworkFingerprint dereferences
+    // intr[0..3] / viewMat[0..15] unconditionally. Validate before touching either array.
+    if (!intrArray || env->GetArrayLength(intrArray) < 4) return;
+    if (!viewMatArray || env->GetArrayLength(viewMatArray) < 16) return;
     if (gSlamEngine) {
         cv::Mat composite;
         bitmapToMat(env, bitmap, composite);

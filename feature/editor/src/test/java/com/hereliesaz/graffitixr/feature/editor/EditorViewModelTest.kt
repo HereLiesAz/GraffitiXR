@@ -64,6 +64,11 @@ class EditorViewModelTest {
         currentProjectFlow.value = testProject
         every { projectRepository.currentProject } returns currentProjectFlow
         every { settingsRepository.backgroundColor } returns kotlinx.coroutines.flow.flowOf(0xFF000000.toInt())
+        // EditorViewModel now restores isRightHanded from SettingsRepository at init (a live
+        // collector, same as backgroundColor above) — an unstubbed relaxed-mock Flow here would
+        // leave the collector's behaviour undefined, so stub it explicitly like the other settings
+        // flows this ViewModel collects.
+        every { settingsRepository.isRightHanded } returns kotlinx.coroutines.flow.flowOf(true)
 
         // Mock static methods for Bitmap, Uri, and Toast
         mockkStatic(BitmapFactory::class)
@@ -361,5 +366,34 @@ class EditorViewModelTest {
         viewModel.toggleImageLock()
         testDispatcher.scheduler.advanceUntilIdle()
         assertNull(viewModel.uiState.value.design)
+    }
+
+    // ==================== Dominant hand persistence ====================
+    // Regression coverage for the bug where ToggleHandedness only flipped an in-memory field and
+    // never reached SettingsRepository, so the choice never survived a restart.
+
+    @Test
+    fun `initial state restores isRightHanded from SettingsRepository`() = runTest {
+        every { settingsRepository.isRightHanded } returns kotlinx.coroutines.flow.flowOf(false)
+        val restoredViewModel = EditorViewModel(
+            projectRepository, settingsRepository, projectManager, exportManager, context,
+            slamManager, object : DispatcherProvider {
+                override val main: kotlinx.coroutines.CoroutineDispatcher = testDispatcher
+                override val io: kotlinx.coroutines.CoroutineDispatcher = testDispatcher
+                override val default: kotlinx.coroutines.CoroutineDispatcher = testDispatcher
+                override val unconfined: kotlinx.coroutines.CoroutineDispatcher = testDispatcher
+            }, opEmitter, subjectIsolator
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertFalse(restoredViewModel.uiState.value.isRightHanded)
+    }
+
+    @Test
+    fun `toggleHandedness flips state and persists through SettingsRepository`() = runTest {
+        val before = viewModel.uiState.value.isRightHanded
+        viewModel.toggleHandedness()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(!before, viewModel.uiState.value.isRightHanded)
+        coVerify { settingsRepository.setRightHanded(!before) }
     }
 }

@@ -120,6 +120,19 @@ class EditorViewModel @Inject constructor(
             }
         }
 
+        // Dominant hand is a device/user-level preference (SettingsRepository), not per-project —
+        // an artist doesn't have a different dominant hand per project. Restoring it here on every
+        // launch is what makes the Settings toggle survive a restart; without this the reducer's
+        // ToggleHandedness only ever flipped an in-memory EditorUiState field that started from the
+        // hardcoded default every time the process was recreated. Kept as a live collector (not a
+        // one-shot read) so a change made from Settings is reflected immediately if this ViewModel
+        // is still alive, matching the backgroundColor collector just above.
+        viewModelScope.launch(dispatchers.main) {
+            settingsRepository.isRightHanded.collect { isRight ->
+                _uiState.update { it.copy(isRightHanded = isRight) }
+            }
+        }
+
         viewModelScope.launch(dispatchers.main) {
             projectRepository.currentProject.collect { project ->
                 if (project != null) {
@@ -578,7 +591,20 @@ class EditorViewModel @Inject constructor(
 
     // ── Settings / perception layers ──────────────────────────────────────────
 
-    fun toggleHandedness() = dispatch(EditorIntent.ToggleHandedness)
+    /**
+     * Flips the in-memory placement immediately (so the rail docks on the other side without
+     * waiting on IO) and persists the new value to [SettingsRepository] so it survives a restart.
+     * Previously this only dispatched the reducer intent — a purely in-memory `EditorUiState` flip
+     * with no write to DataStore, even though a working persisted `isRightHanded` flow already
+     * existed on [SettingsRepository] and just had no caller.
+     */
+    fun toggleHandedness() {
+        dispatch(EditorIntent.ToggleHandedness)
+        val isRightHanded = _uiState.value.isRightHanded
+        viewModelScope.launch(dispatchers.io) {
+            settingsRepository.setRightHanded(isRightHanded)
+        }
+    }
     fun toggleDiagOverlay() = dispatch(EditorIntent.ToggleDiagOverlay)
     fun toggleFeaturePoints() = dispatch(EditorIntent.ToggleFeaturePoints)
     fun togglePlaneGrids() = dispatch(EditorIntent.TogglePlaneGrids)
