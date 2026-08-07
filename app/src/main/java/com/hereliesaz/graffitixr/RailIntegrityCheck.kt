@@ -14,6 +14,14 @@ import com.hereliesaz.graffitixr.common.model.EditorMode
  *     class of bug where an edge points at a renamed/removed item (e.g. the old `mode.mockup.wall`,
  *     whose real id is `mockup.wall`). Runtime guidance highlights (AZ_ITEM_ACTIVE / dynamic
  *     selectors) are resolved at render time and are not checked here.
+ * (5) Every id addressed by [decorateRailItems] — `azHighlight` and `azItemState` — matches a
+ *     registered rail item (WARN).
+ *
+ * (5) is why this class earns its keep. Both of those calls are *post-hoc decorators*: AzNavRail
+ * applies them after the whole DSL block has run, and an id it does not recognise is silently
+ * ignored. There is no crash, no log, no visual difference from "the state was false" — a renamed
+ * item just quietly stops being highlighted or badged. Every other kind of orphan in this file has
+ * the same shape, which is exactly why the check exists at all.
  */
 internal object RailIntegrityCheck {
 
@@ -23,6 +31,7 @@ internal object RailIntegrityCheck {
         mode: EditorMode,
         helpList: Map<String, Any>,
         guidanceHighlightIds: Set<String>,
+        decoratedIds: Set<String> = emptySet(),
     ) {
         val railIds = enumerateRailItemIds(mode)
 
@@ -50,6 +59,13 @@ internal object RailIntegrityCheck {
         guidanceHighlightIds.forEach { id ->
             if (id !in railIds) {
                 Log.w(TAG, "guidance highlight id '$id' has no matching rail item")
+            }
+        }
+
+        // (5) decorator orphans — see the class doc. AzNavRail drops these silently.
+        decoratedIds.forEach { id ->
+            if (id !in railIds) {
+                Log.w(TAG, "azHighlight/azItemState id '$id' has no matching rail item")
             }
         }
     }
