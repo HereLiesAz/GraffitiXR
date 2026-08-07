@@ -26,7 +26,6 @@ public:
 
     void initialize(int width, int height);
     void updateCamera(float* viewMat, float* projMat);
-    void updateMappingCamera(float* viewMat, float* projMat);
     void updateLightLevel(float level);
     void updateAnchorTransform(float* transformMat);
     void updateDeviceMotion(float* angularVel, float* linearVel);
@@ -699,8 +698,6 @@ private:
 
     float mViewMatrix[16];
     float mProjMatrix[16];
-    float mMappingViewMatrix[16];
-    float mMappingProjMatrix[16];
     bool mCameraReady = false;
 
     int mScreenWidth = 1920;

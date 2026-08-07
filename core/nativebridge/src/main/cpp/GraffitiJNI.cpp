@@ -370,25 +370,20 @@ JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(
         JNIEnv* env, jobject thiz,
         jfloatArray viewMatrix, jfloatArray projMatrix,
-        jfloatArray mappingViewMatrix, jfloatArray mappingProjMatrix,
         jlong timestampNs) {
     std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
-        // All four are memcpy'd as 16 floats below (and read as 4x4 by updateCamera), so a short
-        // array would read past the end. Validate every one before pinning any of them.
-        if (!viewMatrix || !projMatrix || !mappingViewMatrix || !mappingProjMatrix) return;
-        if (env->GetArrayLength(viewMatrix) < 16 || env->GetArrayLength(projMatrix) < 16 ||
-            env->GetArrayLength(mappingViewMatrix) < 16 || env->GetArrayLength(mappingProjMatrix) < 16) {
+        // Both are memcpy'd as 16 floats below (and read as 4x4 by updateCamera), so a short
+        // array would read past the end. Validate both before pinning either.
+        if (!viewMatrix || !projMatrix) return;
+        if (env->GetArrayLength(viewMatrix) < 16 || env->GetArrayLength(projMatrix) < 16) {
             return;
         }
         jfloat* view = env->GetFloatArrayElements(viewMatrix, nullptr);
         jfloat* proj = env->GetFloatArrayElements(projMatrix, nullptr);
-        jfloat* mView = env->GetFloatArrayElements(mappingViewMatrix, nullptr);
-        jfloat* mProj = env->GetFloatArrayElements(mappingProjMatrix, nullptr);
 
         try {
             gSlamEngine->updateCamera(view, proj);
-            gSlamEngine->updateMappingCamera(mView, mProj);
         } catch (const std::exception& e) {
             LOGE("nativeUpdateCamera: exception: %s", e.what());
         } catch (...) {
@@ -397,8 +392,6 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(
 
         env->ReleaseFloatArrayElements(viewMatrix, view, JNI_ABORT);
         env->ReleaseFloatArrayElements(projMatrix, proj, JNI_ABORT);
-        env->ReleaseFloatArrayElements(mappingViewMatrix, mView, JNI_ABORT);
-        env->ReleaseFloatArrayElements(mappingProjMatrix, mProj, JNI_ABORT);
     }
 }
 

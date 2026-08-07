@@ -32,7 +32,6 @@ fun EditorUi(
     actions: EditorViewModel,
     uiState: EditorUiState,
     isTouchLocked: Boolean,
-    showUnlockInstructions: Boolean,
     strings: AppStrings,
     isCapturingTarget: Boolean = false
 ) {

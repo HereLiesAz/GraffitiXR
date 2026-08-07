@@ -605,7 +605,6 @@ class ArRenderer(
     private val viewMatrixScratch = FloatArray(16)
     private val projMatrixScratch = FloatArray(16)
     private val mappingViewMatrixScratch = FloatArray(16)
-    private val mappingProjMatrixScratch = FloatArray(16)
     private val backboneScratch = FloatArray(16)
     // Scratch for composing the overlay matrix (anchor frame * in-plane transform).
     private val overlayBaseScratch = FloatArray(16)
@@ -1414,26 +1413,15 @@ class ArRenderer(
             camera.getViewMatrix(viewMatrix, 0)
             camera.getProjectionMatrix(projMatrix, 0, 0.1f, 100.0f)
 
+            // mappingViewMatrix is NOT what ARCore's own getViewMatrix() returns above — it's built
+            // from camera.pose.inverse() so its translation is expressed in the "mapping" convention
+            // the target-capture path below (onTargetCaptured) expects. Kept only for that one use; a
+            // sibling mappingProjMatrix that used to accompany it fed nothing but dead native storage
+            // (MobileGS::updateMappingCamera wrote it and nothing ever read it back) and was removed.
             val mappingViewMatrix = mappingViewMatrixScratch
-            val mappingProjMatrix = mappingProjMatrixScratch
-            // mappingProjMatrix is only partially overwritten below (cells 0/5/8/9/10/11/14/15), so
-            // a reused buffer has to be cleared or it would carry the previous frame's stray cells.
-            java.util.Arrays.fill(mappingProjMatrix, 0f)
             camera.pose.inverse().toMatrix(mappingViewMatrix, 0)
 
             val intrinsics = camera.imageIntrinsics
-            val focalLength = intrinsics.focalLength
-            val principalPoint = intrinsics.principalPoint
-            val dims = intrinsics.imageDimensions
-
-            mappingProjMatrix[0] = 2.0f * focalLength[0] / dims[0]
-            mappingProjMatrix[5] = 2.0f * focalLength[1] / dims[1]
-            mappingProjMatrix[8] = 2.0f * principalPoint[0] / dims[0] - 1.0f
-            mappingProjMatrix[9] = 1.0f - 2.0f * principalPoint[1] / dims[1]
-            mappingProjMatrix[10] = -(100.1f) / (99.9f)
-            mappingProjMatrix[11] = -1.0f
-            mappingProjMatrix[14] = -(2.0f * 100.0f * 0.1f) / (99.9f)
-            mappingProjMatrix[15] = 0.0f
 
             lastStep = "slamCamera"
             val isTracking = camera.trackingState == TrackingState.TRACKING
@@ -1456,7 +1444,7 @@ class ArRenderer(
             // The not-tracking case is never gated (shouldRunHeavyThisFrame forces active), so a
             // relocalization always re-feeds SLAM immediately.
             if (shouldRunHeavyThisFrame(viewMatrix, isTracking)) {
-                slamManager.updateCamera(viewMatrix, projMatrix, mappingViewMatrix, mappingProjMatrix, frame.timestamp)
+                slamManager.updateCamera(viewMatrix, projMatrix, frame.timestamp)
             }
 
             lastStep = "light"

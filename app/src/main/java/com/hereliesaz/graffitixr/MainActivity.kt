@@ -1673,14 +1673,6 @@ class MainActivity : ComponentActivity() {
             actions = viewModel,
             uiState = uiState,
             isTouchLocked = mainUiState.isTouchLocked,
-            // Dead parameter: EditorUi.kt (feature/editor, out of scope here) declares this but never
-            // reads it in its body — the real unlock-instructions popup is MainActivity's own local
-            // `remember`ed state (UnlockInstructionsPopup, near the TouchLockOverlay usage above), not
-            // this one. MainUiState.showUnlockInstructions and MainViewModel.showUnlockInstructions()
-            // were removed as dead state; this call still has to supply the parameter since EditorUi's
-            // signature requires it and that file is out of scope to edit, so a hardcoded false stands
-            // in. Follow-up for whoever owns feature/editor: drop the parameter from EditorUi.kt.
-            showUnlockInstructions = false,
             strings = strings,
             isCapturingTarget = mainUiState.isCapturingTarget
         )

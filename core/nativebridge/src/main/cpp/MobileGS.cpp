@@ -90,13 +90,9 @@ void MobileGS::initialize(int width, int height) {
 
     memset(mViewMatrix, 0, sizeof(mViewMatrix));
     memset(mProjMatrix, 0, sizeof(mProjMatrix));
-    memset(mMappingViewMatrix, 0, sizeof(mMappingViewMatrix));
-    memset(mMappingProjMatrix, 0, sizeof(mMappingProjMatrix));
     memset(mAnchorMatrix, 0, sizeof(mAnchorMatrix));
     mViewMatrix[0] = mViewMatrix[5] = mViewMatrix[10] = mViewMatrix[15] = 1.0f;
     mProjMatrix[0] = mProjMatrix[5] = mProjMatrix[10] = mProjMatrix[15] = 1.0f;
-    mMappingViewMatrix[0] = mMappingViewMatrix[5] = mMappingViewMatrix[10] = mMappingViewMatrix[15] = 1.0f;
-    mMappingProjMatrix[0] = mMappingProjMatrix[5] = mMappingProjMatrix[10] = mMappingProjMatrix[15] = 1.0f;
     mAnchorMatrix[0] = mAnchorMatrix[5] = mAnchorMatrix[10] = mAnchorMatrix[15] = 1.0f;
 
     if (!mRelocRunning) {
@@ -110,12 +106,6 @@ void MobileGS::updateCamera(float* viewMat, float* projMat) {
     memcpy(mViewMatrix, viewMat, 16 * sizeof(float));
     memcpy(mProjMatrix, projMat, 16 * sizeof(float));
     mCameraReady = true;
-}
-
-void MobileGS::updateMappingCamera(float* viewMat, float* projMat) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    memcpy(mMappingViewMatrix, viewMat, 16 * sizeof(float));
-    memcpy(mMappingProjMatrix, projMat, 16 * sizeof(float));
 }
 
 void MobileGS::updateLightLevel(float level) {

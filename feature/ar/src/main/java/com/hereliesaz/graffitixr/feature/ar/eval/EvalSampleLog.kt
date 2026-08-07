@@ -160,7 +160,7 @@ data class EvalSample(
      * Secondary. It is **not** E0b's independent variable (see [captureRotationNeededDeg]), and
      * grouping by it is the mistake this pair of columns exists to prevent. It is logged because
      * the live path has frame handling of its own — the reloc feed is rotated by `cvRotateCode`
-     * while `mappingProjMatrix` is built from *unrotated* `imageIntrinsics` — so a run where the
+     * while camera intrinsics are read *unrotated* from `imageIntrinsics` — so a run where the
      * two columns disagree is the one worth looking at twice.
      */
     val liveRotationNeededDeg: Int = -1,

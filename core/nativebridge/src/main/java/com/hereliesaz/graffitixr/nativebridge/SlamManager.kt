@@ -547,11 +547,9 @@ class SlamManager @Inject constructor(
     fun updateCamera(
         viewMatrix: FloatArray,
         projectionMatrix: FloatArray,
-        mappingViewMatrix: FloatArray,
-        mappingProjectionMatrix: FloatArray,
         timestampNs: Long
     ) {
-        nativeUpdateCamera(viewMatrix, projectionMatrix, mappingViewMatrix, mappingProjectionMatrix, timestampNs)
+        nativeUpdateCamera(viewMatrix, projectionMatrix, timestampNs)
     }
 
     fun feedYuvFrame(
@@ -735,8 +733,6 @@ class SlamManager @Inject constructor(
     private external fun nativeUpdateCamera(
         viewMatrix: FloatArray,
         projectionMatrix: FloatArray,
-        mappingViewMatrix: FloatArray,
-        mappingProjectionMatrix: FloatArray,
         timestampNs: Long
     )
     private external fun nativeUpdateLightLevel(level: Float)
