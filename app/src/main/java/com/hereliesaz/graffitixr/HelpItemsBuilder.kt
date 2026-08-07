@@ -59,6 +59,8 @@ internal fun buildHelpItems(strings: AppStrings): Map<String, Any> = mapOf(
     "design.adjust" to strings.nav.adjustInfo,
     "design.balance" to strings.nav.balanceInfo,
     "design.invert" to strings.nav.invertInfo,
+    "design.outline" to strings.nav.outlineInfo,
+    "design.isolate" to strings.nav.isolateInfo,
 
     // Project menu
     "host.project" to strings.help.projectHost,

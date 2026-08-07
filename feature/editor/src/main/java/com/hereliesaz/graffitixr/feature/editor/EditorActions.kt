@@ -24,6 +24,12 @@ interface EditorActions {
     fun onColorBalanceBChanged(v: Float)
     fun onToggleInvert()
 
+    /** Outline: render the design as a sketch — the form that is actually traceable. */
+    fun onToggleOutline()
+
+    /** Subject isolation: keep the segmented subject, drop the rest to transparent. */
+    fun onToggleSubjectIsolation()
+
     fun onUndoClicked()
     fun onRedoClicked()
 

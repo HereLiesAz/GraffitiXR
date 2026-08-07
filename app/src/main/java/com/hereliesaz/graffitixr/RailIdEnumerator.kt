@@ -55,7 +55,10 @@ internal fun enumerateRailItemIdRegistrations(mode: EditorMode): List<String> {
     }
 
     // Design menu (per-design controls: the adjust/colour panels and invert)
-    ids += listOf("host.design", "design.adjust", "design.balance", "design.invert")
+    ids += listOf(
+        "host.design", "design.adjust", "design.balance", "design.invert",
+        "design.outline", "design.isolate",
+    )
 
     // Project menu
     ids += listOf(

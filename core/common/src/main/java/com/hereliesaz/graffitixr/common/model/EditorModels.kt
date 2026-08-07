@@ -43,6 +43,17 @@ data class Layer(
     val rotationZ: Float = 0f,
     val scale: Float = 1.0f,
     val isInverted: Boolean = false,
+    /**
+     * Outline effect: the image is shown as a pencil sketch — dark lines opaque, light areas
+     * transparent — which is what you actually want to trace from.
+     *
+     * A flag rather than a baked bitmap, because [uri] always points at the untouched import. The
+     * effects are re-derived from it on load, so toggling one off gets the original back exactly
+     * and no round trip degrades the source.
+     */
+    val isSketch: Boolean = false,
+    /** Subject isolation: everything but the segmented subject is made transparent. */
+    val isSubjectIsolated: Boolean = false,
 )
 
 /**

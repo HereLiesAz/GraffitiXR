@@ -1820,6 +1820,20 @@ class MainActivity : ComponentActivity() {
                     color = if (activeInverted) Cyan else navItemColor, shape = AzButtonShape.NONE,
                 ) { editorViewModel.onToggleInvert() }
             }
+            // Outline and Isolate sit here with Invert because they are the same kind of thing: what
+            // the design LOOKS like, as opposed to where it sits. Unlike Invert they re-render the
+            // bitmap, but they are equally reversible — the untouched import is kept and both are
+            // re-derived from it, so turning one off returns the original exactly.
+            azRailSubItem(
+                id = "design.outline", hostId = "host.design", text = navStrings.outline,
+                color = if (editorUiState.design?.isSketch == true) Cyan else navItemColor,
+                shape = AzButtonShape.NONE,
+            ) { editorViewModel.onToggleOutline() }
+            azRailSubItem(
+                id = "design.isolate", hostId = "host.design", text = navStrings.isolate,
+                color = if (editorUiState.design?.isSubjectIsolated == true) Cyan else navItemColor,
+                shape = AzButtonShape.NONE,
+            ) { editorViewModel.onToggleSubjectIsolation() }
 
             azDivider()
 

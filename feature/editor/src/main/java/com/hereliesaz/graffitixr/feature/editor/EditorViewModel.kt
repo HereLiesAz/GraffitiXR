@@ -13,6 +13,7 @@ import com.hereliesaz.graffitixr.common.DispatcherProvider
 import com.hereliesaz.graffitixr.common.coop.OpEmitter
 import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.common.util.ImageUtils
+import com.hereliesaz.graffitixr.common.util.SketchProcessor
 import com.hereliesaz.graffitixr.common.util.computeAutoTune
 import com.hereliesaz.graffitixr.common.util.imageStats
 import com.hereliesaz.graffitixr.common.util.saveBitmapToGallery
@@ -42,13 +43,16 @@ import androidx.core.net.toUri
  *
  * This app's job is getting an image into place for tracing — by lightbox (Trace / Overlay /
  * Mockup) or by projection (AR). Authoring the image belongs to the companion design app, so the
- * painting, stencil, outline-extraction, subject-isolation and text-authoring pipelines that used
- * to live here have been removed; images arrive already finished, via the picker or an inbound
- * ACTION_SEND share, and leave via [exportImage] / [exportForShare].
+ * painting, stencil and text-authoring pipelines that used to live here have been removed; images
+ * arrive already finished, via the picker or an inbound ACTION_SEND share, and leave via
+ * [exportImage] / [exportForShare].
  *
- * What remains is placement (transform, warp, lock, layer order) and legibility (opacity,
- * brightness, contrast, saturation, colour balance, invert) — the controls that make an overlay
- * usable against a real wall.
+ * What remains is placement (transform, lock) and legibility — opacity, brightness, contrast,
+ * saturation, colour balance, invert, plus the two effects that change what the image IS rather
+ * than how it is toned: Outline ([onToggleOutline]) and subject isolation
+ * ([onToggleSubjectIsolation]). Those two are here rather than in the design app because they serve
+ * tracing specifically: an outline is the form you trace, and isolation removes a background that
+ * would otherwise be projected onto the wall.
  */
 @HiltViewModel
 class EditorViewModel @Inject constructor(
@@ -60,6 +64,7 @@ class EditorViewModel @Inject constructor(
     internal val slamManager: SlamManager,
     private val dispatchers: DispatcherProvider,
     private val opEmitter: OpEmitter,
+    private val subjectIsolator: SubjectIsolator,
 ) : ViewModel(), EditorActions {
 
     private val _uiState = MutableStateFlow(EditorUiState())
@@ -94,6 +99,19 @@ class EditorViewModel @Inject constructor(
     private var thumbnailJob: kotlinx.coroutines.Job? = null
 
     private var anchorHalfExtentMeters: Pair<Float, Float>? = null
+
+    /**
+     * The design exactly as imported, before Outline or subject isolation.
+     *
+     * The effects are toggles, so they must be reversible without loss: re-deriving from this each
+     * time is what makes turning one off give back the original rather than an image that has been
+     * through the pipeline twice. Kept off [EditorUiState] because it is a decode cache, not state
+     * the UI reads — the persisted `uri` is the durable copy and this is refilled from it on load.
+     */
+    private var designSourceBitmap: Bitmap? = null
+
+    /** Cancels a superseded effect recompute, so rapid toggling doesn't pile up full-image work. */
+    private var designEffectJob: kotlinx.coroutines.Job? = null
 
     init {
         viewModelScope.launch(dispatchers.main) {
@@ -132,9 +150,13 @@ class EditorViewModel @Inject constructor(
         val pendingUri = loaded?.takeIf { it.bitmap == null }?.uri
         if (pendingUri != null) {
             viewModelScope.launch(dispatchers.io) {
-                val bitmap = ImageUtils.loadBitmapAsync(context, pendingUri)
+                // uri is always the untouched import, so this is the effect source; the saved
+                // Outline / isolation flags are then re-derived on top of it.
+                val source = ImageUtils.loadBitmapAsync(context, pendingUri)
+                val shown = source?.let { applyDesignEffects(it, loaded) }
                 withContext(dispatchers.main) {
-                    dispatch(EditorIntent.RestoreDesign(loaded.copy(bitmap = bitmap)))
+                    designSourceBitmap = source
+                    dispatch(EditorIntent.RestoreDesign(loaded.copy(bitmap = shown)))
                 }
             }
         }
@@ -203,10 +225,15 @@ class EditorViewModel @Inject constructor(
         // The bitmap is transient and identical across a property-only change, so carry the live one
         // over rather than reloading it from disk.
         val restored = command.oldDesign?.copy(bitmap = _uiState.value.design?.bitmap)
+        val effectsChanged = restored?.isSketch != _uiState.value.design?.isSketch ||
+            restored?.isSubjectIsolated != _uiState.value.design?.isSubjectIsolated
         dispatch(EditorIntent.RestoreDesign(restored))
         saveProject()
         emitDesignResync(restored)
         updateHistoryCounts()
+        // The carried-over bitmap is only valid while the effect flags are unchanged; undoing an
+        // effect toggle has to re-render from the source or the pixels contradict the flags.
+        if (effectsChanged) recomputeDesignEffects()
     }
 
     // ── The design ────────────────────────────────────────────────────────────
@@ -242,6 +269,8 @@ class EditorViewModel @Inject constructor(
                 )
 
                 withContext(dispatchers.main) {
+                    // A new import starts with no effects, so it is its own source.
+                    designSourceBitmap = bitmap
                     dispatch(EditorIntent.SetDesign(design))
                     opEmitter.emit(Op.DesignReplace(design))
                     saveProject()
@@ -252,6 +281,64 @@ class EditorViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    // ── Design effects (Outline, subject isolation) ───────────────────────────
+
+    /**
+     * Renders [source] through whichever effects [design] has enabled.
+     *
+     * Isolation runs first and Outline second, because that is the order the results compose: cut
+     * the subject out, then draw the lines of what is left. Reversing it would sketch the
+     * background and then throw away the very edges that made it worth sketching.
+     *
+     * Each stage falls back to its input on failure, so a segmenter that can't find a subject or an
+     * OpenCV pass that throws costs the user that one effect, not their image.
+     */
+    private suspend fun applyDesignEffects(source: Bitmap, design: Layer): Bitmap {
+        var out = source
+        if (design.isSubjectIsolated) {
+            out = subjectIsolator.isolate(out).getOrNull()?.isolatedBitmap ?: out
+        }
+        if (design.isSketch) {
+            out = SketchProcessor.sketchEffect(out) ?: out
+        }
+        return out
+    }
+
+    /**
+     * Re-derives the shown bitmap after an effect toggle, always from [designSourceBitmap] rather
+     * than from what is currently displayed — that is what makes the toggles reversible.
+     */
+    private fun recomputeDesignEffects() {
+        val source = designSourceBitmap ?: return
+        designEffectJob?.cancel()
+        designEffectJob = viewModelScope.launch(dispatchers.default) {
+            val design = _uiState.value.design ?: return@launch
+            val rendered = applyDesignEffects(source, design)
+            withContext(dispatchers.main) {
+                updateDesign { it.copy(bitmap = rendered) }
+                saveProject()
+                // Guests are shown pixels, not a pipeline, so ship the result rather than the flag.
+                opEmitter.emit(Op.DesignBitmapReplace(ImageUtils.bitmapToByteArray(rendered)))
+            }
+        }
+    }
+
+    /** Outline: turn the image into a sketch that is actually traceable. */
+    override fun onToggleOutline() {
+        if (_uiState.value.design == null) return
+        pushHistory()
+        updateDesign { it.copy(isSketch = !it.isSketch) }
+        recomputeDesignEffects()
+    }
+
+    /** Subject isolation: drop everything the segmenter does not read as the subject. */
+    override fun onToggleSubjectIsolation() {
+        if (_uiState.value.design == null) return
+        pushHistory()
+        updateDesign { it.copy(isSubjectIsolated = !it.isSubjectIsolated) }
+        recomputeDesignEffects()
     }
 
     // ── Background (Mockup wall photo) ────────────────────────────────────────
