@@ -1258,8 +1258,19 @@ class MainActivity : ComponentActivity() {
                             // from hardware stereo (isHardwareStereoActive) and from VIO-baseline
                             // triangulation (currentCenterDepth > 0f populated in ArRenderer),
                             // both of which reach ArUiState, so gate on those instead.
+                            //
+                            // Eval-only instrumentation (DistanceFormat lives under feature.ar.eval),
+                            // but this condition was missing the diagnostic gate the sibling EvalOverlay
+                            // above has — so it rendered for every artist, in every build, whenever
+                            // depth was available (which is most of the time once VIO is triangulating).
+                            // Also never cleared: a tapMark from placing the target stays in
+                            // arUiState.tapMarks and keeps drawing its yellow label indefinitely, right
+                            // where the artist tapped to place it — a stray, unlabelled mark with no
+                            // way to dismiss it. Gated the same way EvalOverlay already is.
                             val hasDepth = arUiState.isHardwareStereoActive || arUiState.currentCenterDepth > 0f
-                            if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && hasDepth) {
+                            if (EVAL_OVERLAY_ENABLED && editorUiState.showDiagOverlay &&
+                                editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && hasDepth
+                            ) {
                                 androidx.compose.material3.Text(
                                     text = com.hereliesaz.graffitixr.feature.ar.eval.DistanceFormat.format(
                                         arUiState.currentCenterDepth, arUiState.isImperialUnits
