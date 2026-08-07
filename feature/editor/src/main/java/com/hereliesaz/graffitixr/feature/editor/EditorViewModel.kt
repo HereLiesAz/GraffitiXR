@@ -10,9 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.DispatcherProvider
-import com.hereliesaz.graffitixr.common.azphalt.applyCubeLut
 import com.hereliesaz.graffitixr.common.coop.OpEmitter
-import com.hereliesaz.graffitixr.data.azphalt.ExtensionRepository
 import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.common.util.ImageUtils
 import com.hereliesaz.graffitixr.common.util.computeAutoTune
@@ -62,7 +60,6 @@ class EditorViewModel @Inject constructor(
     internal val slamManager: SlamManager,
     private val dispatchers: DispatcherProvider,
     private val opEmitter: OpEmitter,
-    private val extensions: ExtensionRepository,
 ) : ViewModel(), EditorActions {
 
     private val _uiState = MutableStateFlow(EditorUiState())
@@ -704,56 +701,6 @@ class EditorViewModel @Inject constructor(
     }
 
     override fun onFeedbackShown() = dispatch(EditorIntent.FeedbackShown)
-
-    /**
-     * Grade the active layer through an installed azphalt LUT extension.
-     *
-     * This is the marketplace's payoff — the point at which an installed `.azp` actually changes the
-     * artwork — and until now nothing called it, because nothing could reach the marketplace screen
-     * at all. Returns a [LutApplyResult] rather than showing anything itself: the editor has no
-     * feedback channel of its own, and the caller (which owns the panel) is the right place to say
-     * what went wrong.
-     *
-     * The graded bitmap replaces the layer's pixels and is broadcast to any co-op guest as a
-     * [Op.LayerBitmapReplace], because a LUT is not a replayable stroke.
-     */
-    suspend fun applyInstalledLut(extensionId: String): LutApplyResult {
-        val state = _uiState.value
-        val activeId = state.activeLayerId ?: return LutApplyResult.NoActiveLayer
-        val source = state.layers.find { it.id == activeId }?.bitmap ?: return LutApplyResult.NoActiveLayer
-
-        val graded = withContext(dispatchers.default) {
-            val lut = extensions.loadLut(extensionId) ?: return@withContext null
-            runCatching { source.applyCubeLut(lut) }.getOrNull()
-        } ?: return LutApplyResult.LutUnreadable
-
-        withContext(dispatchers.main) {
-            _uiState.update { s ->
-                s.copy(layers = s.layers.map { if (it.id == activeId) it.copy(bitmap = graded) else it })
-            }
-        }
-        // Off the main thread: PNG-encoding a full-canvas bitmap is not a main-thread operation, and
-        // HostSession.enqueueOp encodes on the caller's thread.
-        viewModelScope.launch(dispatchers.default) {
-            val png = java.io.ByteArrayOutputStream().use { out ->
-                graded.compress(Bitmap.CompressFormat.PNG, 100, out)
-                out.toByteArray()
-            }
-            opEmitter.emit(Op.LayerBitmapReplace(activeId, png))
-        }
-        return LutApplyResult.Applied
-    }
-
-    /** Outcome of [applyInstalledLut], so the caller can explain a no-op instead of appearing inert. */
-    enum class LutApplyResult {
-        Applied,
-
-        /** Nothing to grade: no layer selected, or the selected layer has no rasterised image yet. */
-        NoActiveLayer,
-
-        /** The extension is installed but its `.cube` file is missing or does not parse. */
-        LutUnreadable,
-    }
 
     // ── Co-op ─────────────────────────────────────────────────────────────────
 

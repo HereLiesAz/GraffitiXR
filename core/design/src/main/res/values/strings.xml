@@ -133,8 +133,6 @@
 
     <!-- Label for the application settings menu. -->
     <string name="nav_settings">Settings</string>
-    <string name="nav_extensions">Extensions</string>
-    <string name="nav_extensions_info">Browse and install azphalt extensions, and apply an installed colour grade to the active layer.</string>
     <!-- Description of the settings menu, listing configurable preferences. -->
     <string name="nav_settings_info">Configure handedness, AR scan mode, units, and other app preferences.</string>
 

@@ -60,7 +60,6 @@ internal fun enumerateRailItemIdRegistrations(mode: EditorMode): List<String> {
     // Project menu
     ids += listOf(
         "host.project", "proj.new", "proj.save", "proj.export", "proj.load", "proj.settings",
-        "proj.extensions",
     )
 
     // Global tools

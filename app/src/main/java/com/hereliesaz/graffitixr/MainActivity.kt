@@ -175,10 +175,6 @@ class MainActivity : ComponentActivity() {
 
     var showSaveDialog by mutableStateOf(false)
     var showSettings by mutableStateOf(false)
-    // The azphalt marketplace panel. Its whole stack (MarketplaceScreen, MarketplaceViewModel,
-    // ExtensionRepository, AzpInstaller, the registry client and the signature/trust checks) was
-    // unreachable: nothing in the app module referenced it, so no rail entry, no route, no way in.
-    var showMarketplace by mutableStateOf(false)
     var hasCameraPermission by mutableStateOf(false)
     var showWallSourceDialog by mutableStateOf(false)
     var isExporting by mutableStateOf(false)
@@ -490,7 +486,6 @@ class MainActivity : ComponentActivity() {
                 }
 
                 BackHandler(enabled = showSettings) { showSettings = false }
-                BackHandler(enabled = showMarketplace) { showMarketplace = false }
                 BackHandler(enabled = mainUiState.isInPlaneRealignment) {
                     mainViewModel.endPlaneRealignment()
                 }
@@ -849,7 +844,7 @@ class MainActivity : ComponentActivity() {
                         // is that auto overlays (onboarding, AR-unavailable explainer) must
                         // early-return on EVERY modal, not just one — collapsing the repeated
                         // boolean chains here prevents a future overlay from forgetting one.
-                        val anyModalActive = showLibrary || showSettings || showMarketplace || isExporting ||
+                        val anyModalActive = showLibrary || showSettings || isExporting ||
                             mainUiState.isCapturingTarget || showSaveDialog ||
                             dashboardUiState.showNewProjectDialog
 
@@ -1513,36 +1508,6 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            if (showMarketplace) {
-                                val marketplaceViewModel: com.hereliesaz.graffitixr.feature.dashboard.MarketplaceViewModel = hiltViewModel()
-                                val scope = rememberCoroutineScope()
-                                com.hereliesaz.graffitixr.feature.dashboard.MarketplaceScreen(
-                                    viewModel = marketplaceViewModel,
-                                    onApplyLut = { extensionId ->
-                                        scope.launch {
-                                            // Say what happened either way: the panel used to close
-                                            // on Apply and the grade silently no-op when there was
-                                            // no active layer or the .cube wouldn't parse, which
-                                            // reads as "the button does nothing".
-                                            val message = when (editorViewModel.applyInstalledLut(extensionId)) {
-                                                EditorViewModel.LutApplyResult.Applied -> "Grade applied"
-                                                EditorViewModel.LutApplyResult.NoActiveLayer ->
-                                                    "Select a layer with an image first"
-                                                EditorViewModel.LutApplyResult.LutUnreadable ->
-                                                    "That extension's colour grade couldn't be read"
-                                            }
-                                            Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
-                                        }
-                                    },
-                                    onClose = {
-                                        showMarketplace = false
-                                        // Drop the one-shot install/uninstall status so reopening
-                                        // the panel doesn't replay a message from last time.
-                                        marketplaceViewModel.clearStatus()
-                                    },
-                                )
-                            }
-
                             if (hostQr != null && coopState is CoopSessionState.WaitingForGuest) {
                                 CoopHostQrOverlay(
                                     qrPayload = hostQr!!,
@@ -1893,9 +1858,6 @@ class MainActivity : ComponentActivity() {
             }
             azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE) {
                 showSettings = true
-            }
-            azRailSubItem(id = "proj.extensions", hostId = "host.project", text = navStrings.extensions, color = navItemColor, shape = AzButtonShape.NONE) {
-                showMarketplace = true
             }
 
 
