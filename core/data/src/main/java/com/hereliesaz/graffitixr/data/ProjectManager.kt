@@ -71,12 +71,6 @@ class ProjectManager @Inject constructor(
         }
     }
 
-    fun getCloudPointsPath(context: Context, projectId: String): String {
-        val root = File(context.filesDir, "projects/$projectId")
-        if (!root.exists()) root.mkdirs()
-        return File(root, "cloud_points.bin").absolutePath
-    }
-
     suspend fun saveProject(context: Context, projectData: GraffitiProject, targetImages: List<Bitmap>? = null, thumbnail: Bitmap? = null) = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/${projectData.id}")
         if (!root.exists()) root.mkdirs()

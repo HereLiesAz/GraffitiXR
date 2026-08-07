@@ -6,10 +6,6 @@ import android.opengl.Matrix
 import com.google.ar.core.PointCloud
 import com.hereliesaz.graffitixr.common.util.GlReleasable
 import com.hereliesaz.graffitixr.design.rendering.ShaderUtil
-import timber.log.Timber
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.HashMap
@@ -27,12 +23,15 @@ class PointCloudRenderer : GlReleasable {
         private set
     private var vboId = 0
 
-    /** Set from any thread; consumed on the GL thread at the start of [draw]. */
-    @Volatile var pendingLoadPath: String? = null
-
-    // Local buffer to store accumulated points (x, y, z, confidence)
+    // Accumulated points, stored ANCHOR-LOCAL as (x, y, z, confidence) — see [update].
     private val localBuffer = FloatArray(maxPoints * 4)
     private val pointIdMap = HashMap<Int, Int>()
+
+    // Scratch for the world->anchor transform in [update]; GL-thread only, so one instance is fine.
+    private val localScratch = FloatArray(4)
+    private val worldScratch = FloatArray(4)
+    private val mvpMatrix = FloatArray(16)
+    private val viewProj = FloatArray(16)
 
     // Reusable GL upload buffers (GL thread only). [update] runs every frame while scanning, so
     // allocating a fresh direct buffer each call churned the GC and caused scan-time jank; allocate
@@ -80,7 +79,39 @@ class PointCloudRenderer : GlReleasable {
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
     }
 
-    fun update(pointCloud: PointCloud) {
+    /**
+     * Fold this frame's ARCore feature points into the accumulated cloud.
+     *
+     * ## Why the points are stored anchor-local, and why the position is always taken
+     *
+     * ARCore's point cloud reports positions in the CURRENT frame's world estimate, and that
+     * estimate is not fixed: ARCore continuously refines each feature's position as it gathers
+     * observations, and periodically corrects the whole world frame at once (loop closure). A point
+     * captured a minute ago is expressed in a frame that no longer exists.
+     *
+     * This class used to ignore both facts. It wrote a point's position once and then only ever
+     * overwrote it when a later observation arrived with strictly HIGHER confidence:
+     *
+     *     if (conf > oldConf) { ...write x, y, z... }
+     *
+     * Confidence is not monotonic, so in practice the position was frozen at roughly first sighting
+     * and every subsequent refinement was thrown away — and world corrections were thrown away too,
+     * because nothing re-read the old points at all. The accumulated cloud therefore drifted away
+     * from the camera image, visibly and permanently, over the life of a session. That is the defect
+     * this rewrite exists to fix, so the confidence comparison is gone: the newest observation of a
+     * point is always the best one, because it is the one expressed in the newest world estimate.
+     *
+     * Refreshing the points currently in view is necessary but not sufficient — a point ARCore is
+     * not looking at right now still has to move when the world frame is corrected. That is what an
+     * [com.google.ar.core.Anchor] is for: ARCore updates an anchor's pose to keep it attached to the
+     * real world across exactly those corrections. So the points are stored relative to the caller's
+     * anchor and drawn through its live pose ([draw]), which makes the whole accumulated cloud
+     * inherit every correction ARCore applies, whether or not a given point is in frame.
+     *
+     * @param worldToAnchor the inverse of the cloud anchor's pose, column-major 4x4. Points are
+     *   transformed by it before being stored, so [localBuffer] holds anchor-local coordinates.
+     */
+    fun update(pointCloud: PointCloud, worldToAnchor: FloatArray) {
         val points = pointCloud.points ?: return
         val ids = pointCloud.ids ?: return
 
@@ -89,33 +120,27 @@ class PointCloudRenderer : GlReleasable {
 
         for (i in 0 until numPoints) {
             val id = ids.get(i)
-            val x = points.get(i * 4)
-            val y = points.get(i * 4 + 1)
-            val z = points.get(i * 4 + 2)
+            worldScratch[0] = points.get(i * 4)
+            worldScratch[1] = points.get(i * 4 + 1)
+            worldScratch[2] = points.get(i * 4 + 2)
+            worldScratch[3] = 1f
             val conf = points.get(i * 4 + 3)
+            Matrix.multiplyMV(localScratch, 0, worldToAnchor, 0, worldScratch, 0)
 
-            if (pointIdMap.containsKey(id)) {
-                val index = pointIdMap[id]!!
-                val offset = index * 4
-                val oldConf = localBuffer[offset + 3]
-                if (conf > oldConf) {
-                    localBuffer[offset] = x
-                    localBuffer[offset+1] = y
-                    localBuffer[offset+2] = z
-                    localBuffer[offset+3] = conf
-                    hasUpdates = true
-                }
-            } else if (accumulatedPointCount < maxPoints) {
-                val index = accumulatedPointCount
-                pointIdMap[id] = index
-                val offset = index * 4
-                localBuffer[offset] = x
-                localBuffer[offset+1] = y
-                localBuffer[offset+2] = z
-                localBuffer[offset+3] = conf
+            val index = pointIdMap[id] ?: run {
+                if (accumulatedPointCount >= maxPoints) return@run null
+                val fresh = accumulatedPointCount
+                pointIdMap[id] = fresh
                 accumulatedPointCount++
-                hasUpdates = true
-            }
+                fresh
+            } ?: continue
+
+            val offset = index * 4
+            localBuffer[offset] = localScratch[0]
+            localBuffer[offset + 1] = localScratch[1]
+            localBuffer[offset + 2] = localScratch[2]
+            localBuffer[offset + 3] = conf
+            hasUpdates = true
         }
 
         if (hasUpdates) {
@@ -131,13 +156,14 @@ class PointCloudRenderer : GlReleasable {
         }
     }
 
-    fun draw(viewMatrix: FloatArray, projectionMatrix: FloatArray) {
-        val loadPath = pendingLoadPath
-        if (loadPath != null) {
-            pendingLoadPath = null
-            loadFromFile(loadPath)
-        }
-
+    /**
+     * Draw the accumulated cloud through the live pose of the anchor its points are stored against.
+     *
+     * [anchorModel] is the cloud anchor's current pose as a column-major 4x4 (anchor -> world). It
+     * must be re-read from the anchor every frame: that is the whole mechanism by which ARCore's
+     * world corrections reach points it is not currently observing.
+     */
+    fun draw(viewMatrix: FloatArray, projectionMatrix: FloatArray, anchorModel: FloatArray) {
         if (accumulatedPointCount == 0) return
 
         GLES20.glUseProgram(program)
@@ -145,11 +171,11 @@ class PointCloudRenderer : GlReleasable {
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
 
-        val mvpMatrix = FloatArray(16)
-        Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
+        Matrix.multiplyMM(viewProj, 0, projectionMatrix, 0, viewMatrix, 0)
+        Matrix.multiplyMM(mvpMatrix, 0, viewProj, 0, anchorModel, 0)
 
         GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0)
-        GLES20.glUniform1f(pointSizeHandle, 15.0f) // Adjusted point size
+        GLES20.glUniform1f(pointSizeHandle, 15.0f)
 
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
         GLES20.glVertexAttribPointer(positionHandle, 4, GLES20.GL_FLOAT, false, 16, 0)
@@ -175,55 +201,5 @@ class PointCloudRenderer : GlReleasable {
         if (program != 0) { GLES20.glDeleteProgram(program); program = 0 }
         if (vboId != 0) { GLES20.glDeleteBuffers(1, intArrayOf(vboId), 0); vboId = 0 }
         clear()
-    }
-
-    fun saveToFile(path: String) {
-        val count = accumulatedPointCount
-        if (count == 0) return
-        try {
-            FileOutputStream(File(path)).use { out ->
-                val buf = ByteBuffer.allocate(8 + 4 + 4 + count * 4 * 4)
-                    .order(ByteOrder.LITTLE_ENDIAN)
-                buf.put('G'.code.toByte()); buf.put('X'.code.toByte())
-                buf.put('P'.code.toByte()); buf.put('C'.code.toByte())
-                buf.putInt(1)
-                buf.putInt(count)
-                for (i in 0 until count * 4) buf.putFloat(localBuffer[i])
-                out.write(buf.array())
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "PointCloudRenderer: saveToFile failed ($path)")
-        }
-    }
-
-    fun loadFromFile(path: String) {
-        try {
-            val file = File(path)
-            if (!file.exists()) return
-            FileInputStream(file).use { inp ->
-                val bytes = inp.readBytes()
-                val buf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
-                if (buf.remaining() < 12) return
-                val magic = String(byteArrayOf(buf.get(), buf.get(), buf.get(), buf.get()))
-                if (magic != "GXPC") { Timber.w("PointCloudRenderer: bad magic '$magic'"); return }
-                @Suppress("UNUSED_VARIABLE") val version = buf.getInt()
-                val count = buf.getInt().coerceAtMost(maxPoints)
-                val needed = count * 4 * 4
-                if (buf.remaining() < needed) return
-                for (i in 0 until count * 4) localBuffer[i] = buf.getFloat()
-                accumulatedPointCount = count
-                pointIdMap.clear()
-
-                GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, vboId)
-                val gpuBuf = ByteBuffer.allocateDirect(count * 4 * 4).order(ByteOrder.nativeOrder())
-                val fBuf = gpuBuf.asFloatBuffer()
-                fBuf.put(localBuffer, 0, count * 4)
-                fBuf.position(0)
-                GLES20.glBufferSubData(GLES20.GL_ARRAY_BUFFER, 0, count * 4 * 4, gpuBuf)
-                GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER, 0)
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "PointCloudRenderer: loadFromFile failed ($path)")
-        }
     }
 }

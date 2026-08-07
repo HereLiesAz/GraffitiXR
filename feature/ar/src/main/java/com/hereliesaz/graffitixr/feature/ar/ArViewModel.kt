@@ -992,7 +992,6 @@ class ArViewModel @Inject constructor(
                 if (project != null) {
                     loadedProjectId = project.id
                     loadMapIfExists()
-                    loadCloudPointsIfExists()
                     loadFingerprintIfExists()
                 }
             }
@@ -1844,17 +1843,20 @@ class ArViewModel @Inject constructor(
 
     fun saveMapBlocking() {
         val projectId = loadedProjectId ?: return
-        val cloudPath = projectManager.getCloudPointsPath(appContext, projectId)
+        // The wall feature map is the only thing here that survives a session meaningfully: it is
+        // re-registered on load through the fingerprint + PnP relocalization, so its coordinates are
+        // recoverable.
+        //
+        // The ARCore point cloud used to be written alongside it and restored on open. That could
+        // not work: the file holds raw ARCore world coordinates, and a new session's world origin is
+        // wherever the device happened to start, so every restored point landed at an arbitrary
+        // rigid offset from the wall it was scanned off — and then appeared to drift as the artist
+        // moved, because nothing re-registered it. It is a scan VISUALISATION (relocalization rides
+        // the fingerprint, not the cloud), so the honest fix is not to persist it at all.
+        saveWallFeatureMap()
 
-        // The two things a session actually accumulates: the ARCore point cloud (a file of its own)
-        // and the native wall feature map (merged into the project record). The native
-        // saveModel(mapPath) call that used to sit here went with the voxel/splat map — it was a
-        // no-op that made this function LOOK like it persisted more than it did.
-        renderer?.saveCloudPoints(cloudPath)
-        saveWallFeatureMap() // Phase 3b: persist the passive feature map into the project record
-
-        lastSavedMapPointCount.set(renderer?.mappedPointCount ?: 0)
-        Timber.d("Atomic persistence complete: Saved all mapping components for $projectId")
+        lastSavedMapPointCount.set(slamManager.getMapPointCount())
+        Timber.d("Atomic persistence complete: saved the wall feature map for $projectId")
     }
 
     fun saveMapNow() {
@@ -2394,34 +2396,16 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    private fun loadCloudPointsIfExists() {
-        val projectId = loadedProjectId ?: return
-        val path = projectManager.getCloudPointsPath(appContext, projectId)
-        if (File(path).exists()) {
-            renderer?.scheduleCloudPointsLoad(path)
-        }
-    }
-
     /**
-     * Restore this project's accumulated ARCore point cloud, if it saved one.
+     * Seed the autosave baseline for a freshly opened project.
      *
-     * This used to also `slamManager.loadModel(mapPath)` and skip the whole restore when
-     * `getSplatCount() > 0`. Both went with the voxel/splat map: `loadModel` is a native no-op, and
-     * the guard read a hardcoded 0 so it never fired. What is left is the one component that really
-     * does persist, and the baseline the autosave compares against.
+     * This used to restore a saved ARCore point cloud too, which could not be correct — see
+     * [saveMapBlocking] — and before that a native `loadModel` that had been a no-op since the
+     * voxel/splat map was deleted. The wall feature map itself is restored by the project load path,
+     * which re-registers it through the fingerprint.
      */
     private fun loadMapIfExists() {
-        val projectId = loadedProjectId ?: return
-        val cloudPath = projectManager.getCloudPointsPath(appContext, projectId)
-
-        if (File(cloudPath).exists()) {
-            renderer?.scheduleCloudPointsLoad(cloudPath)
-            Timber.d("Atomic persistence complete: Loaded available mapping components for $projectId")
-        }
-        // Whether or not a cloud was restored, the save baseline starts from what the renderer
-        // currently holds — a fresh renderer holds nothing, and a scheduled load lands on the GL
-        // thread, so the first autosave tick re-reads it anyway.
-        lastSavedMapPointCount.set(renderer?.mappedPointCount ?: 0)
+        lastSavedMapPointCount.set(slamManager.getMapPointCount())
     }
 
     private fun startAutoSave() {
@@ -2487,7 +2471,6 @@ class ArViewModel @Inject constructor(
         slamManager.setSelfGrowEnabled(_evalSelfGrowEnabled.value)
         applyFeatureMapSwitch(_evalFeatureMapEnabled.value)
         renderer?.attachSession(session)
-        loadCloudPointsIfExists()
     }
 
     fun setTrackingState(
