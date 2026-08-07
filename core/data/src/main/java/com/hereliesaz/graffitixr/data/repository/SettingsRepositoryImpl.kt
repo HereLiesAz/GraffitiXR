@@ -41,6 +41,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val SHOW_ANCHOR_BOUNDARY = booleanPreferencesKey("show_anchor_boundary")
     private val DRIFT_CORRECTION_ENABLED = booleanPreferencesKey("drift_correction_enabled")
     private val SELF_GROW_ENABLED = booleanPreferencesKey("self_grow_enabled")
+    private val FEATURE_MAP_ENABLED = booleanPreferencesKey("feature_map_enabled")
     private val FORCED_STEREO_UNSTABLE = booleanPreferencesKey("forced_stereo_unstable")
     // Key intentionally renamed from "stereo_capability": the probe's meaning changed from "stereo
     // tracks" to "dual lenses actually triangulate depth", so pre-existing verdicts must be discarded
@@ -48,7 +49,6 @@ class SettingsRepositoryImpl @Inject constructor(
     private val STEREO_CAPABILITY = intPreferencesKey("depth_triangulation_capability")
     private val IS_IMPERIAL_UNITS = booleanPreferencesKey("is_imperial_units")
     private val BACKGROUND_COLOR = intPreferencesKey("background_color")
-    private val PARALLAX_MIN_DEG = floatPreferencesKey("parallax_min_degrees")
     private val CAMERA_TARGET_FPS = intPreferencesKey("camera_target_fps")
     private val THROTTLE_ON_THERMAL = booleanPreferencesKey("throttle_on_thermal")
     private val THROTTLE_ON_POWER_SAVE = booleanPreferencesKey("throttle_on_power_save")
@@ -152,6 +152,16 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
+    override val featureMapEnabled: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[FEATURE_MAP_ENABLED] ?: false }
+
+    override suspend fun setFeatureMapEnabled(on: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[FEATURE_MAP_ENABLED] = on
+        }
+    }
+
     override val isImperialUnits: Flow<Boolean> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { preferences -> preferences[IS_IMPERIAL_UNITS] ?: false }
@@ -169,16 +179,6 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setBackgroundColor(argb: Int) {
         context.dataStore.edit { preferences ->
             preferences[BACKGROUND_COLOR] = argb
-        }
-    }
-
-    override val parallaxMinDegrees: Flow<Float> = context.dataStore.data
-        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { preferences -> preferences[PARALLAX_MIN_DEG] ?: 4.0f }
-
-    override suspend fun setParallaxMinDegrees(deg: Float) {
-        context.dataStore.edit { preferences ->
-            preferences[PARALLAX_MIN_DEG] = deg
         }
     }
 

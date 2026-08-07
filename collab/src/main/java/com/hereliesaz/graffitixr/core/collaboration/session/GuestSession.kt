@@ -137,7 +137,11 @@ internal class GuestSession(
                     if (!isReconnect) {
                         receiveBulk(input, output, crypto)
                     }
-                    _state.value = CoopSessionState.Connected(peerName = "host")
+                    // The host's own name, now that HELLO_OK carries it. Falls back to "host" for
+                    // a peer that predates the field — the same string this used to hard-code.
+                    _state.value = CoopSessionState.Connected(
+                        peerName = helloOk.hostName.ifBlank { "host" },
+                    )
                     phase = Phase.Live
                     livePhase(input, output, crypto)
                     true
@@ -157,7 +161,7 @@ internal class GuestSession(
                     false
                 }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Transient: let the caller decide whether to retry (reconnect) or end the session.
             // Close the half-open socket now so a failed attempt doesn't leak an FD — the reconnect
             // loop reassigns the field on the next try and would otherwise orphan this one.
@@ -213,7 +217,7 @@ internal class GuestSession(
                     readSecure(input, crypto) ?: run {
                         attemptReconnect(); return@launch
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     attemptReconnect(); return@launch
                 }
                 when (frame.type) {
@@ -228,7 +232,7 @@ internal class GuestSession(
                         val ping = OpCodec.decode<PingPayload>(frame.payload)
                         try {
                             writeSecure(output, crypto, FrameType.PONG, OpCodec.encode(ping))
-                        } catch (e: Exception) {
+                        } catch (_: Exception) {
                             attemptReconnect(); return@launch
                         }
                     }

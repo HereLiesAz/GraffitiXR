@@ -26,7 +26,6 @@ data class TapMark(val nx: Float, val ny: Float, val distanceMeters: Float)
 data class ArUiState(
     val isScanning: Boolean = false,
     val splatCount: Int = 0,
-    val immutableSplatCount: Int = 0,
     val isTargetDetected: Boolean = false,
     // True once a target fingerprint has been saved to the current project.
     // Controls whether artwork is rendered in AR space (via OverlayRenderer).
@@ -146,8 +145,6 @@ data class ArUiState(
 
     // Phase 5 — When true, OverlayRenderer draws an orange line-loop around the anchor quad boundary.
     val showAnchorBoundary: Boolean = false,
-    /** Minimum viewpoint shift (degrees) before a re-observation parallax-verifies a voxel. */
-    val parallaxMinDegrees: Float = 4.0f,
     /** ARCore camera target frame rate: 60 (default) or 30. Applies on next AR entry. */
     val cameraTargetFps: Int = 60,
     /**
@@ -228,11 +225,8 @@ data class ArUiState(
     val showCoopNotFoundDialog: Boolean = false,
 
     // ── Enhanced Diagnostics ──────────────
-    val isDualLensActive: Boolean = false,
     val isHardwareStereoActive: Boolean = false,
     val currentCenterDepth: Float = -1f,
-    val visibleSplatConfidenceAvg: Float = 0f,
-    val globalSplatConfidenceAvg: Float = 0f,
     val fpsAr: Float = 0f,
     val rawSensorReadings: String? = null,
 

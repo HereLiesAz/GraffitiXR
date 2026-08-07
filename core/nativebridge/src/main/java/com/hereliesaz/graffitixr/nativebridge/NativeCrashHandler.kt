@@ -14,7 +14,7 @@ object NativeCrashHandler {
         try {
             nativeInstall(path)
             installed = true
-        } catch (t: Throwable) {
+        } catch (_: Throwable) {
             // Native lib not loaded / symbol missing — non-fatal; we just won't capture native crashes.
         }
     }

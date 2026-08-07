@@ -1,8 +1,6 @@
 package com.hereliesaz.graffitixr.design.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -23,8 +21,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import com.hereliesaz.graffitixr.common.model.ArState
-import kotlinx.coroutines.delay
 
 @Composable
 fun TouchLockOverlay(isLocked: Boolean, onUnlockRequested: () -> Unit) {
@@ -58,47 +54,6 @@ fun TouchLockOverlay(isLocked: Boolean, onUnlockRequested: () -> Unit) {
                 }
             }
     )
-}
-
-@Composable
-fun StatusOverlay(qualityWarning: String?, arState: ArState, isPlanesDetected: Boolean, isTargetCreated: Boolean, splatCount: Int, modifier: Modifier) {
-    AnimatedVisibility(true, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
-        val bg = if (qualityWarning != null) Color.Red.copy(0.8f) else Color.Black.copy(0.5f)
-        val txt = when {
-            qualityWarning != null -> qualityWarning
-            !isTargetCreated -> "Create a Grid to start."
-            arState == ArState.SEARCHING && !isPlanesDetected -> "Scan surfaces around you."
-            arState == ArState.SEARCHING && isPlanesDetected -> "Tap a surface to place anchor."
-            arState == ArState.LOCKED -> "Looking for your Grid..."
-            arState == ArState.PLACED -> "Ready. ($splatCount pts)"
-            else -> ""
-        }
-        if (txt.isNotEmpty()) {
-            Box(Modifier.background(bg, RoundedCornerShape(8.dp)).padding(16.dp, 8.dp)) {
-                Text(txt, color = Color.White, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-            }
-        }
-    }
-}
-
-@Composable
-fun CaptureAnimation() {
-    var f by remember { mutableFloatStateOf(0f) }
-    var s by remember { mutableFloatStateOf(0f) }
-    val af by animateFloatAsState(f, tween(200))
-    val `as` by animateFloatAsState(s, tween(300))
-
-    LaunchedEffect(Unit) {
-        s = 0.5f
-        delay(100)
-        f = 1f
-        delay(50)
-        f = 0f
-        delay(150)
-        s = 0f
-    }
-
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = `as`)).zIndex(10f))
 }
 
 @Composable

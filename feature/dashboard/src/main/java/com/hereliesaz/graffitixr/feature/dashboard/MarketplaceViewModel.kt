@@ -57,8 +57,6 @@ class MarketplaceViewModel @Inject constructor(
     private val _status = MutableStateFlow<String?>(null)
     val status: StateFlow<String?> = _status.asStateFlow()
 
-    fun isInstalled(id: String): Boolean = installed.value.any { it.id == id }
-
     fun install(entry: MarketplaceEntry) {
         if (_busyId.value != null) return
         _busyId.value = entry.id

@@ -25,22 +25,11 @@ public:
     ~MobileGS();
 
     void initialize(int width, int height);
-    void initGl();
-    // Split GL init so the caller can localize a stall to the voxel vs mesh stage on-screen.
-    void initVoxelGl();
-    void initVoxelGlProgram();
-    void initVoxelGlBuffer();
-    void initMeshGl();
-    void resetGlContext();
     void updateCamera(float* viewMat, float* projMat);
     void updateMappingCamera(float* viewMat, float* projMat);
     void updateLightLevel(float level);
     void updateAnchorTransform(float* transformMat);
     void updateDeviceMotion(float* angularVel, float* linearVel);
-
-    void processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence);
-    void pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence);
-    void pushPointCloud(const std::vector<float>& points);
 
     void setArCoreTrackingState(bool isTracking);
     void restoreWallFingerprint(const cv::Mat& descriptors, const std::vector<cv::Point3f>& points3d);
@@ -444,8 +433,6 @@ public:
     // Stored as a raw 256x256 gray (NO CLAHE — the head's frozen SuperPoint was trained on raw gray).
     void setWallPatch(const cv::Mat& img);
     bool loadLowLightEnhancer(const std::vector<uchar>& onnxBytes);
-    void clearMap();
-    void pruneByConfidence(float threshold);
     void setViewportSize(int width, int height);
     // Eval: fill out[kStageCount] with average ms/stage since last reset, then reset accumulators.
     void getStageTimingsAndReset(float* out);
@@ -482,14 +469,8 @@ public:
         return mEvalSyncReloc.load(std::memory_order_relaxed)
             ? mEvalSyncEveryN.load(std::memory_order_relaxed) : 0;
     }
-    void setVoxelSize(float size);
-    void setParallaxMinDegrees(float deg);
     void setMappingPaused(bool paused) { mMappingPaused = paused; }
 
-    int getSplatCount() const { return 0; }            // voxel/splat map deleted
-    int getImmutableSplatCount() const { return 0; }   // voxel/splat map deleted
-    void getConfidenceAvgs(float& outVisible, float& outGlobal) const;
-    void setSplatsVisible(bool visible) { mSplatsVisible = visible; }
     /**
      * How much of the registered design the wall now answers for: a PROGRESS measurement, on the
      * timescale of hours, roughly monotonic. For the user's progress readout.
@@ -516,46 +497,14 @@ public:
         return mCorroborationConfidence.load(std::memory_order_relaxed);
     }
 
-    void saveModel(const std::string& path);
-    void loadModel(const std::string& path);
-    bool importModel3D(const std::string& path);
-
-    void updatePersistentMesh(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat);
-    void getPersistentMesh(std::vector<float>& outVertices, std::vector<float>& outWeights);
-
     // Collaboration methods
     std::vector<uint8_t> exportFingerprint();
     void alignToFingerprint(const uint8_t* data, size_t size);
 
-    void draw(bool debugTint = false);
-    // Debug perception view: draws the requested representations explicitly, regardless of
-    // mSplatsVisible. Voxels are confidence-tinted; depth-off so nothing occludes.
-    void drawDebugLayers(bool voxels, bool mesh);
-    // Voxel-method colour-mask: draws splats as a confidence-graded colour wash over the grayscale camera.
-    void drawCoverage();
     void destroy();
     std::mutex& getMutex() { return mMutex; }
 
 private:
-    void mapThreadFunc();
-
-    struct FrameData {
-        cv::Mat depth;
-        cv::Mat color;
-        bool isYuv = false;
-        float viewMatrix[16];
-        float projMatrix[16];
-        float intrinsics[4];
-        bool hasIntrinsics = false;
-        float confidence = 0.5f;
-    };
-
-    std::thread mMapThread;
-    std::mutex mQueueMutex;
-    std::condition_variable mQueueCv;
-    std::vector<FrameData> mFrameQueue;
-    std::atomic<bool> mMapRunning{false};
-
     void relocThreadFunc();
     /**
      * EVALUATION.md 3.1 — one relocalization attempt over one frame, callable either from the
@@ -748,9 +697,7 @@ private:
 
     int mScreenWidth = 1920;
     int mScreenHeight = 1080;
-    float mVoxelSize = 0.02f;
     std::atomic<bool> mMappingPaused{false};
-    bool mSplatsVisible{false};
 
     // --- Evaluation instrumentation (Sub-project A) ---
     // Accumulated wall-time per stage and a sample count, for averaging. Indexes match the Kotlin

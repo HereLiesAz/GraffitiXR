@@ -1,95 +1,75 @@
 package com.hereliesaz.graffitixr
 
-import com.hereliesaz.graffitixr.common.model.Layer
 import com.hereliesaz.graffitixr.design.theme.AppStrings
 
 /**
- * Builds the helpList map consumed by AzNavRail's azAdvanced(helpList = ...)
- * parameter. Single source of truth for help-overlay text.
+ * Builds the helpList map consumed by AzNavRail's azAdvanced(helpList = ...) parameter. Single
+ * source of truth for help-overlay text.
  *
- * Per the AzNavRail v8.11 HelpOverlay scoping rule: when a nested rail is
- * open, only its `nestedRailItems` are shown; otherwise all main-rail items
- * (top-level + host sub-items) are shown. So this map can safely contain:
- *   - All main-rail items (top-level + host sub-items) — surfaced on main Help
- *   - Per-layer popup items — surfaced only when that layer's nested rail is open
+ * Keys must match rail-item IDs registered in ConfigureRailItems — [enumerateRailItemIds] is the
+ * mirror of that registration, and RailIntegrityCheck warns in debug builds about any key here that
+ * has no matching item.
  *
- * Keys must match rail-item IDs registered in ConfigureRailItems.
+ * It previously documented a second app's toolbox: brush, eraser, blur, liquify, filter, text
+ * authoring, stencil generation, dodge/burn, isolate and line-art, under `tool.*` / `adj.*` /
+ * `grp.*` ids and a per-layer nested rail. None of those items exist — the painting, stencil,
+ * outline-extraction and text pipelines moved to the companion design app (see EditorViewModel's
+ * class doc), and no per-layer rail is registered at all. Every one of those entries was help text
+ * for a control the user cannot reach, and each logged an orphan warning on every debug launch.
+ * What remains is one entry per item the rail actually registers.
  */
-internal fun buildHelpItems(strings: AppStrings, layers: List<Layer>): Map<String, Any> {
-    val base = mutableMapOf<String, Any>(
-        // Modes menu
-        "host.modes" to strings.help.modeHost,
-        "mode.ar" to strings.help.ar,
-        "mode.overlay" to strings.help.overlay,
-        "mode.mockup" to strings.help.mockup,
-        "mode.trace" to strings.help.trace,
-        "target.create" to strings.help.create,
-        "mode.ar.light" to strings.help.flashlight,
-        "mode.overlay.light" to strings.help.flashlight,
-        "mockup.wall" to strings.help.wall,
+internal fun buildHelpItems(strings: AppStrings): Map<String, Any> = mapOf(
+    // Open (top-level, replaces the old Design folder)
+    "item.open" to strings.help.addImg,
 
-        // Open (top-level, replaces the old Design folder)
-        "item.open" to strings.help.addImg,
-        "mode.trace.freeze" to strings.help.lockTrace,
+    // Modes menu
+    "host.modes" to strings.help.modeHost,
+    "mode.ar" to strings.help.ar,
+    "mode.overlay" to strings.help.overlay,
+    "mode.mockup" to strings.help.mockup,
+    "mode.trace" to strings.help.trace,
 
-        // Tools menu
-        "sub.design.tools" to strings.help.designHost, // Use design host help for tools parent
-        "grp.paint" to strings.help.addDraw,
-        "tool.brush" to strings.help.size,
-        "tool.eraser" to strings.help.eraser,
-        "grp.retouch" to strings.help.blur,
-        "tool.blur" to strings.help.blur,
-        "tool.liquify" to strings.help.liquify,
-        "grp.color" to strings.help.adj,
-        "adj.invert" to strings.help.invert,
-        "adj.balance" to strings.help.balance,
-        "adj.blend" to strings.help.blend,
-        "tool.filter" to strings.help.adj,
+    // AR tools
+    "target.create" to strings.help.create,
+    "mode.ar.light" to strings.help.flashlight,
+    "mode.ar.lock" to strings.nav.lockInfo,
+    "mode.ar.magic" to strings.adj.magicAlign,
+    "coop" to strings.nav.coop,
+    "coop.host" to strings.nav.hostCoopInfo,
+    "coop.join" to strings.nav.joinCoopInfo,
+    "coop.leave" to strings.nav.leaveCoopInfo,
 
-        // Project menu
-        "host.project" to strings.help.projectHost,
-        "proj.new" to strings.help.newProject,
-        "proj.save" to strings.help.saveProject,
-        "proj.export" to strings.help.exportImage,
-        "proj.load" to strings.help.loadProject,
-        "proj.settings" to strings.help.appSettings,
+    // Overlay tools
+    "mode.overlay.light" to strings.help.flashlight,
+    "mode.overlay.lock" to strings.nav.lockInfo,
 
-        // Global
-        "item.help" to strings.nav.help
-    )
+    // Mockup tools
+    "mockup.wall" to strings.help.wall,
+    "wall.photo" to strings.nav.wallInfo,
+    "wall.file" to strings.nav.wallInfo,
+    "wall.clear" to strings.nav.wallClearInfo,
+    "mode.mockup.lock" to strings.nav.lockInfo,
 
-    layers.forEach { layer ->
-        base[layerId(layer)] = strings.help.layer(layer.name)
-        // Tool category folders (host items) inside the per-layer nested rail. The former
-        // grp.paint folder was retired when Eraser was promoted to a top-level rail item —
-        // Eraser was the only child, so the folder was just an extra tap.
-        base[layerId(layer, "grp.retouch")] = strings.help.blur
-        base[layerId(layer, "grp.adjust")] = strings.help.adj
-        base[layerId(layer, "grp.effects")] = strings.help.stencilGen
-        base[layerId(layer, "grp.text")] = strings.help.editText
-        base[layerId(layer, "editText")] = strings.help.editText
-        base[layerId(layer, "size.brush")] = strings.help.size
-        base[layerId(layer, "size.text")] = strings.help.size
-        base[layerId(layer, "font")] = strings.help.font
-        base[layerId(layer, "color")] = strings.help.color
-        base[layerId(layer, "kern")] = strings.help.kern
-        base[layerId(layer, "bold")] = strings.help.bold
-        base[layerId(layer, "italic")] = strings.help.italic
-        base[layerId(layer, "outline")] = strings.help.outline
-        base[layerId(layer, "shadow")] = strings.help.shadow
-        base[layerId(layer, "stencil")] = strings.help.stencilGen
-        base[layerId(layer, "blend")] = strings.help.blend
-        base[layerId(layer, "adj")] = strings.help.adj
-        base[layerId(layer, "invert")] = strings.help.invert
-        base[layerId(layer, "balance")] = strings.help.balance
-        base[layerId(layer, "eraser")] = strings.help.eraser
-        base[layerId(layer, "blur")] = strings.help.blur
-        base[layerId(layer, "liquify")] = strings.help.liquify
-        base[layerId(layer, "dodge")] = strings.help.dodge
-        base[layerId(layer, "burn")] = strings.help.burn
-        base[layerId(layer, "iso")] = strings.help.iso
-        base[layerId(layer, "line")] = strings.help.line
-    }
+    // Trace tools
+    "mode.trace.freeze" to strings.help.lockTrace,
+    "mode.trace.lock" to strings.nav.lockInfo,
 
-    return base
-}
+    // Design menu
+    "host.design" to strings.nav.adjustInfo,
+    "design.layers" to strings.editor.layers,
+    "design.adjust" to strings.nav.adjustInfo,
+    "design.balance" to strings.nav.balanceInfo,
+    "design.invert" to strings.nav.invertInfo,
+
+    // Project menu
+    "host.project" to strings.help.projectHost,
+    "proj.new" to strings.help.newProject,
+    "proj.save" to strings.help.saveProject,
+    "proj.export" to strings.help.exportImage,
+    "proj.load" to strings.help.loadProject,
+    "proj.settings" to strings.help.appSettings,
+    "proj.extensions" to strings.nav.extensionsInfo,
+
+    // Global
+    "item.help" to strings.nav.help,
+)

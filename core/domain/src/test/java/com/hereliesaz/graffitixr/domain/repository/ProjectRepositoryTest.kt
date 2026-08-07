@@ -113,13 +113,6 @@ class ProjectRepositoryTest {
     }
 
     @Test
-    fun `updateMapPath calls implementation`() = runTest {
-        val repo = mockk<ProjectRepository>(relaxed = true)
-        repo.updateMapPath("1", "path")
-        coVerify { repo.updateMapPath("1", "path") }
-    }
-
-    @Test
     fun `importProject returns success result`() = runTest {
         val repo = mockk<ProjectRepository>()
         val p = GraffitiProject(id = "1", name = "p")

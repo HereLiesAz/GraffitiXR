@@ -51,7 +51,7 @@ suspend fun captureWindowToPng(
                 { result -> if (cont.isActive) cont.resume(result) },
                 Handler(Looper.getMainLooper()),
             )
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             // Thrown when the window has no backing surface yet — mid-rotation, or a request that
             // raced the Activity going down. A real outcome, not a crash.
             if (cont.isActive) cont.resume(PixelCopy.ERROR_SOURCE_NO_DATA)

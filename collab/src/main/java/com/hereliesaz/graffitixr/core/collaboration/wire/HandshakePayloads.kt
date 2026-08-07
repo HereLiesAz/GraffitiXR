@@ -46,12 +46,22 @@ internal data class HelloOkPayload(
     val protocolVersion: Int,
     val hostNonce: ByteArray,
     val hostProof: ByteArray,
+    /**
+     * The host's device name, so the guest's "viewing <peer>" banner can name who it is watching.
+     *
+     * The guest already sends its name in [HelloPayload] and the host displays it; the reverse
+     * direction had no field, so `HostSession.localDeviceName` was accepted, stored and never used
+     * and the guest hard-coded the string "host". Defaulted so an older host that omits it decodes
+     * cleanly into the same fallback rather than failing the handshake.
+     */
+    val hostName: String = "",
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is HelloOkPayload) return false
         return sessionId == other.sessionId && protocolVersion == other.protocolVersion &&
-            hostNonce.contentEquals(other.hostNonce) && hostProof.contentEquals(other.hostProof)
+            hostNonce.contentEquals(other.hostNonce) && hostProof.contentEquals(other.hostProof) &&
+            hostName == other.hostName
     }
 
     override fun hashCode(): Int {
@@ -59,6 +69,7 @@ internal data class HelloOkPayload(
         result = 31 * result + protocolVersion
         result = 31 * result + hostNonce.contentHashCode()
         result = 31 * result + hostProof.contentHashCode()
+        result = 31 * result + hostName.hashCode()
         return result
     }
 }

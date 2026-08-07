@@ -105,63 +105,7 @@ void MobileGS::initialize(int width, int height) {
         mRelocRunning = true;
         mRelocThread = std::thread(&MobileGS::relocThreadFunc, this);
     }
-    if (!mMapRunning) {
-        mMapRunning = true;
-        mMapThread = std::thread(&MobileGS::mapThreadFunc, this);
-    }
 }
-
-// Voxel/splat map deleted: GL-init stubs retained for the JNI/Kotlin surface (no map to init).
-void MobileGS::initGl() {}
-void MobileGS::initVoxelGl() {}
-void MobileGS::initVoxelGlProgram() {}
-void MobileGS::initVoxelGlBuffer() {}
-void MobileGS::initMeshGl() {}
-
-void MobileGS::resetGlContext() {
-    initGl();
-}
-
-// Voxel/splat map deleted: render stubs retained for the JNI/Kotlin surface.
-void MobileGS::draw(bool debugTint) {}
-
-void MobileGS::drawDebugLayers(bool voxels, bool mesh) {}
-
-void MobileGS::drawCoverage() {}
-
-void MobileGS::pushPointCloud(const std::vector<float>& points) {}
-
-// Voxel/splat map deleted: depth integration removed. The relocalizer uses color frames via
-// scheduleRelocCheck, not this path. Stub retained so mapThreadFunc / pushFrame still compile.
-void MobileGS::processDepthFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence) {}
-
-void MobileGS::mapThreadFunc() {
-    setpriority(PRIO_PROCESS, 0, 15);
-    JniThreadAttacher attacher;
-    while (mMapRunning) {
-        FrameData frame;
-        {
-            std::unique_lock<std::mutex> lock(mQueueMutex);
-            mQueueCv.wait(lock,[this] { return !mFrameQueue.empty() || !mMapRunning; });
-            if (!mMapRunning) break;
-            frame = std::move(mFrameQueue.front());
-            mFrameQueue.erase(mFrameQueue.begin());
-        }
-        processDepthFrame(frame.depth, frame.color, frame.viewMatrix, frame.projMatrix,
-                          frame.hasIntrinsics ? frame.intrinsics : nullptr, frame.isYuv, frame.confidence);
-    }
-}
-
-// Voxel/splat map deleted: depth frames are no longer cloned/queued (the queue was only
-// drained-and-discarded). This removes the per-frame cv::Mat::clone() cost on the sensor thread.
-// The idle map thread parks on mQueueCv and exits cleanly on destroy (mMapRunning=false + notify).
-void MobileGS::pushFrame(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat, const float* intrinsics, bool isYuv, float confidence) {}
-
-void MobileGS::clearMap() {}                            // voxel/splat map deleted
-void MobileGS::pruneByConfidence(float threshold) {}   // voxel/splat map deleted
-
-void MobileGS::setParallaxMinDegrees(float deg) {}   // voxel/splat map deleted
-void MobileGS::setVoxelSize(float size) { mVoxelSize = size; }
 
 void MobileGS::updateCamera(float* viewMat, float* projMat) {
     std::lock_guard<std::mutex> lock(mMutex);
@@ -196,16 +140,6 @@ void MobileGS::getAnchorTransform(float* outMat16) const {
     std::lock_guard<std::mutex> lock(mMutex);
     memcpy(outMat16, mAnchorMatrix, 16 * sizeof(float));
 }
-
-void MobileGS::getConfidenceAvgs(float& outVisible, float& outGlobal) const {
-    // Voxel/splat map deleted; reloc no longer depends on this (Kotlin confGlobal is decoupled).
-    outVisible = 0.0f;
-    outGlobal = 0.0f;
-}
-
-// Voxel/splat map deleted: SurfaceMesh removed.
-void MobileGS::updatePersistentMesh(const cv::Mat& depth, const cv::Mat& color, const float* viewMat, const float* projMat) {}
-void MobileGS::getPersistentMesh(std::vector<float>& outVertices, std::vector<float>& outWeights) {}
 
 /**
  * One relocalization attempt over one frame: snapshot the fingerprint, detect, match, solve, publish.
@@ -1360,21 +1294,14 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
 void MobileGS::setArCoreTrackingState(bool t) { mIsArCoreTracking.store(t, std::memory_order_relaxed); }
 
 void MobileGS::destroy() {
-    mMapRunning = false;
     mRelocRunning = false;
-    mQueueCv.notify_all();
     {
         std::lock_guard<std::mutex> lock(mRelocMutex);
         mRelocCv.notify_all();
     }
-    if (mMapThread.joinable()) mMapThread.join();
     if (mRelocThread.joinable()) mRelocThread.join();
 }
 
-// Voxel/splat map deleted: .gxr keeps the fingerprint; old model.map files are ignored.
-void MobileGS::saveModel(const std::string& p) {}
-void MobileGS::loadModel(const std::string& p) {}
-bool MobileGS::importModel3D(const std::string& p) { return false; }
 void MobileGS::setViewportSize(int w, int h) { mScreenWidth = w; mScreenHeight = h; }
 void MobileGS::setRelocEnabled(bool e) { mRelocEnabled = e; }
 

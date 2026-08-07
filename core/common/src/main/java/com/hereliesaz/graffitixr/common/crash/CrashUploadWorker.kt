@@ -1,6 +1,5 @@
 package com.hereliesaz.graffitixr.common.crash
 
-import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -15,7 +14,7 @@ import retrofit2.converter.gson.GsonConverterFactory
  * race that delete (same startup transaction) and usually find nothing. This class only performs the
  * network upload, and never throws (a crash reporter must not crash the app).
  */
-class CrashUploadWorker(private val context: Context) {
+class CrashUploadWorker {
 
     // Built once and reused: recreating Retrofit/OkHttp per upload accumulates thread + connection
     // pools (wasteful, and worse when uploading several crash files in a row). `by lazy` defers

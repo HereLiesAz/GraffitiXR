@@ -31,7 +31,7 @@ class AzpInstaller(
     private val trustStore: TrustStore = TrustStore.EMPTY,
 ) {
 
-    class InstallException(message: String) : Exception(message)
+    class InstallException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
     companion object {
         /** Cumulative decompressed-size ceiling for a `.azp` — a zip-bomb guard on untrusted input.
@@ -80,7 +80,9 @@ class AzpInstaller(
         val manifest: AzphaltManifest = try {
             parseManifest(manifestBytes.decodeToString())
         } catch (t: Throwable) {
-            throw InstallException("Invalid manifest.json: ${t.message}")
+            // Carry the parse failure as the cause, not just its message: the manifest parser's
+            // own exception says WHICH field was malformed, and a bare string drops that.
+            throw InstallException("Invalid manifest.json: ${t.message}", t)
         }
 
         // Asset-host policy (spec/ADOPTION_ASSET_HOST.md). GraffitiXR runs no extension code, so:

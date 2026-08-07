@@ -10,7 +10,6 @@ import com.hereliesaz.graffitixr.common.wearable.WearableManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
-import com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider
 import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Paint
@@ -50,7 +49,6 @@ class ArViewModelTest {
 
     private lateinit var viewModel: ArViewModel
     private val slamManager: SlamManager = mockk(relaxed = true)
-    private val stereoProvider: StereoDepthProvider = mockk(relaxed = true)
     private val projectRepository: ProjectRepository = mockk(relaxed = true)
     private val settingsRepository: SettingsRepository = mockk(relaxed = true)
     private val projectManager: com.hereliesaz.graffitixr.data.ProjectManager = mockk(relaxed = true)
@@ -92,7 +90,7 @@ class ArViewModelTest {
         every { settingsRepository.isImperialUnits } returns flowOf(false)
         every { projectRepository.currentProject } returns MutableStateFlow(null)
         every { context.filesDir } returns File("/tmp")
-        viewModel = ArViewModel(slamManager, stereoProvider, projectRepository, settingsRepository, projectManager, collaborationManager, wearableManager, context, testDispatchers)
+        viewModel = ArViewModel(slamManager, projectRepository, settingsRepository, projectManager, collaborationManager, wearableManager, context, testDispatchers)
     }
 
     @After
@@ -138,7 +136,7 @@ class ArViewModelTest {
 
     @Test
     fun `setTrackingState with true sets correct state`() = runTest {
-        viewModel.setTrackingState(true, 0, 0, false)
+        viewModel.setTrackingState(true, 0, false)
 
         val state = viewModel.uiState.value
         assertTrue(state.isScanning)
@@ -146,7 +144,7 @@ class ArViewModelTest {
 
     @Test
     fun `setTrackingState with false sets correct state`() = runTest {
-        viewModel.setTrackingState(false, 0, 0, false)
+        viewModel.setTrackingState(false, 0, false)
 
         val state = viewModel.uiState.value
         assertFalse(state.isScanning)
@@ -154,10 +152,10 @@ class ArViewModelTest {
 
     @Test
     fun `setTrackingState propagates isDepthApiSupported`() = runTest {
-        viewModel.setTrackingState(true, 100, 0, true)
+        viewModel.setTrackingState(true, 100, true)
         assertTrue(viewModel.uiState.value.isDepthApiSupported)
 
-        viewModel.setTrackingState(true, 100, 0, false)
+        viewModel.setTrackingState(true, 100, false)
         assertFalse(viewModel.uiState.value.isDepthApiSupported)
     }
 
@@ -341,7 +339,7 @@ class ArViewModelTest {
         val flow = MutableStateFlow(false)
         every { settingsRepository.ambientScanEnabled } returns flow
         val vm = ArViewModel(
-            slamManager, stereoProvider, projectRepository, settingsRepository, projectManager,
+            slamManager, projectRepository, settingsRepository, projectManager,
             collaborationManager, wearableManager, context, testDispatchers,
         )
         testDispatcher.scheduler.advanceUntilIdle()
@@ -358,7 +356,7 @@ class ArViewModelTest {
 
     @Test
     fun `setTrackingState false with isDepthApiSupported true reflects correctly`() = runTest {
-        viewModel.setTrackingState(false, 0, 0, true)
+        viewModel.setTrackingState(false, 0, true)
 
         val state = viewModel.uiState.value
         assertFalse(state.isScanning)
@@ -367,7 +365,7 @@ class ArViewModelTest {
 
     @Test
     fun `setTrackingState false with zero splats reflects correctly`() = runTest {
-        viewModel.setTrackingState(false, 0, 0, true)
+        viewModel.setTrackingState(false, 0, true)
 
         val state = viewModel.uiState.value
         assertFalse(state.isScanning)
@@ -502,7 +500,7 @@ class ArViewModelTest {
     private fun viewModelOn(projects: MutableStateFlow<com.hereliesaz.graffitixr.common.model.GraffitiProject?>): ArViewModel {
         every { projectRepository.currentProject } returns projects
         return ArViewModel(
-            slamManager, stereoProvider, projectRepository, settingsRepository, projectManager,
+            slamManager, projectRepository, settingsRepository, projectManager,
             collaborationManager, wearableManager, context, testDispatchers,
         )
     }

@@ -127,10 +127,14 @@ internal class HostSession(
 
     /**
      * Enqueue an Op to be sent to the guest. Seq assignment, wire encoding and DeltaBuffer
-     * accounting all happen here, atomically, so every accepted op is replayable after a
-     * reconnect — nothing can be dropped between enqueue and send anymore. On DeltaBuffer
-     * overflow (guest too far behind / no guest draining) the session ends explicitly rather
-     * than diverging silently.
+     * accounting all happen here, atomically, so nothing can be dropped between enqueue and send.
+     *
+     * A full replay buffer is no longer fatal. It used to be: an oversized op (a whole-canvas
+     * `LayerBitmapReplace` from one Liquify warp) or a long stretch of editing with no guest yet to
+     * ack anything both overflowed the cap, and overflow ended the session. The buffer now evicts
+     * and reports a gap instead, and a reconnect that lands in the gap is served a fresh bulk
+     * snapshot — see [DeltaBuffer] and the replay branch in [handleConnection]. The op itself is
+     * always queued for the live guest either way.
      *
      * Encoding runs on the caller's thread; ops carrying large payloads (LayerBitmapReplace)
      * should be enqueued from a background dispatcher, which OpEmitterImpl's editor call sites
@@ -144,12 +148,7 @@ internal class HostSession(
             if (phase == Phase.Ended) return
             val seq = seqCounter.incrementAndGet()
             val bytes = OpCodec.encode(DeltaPayload(seq, op))
-            if (!deltaBuffer.append(seq, op, bytes.size)) {
-                // Cap exceeded: a future reconnect could not replay without a gap, so end the
-                // session per DeltaBuffer's contract rather than diverge silently.
-                scope.launch { close(CoopSessionState.EndReason.NetworkLost) }
-                return
-            }
+            deltaBuffer.append(seq, op, bytes.size)
             outQueue.trySend(EncodedDelta(seq, bytes))
         }
     }
@@ -158,7 +157,7 @@ internal class HostSession(
         while (scope.isActive) {
             val socket = try {
                 ss.accept()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 if (!scope.isActive) return
                 _state.value = CoopSessionState.Ended(CoopSessionState.EndReason.NetworkLost)
                 return
@@ -168,7 +167,7 @@ internal class HostSession(
             // permanently disabled hosting and leaked its socket.
             try {
                 handleConnection(socket)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // handleConnection only throws before the live loops start (loop failures are
                 // caught inside the loops and route to enterReconnecting). If it adopted this
                 // socket (clientSocket === socket) but then threw — e.g. a write failed during
@@ -246,6 +245,7 @@ internal class HostSession(
                     protocolVersion = protocolVersion,
                     hostNonce = hostNonce,
                     hostProof = hostProof,
+                    hostName = localDeviceName,
                 )
             ),
         )
@@ -255,16 +255,21 @@ internal class HostSession(
         val isReconnect = hello.lastAppliedSeq > 0
         lastAppliedSeq = hello.lastAppliedSeq
 
-        if (isReconnect) {
-            // Replay buffered deltas after lastAppliedSeq. Since seqs are assigned at enqueue,
-            // this may overlap ops still sitting unsent in outQueue; the guest's monotonic
-            // `seq > lastAppliedSeq` filter makes the duplicates harmless, and this replay
-            // completes before the live outbound loop starts, so ordering holds.
-            deltaBuffer.opsAfter(lastAppliedSeq).forEach { (seq, op) ->
+        // Replay buffered deltas after lastAppliedSeq. Since seqs are assigned at enqueue, this
+        // may overlap ops still sitting unsent in outQueue; the guest's monotonic
+        // `seq > lastAppliedSeq` filter makes the duplicates harmless, and the replay completes
+        // before the live outbound loop starts, so ordering holds.
+        //
+        // A null answer means eviction discarded ops this guest still needs, so replay cannot
+        // reconstruct its canvas. That is not a failure — it is exactly the case bulk exists for,
+        // and falling back to it is what turned buffer overflow from "end the session" into "send
+        // more data once".
+        val replay = if (isReconnect) deltaBuffer.opsAfter(lastAppliedSeq) else null
+        if (replay != null) {
+            replay.forEach { (seq, op) ->
                 writeSecure(output, crypto, FrameType.DELTA, OpCodec.encode(DeltaPayload(seq, op)))
             }
         } else {
-            // Bulk transfer.
             sendBulk(output, crypto)
         }
 
@@ -319,7 +324,7 @@ internal class HostSession(
         for (delta in outQueue) {
             try {
                 writeSecure(output, crypto, FrameType.DELTA, delta.bytes)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Connection broken; enter reconnecting. The op stays in deltaBuffer and is
                 // replayed to the reconnecting guest from there.
                 enterReconnecting()
@@ -332,7 +337,7 @@ internal class HostSession(
         while (scope.isActive) {
             val frame = try {
                 readSecure(input, crypto) ?: run { enterReconnecting(); return }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 enterReconnecting(); return
             }
             when (frame.type) {
@@ -344,7 +349,7 @@ internal class HostSession(
                     val ping = OpCodec.decode<PingPayload>(frame.payload)
                     try {
                         writeSecure(output, crypto, FrameType.PONG, OpCodec.encode(ping))
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         enterReconnecting(); return
                     }
                 }
@@ -362,7 +367,7 @@ internal class HostSession(
             delay(5_000)
             try {
                 writeSecure(output, crypto, FrameType.PING, OpCodec.encode(PingPayload(System.currentTimeMillis())))
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 enterReconnecting(); return
             }
         }

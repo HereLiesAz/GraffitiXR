@@ -10,7 +10,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.DispatcherProvider
+import com.hereliesaz.graffitixr.common.azphalt.applyCubeLut
 import com.hereliesaz.graffitixr.common.coop.OpEmitter
+import com.hereliesaz.graffitixr.data.azphalt.ExtensionRepository
 import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.common.util.ImageUtils
 import com.hereliesaz.graffitixr.common.util.computeAutoTune
@@ -60,6 +62,7 @@ class EditorViewModel @Inject constructor(
     internal val slamManager: SlamManager,
     private val dispatchers: DispatcherProvider,
     private val opEmitter: OpEmitter,
+    private val extensions: ExtensionRepository,
 ) : ViewModel(), EditorActions {
 
     private val _uiState = MutableStateFlow(EditorUiState())
@@ -108,7 +111,6 @@ class EditorViewModel @Inject constructor(
                     if (_uiState.value.projectId != project.id) loadProject(project)
                 } else {
                     dispatch(EditorIntent.ClearProject)
-                    slamManager.clearMap()
                     history.clear()
                 }
             }
@@ -158,12 +160,8 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    /** Restores the SLAM map and wall fingerprint so AR relocalizes against the saved target. */
+    /** Restores the wall fingerprint so AR relocalizes against the saved target. */
     private fun restoreWorld(project: GraffitiProject) {
-        slamManager.clearMap()
-        val mapPath = projectManager.getMapPath(context, project.id)
-        if (File(mapPath).exists()) slamManager.loadModel(mapPath)
-
         val fp = project.fingerprint ?: return
         val intr = project.fingerprintIntrinsics
         val anchor = project.fingerprintAnchor
@@ -338,11 +336,9 @@ class EditorViewModel @Inject constructor(
                 val updatedLayers = _uiState.value.layers.map { it.toOverlayLayer() }
                 val modeAdjustments = _uiState.value.modeAdjustments.mapKeys { it.key.name }
 
-                // Paths derive from the (immutable) project id. Persist the SLAM world first so they're valid.
+                // Paths derive from the (immutable) project id.
                 val projectId = currentProject?.id ?: GraffitiProject(name = name ?: "New Project").id
-                val mapPath = projectManager.getMapPath(context, projectId)
                 val cloudPointsPath = projectManager.getCloudPointsPath(context, projectId)
-                slamManager.saveModel(mapPath)
 
                 val manifestToSave: GraffitiProject
                 if (currentProject == null) {
@@ -351,7 +347,6 @@ class EditorViewModel @Inject constructor(
                         name = name ?: "New Project",
                         layers = updatedLayers,
                         modeAdjustments = modeAdjustments,
-                        mapPath = mapPath,
                         cloudPointsPath = cloudPointsPath,
                     )
                     projectRepository.createProject(manifestToSave)
@@ -365,7 +360,6 @@ class EditorViewModel @Inject constructor(
                             layers = updatedLayers,
                             modeAdjustments = modeAdjustments,
                             lastModified = System.currentTimeMillis(),
-                            mapPath = mapPath,
                             cloudPointsPath = cloudPointsPath,
                         )
                     }
@@ -582,6 +576,9 @@ class EditorViewModel @Inject constructor(
 
     override fun onAdjustClicked() = dispatch(EditorIntent.ToggleAdjustPanel)
     fun onBalanceClicked() = dispatch(EditorIntent.ToggleColorPanel)
+
+    /** Opens/closes the layer list. EditorUi renders it on EditorPanel.LAYERS; nothing set that. */
+    fun onLayersClicked() = dispatch(EditorIntent.ToggleLayersPanel)
     override fun onDismissPanel() = dispatch(EditorIntent.DismissPanel)
 
     fun onTransformGesture(pan: Offset, zoom: Float, rotationDelta: Float) {
@@ -639,20 +636,7 @@ class EditorViewModel @Inject constructor(
 
     override fun onScaleChanged(s: Float) = dispatch(EditorIntent.SetScale(s))
     override fun onOffsetChanged(o: Offset) = dispatch(EditorIntent.AddOffset(o))
-    override fun onRotationXChanged(d: Float) = dispatch(EditorIntent.SetRotationX(d))
-    override fun onRotationYChanged(d: Float) = dispatch(EditorIntent.SetRotationY(d))
-    override fun onRotationZChanged(d: Float) = dispatch(EditorIntent.SetRotationZ(d))
     override fun onCycleRotationAxis() = dispatch(EditorIntent.CycleRotationAxis)
-
-    override fun setLayerTransform(scale: Float, offset: Offset, rx: Float, ry: Float, rz: Float) {
-        dispatch(EditorIntent.SetLayerTransform(scale, offset, rx, ry, rz))
-        saveProject()
-    }
-
-    override fun onLayerWarpChanged(layerId: String, mesh: List<Float>) {
-        dispatch(EditorIntent.SetLayerWarp(layerId, mesh))
-        saveProject()
-    }
 
     // ── Legibility ────────────────────────────────────────────────────────────
 
@@ -723,6 +707,56 @@ class EditorViewModel @Inject constructor(
     }
 
     override fun onFeedbackShown() = dispatch(EditorIntent.FeedbackShown)
+
+    /**
+     * Grade the active layer through an installed azphalt LUT extension.
+     *
+     * This is the marketplace's payoff — the point at which an installed `.azp` actually changes the
+     * artwork — and until now nothing called it, because nothing could reach the marketplace screen
+     * at all. Returns a [LutApplyResult] rather than showing anything itself: the editor has no
+     * feedback channel of its own, and the caller (which owns the panel) is the right place to say
+     * what went wrong.
+     *
+     * The graded bitmap replaces the layer's pixels and is broadcast to any co-op guest as a
+     * [Op.LayerBitmapReplace], because a LUT is not a replayable stroke.
+     */
+    suspend fun applyInstalledLut(extensionId: String): LutApplyResult {
+        val state = _uiState.value
+        val activeId = state.activeLayerId ?: return LutApplyResult.NoActiveLayer
+        val source = state.layers.find { it.id == activeId }?.bitmap ?: return LutApplyResult.NoActiveLayer
+
+        val graded = withContext(dispatchers.default) {
+            val lut = extensions.loadLut(extensionId) ?: return@withContext null
+            runCatching { source.applyCubeLut(lut) }.getOrNull()
+        } ?: return LutApplyResult.LutUnreadable
+
+        withContext(dispatchers.main) {
+            _uiState.update { s ->
+                s.copy(layers = s.layers.map { if (it.id == activeId) it.copy(bitmap = graded) else it })
+            }
+        }
+        // Off the main thread: PNG-encoding a full-canvas bitmap is not a main-thread operation, and
+        // HostSession.enqueueOp encodes on the caller's thread.
+        viewModelScope.launch(dispatchers.default) {
+            val png = java.io.ByteArrayOutputStream().use { out ->
+                graded.compress(Bitmap.CompressFormat.PNG, 100, out)
+                out.toByteArray()
+            }
+            opEmitter.emit(Op.LayerBitmapReplace(activeId, png))
+        }
+        return LutApplyResult.Applied
+    }
+
+    /** Outcome of [applyInstalledLut], so the caller can explain a no-op instead of appearing inert. */
+    enum class LutApplyResult {
+        Applied,
+
+        /** Nothing to grade: no layer selected, or the selected layer has no rasterised image yet. */
+        NoActiveLayer,
+
+        /** The extension is installed but its `.cube` file is missing or does not parse. */
+        LutUnreadable,
+    }
 
     // ── Co-op ─────────────────────────────────────────────────────────────────
 

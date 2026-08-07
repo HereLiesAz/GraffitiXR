@@ -86,18 +86,6 @@ class DisplayRotationHelper(context: Context) : DisplayListener {
     }
 
     /**
-     * Returns the aspect ratio of the viewport. Should be called from
-     * [android.opengl.GLSurfaceView.Renderer.onSurfaceChanged].
-     *
-     * @return The aspect ratio of the viewport.
-     */
-    fun getViewportAspectRatio(): Float {
-        lock.withLock {
-            return if (viewportHeight == 0) 1.0f else viewportWidth.toFloat() / viewportHeight.toFloat()
-        }
-    }
-
-    /**
      * Returns the current rotation of the display.
      *
      * @return The current rotation of the display.

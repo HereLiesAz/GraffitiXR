@@ -2,7 +2,6 @@ package com.hereliesaz.graffitixr
 
 import android.util.Log
 import com.hereliesaz.graffitixr.common.model.EditorMode
-import com.hereliesaz.graffitixr.common.model.Layer
 
 /**
  * Debug-only runtime invariants for AzNavRail wiring. Stripped in release
@@ -21,12 +20,11 @@ internal object RailIntegrityCheck {
     private const val TAG = "RailIntegrity"
 
     fun verify(
-        layers: List<Layer>,
         mode: EditorMode,
         helpList: Map<String, Any>,
         guidanceHighlightIds: Set<String>,
     ) {
-        val railIds = enumerateRailItemIds(layers, mode)
+        val railIds = enumerateRailItemIds(mode)
 
         // (1) Uniqueness — enumerator returns a Set, so collisions would already
         //     manifest as missing IDs; an explicit check on the producer side

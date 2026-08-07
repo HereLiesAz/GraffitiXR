@@ -83,6 +83,7 @@ import com.hereliesaz.aznavrail.HiddenMenuScope
 import com.hereliesaz.graffitixr.common.model.CaptureStep
 import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.model.EditorMode
+import com.hereliesaz.graffitixr.common.model.EditorPanel
 import com.hereliesaz.graffitixr.common.model.EditorUiState
 import com.hereliesaz.graffitixr.onboarding.ArUnavailableOverlay
 import com.hereliesaz.graffitixr.common.model.ArUiState
@@ -90,7 +91,6 @@ import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.hereliesaz.graffitixr.common.security.SecurityProviderState
 import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
-import com.hereliesaz.graffitixr.design.components.InfoDialog
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
 import androidx.compose.ui.res.stringResource
@@ -175,6 +175,10 @@ class MainActivity : ComponentActivity() {
 
     var showSaveDialog by mutableStateOf(false)
     var showSettings by mutableStateOf(false)
+    // The azphalt marketplace panel. Its whole stack (MarketplaceScreen, MarketplaceViewModel,
+    // ExtensionRepository, AzpInstaller, the registry client and the signature/trust checks) was
+    // unreachable: nothing in the app module referenced it, so no rail entry, no route, no way in.
+    var showMarketplace by mutableStateOf(false)
     var hasCameraPermission by mutableStateOf(false)
     var showWallSourceDialog by mutableStateOf(false)
     var isExporting by mutableStateOf(false)
@@ -486,6 +490,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 BackHandler(enabled = showSettings) { showSettings = false }
+                BackHandler(enabled = showMarketplace) { showMarketplace = false }
                 BackHandler(enabled = mainUiState.isInPlaneRealignment) {
                     mainViewModel.endPlaneRealignment()
                 }
@@ -698,13 +703,10 @@ class MainActivity : ComponentActivity() {
                     if (luminance > 0.5f) Color.Black else Color.White
                 }
 
-                val allHelpItems = remember(editorUiState.layers, strings) {
-                    buildHelpItems(strings, editorUiState.layers)
-                }
+                val allHelpItems = remember(strings) { buildHelpItems(strings) }
 
                 if (BuildConfig.DEBUG) {
                     RailIntegrityCheck.verify(
-                        layers = editorUiState.layers,
                         mode = editorUiState.editorMode,
                         helpList = allHelpItems,
                         guidanceHighlightIds = GUIDANCE_HIGHLIGHT_IDS,
@@ -847,7 +849,7 @@ class MainActivity : ComponentActivity() {
                         // is that auto overlays (onboarding, AR-unavailable explainer) must
                         // early-return on EVERY modal, not just one — collapsing the repeated
                         // boolean chains here prevents a future overlay from forgetting one.
-                        val anyModalActive = showLibrary || showSettings || isExporting ||
+                        val anyModalActive = showLibrary || showSettings || showMarketplace || isExporting ||
                             mainUiState.isCapturingTarget || showSaveDialog ||
                             dashboardUiState.showNewProjectDialog
 
@@ -1165,6 +1167,7 @@ class MainActivity : ComponentActivity() {
                                 .collectAsState()
                             val evalFusionOn by arViewModel.evalFusionEnabled.collectAsState()
                             val evalSelfGrowOn by arViewModel.evalSelfGrowEnabled.collectAsState()
+                            val evalFeatureMapOn by arViewModel.evalFeatureMapEnabled.collectAsState()
                             // Keyed on Unit: the collector must outlive every recomposition, or a
                             // request raised while the overlay is mid-recompose lands in a
                             // subscriber that no longer exists and the capture is silently lost.
@@ -1219,6 +1222,8 @@ class MainActivity : ComponentActivity() {
                                     onToggleFusion = { arViewModel.evalSetFusionEnabled(it) },
                                     selfGrowEnabled = evalSelfGrowOn,
                                     onToggleSelfGrow = { arViewModel.evalSetSelfGrowEnabled(it) },
+                                    featureMapEnabled = evalFeatureMapOn,
+                                    onToggleFeatureMap = { arViewModel.evalSetFeatureMapEnabled(it) },
                                 )
                             }
 
@@ -1254,10 +1259,10 @@ class MainActivity : ComponentActivity() {
                             // pinned at each tapped wall mark. `isDepthApiSupported` is hardcoded
                             // false (the ARCore Depth API starved VIO on target hardware, see
                             // ArViewModel.initArSessionLocked comment). Depth is still available
-                            // from hardware stereo (isDualLensActive) and from VIO-baseline
+                            // from hardware stereo (isHardwareStereoActive) and from VIO-baseline
                             // triangulation (currentCenterDepth > 0f populated in ArRenderer),
                             // both of which reach ArUiState, so gate on those instead.
-                            val hasDepth = arUiState.isDualLensActive || arUiState.currentCenterDepth > 0f
+                            val hasDepth = arUiState.isHardwareStereoActive || arUiState.currentCenterDepth > 0f
                             if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && hasDepth) {
                                 androidx.compose.material3.Text(
                                     text = com.hereliesaz.graffitixr.feature.ar.eval.DistanceFormat.format(
@@ -1505,6 +1510,36 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
+                            if (showMarketplace) {
+                                val marketplaceViewModel: com.hereliesaz.graffitixr.feature.dashboard.MarketplaceViewModel = hiltViewModel()
+                                val scope = rememberCoroutineScope()
+                                com.hereliesaz.graffitixr.feature.dashboard.MarketplaceScreen(
+                                    viewModel = marketplaceViewModel,
+                                    onApplyLut = { extensionId ->
+                                        scope.launch {
+                                            // Say what happened either way: the panel used to close
+                                            // on Apply and the grade silently no-op when there was
+                                            // no active layer or the .cube wouldn't parse, which
+                                            // reads as "the button does nothing".
+                                            val message = when (editorViewModel.applyInstalledLut(extensionId)) {
+                                                EditorViewModel.LutApplyResult.Applied -> "Grade applied"
+                                                EditorViewModel.LutApplyResult.NoActiveLayer ->
+                                                    "Select a layer with an image first"
+                                                EditorViewModel.LutApplyResult.LutUnreadable ->
+                                                    "That extension's colour grade couldn't be read"
+                                            }
+                                            Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    onClose = {
+                                        showMarketplace = false
+                                        // Drop the one-shot install/uninstall status so reopening
+                                        // the panel doesn't replay a message from last time.
+                                        marketplaceViewModel.clearStatus()
+                                    },
+                                )
+                            }
+
                             if (hostQr != null && coopState is CoopSessionState.WaitingForGuest) {
                                 CoopHostQrOverlay(
                                     qrPayload = hostQr!!,
@@ -1701,6 +1736,13 @@ class MainActivity : ComponentActivity() {
                     azRailSubItem(id = "mode.ar.lock", hostId = "mode.ar", text = "Lock", color = if (arLocked) Cyan else navItemColor, shape = AzButtonShape.NONE) {
                         editorViewModel.onToggleModeTransformLocked(EditorMode.AR)
                     }
+                    // Magic — fit the design to the established anchor's extent (falling back to a
+                    // legibility auto-tune when there is no anchor yet). onMagicClicked was
+                    // implemented and unreachable: the "Magic Wand" the adjustments panel's doc
+                    // still described had been removed from that panel's action row.
+                    azRailSubItem(id = "mode.ar.magic", hostId = "mode.ar", text = navStrings.magic, color = navItemColor, shape = AzButtonShape.NONE) {
+                        editorViewModel.onMagicClicked()
+                    }
                     // Co-op ▸ { Host, Join, Leave } — share this AR coordinate system with a nearby peer.
                     azRailSubHostItem(id = "coop", hostId = "mode.ar", text = navStrings.coop, color = navItemColor, shape = AzButtonShape.NONE)
                     val canHost = arUiState.isAnchorEstablished && arUiState.splatCount > 0
@@ -1786,6 +1828,44 @@ class MainActivity : ComponentActivity() {
 
             azDivider()
 
+            // DESIGN FOLDER — the per-design controls. Every one of these drives an EditorViewModel
+            // action that was already implemented and tested but had no way to be invoked: the
+            // layer list had no opener (so add-a-layer was one-way — nothing could remove, rename,
+            // reorder or hide one), the adjust and colour-balance panels had no toggle outside a
+            // Mode, and per-layer invert had no control at all.
+            azRailHostItem(
+                id = "host.design",
+                text = navStrings.adjust,
+                color = navItemColor,
+                initiallyExpanded = railExpansion["host.design"] ?: false,
+                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.design", it) },
+            )
+            azRailSubItem(
+                id = "design.layers", hostId = "host.design", text = strings.editor.layers,
+                color = if (editorUiState.activePanel == EditorPanel.LAYERS) Cyan else navItemColor,
+                shape = AzButtonShape.NONE,
+            ) { editorViewModel.onLayersClicked() }
+            azRailSubItem(
+                id = "design.adjust", hostId = "host.design", text = navStrings.adjust,
+                color = if (editorUiState.activePanel == EditorPanel.ADJUST) Cyan else navItemColor,
+                shape = AzButtonShape.NONE,
+            ) { editorViewModel.onAdjustClicked() }
+            azRailSubItem(
+                id = "design.balance", hostId = "host.design", text = navStrings.balance,
+                color = if (editorUiState.activePanel == EditorPanel.COLOR) Cyan else navItemColor,
+                shape = AzButtonShape.NONE,
+            ) { editorViewModel.onBalanceClicked() }
+            run {
+                val activeInverted = editorUiState.layers
+                    .find { it.id == editorUiState.activeLayerId }?.isInverted == true
+                azRailSubItem(
+                    id = "design.invert", hostId = "host.design", text = navStrings.invert,
+                    color = if (activeInverted) Cyan else navItemColor, shape = AzButtonShape.NONE,
+                ) { editorViewModel.onToggleInvert() }
+            }
+
+            azDivider()
+
             azRailHostItem(
                 id = "host.project",
                 text = navStrings.project,
@@ -1810,6 +1890,9 @@ class MainActivity : ComponentActivity() {
             }
             azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE) {
                 showSettings = true
+            }
+            azRailSubItem(id = "proj.extensions", hostId = "host.project", text = navStrings.extensions, color = navItemColor, shape = AzButtonShape.NONE) {
+                showMarketplace = true
             }
 
 
@@ -1879,7 +1962,7 @@ private fun ArCoreUnavailableOverlay(modifier: Modifier = Modifier) {
                             Intent(Intent.ACTION_VIEW,
                                 "market://details?id=com.google.ar.core".toUri())
                         )
-                    } catch (e: ActivityNotFoundException) {
+                    } catch (_: ActivityNotFoundException) {
                         context.startActivity(
                             Intent(Intent.ACTION_VIEW,
                                 "https://play.google.com/store/apps/details?id=com.google.ar.core".toUri())
@@ -1921,46 +2004,6 @@ private fun CameraPermissionDeniedBanner(modifier: Modifier = Modifier) {
                 shape = AzButtonShape.RECTANGLE
             )
         }
-    }
-}
-
-@Composable
-private fun TapTargetOverlay(
-    onCancel: () -> Unit,
-    modifier: Modifier = Modifier,
-    strings: AppStrings
-) {
-    Column(
-        modifier = modifier.padding(bottom = 96.dp).padding(horizontal = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .background(Color(0xEEFFFFFF), RoundedCornerShape(16.dp))
-                .border(2.dp, Color.Cyan, RoundedCornerShape(16.dp))
-                .padding(20.dp)
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = strings.ar.targetCreationTitle,
-                    color = Color(0xFF007788),
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = strings.ar.targetCreationText,
-                    color = Color(0xFF222222),
-                    textAlign = TextAlign.Start
-                )
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-        AzButton(
-            text = strings.common.cancel,
-            onClick = onCancel,
-            color = Color.Gray,
-            shape = AzButtonShape.RECTANGLE
-        )
     }
 }
 
@@ -2162,12 +2205,11 @@ private fun DiagnosticOverlay(
                 fontSize = 12.sp
             )
 
-            val lensMode = when {
-                uiState.isHardwareStereoActive -> "MANDATORY HW"
-                uiState.isDualLensActive -> "SW STEREO"
-                else -> "SINGLE (HW NOT FOUND)"
-            }
-            DiagnosticRow("Lens Mode", lensMode, if (uiState.isDualLensActive) Cyan else Color.Gray)
+            // "SW STEREO" is gone with the temporal-stereo path it described: that path ran a full
+            // block match every frame and handed the disparity to a native no-op, while reporting a
+            // depth capability the device did not have.
+            val lensMode = if (uiState.isHardwareStereoActive) "MANDATORY HW" else "SINGLE (HW NOT FOUND)"
+            DiagnosticRow("Lens Mode", lensMode, if (uiState.isHardwareStereoActive) Cyan else Color.Gray)
             DiagnosticRow("Depth (Ctr)", if (uiState.currentCenterDepth > 0) "%.2fm".format(uiState.currentCenterDepth) else "---", Color.White)
 
             Spacer(Modifier.height(4.dp))
@@ -2240,6 +2282,8 @@ private fun RelocDiagnosticsOverlay(
     onToggleFusion: (Boolean) -> Unit,
     selfGrowEnabled: Boolean,
     onToggleSelfGrow: (Boolean) -> Unit,
+    featureMapEnabled: Boolean,
+    onToggleFeatureMap: (Boolean) -> Unit,
 ) {
     val d = diagnostics
     // What to DO about it, not just what happened.
@@ -2406,11 +2450,12 @@ private fun RelocDiagnosticsOverlay(
         // is cumulative over the whole design and moves over hours. They were one number until
         // Phase 4/5b split them, and this row existing separately is what makes the split visible.
         //
-        // "—" is the gated match never having run — no design placement, or no pose this frame — and
-        // is a different state from `0/0`, which says the artist is looking away from the design.
+        // An empty reading is the gated match never having run, and is a different state from
+        // `0/0`, which says the artist is looking away from the design. [corrobGateReason] names
+        // WHICH precondition failed — four of them used to render as one indistinguishable dash.
         DiagnosticRow(
             "Corrob",
-            if (d.corrobPredicted < 0) "—" else buildString {
+            if (d.corrobPredicted < 0) corrobGateReason(d.corrobGate) else buildString {
                 append("${d.corrobMatched}/${d.corrobPredicted}")
                 val r = corroboration.searchRadiusPx
                 if (r >= 0f) append(" · r=${r.toInt()}px")
@@ -2420,6 +2465,10 @@ private fun RelocDiagnosticsOverlay(
                 // features the match declined to test, so the ratio to its left is understated by
                 // exactly that much and a low reading may be the radius rather than the wall.
                 if (d.corrobLoneSkips > 0) append(" · ${d.corrobLoneSkips} skip")
+                // Counts that came from the GLOBAL fallback are a different measurement with a
+                // different denominator; saying so is what stops them being read as a Phase-4
+                // number.
+                append(corrobGateSuffix(d.corrobGate))
             },
             // Amber, not red: zero predicted is the artist looking elsewhere, which is ordinary and
             // self-correcting. Red is reserved for the states that do not fix themselves.
@@ -2486,6 +2535,18 @@ private fun RelocDiagnosticsOverlay(
             androidx.compose.material3.Text(
                 if (selfGrowEnabled) "Self-grow: ON (writes the map)" else "Self-grow: OFF",
                 color = if (selfGrowEnabled) androidx.compose.ui.graphics.Color(0xFFFFC107)
+                else androidx.compose.ui.graphics.Color.Gray,
+            )
+        }
+
+        // The persistent wall feature map (IMPLEMENTATION.md 2b/3): grow it from locked frames and
+        // match against it. Amber for the same reason as self-grow — it is the other switch that
+        // writes persistent state, and it is what makes the WallFeatureMap in the project record
+        // non-empty. Both native flags had no caller at all before this switch existed.
+        androidx.compose.material3.TextButton(onClick = { onToggleFeatureMap(!featureMapEnabled) }) {
+            androidx.compose.material3.Text(
+                if (featureMapEnabled) "Feature map: ON (builds + matches)" else "Feature map: OFF",
+                color = if (featureMapEnabled) androidx.compose.ui.graphics.Color(0xFFFFC107)
                 else androidx.compose.ui.graphics.Color.Gray,
             )
         }
@@ -2575,27 +2636,6 @@ private fun DiagnosticRow(label: String, value: String, color: Color) {
     ) {
         Text(text = label, color = Color.Gray, fontSize = 11.sp)
         Text(text = value, color = color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-private fun ConfidenceProgressBar(label: String, progress: Float) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(text = label, color = Color.White, fontSize = 10.sp)
-            Text(text = "${(progress * 100).toInt()}%", color = Cyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        }
-        Spacer(Modifier.height(2.dp))
-        LinearProgressIndicator(
-            progress = { progress },
-            modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
-            color = Cyan,
-            trackColor = Color.White.copy(alpha = 0.1f)
-        )
     }
 }
 

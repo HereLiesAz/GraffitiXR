@@ -71,19 +71,6 @@ class ProjectManager @Inject constructor(
         }
     }
 
-    fun getMapPath(context: Context, projectId: String): String {
-        val root = File(context.filesDir, "projects/$projectId")
-        if (!root.exists()) root.mkdirs()
-        return File(root, "map.bin").absolutePath
-    }
-
-    /**
-     * Returns the path to the auxiliary mesh persistence file used by SurfaceMesh.
-     */
-    fun getMeshPath(context: Context, projectId: String): String {
-        return getMapPath(context, projectId) + ".mesh"
-    }
-
     fun getCloudPointsPath(context: Context, projectId: String): String {
         val root = File(context.filesDir, "projects/$projectId")
         if (!root.exists()) root.mkdirs()
@@ -105,7 +92,7 @@ class ProjectManager @Inject constructor(
                 if (f.exists()) json.decodeFromString<GraffitiProject>(f.readText()) else null
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e // never swallow cancellation
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 null
             }
             if (existing != null) {

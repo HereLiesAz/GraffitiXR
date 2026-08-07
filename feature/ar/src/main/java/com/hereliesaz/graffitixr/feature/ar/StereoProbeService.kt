@@ -61,7 +61,7 @@ class StereoProbeService : Service() {
                 val capable = runStereoProbe()
                 try {
                     reply?.send(Message.obtain(null, MSG_RESULT, if (capable) 1 else 0, 0))
-                } catch (e: RemoteException) {
+                } catch (_: RemoteException) {
                     // Client already gone (timed out / unbound). Nothing to do.
                 }
             }
@@ -152,7 +152,7 @@ class StereoProbeService : Service() {
                             return true
                         }
                     }
-                } catch (e: NotYetAvailableException) {
+                } catch (_: NotYetAvailableException) {
                     // Depth not converged yet — keep going until the deadline.
                 } catch (e: Exception) {
                     Timber.w(e, "ARDIAG depth-triangulation probe: depth acquire failed")

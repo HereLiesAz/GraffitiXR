@@ -48,14 +48,6 @@ class EditorReducerTest {
     }
 
     @Test
-    fun `SetRotationX sets the rotation and the active axis`() {
-        val s = state(lyr("a"), active = "a")
-        val out = reduce(s, EditorIntent.SetRotationX(45f))
-        assertEquals(45f, out.layers.first().rotationX)
-        assertEquals(RotationAxis.X, out.activeRotationAxis)
-    }
-
-    @Test
     fun `CycleRotationAxis advances X to Y to Z to X and shows feedback`() {
         var s = state(lyr("a"), active = "a").copy(activeRotationAxis = RotationAxis.X)
         s = reduce(s, EditorIntent.CycleRotationAxis); assertEquals(RotationAxis.Y, s.activeRotationAxis)
@@ -136,14 +128,6 @@ class EditorReducerTest {
     fun `ToggleHandedness flips the handedness flag`() {
         val s = state(lyr("a")).copy(isRightHanded = true)
         assertFalse(reduce(s, EditorIntent.ToggleHandedness).isRightHanded)
-    }
-
-    @Test
-    fun `SetLayerWarp sets the mesh on the target layer only`() {
-        val s = state(lyr("a"), lyr("b"))
-        val out = reduce(s, EditorIntent.SetLayerWarp("a", listOf(1f, 2f, 3f)))
-        assertEquals(listOf(1f, 2f, 3f), out.layers.first { it.id == "a" }.warpMesh)
-        assertTrue(out.layers.first { it.id == "b" }.warpMesh.isEmpty())
     }
 
     @Test

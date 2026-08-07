@@ -36,7 +36,7 @@ class ArRenderer(
     private val slamManager: SlamManager,
     // Last arg is the camera→point distance (meters) at the tapped pixel, or -1f when unavailable.
     private val onTargetCaptured: (Bitmap, Int, Int, ByteBuffer?, Int, Int, Int, FloatArray?, FloatArray, Int, Float, FloatArray?, com.hereliesaz.graffitixr.common.model.CaptureEnvironment) -> Unit,
-    private val onTrackingUpdated: (Boolean, Int, Int, Boolean, Float, Float, Triple<Float, Float, Float>?, Boolean, Boolean, Float, Float, Float) -> Unit,
+    private val onTrackingUpdated: (Boolean, Int, Boolean, Float, Float, Triple<Float, Float, Float>?, Boolean, Float) -> Unit,
     private val onLightUpdated: (Float) -> Unit,
     private val onDiag: (String) -> Unit = {},
     // Fired once on the GL thread immediately after the primary anchor is
@@ -51,11 +51,6 @@ class ArRenderer(
     // enough to place the user's artwork. No-op outside the walkthrough's detect
     // phase (doodleLockActive false).
     private val onDoodleLocked: () -> Unit = {},
-    // Fired from the GL thread when ARCore has been stuck not-tracking for a
-    // sustained run of frames (true) or recovers (false). MainScreen uses this
-    // to drop the GLSurfaceView render mode to WHEN_DIRTY so the saturated
-    // main thread can serve input again.
-    private val onTrackingLoopStuck: (Boolean) -> Unit = {},
     // Fired from the GL thread when a torch request was rejected by ARCore (no flash unit, or a
     // camera config that can't drive one), so the UI can drop the toggle instead of latching a
     // light that never came on.
@@ -80,13 +75,6 @@ class ArRenderer(
      * session cleanup coroutine hasn't completed yet.
      */
     @Volatile var isDestroying: Boolean = false
-
-    // Consecutive frames the ARCore camera has reported a non-TRACKING state.
-    // When this crosses STUCK_THRESHOLD we fire onTrackingLoopStuck(true) so
-    // the host can downgrade GL render mode. We fire (false) on recovery.
-    private var consecutiveNotTrackingFrames = 0
-    private var trackingLoopStuckReported = false
-    private val stuckThresholdFrames = 30
 
     private val backgroundScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val sessionLock = ReentrantLock()
@@ -187,7 +175,7 @@ class ArRenderer(
     private var lastPerceptionRefreshMs = 0L
     private val lastPerceptionView = FloatArray(16)
     private var havePerceptionCache = false
-    private var lastPerceptionSplatCount = -1
+    private var lastPerceptionPointCount = -1
     private var perceptionRefreshAvgMs = 0f
 
     // --- Adaptive idle rate (pushed from ArViewModel via MainScreen) -----------------------------
@@ -296,7 +284,6 @@ class ArRenderer(
     @Volatile var visitedSectorsMask: Long = 0L
     /** Current scan phase. Fog is rendered only when AMBIENT and not yet anchored. */
     @Volatile var scanPhase: ScanPhase = ScanPhase.AMBIENT
-    var stereoProvider: com.hereliesaz.graffitixr.nativebridge.depth.StereoDepthProvider? = null
 
     @Volatile private var isFlashlightRequested: Boolean = false
     // Set by updateFlashlight (any thread); consumed at the top of onDrawFrame so the ARCore
@@ -308,6 +295,15 @@ class ArRenderer(
     fun saveCloudPoints(path: String) {
         pointCloudRenderer.saveToFile(path)
     }
+
+    /**
+     * How many points the accumulated ARCore cloud currently holds — the only live measure of "the
+     * map grew" left after the voxel/splat map was deleted, and what the autosave keys on.
+     *
+     * Read from any thread (the field is @Volatile); the count only ever increases within a session
+     * and resets with the renderer.
+     */
+    val mappedPointCount: Int get() = pointCloudRenderer.accumulatedPointCount
 
     fun scheduleCloudPointsLoad(path: String) {
         pointCloudRenderer.pendingLoadPath = path
@@ -324,7 +320,6 @@ class ArRenderer(
     @Volatile private var lastBitmapH: Int = 0
 
     private var frameCount = 0
-    private var diagFrameCount = 0
     // Camera-streaming watchdog: report the first frame ARCore actually delivers (ts>0) and warn once
     // if no camera frame has arrived a few seconds after the session started driving.
     private var camStreamReported = false
@@ -574,7 +569,7 @@ class ArRenderer(
                         .getCameraCharacteristics(cameraId)
                         .get(android.hardware.camera2.CameraCharacteristics.SENSOR_ORIENTATION)
                         ?: 90
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     sensorOrientation = 90
                 }
             } else {
@@ -651,23 +646,6 @@ class ArRenderer(
         // onSurfaceChanged has pushed the viewport, rather than reusing UVs cached before the pause.
         backgroundRenderer.invalidateDisplayGeometry()
         onDiag("surface: bg prog=${backgroundRenderer.isProgramReady} shader=${backgroundRenderer.shaderLog} tex=${backgroundRenderer.textureId}")
-
-        // SLAM GL init is isolated: if it throws it must NOT kill the GL thread (that would leave the
-        // camera passthrough permanently black). resetGlContext() already (re)builds every GL object,
-        // so a separate initGl() call here would be redundant. The breadcrumbs localize a hang (stuck on
-        // "slam begin") vs a throw ("slam FAILED"); the native MobileGS::initGl logs split voxel vs mesh.
-        try {
-            onDiag("surface: voxel program begin")
-            slamManager.initVoxelGlProgram()
-            onDiag("surface: voxel program ok")
-            slamManager.initVoxelGlBuffer()
-            onDiag("surface: voxel buffer ok")
-            slamManager.initMeshGl()
-            onDiag("surface: mesh ok")
-        } catch (t: Throwable) {
-            Timber.e(t, "ARDIAG slam GL init failed")
-            onDiag("surface: slam FAILED ${t.javaClass.simpleName}: ${t.message}")
-        }
 
         overlayRenderer.createOnGlThread()
         pointCloudRenderer.createOnGlThread(context)
@@ -761,11 +739,6 @@ class ArRenderer(
         voxelRevealMaskActive: Boolean,
         isTracking: Boolean
     ) {
-        // Coverage pass (VOXEL_HASH scanning): its alpha is the reveal mask the composite uses to
-        // un-dim the full-colour camera over mapped regions (see PerceptionFbo.composite reveal mode).
-        if (voxelRevealMaskActive) {
-            slamManager.drawCoverage()
-        }
         // Scan/world-mapping indicator: detected planes as metric grids on the real surfaces.
         if (scanActive && !hideVisualization && camera.trackingState == TrackingState.TRACKING) {
             planeRenderer.drawPlanes(activeSession, viewMatrix, projMatrix, camera.pose, gridMode = true)
@@ -845,7 +818,7 @@ class ArRenderer(
             context.contentResolver,
             android.provider.Settings.System.ACCELEROMETER_ROTATION,
         ) == 1
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         false
     }
 
@@ -953,7 +926,7 @@ class ArRenderer(
             lastStep = "update"
             val frame: Frame = try {
                 activeSession.update()
-            } catch (e: SessionPausedException) {
+            } catch (_: SessionPausedException) {
                 if (frameCount % 120 == 0) {
                     Timber.w("ARDIAG onDrawFrame: SessionPaused -> camera black")
                     onDiag("render: session paused -> black")
@@ -1204,7 +1177,6 @@ class ArRenderer(
             val camera = frame.camera
 
             val isDualLensHardware = activeSession.cameraConfig.stereoCameraUsage == com.google.ar.core.CameraConfig.StereoCameraUsage.REQUIRE_AND_USE
-            val isDualLens = isDualLensHardware || (stereoProvider?.isDualLensActive == true)
 
             val viewMatrix = viewMatrixScratch
             val projMatrix = projMatrixScratch
@@ -1274,22 +1246,6 @@ class ArRenderer(
 
             slamManager.setArCoreTrackingState(isTracking)
 
-            lastStep = "anchorCandidates"
-            if (anchorEstablished && frameCount % 60 == 0) {
-                // Promotion: Check for support anchor candidates
-                val candidates = slamManager.getAnchorCandidates(0.95f, 3)
-                candidates?.let { data ->
-                    for (i in 0 until (data.size / 3)) {
-                        val worldPos = com.google.ar.core.Pose(
-                            floatArrayOf(data[i*3], data[i*3+1], data[i*3+2]),
-                            floatArrayOf(0f,0f,0f,1f)
-                        )
-                        anchorOrchestrator.addSupportAnchor(activeSession, worldPos)
-                    }
-                }
-            }
-
-            
             // --- Democratic Consensus Transformation + smoothed reloc fusion ---
             // Backbone: ARCore consensus once anchored, else the native cached pose (as before).
             lastStep = "consensus"
@@ -1476,7 +1432,7 @@ class ArRenderer(
                                 else 0.2f * raw + 0.8f * smoothedCenterDepth
                         }
                     }
-                } catch (e: Exception) { /* ignore */ }
+                } catch (_: Exception) { /* ignore */ }
                 // Snapshot the smoothed value (kept across invalid/dropped frames) for the readout.
                 val centerDepth = smoothedCenterDepth
                 // The view matrix is GL-thread scratch that the next frame overwrites in place, so
@@ -1500,10 +1456,7 @@ class ArRenderer(
                     // Reading a hardcoded 0 is never the right answer, and the point cloud is now the
                     // only live map, so both modes read it. That also restores the stereo check to a
                     // real condition rather than a constant.
-                    val (count, immutableCount) = pointCloudRenderer.accumulatedPointCount to 0
-
-                    val visConf = slamManager.getVisibleConfidenceAvg()
-                    val globConf = slamManager.getGlobalConfidenceAvg()
+                    val count = pointCloudRenderer.accumulatedPointCount
 
                     var relDir: Triple<Float, Float, Float>? = null
                     val distanceMeters = run {
@@ -1536,7 +1489,7 @@ class ArRenderer(
                         if (len > 0.01f && fwdDot > 0f) len else -1f
                     }
 
-                    onTrackingUpdated(isTracking, count, immutableCount, depthSupported, yawDeg, distanceMeters, relDir, isDualLens, isDualLensHardware, centerDepth, visConf, globConf)
+                    onTrackingUpdated(isTracking, count, depthSupported, yawDeg, distanceMeters, relDir, isDualLensHardware, centerDepth)
                 }
             }
 
@@ -1805,12 +1758,8 @@ class ArRenderer(
                             frame.timestamp,
                             cvRotateCode
                         )
-                        // Feed temporal stereo ONLY when mapping AND if hardware stereo isn't active
-                        if (!anchorEstablished && !isDualLensHardware) {
-                            stereoProvider?.submitFrame(planes[0].buffer, image.width, image.height, frame.timestamp)
-                        }
                     }
-                } catch (e: com.google.ar.core.exceptions.NotYetAvailableException) {
+                } catch (_: com.google.ar.core.exceptions.NotYetAvailableException) {
                     // Normal on first frames
                 } catch (e: Exception) {
                     Timber.w(e, "Failed to feed YUV frame")
@@ -1825,53 +1774,12 @@ class ArRenderer(
                             // is a DRAW toggle, and letting a visualization setting decide whether
                             // the map is built is how turning off a layer silently disables co-op.
                             pointCloudRenderer.update(pointCloud)
-                            
-                            // Feed sparse points to Gaussian engine for seeding
-                            val pts = FloatArray(pointCloud.points.remaining())
-                            pointCloud.points.get(pts)
-                            slamManager.feedPointCloud(pts)
                         }
                     } catch (e: Exception) {
                         Timber.w(e, "Failed to acquire point cloud")
                     }
                 }
 
-                // 2. Depth acquisition (STOP processing depth once target is baked)
-                if (depthSupported && !anchorEstablished) {
-                    try {
-                        frame.acquireDepthImage16Bits().use { depthImage ->
-                            val depthPlane = depthImage.planes[0]
-                            val intrArr = floatArrayOf(
-                                intrinsics.focalLength[0], intrinsics.focalLength[1],
-                                intrinsics.principalPoint[0], intrinsics.principalPoint[1]
-                            )
-                            val cpuDim = intrinsics.imageDimensions
-
-                            slamManager.feedArCoreDepth(
-                                depthPlane.buffer,
-                                depthImage.width, depthImage.height,
-                                depthPlane.rowStride,
-                                intrArr, cpuDim[0], cpuDim[1],
-                                cvRotateCode,
-                                if (isDualLensHardware) 0.9f else 0.5f
-                            )
-                        }
-                    } catch (e: com.google.ar.core.exceptions.NotYetAvailableException) {
-                        // Normal on first frames
-                    } catch (e: Exception) {
-                        Timber.w(e, "Failed to feed depth frame")
-                    }
-                }
-            }
-
-            // Cull parallax-failed / never-reinforced voxels. A wrong-depth voxel knocked down by
-            // the parallax check (-0.1) and not re-confirmed trends below threshold and is removed,
-            // so the map converges on geometry verified from multiple baselines. Runs ~every 20s
-            // during active mapping; threshold sits under the seed confidences (sparse 0.4, depth
-            // 0.5) so a fresh, not-yet-verified voxel is never culled before it gets a chance.
-            lastStep = "prune"
-            if (isTracking && !anchorEstablished && frameCount % 600 == 0) {
-                slamManager.pruneByConfidence(0.3f)
             }
 
             // Continuous wall-depth refinement: keep the overlay flush with the ARCore plane estimate.
@@ -1882,7 +1790,7 @@ class ArRenderer(
             if ((!anchorEstablished || isInPlaneRealignment) && frameCount % 30 == 0) {
                 try {
                     refineAnchorFromBestPlane(activeSession, viewMatrix)
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     // Non-fatal: skip this refinement cycle
                 }
             }
@@ -1927,7 +1835,7 @@ class ArRenderer(
                         }
                     }
                 } catch (_: com.google.ar.core.exceptions.NotYetAvailableException) {
-                } catch (e: Exception) { /* Non-fatal */ }
+                } catch (_: Exception) { /* Non-fatal */ }
             }
 
             // During scanning we no longer draw the splat cloud / point cloud / plane grid — the
@@ -2187,8 +2095,11 @@ class ArRenderer(
                 val intervalMs = 1000f / effectivePerceptionFps()
                 val due = nowMs - lastPerceptionRefreshMs >= intervalMs
                 val moved = perceptionPoseChanged(viewMatrix)
-                val splatCount = slamManager.getSplatCount()
-                val mapGrew = splatCount != lastPerceptionSplatCount
+                // The accumulated ARCore cloud, not slamManager.getSplatCount() — that has
+                // returned a hardcoded 0 since the voxel/splat map was deleted, so `mapGrew` was
+                // permanently false and new geometry never triggered a perception redraw on its own.
+                val mappedPoints = pointCloudRenderer.accumulatedPointCount
+                val mapGrew = mappedPoints != lastPerceptionPointCount
                 // A plane mid-dissolve changes every frame with nothing else moving, so it has to
                 // count as a reason to redraw. Otherwise holding the phone still — exactly when the
                 // artist is watching the surfaces settle — would freeze the dissolve part-way.
@@ -2201,7 +2112,7 @@ class ArRenderer(
                     perceptionFbo.unbind(surfaceWidth, surfaceHeight)
                     System.arraycopy(viewMatrix, 0, lastPerceptionView, 0, 16)
                     lastPerceptionRefreshMs = nowMs
-                    lastPerceptionSplatCount = splatCount
+                    lastPerceptionPointCount = mappedPoints
                     havePerceptionCache = true
                     val dt = (android.os.SystemClock.elapsedRealtime() - t0).toFloat()
                     perceptionRefreshAvgMs = perceptionRefreshAvgMs * 0.9f + dt * 0.1f

@@ -25,7 +25,6 @@ fun Layer.toOverlayLayer(): OverlayLayer {
         colorBalanceB = colorBalanceB,
         isImageLocked = isImageLocked,
         isVisible = isVisible,
-        warpMesh = warpMesh,
         isLinked = isLinked,
         isInverted = isInverted,
     )
@@ -51,7 +50,6 @@ fun OverlayLayer.toLayer(): Layer {
         colorBalanceB = colorBalanceB,
         isImageLocked = isImageLocked,
         isVisible = isVisible,
-        warpMesh = warpMesh ?: emptyList(),
         isLinked = isLinked,
         isInverted = isInverted,
     )

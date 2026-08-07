@@ -19,19 +19,12 @@ class SettingsViewModel @Inject constructor(
     val language: StateFlow<AppLanguage> = settingsRepository.language
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppLanguage.SYSTEM)
 
-    val completedTutorials: StateFlow<Set<String>> = settingsRepository.completedTutorials
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
-
     fun setLanguage(language: AppLanguage) {
         viewModelScope.launch { settingsRepository.setLanguage(language) }
     }
 
     fun setBackgroundColor(argb: Int) {
         viewModelScope.launch { settingsRepository.setBackgroundColor(argb) }
-    }
-
-    fun markTutorialComplete(key: String) {
-        viewModelScope.launch { settingsRepository.markTutorialComplete(key) }
     }
 
     fun resetCompletedTutorials() {

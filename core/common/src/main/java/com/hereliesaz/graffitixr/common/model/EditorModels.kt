@@ -36,7 +36,6 @@ data class Layer(
     val isLinked: Boolean = false,
     @Serializable(with = BlendModeSerializer::class)
     val blendMode: BlendMode = BlendMode.SrcOver,
-    val warpMesh: List<Float> = emptyList(),
     @Serializable(with = OffsetSerializer::class)
     val offset: Offset = Offset.Zero,
     val rotationX: Float = 0f,

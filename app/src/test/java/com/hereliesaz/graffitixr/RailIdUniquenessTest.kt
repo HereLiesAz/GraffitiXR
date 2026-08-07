@@ -1,7 +1,6 @@
 package com.hereliesaz.graffitixr
 
 import com.hereliesaz.graffitixr.common.model.EditorMode
-import com.hereliesaz.graffitixr.common.model.Layer
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -14,15 +13,10 @@ import org.junit.Test
  */
 class RailIdUniquenessTest {
 
-    private fun layer(id: String) = Layer(id = id, name = "test")
-
     @Test
     fun `no rail id is registered twice in any editor mode`() {
-        // Two distinct layers exercise the per-layer registration block.
-        val layers = listOf(layer("layer-uuid-1"), layer("layer-uuid-2"))
-
         for (mode in EditorMode.entries) {
-            val registrations = enumerateRailItemIdRegistrations(layers, mode)
+            val registrations = enumerateRailItemIdRegistrations(mode)
             val duplicates = registrations.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
             assertEquals(
                 "Duplicate rail IDs in mode $mode would crash AzNavRail at runtime: $duplicates",
@@ -33,10 +27,22 @@ class RailIdUniquenessTest {
     }
 
     @Test
-    fun `no rail id collides across layers with distinct ids`() {
-        val layers = (1..5).map { layer("uuid-$it") }
-        val registrations = enumerateRailItemIdRegistrations(layers, EditorMode.MOCKUP)
-        val duplicates = registrations.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
-        assertEquals(emptySet<String>(), duplicates)
+    fun `every mode registers the always-on entries exactly once`() {
+        // The navigation spine: Open, the modes host with its four mode entries, the project host
+        // and Help. A mode-gated tool leaking into the always-on set would show up here as a
+        // registration in a mode that should not have it.
+        val alwaysOn = setOf(
+            "item.open", "host.modes", "mode.ar", "mode.overlay", "mode.mockup", "mode.trace",
+            "host.project", "proj.new", "proj.save", "proj.export", "proj.load", "proj.settings",
+            "proj.extensions", "item.help",
+        )
+        for (mode in EditorMode.entries) {
+            val registrations = enumerateRailItemIdRegistrations(mode)
+            assertEquals(
+                "mode $mode is missing always-on rail entries",
+                emptySet<String>(),
+                alwaysOn - registrations.toSet(),
+            )
+        }
     }
 }

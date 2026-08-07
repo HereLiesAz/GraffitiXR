@@ -108,9 +108,6 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    fun navigateToSurveyor() { _navigationTrigger.value = "surveyor" }
-    fun navigateToLibrary() { _navigationTrigger.value = "project_library" }
-    fun navigateToSettings() { _navigationTrigger.value = "settings" }
     fun onNavigationConsumed() { _navigationTrigger.value = null }
 
     fun checkForUpdates(currentVersion: String) {
@@ -169,7 +166,7 @@ class DashboardViewModel @Inject constructor(
 
                 val json = connection.inputStream.bufferedReader().readText()
                 parseRelease(json)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 null
             } finally {
                 // disconnect() was previously only reached on the 200 path — the early return and any
@@ -190,7 +187,7 @@ class DashboardViewModel @Inject constructor(
             val htmlUrl = Regex("\"html_url\"\\s*:\\s*\"([^\"]*/releases/[^\"]*)\"").find(json)?.groupValues?.get(1)
                 ?: "https://github.com/hereliesaz/GraffitiXR/releases"
             GitHubRelease(tagName, htmlUrl)
-        } catch (e: Exception) { null }
+        } catch (_: Exception) { null }
     }
 
     /**

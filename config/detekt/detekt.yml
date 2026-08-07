@@ -1,0 +1,218 @@
+# Detekt configuration for GraffitiXR.
+#
+# The root build script applies detekt to every project with
+# `config.setFrom(files("$rootDir/config/detekt/detekt.yml"))`. That file was never committed, so
+# `./gradlew detekt` — which docs/contributing.md asks every contributor to run — failed for every
+# module with "Configuration file … does not exist". This is that file.
+#
+# `buildUponDefaultConfig = true` in the root build script, so everything here is an override on
+# top of detekt's shipped defaults; rules not mentioned keep their default state.
+#
+# The guiding choice: this gate exists to catch DEFECTS, not to relitigate the shape of the code.
+# Rules that report "this file is big" are switched off with a note — ArRenderer.onDrawFrame and
+# MainActivity.onCreate genuinely are large, and splitting them is a refactor with real regression
+# risk, not something a contributor should be nagged into doing on the way past. Rules that catch
+# the defect classes this codebase has actually shipped (silently swallowed failures, unused
+# members left behind by half-finished removals, unsafe casts) are on and clean.
+
+build:
+  maxIssues: 0
+  excludeCorrectable: false
+
+config:
+  validation: true
+  warningsAsErrors: false
+
+processors:
+  active: true
+
+console-reports:
+  active: true
+
+comments:
+  active: true
+  UndocumentedPublicClass:
+    active: false
+  UndocumentedPublicFunction:
+    active: false
+  UndocumentedPublicProperty:
+    active: false
+
+# --- Size and shape -----------------------------------------------------------------------------
+# Off by decision, not by oversight. The offenders are the GL frame loop (ArRenderer.onDrawFrame),
+# the Activity that hosts the whole single-screen UI (MainActivity.onCreate), the AR session state
+# machine (ArViewModel), the JNI surface (SlamManager) and the exhaustive blend-mode `when`s. Each
+# is large because the thing it models is; a threshold that fires on all of them every run trains
+# contributors to ignore the report, which is worse than not having one.
+complexity:
+  active: true
+  CyclomaticComplexMethod:
+    active: false
+  CognitiveComplexMethod:
+    active: false
+  ComplexCondition:
+    active: false
+  LongMethod:
+    active: false
+  LongParameterList:
+    active: false
+  LargeClass:
+    active: false
+  TooManyFunctions:
+    active: false
+  NestedBlockDepth:
+    active: false
+  MethodOverloading:
+    active: false
+
+coroutines:
+  active: true
+  GlobalCoroutineUsage:
+    active: true
+  RedundantSuspendModifier:
+    active: true
+  SuspendFunWithFlowReturnType:
+    active: true
+
+empty-blocks:
+  active: true
+  EmptyFunctionBlock:
+    # An empty override is how this codebase declares "this callback is intentionally inert"
+    # (renderer no-ops, listener stubs).
+    ignoreOverridden: true
+
+exceptions:
+  active: true
+  SwallowedException:
+    # Deliberately on: a silently-eaten failure is the defect class behind several entries in
+    # docs/AUDIT.md (a capture failure reported as an absence). Where a catch really is inert —
+    # best-effort teardown, a close() on an already-dead socket — bind the exception as `_` so the
+    # intent is visible at the catch site instead of implied.
+    active: true
+    ignoredExceptionTypes:
+      - 'InterruptedException'
+      - 'MalformedURLException'
+      - 'NumberFormatException'
+      - 'ParseException'
+    allowedExceptionNameRegex: '_|(ignore|expected).*'
+  TooGenericExceptionCaught:
+    # Catching Exception around JNI, GL and socket teardown is the correct defensive shape here.
+    active: false
+  TooGenericExceptionThrown:
+    # RuntimeException/IllegalStateException at a native-load or protocol boundary is the honest
+    # type — there is no more specific one to reach for.
+    active: false
+  ThrowingExceptionsWithoutMessageOrCause:
+    active: false
+  InstanceOfCheckForException:
+    # Off: the pattern it flags here is `catch (e: Exception) { if (e is CancellationException)
+    # throw e; … }`, which is the REQUIRED shape for a coroutine that catches broadly — a
+    # CancellationException must be rethrown, and detekt's suggested multi-catch cannot express
+    # "rethrow this one, handle the rest" as compactly.
+    active: false
+  PrintStackTrace:
+    active: true
+  ReturnFromFinally:
+    active: true
+
+naming:
+  active: true
+  FunctionNaming:
+    # @Composable functions are PascalCase by Compose convention, and the rail/DSL builders that
+    # emit them follow the same casing so a call site reads as one list of components.
+    ignoreAnnotated: ['Composable']
+    functionPattern: '[a-zA-Z][a-zA-Z0-9]*'
+  ConstructorParameterNaming:
+    # The GitHub release DTO mirrors the API's snake_case field names so @SerialName is not needed
+    # on every property.
+    parameterPattern: '[a-z][A-Za-z0-9_]*'
+  VariableNaming:
+    # Private DataStore key holders and tuning constants are SCREAMING_SNAKE_CASE; the pose/SLAM
+    # math uses short mathematical names (m, q, t0, fx, cx), which read better than prose here.
+    variablePattern: '(_)?[a-zA-Z][A-Za-z0-9_]*'
+    privateVariablePattern: '(_)?[a-zA-Z][A-Za-z0-9_]*'
+  TopLevelPropertyNaming:
+    constantPattern: '[A-Z][_A-Za-z0-9]*'
+  MatchingDeclarationName:
+    active: false
+  MemberNameEqualsClassName:
+    active: false
+
+performance:
+  active: true
+  SpreadOperator:
+    active: false
+  ArrayPrimitive:
+    active: true
+  ForEachOnRange:
+    active: true
+
+potential-bugs:
+  active: true
+  UnsafeCallOnNullableType:
+    active: true
+  UnsafeCast:
+    active: true
+  UnreachableCode:
+    active: true
+  ImplicitDefaultLocale:
+    active: true
+  EqualsAlwaysReturnsTrueOrFalse:
+    active: true
+  IgnoredReturnValue:
+    active: true
+  MissingPackageDeclaration:
+    active: false
+  CastToNullableType:
+    active: true
+  NullableToStringCall:
+    active: true
+  ExplicitGarbageCollectionCall:
+    active: true
+
+style:
+  active: true
+  MagicNumber:
+    # The tuning constants (thresholds, timeouts, kernel sizes) are documented in
+    # docs/PARAMETERS.md and at their use sites; hoisting each to a named constant would move the
+    # explanation away from the code it explains.
+    active: false
+  MaxLineLength:
+    # Wide enough for the fully-qualified Compose/ARCore types and the long explanatory comments
+    # this codebase favours, narrow enough to still catch a runaway line.
+    maxLineLength: 200
+    excludeCommentStatements: true
+  WildcardImport:
+    active: false
+  ReturnCount:
+    # Guard-clause style: the validation paths in the wire and JNI code return early many times.
+    active: false
+  ThrowsCount:
+    active: false
+  UnusedPrivateMember:
+    # On, and clean. This is the rule that finds half-finished removals — the leftover private
+    # helper nothing calls any more.
+    active: true
+  UnusedPrivateProperty:
+    active: true
+  UnusedParameter:
+    # JNI-shaped and Compose-shaped signatures carry parameters they do not read.
+    active: false
+  UnusedPrivateClass:
+    active: true
+  ForbiddenComment:
+    # Open work lives in docs/AUDIT.md and BACKLOG.md, not in TODO comments; this rule would only
+    # fire on prose that happens to contain the word.
+    active: false
+  LoopWithTooManyJumpStatements:
+    active: false
+  SerialVersionUIDInSerializableClass:
+    active: false
+  DestructuringDeclarationWithTooManyEntries:
+    active: false
+  UseCheckOrError:
+    active: false
+  UseRequire:
+    active: false
+  NewLineAtEndOfFile:
+    active: true

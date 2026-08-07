@@ -76,6 +76,20 @@ interface SettingsRepository {
     suspend fun setSelfGrowEnabled(on: Boolean)
 
     /**
+     * The persistent wall FEATURE MAP (`IMPLEMENTATION.md` phases 2b/3): grow it from
+     * relocalization-locked frames, and match against it as a second relocalization source.
+     *
+     * Off by default, like the other two experiment switches, and persisted for the same reason.
+     * Until this existed, `SlamManager.setMapRelocEnabled`/`setMapBuildEnabled` had no caller at
+     * all: the native flags stayed at their `false` defaults for the process lifetime, so the map
+     * was never built, never matched, and the `WallFeatureMap` the project record persists for it
+     * was always empty — a whole persistence path carrying nothing.
+     */
+    val featureMapEnabled: Flow<Boolean>
+
+    suspend fun setFeatureMapEnabled(on: Boolean)
+
+    /**
      * Set once a device proves it can't run forced hardware-stereo (ARCore motion-stereo disparity
      * fails / VIO never tracks): future sessions skip the stereo config and stay on Canvas, so the
      * broken path can't thrash the device. Cleared when the user explicitly re-selects Mural.
@@ -102,10 +116,6 @@ interface SettingsRepository {
     /** Canvas background color as ARGB Int. Default is opaque black (0xFF000000). */
     val backgroundColor: Flow<Int>
     suspend fun setBackgroundColor(argb: Int)
-
-    /** Minimum viewpoint shift (degrees) before a re-observation parallax-verifies a voxel. Default 4. */
-    val parallaxMinDegrees: Flow<Float>
-    suspend fun setParallaxMinDegrees(deg: Float)
 
     /** ARCore camera target frame rate: 60 (default) or 30. Lower = less power/heat. */
     val cameraTargetFps: Flow<Int>
