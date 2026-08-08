@@ -11,8 +11,8 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
-import org.junit.Ignore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -23,6 +23,8 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.io.File
@@ -65,25 +67,99 @@ class ArSessionTest {
         unmockkObject(NativeLibLoader)
     }
 
-    @Ignore("ARCore Session(context) triggers UnsatisfiedLinkError in JVM — belongs in instrumented tests")
+    // `resumeArSessionInternal`/`pauseArSessionInternal` cannot be exercised through the public
+    // `setArMode(true, ...)` entry point in a JVM unit test: it constructs a real ARCore `Session`,
+    // which throws `UnsatisfiedLinkError` off-device (see the ignored test this file used to have).
+    // Instead these tests reach the private lifecycle methods directly via reflection with a mocked
+    // `Session` injected into the private `session` field — the same technique
+    // `ArViewModelTest.setPrivateField`/`getPrivateField` use — so the assertion lands on the ARCORE
+    // CALL ITSELF (`Session.resume()`/`Session.pause()`), not just "no exception was thrown".
+    //
+    // `renderer` is left null in these tests: `ArRenderer` cannot be substituted with a mock in this
+    // harness (see `ArViewModelTest`'s note on `attaching re-applies the self-grow intent` — a relaxed
+    // mockk does not intercept its methods, so any call into one dereferences real, uninitialised
+    // fields such as its ReentrantLock). With `renderer == null`,
+    // `resumeArSessionInternal`/`pauseArSessionInternal` take the direct-session-call fallback path —
+    // the one this harness can actually observe — which is exactly right, because with no renderer
+    // there is no GL thread that could be racing the session either.
+
     @Test
-    fun `session should not resume if activity is paused`() = runTest {
-        viewModel.setArMode(true, context)
-        viewModel.onActivityPaused()
-        // No direct way to check if session is paused, but no exception should be thrown.
+    fun `resumeArSessionInternal resumes the session and flips isSessionResumed`() {
+        val mockSession: Session = mockk(relaxed = true)
+        setPrivateField(viewModel, "session", mockSession)
+
+        invokePrivate(viewModel, "resumeArSessionInternal")
+
+        verify(exactly = 1) { mockSession.resume() }
+        assertTrue(getPrivateField(viewModel, "isSessionResumed") as Boolean)
     }
 
     @Test
+    fun `resumeArSessionInternal is a no-op with no session`() {
+        // session is null by default — resume() must never be reached, and isSessionResumed must
+        // stay false rather than being flipped on nothing.
+        invokePrivate(viewModel, "resumeArSessionInternal")
+        assertFalse(getPrivateField(viewModel, "isSessionResumed") as Boolean)
+    }
+
+    @Test
+    fun `pauseArSessionInternal pauses the session and clears isSessionResumed`() {
+        val mockSession: Session = mockk(relaxed = true)
+        setPrivateField(viewModel, "session", mockSession)
+        setPrivateField(viewModel, "isSessionResumed", true)
+
+        invokePrivate(viewModel, "pauseArSessionInternal")
+
+        verify(exactly = 1) { mockSession.pause() }
+        assertFalse(getPrivateField(viewModel, "isSessionResumed") as Boolean)
+    }
+
+    /**
+     * `updateSessionStateLocked` (driven here through the public `onActivityResumed()`) must not
+     * reach `resumeArSessionInternal` at all while `isInArMode` is false — verified on the mock
+     * session itself rather than inferred from "nothing crashed".
+     */
+    @Test
     fun `session should not resume if not in AR mode`() = runTest {
+        val mockSession: Session = mockk(relaxed = true)
+        setPrivateField(viewModel, "session", mockSession)
+
         viewModel.setArMode(false, context)
         viewModel.onActivityResumed()
-        // No direct way to check if session is resumed, but no exception should be thrown.
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        verify(exactly = 0) { mockSession.resume() }
+        assertFalse(getPrivateField(viewModel, "isSessionResumed") as Boolean)
     }
 
     @Test
     fun `destroyArSession should not crash if session is null`() = runTest {
         // session is null by default
         viewModel.destroyArSession()
-        // Should not throw any exception
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        // The only observable effect of a no-session cleanup: the destroying latch
+        // (performFullCleanupLocked's own `isDestroying = true` at its top) must be released again,
+        // not left stuck true — which would otherwise wedge every future onDrawFrame's isDestroying
+        // check into early-returning forever.
+        assertFalse(getPrivateField(viewModel, "isDestroying") as Boolean)
+    }
+
+    private fun setPrivateField(obj: Any, fieldName: String, value: Any?) {
+        val field = obj.javaClass.getDeclaredField(fieldName)
+        field.isAccessible = true
+        field.set(obj, value)
+    }
+
+    private fun getPrivateField(obj: Any, fieldName: String): Any? {
+        val field = obj.javaClass.getDeclaredField(fieldName)
+        field.isAccessible = true
+        return field.get(obj)
+    }
+
+    private fun invokePrivate(obj: Any, methodName: String) {
+        val method = obj.javaClass.getDeclaredMethod(methodName)
+        method.isAccessible = true
+        method.invoke(obj)
     }
 }

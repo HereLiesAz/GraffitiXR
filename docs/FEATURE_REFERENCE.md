@@ -14,8 +14,10 @@ maps to a persisted key, the key is named so behaviour can be traced end to end.
 ## 0. Mental model in one paragraph
 
 GraffitiXR is a single artifact (a **project**) viewed through five **modes**. The artwork itself
-is a stack of **layers** edited once in **Design**; every other mode is a *lens* onto that same
-stack, carrying its own **mode adjustment** (position/tone applied to the whole design for that
+is exactly **one design** (the older multi-layer model — a stack with an active-layer id — was
+removed; the design is still represented by the `Layer` type for its per-image properties, but the
+editor holds at most one) chosen/replaced in **Design**; every other mode is a *lens* onto that same
+design, carrying its own **mode adjustment** (position/tone applied to the whole design for that
 lens only). AR mode adds spatial anchoring: an offline **fingerprint** of your marks lets the
 overlay **snap back** to the wall after tracking loss, and a **teleological** loop re-grows that
 fingerprint from your progress so the anchor survives the reference being painted over. Nothing
@@ -25,7 +27,7 @@ touches the network unless you explicitly start a **co-op** session.
 
 ## 1. Modes (`EditorMode`)
 
-Five operational modes. The mode is a lens; switching modes never mutates Design layers, only which
+Five operational modes. The mode is a lens; switching modes never mutates the design, only which
 adjustment/anchoring lens is active.
 
 | Mode | Purpose | Anchoring | Primary output |
@@ -34,7 +36,12 @@ adjustment/anchoring lens is active.
 | **MOCKUP** | Compose the design onto a static wall photo | None (static image) | Flattened preview image |
 | **OVERLAY** | Classic non-AR tracing — reference over live camera | None (screen-space) | Sensor still + composited layers (CameraX) |
 | **TRACE** | Phone-as-lightbox for copying onto paper | Locked screen-space | Transparent-background PNG |
-| **DESIGN** | The one place layers are actually created/edited | N/A (canvas) | The project itself |
+| **DESIGN** | Where the single design is chosen/replaced and edited | N/A (canvas) | The project itself |
+
+As of this writing, DESIGN does not have its own dedicated entry in the mode-switcher host on the
+Rail; it's reached indirectly (e.g. importing an image via the top-level **Open** action switches
+into DESIGN as a side effect). TODO: confirm whether a direct DESIGN rail entry is added by other
+in-flight work, and update this note if so.
 
 ### 1.1 Per-mode "whole-design" adjustment (`ModeAdjustment`)
 
@@ -60,20 +67,14 @@ drift (e.g. a Trace reference) while you still adjust tone.
 
 ### 1.2 AR mode specifics
 
-**Scan mode** (`ArScanMode`, persisted `ar_scan_mode`):
-
-| Value | User-facing | When to use |
-|---|---|---|
-| `CLOUD_POINTS` | **Canvas** | Smaller, desk-scale art. Uses ARCore's feature-point cloud — reliable, no depth API needed |
-| `MURAL` | **Mural** | Wall-scale work. Engine chosen by the Mural Method below |
-
-**Mural method** (`MuralMethod`, persisted `mural_method`) — only meaningful when scan mode is Mural:
-
-| Value | Name | Technique |
-|---|---|---|
-| `VOXEL_HASH` | Mural v1 | Gaussian Splatting — confidence-weighted voxel splats with NDC frustum culling |
-| `SURFACE_MESH` | Mural v2 | Surface-Aware Mesh / t-SNE unroller — conforms the overlay to non-flat surfaces |
-| `CLOUD_OFFSET` | Mural v3 | Point-Cloud Anchor Offset Handoff — lightweight anchor hand-off |
+**Scan Mode and Mural Method are removed / legacy.** `ArScanMode` (Canvas/Mural) and `MuralMethod`
+(three named mapping engines) are no longer live, user-settable options — they are not exposed
+anywhere in the current Settings surface. The persisted `ar_scan_mode` key is kept only as a
+one-time legacy-migration read; the repository's own comment describes `MuralMethod` as naming "two
+mapping engines … that no longer exist." Treat any reference elsewhere in this doc (or in the app)
+to "Canvas vs Mural" scanning or "Mural v1/v2/v3" as describing a removed concept, not a current
+setting. TODO: confirm what (if anything) replaced the scan-mode/mural-method distinction in the
+current AR pipeline, and document that here instead.
 
 **Scan phases** (`ScanPhase`): `AMBIENT` → `WALL` → `COMPLETE`. The guide surfaces only the actions
 relevant to the current phase.
@@ -100,10 +101,20 @@ disturb the reference. Exports a transparent-background PNG (not a solid fill).
 
 ---
 
-## 2. Layers (`Layer`)
+## 2. The design (`Layer`)
 
-The design is an ordered list of layers. Every layer carries the full property set below; all except
-the runtime `bitmap` are serializable (wire-transferable for co-op and project save).
+> **TODO — likely stale beyond this note:** per §0/§1, the editor now holds exactly **one** design,
+> not an ordered list of layers with an active-layer id — the older multi-layer model was removed. The
+> `Layer` type itself (property table below) still names the design's per-image properties, so §2.1 is
+> probably still close to accurate. §2.2's "Layer list operations" table is a different matter: a scan
+> of the current reducer found no `AddLayer` / `RemoveLayer` / `ReorderLayers` / `ReplaceLayers` /
+> `SetLayers` intents — the design is instead set/replaced wholesale (`SetDesign`, `SetDesignTransform`,
+> `SetDesignProps`, `RestoreDesign`). §2.2 as written should be treated as unconfirmed/likely obsolete
+> pending a full rewrite against the current intent set — out of scope for this pass, flagged rather
+> than guessed at.
+
+Every layer carries the full property set below; all except the runtime `bitmap` are serializable
+(wire-transferable for co-op and project save).
 
 ### 2.1 Full layer property table
 
@@ -336,24 +347,33 @@ any active condition (per the toggles above) floors it to 15 fps.
 | Units | `is_imperial_units` | — | Imperial vs metric for sizes/distances |
 | Canvas background | `background_color` | — | `SetCanvasBackground` — colour behind the design in Design/editor |
 | Language | `language` | System | One of the 15 supported languages (§9) |
-| Scan mode | `ar_scan_mode` | — | Canvas vs Mural (§1.2) |
-| Mural method | `mural_method` | — | v1/v2/v3 engine (§1.2) |
+| Scan mode (removed/legacy) | `ar_scan_mode` | — | No longer a live setting; key is read once for legacy migration only (§1.2) |
+| Mural method (removed/legacy) | `mural_method` | — | No longer a live setting; named engines no longer exist (§1.2) |
 
 ### 7.4 Diagnostic overlays (editor toggles)
 
-Runtime visualization toggles for debugging tracking. Method-appropriate defaults are applied on AR entry
-and on method change via `ApplyMethodLayerDefaults(activeMethod)` (the layer matching the active method on,
-the other two off; always-applicable layers untouched). You can then re-enable any manually until the method
-changes again.
+Runtime visualization toggles for debugging tracking, each independently settable from Settings.
+`showFeaturePoints` and `showPoints` default **off** — they are raw perception-debug visualizations
+with no onboarding explanation; `showPlaneGrids` defaults **on**, matching the onboarding copy that
+promises "coloured shapes appear as the engine maps the surface" as user-facing scanning feedback.
+
+> TODO: the previous text here described "method-appropriate defaults" applied via an
+> `ApplyMethodLayerDefaults(activeMethod)` function tied to the now-removed Mural Method setting
+> (§1.2). No such function currently exists in the reducer, so that mechanism has been removed from
+> this doc pending confirmation of whatever (if anything) replaced it. Similarly, `ToggleVoxels` /
+> `ToggleMesh` (and the underlying voxel/splat map and surface mesh they would show) were not found
+> in the current reducer — the confidence-voxel and mesh subsystems have been deleted elsewhere in
+> the codebase (see the removed "Heat Voxel Cubes" note in `UI_UX.md`), so treat "Voxels" and "Mesh"
+> rows below as likely stale until independently reconfirmed.
 
 | Toggle | Intent | Shows |
 |---|---|---|
 | Diagnostics | `ToggleDiagOverlay` | Master diagnostic overlay |
 | Feature points | `ToggleFeaturePoints` | Tracked feature-point cloud |
 | Plane grids | `TogglePlaneGrids` | Detected plane grids |
-| Voxels | `ToggleVoxels` | Confidence voxels (splat method) |
+| Voxels *(TODO: confirm still live)* | `ToggleVoxels` | Confidence voxels (splat method) |
 | Points | `TogglePoints` | Raw point cloud |
-| Mesh | `ToggleMesh` | Surface mesh (mesh method) |
+| Mesh *(TODO: confirm still live)* | `ToggleMesh` | Surface mesh (mesh method) |
 
 ---
 
@@ -460,8 +480,8 @@ colour · sketch thickness.
 **Stencil:** layer count (1–3) · layer roles · tonal polarity · output size (mm) · locked dimension ·
 tiled PDF.
 
-**AR:** scan mode (Canvas/Mural) · mural method (v1/v2/v3) · rotation axis · anchor boundary ·
-tap-to-distance.
+**AR:** rotation axis · anchor boundary · tap-to-distance. (Scan mode / mural method removed — see
+§1.2.)
 
 **Settings:** adaptive rate · throttle on thermal / power-save / low-battery / lag · camera target FPS ·
 depth capability · force stereo · min parallax · handedness · units · canvas background · language.

@@ -34,6 +34,29 @@ class PoseFusion {
     /** Re-arm the cold (hard) snap — call on session resume / tracking loss so the next relock is instant. */
     fun markRelocalizing() { coldStart = true }
 
+    /**
+     * Clears the persistent drift correction back to its initial (no-correction) state and re-arms
+     * the cold-start snap, as if this PoseFusion had just been constructed.
+     *
+     * Call this when a NEW anchor/fingerprint is established inside an already-running session (the
+     * artist re-captures a target). [markRelocalizing] alone does not clear `correction` — by design,
+     * a plain tracking loss keeps the standing correction so a returning lock resumes where it left
+     * off. A re-capture is a different event: the anchor itself changed, so a correction computed
+     * against the OLD anchor's drift is not stale, it is now WRONG for the new one, and applying it
+     * produces a visible offset that would otherwise only ease out over many relock cycles instead of
+     * clearing immediately.
+     */
+    fun reset() {
+        correction = null
+        coldStart = true
+        lastSeq = 0f
+        lastState = FusionState.WAITING_FOR_LOCK
+        lastAlpha = -1f
+        lastInlierRatio = -1f
+        // snapsAccepted/snapsRejected intentionally NOT reset: they are session-lifetime eval counters
+        // (see diagnostics()), and a re-capture mid-session is not a new session.
+    }
+
     companion object {
         /** Minimum inlier ratio for a snap to be trusted at all. */
         const val MIN_INLIER_RATIO = 0.5f

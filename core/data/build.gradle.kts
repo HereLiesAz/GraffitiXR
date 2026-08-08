@@ -22,6 +22,14 @@ android {
     buildFeatures {
         buildConfig = true
     }
+
+    // Robolectric (SettingsRepositoryImplTest) needs Android resources on the unit-test
+    // classpath to initialize its Android environment. Same setting as :collab.
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 // Pin Kotlin's JVM target to match Java (17). Without this, Kotlin defaults to a lower target
@@ -56,4 +64,8 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     // Ed25519 signing in AzpInstallerTest, to build signed `.azp` fixtures the installer verifies.
     testImplementation("org.bouncycastle:bcprov-jdk18on:1.85")
+    // SettingsRepositoryImplTest needs a real android.content.Context to exercise the actual
+    // DataStore-backed persistence rather than mocking SettingsRepository itself (which proves
+    // nothing about the implementation). Same pattern as :collab's QrPayloadTest.
+    testImplementation(libs.robolectric)
 }

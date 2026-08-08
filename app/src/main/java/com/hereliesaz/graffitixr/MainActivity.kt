@@ -152,6 +152,14 @@ import kotlin.math.abs
 
 private const val LIBRARY_ROUTE = "library"
 
+// isExporting is only ever cleared by ArRenderer's GL-thread readback callback
+// (onExportCaptured, via ArViewModel.requestExport). If onDrawFrame bails before reaching
+// that readback (session null, isDestroying, SessionPausedException, session.update()
+// throwing — all real ArRenderer conditions), the callback never fires and isExporting
+// would stay true forever, blanking the entire on-screen UI layer with no recovery. This
+// bounds that wait so a stuck export fails visibly instead of hanging the UI.
+private const val EXPORT_TIMEOUT_MS = 7000L
+
 /**
  * Stages of the first-run "drawing in 60 seconds" flow. Split because the two halves need different
  * things from the device: DRAW is a plain screen (no camera), DETECT needs AR.
@@ -614,6 +622,11 @@ class MainActivity : ComponentActivity() {
                 // Set on a successful pick; the effect below adds the layer once the project id exists.
                 var firstRunPendingUri by rememberSaveable { mutableStateOf<Uri?>(null) }
                 val firstRunScribble = remember { com.hereliesaz.graffitixr.onboarding.ScribbleGenerator.generate() }
+                // Gates firstRunImagePicker behind a one-or-two-sentence explainer so a brand-new user
+                // doesn't get an unexplained OS photo picker as their very first thing on launch. The
+                // "Not now" action marks the tutorial complete (same mechanism as every other exit from
+                // this flow), so declining doesn't re-ambush the user on the next cold launch.
+                var showFirstRunPhotoExplainer by rememberSaveable { mutableStateOf(false) }
 
                 val firstRunImagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
                     if (uri != null) {
@@ -648,7 +661,7 @@ class MainActivity : ComponentActivity() {
                         currentRoute == LIBRARY_ROUTE
                     ) {
                         firstRunTriggered = true
-                        firstRunImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        showFirstRunPhotoExplainer = true
                     }
                 }
 
@@ -715,7 +728,12 @@ class MainActivity : ComponentActivity() {
                     )
                     azConfig(
                         packButtons = true,
-                        dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT,
+                        // "Thumb Range Only" (docs/UI_UX.md): the rail docks on the side the free
+                        // thumb naturally reaches — right side for a right-handed grip, left for
+                        // left-handed. AzDockingSide.LEFT/RIGHT are screen-relative (visual left/right;
+                        // see docs/AZNAVRAIL_COMPLETE_GUIDE.md's usePhysicalDocking note), so this must
+                        // match handedness directly, not invert it.
+                        dockingSide = if (editorUiState.isRightHanded) AzDockingSide.RIGHT else AzDockingSide.LEFT,
                         noMenu = railMenuDisabled
                     )
                     azAdvanced(
@@ -776,7 +794,23 @@ class MainActivity : ComponentActivity() {
                             when (editorUiState.editorMode) {
                                 EditorMode.AR -> {
                                     isExporting = true
+                                    // Guards against onExportCaptured never firing (see
+                                    // EXPORT_TIMEOUT_MS doc above) — cancelled below the moment the
+                                    // readback callback or the "not requested" fallback runs, so it
+                                    // never double-fires against a completed/failed export.
+                                    val timeoutJob = exportDispatchScope.launch {
+                                        kotlinx.coroutines.delay(EXPORT_TIMEOUT_MS)
+                                        if (isExporting) {
+                                            isExporting = false
+                                            Toast.makeText(
+                                                context,
+                                                "Export timed out — try again",
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        }
+                                    }
                                     val requested = arViewModel.requestExport { bmp ->
+                                        timeoutJob.cancel()
                                         isExporting = false
                                         editorViewModel.exportImage(backgroundBitmap = bmp, skipLayerComposite = true)
                                     }
@@ -784,6 +818,7 @@ class MainActivity : ComponentActivity() {
                                         // No renderer attached (e.g. AR mode without camera
                                         // permission), so there is no framebuffer to read back.
                                         // Export the layers alone rather than doing nothing.
+                                        timeoutJob.cancel()
                                         isExporting = false
                                         editorViewModel.exportImage()
                                     }
@@ -876,6 +911,50 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
+                        // First-run photo explainer: shown once, before the OS photo picker ever
+                        // appears, so a brand-new user isn't ambushed by an unexplained system dialog.
+                        // "Not now" marks the tutorial complete via the same persistent mechanism used
+                        // everywhere else in this flow, so declining doesn't re-offer the picker on
+                        // every subsequent cold launch.
+                        if (showFirstRunPhotoExplainer && !showSettings) {
+                            androidx.compose.material3.AlertDialog(
+                                onDismissRequest = {
+                                    showFirstRunPhotoExplainer = false
+                                    mainViewModel.markTutorialCompletePersistent(firstRunDoodleKey)
+                                },
+                                title = { Text("See it on your wall", color = Color.White) },
+                                text = {
+                                    Text(
+                                        "Pick a reference photo of your artwork and we'll show you how it looks on a real wall, in AR.",
+                                        color = Color.White
+                                    )
+                                },
+                                containerColor = Color(0xEE1A1A1A),
+                                confirmButton = {
+                                    AzButton(
+                                        text = "Choose Photo",
+                                        onClick = {
+                                            showFirstRunPhotoExplainer = false
+                                            firstRunImagePicker.launch(
+                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                            )
+                                        },
+                                        shape = AzButtonShape.RECTANGLE
+                                    )
+                                },
+                                dismissButton = {
+                                    AzButton(
+                                        text = "Not now",
+                                        onClick = {
+                                            showFirstRunPhotoExplainer = false
+                                            mainViewModel.markTutorialCompletePersistent(firstRunDoodleKey)
+                                        },
+                                        shape = AzButtonShape.RECTANGLE
+                                    )
+                                }
+                            )
+                        }
+
                         // First-run DRAW stage: the scribble owns the whole screen while the user
                         // copies it. Mounted before the AR coaching below and returns early, so
                         // nothing else in this layer can draw over it.
@@ -925,11 +1004,6 @@ class MainActivity : ComponentActivity() {
                         }
 
                         var fullSize by remember { mutableStateOf(IntSize.Zero) }
-                        var lockTaps by remember { mutableIntStateOf(0) }
-                        
-                        LaunchedEffect(mainUiState.isTouchLocked) {
-                            if (mainUiState.isTouchLocked) lockTaps = 0
-                        }
 
                         Box(Modifier
                             .fillMaxSize()
@@ -938,13 +1012,23 @@ class MainActivity : ComponentActivity() {
                                 if (mainUiState.isTouchLocked) {
                                     Modifier.pointerInput(Unit) {
                                         awaitPointerEventScope {
+                                            // Windowed like TouchLockOverlay in core/design's Overlays.kt:
+                                            // a tap only counts toward the unlock if it follows the
+                                            // previous one within ~500ms, so touches scattered across an
+                                            // entire session (e.g. paper being laid down/pressed/slid
+                                            // while tracing) can't silently accumulate into an unlock.
+                                            var lockTaps = 0
+                                            var lastTapTime = 0L
                                             while (true) {
                                                 val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
                                                 val isDown = event.changes.any { it.pressed && !it.previousPressed }
                                                 event.changes.forEach { it.consume() }
                                                 if (isDown) {
-                                                    lockTaps++
+                                                    val now = System.currentTimeMillis()
+                                                    lockTaps = if (now - lastTapTime < 500) lockTaps + 1 else 1
+                                                    lastTapTime = now
                                                     if (lockTaps >= 4) {
+                                                        lockTaps = 0
                                                         mainViewModel.setTouchLocked(false)
                                                     }
                                                 }
@@ -1463,7 +1547,7 @@ class MainActivity : ComponentActivity() {
                                 androidx.compose.material3.AlertDialog(
                                     onDismissRequest = { showDesignInstructionsDialog = false },
                                     title = { Text("Design Your Mural", color = Color.White) },
-                                    text = { Text("Tap 'Design' in the menu, then press 'Image' to import one, 'Sketch' to draw one, or 'Text' to write one.", color = Color.White) },
+                                    text = { Text("Tap the menu icon, then tap 'Open' to choose a photo of your artwork.", color = Color.White) },
                                     containerColor = Color(0xEE1A1A1A),
                                     confirmButton = {
                                         AzButton(text = "Got it", onClick = { showDesignInstructionsDialog = false }, shape = AzButtonShape.RECTANGLE)
@@ -1589,7 +1673,6 @@ class MainActivity : ComponentActivity() {
             actions = viewModel,
             uiState = uiState,
             isTouchLocked = mainUiState.isTouchLocked,
-            showUnlockInstructions = mainUiState.showUnlockInstructions,
             strings = strings,
             isCapturingTarget = mainUiState.isCapturingTarget
         )
@@ -1793,6 +1876,17 @@ class MainActivity : ComponentActivity() {
                     editorViewModel.onToggleModeTransformLocked(EditorMode.TRACE)
                 }
             }
+
+            // Design ▸ the layer workspace itself — no sub-items, just a route. Without this entry
+            // DESIGN mode (where opacity/brightness/contrast/saturation edit the layer itself, per
+            // EditorViewModel.dispatchModeAdjustIfInMode) was reachable only by opening/creating a
+            // project or via the camera-stall watchdog fallback: once an artist left it for any other
+            // mode, there was no way back to it in the same session short of reopening the project
+            // from the library. navStrings.design ("Design") already existed for this screen (see its
+            // nav_design_info doc) but was never wired into the rail — reused here rather than
+            // inventing new copy; "Adjust" is taken by host.design below, which is a different concept
+            // (the per-layer effects folder), so there is no collision.
+            azRailSubHostItem(id = "mode.design", hostId = "host.modes", text = navStrings.design, route = EditorMode.DESIGN.name, color = navItemColor, shape = AzButtonShape.RECTANGLE)
 
             azDivider()
 
@@ -2719,7 +2813,7 @@ private fun PostTargetInstructionOverlay(modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "Now, open 'Design' in the sidebar and choose Image, Sketch, or Text to create your artwork layer.",
+                text = "Now tap the menu icon and choose 'Open' to add a photo of your artwork.",
                 color = Color.White,
                 textAlign = TextAlign.Center,
                 fontSize = 15.sp,

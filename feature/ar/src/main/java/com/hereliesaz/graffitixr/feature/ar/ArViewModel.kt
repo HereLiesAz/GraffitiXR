@@ -555,12 +555,36 @@ class ArViewModel @Inject constructor(
         viewModelScope.launch { kotlinx.coroutines.delay(500); slamManager.setMappingPaused(false) }
     }
 
+    /**
+     * Debug-only (gated behind [EVAL_OVERLAY_ENABLED] at the call site), but the same footgun as
+     * [resumeArSessionInternal]: `session.recordingStatus`/`startRecording` previously ran directly on
+     * the caller's thread (a Compose onClick, so the main thread) with no guard against the GL
+     * thread's concurrent `session.update()`. Routed through [ArRenderer.withLockedSession] so it is
+     * serialized against [ArRenderer.onDrawFrame] the same way. When no renderer is attached (AR not
+     * actually active — the eval overlay is only shown in AR mode, but a stale click during teardown
+     * is possible), there is no GL thread that could be racing, so calling the session directly is
+     * safe — matching the previous behaviour for that case.
+     */
     fun evalStartRecording() {
-        session?.let { evalRecorder.startRecording(it, "eval_${android.os.SystemClock.elapsedRealtime()}") }
+        val s = session ?: return
+        val r = renderer
+        if (r != null) {
+            r.withLockedSession { locked ->
+                evalRecorder.startRecording(locked, "eval_${android.os.SystemClock.elapsedRealtime()}")
+            }
+        } else {
+            evalRecorder.startRecording(s, "eval_${android.os.SystemClock.elapsedRealtime()}")
+        }
     }
 
     fun evalStopRecording() {
-        session?.let { evalRecorder.stopRecording(it) }
+        val s = session ?: return
+        val r = renderer
+        if (r != null) {
+            r.withLockedSession { locked -> evalRecorder.stopRecording(locked) }
+        } else {
+            evalRecorder.stopRecording(s)
+        }
     }
 
     /** A/B switch for the pose fusion (Sub-project B): on = corrected snap-back fusion, off = old toggle. */
@@ -1798,12 +1822,43 @@ class ArViewModel @Inject constructor(
         _uiState.update { it.copy(hasCameraPermission = granted) }
     }
 
+    /**
+     * `Session.resume()` called directly from here used to race the GL thread, which is inside
+     * `ArRenderer.onDrawFrame` calling `session.update()` and other Session methods under its own
+     * `sessionLock` — ARCore's Session is documented not thread-safe, and this exact class of race
+     * produced a native SIGSEGV on ARCore's MTC_vio thread elsewhere in this app (see
+     * `ArRenderer.updateFlashlight`'s doc). Routed through `ArRenderer.requestResume()` so it happens
+     * under that same lock instead.
+     *
+     * Falls back to calling `resume()` directly — same as before this fix — when
+     * `ArRenderer.requestResume()` reports [SessionLifecycleOutcome.NoSession], which covers TWO
+     * cases: no renderer is attached at all (before the GLSurfaceView exists for this AR entry), or a
+     * renderer IS attached but its own session reference was already nulled by a caller that ran
+     * `detachSessionBounded` first specifically so it could touch the session directly afterwards
+     * (see `recoverFromBrokenStereo`, which does exactly that before calling this). Either way there
+     * is no GL thread that could be concurrently driving `onDrawFrame` against THIS session, so a
+     * direct call is safe — the race this guards against requires a renderer that still holds the
+     * live session.
+     */
     private fun resumeArSessionInternal() {
         val s = session ?: return
+        val r = renderer
         try {
-            s.resume()
-            isSessionResumed = true
-            startAutoSave()
+            when (val outcome = r?.requestResume()) {
+                null, is com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome.NoSession -> {
+                    s.resume()
+                    isSessionResumed = true
+                    startAutoSave()
+                }
+                is com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome.Applied -> {
+                    isSessionResumed = true
+                    startAutoSave()
+                }
+                is com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome.LockTimeout -> {
+                    Timber.e("Failed to resume ARCore session: GL thread did not release its session lock in time")
+                }
+                is com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome.Failed -> throw outcome.error
+            }
         } catch (e: CameraNotAvailableException) {
             Timber.e(e, "Camera not available for ARCore")
             // Permission revoked at runtime, or the camera is held elsewhere. Tell the user
@@ -1816,12 +1871,25 @@ class ArViewModel @Inject constructor(
         }
     }
 
+    /** Same race, same fix, same NoSession fallback reasoning as [resumeArSessionInternal] — see its doc. */
     private fun pauseArSessionInternal() {
         val s = session ?: return
+        val r = renderer
         try {
             stopAutoSave()
-            s.pause()
-            isSessionResumed = false
+            when (val outcome = r?.requestPause()) {
+                null, is com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome.NoSession -> {
+                    s.pause()
+                    isSessionResumed = false
+                }
+                is com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome.Applied -> {
+                    isSessionResumed = false
+                }
+                is com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome.LockTimeout -> {
+                    Timber.e("Failed to pause ARCore session: GL thread did not release its session lock in time")
+                }
+                is com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome.Failed -> throw outcome.error
+            }
         } catch (e: Exception) {
             Timber.e(e, "Failed to pause ARCore session")
         }

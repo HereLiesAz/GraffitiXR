@@ -97,6 +97,31 @@ class NativeMethodAritySignatureTest {
         )
     }
 
+    /**
+     * `getRelocDiagnostics`'s KDoc used to spell out the packed array's width as a word in prose,
+     * and that word went stale three times as the array grew (three, four, six, nine). It now
+     * references [RELOC_DIAGNOSTICS_ARRAY_SIZE] instead of repeating the number; this
+     * test is what keeps that constant honest against the actual `jint vals[...]` literal in
+     * GraffitiJNI.cpp so a fifth drift fails here rather than silently.
+     */
+    @Test
+    fun `RELOC_DIAGNOSTICS_ARRAY_SIZE matches GraffitiJNI's packed diagnostics array literal`() {
+        val cpp = File(repoRoot(), CPP_SRC).readText()
+        val match = Regex("""jint vals\[(\d+)]\s*=""").find(cpp)
+        assertTrue(
+            "could not find `jint vals[N] = ...` in $CPP_SRC — nativeGetRelocDiagnostics's packing " +
+                "array literal, or its shape, changed",
+            match != null,
+        )
+        val cppSize = match!!.groupValues[1].toInt()
+        assertEquals(
+            "RELOC_DIAGNOSTICS_ARRAY_SIZE (${RELOC_DIAGNOSTICS_ARRAY_SIZE}) " +
+                "no longer matches GraffitiJNI.cpp's `jint vals[$cppSize]` — update the Kotlin " +
+                "constant (and its KDoc) to match.",
+            cppSize, RELOC_DIAGNOSTICS_ARRAY_SIZE,
+        )
+    }
+
     private companion object {
         const val KOTLIN_SRC =
             "core/nativebridge/src/main/java/com/hereliesaz/graffitixr/nativebridge/SlamManager.kt"

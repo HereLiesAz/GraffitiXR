@@ -52,8 +52,6 @@ struct StageTimer {
 };
 }
 
-std::string gLastSplatTrace = "";
-
 extern JavaVM* gJvm;
 
 struct JniThreadAttacher {
@@ -92,13 +90,9 @@ void MobileGS::initialize(int width, int height) {
 
     memset(mViewMatrix, 0, sizeof(mViewMatrix));
     memset(mProjMatrix, 0, sizeof(mProjMatrix));
-    memset(mMappingViewMatrix, 0, sizeof(mMappingViewMatrix));
-    memset(mMappingProjMatrix, 0, sizeof(mMappingProjMatrix));
     memset(mAnchorMatrix, 0, sizeof(mAnchorMatrix));
     mViewMatrix[0] = mViewMatrix[5] = mViewMatrix[10] = mViewMatrix[15] = 1.0f;
     mProjMatrix[0] = mProjMatrix[5] = mProjMatrix[10] = mProjMatrix[15] = 1.0f;
-    mMappingViewMatrix[0] = mMappingViewMatrix[5] = mMappingViewMatrix[10] = mMappingViewMatrix[15] = 1.0f;
-    mMappingProjMatrix[0] = mMappingProjMatrix[5] = mMappingProjMatrix[10] = mMappingProjMatrix[15] = 1.0f;
     mAnchorMatrix[0] = mAnchorMatrix[5] = mAnchorMatrix[10] = mAnchorMatrix[15] = 1.0f;
 
     if (!mRelocRunning) {
@@ -112,12 +106,6 @@ void MobileGS::updateCamera(float* viewMat, float* projMat) {
     memcpy(mViewMatrix, viewMat, 16 * sizeof(float));
     memcpy(mProjMatrix, projMat, 16 * sizeof(float));
     mCameraReady = true;
-}
-
-void MobileGS::updateMappingCamera(float* viewMat, float* projMat) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    memcpy(mMappingViewMatrix, viewMat, 16 * sizeof(float));
-    memcpy(mMappingProjMatrix, projMat, 16 * sizeof(float));
 }
 
 void MobileGS::updateLightLevel(float level) {
@@ -1528,8 +1516,22 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
         // set. Empty = all backbone, i.e. pre-Phase-2 behaviour, which is the right default for a
         // map whose design footprint this device never saw.
         mWallRegions.clear();
-        mRelocRequested = true; // Trigger relocalization thread to start searching
+        // This install carries no accompanying capture view or matching camera intrinsics -- it is a
+        // foreign (peer) point set. Solving PnP against it with this device's stale intrinsics, or
+        // rectifying against a capture view that belongs to unrelated local geometry, injects bad
+        // correspondences. Reset to the same "no real intrinsics yet" default restoreWallFingerprintMetric
+        // uses when it isn't given a capture view, so PnP falls back to the safe default path.
+        memset(mFingerprintIntrinsics, 0, 4 * sizeof(float));
+        mHasFingerprintView = false;
     }
+    {
+        // Trigger the relocalization worker to start searching. mRelocRequested/mRelocCv are paired
+        // under mRelocMutex (see scheduleRelocCheck) -- mMutex does not guard them, so setting the
+        // flag there and never notifying leaves the worker parked in mRelocCv.wait(...) forever.
+        std::lock_guard<std::mutex> lock(mRelocMutex);
+        mRelocRequested = true;
+    }
+    mRelocCv.notify_one();
     LOGI("Co-op: Received fingerprint with %u points. Relocalization triggered.", numPoints);
 }
 bool MobileGS::relocWantsFrame() {
@@ -1736,10 +1738,20 @@ void MobileGS::setWallPatch(const cv::Mat& img) {
 
 bool MobileGS::getSuperPointFeatures(const cv::Mat& image, std::vector<cv::KeyPoint>& kps, cv::Mat& descs) {
     if (!mSuperPoint.isLoaded() || image.empty()) return false;
+    // Same low-light enhance-before-detect step runRelocPass / getFingerprintKeypoints /
+    // generateFingerprint all take: without it, a target captured in low light (this is the
+    // nativeDetectSuperPoint path MetricFingerprintBuilder uses to build the shipping depth-off
+    // fingerprint) gets descriptors computed on non-enhanced, CLAHE-only pixels while live reloc
+    // frames in the same low light get the full enhance-then-CLAHE treatment -- making the two
+    // incomparable.
+    cv::Mat workFrame = image;
+    if (mEnhancer.isLoaded() && mLightLevel < kLowLightThreshold) {
+        cv::Mat enhanced; if (mEnhancer.enhance(image, enhanced)) workFrame = enhanced;
+    }
     cv::Mat gray;
-    if (image.channels() == 4)      cv::cvtColor(image, gray, cv::COLOR_RGBA2GRAY);
-    else if (image.channels() == 3) cv::cvtColor(image, gray, cv::COLOR_RGB2GRAY);
-    else                            gray = image;
+    if (workFrame.channels() == 4)      cv::cvtColor(workFrame, gray, cv::COLOR_RGBA2GRAY);
+    else if (workFrame.channels() == 3) cv::cvtColor(workFrame, gray, cv::COLOR_RGB2GRAY);
+    else                                gray = workFrame;
     normalizeForFeatures(gray); // CLAHE, identical to the reloc path so descriptors stay comparable
     if (!mSuperPoint.detect(gray, kps, descs)) return false;
     return !kps.empty() && !descs.empty();
@@ -1923,7 +1935,17 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
     return fd;
 }
 void MobileGS::getStageTimingsAndReset(float* out) {
+    // Indices 0-3 (voxelUpdate/voxelKeyframe/surfaceMesh/draw) name stages of a splat-rendering
+    // pipeline this engine does not implement -- there is no corresponding block of work in this
+    // file to time, so reporting a number for them would be fabricated. Only index 4 (pnpReloc, see
+    // the StageTimer in runRelocPass) is ever actually sampled. Report -1.0f for the unmeasured
+    // slots, the same "not measured" sentinel used throughout this header, instead of a silent 0.0
+    // that would read downstream as "this stage genuinely costs nothing."
     for (int i = 0; i < kStageCount; ++i) {
+        if (i != 4) {
+            out[i] = -1.0f;
+            continue;
+        }
         uint64_t n = mStageSamples[i].exchange(0, std::memory_order_relaxed);
         double acc = mStageAccumMs[i].exchange(0.0, std::memory_order_relaxed);
         out[i] = (n > 0) ? static_cast<float>(acc / static_cast<double>(n)) : 0.0f;
@@ -1931,11 +1953,13 @@ void MobileGS::getStageTimingsAndReset(float* out) {
 }
 
 void MobileGS::setStageEnabled(int stage, bool enabled) {
-    // Only stages 1 (voxelKeyframe) and 2 (surfaceMesh) are gateable for A/B cost attribution.
-    // Stage 0 (voxelUpdate) is the relocalization backbone; stages 3 (draw) and 4 (pnpReloc) are
-    // timing-only and always run — their cost is read from the timers, never toggled. Reject 0/3/4
-    // so setStageEnabled(3/4,false) isn't a confusing silent no-op.
-    if (stage == 1 || stage == 2) mStageEnabled[stage].store(enabled, std::memory_order_relaxed);
+    // No stage's work is actually gated by this flag: only stage 4 (pnpReloc) is ever timed in this
+    // file (see getStageTimingsAndReset), and it is not optional -- relocalization must run. The
+    // previous implementation stored into an mStageEnabled array that nothing ever read, so toggling
+    // it silently did nothing while looking like it skipped work. Rather than keep that dishonest
+    // no-op quiet, log it so a caller relying on this to change cost finds out immediately.
+    LOGE("setStageEnabled(stage=%d, enabled=%d) is a no-op: no stage's work is gated by this flag.",
+         stage, enabled ? 1 : 0);
 }
 
 void MobileGS::getRelocResult(float* out19) const {
