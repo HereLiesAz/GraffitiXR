@@ -728,12 +728,10 @@ class MainActivity : ComponentActivity() {
                     )
                     azConfig(
                         packButtons = true,
-                        // "Thumb Range Only" (docs/UI_UX.md): the rail docks on the side the free
-                        // thumb naturally reaches — right side for a right-handed grip, left for
-                        // left-handed. AzDockingSide.LEFT/RIGHT are screen-relative (visual left/right;
-                        // see docs/AZNAVRAIL_COMPLETE_GUIDE.md's usePhysicalDocking note), so this must
-                        // match handedness directly, not invert it.
-                        dockingSide = if (editorUiState.isRightHanded) AzDockingSide.RIGHT else AzDockingSide.LEFT,
+                        // "Thumb Range Only" (docs/UI_UX.md): dominant hand holds the spray can/pen,
+                        // not the phone — the phone sits in the off-hand, so the rail must dock on
+                        // the side opposite the dominant hand for that hand's thumb to reach it.
+                        dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT,
                         noMenu = railMenuDisabled
                     )
                     azAdvanced(
