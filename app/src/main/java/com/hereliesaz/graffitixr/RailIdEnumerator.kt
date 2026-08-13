@@ -34,7 +34,7 @@ internal fun enumerateRailItemIds(mode: EditorMode): Set<String> =
 internal fun enumerateRailItemIdRegistrations(mode: EditorMode): List<String> {
     val ids = mutableListOf<String>()
 
-    // Open (top-level, replaces the old Design folder — no sub-items).
+    // Open (a sub-item of the top-level Design folder).
     ids += "item.open"
 
     // Modes menu. Every mode's sub-host is always registered (they are the navigation entries);
@@ -54,9 +54,10 @@ internal fun enumerateRailItemIdRegistrations(mode: EditorMode): List<String> {
         ids += listOf("mode.trace.freeze", "mode.trace.lock")
     }
 
-    // Design menu (per-design controls: the adjust/colour panels and invert)
+    // Design menu (the top-level workspace entry, plus its per-design controls: the adjust/colour
+    // panels and invert)
     ids += listOf(
-        "host.design", "design.adjust", "design.balance", "design.invert",
+        "mode.design", "host.design", "design.adjust", "design.balance", "design.invert",
         "design.outline", "design.isolate",
     )
 

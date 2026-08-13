@@ -1727,24 +1727,78 @@ class MainActivity : ComponentActivity() {
             // toggles only). host.modes' expandWhen reads railExpansion["host.project"] so opening Project
             // collapses Modes and closing it re-expands them.
 
-            // 1. OPEN (TOP) — a plain action, no sub-items (replaces the old Design folder). Opens an
-            // image picker so the chosen image lands as a new layer, staying in the current mode (the
-            // layer is shared across every mode). Only ensures a project exists first, since onAddLayer
-            // silently no-ops without one.
-            azRailItem(
+            // 1. DESIGN (TOP) — the layer workspace itself, promoted to the top slot Open used to
+            // occupy. Tapping it routes straight into DESIGN mode (opacity/brightness/contrast/
+            // saturation edit the layer itself, per EditorViewModel.dispatchModeAdjustIfInMode);
+            // expanding it reveals Open (the action that used to sit here on its own) and the
+            // per-design Adjust folder as sub-items, so "start a design" and "adjust it" live under
+            // one folder instead of two unrelated top-level entries.
+            azRailHostItem(
+                id = "mode.design",
+                text = navStrings.design,
+                route = EditorMode.DESIGN.name,
+                color = navItemColor,
+                initiallyExpanded = railExpansion["mode.design"] ?: false,
+                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("mode.design", it) },
+            )
+            // Open — opens an image picker so the chosen image lands as a new layer, staying in the
+            // current mode (the layer is shared across every mode). Only ensures a project exists
+            // first, since onAddLayer silently no-ops without one.
+            azRailSubItem(
                 id = "item.open",
+                hostId = "mode.design",
                 text = navStrings.open,
                 color = navItemColor,
                 classifiers = setOf("toggle"),
+                shape = AzButtonShape.NONE,
                 onClick = {
                     if (editorUiState.projectId == null) dashboardViewModel.createAndOpenProject()
                     overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
             )
+            // Adjust ▸ the per-design controls. Every one of these drives an EditorViewModel action
+            // that was already implemented and tested but had no way to be invoked: the layer list had
+            // no opener (so add-a-layer was one-way — nothing could remove, rename, reorder or hide
+            // one), the adjust and colour-balance panels had no toggle outside a Mode, and per-layer
+            // invert had no control at all.
+            azRailSubHostItem(
+                id = "host.design",
+                hostId = "mode.design",
+                text = navStrings.adjust,
+                color = navItemColor,
+                shape = AzButtonShape.NONE,
+                initiallyExpanded = railExpansion["host.design"] ?: false,
+                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.design", it) },
+            )
+            azRailSubItem(
+                id = "design.adjust", hostId = "host.design", text = navStrings.adjust,
+                color = navItemColor, classifiers = setOf("toggle", "panel"),
+                shape = AzButtonShape.NONE,
+            ) { editorViewModel.onAdjustClicked() }
+            azRailSubItem(
+                id = "design.balance", hostId = "host.design", text = navStrings.balance,
+                color = navItemColor, classifiers = setOf("toggle", "panel"),
+                shape = AzButtonShape.NONE,
+            ) { editorViewModel.onBalanceClicked() }
+            azRailSubItem(
+                id = "design.invert", hostId = "host.design", text = navStrings.invert,
+                color = navItemColor, classifiers = setOf("toggle", "effect"),
+                shape = AzButtonShape.NONE,
+            ) { editorViewModel.onToggleInvert() }
+            azRailSubItem(
+                id = "design.outline", hostId = "host.design", text = navStrings.outline,
+                color = navItemColor, classifiers = setOf("toggle", "effect"),
+                shape = AzButtonShape.NONE,
+            ) { editorViewModel.onToggleOutline() }
+            azRailSubItem(
+                id = "design.isolate", hostId = "host.design", text = navStrings.isolate,
+                color = navItemColor, classifiers = setOf("toggle", "effect"),
+                shape = AzButtonShape.NONE,
+            ) { editorViewModel.onToggleSubjectIsolation() }
 
             azDivider()
 
-            // 2. PROJECT FOLDER — directly under Open. Opening it collapses Modes (see host.modes'
+            // 2. PROJECT FOLDER — directly under Design. Opening it collapses Modes (see host.modes'
             // expandWhen below); its expansion is persisted per-project via onExpandedChange so the two
             // folders coordinate reactively.
             // 3. MODES FOLDER — always expanded, unless the user manually collapses it or opens the
@@ -1763,7 +1817,7 @@ class MainActivity : ComponentActivity() {
             val showArModeEntry = !arUiState.isArCoreAvailabilityResolved || arUiState.isArCoreAvailable
             if (showArModeEntry) {
                 // AR is a sub-host: it navigates to AR mode and contains its tools.
-                azRailSubHostItem(id = "mode.ar", hostId = "host.modes", text = navStrings.arMode, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.RECTANGLE)
+                azRailSubHostItem(id = "mode.ar", hostId = "host.modes", text = navStrings.arMode, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE)
                 // Target capture — only meaningful while in AR mode.
                 if (editorUiState.editorMode == EditorMode.AR) {
                     // Target button is a toggle: selected (cyan) means screen taps create the target;
@@ -1827,7 +1881,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            azRailSubHostItem(id = "mode.overlay", hostId = "host.modes", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.RECTANGLE)
+            azRailSubHostItem(id = "mode.overlay", hostId = "host.modes", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE)
             // Flashlight — illuminate the wall in low light while overlaying.
             if (editorUiState.editorMode == EditorMode.OVERLAY) {
                 azRailSubItem(id = "mode.overlay.light", hostId = "mode.overlay", text = navStrings.light, color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE) {
@@ -1844,7 +1898,7 @@ class MainActivity : ComponentActivity() {
             // was carrying a Wall ▸ Photo/File/Clear folder and a Mockup Lock that could not act on
             // anything they were looking at. Tapping Mockup routes into the mode, so the tools are one
             // tap away rather than gone.
-            azRailSubHostItem(id = "mode.mockup", hostId = "host.modes", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.RECTANGLE)
+            azRailSubHostItem(id = "mode.mockup", hostId = "host.modes", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE)
             if (editorUiState.editorMode == EditorMode.MOCKUP) {
                 azRailSubHostItem(id = "mockup.wall", hostId = "mode.mockup", text = navStrings.wall, color = navItemColor, shape = AzButtonShape.NONE)
                 azRailSubItem(id = "wall.photo", hostId = "mockup.wall", text = navStrings.photo, color = navItemColor, shape = AzButtonShape.NONE) {
@@ -1865,7 +1919,7 @@ class MainActivity : ComponentActivity() {
             }
 
             // Trace ▸ { Freeze, Lock } — same mode gating as the others.
-            azRailSubHostItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.RECTANGLE)
+            azRailSubHostItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE)
             if (editorUiState.editorMode == EditorMode.TRACE) {
                 azRailSubItem(id = "mode.trace.freeze", hostId = "mode.trace", text = "Freeze", color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE) {
                     mainViewModel.setTouchLocked(!isTouchLocked)
@@ -1874,57 +1928,6 @@ class MainActivity : ComponentActivity() {
                     editorViewModel.onToggleModeTransformLocked(EditorMode.TRACE)
                 }
             }
-
-            // Design ▸ the layer workspace itself — no sub-items, just a route. Without this entry
-            // DESIGN mode (where opacity/brightness/contrast/saturation edit the layer itself, per
-            // EditorViewModel.dispatchModeAdjustIfInMode) was reachable only by opening/creating a
-            // project or via the camera-stall watchdog fallback: once an artist left it for any other
-            // mode, there was no way back to it in the same session short of reopening the project
-            // from the library. navStrings.design ("Design") already existed for this screen (see its
-            // nav_design_info doc) but was never wired into the rail — reused here rather than
-            // inventing new copy; "Adjust" is taken by host.design below, which is a different concept
-            // (the per-layer effects folder), so there is no collision.
-            azRailSubHostItem(id = "mode.design", hostId = "host.modes", text = navStrings.design, route = EditorMode.DESIGN.name, color = navItemColor, shape = AzButtonShape.RECTANGLE)
-
-            azDivider()
-
-            // DESIGN FOLDER — the per-design controls. Every one of these drives an EditorViewModel
-            // action that was already implemented and tested but had no way to be invoked: the
-            // layer list had no opener (so add-a-layer was one-way — nothing could remove, rename,
-            // reorder or hide one), the adjust and colour-balance panels had no toggle outside a
-            // Mode, and per-layer invert had no control at all.
-            azRailHostItem(
-                id = "host.design",
-                text = navStrings.adjust,
-                color = navItemColor,
-                initiallyExpanded = railExpansion["host.design"] ?: false,
-                onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.design", it) },
-            )
-            azRailSubItem(
-                id = "design.adjust", hostId = "host.design", text = navStrings.adjust,
-                color = navItemColor, classifiers = setOf("toggle", "panel"),
-                shape = AzButtonShape.NONE,
-            ) { editorViewModel.onAdjustClicked() }
-            azRailSubItem(
-                id = "design.balance", hostId = "host.design", text = navStrings.balance,
-                color = navItemColor, classifiers = setOf("toggle", "panel"),
-                shape = AzButtonShape.NONE,
-            ) { editorViewModel.onBalanceClicked() }
-            azRailSubItem(
-                id = "design.invert", hostId = "host.design", text = navStrings.invert,
-                color = navItemColor, classifiers = setOf("toggle", "effect"),
-                shape = AzButtonShape.NONE,
-            ) { editorViewModel.onToggleInvert() }
-            azRailSubItem(
-                id = "design.outline", hostId = "host.design", text = navStrings.outline,
-                color = navItemColor, classifiers = setOf("toggle", "effect"),
-                shape = AzButtonShape.NONE,
-            ) { editorViewModel.onToggleOutline() }
-            azRailSubItem(
-                id = "design.isolate", hostId = "host.design", text = navStrings.isolate,
-                color = navItemColor, classifiers = setOf("toggle", "effect"),
-                shape = AzButtonShape.NONE,
-            ) { editorViewModel.onToggleSubjectIsolation() }
 
             azDivider()
 
