@@ -353,9 +353,10 @@ any active condition (per the toggles above) floors it to 15 fps.
 ### 7.4 Diagnostic overlays (editor toggles)
 
 Runtime visualization toggles for debugging tracking, each independently settable from Settings.
-`showFeaturePoints` and `showPoints` default **off** — they are raw perception-debug visualizations
-with no onboarding explanation; `showPlaneGrids` defaults **on**, matching the onboarding copy that
-promises "coloured shapes appear as the engine maps the surface" as user-facing scanning feedback.
+`showFeaturePoints` defaults **off** — it is a raw perception-debug visualization with no onboarding
+explanation. `showPlaneGrids` and `showPoints` default **on**, matching the onboarding copy that
+promises "coloured shapes appear as the engine maps the surface" as user-facing scanning feedback —
+the accumulated point cloud is the visible result of that scan.
 
 > TODO: the previous text here described "method-appropriate defaults" applied via an
 > `ApplyMethodLayerDefaults(activeMethod)` function tied to the now-removed Mural Method setting

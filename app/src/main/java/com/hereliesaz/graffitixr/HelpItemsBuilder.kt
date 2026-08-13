@@ -19,7 +19,7 @@ import com.hereliesaz.graffitixr.design.theme.AppStrings
  * What remains is one entry per item the rail actually registers.
  */
 internal fun buildHelpItems(strings: AppStrings): Map<String, Any> = mapOf(
-    // Open (top-level, replaces the old Design folder)
+    // Open (a sub-item of the top-level Design folder)
     "item.open" to strings.help.addImg,
 
     // Modes menu
@@ -55,6 +55,7 @@ internal fun buildHelpItems(strings: AppStrings): Map<String, Any> = mapOf(
     "mode.trace.lock" to strings.nav.lockInfo,
 
     // Design menu
+    "mode.design" to strings.nav.designInfo,
     "host.design" to strings.nav.adjustInfo,
     "design.adjust" to strings.nav.adjustInfo,
     "design.balance" to strings.nav.balanceInfo,
