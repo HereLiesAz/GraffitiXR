@@ -227,6 +227,12 @@ class SlamManager @Inject constructor(
      */
     @Volatile var captureAnchorCam: FloatArray? = null
 
+    /**
+     * A no-op in the current native engine: neither [angularVel] nor [linearVel] is read by any
+     * consumer there (there is no deblur or motion-compensation stage). Kept as a callable, logged
+     * no-op (native logs a warning once) rather than removed so this doesn't need to change ahead of
+     * a real consumer existing.
+     */
     fun updateDeviceMotion(angularVel: FloatArray, linearVel: FloatArray) {
         nativeUpdateDeviceMotion(angularVel, linearVel)
     }
@@ -452,6 +458,8 @@ class SlamManager @Inject constructor(
         }
     }
 
+    /** A no-op in the current native engine: no viewport-dependent state there reads the size this
+     *  sets. Native logs a warning on every call. */
     fun setViewportSize(width: Int, height: Int) = nativeSetViewportSize(width, height)
 
     fun setRelocEnabled(enabled: Boolean) = nativeSetRelocEnabled(enabled)
@@ -542,6 +550,12 @@ class SlamManager @Inject constructor(
     fun setWallPatch(bitmap: Bitmap) = nativeSetWallPatch(bitmap)
     /** Store the canonical patch from a raw [size]x[size] gray byte buffer (persisted on Fingerprint). */
     fun setWallPatchBytes(data: ByteArray, size: Int) = nativeSetWallPatchBytes(data, size)
+
+    /**
+     * A no-op in the current native engine: there is no gaussian-splat mapper for this to pause, so
+     * calling it does not pause anything. Kept as a callable, logged no-op (native logs a warning on
+     * every call) so call sites don't need to change ahead of a real mapper existing to gate.
+     */
     fun setMappingPaused(paused: Boolean) = nativeSetMappingPaused(paused)
 
     fun updateCamera(
@@ -585,15 +599,22 @@ class SlamManager @Inject constructor(
     fun loadLowLightEnhancer(assetManager: AssetManager) = nativeLoadLowLightEnhancer(assetManager)
 
 
-    /** Eval (Sub-project A): average ms/stage since last call, then resets native accumulators.
-     *  Indexes: 0=voxelUpdate,1=voxelKeyframe,2=surfaceMesh,3=draw,4=pnpReloc. */
+    /** Eval (Sub-project A): average ms/stage since last call for the one stage that is actually
+     *  timed, then resets native accumulators. Indexes: 0=voxelUpdate,1=voxelKeyframe,2=surfaceMesh,
+     *  3=draw,4=pnpReloc. Only index 4 (pnpReloc) is ever sampled -- the other four name stages of a
+     *  splat-rendering pipeline the native engine does not implement, so they always read -1.0f
+     *  ("not measured"), never a real average. Index 4 itself reads -1.0f for any poll interval in
+     *  which no reloc pass ran (the worker only samples a frame with >=8 correspondences). */
     fun getStageTimings(): FloatArray {
         val out = FloatArray(5)
         nativeGetStageTimings(out)
         return out
     }
 
-    /** Eval: toggle a native stage for A/B cost attribution. Stage 0 is non-gateable (reloc backbone). */
+    /** Eval: toggle a native stage for A/B cost attribution. A no-op in the current native engine --
+     *  no stage's work is actually gated by this flag (not even stage 4/pnpReloc, which is not
+     *  optional: relocalization must run). Calling this logs a warning natively instead of silently
+     *  doing nothing. */
     fun setStageEnabled(stage: Int, enabled: Boolean) = nativeSetStageEnabled(stage, enabled)
 
     /** Pose fusion (B): [0..15]=pnpMat, [16]=inlierCount, [17]=matchCount, [18]=seq. */

@@ -1,7 +1,15 @@
 package com.hereliesaz.graffitixr.nativebridge
 
+import com.hereliesaz.graffitixr.common.util.NativeLibLoader
+import com.hereliesaz.graffitixr.common.wearable.WearableManager
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
+import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -12,51 +20,77 @@ import org.junit.Test
  * requirement — is the *gate*: `setEvalRngSeedIfDebuggable` must not reach JNI when the build is
  * not debuggable.
  *
- * This is deliberately a test of the decision, not of the effect. Asserting the effect would need
- * an instrumented run; asserting the decision catches the failure that matters, which is someone
- * later "simplifying" the guard away and shipping a fixed RANSAC seed to every user. A fixed seed
- * in production is a behaviour change, not an evaluation affordance: every device would draw the
- * identical sample sequence forever.
- *
- * [Gate] mirrors the branch in `SlamManager.setEvalRngSeedIfDebuggable` exactly. That duplication is
- * the cost of the native boundary and is called out here so nobody mistakes it for coverage of the
- * real method — `SlamManagerEvalSeedContractTest` below pins that the real signature still exists.
+ * **On the exceptions.** `libgraffitixr.so` is not on a JVM unit-test classpath, so
+ * `nativeSetEvalRngSeed` throws `UnsatisfiedLinkError` the moment it is actually invoked. That is
+ * the instrument, not noise (see `SlamManagerAnchorEstablishmentTest`'s class KDoc for the same
+ * technique): a call that stops at the gate returns normally, having never reached JNI, and a call
+ * that passes the gate reaches `nativeSetEvalRngSeed` and throws. The two outcomes are unambiguous
+ * evidence of which side of the `if (debuggable)` branch in `SlamManager.setEvalRngSeedIfDebuggable`
+ * the call landed on — this exercises the REAL production method, not a copy of its logic, so
+ * deleting the guard from that method fails these tests.
  */
 class EvalRngSeedGuardTest {
 
-    /** The gate under test, isolated from the JNI call it protects. */
-    private class Gate {
-        val seedsApplied = mutableListOf<Long>()
-        fun setIfDebuggable(seed: Long, debuggable: Boolean) {
-            if (debuggable) seedsApplied.add(seed)
+    private lateinit var slamManager: SlamManager
+
+    @Before
+    fun setup() {
+        // The constructor calls NativeLibLoader.loadAll(), which throws when the .so is absent.
+        mockkObject(NativeLibLoader)
+        every { NativeLibLoader.loadAll() } returns Unit
+        slamManager = SlamManager(mockk<WearableManager>(relaxed = true))
+    }
+
+    @After
+    fun tearDown() {
+        unmockkObject(NativeLibLoader)
+    }
+
+    @Test
+    fun `a debuggable build reaches the native seeder`() {
+        try {
+            slamManager.setEvalRngSeedIfDebuggable(20260801L, debuggable = true)
+            fail("expected the debuggable branch to reach nativeSetEvalRngSeed and throw UnsatisfiedLinkError")
+        } catch (expected: UnsatisfiedLinkError) {
+            // expected: proves the debuggable=true branch called through to JNI.
         }
     }
 
     @Test
-    fun `a debuggable build applies the seed`() {
-        val g = Gate()
-        g.setIfDebuggable(20260801L, debuggable = true)
-        assertEquals(listOf(20260801L), g.seedsApplied)
-    }
-
-    @Test
-    fun `a release build never reaches the engine`() {
-        val g = Gate()
-        g.setIfDebuggable(20260801L, debuggable = false)
-        assertTrue("release must not seed, got ${g.seedsApplied}", g.seedsApplied.isEmpty())
+    fun `a release build never reaches the native seeder`() {
+        // If the `if (debuggable)` guard were removed from the real method, this would also throw
+        // UnsatisfiedLinkError instead of returning normally.
+        slamManager.setEvalRngSeedIfDebuggable(20260801L, debuggable = false)
     }
 
     /**
-     * A negative seed is the engine's "leave the RNG alone" sentinel, so `clearEvalRngSeed` must
-     * send something negative. Pinned because `0` reads like a plausible "no seed" value and is in
-     * fact a perfectly valid seed — the same sentinel confusion the eval CSV's `rotationNeededDeg`
-     * column already had to be corrected for once.
+     * A negative seed is the engine's "leave the RNG alone" sentinel. `clearEvalRngSeed` is not
+     * itself debuggable-gated — unlike the seeder above, it always calls through — so reaching JNI
+     * here is the expected, unconditional behaviour rather than evidence of a missing guard.
      */
     @Test
-    fun `the clear sentinel is negative, and zero is a real seed`() {
-        val clearValue = -1L
-        assertTrue("clear must be negative", clearValue < 0)
-        assertTrue("zero must NOT read as 'no seed'", 0L >= 0)
+    fun `clearEvalRngSeed reaches the native seeder unconditionally`() {
+        try {
+            slamManager.clearEvalRngSeed()
+            fail("expected clearEvalRngSeed to reach nativeSetEvalRngSeed and throw UnsatisfiedLinkError")
+        } catch (expected: UnsatisfiedLinkError) {
+            // expected: clearEvalRngSeed always calls through, regardless of debuggable state.
+        }
+    }
+
+    /**
+     * Zero is a valid RANSAC seed, not a "no seed" marker — only a NEGATIVE value means that. The
+     * debuggable gate must not special-case zero as an implicit no-op; it must let it through like
+     * any other seed once `debuggable` is true.
+     */
+    @Test
+    fun `a zero seed in a debuggable build still reaches the native seeder`() {
+        try {
+            slamManager.setEvalRngSeedIfDebuggable(0L, debuggable = true)
+            fail("expected a zero seed to reach nativeSetEvalRngSeed and throw UnsatisfiedLinkError")
+        } catch (expected: UnsatisfiedLinkError) {
+            // expected: zero is a real seed and must pass the gate exactly like any other.
+        }
     }
 }
 
