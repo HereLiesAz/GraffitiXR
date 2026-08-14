@@ -108,9 +108,27 @@ class ArRenderer(
      * Latest ARCore frame snapshot. WARNING: do NOT call Session/Frame methods on this from off
      * the GL thread — ARCore is not thread-safe and a hitTest here racing update() corrupts
      * native state. For hit tests, use [requestHitTest], which runs on the GL thread under
-     * [sessionLock].
+     * [sessionLock]. [AtomicReference] only makes the REFERENCE itself safe to read cross-thread;
+     * it does not make the [Frame] object it points to safe to call methods on — see
+     * [latestFrameTimestampNs] for the one piece of it ([Frame.getTimestamp]) that is meant to be
+     * read off-thread.
      */
     val latestFrame: AtomicReference<Frame?> = AtomicReference(null)
+
+    /**
+     * Timestamp (ns) of the most recently processed ARCore frame, or 0 if none has arrived yet —
+     * a plain `@Volatile Long` cached by the GL thread alongside [latestFrame], specifically so
+     * off-thread callers (e.g. [com.hereliesaz.graffitixr.feature.ar.lastArFrameTimestampNs],
+     * polled ~1 Hz from a Compose coroutine to report camera-feeding health) never need to touch
+     * the [Frame] object itself. Reading `latestFrame.get()?.timestamp` directly used to call
+     * [Frame.getTimestamp] — a native ARCore call — from whatever thread the poller ran on, which
+     * is exactly what the warning on [latestFrame] says not to do: the AtomicReference makes the
+     * REFERENCE safe to hand across threads, not the native call inside it. This field is written
+     * only from the GL thread (same place [latestFrame] is set) and is a plain value type, so
+     * reading it off-thread touches no ARCore native state at all.
+     */
+    @Volatile var latestFrameTimestampNs: Long = 0L
+        private set
 
     private class PendingHitTest(
         val x: Float,
@@ -195,13 +213,19 @@ class ArRenderer(
     private val pointCloudRenderer = PointCloudRenderer()
     private val planeRenderer = PlaneRenderer()
     // Diagnostic "what is the AR seeing" view: current-frame ARCore feature points (yellow) +
-    // tracked planes, drawn over the camera whenever showArDebugView is set. Tied by MainScreen
-    // to the Diagnostic Overlay setting. Separate from pointCloudRenderer, which accumulates and
-    // persists with the project.
+    // tracked planes, drawn over the camera whenever showFeaturePoints is set. Tied by MainScreen
+    // to the Diagnostic Overlay setting. Separate from pointCloudRenderer, which accumulates points
+    // across frames in memory for scan hints/phase completion — neither renderer persists points
+    // with the project (see ArDebugRenderer's class doc for why the point cloud specifically doesn't).
     private val arDebugRenderer = ArDebugRenderer()
     // Independent perception-layer toggles (Settings; default on). Drawn while in AR and tracking,
     // suppressed during target capture. Each governs one layer of "what the AR is seeing".
-    @Volatile var showFeaturePoints: Boolean = true  // ARCore tracker landmarks (yellow dots)
+    // showFeaturePoints defaults to false here, matching EditorUiState.showFeaturePoints's own
+    // default (core/common/EditorModels.kt) — MainScreen always pushes the real persisted value into
+    // this field right after attaching the renderer, but for the one composition before that push
+    // lands, this field's own default is what's actually drawn, so it needs to agree with the UI
+    // state's default rather than silently overriding it to "on".
+    @Volatile var showFeaturePoints: Boolean = false // ARCore tracker landmarks (yellow dots)
     @Volatile var showPlaneGrids: Boolean = true      // detected planes as metric grids
     @Volatile var showPoints: Boolean = true          // accumulated sparse point cloud
 
@@ -272,11 +296,32 @@ class ArRenderer(
 
     /**
      * How far the primary ARCore anchor's own pose has moved since establishment, in metres, or -1
-     * with no established anchor. See `AnchorOrchestrator.primaryAnchorDriftMeters` — added to give
+     * with no established anchor (or no live session, or the GL thread couldn't be locked out in
+     * time — folded into the same sentinel rather than a new result type, since callers already treat
+     * -1 as "nothing to report"). See `AnchorOrchestrator.primaryAnchorDriftMeters` — added to give
      * a "the overlay is receding" report a number to check FIRST, before anything downstream of the
      * anchor (fusion, relocalization) is even considered.
+     *
+     * Called from `ArViewModel.buildDiagnosticReport()` on the main thread, i.e. off the GL thread.
+     * `AnchorOrchestrator`'s `synchronized(this)` covers only its own Kotlin collection fields —
+     * `primaryAnchorDriftMeters()` also reads `Anchor.pose`, a real ARCore native call, which is not
+     * safe to run concurrently with the GL thread's own ARCore calls under [sessionLock]. Routed
+     * through [withLockedSession] (bounded, like every other off-GL-thread ARCore touch in this class)
+     * so the two cannot race.
      */
-    fun primaryAnchorDriftMeters(): Float = anchorOrchestrator.primaryAnchorDriftMeters()
+    fun primaryAnchorDriftMeters(): Float =
+        withLockedSession { anchorOrchestrator.primaryAnchorDriftMeters() } ?: -1f
+
+    /**
+     * Active (TRACKING) consensus-anchor count, serialized against [onDrawFrame] via
+     * [withLockedSession] for the same reason [primaryAnchorDriftMeters] is: despite
+     * `AnchorOrchestrator`'s `synchronized(this)`, `getActiveAnchorCount()` reads `Anchor.trackingState`
+     * — a real ARCore native call — which off-GL-thread callers must not run concurrently with the GL
+     * thread's own ARCore calls. This is a `ReentrantLock`, so the existing on-GL-thread caller (inside
+     * [onDrawFrame], already holding [sessionLock]) re-enters it for free rather than deadlocking.
+     * Returns 0 if there is no live session or the lock could not be acquired in time.
+     */
+    fun activeAnchorCount(): Int = withLockedSession { anchorOrchestrator.getActiveAnchorCount() } ?: 0
 
     /**
      * The last fusion decision, for the overlay and the eval CSV. Combines [fusionSkipReason] — the
@@ -377,16 +422,23 @@ class ArRenderer(
     private val worldToCloudAnchorScratch = FloatArray(16)
 
     /**
-     * The live anchor->world matrix for [cloudAnchor], creating the anchor if needed, or null when
-     * the session cannot supply one this frame (not tracking yet).
+     * Detaches and forgets [cloudAnchor] — clearing the accumulated point cloud with it — if it has
+     * stopped tracking.
      *
-     * Re-read every frame on purpose: caching it would reintroduce precisely the staleness the
-     * anchor exists to remove.
+     * Split out of [cloudAnchorModel] (which still calls this first) so this check can run on its
+     * own, independent of whether a NEW cloud anchor should also be created right now. Previously the
+     * only way to reach this check was through [cloudAnchorModel], and after an anchor is established
+     * that function's only remaining caller was inside the `showPoints` DRAW-toggle branch of the
+     * perception-layer draw path — so with `showPoints` off, a cloud anchor that died AFTER
+     * establishment was never detected, and `pointCloudRenderer.accumulatedPointCount` (which drives
+     * scan-hint/phase-completion logic) stayed stuck reporting a stale, no-longer-valid count. Called
+     * unconditionally once per frame at the same throttled cadence as the rest of the accumulate
+     * logic (see the frame-data-pipeline block in [onDrawFrame]) so liveness is checked regardless of
+     * `showPoints` or [anchorEstablished].
      */
-    private fun cloudAnchorModel(session: Session, camera: com.google.ar.core.Camera): FloatArray? {
-        if (camera.trackingState != TrackingState.TRACKING) return null
-        val existing = cloudAnchor
-        if (existing != null && existing.trackingState != TrackingState.TRACKING) {
+    private fun checkCloudAnchorLiveness() {
+        val existing = cloudAnchor ?: return
+        if (existing.trackingState != TrackingState.TRACKING) {
             // The anchor is gone, so every accumulated point is expressed against a frame ARCore no
             // longer maintains. Detaching without clearing would leave that stale geometry pinned to
             // a fresh anchor at a different pose — worse than starting over.
@@ -394,6 +446,20 @@ class ArRenderer(
             cloudAnchor = null
             pointCloudRenderer.clear()
         }
+    }
+
+    /**
+     * The live anchor->world matrix for [cloudAnchor], creating the anchor if needed, or null when
+     * the session cannot supply one this frame (not tracking yet).
+     *
+     * Re-read every frame on purpose: caching it would reintroduce precisely the staleness the
+     * anchor exists to remove. Only call this where creating a fresh cloud anchor is actually wanted
+     * (pre-establishment accumulation, or drawing the accumulated cloud) — for the liveness check
+     * alone, independent of creation, use [checkCloudAnchorLiveness] directly.
+     */
+    private fun cloudAnchorModel(session: Session, camera: com.google.ar.core.Camera): FloatArray? {
+        if (camera.trackingState != TrackingState.TRACKING) return null
+        checkCloudAnchorLiveness()
         val anchor = cloudAnchor ?: try {
             session.createAnchor(camera.pose).also { cloudAnchor = it }
         } catch (e: Exception) {
@@ -533,6 +599,12 @@ class ArRenderer(
     // flag, and again once a candidate is accepted. Capped by MAX_OVERLAY_CORRECTION_RETRY_FRAMES so
     // an anchor that never starts tracking doesn't leave the flag pending for the rest of the session.
     private var overlayRotationCorrectionRetryFrames: Int = 0
+    // The disambiguating "up" reference (see the candidate-build block below) resolved from the LIVE
+    // camera matrix on the FIRST attempt for the current pending correction, then reused unchanged for
+    // every retry. Frozen here rather than re-derived from viewMatrix each retry frame — recomputing it
+    // per-retry is the exact bug this fix closes: an up vector that tracks the live camera made the
+    // eventually-accepted correction depend on which frame the retry happened to land on.
+    private val overlayRotationCorrectionUpSnapshot = FloatArray(3)
 
     /**
      * One-time rotation correction, computed the instant an anchor is established and never touched
@@ -855,9 +927,19 @@ class ArRenderer(
         startStallWatchdog()
     }
 
-    /** Watches the GL render thread from the side. If onDrawFrame stops advancing (e.g. blocked in
-     *  session.update() because the camera never feeds ARCore), the blocked thread can't report, so
-     *  this one surfaces the stuck step on screen exactly once. */
+    /** Watches the GL render thread from the side. If onDrawFrame stops advancing — blocked inside
+     *  session.update() or another native call — the blocked thread can't report on itself, so this
+     *  one surfaces the stuck step on screen exactly once (per attach/reconfigure — see
+     *  [resetCameraStreamWatchdog]).
+     *
+     *  This tracks "time since the last onDrawFrame tick" ([lastTickMs]), which keeps advancing right
+     *  up until a stall starts NO MATTER WHEN that is — including well after the camera has already
+     *  been streaming successfully for a while (e.g. it is later disconnected, or an unrelated ARCore
+     *  native call wedges). The condition below must therefore NOT also require `!camStreamReported`:
+     *  that field latches true on the FIRST successful camera frame and is only cleared by
+     *  [resetCameraStreamWatchdog], so gating on it made this watchdog fire at most once ever, and only
+     *  for a stall that happened before any frame had arrived — a later stall, which is exactly the
+     *  case this doc describes, could never be caught. */
     private fun startStallWatchdog() {
         if (watchdog != null) return
         lastTickMs = android.os.SystemClock.elapsedRealtime()
@@ -867,13 +949,18 @@ class ArRenderer(
                 val tick = lastTickMs
                 if (tick == 0L || isDestroying) continue
                 val age = android.os.SystemClock.elapsedRealtime() - tick
-                if (age > 2500 && !stallReported && !camStreamReported) {
+                if (age > 2500 && !stallReported) {
                     stallReported = true
                     // lastStep now tracks every stage of onDrawFrame (not just up to "update"), so
                     // this names the actual wedged stage: "update" = ARCore blocked waiting on the
                     // camera; "slamCamera"/"slamFeed"/"mesh" = a native SLAM call; "frameDone" =
                     // the frame finished and the GL thread never came back (swap/pause/scheduler).
-                    onDiag("RENDER STALLED f=$frameCount step=$lastStep for ${age}ms (no camera frame ever arrived)")
+                    val whenText = if (camStreamReported) {
+                        "camera had already been streaming"
+                    } else {
+                        "no camera frame ever arrived"
+                    }
+                    onDiag("RENDER STALLED f=$frameCount step=$lastStep for ${age}ms ($whenText)")
                     reportCameraNotFeeding()
                 }
             }
@@ -1150,6 +1237,7 @@ class ArRenderer(
             }
 
             latestFrame.set(frame)
+            latestFrameTimestampNs = frame.timestamp
             lastStep = "hitTests"
             drainHitTestQueue(frame)
             // Camera-streaming verdict, surfaced on-screen so we don't need adb. ARCore returns ts=0
@@ -1562,20 +1650,40 @@ class ArRenderer(
                 var haveCandidate = false
                 if (nx != 0f || ny != 0f || nz != 0f) {
                     // Pick an up reference that isn't parallel to the normal — same choice overlayDraw
-                    // used to remake every frame, made here exactly once.
-                    var upX = 0f; var upY = 1f; var upZ = 0f
-                    if (kotlin.math.abs(ny) > 0.95f) {
-                        upX = viewMatrix[1]; upY = viewMatrix[5]; upZ = viewMatrix[9] // camera up
+                    // used to remake every frame, made here exactly once. "Once" means once per pending
+                    // correction, not once per attempt: this block re-runs every frame while retries are
+                    // outstanding (see the retry loop below), so the two branches that read the LIVE
+                    // camera matrix (near-horizontal-normal -> camera up; fully degenerate -> camera
+                    // backward) are resolved only on the FIRST attempt and then frozen into
+                    // [overlayRotationCorrectionUpSnapshot] for every later retry. Re-deriving the up
+                    // reference from the live camera on each retry was exactly the bug this field's own
+                    // class KDoc (above) already describes as fixed elsewhere: an up vector that changes
+                    // as the phone tilts made the accepted correction — and therefore the artwork's
+                    // final orientation — depend on which frame the retry happened to land on, instead
+                    // of being the one-time framing decision it's supposed to be.
+                    var upX: Float; var upY: Float; var upZ: Float
+                    if (overlayRotationCorrectionRetryFrames == 0) {
+                        upX = 0f; upY = 1f; upZ = 0f
+                        if (kotlin.math.abs(ny) > 0.95f) {
+                            upX = viewMatrix[1]; upY = viewMatrix[5]; upZ = viewMatrix[9] // camera up
+                        }
+                        var dot = upX * nx + upY * ny + upZ * nz
+                        var yX = upX - dot * nx; var yY = upY - dot * ny; var yZ = upZ - dot * nz
+                        var yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
+                        if (yLen <= 1e-4f) {
+                            upX = viewMatrix[2]; upY = viewMatrix[6]; upZ = viewMatrix[10] // camera backward (GL/ARCore look down -Z)
+                        }
+                        overlayRotationCorrectionUpSnapshot[0] = upX
+                        overlayRotationCorrectionUpSnapshot[1] = upY
+                        overlayRotationCorrectionUpSnapshot[2] = upZ
+                    } else {
+                        upX = overlayRotationCorrectionUpSnapshot[0]
+                        upY = overlayRotationCorrectionUpSnapshot[1]
+                        upZ = overlayRotationCorrectionUpSnapshot[2]
                     }
-                    var dot = upX * nx + upY * ny + upZ * nz
+                    val dot = upX * nx + upY * ny + upZ * nz
                     var yX = upX - dot * nx; var yY = upY - dot * ny; var yZ = upZ - dot * nz
-                    var yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
-                    if (yLen <= 1e-4f) {
-                        upX = viewMatrix[2]; upY = viewMatrix[6]; upZ = viewMatrix[10] // camera backward (GL/ARCore look down -Z)
-                        dot = upX * nx + upY * ny + upZ * nz
-                        yX = upX - dot * nx; yY = upY - dot * ny; yZ = upZ - dot * nz
-                        yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
-                    }
+                    val yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
                     if (yLen > 1e-4f) {
                         yX /= yLen; yY /= yLen; yZ /= yLen
                         // +X = +Y × +Z (right-handed: width axis, horizontal across the surface).
@@ -1621,7 +1729,12 @@ class ArRenderer(
                     val composedDot = overlayRotScratch2[8] * nx + overlayRotScratch2[9] * ny + overlayRotScratch2[10] * nz
                     reproducesNormal = composedDot >= 0.99f
                 }
-                val anchorTracking = normalIsDegenerate || anchorOrchestrator.getActiveAnchorCount() > 0
+                // Goes through activeAnchorCount() (which wraps this same call in withLockedSession)
+                // rather than calling anchorOrchestrator.getActiveAnchorCount() directly, so there is
+                // exactly one call path into it and no direct, unsynchronized route can be reintroduced
+                // later. sessionLock is reentrant and already held on this thread for the whole frame,
+                // so this re-enters for free rather than blocking.
+                val anchorTracking = normalIsDegenerate || activeAnchorCount() > 0
                 val giveUp = overlayRotationCorrectionRetryFrames >= MAX_OVERLAY_CORRECTION_RETRY_FRAMES
                 val valid = anchorTracking && reproducesNormal
 
@@ -1992,49 +2105,6 @@ class ArRenderer(
                 }
             }
 
-            lastStep = "export"
-            if (exportThisFrame) {
-                exportRequested = false
-                try {
-                    // Read the composited GL framebuffer instead of the raw camera image. By this
-                    // point in onDrawFrame the camera texture and the wall-anchored overlay quad
-                    // (with its true perspective/lean) are already drawn, so the readback matches
-                    // exactly what the user sees on-screen minus the Compose UI overlays (rail,
-                    // settings, reticle chips, distance labels) — those live in a separate Compose
-                    // window that never touches this framebuffer, so they naturally aren't
-                    // captured. Camera-sensor rotation is baked in by ARCore's camera-texture draw
-                    // (background renderer applies the display transform), so no post-rotate is
-                    // needed here — unlike the raw-image path that had to correct sensor orientation.
-                    // Snapshot the callback so a concurrent clear doesn't strand the readback
-                    // in a bitmap nobody owns. Also short-circuits the whole allocate/draw block
-                    // if nothing is listening — treat requestExport being unset here as a spurious
-                    // flag flip rather than doing work for nothing.
-                    val callback = onExportCaptured
-                    val w = surfaceWidth
-                    val h = surfaceHeight
-                    if (callback != null && w > 0 && h > 0) {
-                        val buf = ByteBuffer.allocateDirect(w * h * 4).order(java.nio.ByteOrder.nativeOrder())
-                        GLES30.glReadPixels(0, 0, w, h, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, buf)
-                        buf.rewind()
-                        val flipped = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                        // GL origin is bottom-left; Bitmap is top-left. Wrap the readback in an
-                        // upside-down source Bitmap, then draw it into `flipped` with a vertical
-                        // scale of -1 so the final Bitmap has natural (top-left) orientation.
-                        val source = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                        source.copyPixelsFromBuffer(buf)
-                        val canvas = android.graphics.Canvas(flipped)
-                        val matrix = android.graphics.Matrix().apply { postScale(1f, -1f, w / 2f, h / 2f) }
-                        canvas.drawBitmap(source, matrix, null)
-                        source.recycle()
-
-                        callback(flipped)
-                        onExportCaptured = null
-                    }
-                } catch (e: Exception) {
-                    Timber.e(e, "Failed to capture export frame")
-                }
-            }
-
             // ── Frame Data Pipeline ──
             // Post-anchor this was every 30th frame — 2 Hz at 60 fps — which is the rate the wall gets
             // re-checked for relocalization while the artist is actually painting, i.e. the rate the
@@ -2101,6 +2171,13 @@ class ArRenderer(
                 } catch (e: Exception) {
                     Timber.w(e, "Failed to feed YUV frame")
                 }
+
+                // Cloud-anchor liveness: detect a dead cloud anchor and clear the (now-stale)
+                // accumulated cloud with it, EVERY frame at this cadence — not only pre-establishment,
+                // and not only when the draw path happens to run (see checkCloudAnchorLiveness's doc).
+                // A dead anchor found here is also what stops the pre-establishment block below from
+                // reusing it, so this must run before that check.
+                checkCloudAnchorLiveness()
 
                 // 1. Point Cloud acquisition (only when scanning in CLOUD_POINTS mode)
                 if (!anchorEstablished) {
@@ -2449,6 +2526,56 @@ class ArRenderer(
             } else {
                 drawPerceptionLayers(frame, activeSession, camera, viewMatrix, projMatrix, scanActive, voxelRevealMaskActive, isTracking)
             }
+
+            lastStep = "export"
+            if (exportThisFrame) {
+                exportRequested = false
+                try {
+                    // Read the composited GL framebuffer instead of the raw camera image. This MUST
+                    // run after every draw call that touches the default framebuffer this frame —
+                    // background camera texture (backgroundRenderer.draw, above), the wall-anchored
+                    // overlay quad with its true perspective/lean (overlayRenderer.draw, above), and
+                    // the perception layers (drawPerceptionLayers / perceptionFbo.composite, just
+                    // above) — so the readback matches exactly what the user sees on-screen minus the
+                    // Compose UI overlays (rail, settings, reticle chips, distance labels) — those
+                    // live in a separate Compose window that never touches this framebuffer, so they
+                    // naturally aren't captured. hideVisualization is latched true (by
+                    // ArViewModel.requestExport, before exportRequested) before this frame's
+                    // perception-layer gates are checked above, so the perception overlays are never
+                    // drawn into an export in the first place — nothing to skip here. Camera-sensor
+                    // rotation is baked in by ARCore's camera-texture draw (background renderer
+                    // applies the display transform), so no post-rotate is needed here — unlike the
+                    // raw-image path that had to correct sensor orientation.
+                    // Snapshot the callback so a concurrent clear doesn't strand the readback
+                    // in a bitmap nobody owns. Also short-circuits the whole allocate/draw block
+                    // if nothing is listening — treat requestExport being unset here as a spurious
+                    // flag flip rather than doing work for nothing.
+                    val callback = onExportCaptured
+                    val w = surfaceWidth
+                    val h = surfaceHeight
+                    if (callback != null && w > 0 && h > 0) {
+                        val buf = ByteBuffer.allocateDirect(w * h * 4).order(java.nio.ByteOrder.nativeOrder())
+                        GLES30.glReadPixels(0, 0, w, h, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, buf)
+                        buf.rewind()
+                        val flipped = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                        // GL origin is bottom-left; Bitmap is top-left. Wrap the readback in an
+                        // upside-down source Bitmap, then draw it into `flipped` with a vertical
+                        // scale of -1 so the final Bitmap has natural (top-left) orientation.
+                        val source = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                        source.copyPixelsFromBuffer(buf)
+                        val canvas = android.graphics.Canvas(flipped)
+                        val matrix = android.graphics.Matrix().apply { postScale(1f, -1f, w / 2f, h / 2f) }
+                        canvas.drawBitmap(source, matrix, null)
+                        source.recycle()
+
+                        callback(flipped)
+                        onExportCaptured = null
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to capture export frame")
+                }
+            }
+
             // A stall reported at "frameDone" means onDrawFrame COMPLETED and the GL thread never
             // came back for the next frame — wedge is in eglSwapBuffers / the GLThread scheduler /
             // a pause request, not in this frame body.
@@ -2713,13 +2840,20 @@ class ArRenderer(
         }
         try {
             session = null
+            // anchorOrchestrator.clear() calls Anchor.detach() — a real ARCore native call — on this
+            // (main) thread, so it needs the same best-effort serialization against onDrawFrame as
+            // nulling `session` above, not a separate unlocked call afterwards. Kept inside this same
+            // bounded try/finally rather than given its own lock attempt: best-effort and bounded
+            // either way, since blocking here is the exact freeze this method's own doc says an
+            // unconditional lock caused.
+            anchorOrchestrator.clear()
         } finally {
             if (locked) sessionLock.unlock()
         }
         failPendingHitTests()
-        anchorOrchestrator.clear()
         pendingOverlayBitmap = null
         latestFrame.set(null)
+        latestFrameTimestampNs = 0L
     }
 
     private companion object {
@@ -2752,12 +2886,23 @@ class ArRenderer(
         const val PERCEPTION_FLOOR_FPS = 30
         // Rolling-average perception-refresh cost (ms) above which the lag trigger floors the rate.
         const val PERCEPTION_LAG_MS = 16f
-        // Per-element view-matrix delta below which the pose is treated as unchanged (skip redraw).
-        const val PERCEPTION_POSE_EPSILON = 1e-4f
+        // Per-element view-matrix delta below which the pose is treated as unchanged (skip the
+        // offscreen perception-FBO redraw and reuse the cached composite). Was 1e-4f — an order of
+        // magnitude BELOW IDLE_POSE_EPSILON's calibrated handheld-jitter noise floor (~0.09°/1.5mm,
+        // see its doc below), so ordinary hand tremor while holding the phone "still" already exceeded
+        // it most frames: perceptionPoseChanged() returned true almost every frame even with no real
+        // motion, and the cache this epsilon exists to enable was never actually used handheld. Set
+        // equal to IDLE_POSE_EPSILON — the same calibrated noise floor already trusted elsewhere in
+        // this file — rather than a new independently-chosen value, and deliberately not looser than
+        // that: plane-grid/point-cloud perception layers should redraw at least as eagerly as heavy
+        // SLAM/VIO work re-arms from idle, so genuine motion (which moves the view matrix far more
+        // than a jitter-scale delta) still triggers an immediate redraw.
+        const val PERCEPTION_POSE_EPSILON = 1.5e-3f
 
         // --- Adaptive idle gating ---
-        // Per-element view-matrix delta below which the phone is treated as "still" for idle. Coarser
-        // than the perception epsilon so handheld micro-jitter doesn't count as motion (≈0.09° / 1.5mm).
+        // Per-element view-matrix delta below which the phone is treated as "still" for idle —
+        // calibrated to sit above handheld micro-jitter so it doesn't count as motion (≈0.09° / 1.5mm).
+        // PERCEPTION_POSE_EPSILON above is intentionally set to this same value.
         const val IDLE_POSE_EPSILON = 1.5e-3f
         // Continuous no-motion + no-interaction time before entering idle (slow to sleep).
         const val IDLE_ENTER_DEBOUNCE_MS = 700L

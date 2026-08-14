@@ -11,13 +11,18 @@ import com.hereliesaz.graffitixr.design.rendering.ShaderUtil
 /**
  * Diagnostic visualization of what ARCore is currently perceiving: the CURRENT frame's sparse
  * feature points, drawn as yellow dots over the camera passthrough. Deliberately separate from
- * [PointCloudRenderer]: that one ACCUMULATES points and persists them with the project
- * (saveCloudPoints), so feeding it every frame for a debug view would pollute the saved cloud.
- * This renderer holds only the latest frame's points and owns no persistent state.
+ * [PointCloudRenderer]: that one ACCUMULATES points across frames (into an in-memory cloud used for
+ * scan hints/phase completion — see `ArRenderer.checkCloudAnchorLiveness`'s doc), so feeding it every
+ * frame for a debug view would pollute that accumulation. Neither renderer persists points with the
+ * project: the ARCore point cloud used to be saved and restored, but a restored session's world
+ * origin is arbitrary relative to the one it was scanned in, so every point would land at a rigid
+ * offset and then appear to drift — see `ArViewModel.saveMapBlocking`'s doc. This renderer holds only
+ * the latest frame's points and owns no persistent state.
  *
- * Driven by [ArRenderer.showArDebugView], which MainScreen ties to the existing Diagnostic
- * Overlay setting. Tracked planes are visualized separately via [PlaneRenderer.drawPlanes];
- * together they show "what the AR is seeing" — feature points + fitted surfaces.
+ * Driven by [ArRenderer.showFeaturePoints] (the real gate — not a field named "showArDebugView",
+ * which does not exist), which MainScreen ties to the Diagnostic Overlay setting. Tracked planes are
+ * visualized separately via [PlaneRenderer.drawPlanes]; together they show "what the AR is seeing" —
+ * feature points + fitted surfaces.
  *
  * GL-thread only, like the other sub-renderers.
  */
@@ -34,6 +39,10 @@ class ArDebugRenderer : GlReleasable {
     private var pointCount = 0
     /** Last uploaded current-frame point count — surfaced in the diag log by ArRenderer. */
     val lastPointCount: Int get() = pointCount
+    // Reused MVP scratch (GL thread only) — see [draw]. Mirrors PointCloudRenderer's own
+    // `mvpMatrix` field: allocating a fresh FloatArray(16) inside draw() every frame is exactly the
+    // per-frame-allocation-on-the-GL-thread pattern that renderer was rewritten to eliminate.
+    private val mvpMatrix = FloatArray(16)
     // Last point-cloud timestamp uploaded; ARCore returns the same cloud object until a new one
     // is computed, so skipping identical timestamps avoids redundant VBO uploads.
     private var lastCloudTimestampNs = 0L
@@ -102,7 +111,6 @@ class ArDebugRenderer : GlReleasable {
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
 
-        val mvpMatrix = FloatArray(16)
         Matrix.multiplyMM(mvpMatrix, 0, projectionMatrix, 0, viewMatrix, 0)
 
         GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0)

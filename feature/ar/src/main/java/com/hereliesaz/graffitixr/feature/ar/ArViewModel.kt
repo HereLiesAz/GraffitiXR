@@ -44,6 +44,7 @@ import com.hereliesaz.graffitixr.common.wearable.WearableManager
 import com.hereliesaz.graffitixr.feature.ar.coop.calibration.Mat4
 import com.hereliesaz.graffitixr.feature.ar.coop.calibration.Procrustes
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
+import com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.data.ProjectManager
@@ -73,6 +74,37 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import timber.log.Timber
 import javax.inject.Inject
+
+/**
+ * Retries a [SessionLifecycleOutcome]-returning [request] (an [ArRenderer.requestResume] or
+ * [ArRenderer.requestPause] call) up to [maxRetries] times when it reports
+ * [SessionLifecycleOutcome.LockTimeout] — the GL thread was still inside `onDrawFrame` holding its
+ * session lock when the bounded wait expired. That is usually a single slow frame finishing (a heavy
+ * perception redraw, a GC pause), not a permanently wedged thread, so a few short retries give it a
+ * chance to release the lock before the caller gives up. [sleeper] is injected (default
+ * [Thread.sleep]) so a test can assert the retry count and give-up outcome without real wall-clock
+ * waits or a live [ArRenderer].
+ *
+ * Deliberately top-level and free of any [ArViewModel]/[ArRenderer] instance state: this is the part
+ * of the LockTimeout fix that actually needs a unit test, and `ArRenderer` cannot be mocked in this
+ * module's JVM test harness (see `ArSessionTest`'s note) — extracting the retry/give-up decision here
+ * makes it testable with a plain lambda standing in for the renderer call.
+ */
+internal fun retryOnLockTimeout(
+    maxRetries: Int = ArViewModel.LOCK_TIMEOUT_MAX_RETRIES,
+    delayMs: Long = ArViewModel.LOCK_TIMEOUT_RETRY_DELAY_MS,
+    sleeper: (Long) -> Unit = { Thread.sleep(it) },
+    request: () -> SessionLifecycleOutcome,
+): SessionLifecycleOutcome {
+    var outcome = request()
+    var attempt = 0
+    while (outcome is SessionLifecycleOutcome.LockTimeout && attempt < maxRetries) {
+        attempt++
+        sleeper(delayMs)
+        outcome = request()
+    }
+    return outcome
+}
 
 @HiltViewModel
 class ArViewModel @Inject constructor(
@@ -1839,25 +1871,41 @@ class ArViewModel @Inject constructor(
      * is no GL thread that could be concurrently driving `onDrawFrame` against THIS session, so a
      * direct call is safe — the race this guards against requires a renderer that still holds the
      * live session.
+     *
+     * [SessionLifecycleOutcome.LockTimeout] (the GL thread was still inside `onDrawFrame` holding the
+     * session lock when the bounded wait expired) is retried a bounded number of times via
+     * [retryOnLockTimeout] before giving up — a single slow frame finishing between attempts is the
+     * common case. If every retry still times out, the user is told rather than being left staring at
+     * a camera that silently never resumed (previously this branch only logged, leaving
+     * `isSessionResumed` false with nothing visible and nothing retrying).
      */
     private fun resumeArSessionInternal() {
         val s = session ?: return
         val r = renderer
         try {
-            when (val outcome = r?.requestResume()) {
-                null, is com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome.NoSession -> {
+            val outcome = r?.let { renderer -> retryOnLockTimeout { renderer.requestResume() } }
+            when (outcome) {
+                null, is SessionLifecycleOutcome.NoSession -> {
                     s.resume()
                     isSessionResumed = true
                     startAutoSave()
                 }
-                is com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome.Applied -> {
+                is SessionLifecycleOutcome.Applied -> {
                     isSessionResumed = true
                     startAutoSave()
                 }
-                is com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome.LockTimeout -> {
-                    Timber.e("Failed to resume ARCore session: GL thread did not release its session lock in time")
+                is SessionLifecycleOutcome.LockTimeout -> {
+                    Timber.e(
+                        "Failed to resume ARCore session: GL thread did not release its session " +
+                            "lock after ${LOCK_TIMEOUT_MAX_RETRIES} retries"
+                    )
+                    _feedback.tryEmit(
+                        com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                            "AR camera did not resume — try leaving and re-entering AR mode"
+                        )
+                    )
                 }
-                is com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome.Failed -> throw outcome.error
+                is SessionLifecycleOutcome.Failed -> throw outcome.error
             }
         } catch (e: CameraNotAvailableException) {
             Timber.e(e, "Camera not available for ARCore")
@@ -1871,24 +1919,36 @@ class ArViewModel @Inject constructor(
         }
     }
 
-    /** Same race, same fix, same NoSession fallback reasoning as [resumeArSessionInternal] — see its doc. */
+    /**
+     * Same race, same fix, same NoSession fallback reasoning as [resumeArSessionInternal] — see its
+     * doc, including the [SessionLifecycleOutcome.LockTimeout] retry-then-notify handling.
+     */
     private fun pauseArSessionInternal() {
         val s = session ?: return
         val r = renderer
         try {
             stopAutoSave()
-            when (val outcome = r?.requestPause()) {
-                null, is com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome.NoSession -> {
+            val outcome = r?.let { renderer -> retryOnLockTimeout { renderer.requestPause() } }
+            when (outcome) {
+                null, is SessionLifecycleOutcome.NoSession -> {
                     s.pause()
                     isSessionResumed = false
                 }
-                is com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome.Applied -> {
+                is SessionLifecycleOutcome.Applied -> {
                     isSessionResumed = false
                 }
-                is com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome.LockTimeout -> {
-                    Timber.e("Failed to pause ARCore session: GL thread did not release its session lock in time")
+                is SessionLifecycleOutcome.LockTimeout -> {
+                    Timber.e(
+                        "Failed to pause ARCore session: GL thread did not release its session " +
+                            "lock after ${LOCK_TIMEOUT_MAX_RETRIES} retries"
+                    )
+                    _feedback.tryEmit(
+                        com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                            "AR camera did not pause cleanly — it may keep running in the background"
+                        )
+                    )
                 }
-                is com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome.Failed -> throw outcome.error
+                is SessionLifecycleOutcome.Failed -> throw outcome.error
             }
         } catch (e: Exception) {
             Timber.e(e, "Failed to pause ARCore session")
@@ -3231,6 +3291,18 @@ class ArViewModel @Inject constructor(
         // Hard cap on the whole detect phase, measured from when it starts. Guarantees the phase ends
         // even if ARCore never finds a surface, so onboarding can't run indefinitely.
         const val DOODLE_PHASE_TIMEOUT_MS = 60_000L
+
+        /**
+         * Bounded retries for [SessionLifecycleOutcome.LockTimeout] from [ArRenderer.requestResume] /
+         * [ArRenderer.requestPause]. A timeout there means the GL thread was still inside
+         * `onDrawFrame` holding `sessionLock` when the bounded wait expired — usually a single slow
+         * frame (a heavy perception redraw, a GC pause), not a permanently wedged thread. A few short
+         * retries give that frame a chance to finish and release the lock before we give up and leave
+         * the user staring at a dead camera; giving up after retries still leaves them informed via
+         * [_feedback] rather than silently stuck.
+         */
+        const val LOCK_TIMEOUT_MAX_RETRIES = 3
+        const val LOCK_TIMEOUT_RETRY_DELAY_MS = 200L
     }
     // @Volatile: written on main (setDoodlePhase) / IO (build result) and read on the GL thread
     // (onTargetCaptured), so the GL thread must observe the latest value.
