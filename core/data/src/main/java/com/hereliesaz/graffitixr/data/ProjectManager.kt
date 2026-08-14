@@ -8,7 +8,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode as ComposeBlendMode
 import com.hereliesaz.graffitixr.common.model.*
 import com.hereliesaz.graffitixr.common.model.BlendMode as ModelBlendMode
-import com.hereliesaz.graffitixr.common.util.ImageUtils
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -47,6 +46,12 @@ class ProjectManager @Inject constructor(
         prettyPrint = true
         ignoreUnknownKeys = true
         encodeDefaults = true
+        // CaptureEnvironment's attitude/location groups use Float.NaN/Double.NaN as the documented
+        // "not measured" sentinel (azimuthDeg, bearingDeg, speedMps, altitudeM, ...) and those fields
+        // are genuinely NaN at runtime whenever a capture has, say, a GPS fix but no bearing (a user
+        // standing still). kotlinx.serialization throws by default on encoding a non-finite float —
+        // without this flag, saving that ordinary project crashes instead of persisting.
+        allowSpecialFloatingPointValues = true
     }
 
     companion object {
@@ -56,6 +61,16 @@ class ProjectManager @Inject constructor(
          * be able to fill the app sandbox. Generous vs. real projects (multi-layer PNGs).
          */
         private const val MAX_IMPORT_BYTES = 512L * 1024 * 1024
+
+        /**
+         * Cap on how many captured target images a single project keeps. Nothing previously pruned
+         * this list, so repeated re-captures on a long-lived project (a normal workflow — the artist
+         * re-aims until a fingerprint takes) grew it, and its on-disk PNGs, without bound short of
+         * deleting the whole project. No existing precedent in this codebase for the right number, so
+         * 30 is chosen as generous headroom for a real capture session (an artist rarely retries more
+         * than a handful of times) while still bounding worst-case storage to a few dozen PNGs.
+         */
+        private const val MAX_TARGET_IMAGES = 30
     }
 
     fun getProjectList(context: Context): List<String> {
@@ -115,17 +130,19 @@ class ProjectManager @Inject constructor(
             }
         }
 
-        // Properly append new targets to the existing list
+        // Properly append new targets to the existing list, then prune to MAX_TARGET_IMAGES so
+        // repeated captures can't grow this list (and its on-disk PNGs) without bound. Filenames are
+        // unique (not size-indexed): once the list is pruned to the cap its size stops growing, so an
+        // index derived from it would collide with — and silently overwrite — a still-kept file.
         val savedTargetUris = if (targetImages != null) {
-            val existingCount = incoming.targetImageUris.size
-            val newUris = targetImages.mapIndexed { index, bitmap ->
-                val file = File(root, "target_${existingCount + index}.png")
+            val newUris = targetImages.map { bitmap ->
+                val file = File.createTempFile("target_", ".png", root)
                 FileOutputStream(file).use { out ->
                     bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
                 }
                 uriProvider.getUriForFile(file)
             }
-            incoming.targetImageUris + newUris
+            pruneTargetImages(incoming.targetImageUris + newUris)
         } else {
             incoming.targetImageUris
         }
@@ -158,32 +175,61 @@ class ProjectManager @Inject constructor(
         }
     }
 
-    suspend fun loadProject(context: Context, projectId: String): LoadedProject? = withContext(Dispatchers.IO) {
-        val root = File(context.filesDir, "projects/$projectId")
-        val projectFile = File(root, "project.json")
-        if (!projectFile.exists()) return@withContext null
-
-        return@withContext try {
-            val jsonString = projectFile.readText()
-            val decoded = json.decodeFromString<GraffitiProject>(jsonString)
-            val projectData = migrateInMemory(decoded)
-            if (projectData !== decoded) {
-                // Persist the migration only on a full load — loadProjectMetadata stays read-only.
-                saveProject(context, projectData)
-                Log.i("ProjectManager", "Migrated legacyVisuals for project ${projectData.id}")
+    /**
+     * Drops the oldest entries once [uris] exceeds [MAX_TARGET_IMAGES], deleting their backing files
+     * so a pruned entry doesn't leak a PNG that nothing references any more.
+     */
+    private fun pruneTargetImages(uris: List<Uri>): List<Uri> {
+        if (uris.size <= MAX_TARGET_IMAGES) return uris
+        val overflow = uris.size - MAX_TARGET_IMAGES
+        uris.take(overflow).forEach { uri ->
+            try {
+                uri.path?.let { File(it).delete() }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Best-effort: a failed delete just leaves an orphaned file, not a correctness issue.
             }
-
-            val targetBitmaps = projectData.targetImageUris.mapNotNull { uri ->
-                ImageUtils.loadBitmapSync(context, uri)
-            }
-
-            LoadedProject(projectData, targetBitmaps)
-        } catch (e: Exception) {
-            Log.e("ProjectManager", "Failed to load project", e)
-            null
         }
+        return uris.drop(overflow)
     }
 
+    /**
+     * Writes [bitmap] to disk as the next target image for [projectId] and returns the resulting
+     * (pruned) URI list — pure file IO, does NOT touch project.json. Callers own folding the result
+     * into the project (e.g. via [ProjectRepository.updateProject]'s atomic transform) so this can be
+     * used by writers that must not perform a whole-object [saveProject] (see MainViewModel's target
+     * capture paths, which used to call [saveProject] directly and could silently clobber a concurrent
+     * AR wall-map or editor design save).
+     */
+    suspend fun appendTargetImage(
+        context: Context,
+        projectId: String,
+        existingUris: List<Uri>,
+        bitmap: Bitmap,
+    ): List<Uri> = withContext(Dispatchers.IO) {
+        val root = File(context.filesDir, "projects/$projectId").also { if (!it.exists()) it.mkdirs() }
+        // Unique filename, not size-indexed — see the comment in saveProject's target-image block for
+        // why an index derived from (possibly already-pruned) list size would collide.
+        val file = File.createTempFile("target_", ".png", root)
+        FileOutputStream(file).use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
+        pruneTargetImages(existingUris + uriProvider.getUriForFile(file))
+    }
+
+    /**
+     * Loads a project's metadata, applying [migrateInMemory] purely in memory.
+     *
+     * This used to be two functions: this read-only one (used everywhere — dashboard listing, repo
+     * `getProject`/`loadProject`, `updateTargetFingerprint`) plus a `loadProject(): LoadedProject?`
+     * that additionally loaded every target-image bitmap and — its one distinguishing behavior —
+     * persisted the migration back to project.json. That second function had no caller anywhere in
+     * the codebase (nothing ever consumed a `LoadedProject`'s bitmaps either), so the "persist on
+     * full load" behavior a couple of old comments described never actually happened: every real load
+     * went through this function, which was always read-only. Migrations stay in-memory-only and are
+     * re-applied (cheaply — a couple of reference/equality checks) on every load; the dead function
+     * and its now-inaccurate comments have been removed rather than wired up, since nothing in the
+     * app needs pre-loaded target-image bitmaps and re-migrating on every read is not a real cost.
+     */
     suspend fun loadProjectMetadata(context: Context, projectId: String): GraffitiProject? = withContext(Dispatchers.IO) {
         val root = File(context.filesDir, "projects/$projectId")
         val projectFile = File(root, "project.json")
@@ -192,8 +238,6 @@ class ProjectManager @Inject constructor(
         return@withContext try {
             val jsonString = projectFile.readText()
             val project = json.decodeFromString<GraffitiProject>(jsonString)
-            // In-memory migration only: this is a read path (dashboard listing) and must not
-            // write to disk — the persisted migration happens in loadProject.
             migrateInMemory(project)
         } catch (e: Exception) {
             Log.e("ProjectManager", "Failed to load project metadata", e)
@@ -293,33 +337,49 @@ class ProjectManager @Inject constructor(
     }
 
     /**
-     * Read the current ZIP entry, bounding the CUMULATIVE decompressed size: streams in chunks and
-     * aborts (returns null) the moment [runningTotal] + this entry would exceed [MAX_IMPORT_BYTES], so
-     * a zip bomb can't OOM the app before the cap is hit — never `readBytes()` an entry unbounded.
-     * Returns (entryBytes, newRunningTotal), or null once the cap is exceeded.
+     * Streams the current ZIP entry straight to a fresh temp file under [cacheDir], bounding the
+     * CUMULATIVE decompressed size: aborts (deletes the temp file, returns null) the moment
+     * [runningTotal] + this entry would exceed [MAX_IMPORT_BYTES].
+     *
+     * Writing to disk as we go — rather than buffering the whole entry in memory first and checking
+     * the cap afterwards — is what makes the cap actually protective: a heap `ByteArrayOutputStream`
+     * doubles its backing array as it grows, so a single entry a few hundred MB under the cap could
+     * OOM a typical Android heap long before this function's own size check ever ran. The chunk size
+     * (64 KiB) bounds how much of any one entry is ever in memory at once, regardless of the entry's
+     * total (possibly cap-sized) length.
+     *
+     * Returns (tempFile, newRunningTotal), or null once the cap is exceeded.
      */
-    private fun readEntryBounded(zis: ZipInputStream, runningTotal: Long): Pair<ByteArray, Long>? {
-        val out = ByteArrayOutputStream()
+    private fun streamEntryBounded(zis: ZipInputStream, runningTotal: Long, cacheDir: File): Pair<File, Long>? {
+        val tmp = File.createTempFile("gxr_", null, cacheDir)
         val chunk = ByteArray(64 * 1024)
         var total = runningTotal
-        while (true) {
-            val n = zis.read(chunk)
-            if (n < 0) break
-            total += n
-            if (total > MAX_IMPORT_BYTES) return null
-            out.write(chunk, 0, n)
+        var exceeded = false
+        FileOutputStream(tmp).use { out ->
+            while (true) {
+                val n = zis.read(chunk)
+                if (n < 0) break
+                total += n
+                if (total > MAX_IMPORT_BYTES) {
+                    exceeded = true
+                    break
+                }
+                out.write(chunk, 0, n)
+            }
         }
-        return out.toByteArray() to total
+        if (exceeded) {
+            tmp.delete()
+            return null
+        }
+        return tmp to total
     }
 
     suspend fun importProjectFromUri(context: Context, uri: Uri): GraffitiProject? = withContext(Dispatchers.IO) {
-        var extractedFiles: Map<String, File> = emptyMap()
+        val extractedFiles = mutableMapOf<String, File>()
         return@withContext try {
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
                 ZipInputStream(inputStream).use { zis ->
                     var projectData: GraffitiProject? = null
-                    val extracted = mutableMapOf<String, File>()
-                    extractedFiles = extracted
                     var totalBytes = 0L
 
                     var entry = zis.nextEntry
@@ -328,23 +388,25 @@ class ProjectManager @Inject constructor(
                         val relativeName = if (name.contains('/')) name.substringAfter('/') else name
 
                         if (!entry.isDirectory && relativeName.isNotEmpty()) {
-                            val read = readEntryBounded(zis, totalBytes)
-                            if (read == null) {
+                            val streamed = streamEntryBounded(zis, totalBytes, context.cacheDir)
+                            if (streamed == null) {
                                 Log.e("ProjectManager", "Import aborted: archive exceeds $MAX_IMPORT_BYTES bytes")
                                 return@use null
                             }
-                            val (bytes, newTotal) = read
+                            val (tmpFile, newTotal) = streamed
                             totalBytes = newTotal
                             if (relativeName == "project.json") {
                                 try {
-                                    projectData = json.decodeFromString<GraffitiProject>(bytes.decodeToString())
+                                    projectData = json.decodeFromString<GraffitiProject>(tmpFile.readText())
                                 } catch (e: Exception) {
                                     Log.e("ProjectManager", "Failed to parse project.json", e)
                                 }
                             }
-                            extracted[relativeName] = File.createTempFile("gxr_", null, context.cacheDir).also {
-                                it.writeBytes(bytes)
-                            }
+                            // Duplicate entry names (e.g. two entries whose first path segment strips
+                            // to the same relative name) must not leak the SUPERSEDED temp file — the
+                            // map assignment below would otherwise drop the only reference to it.
+                            extractedFiles.remove(relativeName)?.delete()
+                            extractedFiles[relativeName] = tmpFile
                         }
                         zis.closeEntry()
                         entry = zis.nextEntry
@@ -358,7 +420,7 @@ class ProjectManager @Inject constructor(
                     }
                     val destDir = File(context.filesDir, "projects/${project.id}").also { it.mkdirs() }
 
-                    for ((name, tmpFile) in extracted) {
+                    for ((name, tmpFile) in extractedFiles) {
                         // Zip-Slip guard: entry names are attacker-controlled and may contain
                         // ".." components that escape destDir.
                         val dest = resolveInside(destDir, name)
@@ -464,62 +526,75 @@ class ProjectManager @Inject constructor(
 
     /**
      * Loads a project received as raw bytes from a host device (spectator/guest path).
+     *
+     * Mirrors [importProjectFromUri]'s hardening: entries stream straight to temp files (never held
+     * fully in memory — a co-op bulk snapshot is exactly as untrusted as an imported .gxr), the
+     * cumulative decompressed size is capped at [MAX_IMPORT_BYTES], and temp files are always cleaned
+     * up (duplicate-collision path and the exception path both included).
      */
     suspend fun loadAsSpectator(bytes: ByteArray) = withContext(Dispatchers.IO) {
         if (bytes.isEmpty()) return@withContext
 
-        run {
-            try {
-                ZipInputStream(bytes.inputStream()).use { zis ->
-                    var projectData: GraffitiProject? = null
-                    val extractedFiles = mutableMapOf<String, ByteArray>()
-                    var totalBytes = 0L
+        val extractedFiles = mutableMapOf<String, File>()
+        try {
+            ZipInputStream(bytes.inputStream()).use { zis ->
+                var projectData: GraffitiProject? = null
+                var totalBytes = 0L
 
-                    var entry = zis.nextEntry
-                    while (entry != null) {
-                        val name = entry.name
-                        if (!entry.isDirectory && name.isNotEmpty()) {
-                            val read = readEntryBounded(zis, totalBytes)
-                            if (read == null) {
-                                Log.e("ProjectManager", "Spectator load aborted: archive exceeds $MAX_IMPORT_BYTES bytes")
-                                return@use
-                            }
-                            val (fileBytes, newTotal) = read
-                            totalBytes = newTotal
-                            if (name == "project.json") {
-                                projectData = json.decodeFromString<GraffitiProject>(fileBytes.decodeToString())
-                            }
-                            extractedFiles[name] = fileBytes
+                var entry = zis.nextEntry
+                while (entry != null) {
+                    val name = entry.name
+                    if (!entry.isDirectory && name.isNotEmpty()) {
+                        val streamed = streamEntryBounded(zis, totalBytes, context.cacheDir)
+                        if (streamed == null) {
+                            Log.e("ProjectManager", "Spectator load aborted: archive exceeds $MAX_IMPORT_BYTES bytes")
+                            return@use
                         }
-                        zis.closeEntry()
-                        entry = zis.nextEntry
-                    }
-
-                    val project = projectData ?: return@use
-                    // The archive arrived over the co-op wire — id and entry names are untrusted.
-                    if (!isSafeProjectId(project.id)) {
-                        Log.e("ProjectManager", "Spectator load rejected: unsafe project id")
-                        return@use
-                    }
-                    val destDir = File(context.filesDir, "projects/${project.id}").also { it.mkdirs() }
-
-                    for ((name, fileBytes) in extractedFiles) {
-                        val dest = resolveInside(destDir, name)
-                        if (dest == null) {
-                            Log.w("ProjectManager", "Skipping zip entry escaping project dir: $name")
-                            continue
+                        val (tmpFile, newTotal) = streamed
+                        totalBytes = newTotal
+                        if (name == "project.json") {
+                            projectData = json.decodeFromString<GraffitiProject>(tmpFile.readText())
                         }
-                        dest.parentFile?.mkdirs()
-                        dest.writeBytes(fileBytes)
+                        // Duplicate entry names must not leak the superseded temp file.
+                        extractedFiles.remove(name)?.delete()
+                        extractedFiles[name] = tmpFile
                     }
+                    zis.closeEntry()
+                    entry = zis.nextEntry
+                }
 
-                    withContext(Dispatchers.Main) {
-                        projectRepositoryProvider.get().createProject(project)
+                val project = projectData ?: return@use
+                // The archive arrived over the co-op wire — id and entry names are untrusted.
+                if (!isSafeProjectId(project.id)) {
+                    Log.e("ProjectManager", "Spectator load rejected: unsafe project id")
+                    return@use
+                }
+                val destDir = File(context.filesDir, "projects/${project.id}").also { it.mkdirs() }
+
+                for ((name, tmpFile) in extractedFiles) {
+                    val dest = resolveInside(destDir, name)
+                    if (dest == null) {
+                        Log.w("ProjectManager", "Skipping zip entry escaping project dir: $name")
+                        tmpFile.delete()
+                        continue
+                    }
+                    dest.parentFile?.mkdirs()
+                    if (dest.exists()) dest.delete()
+                    if (!tmpFile.renameTo(dest)) {
+                        tmpFile.copyTo(dest, overwrite = true)
+                        tmpFile.delete()
                     }
                 }
-            } catch (e: Exception) {
-                Log.e("ProjectManager", "loadAsSpectator failed", e)
+
+                withContext(Dispatchers.Main) {
+                    projectRepositoryProvider.get().createProject(project)
+                }
             }
+        } catch (e: Exception) {
+            Log.e("ProjectManager", "loadAsSpectator failed", e)
+        } finally {
+            // Temp files are only renamed away on the success path; clear any stragglers.
+            extractedFiles.values.forEach { if (it.exists()) it.delete() }
         }
     }
 

@@ -240,11 +240,19 @@ class MainViewModel @Inject constructor(
             val patch = grayPatchBytes(sensorBmp)
             slamManager.setWallPatchBytes(patch, PATCH_SIZE)
 
-            projectManager.saveProject(
-                context = context,
-                projectData = currentProject.copy(fingerprint = fp.copy(patchData = patch)),
-                targetImages = listOf(bitmap)
-            )
+            // Target capture is a writer of the SAME project.json as the editor's design-layer save and
+            // AR's wall-feature-map save. A raw whole-object saveProject here (as this used to be) would
+            // bypass the repository's atomic transform and could silently clobber whichever of those two
+            // ran concurrently (or be clobbered by them) — see docs/AUDIT.md save-race. Route through
+            // updateProject { } instead, and only copy the fields target-capture owns onto `current`.
+            val baseTargetUris = projectRepository.currentProject.value?.targetImageUris ?: currentProject.targetImageUris
+            val updatedTargetUris = projectManager.appendTargetImage(context, currentProject.id, baseTargetUris, bitmap)
+            projectRepository.updateProject { current ->
+                current.copy(
+                    fingerprint = fp.copy(patchData = patch),
+                    targetImageUris = updatedTargetUris,
+                )
+            }
 
             projectRepository.loadProject(currentProject.id)
             _uiState.update { it.copy(targetCapturedThisSession = true) }
@@ -388,9 +396,15 @@ class MainViewModel @Inject constructor(
             val patch = grayPatchBytes(bitmap)
             slamManager.setWallPatchBytes(patch, PATCH_SIZE)
 
-            projectManager.saveProject(
-                context = context,
-                projectData = currentProject.copy(
+            // Target capture is a writer of the SAME project.json as the editor's design-layer save and
+            // AR's wall-feature-map save. A raw whole-object saveProject here (as this used to be) would
+            // bypass the repository's atomic transform and could silently clobber whichever of those two
+            // ran concurrently (or be clobbered by them) — see docs/AUDIT.md save-race. Route through
+            // updateProject { } instead, and only copy the fields target-capture owns onto `current`.
+            val baseTargetUris = projectRepository.currentProject.value?.targetImageUris ?: currentProject.targetImageUris
+            val updatedTargetUris = projectManager.appendTargetImage(context, currentProject.id, baseTargetUris, bitmap)
+            projectRepository.updateProject { current ->
+                current.copy(
                     fingerprint = fp.copy(patchData = patch),
                     // Persist the capture's intrinsics + anchor + view — the exact values just fed to
                     // restoreWallFingerprintMetric — so reload relocalizes with the true intrinsics
@@ -409,9 +423,9 @@ class MainViewModel @Inject constructor(
                     // fingerprint's geometry is frozen at that instant, so these are the conditions
                     // any later attribution has to work from — and they exist nowhere else.
                     captureEnvironment = captureEnvironment,
-                ),
-                targetImages = listOf(bitmap)
-            )
+                    targetImageUris = updatedTargetUris,
+                )
+            }
             projectRepository.loadProject(currentProject.id)
             _uiState.update { it.copy(targetCapturedThisSession = true) }
             withContext(Dispatchers.Main) {

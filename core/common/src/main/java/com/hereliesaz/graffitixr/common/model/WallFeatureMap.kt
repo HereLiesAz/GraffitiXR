@@ -47,7 +47,11 @@ data class WallFeatureMap(
         // Defensive: the parallel arrays must agree so the native restore (Phase 2) can trust
         // them and never index out of bounds. Empty optional arrays are allowed.
         require(descriptorsRows >= 0 && descriptorsCols >= 0) { "descriptor dims must be non-negative" }
-        require(points3d.size == descriptorsRows * 3) {
+        // Widened to Long: a crafted/corrupt descriptorsRows (e.g. from an imported .gxr) can be
+        // large enough that `descriptorsRows * 3` wraps a 32-bit Int to a small value, which would
+        // make this guard satisfiable against the wrapped result instead of the real one — the same
+        // class of bug fixed on the native side (see GraffitiJNI.cpp's 64-bit row/col/elemSize checks).
+        require(points3d.size.toLong() == descriptorsRows.toLong() * 3L) {
             "points3d (${points3d.size}) must be 3 * descriptorsRows ($descriptorsRows)"
         }
         require(descriptorsRows == 0 || descriptorsData.size % descriptorsRows == 0) {

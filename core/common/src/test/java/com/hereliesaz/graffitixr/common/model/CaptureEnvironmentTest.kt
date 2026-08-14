@@ -149,6 +149,48 @@ class CaptureEnvironmentTest {
         assertEquals(false, FrameOrientation(0, 90, 90).autoRotateEnabled)
     }
 
+    /**
+     * The bug this whole class of sentinel exists to avoid missing: kotlinx.serialization throws by
+     * default when encoding a non-finite Float/Double, and azimuthDeg/bearingDeg/speedMps/altitudeM
+     * default to NaN — genuinely, at runtime, whenever a capture has (say) a GPS fix but no bearing
+     * because the user is standing still. Every other test in this file only ever serializes finite
+     * values, so this is the one that actually exercises the sentinel through a real encode/decode —
+     * and it only passes with `allowSpecialFloatingPointValues = true` (see ProjectManager's `json`,
+     * which sets it for exactly this reason; the plain `json` above in this file does not, and would
+     * throw on this same input).
+     */
+    @Test
+    fun `NaN sentinel fields round trip through a Json that allows special floating point values`() {
+        val permissive = Json { ignoreUnknownKeys = true; encodeDefaults = true; allowSpecialFloatingPointValues = true }
+        val env = CaptureEnvironment(
+            location = LocationFix(latitude = 51.5072, longitude = -0.1276), // bearingDeg/speedMps -> NaN
+            attitude = DeviceAttitude(), // azimuthDeg/pitchDeg/rollDeg -> NaN
+        )
+
+        val decoded = permissive.decodeFromString<CaptureEnvironment>(permissive.encodeToString(env))
+
+        assertEquals(env, decoded)
+        val decodedLocation = decoded.location!!
+        assertTrue(decodedLocation.bearingDeg.isNaN())
+        assertTrue(decodedLocation.speedMps.isNaN())
+        assertTrue(decoded.attitude!!.azimuthDeg.isNaN())
+    }
+
+    /**
+     * The failure mode this guards against: WITHOUT `allowSpecialFloatingPointValues`, encoding the
+     * exact same everyday capture (GPS fix, no bearing) throws instead of saving.
+     */
+    @Test
+    fun `the same NaN-bearing record throws on a Json without allowSpecialFloatingPointValues`() {
+        val env = CaptureEnvironment(location = LocationFix(latitude = 1.0, longitude = 2.0))
+        try {
+            json.encodeToString(env)
+            org.junit.Assert.fail("expected encoding a NaN field to throw without allowSpecialFloatingPointValues")
+        } catch (e: kotlinx.serialization.SerializationException) {
+            // expected — this is exactly the crash the production Json config must avoid.
+        }
+    }
+
     /** The arithmetic the capture path performs, pinned so a stored record can be re-checked. */
     @Test
     fun `rotationNeeded is consistent with its two inputs`() {
