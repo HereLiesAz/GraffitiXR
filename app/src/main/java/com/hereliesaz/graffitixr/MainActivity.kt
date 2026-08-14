@@ -609,7 +609,10 @@ class MainActivity : ComponentActivity() {
                 //
                 // Strictly contained: gated behind the tutorial key + ARCore availability + camera
                 // permission. If any condition fails it's a complete no-op and normal library startup
-                // is byte-for-byte unchanged. The key is marked complete only once detection lands.
+                // is byte-for-byte unchanged. The key is marked complete on detection landing (the
+                // intended path) and equally on every way out of the flow — the explainer dialog's
+                // dismiss and "Not now", and the DRAW stage's "Skip" — so declining doesn't re-offer
+                // the walkthrough on a later cold launch. It does not mean "the user has a fingerprint."
                 val firstRunDoodleKey = "first_run_ar_doodle"
                 val firstRunCompletedTutorials by mainViewModel.completedTutorials.collectAsState()
                 // rememberSaveable so a process/config event mid-flow doesn't reset the stage and
@@ -1003,38 +1006,13 @@ class MainActivity : ComponentActivity() {
 
                         var fullSize by remember { mutableStateOf(IntSize.Zero) }
 
+                        // The 4-tap touch-unlock gesture is handled once, by TouchLockOverlay below
+                        // (core/design's Overlays.kt) — it already blocks and counts every touch while
+                        // locked (fillMaxSize + zIndex(100f) + its own consuming pointerInput), so this
+                        // Box does not need — and used to duplicate — a second, independent recognizer.
                         Box(Modifier
                             .fillMaxSize()
                             .onSizeChanged { fullSize = it }
-                            .then(
-                                if (mainUiState.isTouchLocked) {
-                                    Modifier.pointerInput(Unit) {
-                                        awaitPointerEventScope {
-                                            // Windowed like TouchLockOverlay in core/design's Overlays.kt:
-                                            // a tap only counts toward the unlock if it follows the
-                                            // previous one within ~500ms, so touches scattered across an
-                                            // entire session (e.g. paper being laid down/pressed/slid
-                                            // while tracing) can't silently accumulate into an unlock.
-                                            var lockTaps = 0
-                                            var lastTapTime = 0L
-                                            while (true) {
-                                                val event = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Initial)
-                                                val isDown = event.changes.any { it.pressed && !it.previousPressed }
-                                                event.changes.forEach { it.consume() }
-                                                if (isDown) {
-                                                    val now = System.currentTimeMillis()
-                                                    lockTaps = if (now - lastTapTime < 500) lockTaps + 1 else 1
-                                                    lastTapTime = now
-                                                    if (lockTaps >= 4) {
-                                                        lockTaps = 0
-                                                        mainViewModel.setTouchLocked(false)
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                } else Modifier
-                            )
                         ) {
                             AzNavHost(startDestination = LIBRARY_ROUTE) {
                                 composable(LIBRARY_ROUTE) {
@@ -1733,12 +1711,19 @@ class MainActivity : ComponentActivity() {
             // expanding it reveals Open (the action that used to sit here on its own) and the
             // per-design Adjust folder as sub-items, so "start a design" and "adjust it" live under
             // one folder instead of two unrelated top-level entries.
+            //
+            // expandWhen forces this open whenever the user is actually IN Design mode (matching
+            // host.modes' expandWhen pattern below) — landing here via "New Project" / "Load" /
+            // the AR-stall fallback all navigate directly, never through a rail tap, so without this
+            // the host stayed collapsed and both Open and the guidance callout that points at it
+            // ("Tap 'Open' to add your first layer") were unreachable/invisible on a first run.
             azRailHostItem(
                 id = "mode.design",
                 text = navStrings.design,
                 route = EditorMode.DESIGN.name,
                 color = navItemColor,
                 initiallyExpanded = railExpansion["mode.design"] ?: false,
+                expandWhen = { isDesignMode },
                 onExpandedChange = { editorViewModel.onRailHostExpansionChanged("mode.design", it) },
             )
             // Open — opens an image picker so the chosen image lands as a new layer, staying in the
