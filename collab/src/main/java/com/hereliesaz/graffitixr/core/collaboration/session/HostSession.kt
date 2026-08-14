@@ -1,6 +1,7 @@
 // collab/src/main/java/com/hereliesaz/graffitixr/core/collaboration/session/HostSession.kt
 package com.hereliesaz.graffitixr.core.collaboration.session
 
+import android.util.Log
 import com.hereliesaz.graffitixr.common.model.CoopSessionState
 import com.hereliesaz.graffitixr.common.model.Op
 import com.hereliesaz.graffitixr.core.collaboration.wire.BulkAckPayload
@@ -97,8 +98,36 @@ internal class HostSession(
     // access to crypto's send counter (each of the outbound/inbound/heartbeat loops writes here).
     private suspend fun writeSecure(output: OutputStream, crypto: SessionCrypto, type: FrameType, payload: ByteArray) {
         writeMutex.withLock {
-            Frame.write(output, FrameType.ENC, crypto.seal(type, payload))
-            output.flush()
+            writeFrameTimed(output, FrameType.ENC, crypto.seal(type, payload))
+        }
+    }
+
+    /**
+     * Write one frame with a bound on wall-clock time, so a guest that stops reading
+     * (backgrounded app, throttled network, or a hostile peer that just never calls read())
+     * cannot block this write forever. acceptLoop calls handleConnection synchronously and
+     * single-threaded, so an unbounded write here — the handshake replies, [sendBulk], and the
+     * reconnect replay all go through this path — would wedge the accept loop for every
+     * subsequent joiner indefinitely.
+     *
+     * `java.net.Socket` exposes no write-side timeout (`soTimeout` only bounds reads), so the
+     * actual write runs on a plain IO thread and this coroutine only waits up to
+     * [WRITE_TIMEOUT_MS] for it. If it doesn't finish in time, the coroutine gives up, but the
+     * underlying thread is still parked inside the blocking write call — closing [output] (which,
+     * per `Socket.getOutputStream`'s contract, closes the socket) unblocks that thread with an
+     * IOException, then this function throws so the caller treats it exactly like any other
+     * failed write: a dropped connection, not a wedged one.
+     */
+    private suspend fun writeFrameTimed(output: OutputStream, type: FrameType, payload: ByteArray) {
+        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+            withContext(Dispatchers.IO) {
+                Frame.write(output, type, payload)
+                output.flush()
+            }
+        }
+        if (completed == null) {
+            try { output.close() } catch (_: Exception) {}
+            throw java.io.IOException("write timed out after ${WRITE_TIMEOUT_MS}ms")
         }
     }
 
@@ -139,6 +168,14 @@ internal class HostSession(
      * Encoding runs on the caller's thread; ops carrying large payloads (LayerBitmapReplace)
      * should be enqueued from a background dispatcher, which OpEmitterImpl's editor call sites
      * already do.
+     *
+     * An op whose encoded DELTA frame cannot fit under [Frame.MAX_PAYLOAD_BYTES] is rejected here
+     * rather than queued: [Frame.write] would throw [IllegalArgumentException] the moment this op
+     * reached the wire, and that happens twice over for a bad entry — once (harmlessly) in
+     * [outboundLoop], which treats any write failure as a dropped connection, and then again,
+     * unguarded, on every subsequent reconnect's replay in [handleConnection], permanently
+     * stranding the guest. Refusing it here means it never enters [deltaBuffer] or [outQueue] at
+     * all, so neither path ever sees it.
      */
     fun enqueueOp(op: Op) {
         synchronized(enqueueLock) {
@@ -148,6 +185,15 @@ internal class HostSession(
             if (phase == Phase.Ended) return
             val seq = seqCounter.incrementAndGet()
             val bytes = OpCodec.encode(DeltaPayload(seq, op))
+            if (bytes.size > Frame.MAX_PAYLOAD_BYTES) {
+                Log.w(
+                    TAG,
+                    "dropping op (seq=$seq, ${op.javaClass.simpleName}): encoded size ${bytes.size}B " +
+                        "exceeds Frame.MAX_PAYLOAD_BYTES (${Frame.MAX_PAYLOAD_BYTES}B); it can never " +
+                        "be sent as a single DELTA frame",
+                )
+                return
+            }
             deltaBuffer.append(seq, op, bytes.size)
             outQueue.trySend(EncodedDelta(seq, bytes))
         }
@@ -159,6 +205,13 @@ internal class HostSession(
                 ss.accept()
             } catch (_: Exception) {
                 if (!scope.isActive) return
+                // close() sets phase = Ended and _state.value = Ended(reason) BEFORE closing
+                // serverSocket in its finally block; closing serverSocket is exactly what
+                // unblocks this accept() with a SocketException. Without this guard, that
+                // exception races scope.cancel() (nothing serializes them) and can land here
+                // first, overwriting the deliberate close reason with a misreported
+                // NetworkLost. Mirrors GuestSession.attemptReconnect()'s phase == Ended check.
+                if (phase == Phase.Ended) return
                 _state.value = CoopSessionState.Ended(CoopSessionState.EndReason.NetworkLost)
                 return
             }
@@ -202,32 +255,32 @@ internal class HostSession(
         val prk = SessionCrypto.prk(token)
         val expectedProof = SessionCrypto.helloProof(prk, hello.guestNonce)
         if (!java.security.MessageDigest.isEqual(hello.proof, expectedProof)) {
-            Frame.write(
+            writeFrameTimed(
                 output,
                 FrameType.HELLO_REJECTED,
                 OpCodec.encode(HelloRejectedPayload(HelloRejectedPayload.RejectReason.BadToken)),
             )
-            output.flush(); socket.close(); return
+            socket.close(); return
         }
         if (hello.clientVersion != protocolVersion) {
-            Frame.write(
+            writeFrameTimed(
                 output,
                 FrameType.HELLO_REJECTED,
                 OpCodec.encode(HelloRejectedPayload(HelloRejectedPayload.RejectReason.VersionMismatch)),
             )
-            output.flush(); socket.close(); return
+            socket.close(); return
         }
 
         // Single guest only. A reconnecting guest is fine because enterReconnecting() nulls
         // clientSocket before the new connection; a *second* concurrent guest is rejected so
         // two live phases never share (and interleave on) the same outQueue/output.
         if (clientSocket != null) {
-            Frame.write(
+            writeFrameTimed(
                 output,
                 FrameType.HELLO_REJECTED,
                 OpCodec.encode(HelloRejectedPayload(HelloRejectedPayload.RejectReason.AlreadyHosting)),
             )
-            output.flush(); socket.close(); return
+            socket.close(); return
         }
 
         // Accept. Build the per-connection crypto from token + both nonces (fresh keys every
@@ -236,7 +289,7 @@ internal class HostSession(
         val hostProof = SessionCrypto.helloOkProof(prk, hostNonce, hello.guestNonce)
         val crypto = SessionCrypto.forHost(token, sessionId, hello.guestNonce, hostNonce)
         activeCrypto = crypto
-        Frame.write(
+        writeFrameTimed(
             output,
             FrameType.HELLO_OK,
             OpCodec.encode(
@@ -249,7 +302,6 @@ internal class HostSession(
                 )
             ),
         )
-        output.flush()
 
         clientSocket = socket
         val isReconnect = hello.lastAppliedSeq > 0
@@ -267,7 +319,18 @@ internal class HostSession(
         val replay = if (isReconnect) deltaBuffer.opsAfter(lastAppliedSeq) else null
         if (replay != null) {
             replay.forEach { (seq, op) ->
-                writeSecure(output, crypto, FrameType.DELTA, OpCodec.encode(DeltaPayload(seq, op)))
+                // Each entry gets its own try/catch: enqueueOp now rejects an op that can't fit a
+                // single Frame before it ever reaches deltaBuffer, but this stays defensive against
+                // any other cause of a bad/oversized buffered entry (e.g. version skew with a peer
+                // running an older cap). Without this, one bad entry threw uncaught here, which
+                // killed this fresh connection on every reconnect attempt — the guest reconnects
+                // successfully at the transport layer and is killed again each time, stranded until
+                // its reconnect window expires. Log and skip instead.
+                try {
+                    writeSecure(output, crypto, FrameType.DELTA, OpCodec.encode(DeltaPayload(seq, op)))
+                } catch (e: Exception) {
+                    Log.w(TAG, "skipping unsendable replay entry (seq=$seq, ${op.javaClass.simpleName})", e)
+                }
             }
         } else {
             sendBulk(output, crypto)
@@ -408,23 +471,29 @@ internal class HostSession(
      * is plaintext; once a live connection exists it is sealed like every other frame so the
      * guest, which only accepts ENC frames post-handshake, can act on the reason.
      */
-    private fun sendBye(output: OutputStream, reason: CoopSessionState.EndReason, crypto: SessionCrypto?) {
+    private suspend fun sendBye(output: OutputStream, reason: CoopSessionState.EndReason, crypto: SessionCrypto?) {
         try {
             val payload = OpCodec.encode(ByePayload(reason))
             if (crypto != null) {
-                Frame.write(output, FrameType.ENC, crypto.seal(FrameType.BYE, payload))
+                writeFrameTimed(output, FrameType.ENC, crypto.seal(FrameType.BYE, payload))
             } else {
-                Frame.write(output, FrameType.BYE, payload)
+                writeFrameTimed(output, FrameType.BYE, payload)
             }
-            output.flush()
-        } catch (_: Exception) { /* socket may already be closed */ }
+        } catch (_: Exception) { /* socket may already be closed, or the write timed out */ }
     }
 
     private companion object {
+        private const val TAG = "HostSession"
+
         // Guests ack every 1s and answer 5s PINGs, so 15s of read silence means a dead or
         // half-open peer. Also bounds handshake reads in handleConnection, so a stalled
         // client can block the accept loop for at most this long.
         const val READ_TIMEOUT_MS = 15_000
+
+        // Plain java.net.Socket exposes no write-side timeout, so writeFrameTimed enforces one
+        // itself. Mirrors READ_TIMEOUT_MS: a guest that stops reading for this long (backgrounded,
+        // throttled, or hostile) is treated as gone rather than left to block the accept loop.
+        const val WRITE_TIMEOUT_MS = 15_000L
     }
 
     override suspend fun close(reason: CoopSessionState.EndReason) {
