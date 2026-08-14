@@ -855,9 +855,19 @@ class ArRenderer(
         startStallWatchdog()
     }
 
-    /** Watches the GL render thread from the side. If onDrawFrame stops advancing (e.g. blocked in
-     *  session.update() because the camera never feeds ARCore), the blocked thread can't report, so
-     *  this one surfaces the stuck step on screen exactly once. */
+    /** Watches the GL render thread from the side. If onDrawFrame stops advancing — blocked inside
+     *  session.update() or another native call — the blocked thread can't report on itself, so this
+     *  one surfaces the stuck step on screen exactly once (per attach/reconfigure — see
+     *  [resetCameraStreamWatchdog]).
+     *
+     *  This tracks "time since the last onDrawFrame tick" ([lastTickMs]), which keeps advancing right
+     *  up until a stall starts NO MATTER WHEN that is — including well after the camera has already
+     *  been streaming successfully for a while (e.g. it is later disconnected, or an unrelated ARCore
+     *  native call wedges). The condition below must therefore NOT also require `!camStreamReported`:
+     *  that field latches true on the FIRST successful camera frame and is only cleared by
+     *  [resetCameraStreamWatchdog], so gating on it made this watchdog fire at most once ever, and only
+     *  for a stall that happened before any frame had arrived — a later stall, which is exactly the
+     *  case this doc describes, could never be caught. */
     private fun startStallWatchdog() {
         if (watchdog != null) return
         lastTickMs = android.os.SystemClock.elapsedRealtime()
@@ -867,13 +877,18 @@ class ArRenderer(
                 val tick = lastTickMs
                 if (tick == 0L || isDestroying) continue
                 val age = android.os.SystemClock.elapsedRealtime() - tick
-                if (age > 2500 && !stallReported && !camStreamReported) {
+                if (age > 2500 && !stallReported) {
                     stallReported = true
                     // lastStep now tracks every stage of onDrawFrame (not just up to "update"), so
                     // this names the actual wedged stage: "update" = ARCore blocked waiting on the
                     // camera; "slamCamera"/"slamFeed"/"mesh" = a native SLAM call; "frameDone" =
                     // the frame finished and the GL thread never came back (swap/pause/scheduler).
-                    onDiag("RENDER STALLED f=$frameCount step=$lastStep for ${age}ms (no camera frame ever arrived)")
+                    val whenText = if (camStreamReported) {
+                        "camera had already been streaming"
+                    } else {
+                        "no camera frame ever arrived"
+                    }
+                    onDiag("RENDER STALLED f=$frameCount step=$lastStep for ${age}ms ($whenText)")
                     reportCameraNotFeeding()
                 }
             }
