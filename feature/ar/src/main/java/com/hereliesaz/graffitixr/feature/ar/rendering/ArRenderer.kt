@@ -219,7 +219,12 @@ class ArRenderer(
     private val arDebugRenderer = ArDebugRenderer()
     // Independent perception-layer toggles (Settings; default on). Drawn while in AR and tracking,
     // suppressed during target capture. Each governs one layer of "what the AR is seeing".
-    @Volatile var showFeaturePoints: Boolean = true  // ARCore tracker landmarks (yellow dots)
+    // showFeaturePoints defaults to false here, matching EditorUiState.showFeaturePoints's own
+    // default (core/common/EditorModels.kt) — MainScreen always pushes the real persisted value into
+    // this field right after attaching the renderer, but for the one composition before that push
+    // lands, this field's own default is what's actually drawn, so it needs to agree with the UI
+    // state's default rather than silently overriding it to "on".
+    @Volatile var showFeaturePoints: Boolean = false // ARCore tracker landmarks (yellow dots)
     @Volatile var showPlaneGrids: Boolean = true      // detected planes as metric grids
     @Volatile var showPoints: Boolean = true          // accumulated sparse point cloud
 
