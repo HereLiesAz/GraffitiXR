@@ -1,8 +1,12 @@
 package com.hereliesaz.graffitixr.data
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.net.Uri
+import com.hereliesaz.graffitixr.common.model.CaptureEnvironment
+import com.hereliesaz.graffitixr.common.model.DeviceAttitude
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
+import com.hereliesaz.graffitixr.common.model.LocationFix
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -14,6 +18,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -201,4 +206,119 @@ class ProjectManagerTest {
         // Read path must be side-effect free: bytes on disk untouched.
         assertEquals(legacyJson, projectFile.readText())
     }
+
+    // --- NaN sentinel serialization (CaptureEnvironment) ---
+
+    @Test
+    fun `saveProject does not throw when captureEnvironment has NaN sentinel fields`() = runTest {
+        // GPS very often has a fix but no bearing/speed (a user standing still) — those default to
+        // Float.NaN (see LocationFix), and DeviceAttitude's azimuth/pitch/roll do the same when no
+        // absolute heading is available. kotlinx.serialization throws on a non-finite float unless
+        // the Json is configured for it — this must not crash an entirely ordinary capture.
+        val env = CaptureEnvironment(
+            location = LocationFix(latitude = 40.0, longitude = -74.0), // bearingDeg/speedMps -> NaN
+            attitude = DeviceAttitude(), // azimuthDeg/pitchDeg/rollDeg -> NaN
+        )
+        val project = GraffitiProject(id = "nan_project", name = "NaN test", captureEnvironment = env)
+
+        // Must not throw.
+        manager.saveProject(mockContext, project)
+
+        val loaded = manager.loadProjectMetadata(mockContext, "nan_project")
+        assertEquals(40.0, loaded?.captureEnvironment?.location?.latitude ?: 0.0, 0.0)
+        assertTrue(loaded?.captureEnvironment?.location?.bearingDeg?.isNaN() == true)
+        assertTrue(loaded?.captureEnvironment?.location?.speedMps?.isNaN() == true)
+        assertTrue(loaded?.captureEnvironment?.attitude?.azimuthDeg?.isNaN() == true)
+    }
+
+    // --- Target image pruning (unbounded growth) ---
+
+    /** A [UriProvider] whose returned [Uri] mocks expose a real, deletable file path. */
+    private fun realFileUriProvider(): UriProvider = object : UriProvider {
+        override fun getUriForFile(file: File): Uri {
+            val u = mockk<Uri>(relaxed = true)
+            every { u.path } returns file.absolutePath
+            every { u.toString() } returns "file://${file.absolutePath}"
+            return u
+        }
+    }
+
+    @Test
+    fun `saveProject prunes target images beyond the cap and deletes their files`() = runTest {
+        // The default `Uri.parse` stub from setup() returns the SAME opaque mock for every string,
+        // which would make a round-tripped URI's `.path` meaningless. Override it here so decoding
+        // the "file://..." strings this test's UriProvider writes reconstructs a working `.path`,
+        // mirroring what real android.net.Uri.parse/.fromFile actually do.
+        every { Uri.parse(any()) } answers {
+            val s = firstArg<String>()
+            mockk<Uri>(relaxed = true).also { m ->
+                every { m.path } returns s.removePrefix("file://")
+                every { m.toString() } returns s
+            }
+        }
+
+        val projectRepositoryProvider = mockk<javax.inject.Provider<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>>(relaxed = true)
+        val pruningManager = ProjectManager(mockContext, realFileUriProvider(), projectRepositoryProvider)
+        val bitmap = mockk<Bitmap>(relaxed = true)
+
+        var project = GraffitiProject(id = "many_targets", name = "Many targets")
+        // One capture at a time, as the real capture flow does — 35 captures against a cap of 30.
+        repeat(35) {
+            pruningManager.saveProject(mockContext, project, targetImages = listOf(bitmap))
+            project = pruningManager.loadProjectMetadata(mockContext, "many_targets")!!
+        }
+
+        assertEquals(30, project.targetImageUris.size)
+        // Nothing beyond the cap remains on disk — pruned entries are deleted, not merely dropped
+        // from the list.
+        val targetFiles = File(tempFilesDir, "projects/many_targets").listFiles { f -> f.name.startsWith("target_") }
+        assertEquals(30, targetFiles?.size ?: -1)
+    }
+
+    @Test
+    fun `appendTargetImage prunes beyond the cap without touching project json`() = runTest {
+        val projectRepositoryProvider = mockk<javax.inject.Provider<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>>(relaxed = true)
+        val pruningManager = ProjectManager(mockContext, realFileUriProvider(), projectRepositoryProvider)
+        val bitmap = mockk<Bitmap>(relaxed = true)
+
+        var uris = emptyList<Uri>()
+        repeat(35) {
+            uris = pruningManager.appendTargetImage(mockContext, "capture_only", uris, bitmap)
+        }
+
+        assertEquals(30, uris.size)
+        // Pure file IO: appendTargetImage must never create project.json.
+        assertFalse(File(tempFilesDir, "projects/capture_only/project.json").exists())
+        val targetFiles = File(tempFilesDir, "projects/capture_only").listFiles { f -> f.name.startsWith("target_") }
+        assertEquals(30, targetFiles?.size ?: -1)
+    }
+
+    // --- Zip extraction temp-file cleanup (duplicate entry names) ---
+
+    @Test
+    fun `import deletes the superseded temp file on duplicate entry names`() = runTest {
+        // Both entries strip (first path segment removed) to the same relative name "dup.png" — the
+        // LATER entry must win, and the EARLIER entry's temp file must not leak into the cache dir.
+        val zip = zipOf(
+            "project.json" to projectJson("dup_project"),
+            "a/dup.png" to byteArrayOf(1, 1, 1),
+            "b/dup.png" to byteArrayOf(2, 2, 2, 2),
+        )
+
+        val result = importZip(zip)
+
+        assertEquals("dup_project", result?.id)
+        val destFile = File(tempFilesDir, "projects/dup_project/dup.png")
+        assertTrue(destFile.exists())
+        assertArrayEquals(byteArrayOf(2, 2, 2, 2), destFile.readBytes())
+
+        val cacheDir = File(tempFilesDir, "cache")
+        val leftoverTempFiles = cacheDir.listFiles { f -> f.name.startsWith("gxr_") } ?: emptyArray()
+        assertTrue(
+            "cache dir must not accumulate a leaked temp file from the superseded duplicate: " +
+                leftoverTempFiles.joinToString { it.name },
+            leftoverTempFiles.isEmpty(),
+        )
+    }
+
 }

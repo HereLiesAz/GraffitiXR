@@ -808,7 +808,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFeature
     jsize descLen = env->GetArrayLength(descArray);
     if ((jlong)rows * (jlong)cols * (jlong)CV_ELEM_SIZE(type) > (jlong)descLen) return;
     jsize ptsLen = env->GetArrayLength(ptsArray);
-    if (ptsLen != rows * 3) return;
+    // 64-bit, matching the rows*cols*elemSize check above: `rows * 3` computed in 32-bit jint can
+    // wrap for a hostile large `rows`, making this comparison pass against the wrapped value even
+    // though the real row count is huge — which would then feed `points3d.reserve(rows)` below,
+    // outside any try/catch, and a multi-gigabyte reserve() throws std::bad_alloc -> std::terminate.
+    if ((jlong)ptsLen != (jlong)rows * 3LL) return;
     jsize confLen = confArray ? env->GetArrayLength(confArray) : 0;
     if (confLen > 0 && confLen != rows) return;
     jsize obsLen = obsArray ? env->GetArrayLength(obsArray) : 0;

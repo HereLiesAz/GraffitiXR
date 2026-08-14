@@ -5,6 +5,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 
 /**
@@ -69,5 +70,25 @@ class WallFeatureMapTest {
         val decoded = json.decodeFromString<WallFeatureMap>(json.encodeToString(WallFeatureMap()))
         assertEquals(WallFeatureMap(), decoded)
         assertEquals(0, decoded.pointCount)
+    }
+
+    /**
+     * A crafted/corrupt `descriptorsRows` (e.g. from an imported `.gxr`) must not be able to slip a
+     * tiny `points3d` array past the size check by overflowing `descriptorsRows * 3` in 32-bit Int.
+     * 1_431_655_766 * 3 == 4_294_967_298, which wraps a 32-bit Int to 2 — so a hostile row count
+     * paired with a 2-element points3d would satisfy a naive `Int` comparison even though the real
+     * required size (over four billion floats) could never actually be allocated. The constructor
+     * must reject this regardless (see the 64-bit-widened check in the init block).
+     */
+    @Test
+    fun `constructor rejects a descriptorsRows count that would 32-bit-overflow the points3d size check`() {
+        val hostileRows = 1_431_655_766
+        val wrappedSize = 2 // (hostileRows * 3) truncated to a 32-bit Int wraps to this
+        try {
+            WallFeatureMap(points3d = FloatArray(wrappedSize), descriptorsRows = hostileRows)
+            fail("expected the 64-bit-widened points3d size check to reject a wrapped hostile row count")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
     }
 }

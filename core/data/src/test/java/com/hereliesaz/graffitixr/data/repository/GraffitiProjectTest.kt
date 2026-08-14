@@ -57,13 +57,14 @@ class GraffitiProjectTest {
         assertEquals("Test Project", project.name)
         assertEquals(true, project.layers[0].isImageLocked)
 
-        // Actually exercise serialization — the test name promised a round-trip but only ever
-        // checked the constructed object's fields, so a serialization regression went uncaught.
+        // Full round-trip equality — the test name promised "preserves all fields" but only ever
+        // checked 4 of the class's ~30, so a regression in any OTHER field (there is no shortage:
+        // drawingPaths, gpsData, fingerprintIntrinsics, railExpansion, ...) went uncaught. GraffitiProject
+        // is a data class, so assertEquals against the whole object exercises every field at once;
+        // WallFeatureMap/Fingerprint (left at their null defaults here) have their own dedicated
+        // array-aware equals() overrides, covered separately by the tests below.
         val decoded = json.decodeFromString<GraffitiProject>(json.encodeToString(project))
-        assertEquals("test-id", decoded.id)
-        assertEquals("Test Project", decoded.name)
-        assertEquals(true, decoded.layers[0].isImageLocked)
-        assertEquals("/path/to/fingerprint", decoded.targetFingerprintPath)
+        assertEquals(project, decoded)
     }
 
     @Test
