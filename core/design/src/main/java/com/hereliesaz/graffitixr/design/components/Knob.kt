@@ -46,6 +46,10 @@ import kotlin.math.sin
  * @param valueRange The valid range of values (min..max).
  * @param modifier The modifier to be applied to the layout.
  * @param color The primary color of the knob indicator.
+ * @param labelColor The color of the text label below the knob. Defaults to white; callers that
+ *   know the surrounding canvas/background color should pass a luminance-aware color (see
+ *   [com.hereliesaz.graffitixr.design.theme.contrastColorFor]) so the label stays legible against
+ *   light backgrounds too.
  * @param defaultValue The value to reset to on double-tap.
  * @param valueFormatter Function to format the value for accessibility state description.
  */
@@ -59,6 +63,7 @@ fun Knob(
     valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
     modifier: Modifier = Modifier,
     color: Color = Color.White,
+    labelColor: Color = Color.White,
     defaultValue: Float = valueRange.start,
     valueFormatter: (Float) -> String = { "%.2f".format(it) }
 ) {
@@ -191,6 +196,6 @@ fun Knob(
             }
         }
         Spacer(modifier = Modifier.height(4.dp))
-        Text(text = text, style = MaterialTheme.typography.labelSmall, color = Color.White)
+        Text(text = text, style = MaterialTheme.typography.labelSmall, color = labelColor)
     }
 }

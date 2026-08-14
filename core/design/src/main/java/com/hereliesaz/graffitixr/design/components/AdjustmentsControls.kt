@@ -8,7 +8,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.SettingsBackupRestore
 import androidx.compose.material3.Icon
@@ -43,6 +42,14 @@ fun UndoRedoRow(
      */
     isResetActive: Boolean = false,
     onReset: () -> Unit = {},
+    /**
+     * Color for the undo/redo count labels. Defaults to the theme's onSurface color (which
+     * Theme.kt currently pins to white); callers that know the surrounding canvas/background
+     * color should pass a luminance-aware color instead, e.g. via
+     * [com.hereliesaz.graffitixr.design.theme.contrastColorFor], so the counts stay legible
+     * against light canvas-background presets too.
+     */
+    countColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     Row(
         modifier = modifier
@@ -71,7 +78,7 @@ fun UndoRedoRow(
                 Text(
                     text = undoCount.toString(),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = countColor,
                     modifier = Modifier.padding(start = 4.dp)
                 )
             }
@@ -98,7 +105,7 @@ fun UndoRedoRow(
                 Text(
                     text = redoCount.toString(),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = countColor,
                     modifier = Modifier.padding(end = 4.dp)
                 )
             }
@@ -134,7 +141,9 @@ fun AdjustmentsKnobsRow(
     onAdjustmentStart: () -> Unit,
     onAdjustmentEnd: () -> Unit,
     strings: AppStrings,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** See [Knob]'s labelColor: defaults to white, pass a luminance-aware color for light canvases. */
+    labelColor: Color = Color.White
 ) {
     Row(
         modifier = modifier
@@ -149,6 +158,7 @@ fun AdjustmentsKnobsRow(
             onValueChangeFinished = onAdjustmentEnd,
             text = strings.adj.opacity,
             color = MaterialTheme.colorScheme.secondary,
+            labelColor = labelColor,
             valueRange = 0f..1f,
             defaultValue = 1f,
             valueFormatter = { "${(it * 100).roundToInt()}%" }
@@ -160,6 +170,7 @@ fun AdjustmentsKnobsRow(
             onValueChangeFinished = onAdjustmentEnd,
             text = strings.adj.brightness,
             color = MaterialTheme.colorScheme.onSurface,
+            labelColor = labelColor,
             valueRange = -1f..1f,
             defaultValue = 0f,
             valueFormatter = { "${(it * 100).roundToInt()}%" }
@@ -171,6 +182,7 @@ fun AdjustmentsKnobsRow(
             onValueChangeFinished = onAdjustmentEnd,
             text = strings.adj.contrast,
             color = MaterialTheme.colorScheme.tertiary,
+            labelColor = labelColor,
             valueRange = 0f..2f,
             defaultValue = 1f,
             valueFormatter = { "${(it * 100).roundToInt()}%" }
@@ -182,6 +194,7 @@ fun AdjustmentsKnobsRow(
             onValueChangeFinished = onAdjustmentEnd,
             text = strings.adj.saturation,
             color = MaterialTheme.colorScheme.primary,
+            labelColor = labelColor,
             valueRange = 0f..2f,
             defaultValue = 1f,
             valueFormatter = { "${(it * 100).roundToInt()}%" }
@@ -200,7 +213,9 @@ fun ColorBalanceKnobsRow(
     onAdjustmentStart: () -> Unit,
     onAdjustmentEnd: () -> Unit,
     strings: AppStrings,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** See [Knob]'s labelColor: defaults to white, pass a luminance-aware color for light canvases. */
+    labelColor: Color = Color.White
 ) {
     Row(
         modifier = modifier
@@ -216,6 +231,7 @@ fun ColorBalanceKnobsRow(
             onValueChangeFinished = onAdjustmentEnd,
             text = strings.adj.red,
             color = Color.Red,
+            labelColor = labelColor,
             valueRange = 0f..2f,
             defaultValue = 1f,
             valueFormatter = { "${(it * 100).roundToInt()}%" }
@@ -228,6 +244,7 @@ fun ColorBalanceKnobsRow(
             onValueChangeFinished = onAdjustmentEnd,
             text = strings.adj.green,
             color = Color.Green,
+            labelColor = labelColor,
             valueRange = 0f..2f,
             defaultValue = 1f,
             valueFormatter = { "${(it * 100).roundToInt()}%" }
@@ -240,6 +257,7 @@ fun ColorBalanceKnobsRow(
             onValueChangeFinished = onAdjustmentEnd,
             text = strings.adj.blue,
             color = Color.Blue,
+            labelColor = labelColor,
             valueRange = 0f..2f,
             defaultValue = 1f,
             valueFormatter = { "${(it * 100).roundToInt()}%" }

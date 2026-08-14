@@ -381,6 +381,10 @@
     <string name="status_world_mapped">WORLD MAPPED: %1$d%%</string>
     <string name="status_ready">Ready. (%1$d pts)</string>
     <string name="unlock_hint">Tap 4 times to unlock</string>
+    <string name="rotation_axis_feedback">Rotating on %1$s axis</string>
+    <string name="rotation_axis_x">X</string>
+    <string name="rotation_axis_y">Y</string>
+    <string name="rotation_axis_z">Z</string>
 
     <!-- Library Screen -->
     <string name="lib_app_title">GraffitiXR</string>
