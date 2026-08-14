@@ -213,9 +213,10 @@ class ArRenderer(
     private val pointCloudRenderer = PointCloudRenderer()
     private val planeRenderer = PlaneRenderer()
     // Diagnostic "what is the AR seeing" view: current-frame ARCore feature points (yellow) +
-    // tracked planes, drawn over the camera whenever showArDebugView is set. Tied by MainScreen
-    // to the Diagnostic Overlay setting. Separate from pointCloudRenderer, which accumulates and
-    // persists with the project.
+    // tracked planes, drawn over the camera whenever showFeaturePoints is set. Tied by MainScreen
+    // to the Diagnostic Overlay setting. Separate from pointCloudRenderer, which accumulates points
+    // across frames in memory for scan hints/phase completion — neither renderer persists points
+    // with the project (see ArDebugRenderer's class doc for why the point cloud specifically doesn't).
     private val arDebugRenderer = ArDebugRenderer()
     // Independent perception-layer toggles (Settings; default on). Drawn while in AR and tracking,
     // suppressed during target capture. Each governs one layer of "what the AR is seeing".
