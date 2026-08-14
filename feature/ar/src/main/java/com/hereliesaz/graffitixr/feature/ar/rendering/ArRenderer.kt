@@ -416,16 +416,23 @@ class ArRenderer(
     private val worldToCloudAnchorScratch = FloatArray(16)
 
     /**
-     * The live anchor->world matrix for [cloudAnchor], creating the anchor if needed, or null when
-     * the session cannot supply one this frame (not tracking yet).
+     * Detaches and forgets [cloudAnchor] — clearing the accumulated point cloud with it — if it has
+     * stopped tracking.
      *
-     * Re-read every frame on purpose: caching it would reintroduce precisely the staleness the
-     * anchor exists to remove.
+     * Split out of [cloudAnchorModel] (which still calls this first) so this check can run on its
+     * own, independent of whether a NEW cloud anchor should also be created right now. Previously the
+     * only way to reach this check was through [cloudAnchorModel], and after an anchor is established
+     * that function's only remaining caller was inside the `showPoints` DRAW-toggle branch of the
+     * perception-layer draw path — so with `showPoints` off, a cloud anchor that died AFTER
+     * establishment was never detected, and `pointCloudRenderer.accumulatedPointCount` (which drives
+     * scan-hint/phase-completion logic) stayed stuck reporting a stale, no-longer-valid count. Called
+     * unconditionally once per frame at the same throttled cadence as the rest of the accumulate
+     * logic (see the frame-data-pipeline block in [onDrawFrame]) so liveness is checked regardless of
+     * `showPoints` or [anchorEstablished].
      */
-    private fun cloudAnchorModel(session: Session, camera: com.google.ar.core.Camera): FloatArray? {
-        if (camera.trackingState != TrackingState.TRACKING) return null
-        val existing = cloudAnchor
-        if (existing != null && existing.trackingState != TrackingState.TRACKING) {
+    private fun checkCloudAnchorLiveness() {
+        val existing = cloudAnchor ?: return
+        if (existing.trackingState != TrackingState.TRACKING) {
             // The anchor is gone, so every accumulated point is expressed against a frame ARCore no
             // longer maintains. Detaching without clearing would leave that stale geometry pinned to
             // a fresh anchor at a different pose — worse than starting over.
@@ -433,6 +440,20 @@ class ArRenderer(
             cloudAnchor = null
             pointCloudRenderer.clear()
         }
+    }
+
+    /**
+     * The live anchor->world matrix for [cloudAnchor], creating the anchor if needed, or null when
+     * the session cannot supply one this frame (not tracking yet).
+     *
+     * Re-read every frame on purpose: caching it would reintroduce precisely the staleness the
+     * anchor exists to remove. Only call this where creating a fresh cloud anchor is actually wanted
+     * (pre-establishment accumulation, or drawing the accumulated cloud) — for the liveness check
+     * alone, independent of creation, use [checkCloudAnchorLiveness] directly.
+     */
+    private fun cloudAnchorModel(session: Session, camera: com.google.ar.core.Camera): FloatArray? {
+        if (camera.trackingState != TrackingState.TRACKING) return null
+        checkCloudAnchorLiveness()
         val anchor = cloudAnchor ?: try {
             session.createAnchor(camera.pose).also { cloudAnchor = it }
         } catch (e: Exception) {
@@ -2144,6 +2165,13 @@ class ArRenderer(
                 } catch (e: Exception) {
                     Timber.w(e, "Failed to feed YUV frame")
                 }
+
+                // Cloud-anchor liveness: detect a dead cloud anchor and clear the (now-stale)
+                // accumulated cloud with it, EVERY frame at this cadence — not only pre-establishment,
+                // and not only when the draw path happens to run (see checkCloudAnchorLiveness's doc).
+                // A dead anchor found here is also what stops the pre-establishment block below from
+                // reusing it, so this must run before that check.
+                checkCloudAnchorLiveness()
 
                 // 1. Point Cloud acquisition (only when scanning in CLOUD_POINTS mode)
                 if (!anchorEstablished) {
