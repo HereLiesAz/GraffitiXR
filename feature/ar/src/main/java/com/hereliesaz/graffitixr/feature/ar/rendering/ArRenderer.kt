@@ -1992,49 +1992,6 @@ class ArRenderer(
                 }
             }
 
-            lastStep = "export"
-            if (exportThisFrame) {
-                exportRequested = false
-                try {
-                    // Read the composited GL framebuffer instead of the raw camera image. By this
-                    // point in onDrawFrame the camera texture and the wall-anchored overlay quad
-                    // (with its true perspective/lean) are already drawn, so the readback matches
-                    // exactly what the user sees on-screen minus the Compose UI overlays (rail,
-                    // settings, reticle chips, distance labels) — those live in a separate Compose
-                    // window that never touches this framebuffer, so they naturally aren't
-                    // captured. Camera-sensor rotation is baked in by ARCore's camera-texture draw
-                    // (background renderer applies the display transform), so no post-rotate is
-                    // needed here — unlike the raw-image path that had to correct sensor orientation.
-                    // Snapshot the callback so a concurrent clear doesn't strand the readback
-                    // in a bitmap nobody owns. Also short-circuits the whole allocate/draw block
-                    // if nothing is listening — treat requestExport being unset here as a spurious
-                    // flag flip rather than doing work for nothing.
-                    val callback = onExportCaptured
-                    val w = surfaceWidth
-                    val h = surfaceHeight
-                    if (callback != null && w > 0 && h > 0) {
-                        val buf = ByteBuffer.allocateDirect(w * h * 4).order(java.nio.ByteOrder.nativeOrder())
-                        GLES30.glReadPixels(0, 0, w, h, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, buf)
-                        buf.rewind()
-                        val flipped = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                        // GL origin is bottom-left; Bitmap is top-left. Wrap the readback in an
-                        // upside-down source Bitmap, then draw it into `flipped` with a vertical
-                        // scale of -1 so the final Bitmap has natural (top-left) orientation.
-                        val source = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                        source.copyPixelsFromBuffer(buf)
-                        val canvas = android.graphics.Canvas(flipped)
-                        val matrix = android.graphics.Matrix().apply { postScale(1f, -1f, w / 2f, h / 2f) }
-                        canvas.drawBitmap(source, matrix, null)
-                        source.recycle()
-
-                        callback(flipped)
-                        onExportCaptured = null
-                    }
-                } catch (e: Exception) {
-                    Timber.e(e, "Failed to capture export frame")
-                }
-            }
-
             // ── Frame Data Pipeline ──
             // Post-anchor this was every 30th frame — 2 Hz at 60 fps — which is the rate the wall gets
             // re-checked for relocalization while the artist is actually painting, i.e. the rate the
@@ -2449,6 +2406,56 @@ class ArRenderer(
             } else {
                 drawPerceptionLayers(frame, activeSession, camera, viewMatrix, projMatrix, scanActive, voxelRevealMaskActive, isTracking)
             }
+
+            lastStep = "export"
+            if (exportThisFrame) {
+                exportRequested = false
+                try {
+                    // Read the composited GL framebuffer instead of the raw camera image. This MUST
+                    // run after every draw call that touches the default framebuffer this frame —
+                    // background camera texture (backgroundRenderer.draw, above), the wall-anchored
+                    // overlay quad with its true perspective/lean (overlayRenderer.draw, above), and
+                    // the perception layers (drawPerceptionLayers / perceptionFbo.composite, just
+                    // above) — so the readback matches exactly what the user sees on-screen minus the
+                    // Compose UI overlays (rail, settings, reticle chips, distance labels) — those
+                    // live in a separate Compose window that never touches this framebuffer, so they
+                    // naturally aren't captured. hideVisualization is latched true (by
+                    // ArViewModel.requestExport, before exportRequested) before this frame's
+                    // perception-layer gates are checked above, so the perception overlays are never
+                    // drawn into an export in the first place — nothing to skip here. Camera-sensor
+                    // rotation is baked in by ARCore's camera-texture draw (background renderer
+                    // applies the display transform), so no post-rotate is needed here — unlike the
+                    // raw-image path that had to correct sensor orientation.
+                    // Snapshot the callback so a concurrent clear doesn't strand the readback
+                    // in a bitmap nobody owns. Also short-circuits the whole allocate/draw block
+                    // if nothing is listening — treat requestExport being unset here as a spurious
+                    // flag flip rather than doing work for nothing.
+                    val callback = onExportCaptured
+                    val w = surfaceWidth
+                    val h = surfaceHeight
+                    if (callback != null && w > 0 && h > 0) {
+                        val buf = ByteBuffer.allocateDirect(w * h * 4).order(java.nio.ByteOrder.nativeOrder())
+                        GLES30.glReadPixels(0, 0, w, h, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, buf)
+                        buf.rewind()
+                        val flipped = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                        // GL origin is bottom-left; Bitmap is top-left. Wrap the readback in an
+                        // upside-down source Bitmap, then draw it into `flipped` with a vertical
+                        // scale of -1 so the final Bitmap has natural (top-left) orientation.
+                        val source = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                        source.copyPixelsFromBuffer(buf)
+                        val canvas = android.graphics.Canvas(flipped)
+                        val matrix = android.graphics.Matrix().apply { postScale(1f, -1f, w / 2f, h / 2f) }
+                        canvas.drawBitmap(source, matrix, null)
+                        source.recycle()
+
+                        callback(flipped)
+                        onExportCaptured = null
+                    }
+                } catch (e: Exception) {
+                    Timber.e(e, "Failed to capture export frame")
+                }
+            }
+
             // A stall reported at "frameDone" means onDrawFrame COMPLETED and the GL thread never
             // came back for the next frame — wedge is in eglSwapBuffers / the GLThread scheduler /
             // a pause request, not in this frame body.
