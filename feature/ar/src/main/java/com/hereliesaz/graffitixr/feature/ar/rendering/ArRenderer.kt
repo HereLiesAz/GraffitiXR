@@ -533,6 +533,12 @@ class ArRenderer(
     // flag, and again once a candidate is accepted. Capped by MAX_OVERLAY_CORRECTION_RETRY_FRAMES so
     // an anchor that never starts tracking doesn't leave the flag pending for the rest of the session.
     private var overlayRotationCorrectionRetryFrames: Int = 0
+    // The disambiguating "up" reference (see the candidate-build block below) resolved from the LIVE
+    // camera matrix on the FIRST attempt for the current pending correction, then reused unchanged for
+    // every retry. Frozen here rather than re-derived from viewMatrix each retry frame — recomputing it
+    // per-retry is the exact bug this fix closes: an up vector that tracks the live camera made the
+    // eventually-accepted correction depend on which frame the retry happened to land on.
+    private val overlayRotationCorrectionUpSnapshot = FloatArray(3)
 
     /**
      * One-time rotation correction, computed the instant an anchor is established and never touched
@@ -1577,20 +1583,40 @@ class ArRenderer(
                 var haveCandidate = false
                 if (nx != 0f || ny != 0f || nz != 0f) {
                     // Pick an up reference that isn't parallel to the normal — same choice overlayDraw
-                    // used to remake every frame, made here exactly once.
-                    var upX = 0f; var upY = 1f; var upZ = 0f
-                    if (kotlin.math.abs(ny) > 0.95f) {
-                        upX = viewMatrix[1]; upY = viewMatrix[5]; upZ = viewMatrix[9] // camera up
+                    // used to remake every frame, made here exactly once. "Once" means once per pending
+                    // correction, not once per attempt: this block re-runs every frame while retries are
+                    // outstanding (see the retry loop below), so the two branches that read the LIVE
+                    // camera matrix (near-horizontal-normal -> camera up; fully degenerate -> camera
+                    // backward) are resolved only on the FIRST attempt and then frozen into
+                    // [overlayRotationCorrectionUpSnapshot] for every later retry. Re-deriving the up
+                    // reference from the live camera on each retry was exactly the bug this field's own
+                    // class KDoc (above) already describes as fixed elsewhere: an up vector that changes
+                    // as the phone tilts made the accepted correction — and therefore the artwork's
+                    // final orientation — depend on which frame the retry happened to land on, instead
+                    // of being the one-time framing decision it's supposed to be.
+                    var upX: Float; var upY: Float; var upZ: Float
+                    if (overlayRotationCorrectionRetryFrames == 0) {
+                        upX = 0f; upY = 1f; upZ = 0f
+                        if (kotlin.math.abs(ny) > 0.95f) {
+                            upX = viewMatrix[1]; upY = viewMatrix[5]; upZ = viewMatrix[9] // camera up
+                        }
+                        var dot = upX * nx + upY * ny + upZ * nz
+                        var yX = upX - dot * nx; var yY = upY - dot * ny; var yZ = upZ - dot * nz
+                        var yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
+                        if (yLen <= 1e-4f) {
+                            upX = viewMatrix[2]; upY = viewMatrix[6]; upZ = viewMatrix[10] // camera backward (GL/ARCore look down -Z)
+                        }
+                        overlayRotationCorrectionUpSnapshot[0] = upX
+                        overlayRotationCorrectionUpSnapshot[1] = upY
+                        overlayRotationCorrectionUpSnapshot[2] = upZ
+                    } else {
+                        upX = overlayRotationCorrectionUpSnapshot[0]
+                        upY = overlayRotationCorrectionUpSnapshot[1]
+                        upZ = overlayRotationCorrectionUpSnapshot[2]
                     }
-                    var dot = upX * nx + upY * ny + upZ * nz
+                    val dot = upX * nx + upY * ny + upZ * nz
                     var yX = upX - dot * nx; var yY = upY - dot * ny; var yZ = upZ - dot * nz
-                    var yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
-                    if (yLen <= 1e-4f) {
-                        upX = viewMatrix[2]; upY = viewMatrix[6]; upZ = viewMatrix[10] // camera backward (GL/ARCore look down -Z)
-                        dot = upX * nx + upY * ny + upZ * nz
-                        yX = upX - dot * nx; yY = upY - dot * ny; yZ = upZ - dot * nz
-                        yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
-                    }
+                    val yLen = kotlin.math.sqrt(yX * yX + yY * yY + yZ * yZ)
                     if (yLen > 1e-4f) {
                         yX /= yLen; yY /= yLen; yZ /= yLen
                         // +X = +Y × +Z (right-handed: width axis, horizontal across the surface).
