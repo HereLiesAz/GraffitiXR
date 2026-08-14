@@ -23,18 +23,20 @@ suspend fun PointerInputScope.detectSmartOverlayGestures(
         var rotation = 0f
         var pan = Offset.Zero
         var pastTouchSlop = false
+        // Whether onGestureStart() has actually fired this cycle -- see below for why this is not
+        // simply "== pastTouchSlop", and why onGestureEnd() at the bottom is gated on it too.
+        var started = false
         val touchSlop = viewConfiguration.touchSlop
 
         awaitFirstDown(requireUnconsumed = false)
-        onGestureStart()
 
         do {
             val event = awaitPointerEvent()
             val canceled = event.changes.any { it.isConsumed }
-            if (canceled) {
-                onGestureEnd()
-                break
-            }
+            // Just break, don't call onGestureEnd() here too -- falling through to the single call
+            // after the loop (which used to run unconditionally on top of this one) fired
+            // onGestureEnd() TWICE for every cancelled gesture: once here, once past the loop.
+            if (canceled) break
 
             val pointerInputChanges = event.changes
 
@@ -57,6 +59,14 @@ suspend fun PointerInputScope.detectSmartOverlayGestures(
 
                 if (zoom > 1.1f || zoom < 0.9f || rotationDegrees > 10.0 || panAmount > touchSlop) {
                     pastTouchSlop = true
+                    // Fire exactly on this false->true edge: this is the first point at which the
+                    // gesture is actually a drag/pinch/rotate rather than a tap. onGestureStart used
+                    // to fire unconditionally on the initial pointer-down above, before slop had any
+                    // chance to be crossed -- so a plain single tap (pushHistory() + a full
+                    // save-and-broadcast in this app's caller) fired it every time, for a gesture
+                    // that never moved anything.
+                    started = true
+                    onGestureStart()
                 }
             }
 
@@ -73,6 +83,9 @@ suspend fun PointerInputScope.detectSmartOverlayGestures(
             }
         } while (event.changes.any { it.pressed })
 
-        onGestureEnd()
+        // Symmetric with the guard above onGestureStart(): only a cycle that actually started one
+        // (crossed touch slop) ends one, whether it ended via the break above or falling out of the
+        // loop naturally.
+        if (started) onGestureEnd()
     }
 }

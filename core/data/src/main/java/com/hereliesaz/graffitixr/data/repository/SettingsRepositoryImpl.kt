@@ -57,6 +57,10 @@ class SettingsRepositoryImpl @Inject constructor(
     private val THROTTLE_ON_LAG = booleanPreferencesKey("throttle_on_lag")
     private val ADAPTIVE_RATE_ENABLED = booleanPreferencesKey("adaptive_rate_enabled")
     private val COMPLETED_TUTORIALS = stringSetPreferencesKey("completed_tutorials")
+    private val SHOW_DIAG_OVERLAY = booleanPreferencesKey("show_diag_overlay")
+    private val SHOW_FEATURE_POINTS = booleanPreferencesKey("show_feature_points")
+    private val SHOW_PLANE_GRIDS = booleanPreferencesKey("show_plane_grids")
+    private val SHOW_POINTS = booleanPreferencesKey("show_points")
 
     override val language: Flow<AppLanguage> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
@@ -250,5 +254,39 @@ class SettingsRepositoryImpl @Inject constructor(
         context.dataStore.edit { preferences ->
             preferences[COMPLETED_TUTORIALS] = emptySet()
         }
+    }
+
+    // Defaults mirror EditorUiState's hardcoded fallbacks, so an install that has never touched
+    // these rows keeps exactly the visualization it shipped with.
+    override val showDiagOverlay: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[SHOW_DIAG_OVERLAY] ?: false }
+
+    override suspend fun setShowDiagOverlay(on: Boolean) {
+        context.dataStore.edit { it[SHOW_DIAG_OVERLAY] = on }
+    }
+
+    override val showFeaturePoints: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[SHOW_FEATURE_POINTS] ?: false }
+
+    override suspend fun setShowFeaturePoints(on: Boolean) {
+        context.dataStore.edit { it[SHOW_FEATURE_POINTS] = on }
+    }
+
+    override val showPlaneGrids: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[SHOW_PLANE_GRIDS] ?: true }
+
+    override suspend fun setShowPlaneGrids(on: Boolean) {
+        context.dataStore.edit { it[SHOW_PLANE_GRIDS] = on }
+    }
+
+    override val showPoints: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[SHOW_POINTS] ?: true }
+
+    override suspend fun setShowPoints(on: Boolean) {
+        context.dataStore.edit { it[SHOW_POINTS] = on }
     }
 }

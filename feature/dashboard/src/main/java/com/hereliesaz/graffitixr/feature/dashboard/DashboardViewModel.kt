@@ -57,19 +57,17 @@ class DashboardViewModel @Inject constructor(
      * user jumps straight into Design with no active project — otherwise every Add silently no-ops
      * because the add handlers require a projectId.
      */
-    fun createAndOpenProject(name: String = "Untitled", isRightHanded: Boolean = true) {
+    fun createAndOpenProject(name: String = "Untitled") {
         viewModelScope.launch {
             val p = repository.createProject(name)
-            repository.updateProject(p.copy(isRightHanded = isRightHanded))
             repository.loadProject(p.id)
             loadAvailableProjects()
         }
     }
 
-    fun onCreateProject(name: String, isRightHanded: Boolean) {
+    fun onCreateProject(name: String) {
         viewModelScope.launch {
-            val p = repository.createProject(name)
-            repository.updateProject(p.copy(isRightHanded = isRightHanded))
+            repository.createProject(name)
             _uiState.update { it.copy(showNewProjectDialog = false) }
             loadAvailableProjects()
         }

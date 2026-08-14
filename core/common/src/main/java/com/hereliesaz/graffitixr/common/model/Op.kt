@@ -21,6 +21,20 @@ sealed class Op {
     @Serializable
     data class DesignTransform(val matrix: List<Float>) : Op()
 
+    /**
+     * The whole-design adjustment for one mode (AR/Overlay/Mockup/Trace) changed — the counterpart
+     * to [DesignTransform] for placement that lives on [ModeAdjustment] rather than the design
+     * layer. Outside DESIGN mode every gesture and tone control writes here, not to the design, so
+     * before this variant existed a co-op guest never received the host's actual on-wall placement
+     * — only [DesignTransform]s carrying the design's own (untouched, still-identity) transform.
+     *
+     * [mode] is the mode's name ([EditorMode.name]), not the enum directly: [EditorMode] isn't
+     * `@Serializable`, and every other on-disk/on-wire representation of a mode in this codebase
+     * already uses its name for the same reason (see `GraffitiProject.modeAdjustments`).
+     */
+    @Serializable
+    data class ModeTransform(val mode: String, val adjustment: ModeAdjustment) : Op()
+
     @Serializable
     data class DesignProps(val props: LayerProps) : Op()
 

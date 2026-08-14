@@ -85,10 +85,29 @@ class EditorViewModel @Inject constructor(
                 projectRepository.currentProject.value?.railExpansion ?: emptyMap()
             )
 
-    /** Persist a host item's expanded/collapsed state into the project record so it survives reopen. */
+    private var railExpansionJob: kotlinx.coroutines.Job? = null
+    private val pendingRailExpansion = mutableMapOf<String, Boolean>()
+
+    /**
+     * Persist a host item's expanded/collapsed state into the project record so it survives reopen.
+     *
+     * Debounced: every write goes through [ProjectRepository.updateProject], which unconditionally
+     * saves the whole manifest AND rescans the entire project library — appropriate for an actual
+     * edit, wasteful for what's purely a UI preference. Undebounced, tapping through the rail's four
+     * host folders was a full save-and-rescan burst, one per tap. Called only from the UI thread, so
+     * [pendingRailExpansion] needs no synchronization.
+     */
     fun onRailHostExpansionChanged(hostId: String, expanded: Boolean) {
-        viewModelScope.launch(dispatchers.io) {
-            projectRepository.updateProject { it.copy(railExpansion = it.railExpansion + (hostId to expanded)) }
+        pendingRailExpansion[hostId] = expanded
+        railExpansionJob?.cancel()
+        railExpansionJob = viewModelScope.launch(dispatchers.main) {
+            kotlinx.coroutines.delay(500)
+            val toWrite = pendingRailExpansion.toMap()
+            pendingRailExpansion.clear()
+            if (toWrite.isEmpty()) return@launch
+            withContext(dispatchers.io) {
+                projectRepository.updateProject { it.copy(railExpansion = it.railExpansion + toWrite) }
+            }
         }
     }
 
@@ -133,6 +152,31 @@ class EditorViewModel @Inject constructor(
             }
         }
 
+        // The four perception-debug overlays below this comment used to only dispatch an in-memory
+        // reducer intent — indistinguishable in Settings from isRightHanded just above, which
+        // genuinely persists, until the process was killed and every one of them silently reverted
+        // to its hardcoded default. Restored the same way: a live collector, not a one-shot read.
+        viewModelScope.launch(dispatchers.main) {
+            settingsRepository.showDiagOverlay.collect { on ->
+                _uiState.update { it.copy(showDiagOverlay = on) }
+            }
+        }
+        viewModelScope.launch(dispatchers.main) {
+            settingsRepository.showFeaturePoints.collect { on ->
+                _uiState.update { it.copy(showFeaturePoints = on) }
+            }
+        }
+        viewModelScope.launch(dispatchers.main) {
+            settingsRepository.showPlaneGrids.collect { on ->
+                _uiState.update { it.copy(showPlaneGrids = on) }
+            }
+        }
+        viewModelScope.launch(dispatchers.main) {
+            settingsRepository.showPoints.collect { on ->
+                _uiState.update { it.copy(showPoints = on) }
+            }
+        }
+
         viewModelScope.launch(dispatchers.main) {
             projectRepository.currentProject.collect { project ->
                 if (project != null) {
@@ -146,6 +190,18 @@ class EditorViewModel @Inject constructor(
     }
 
     private fun loadProject(project: GraffitiProject) {
+        // This only runs on a genuine project switch (the caller already checked projectId
+        // changed) — so anything scoped to the PREVIOUS project must be invalidated here, or it
+        // leaks into the new one. Undo history is the sharpest case: left uncleared, pressing
+        // Undo in the new project restored and persisted the OLD project's design (it was never
+        // cleared anywhere but the null-project path, which a switch never hits). The decoded
+        // "before effects" cache and the AR target extent from Magic are the same class of bug —
+        // silently applying stale, previous-project state to the one now on screen.
+        history.clear()
+        updateHistoryCounts()
+        designSourceBitmap = null
+        anchorHalfExtentMeters = null
+
         val current = _uiState.value.design
         val loaded = project.design?.toLayer()?.let { design ->
             // Carry the live bitmap over when the image is unchanged, so reopening the same project
@@ -218,7 +274,7 @@ class EditorViewModel @Inject constructor(
     // ── Undo / redo ───────────────────────────────────────────────────────────
 
     private fun pushHistory() {
-        history.pushProperty(currentDesignSnapshot())
+        history.pushProperty(currentDesignSnapshot(), currentSnapshotMode(), currentModeAdjustmentSnapshot())
         updateHistoryCounts()
     }
 
@@ -229,9 +285,28 @@ class EditorViewModel @Inject constructor(
     /** The design, stripped of its bitmap — what we record so an undo can be reverted. */
     private fun currentDesignSnapshot(): Layer? = _uiState.value.design?.copy(bitmap = null)
 
-    override fun onUndoClicked() = applyHistory(history.popUndo { EditCommand(currentDesignSnapshot()) })
+    /**
+     * The mode a snapshot is being taken in — null in DESIGN mode, where there is no whole-design
+     * adjustment to capture (design-mode edits go straight to the design layer, already covered by
+     * [currentDesignSnapshot]).
+     */
+    private fun currentSnapshotMode(): EditorMode? =
+        _uiState.value.editorMode.takeIf { it != EditorMode.DESIGN }
 
-    override fun onRedoClicked() = applyHistory(history.popRedo { EditCommand(currentDesignSnapshot()) })
+    /**
+     * The active mode's [ModeAdjustment], if the snapshot is being taken outside DESIGN — every
+     * gesture and tone control there writes here, not to the design, so it has to travel with the
+     * design snapshot for Undo to restore what actually changed.
+     */
+    private fun currentModeAdjustmentSnapshot(): ModeAdjustment? =
+        currentSnapshotMode()?.let { _uiState.value.modeAdjustments[it] ?: ModeAdjustment() }
+
+    private fun currentCommand() =
+        EditCommand(currentDesignSnapshot(), currentSnapshotMode(), currentModeAdjustmentSnapshot())
+
+    override fun onUndoClicked() = applyHistory(history.popUndo { currentCommand() })
+
+    override fun onRedoClicked() = applyHistory(history.popRedo { currentCommand() })
 
     private fun applyHistory(command: EditCommand?) {
         command ?: return
@@ -241,6 +316,13 @@ class EditorViewModel @Inject constructor(
         val effectsChanged = restored?.isSketch != _uiState.value.design?.isSketch ||
             restored?.isSubjectIsolated != _uiState.value.design?.isSubjectIsolated
         dispatch(EditorIntent.RestoreDesign(restored))
+        // Restore the mode adjustment the snapshot was taken alongside, if any — without this, an
+        // outside-DESIGN Undo restored an (unchanged) design and left modeAdjustments exactly where
+        // they were, a visible no-op; after a Reset it left the real placement nowhere to come back
+        // from once the pre-Reset stash was cleared by RestoreDesign just above.
+        if (command.oldMode != null && command.oldModeAdjustment != null) {
+            dispatch(EditorIntent.SetModeAdjustment(command.oldMode, command.oldModeAdjustment))
+        }
         saveProject()
         emitDesignResync(restored)
         updateHistoryCounts()
@@ -408,8 +490,15 @@ class EditorViewModel @Inject constructor(
                     // Atomic read-modify-write: a concurrent AR wall-feature-map save merges into the SAME
                     // currentProject, so writing a full stale copy here would drop its wall map (and vice
                     // versa). The transform only touches the editor-owned fields.
+                    //
+                    // Guarded on id, matching scheduleThumbnailUpdate below: this launches on the IO
+                    // dispatcher, so by the time it runs the user may already have switched to a
+                    // different project, in which case `current` is that new project, not the one
+                    // `updatedDesign`/`modeAdjustments` were captured from — writing them anyway would
+                    // clobber the new project with the old one's design.
                     projectRepository.updateProject { current ->
-                        current.copy(
+                        if (current.id != projectId) current
+                        else current.copy(
                             name = name ?: current.name,
                             design = updatedDesign,
                             modeAdjustments = modeAdjustments,
@@ -440,6 +529,14 @@ class EditorViewModel @Inject constructor(
      */
     private fun scheduleThumbnailUpdate() {
         val projectId = _uiState.value.projectId ?: return
+        // Snapshot the design NOW, not after the debounce delay below. This is called again on
+        // every edit (each call cancels the previous job and restarts the 2s timer), so a fresh
+        // snapshot here already picks up the latest edit — reading _uiState.value.design after the
+        // delay instead bought nothing for that case, but did mean that if the user switched
+        // projects inside the 2s window, this composited whatever project happened to be current
+        // when the delay elapsed into the id captured above, writing one project's live artwork
+        // into a DIFFERENT project's thumbnail file.
+        val design = _uiState.value.design?.takeIf { it.isVisible && it.bitmap != null } ?: return
         // Confine the job cancel/assign to the main thread so concurrent saveProject() calls (which
         // run on the multi-threaded IO dispatcher) can't race on thumbnailJob and leak coroutines.
         viewModelScope.launch(dispatchers.main) {
@@ -447,7 +544,6 @@ class EditorViewModel @Inject constructor(
             thumbnailJob = viewModelScope.launch(dispatchers.default) {
                 try {
                     kotlinx.coroutines.delay(2000)
-                    val design = _uiState.value.design?.takeIf { it.isVisible && it.bitmap != null } ?: return@launch
                     val metrics = context.resources.displayMetrics
                     val w = metrics.widthPixels.takeIf { it > 0 } ?: 1080
                     val h = metrics.heightPixels.takeIf { it > 0 } ?: 1920
@@ -536,12 +632,19 @@ class EditorViewModel @Inject constructor(
                     val metrics = context.resources.displayMetrics
                     val bgBmp = backgroundBitmap
                         ?: if (_uiState.value.editorMode == EditorMode.MOCKUP) _uiState.value.backgroundBitmap else null
+                    // Every gesture and tone control outside DESIGN mode writes to modeAdjustments,
+                    // not the layer — omitting it here exported the design at its untouched default
+                    // placement regardless of what was on screen in Overlay/Mockup/Trace.
+                    val modeAdj = _uiState.value.editorMode
+                        .takeIf { it != EditorMode.DESIGN }
+                        ?.let { _uiState.value.modeAdjustments[it] }
                     exportManager.composite(
                         _uiState.value.design,
                         metrics.widthPixels.takeIf { it > 0 } ?: 1080,
                         metrics.heightPixels.takeIf { it > 0 } ?: 1920,
                         backgroundBitmap = bgBmp,
                         backgroundColor = android.graphics.Color.TRANSPARENT,
+                        modeAdj = modeAdj,
                     )
                 }
 
@@ -605,10 +708,29 @@ class EditorViewModel @Inject constructor(
             settingsRepository.setRightHanded(isRightHanded)
         }
     }
-    fun toggleDiagOverlay() = dispatch(EditorIntent.ToggleDiagOverlay)
-    fun toggleFeaturePoints() = dispatch(EditorIntent.ToggleFeaturePoints)
-    fun togglePlaneGrids() = dispatch(EditorIntent.TogglePlaneGrids)
-    fun togglePoints() = dispatch(EditorIntent.TogglePoints)
+    fun toggleDiagOverlay() {
+        dispatch(EditorIntent.ToggleDiagOverlay)
+        val on = _uiState.value.showDiagOverlay
+        viewModelScope.launch(dispatchers.io) { settingsRepository.setShowDiagOverlay(on) }
+    }
+
+    fun toggleFeaturePoints() {
+        dispatch(EditorIntent.ToggleFeaturePoints)
+        val on = _uiState.value.showFeaturePoints
+        viewModelScope.launch(dispatchers.io) { settingsRepository.setShowFeaturePoints(on) }
+    }
+
+    fun togglePlaneGrids() {
+        dispatch(EditorIntent.TogglePlaneGrids)
+        val on = _uiState.value.showPlaneGrids
+        viewModelScope.launch(dispatchers.io) { settingsRepository.setShowPlaneGrids(on) }
+    }
+
+    fun togglePoints() {
+        dispatch(EditorIntent.TogglePoints)
+        val on = _uiState.value.showPoints
+        viewModelScope.launch(dispatchers.io) { settingsRepository.setShowPoints(on) }
+    }
 
     // ── Placement ─────────────────────────────────────────────────────────────
 
@@ -666,7 +788,9 @@ class EditorViewModel @Inject constructor(
             val rx = if (axis == RotationAxis.X) layer.rotationX + rotationDelta else layer.rotationX
             val ry = if (axis == RotationAxis.Y) layer.rotationY + rotationDelta else layer.rotationY
             val rz = if (axis == RotationAxis.Z) layer.rotationZ + rotationDelta else layer.rotationZ
-            layer.copy(scale = layer.scale * zoom, offset = layer.offset + pan, rotationX = rx, rotationY = ry, rotationZ = rz)
+            // Clamped to the same [0.1, 10] range ApplyModeTransformGesture already enforces for
+            // every non-Design mode's pinch — the same gesture source had two different contracts.
+            layer.copy(scale = (layer.scale * zoom).coerceIn(0.1f, 10f), offset = layer.offset + pan, rotationX = rx, rotationY = ry, rotationZ = rz)
         }
     }
 
@@ -688,11 +812,21 @@ class EditorViewModel @Inject constructor(
     override fun onGestureEnd() {
         saveProject()
         dispatch(EditorIntent.SetGestureInProgress(false))
-        // The editor stores transform as scale/offset/rotationX/Y/Z rather than a Matrix, so we
-        // encode them in the first 6 slots of a 16-float list (slots 6-15 are zeros).
-        // applySpectatorOp must decode using the same convention.
-        val layer = _uiState.value.design ?: return
-        opEmitter.emit(Op.DesignTransform(layer.encodeTransform()))
+        val mode = _uiState.value.editorMode
+        if (mode == EditorMode.DESIGN) {
+            // The editor stores transform as scale/offset/rotationX/Y/Z rather than a Matrix, so we
+            // encode them in the first 6 slots of a 16-float list (slots 6-15 are zeros).
+            // applySpectatorOp must decode using the same convention.
+            val layer = _uiState.value.design ?: return
+            opEmitter.emit(Op.DesignTransform(layer.encodeTransform()))
+        } else {
+            // Outside DESIGN, a transform gesture writes to modeAdjustments, not the design layer —
+            // the design's own transform is untouched, so emitting DesignTransform here always sent
+            // an unchanging identity and the guest's copy of the artwork never moved. Send what
+            // actually changed instead.
+            val adjustment = _uiState.value.modeAdjustments[mode] ?: return
+            opEmitter.emit(Op.ModeTransform(mode.name, adjustment))
+        }
     }
 
     override fun toggleImageLock() {
@@ -709,8 +843,6 @@ class EditorViewModel @Inject constructor(
         emitActiveLayerProps()
     }
 
-    override fun onScaleChanged(s: Float) = dispatch(EditorIntent.SetScale(s))
-    override fun onOffsetChanged(o: Offset) = dispatch(EditorIntent.AddOffset(o))
     override fun onCycleRotationAxis() = dispatch(EditorIntent.CycleRotationAxis)
 
     // ── Legibility ────────────────────────────────────────────────────────────
@@ -828,6 +960,11 @@ class EditorViewModel @Inject constructor(
                         offset = Offset(op.matrix[1], op.matrix[2]),
                         rx = op.matrix[3], ry = op.matrix[4], rz = op.matrix[5],
                     ))
+                }
+            }
+            is Op.ModeTransform -> {
+                runCatching { EditorMode.valueOf(op.mode) }.getOrNull()?.let { mode ->
+                    dispatch(EditorIntent.SetModeAdjustment(mode, op.adjustment))
                 }
             }
             is Op.DesignProps -> dispatch(EditorIntent.SetDesignProps(op.props))

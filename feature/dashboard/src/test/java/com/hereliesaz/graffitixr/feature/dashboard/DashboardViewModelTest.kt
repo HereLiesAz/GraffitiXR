@@ -71,15 +71,14 @@ class DashboardViewModelTest {
     }
 
     @Test
-    fun `onCreateProject creates and updates project`() = runTest {
+    fun `onCreateProject creates the project and dismisses the dialog`() = runTest {
         val newProject = GraffitiProject(id = "new", name = "Test Project")
         coEvery { repository.createProject(any<String>()) } returns newProject
 
-        viewModel.onCreateProject(name = "Test Project", isRightHanded = false)
+        viewModel.onCreateProject(name = "Test Project")
         testDispatcher.scheduler.advanceUntilIdle()
 
         coVerify { repository.createProject("Test Project") }
-        coVerify { repository.updateProject(match<GraffitiProject> { it.id == "new" && !it.isRightHanded }) }
         assertEquals(false, viewModel.uiState.value.showNewProjectDialog)
     }
 
