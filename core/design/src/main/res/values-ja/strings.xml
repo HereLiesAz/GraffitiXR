@@ -550,4 +550,83 @@
     <string name="settings_scan_mode_voxel_hash">ボクセルハッシュ</string>
     <string name="settings_scan_mode_surface_mesh">サーフェスメッシュ</string>
     <string name="settings_mural_method_label">ミューラルエンジン</string>
+
+
+    <!-- Added by audit item 4: missing keys relative to core/design's default table -->
+    <string name="nav_coop">コープ</string>
+    <string name="nav_host_coop">ホスト</string>
+    <string name="nav_host_coop_info">近くのユーザーとARの座標系を共有するために、コープセッションをホストします。</string>
+    <string name="nav_join_coop">参加</string>
+    <string name="nav_join_coop_info">近くのコープセッションに参加して、AR表示をホストに合わせます。</string>
+    <string name="nav_leave_coop">退出</string>
+    <string name="nav_leave_coop_info">現在のコープセッションから退出します。</string>
+    <string name="nav_wearable">ウェアラブル</string>
+    <string name="nav_wearable_info">スマートグラスに接続して、視点に合わせたカメラ入力によるハンズフリーのAR体験を実現します。</string>
+    <string name="nav_wall_clear">消去</string>
+    <string name="nav_wall_clear_info">モックアップモードで使用されている壁の背景写真を削除します。</string>
+    <string name="nav_magic">マジック</string>
+    <string name="nav_edges">エッジ</string>
+    <string name="nav_filter">フィルター</string>
+    <string name="nav_photo">写真</string>
+    <string name="nav_file">ファイル</string>
+    <string name="shared_image_pick_project">共有された画像を追加するには、プロジェクトを開くか新規作成してください</string>
+    <string name="camera_stalled_error">カメラが映像を送信していません — ARを終了します。より安全なカメラモードで再試行するには、ARを再度開いてください。</string>
+    <string name="syncing">同期中...</string>
+    <string name="adj_reset">配置をリセット</string>
+    <string name="adj_restore_placement">配置を復元</string>
+    <string name="status_world_mapped">ワールドマッピング完了: %1$d%%</string>
+    <string name="rotation_axis_feedback">%1$s軸で回転中</string>
+    <string name="rotation_axis_x">X</string>
+    <string name="rotation_axis_y">Y</string>
+    <string name="rotation_axis_z">Z</string>
+    <string name="settings_language_label">言語</string>
+    <string name="settings_layer_feature_points">特徴点を表示</string>
+    <string name="settings_layer_plane_grids">平面グリッドを表示</string>
+    <string name="settings_layer_voxels">ボクセルを表示</string>
+    <string name="settings_layer_points">点群を表示</string>
+    <string name="settings_layer_mesh">メッシュを表示</string>
+    <string name="settings_parallax_threshold">視差検証角度</string>
+    <string name="settings_camera_fps">カメラのフレームレート</string>
+    <string name="settings_scan_mode_cloud_offset">クラウドオフセット</string>
+    <string name="settings_reset_tutorials_label">チュートリアルをリセット</string>
+    <string name="settings_reset_tutorials_value">初回ガイドを再表示する</string>
+    <string name="help_cloud_offset">アンカーオフセットの引き継ぎ: 大規模な壁画向けの高精度な点群トラッキング。手順: 360度スキャンを完了してから、タップしてアンカーを配置します。</string>
+    <string-array name="onboarding_trace">
+        <item>これはライトボックスモードです。</item>
+        <item>「開く」をタップして最初のレイヤーを追加します。追加したら、キャンバス上でピンチとドラッグを行い、サイズと位置を調整できます。</item>
+        <item>希望の位置とサイズになったら、凍結ボタンを押すと、スマートフォンが紙にトレースするためのライトボックスになります。</item>
+        <item>編集にはライトボックスモードまたはモックアップモードの使用をお勧めします。</item>
+        <item>こうしておけば画像の準備が整い、ARボタンを押したときにスマートフォンは拡張現実に集中できます。</item>
+    </string-array>
+    <string-array name="onboarding_ar">
+        <item>AR投影 — スマートフォンの深度センサーと空間トラッキングを使って、デザインを実際の壁に投影します。</item>
+        <item>壁に向けて、ゆっくり左右に動かしてください。エンジンが表面をマッピングするにつれて、色の付いた図形が表示されます。壁のエリア全体がカバーされるまで待ちます。</item>
+        <item>画面をタップするだけです。アプリが壁を撮影し、トラッキング用の特徴を抽出して、即座にアンカーを固定します。</item>
+        <item>「開く」をタップしてデザインレイヤーを追加します — 今設定したアンカーを使って壁に投影されます。</item>
+        <item>ヒント — 何もない白い壁、滑らかなコンクリート、単色の面は追跡できません。落書き、粗い漆喰、その他の明確な模様にアンカーポイントを合わせてください。</item>
+    </string-array>
+    <string-array name="onboarding_overlay">
+        <item>ライブオーバーレイ — 表面をスキャンする必要なく、ライブカメラ映像の上にデザインが浮かびます。</item>
+        <item>「開く」をタップしてレイヤーを追加します — 写真を選ぶと、ライブカメラ映像の上に浮かんでここに表示されます。</item>
+        <item>ピンチで拡大縮小、ドラッグで移動します。オーバーレイは画面に固定されたままです — 後ろに下がって、壁にどう収まるか確認しましょう。</item>
+    </string-array>
+    <string-array name="onboarding_ar_unavailable">
+        <item>このデバイスはARCoreに対応していないため、AR投影モードは使用できません。</item>
+        <item>ライトボックス、モックアップ、ライブオーバーレイは引き続き使用できます — AR以外のすべてのモードはARCoreなしで動作します。</item>
+        <item>タップして閉じます。</item>
+    </string-array>
+    <string-array name="onboarding_mockup">
+        <item>写真モックアップ — 筆を取る前に、写真の上でデザインをプレビューできます。</item>
+        <item>「壁」をタップして、表面の写真を選択または撮影します。最初にこれを行ってください!</item>
+        <item>「開く」をタップして、壁の写真の上にレイヤーを追加します。ピンチとドラッグでサイズと位置を調整します。</item>
+    </string-array>
+    <string-array name="onboarding_design">
+        <item>これがデザイン画面です — あなたの作業スペースです。ここで作成したものは、他のすべてのモードに引き継がれます。</item>
+        <item>「開く」をタップして最初のレイヤーを追加します — ギャラリーから写真を選ぶと、作品としてここに配置されます。</item>
+        <item>レイヤーをタップしてツールを開きます — ペイント、レタッチ、調整、エフェクトのフォルダにグループ化されています。キャンバス上でピンチとドラッグを行い、サイズと位置を調整します。</item>
+        <item>仕上がりに満足したら、使い方を選びます: 「ライトボックス」でスマートフォンをライトボックスにする、「モックアップ」で写真上にプレビューする、または「AR」で壁に投影する。</item>
+    </string-array>
+    <string-array name="onboarding_design_layers">
+        <item>開く — ギャラリーから写真をインポートします。新しいレイヤーとして配置されます。</item>
+    </string-array>
 </resources>

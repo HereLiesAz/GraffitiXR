@@ -241,4 +241,86 @@
     <string name="unit_feet">ft</string>
     <string name="unit_centimeters">cm</string>
     <string name="unit_meters">m</string>
+
+
+    <!-- Added by audit item 4: missing keys relative to core/design's default table -->
+    <string name="nav_coop">Coop</string>
+    <string name="nav_host_coop">I-host</string>
+    <string name="nav_host_coop_info">Mag-host ng coop session para ibahagi ang iyong AR coordinate system sa mga taong malapit.</string>
+    <string name="nav_join_coop">Sumali</string>
+    <string name="nav_join_coop_info">Sumali sa isang malapit na coop session para i-align ang iyong AR view sa host.</string>
+    <string name="nav_leave_coop">Umalis</string>
+    <string name="nav_leave_coop_info">Umalis sa kasalukuyang coop session.</string>
+    <string name="nav_wearable">Wearable</string>
+    <string name="nav_wearable_info">Kumonekta sa smart glasses para sa hands-free na AR na karanasan na may camera input na naka-align sa iyong perspektibo.</string>
+    <string name="nav_wall_clear">Alisin</string>
+    <string name="nav_wall_clear_info">Inaalis ang larawan ng pader sa background na ginagamit sa Mockup mode.</string>
+    <string name="nav_magic">Mahika</string>
+    <string name="nav_edges">Gilid</string>
+    <string name="nav_filter">Filter</string>
+    <string name="nav_photo">Larawan</string>
+    <string name="nav_file">File</string>
+    <string name="shared_image_pick_project">Magbukas o gumawa ng proyekto para idagdag ang ibinahaging larawan</string>
+    <string name="camera_stalled_error">Hindi na nagbibigay ng frame ang camera — lalabas sa AR. Buksan muli ang AR para subukan ulit gamit ang mas ligtas na camera mode.</string>
+    <string name="syncing">NAGSI-SYNC...</string>
+    <string name="adj_reset">I-reset ang paglalagay</string>
+    <string name="adj_restore_placement">Ibalik ang paglalagay</string>
+    <string name="status_world_mapped">NAMAPA ANG MUNDO: %1$d%%</string>
+    <string name="rotation_axis_feedback">Umiikot sa %1$s axis</string>
+    <string name="rotation_axis_x">X</string>
+    <string name="rotation_axis_y">Y</string>
+    <string name="rotation_axis_z">Z</string>
+    <string name="settings_language_label">Wika</string>
+    <string name="settings_layer_feature_points">Ipakita ang Feature Points</string>
+    <string name="settings_layer_plane_grids">Ipakita ang Plane Grids</string>
+    <string name="settings_layer_voxels">Ipakita ang Voxels</string>
+    <string name="settings_layer_points">Ipakita ang Point Cloud</string>
+    <string name="settings_layer_mesh">Ipakita ang Mesh</string>
+    <string name="settings_parallax_threshold">Anggulo ng Pag-verify ng Parallax</string>
+    <string name="settings_camera_fps">Frame Rate ng Camera</string>
+    <string name="settings_scan_mode_cloud_offset">Cloud Offset</string>
+    <string name="settings_reset_tutorials_label">I-reset ang mga Tutorial</string>
+    <string name="settings_reset_tutorials_value">Ipakita muli ang mga unang gabay</string>
+    <string name="help_cloud_offset">Paglipat ng Anchor Offset: Mataas na katumpakang point cloud tracking para sa malalaking mural. Mga Tagubilin: Kumpletuhin ang 360-degree scan, pagkatapos ay pindutin para ilagay ang anchor.</string>
+    <string name="settings_scan_mode_voxel_hash">Voxel Hash</string>
+    <string name="settings_mural_method_label">Mural Engine</string>
+    <string name="settings_scan_mode_surface_mesh">Surface Mesh</string>
+    <string-array name="onboarding_trace">
+        <item>Ito ang Bakas mode.</item>
+        <item>Pindutin ang \'Bukas\' para idagdag ang iyong unang layer. Kapag nailagay na ito, pisilin at i-drag sa canvas para i-resize at ilagay ito.</item>
+        <item>Kapag nasa tamang lugar at anyo na ang mga ito, pindutin ang Freeze button para gawing light box ang iyong telepono para sa pagbabakas sa papel.</item>
+        <item>Inirerekomenda naming gamitin ang Bakas mode o Mockup mode para sa pag-edit.</item>
+        <item>Sa ganoong paraan, handa na ang iyong mga imahe at makakapag-focus ang iyong telepono sa augmented reality kapag pinindot mo ang AR button.</item>
+    </string-array>
+    <string-array name="onboarding_ar">
+        <item>AR Projection — inipoprojekta ang iyong disenyo sa isang tunay na pader gamit ang depth sensor at spatial tracking ng telepono.</item>
+        <item>Itutok ang telepono sa pader at dahan-dahang gumalaw paikot. Lalabas ang makukulay na hugis habang pinepeke-mapa ng engine ang ibabaw. Maghintay hanggang matakpan ang buong lugar ng pader.</item>
+        <item>Pindutin lang ang screen. Kukunan ng app ang larawan ng pader, kukunin ang mga tracking feature, at agad na iko-lock ang anchor.</item>
+        <item>Pindutin ang \'Bukas\' para magdagdag ng design layer — ito ay ipoprojekta sa pader gamit ang anchor na kakalagay mo lang.</item>
+        <item>Tip — ang mga blangkong puting pader, makinis na semento, at solidong-kulay na ibabaw ay hindi matra-track. Ituon ang iyong anchor point sa graffiti, magaspang na plaster, o anumang natatanging marka.</item>
+    </string-array>
+    <string-array name="onboarding_overlay">
+        <item>Live Overlay — lumulutang ang iyong disenyo sa ibabaw ng live camera feed, walang kailangang i-scan na ibabaw.</item>
+        <item>Pindutin ang \'Bukas\' para magdagdag ng layer — pumili ng larawan at lalabas ito rito, lumulutang sa ibabaw ng live camera feed.</item>
+        <item>Pisilin para i-resize, i-drag para muling ilagay. Nananatiling nakapirmi sa iyong screen ang overlay — umatras para makita kung paano ito bumagay sa pader.</item>
+    </string-array>
+    <string-array name="onboarding_ar_unavailable">
+        <item>Hindi suportado ng device na ito ang ARCore, kaya hindi available ang AR Projection mode.</item>
+        <item>Magagamit mo pa rin ang Bakas, Mockup, at Live Overlay — gumagana nang walang ARCore ang lahat ng mode maliban sa AR.</item>
+        <item>Pindutin para i-dismiss.</item>
+    </string-array>
+    <string-array name="onboarding_mockup">
+        <item>Photo Mockup — i-preview ang iyong disenyo sa isang larawan bago ka pa man humawak ng brush.</item>
+        <item>Pindutin ang \'Pader\' para pumili o kumuha ng larawan ng iyong ibabaw. Gawin muna ito!</item>
+        <item>Pindutin ang \'Bukas\' para magdagdag ng layer sa ibabaw ng larawan ng pader. Pisilin at i-drag para i-resize at i-position ito.</item>
+    </string-array>
+    <string-array name="onboarding_design">
+        <item>Ito ang Disenyo — ang iyong workspace. Anumang gawin mo rito ay dadalhin sa bawat ibang mode.</item>
+        <item>Pindutin ang \'Bukas\' para idagdag ang iyong unang layer — pumili ng larawan mula sa iyong gallery at ito ay lalapag dito bilang iyong obra.</item>
+        <item>Pindutin ang isang layer para buksan ang mga tool nito — nakagrupo sa mga folder na Paint, Retouch, Adjust, at Effects. Pisilin at i-drag sa canvas para i-resize at ilagay ito.</item>
+        <item>Kapag tama na ang itsura nito, piliin kung paano ito gagamitin: \'Bakas\' para gawing light box ang iyong telepono, \'Mockup\' para i-preview sa isang larawan, o \'AR\' para i-projekta ito sa isang pader.</item>
+    </string-array>
+    <string-array name="onboarding_design_layers">
+        <item>Bukas — nag-i-import ng larawan mula sa iyong gallery; ito ay lalapag bilang bagong layer.</item>
+    </string-array>
 </resources>

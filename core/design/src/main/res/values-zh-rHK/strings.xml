@@ -532,4 +532,83 @@
     <string name="settings_scan_mode_voxel_hash">體素雜湊</string>
     <string name="settings_scan_mode_surface_mesh">表面網格</string>
     <string name="settings_mural_method_label">壁畫引擎</string>
+
+
+    <!-- Added by audit item 4: missing keys relative to core/design's default table -->
+    <string name="nav_coop">協作</string>
+    <string name="nav_host_coop">主持</string>
+    <string name="nav_host_coop_info">主持協作工作階段，與附近使用者共享您的AR座標系統。</string>
+    <string name="nav_join_coop">加入</string>
+    <string name="nav_join_coop_info">加入附近的協作工作階段，將您的AR視圖與主持人對齊。</string>
+    <string name="nav_leave_coop">離開</string>
+    <string name="nav_leave_coop_info">離開目前的協作工作階段。</string>
+    <string name="nav_wearable">穿戴裝置</string>
+    <string name="nav_wearable_info">連接智能眼鏡，透過與視角對齊的鏡頭輸入，獲得免持AR體驗。</string>
+    <string name="nav_wall_clear">清除</string>
+    <string name="nav_wall_clear_info">移除小樣模式中使用的牆面背景相片。</string>
+    <string name="nav_magic">魔法</string>
+    <string name="nav_edges">邊緣</string>
+    <string name="nav_filter">濾鏡</string>
+    <string name="nav_photo">相片</string>
+    <string name="nav_file">檔案</string>
+    <string name="shared_image_pick_project">開啟或建立專案以加入共享的圖片</string>
+    <string name="camera_stalled_error">鏡頭未能提供畫面 — 正在退出AR。請重新開啟AR，以較安全的鏡頭模式重試。</string>
+    <string name="syncing">同步中...</string>
+    <string name="adj_reset">重設位置</string>
+    <string name="adj_restore_placement">還原位置</string>
+    <string name="status_world_mapped">世界映射完成：%1$d%%</string>
+    <string name="rotation_axis_feedback">正繞 %1$s 軸旋轉</string>
+    <string name="rotation_axis_x">X</string>
+    <string name="rotation_axis_y">Y</string>
+    <string name="rotation_axis_z">Z</string>
+    <string name="settings_language_label">語言</string>
+    <string name="settings_layer_feature_points">顯示特徵點</string>
+    <string name="settings_layer_plane_grids">顯示平面網格</string>
+    <string name="settings_layer_voxels">顯示體素</string>
+    <string name="settings_layer_points">顯示點雲</string>
+    <string name="settings_layer_mesh">顯示網格</string>
+    <string name="settings_parallax_threshold">視差驗證角度</string>
+    <string name="settings_camera_fps">鏡頭幀率</string>
+    <string name="settings_scan_mode_cloud_offset">點雲偏移</string>
+    <string name="settings_reset_tutorials_label">重設教學</string>
+    <string name="settings_reset_tutorials_value">重新顯示新手指南</string>
+    <string name="help_cloud_offset">錨點偏移傳遞：適用於大型壁畫的高精度點雲追蹤。操作說明：完成360°掃描後，點按以放置錨點。</string>
+    <string-array name="onboarding_trace">
+        <item>這是痕跡模式。</item>
+        <item>點按「開啟」加入您的第一個圖層。加入後，可在畫布上雙指縮放和拖曳來調整大小和位置。</item>
+        <item>當圖層處於您想要的位置和狀態後，按下凍結按鈕，把手機變成用於拓印到紙上的透光台。</item>
+        <item>我們建議使用痕跡模式或小樣模式進行編輯。</item>
+        <item>這樣您的圖像就準備就緒，按下AR按鈕時手機就能專注於擴增實境。</item>
+    </string-array>
+    <string-array name="onboarding_ar">
+        <item>AR投影 — 利用手機的深度感應器和空間追蹤，將您的設計投影到真實牆面上。</item>
+        <item>將手機對準牆面並緩慢左右移動。隨著引擎對表面進行建圖，會出現彩色圖形。請等待牆面區域被完全覆蓋。</item>
+        <item>只需點按螢幕。應用程式會拍攝牆面相片，擷取追蹤特徵，並立即鎖定錨點。</item>
+        <item>點按「開啟」加入設計圖層 — 它會使用您剛設定的錨點投影到牆面上。</item>
+        <item>提示 — 空白的白牆、光滑的混凝土和純色表面無法被追蹤。請將錨點對準塗鴉、粗糙的灰泥或任何明顯的標記。</item>
+    </string-array>
+    <string-array name="onboarding_overlay">
+        <item>即時覆蓋 — 您的設計懸浮在即時鏡頭畫面上方，無需掃描任何表面。</item>
+        <item>點按「開啟」加入圖層 — 選擇一張相片，它會懸浮在即時鏡頭畫面上方顯示於此。</item>
+        <item>雙指縮放以調整大小，拖曳以重新定位。覆蓋層會固定在螢幕上 — 後退一步查看它與牆面的貼合效果。</item>
+    </string-array>
+    <string-array name="onboarding_ar_unavailable">
+        <item>此裝置不支援ARCore，因此無法使用AR投影模式。</item>
+        <item>您仍可以使用痕跡、小樣和即時覆蓋模式 — 除AR外的所有模式均可在沒有ARCore的情況下使用。</item>
+        <item>點按以關閉。</item>
+    </string-array>
+    <string-array name="onboarding_mockup">
+        <item>相片小樣 — 在動筆之前，先在相片上預覽您的設計。</item>
+        <item>點按「牆」以選擇或拍攝您的表面相片。請先完成此步驟！</item>
+        <item>點按「開啟」在牆面相片上方加入圖層。雙指縮放和拖曳以調整大小和位置。</item>
+    </string-array>
+    <string-array name="onboarding_design">
+        <item>這是設計畫面 — 您的工作空間。您在這裡建立的內容會延續到其他所有模式中。</item>
+        <item>點按「開啟」加入您的第一個圖層 — 從相簿中選擇一張相片，它會作為您的作品出現在這裡。</item>
+        <item>點按圖層以開啟其工具 — 分組在繪畫、修飾、調整和效果資料夾中。在畫布上雙指縮放和拖曳以調整大小和位置。</item>
+        <item>滿意效果後，選擇使用方式：「痕跡」將手機變為透光台，「小樣」在相片上預覽，或「AR」將其投影到牆面上。</item>
+    </string-array>
+    <string-array name="onboarding_design_layers">
+        <item>開啟 — 從相簿匯入一張相片；它會作為新圖層放置。</item>
+    </string-array>
 </resources>

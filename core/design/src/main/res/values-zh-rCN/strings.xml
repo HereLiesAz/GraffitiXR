@@ -550,4 +550,83 @@
     <string name="settings_scan_mode_voxel_hash">体素哈希</string>
     <string name="settings_scan_mode_surface_mesh">表面网格</string>
     <string name="settings_mural_method_label">壁画引擎</string>
+
+
+    <!-- Added by audit item 4: missing keys relative to core/design's default table -->
+    <string name="nav_coop">协作</string>
+    <string name="nav_host_coop">主持</string>
+    <string name="nav_host_coop_info">主持一个协作会话，与附近的用户共享你的AR坐标系统。</string>
+    <string name="nav_join_coop">加入</string>
+    <string name="nav_join_coop_info">加入附近的协作会话，将你的AR视图与主持人对齐。</string>
+    <string name="nav_leave_coop">离开</string>
+    <string name="nav_leave_coop_info">离开当前的协作会话。</string>
+    <string name="nav_wearable">可穿戴设备</string>
+    <string name="nav_wearable_info">连接智能眼镜，获得与视角对齐的摄像头输入，实现免提AR体验。</string>
+    <string name="nav_wall_clear">清除</string>
+    <string name="nav_wall_clear_info">移除效果图模式中使用的背景墙面照片。</string>
+    <string name="nav_magic">魔法</string>
+    <string name="nav_edges">边缘</string>
+    <string name="nav_filter">滤镜</string>
+    <string name="nav_photo">照片</string>
+    <string name="nav_file">文件</string>
+    <string name="shared_image_pick_project">打开或创建一个项目以添加共享的图片</string>
+    <string name="camera_stalled_error">摄像头未能提供画面 — 正在退出AR。请重新打开AR，以更安全的摄像头模式重试。</string>
+    <string name="syncing">同步中...</string>
+    <string name="adj_reset">重置位置</string>
+    <string name="adj_restore_placement">恢复位置</string>
+    <string name="status_world_mapped">世界映射完成：%1$d%%</string>
+    <string name="rotation_axis_feedback">正在绕 %1$s 轴旋转</string>
+    <string name="rotation_axis_x">X</string>
+    <string name="rotation_axis_y">Y</string>
+    <string name="rotation_axis_z">Z</string>
+    <string name="settings_language_label">语言</string>
+    <string name="settings_layer_feature_points">显示特征点</string>
+    <string name="settings_layer_plane_grids">显示平面网格</string>
+    <string name="settings_layer_voxels">显示体素</string>
+    <string name="settings_layer_points">显示点云</string>
+    <string name="settings_layer_mesh">显示网格</string>
+    <string name="settings_parallax_threshold">视差验证角度</string>
+    <string name="settings_camera_fps">摄像头帧率</string>
+    <string name="settings_scan_mode_cloud_offset">点云偏移</string>
+    <string name="settings_reset_tutorials_label">重置教程</string>
+    <string name="settings_reset_tutorials_value">重新显示新手指南</string>
+    <string name="help_cloud_offset">锚点偏移传递：适用于大型壁画的高精度点云追踪。操作说明：完成360°扫描后，点击以放置锚点。</string>
+    <string-array name="onboarding_trace">
+        <item>这是追踪模式。</item>
+        <item>点击“打开”添加你的第一个图层。添加后，可在画布上双指缩放和拖动来调整大小和位置。</item>
+        <item>当图层处于你想要的位置和状态后，按下冻结按钮，把手机变成用于拓印到纸上的透光台。</item>
+        <item>我们建议使用追踪模式或效果图模式进行编辑。</item>
+        <item>这样你的图像就准备就绪，按下AR按钮时手机就能专注于增强现实。</item>
+    </string-array>
+    <string-array name="onboarding_ar">
+        <item>AR投影 — 利用手机的深度传感器和空间追踪，将你的设计投影到真实墙面上。</item>
+        <item>将手机对准墙面并缓慢左右移动。随着引擎对表面进行建图，会出现彩色形状。请等待墙面区域被完全覆盖。</item>
+        <item>只需点击屏幕。应用会拍摄墙面照片，提取追踪特征，并立即锁定锚点。</item>
+        <item>点击“打开”添加设计图层 — 它会使用你刚设置的锚点投影到墙面上。</item>
+        <item>提示 — 空白的白墙、光滑的混凝土和纯色表面无法被追踪。请将锚点对准涂鸦、粗糙的灰泥或任何明显的标记。</item>
+    </string-array>
+    <string-array name="onboarding_overlay">
+        <item>实时叠加 — 你的设计悬浮在实时摄像头画面上方，无需扫描任何表面。</item>
+        <item>点击“打开”添加图层 — 选择一张照片，它会悬浮在实时摄像头画面上方显示于此。</item>
+        <item>双指缩放以调整大小，拖动以重新定位。叠加层会固定在屏幕上 — 后退一步查看它与墙面的贴合效果。</item>
+    </string-array>
+    <string-array name="onboarding_ar_unavailable">
+        <item>此设备不支持ARCore，因此无法使用AR投影模式。</item>
+        <item>你仍可以使用追踪、效果图和实时叠加模式 — 除AR外的所有模式均可在没有ARCore的情况下使用。</item>
+        <item>点击以关闭。</item>
+    </string-array>
+    <string-array name="onboarding_mockup">
+        <item>照片效果图 — 在动笔之前，先在照片上预览你的设计。</item>
+        <item>点击“墙面”以选择或拍摄你的表面照片。请先完成此步骤！</item>
+        <item>点击“打开”在墙面照片上方添加图层。双指缩放和拖动以调整大小和位置。</item>
+    </string-array>
+    <string-array name="onboarding_design">
+        <item>这是设计界面 — 你的工作空间。你在这里创建的内容会延续到其他所有模式中。</item>
+        <item>点击“打开”添加你的第一个图层 — 从相册中选择一张照片，它会作为你的作品出现在这里。</item>
+        <item>点击图层以打开其工具 — 分组在绘画、修饰、调整和效果文件夹中。在画布上双指缩放和拖动以调整大小和位置。</item>
+        <item>满意效果后，选择使用方式：“追踪”将手机变为透光台，“效果图”在照片上预览，或“AR”将其投影到墙面上。</item>
+    </string-array>
+    <string-array name="onboarding_design_layers">
+        <item>打开 — 从相册导入一张照片；它会作为新图层放置。</item>
+    </string-array>
 </resources>

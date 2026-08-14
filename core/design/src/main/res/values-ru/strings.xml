@@ -532,4 +532,83 @@
     <string name="settings_scan_mode_voxel_hash">Воксельный хеш</string>
     <string name="settings_scan_mode_surface_mesh">Поверхностная сетка</string>
     <string name="settings_mural_method_label">Движок мурала</string>
+
+
+    <!-- Added by audit item 4: missing keys relative to core/design's default table -->
+    <string name="nav_coop">Совместная работа</string>
+    <string name="nav_host_coop">Хост</string>
+    <string name="nav_host_coop_info">Организуйте совместный сеанс, чтобы поделиться своей системой координат AR с пользователями поблизости.</string>
+    <string name="nav_join_coop">Присоединиться</string>
+    <string name="nav_join_coop_info">Присоединитесь к ближайшему совместному сеансу, чтобы согласовать свой вид AR с хостом.</string>
+    <string name="nav_leave_coop">Выйти</string>
+    <string name="nav_leave_coop_info">Выйти из текущего совместного сеанса.</string>
+    <string name="nav_wearable">Носимое устройство</string>
+    <string name="nav_wearable_info">Подключитесь к смарт-очкам для AR-опыта без использования рук с вводом камеры, согласованным с вашей перспективой.</string>
+    <string name="nav_wall_clear">Очистить</string>
+    <string name="nav_wall_clear_info">Удаляет фоновое фото стены, используемое в режиме Макет.</string>
+    <string name="nav_magic">Магия</string>
+    <string name="nav_edges">Края</string>
+    <string name="nav_filter">Фильтр</string>
+    <string name="nav_photo">Фото</string>
+    <string name="nav_file">Файл</string>
+    <string name="shared_image_pick_project">Откройте или создайте проект, чтобы добавить общее изображение</string>
+    <string name="camera_stalled_error">Камера перестала передавать кадры — выход из режима AR. Откройте AR снова, чтобы повторить попытку в более безопасном режиме камеры.</string>
+    <string name="syncing">СИНХРОНИЗАЦИЯ...</string>
+    <string name="adj_reset">Сбросить размещение</string>
+    <string name="adj_restore_placement">Восстановить размещение</string>
+    <string name="status_world_mapped">МИР КАРТИРОВАН: %1$d%%</string>
+    <string name="rotation_axis_feedback">Вращение вокруг оси %1$s</string>
+    <string name="rotation_axis_x">X</string>
+    <string name="rotation_axis_y">Y</string>
+    <string name="rotation_axis_z">Z</string>
+    <string name="settings_language_label">Язык</string>
+    <string name="settings_layer_feature_points">Показывать точки особенностей</string>
+    <string name="settings_layer_plane_grids">Показывать сетки плоскостей</string>
+    <string name="settings_layer_voxels">Показывать воксели</string>
+    <string name="settings_layer_points">Показывать облако точек</string>
+    <string name="settings_layer_mesh">Показывать сетку модели</string>
+    <string name="settings_parallax_threshold">Угол проверки параллакса</string>
+    <string name="settings_camera_fps">Частота кадров камеры</string>
+    <string name="settings_scan_mode_cloud_offset">Смещение облака точек</string>
+    <string name="settings_reset_tutorials_label">Сбросить обучающие материалы</string>
+    <string name="settings_reset_tutorials_value">Показать вводные подсказки заново</string>
+    <string name="help_cloud_offset">Передача смещения якоря: высокоточное отслеживание облака точек для масштабных фресок. Инструкции: завершите сканирование на 360°, затем нажмите, чтобы разместить якорь.</string>
+    <string-array name="onboarding_trace">
+        <item>Это режим Следа.</item>
+        <item>Нажмите «Открыть», чтобы добавить первый слой. После добавления сведите или разведите пальцы и перетащите на холсте, чтобы изменить размер и разместить его.</item>
+        <item>Когда всё будет на месте и так, как вы хотите, нажмите кнопку Заморозить, чтобы превратить телефон в световой стол для перерисовки на бумагу.</item>
+        <item>Для редактирования мы рекомендуем использовать режим Следа или режим Макет.</item>
+        <item>Так ваши изображения будут готовы, и телефон сможет сосредоточиться на дополненной реальности при нажатии кнопки AR.</item>
+    </string-array>
+    <string-array name="onboarding_ar">
+        <item>AR-проекция — проецирует ваш дизайн на настоящую стену с помощью датчика глубины и пространственного отслеживания телефона.</item>
+        <item>Наведите телефон на стену и медленно двигайте его из стороны в сторону. По мере картирования поверхности движком будут появляться цветные фигуры. Дождитесь, пока не будет охвачена вся область стены.</item>
+        <item>Просто коснитесь экрана. Приложение сфотографирует стену, извлечёт отслеживаемые признаки и мгновенно зафиксирует якорь.</item>
+        <item>Нажмите «Открыть», чтобы добавить слой дизайна — он будет проецироваться на стену с использованием только что установленного якоря.</item>
+        <item>Совет — пустые белые стены, гладкий бетон и однотонные поверхности не отслеживаются. Наведите точку привязки на граффити, грубую штукатурку или любой другой отчётливый узор.</item>
+    </string-array>
+    <string-array name="onboarding_overlay">
+        <item>Живое наложение — ваш дизайн парит поверх изображения с камеры в реальном времени, без необходимости сканировать поверхность.</item>
+        <item>Нажмите «Открыть», чтобы добавить слой — выберите фото, и оно появится здесь, паря над изображением с камеры в реальном времени.</item>
+        <item>Сведите пальцы для изменения масштаба, перетаскивайте для перемещения. Наложение остаётся зафиксированным на экране — отойдите назад, чтобы увидеть, как оно вписывается в стену.</item>
+    </string-array>
+    <string-array name="onboarding_ar_unavailable">
+        <item>Это устройство не поддерживает ARCore, поэтому режим AR-проекции недоступен.</item>
+        <item>Вы всё ещё можете использовать режимы След, Макет и Живое наложение — все режимы, кроме AR, работают без ARCore.</item>
+        <item>Нажмите, чтобы закрыть.</item>
+    </string-array>
+    <string-array name="onboarding_mockup">
+        <item>Фотомакет — просмотрите свой дизайн на фотографии, прежде чем вообще браться за кисть.</item>
+        <item>Нажмите «Стена», чтобы выбрать или сделать фото своей поверхности. Сделайте это в первую очередь!</item>
+        <item>Нажмите «Открыть», чтобы добавить слой поверх фото стены. Сведите пальцы и перетаскивайте, чтобы изменить размер и расположение.</item>
+    </string-array>
+    <string-array name="onboarding_design">
+        <item>Это Дизайн — ваше рабочее пространство. Всё, что вы создадите здесь, перенесётся во все остальные режимы.</item>
+        <item>Нажмите «Открыть», чтобы добавить первый слой — выберите фото из галереи, и оно появится здесь как ваша работа.</item>
+        <item>Нажмите на слой, чтобы открыть его инструменты — сгруппированные в папки Рисование, Ретушь, Настройка и Эффекты. Сведите пальцы и перетаскивайте на холсте, чтобы изменить размер и разместить его.</item>
+        <item>Когда всё будет выглядеть так, как нужно, выберите, как это использовать: «След», чтобы превратить телефон в световой стол, «Макет», чтобы просмотреть на фото, или «AR», чтобы спроецировать на стену.</item>
+    </string-array>
+    <string-array name="onboarding_design_layers">
+        <item>Открыть — импортирует фото из галереи; оно появляется как новый слой.</item>
+    </string-array>
 </resources>
