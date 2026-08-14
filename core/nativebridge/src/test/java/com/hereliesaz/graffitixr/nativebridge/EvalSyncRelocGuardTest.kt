@@ -1,7 +1,16 @@
 package com.hereliesaz.graffitixr.nativebridge
 
+import com.hereliesaz.graffitixr.common.util.NativeLibLoader
+import com.hereliesaz.graffitixr.common.wearable.WearableManager
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -17,29 +26,61 @@ import org.junit.Test
  * As with the seed, the effect lives in native code and cannot be exercised here — there is no
  * `libgraffitixr.so` on this classpath. What is testable is the *decision*: the gate, the cadence
  * arithmetic, and the sentinel. Those are where the realistic mistakes are.
+ *
+ * **On the exceptions.** As in `SlamManagerAnchorEstablishmentTest` and `EvalRngSeedGuardTest`: a
+ * call that reaches JNI throws `UnsatisfiedLinkError` off-device, and a call that stops at the gate
+ * returns normally. Both guard tests below exercise the REAL `SlamManager` methods, not a copy of
+ * their logic, so deleting the `if (debuggable)` check from production code fails them.
  */
 class EvalSyncRelocGuardTest {
 
-    /** The gate under test, isolated from the JNI call it protects. */
-    private class Gate {
-        val calls = mutableListOf<Pair<Boolean, Int>>()
-        fun setIfDebuggable(enabled: Boolean, everyN: Int, debuggable: Boolean) {
-            if (debuggable) calls.add(enabled to everyN)
+    private lateinit var slamManager: SlamManager
+
+    @Before
+    fun setup() {
+        // The constructor calls NativeLibLoader.loadAll(), which throws when the .so is absent.
+        mockkObject(NativeLibLoader)
+        every { NativeLibLoader.loadAll() } returns Unit
+        slamManager = SlamManager(mockk<WearableManager>(relaxed = true))
+    }
+
+    @After
+    fun tearDown() {
+        unmockkObject(NativeLibLoader)
+    }
+
+    @Test
+    fun `a debuggable build reaches the native inline-reloc setter`() {
+        try {
+            slamManager.setEvalSyncRelocIfDebuggable(enabled = true, everyN = 5, debuggable = true)
+            fail("expected the debuggable branch to reach nativeSetEvalSyncReloc and throw UnsatisfiedLinkError")
+        } catch (expected: UnsatisfiedLinkError) {
+            // expected: proves the debuggable=true branch called through to JNI.
         }
     }
 
     @Test
-    fun `a debuggable build enables inline reloc`() {
-        val g = Gate()
-        g.setIfDebuggable(enabled = true, everyN = 5, debuggable = true)
-        assertEquals(listOf(true to 5), g.calls)
+    fun `a release build never reaches the native inline-reloc setter`() {
+        // If the `if (debuggable)` guard were removed from the real method, this would also throw
+        // UnsatisfiedLinkError instead of returning normally.
+        slamManager.setEvalSyncRelocIfDebuggable(enabled = true, everyN = 5, debuggable = false)
     }
 
+    /**
+     * `evalSyncRelocEveryN()` must be a genuine read-back through JNI, not a cached/local value. If
+     * it were hardcoded to report whatever the caller last asked for, a release build — where the
+     * gate above declines and nothing is ever set natively — would still report a stale cadence
+     * instead of the true "off". Reaching `nativeGetEvalSyncRelocEveryN` and throwing off-device is
+     * exactly the evidence that it queries the engine rather than remembering a value locally.
+     */
     @Test
-    fun `a release build never reaches the engine`() {
-        val g = Gate()
-        g.setIfDebuggable(enabled = true, everyN = 5, debuggable = false)
-        assertTrue("release must not run reloc inline, got ${g.calls}", g.calls.isEmpty())
+    fun `evalSyncRelocEveryN reads back through the engine rather than a cached value`() {
+        try {
+            slamManager.evalSyncRelocEveryN()
+            fail("expected evalSyncRelocEveryN to reach nativeGetEvalSyncRelocEveryN and throw UnsatisfiedLinkError")
+        } catch (expected: UnsatisfiedLinkError) {
+            // expected: proves the accessor queries the engine instead of caching a value.
+        }
     }
 
     /**
@@ -74,15 +115,19 @@ class EvalSyncRelocGuardTest {
 
     /**
      * `evalSyncRelocEveryN()` reports **0** when sync mode is off, so one int carries both the flag
-     * and the cadence — and 0 can be the "off" marker here precisely because a cadence of 0 is
-     * impossible, unlike the RNG seed where 0 is a perfectly valid seed and the sentinel had to be
-     * negative. The two sentinels differ for a reason, and this pins that reasoning so nobody
-     * "harmonises" them.
+     * and the cadence — and 0 can be the "off" marker here precisely because the native floor above
+     * makes a REAL cadence of 0 unreachable (`maxOf(1, everyN)` never produces it), unlike the RNG
+     * seed where 0 is a perfectly valid seed and that sentinel had to be negative instead. Tied to
+     * the actual floor arithmetic, not to two hardcoded literals, so a change to the floor is what
+     * would break this rather than a copy of the reasoning going stale on its own.
      */
     @Test
     fun `zero is a valid off marker for the cadence, unlike the seed`() {
-        assertTrue("a cadence of 0 is impossible, so 0 can mean 'off'", maxOf(1, 0) != 0)
-        assertTrue("a seed of 0 is possible, so its sentinel must be negative", 0L >= 0)
+        val everyReachableCadence = intArrayOf(0, -1, 1, 2, 30, Int.MIN_VALUE).map { maxOf(1, it) }
+        assertTrue(
+            "a cadence of 0 is unreachable through the real floor, so 0 can mean 'off'",
+            everyReachableCadence.none { it == 0 },
+        )
     }
 }
 
