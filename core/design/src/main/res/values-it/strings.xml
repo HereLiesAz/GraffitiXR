@@ -28,19 +28,14 @@
     <!-- Description of Trace mode, explaining its use as a light-table for physical tracing. -->
     <string name="nav_trace_info">Usa il tuo design come sovrapposizione su un tavolo luminoso per tracciare linee di riferimento su una superficie fisica.</string>
     <!-- Alternative name for Trace mode, often referred to as Lightbox. -->
-    <string name="nav_trace_mode">Tavolo luminoso</string>
 
     <!-- Label for Canvas mode, which is optimized for smaller, desk-scale artwork. -->
-    <string name="nav_canvas">Tela</string>
     <!-- Label for Mural mode, which is optimized for large-scale wall artwork. -->
-    <string name="nav_mural">Murale</string>
     <!-- Description for the toggle between Canvas and Mural scanning modes. -->
     <string name="nav_scan_mode_toggle_info">Passa tra Tela (ottimizzato per opere d\'arte più piccole su scrivania) e Murale (ottimizzato per muri di grandi dimensioni e Gaussian Splatting).</string>
 
     <!-- Label for the Stencil generation tool. -->
-    <string name="nav_stencil">Stencil</string>
     <!-- Description of the Stencil tool, explaining how it creates multi-layer printable templates. -->
-    <string name="nav_stencil_info">Genera stencil stampabili a più livelli dalla tua opera d\'arte. Ogni livello viene stampato come tasselli solo contorno dimensionati per carta formato Lettera USA.</string>
 
     <!-- Label for the Target/Grid management menu in AR mode. -->
     <string name="nav_grid">Bersaglio</string>
@@ -48,9 +43,7 @@
     <string name="nav_grid_info">Crea e gestisci i bersagli di ancoraggio AR. Fotografa segni di riferimento dipinti sul muro per bloccare la proiezione in posizione.</string>
 
     <!-- Label for the wall survey tool, used to improve AR tracking. -->
-    <string name="nav_surveyor">Rilevamento</string>
     <!-- Description of the Survey tool, explaining its role in tracking accuracy. -->
-    <string name="nav_surveyor_info">Mappa la superficie del muro per migliorare l\'accuratezza del tracciamento AR.</string>
 
     <!-- Label for the action to create a new AR anchor. -->
     <string name="nav_create">Crea</string>
@@ -153,83 +146,51 @@
     <string name="nav_light_info">Attiva la torcia del dispositivo per illuminare il tuo muro mentre lavori in condizioni di scarsa illuminazione.</string>
 
     <!-- Label for the touch input lock feature. -->
-    <string name="nav_lock">Blocca</string>
     <!-- Description of the touch lock, explaining how to unlock it. -->
     <string name="nav_lock_info">Blocca il touchscreen per evitare modifiche accidentali mentre spruzzi. Tocca tre volte ovunque per sbloccare.</string>
 
 
     <!-- Tooltip info for the brush tool. -->
-    <string name="info_brush">Dipingi tratti a mano libera su questo livello. Trascina su/giù sul pulsante Dimensione per cambiare il diametro del pennello; trascina a sinistra/destra per regolare la sfumatura (morbidezza dei bordi).</string>
     <!-- Tooltip info for the eraser tool. -->
-    <string name="info_eraser">Cancella parti di questo livello con un pennello rotondo. Trascina su/giù sul pulsante Dimensione per cambiare il diametro; trascina a sinistra/destra per regolare la sfumatura.</string>
     <!-- Tooltip info for the blur tool. -->
-    <string name="info_blur">Spalma e ammorbidisci aree di questo livello. Trascina su una regione per sfocarla.</string>
     <!-- Tooltip info for the liquify/warp tool. -->
-    <string name="info_liquify">Spingi e deforma i pixel in qualsiasi direzione. Trascina su un\'area per distorcerla — utile per regolare le proporzioni.</string>
     <!-- Tooltip info for the dodge (lighten) tool. -->
-    <string name="info_dodge">Schiarisci aree specifiche dipingendoci sopra.</string>
     <!-- Tooltip info for the burn (darken) tool. -->
-    <string name="info_burn">Scurisci aree specifiche dipingendoci sopra.</string>
     <!-- Tooltip info for the brush size control, explaining vertical and horizontal drag gestures. -->
-    <string name="info_size">Trascina su/giù per cambiare il diametro del pennello. Trascina a sinistra/destra per regolare la sfumatura — una sfumatura più ampia dà bordi più morbidi, più simili a quelli di una bomboletta spray.</string>
     <!-- Tooltip info for the brush color control, explaining gestures and the color wheel. -->
-    <string name="info_color">Mostra il colore del pennello attivo. Trascina su/giù per regolare la luminosità; trascina a sinistra/destra per regolare la saturazione. Tocca per aprire la ruota dei colori completa.</string>
     <!-- Tooltip info for adding a new drawing layer. -->
-    <string name="info_draw">Aggiungi un nuovo livello trasparente vuoto per il disegno a mano libera.</string>
     <!-- Tooltip info for the AR keyframe tool, used for drift correction. -->
-    <string name="info_keyframe">Salva la posa corrente della telecamera AR come fotogramma chiave. Usato per correggere la deriva e riallineare la proiezione dopo essersi allontanati e tornati.</string>
     <!-- Tooltip info for an individual layer in the design rail. -->
-    <string name="info_layer">Questo livello. Tocca per attivarlo. Apri la barra orizzontale per accedere agli strumenti. Tieni premuto e trascina per riordinare.</string>
 
 
     <!-- Label for selecting the number of stencil layers. -->
-    <string name="stencil_layers">Livelli</string>
     <!-- Description of stencil layer options (silhouette, highlight, midtone). -->
-    <string name="stencil_layers_info">Scegli quanti livelli di stencil generare: 1 (solo sagoma), 2 (sagoma + luce) o 3 (sagoma + mezzotono + luce).</string>
 
     <!-- Action label to re-generate stencils. -->
-    <string name="stencil_rebuild">Ricostruisci</string>
     <!-- Description of the Rebuild action for the stencil pipeline. -->
-    <string name="stencil_rebuild_info">Esegui nuovamente la pipeline di generazione dello stencil sul livello sorgente corrente.</string>
 
     <!-- Label for the stencil printing configuration. -->
-    <string name="stencil_print">Stampa</string>
     <!-- Description of the print tool, mentioning tiled PDF generation. -->
-    <string name="stencil_print_info">Configura la dimensione di stampa nel mondo reale e genera un PDF a mosaico per carta formato Lettera USA.</string>
 
     <!-- Label for setting the real-world size of the stencil. -->
-    <string name="stencil_print_size">Dimensione</string>
     <!-- Description of the stencil size control, mentioning centimetre units and live page count. -->
-    <string name="stencil_print_size_info">Trascina su/giù per impostare la larghezza o l\'altezza dello stencil nel mondo reale in centimetri. Il conteggio delle pagine si aggiorna in tempo reale.</string>
 
     <!-- Label for toggling between width and height locking for print sizing. -->
-    <string name="stencil_print_dim_toggle">L / A</string>
     <!-- Description of the dimension lock toggle. -->
-    <string name="stencil_print_dim_toggle_info">Tocca per passare dal blocco della larghezza a quello dell\'altezza dell\'output.</string>
 
     <!-- Action label to generate and print the tiled PDF. -->
-    <string name="stencil_export_pdf">Stampa PDF</string>
     <!-- Description of the PDF export, including the mention of overlaps for assembly. -->
-    <string name="stencil_export_pdf_info">Genera un PDF a mosaico di tutti i livelli di stencil pronti per essere stampati e tagliati. Ogni tassello include una sovrapposizione di 3 mm per l\'allineamento di assemblaggio.</string>
 
     <!-- Action label to save stencil layers as PNG images. -->
-    <string name="stencil_save_layers">Salva PNG</string>
     <!-- Description of the PNG save action for stencil layers. -->
-    <string name="stencil_save_layers_info">Salva ogni livello di stencil come immagine PNG separata nella tua galleria.</string>
 
     <!-- Label for the button to return to the main editor from stencil mode. -->
-    <string name="stencil_back">← Editor</string>
     <!-- Description of the back action, noting that stencil layers are preserved. -->
-    <string name="stencil_back_info">Torna all\'editor principale. I tuoi livelli di stencil sono conservati nella sessione.</string>
 
     <!-- Action label to add a text layer. -->
-    <string name="nav_text">Testo</string>
     <!-- Action label to add a blank drawing layer. -->
-    <string name="nav_draw">Disegna</string>
     <!-- Action label to edit layer content (like text). -->
-    <string name="nav_edit">Modifica</string>
     <!-- Action label for font selection. -->
-    <string name="nav_font">Font</string>
     <!-- Action label for size adjustment. -->
     <string name="nav_size">Dimensione</string>
     <!-- Action label for color selection. -->
@@ -243,15 +204,10 @@
     <!-- Action label for drop shadow toggle. -->
     <string name="nav_shadow">Ombra</string>
     <!-- Action label for the eraser tool. -->
-    <string name="nav_eraser">Gomma</string>
     <!-- Action label for the blur/smudge tool. -->
-    <string name="nav_blur">Sfoca</string>
     <!-- Action label for the liquify/warp tool. -->
-    <string name="nav_liquify">Fluidifica</string>
     <!-- Action label for the dodge/lighten tool. -->
-    <string name="nav_dodge">Scherma</string>
     <!-- Action label for the burn/darken tool. -->
-    <string name="nav_burn">Brucia</string>
 
     <!-- MainActivity UI strings -->
     <!-- Label shown when a stencil or process is generating. -->
@@ -411,7 +367,6 @@
     <string name="settings_off">Spento</string>
     <string name="settings_scan_mode_label">Modalità Scansione AR</string>
     <string name="settings_scan_mode_point_cloud">Nuvola di Punti</string>
-    <string name="settings_scan_mode_gaussian_splat">Gaussian Splatting</string>
     <string name="settings_anchor_boundary_label">Mostra Confine dell\'Ancora</string>
     <string name="settings_units_label">Unità di Distanza</string>
     <string name="settings_units_imperial">Imperiali (ft)</string>
@@ -574,35 +529,86 @@
     <!-- Tutorial: Trace Mode -->
 
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
-    <string name="tut_create_anchor_title">Crea Ancora</string>
-    <string name="tut_create_anchor_text">Blocca la tua proiezione su un punto specifico sul muro. Una volta impostato, il design rimane al suo posto anche se cammini in giro.</string>
-    <string name="tut_surface_req_title">Requisiti della Superficie</string>
-    <string name="tut_surface_req_text">Il muro ha bisogno di una texture visibile — graffiti, intonaco ruvido, mattoni o adesivi vanno tutti bene. Muri lisci, vuoti o a tinta unita non manterranno un\'ancora.</string>
-    <string name="tut_blobs_title">Cosa Significano le Macchie</string>
-    <string name="tut_blobs_text">Dopo aver toccato, vedrai brevemente delle macchie verdi. Quelli sono i punti chiave di tracciamento che l\'app ha estratto. Più macchie = blocco più forte.</string>
-    <string name="tut_import_img_title">Importa Immagine</string>
-    <string name="tut_import_img_text">Aggiungi uno schizzo, una foto o un riferimento dalla tua galleria. Appare come un nuovo livello impilato in cima agli altri.</string>
-    <string name="tut_scale_pos_title">Scala e Posiziona</string>
-    <string name="tut_scale_pos_text">Pizzica con due dita per ridimensionare. Trascina con un dito per riposizionare. Il livello si aggancia alla superficie del muro proiettata in modalità AR.</string>
-    <string name="tut_lock_freeze_title">Blocca / Congela</string>
-    <string name="tut_lock_freeze_text">Nella modalità Ricalco (Tavolo luminoso): disabilita il tocco in modo da poter poggiare la carta sullo schermo senza spostare accidentalmente nulla.</string>
-    <string name="tut_in_other_modes_title">In Altre Modalità</string>
-    <string name="tut_in_other_modes_text">Nelle modalità AR, Sovrapposizione e Mockup: blocca le trasformazioni del livello in modo che i design non possano essere spostati o ridimensionati accidentalmente.</string>
-    <string name="tut_stencil_gen_title">Genera Stencil</string>
-    <string name="tut_stencil_gen_text">Converte la tua immagine in stencil stampabili per vernice spray. Ogni stencil rappresenta un livello di colore del design.</string>
-    <string name="tut_how_many_layers_title">Quanti Livelli?</string>
-    <string name="tut_how_many_layers_text">Un design a 3 colori produce 3 fogli di stencil. Più colori = più fogli. Immagini semplici ad alto contrasto danno i risultati migliori.</string>
-    <string name="tut_exporting_title">Esportazione</string>
-    <string name="tut_exporting_text">Ogni stencil viene esportato come PDF. Stampa in scala 100% (nessun ridimensionamento) per ottenere dimensioni reali accurate.</string>
-    <string name="tut_opacity_brightness_title">Opacità e Luminosità</string>
-    <string name="tut_opacity_brightness_text">L\'opacità controlla la trasparenza del livello. La luminosità cambia la chiarezza complessiva — utile per abbinare il livello al tono del tuo muro.</string>
-    <string name="tut_contrast_saturation_title">Contrasto e Saturazione</string>
-    <string name="tut_contrast_saturation_text">Il contrasto separa i neri dai bianchi — ottimo per far risaltare i contorni dello stencil. La saturazione controlla l\'intensità del colore; trascina a zero per la scala di grigi.</string>
-    <string name="tut_isolate_subject_title">Isola Soggetto</string>
-    <string name="tut_isolate_subject_text">Usa l\'IA per rimuovere automaticamente lo sfondo, lasciando solo il soggetto principale dell\'immagine.</string>
-    <string name="tut_best_results_title">Migliori Risultati</string>
-    <string name="tut_best_results_text">Funziona meglio su foto con un soggetto chiaro su uno sfondo liscio o contrastante. Scene complesse con sfondi disordinati potrebbero richiedere ritocchi manuali con la gomma.</string>
     <string name="settings_scan_mode_voxel_hash">Voxel hash</string>
     <string name="settings_scan_mode_surface_mesh">Mesh di superficie</string>
     <string name="settings_mural_method_label">Motore murale</string>
+
+
+    <!-- Added by audit item 4: missing keys relative to core/design's default table -->
+    <string name="nav_coop">Coop</string>
+    <string name="nav_host_coop">Ospita</string>
+    <string name="nav_host_coop_info">Ospita una sessione cooperativa per condividere il tuo sistema di coordinate AR con altri utenti nelle vicinanze.</string>
+    <string name="nav_join_coop">Unisciti</string>
+    <string name="nav_join_coop_info">Unisciti a una sessione cooperativa nelle vicinanze per allineare la tua vista AR con quella dell\'host.</string>
+    <string name="nav_leave_coop">Esci</string>
+    <string name="nav_leave_coop_info">Esci dalla sessione cooperativa corrente.</string>
+    <string name="nav_wearable">Indossabile</string>
+    <string name="nav_wearable_info">Connettiti a un visore smart per un\'esperienza AR a mani libere con input della fotocamera allineato alla tua prospettiva.</string>
+    <string name="nav_wall_clear">Rimuovi</string>
+    <string name="nav_wall_clear_info">Rimuove la foto del muro di sfondo usata nella modalità Mockup.</string>
+    <string name="nav_magic">Magia</string>
+    <string name="nav_edges">Bordi</string>
+    <string name="nav_filter">Filtro</string>
+    <string name="nav_photo">Foto</string>
+    <string name="nav_file">File</string>
+    <string name="shared_image_pick_project">Apri o crea un progetto per aggiungere l\'immagine condivisa</string>
+    <string name="camera_stalled_error">La fotocamera non sta più inviando fotogrammi: uscita dalla modalità AR. Riapri AR per riprovare con una modalità fotocamera più sicura.</string>
+    <string name="syncing">SINCRONIZZAZIONE...</string>
+    <string name="adj_reset">Reimposta posizionamento</string>
+    <string name="adj_restore_placement">Ripristina posizionamento</string>
+    <string name="status_world_mapped">MONDO MAPPATO: %1$d%%</string>
+    <string name="rotation_axis_feedback">Rotazione sull\'asse %1$s</string>
+    <string name="rotation_axis_x">X</string>
+    <string name="rotation_axis_y">Y</string>
+    <string name="rotation_axis_z">Z</string>
+    <string name="settings_language_label">Lingua</string>
+    <string name="settings_layer_feature_points">Mostra punti caratteristici</string>
+    <string name="settings_layer_plane_grids">Mostra griglie del piano</string>
+    <string name="settings_layer_voxels">Mostra voxel</string>
+    <string name="settings_layer_points">Mostra nuvola di punti</string>
+    <string name="settings_layer_mesh">Mostra mesh</string>
+    <string name="settings_parallax_threshold">Angolo di verifica della parallasse</string>
+    <string name="settings_camera_fps">Frequenza fotogrammi fotocamera</string>
+    <string name="settings_scan_mode_cloud_offset">Offset nuvola</string>
+    <string name="settings_reset_tutorials_label">Reimposta tutorial</string>
+    <string name="settings_reset_tutorials_value">Mostra di nuovo le guide iniziali</string>
+    <string name="help_cloud_offset">Trasferimento offset ancora: tracciamento ad alta precisione della nuvola di punti per murales su larga scala. Istruzioni: completa la scansione a 360°, poi tocca per posizionare l\'ancora.</string>
+    <string-array name="onboarding_trace">
+        <item>Questa è la modalità Ricalco.</item>
+        <item>Tocca «Apri» per aggiungere il tuo primo livello. Una volta inserito, pizzica e trascina sulla tela per ridimensionarlo e posizionarlo.</item>
+        <item>Quando sono dove e come li vuoi, premi il pulsante Blocca per trasformare il telefono in un tavolo luminoso per ricalcare su carta.</item>
+        <item>Ti consigliamo di usare la modalità Ricalco o Mockup per la modifica.</item>
+        <item>Così le tue immagini sono pronte e il telefono può concentrarsi sulla realtà aumentata quando premi il pulsante AR.</item>
+    </string-array>
+    <string-array name="onboarding_ar">
+        <item>Proiezione AR — proietta il tuo design su un muro reale usando il sensore di profondità e il tracciamento spaziale del telefono.</item>
+        <item>Punta il muro e muoviti lentamente da un lato all\'altro. Appariranno forme colorate mentre il motore mappa la superficie. Attendi finché l\'area del muro non è coperta.</item>
+        <item>Basta toccare lo schermo. L\'app fotografa il muro, estrae punti di tracciamento e blocca l\'ancora all\'istante.</item>
+        <item>Tocca «Apri» per aggiungere un livello di design — verrà proiettato sul muro usando l\'ancora appena impostata.</item>
+        <item>Consiglio — muri bianchi vuoti, cemento liscio e superfici a tinta unita non possono essere tracciati. Punta l\'ancora su graffiti, intonaco ruvido o qualsiasi segno distintivo.</item>
+    </string-array>
+    <string-array name="onboarding_overlay">
+        <item>Overlay dal vivo — il tuo design fluttua sopra il flusso della fotocamera in diretta, senza bisogno di scansionare alcuna superficie.</item>
+        <item>Tocca «Apri» per aggiungere un livello — scegli una foto e apparirà qui, fluttuando sopra il flusso della fotocamera in diretta.</item>
+        <item>Pizzica per ridimensionare, trascina per riposizionare. L\'overlay resta fisso sullo schermo — allontanati per vedere come si adatta al muro.</item>
+    </string-array>
+    <string-array name="onboarding_ar_unavailable">
+        <item>Questo dispositivo non supporta ARCore, quindi la modalità Proiezione AR non è disponibile.</item>
+        <item>Puoi comunque usare Ricalco, Mockup e Overlay dal vivo — tutte le modalità tranne AR funzionano senza ARCore.</item>
+        <item>Tocca per chiudere.</item>
+    </string-array>
+    <string-array name="onboarding_mockup">
+        <item>Mockup fotografico — visualizza in anteprima il tuo design su una foto prima ancora di prendere un pennello.</item>
+        <item>Tocca «Muro» per scegliere o scattare una foto della tua superficie. Fallo per primo!</item>
+        <item>Tocca «Apri» per aggiungere un livello sopra la foto del muro. Pizzica e trascina per ridimensionarlo e posizionarlo.</item>
+    </string-array>
+    <string-array name="onboarding_design">
+        <item>Questo è Design — il tuo spazio di lavoro. Tutto ciò che crei qui si riporta in ogni altra modalità.</item>
+        <item>Tocca «Apri» per aggiungere il tuo primo livello — scegli una foto dalla galleria e apparirà qui come tua opera.</item>
+        <item>Tocca un livello per aprire i suoi strumenti — raggruppati nelle cartelle Dipingi, Ritocca, Regola ed Effetti. Pizzica e trascina sulla tela per ridimensionarlo e posizionarlo.</item>
+        <item>Quando è come lo vuoi, scegli come usarlo: «Ricalco» per trasformare il telefono in un tavolo luminoso, «Mockup» per visualizzarlo su una foto, o «AR» per proiettarlo su un muro.</item>
+    </string-array>
+    <string-array name="onboarding_design_layers">
+        <item>Apri — importa una foto dalla galleria; viene aggiunta come nuovo livello.</item>
+    </string-array>
 </resources>

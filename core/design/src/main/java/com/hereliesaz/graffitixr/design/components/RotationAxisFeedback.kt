@@ -12,8 +12,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.graffitixr.common.model.RotationAxis
+import com.hereliesaz.graffitixr.design.R
+
+@Composable
+private fun RotationAxis.label(): String = when (this) {
+    RotationAxis.X -> stringResource(R.string.rotation_axis_x)
+    RotationAxis.Y -> stringResource(R.string.rotation_axis_y)
+    RotationAxis.Z -> stringResource(R.string.rotation_axis_z)
+}
 
 @Composable
 fun RotationAxisFeedback(
@@ -39,7 +48,7 @@ fun RotationAxisFeedback(
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
             Text(
-                text = "Rotating on ${axis.name} axis",
+                text = stringResource(R.string.rotation_axis_feedback, axis.label()),
                 color = Color.White,
                 modifier = Modifier.shadow(elevation = 2.dp)
             )

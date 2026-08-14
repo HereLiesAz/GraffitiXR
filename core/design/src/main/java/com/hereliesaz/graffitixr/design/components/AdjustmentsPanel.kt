@@ -12,10 +12,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.hereliesaz.graffitixr.common.model.OverlayLayer
 import com.hereliesaz.graffitixr.design.theme.AppStrings
+import com.hereliesaz.graffitixr.design.theme.contrastColorFor
 
 data class AdjustmentsState(
     val hideUiForCapture: Boolean = false,
@@ -31,13 +33,21 @@ data class AdjustmentsState(
     val isCapturingTarget: Boolean = false,
     val activeLayer: OverlayLayer? = null,
     // Undo/redo belongs to the Design screen only; Modes show the finished design (no history controls).
-    val showUndoRedo: Boolean = true
+    val showUndoRedo: Boolean = true,
+    /**
+     * The canvas/wall background currently behind these controls, if known. When set, knob labels
+     * and undo/redo counts switch to black or white for contrast (see [contrastColorFor]) instead
+     * of always rendering white -- which otherwise vanishes against light canvas-background presets
+     * (e.g. the app's own "White" preset). Left null (falling back to white, the prior behavior)
+     * until a caller threads the real canvas background through.
+     */
+    val canvasBackground: Color? = null
 )
 
 /**
  * Integrated panel for image adjustments, color balance, and undo/redo controls.
  * This panel handles the visibility of the adjustment knobs and the persistent
- * action row (Undo, Redo, Magic Wand).
+ * action row (Undo, Reset, Redo).
  */
 @Composable
 fun AdjustmentsPanel(
@@ -75,9 +85,9 @@ fun AdjustmentsPanel(
     val hasHistory = state.hasHistory
 
     // The panel should be visible if we are adjusting an image, or if we have an image active,
-    // or if we are in AR mode (to provide access to the Magic Wand for anchoring),
+    // or if we are in AR mode (to provide access to the action row while anchoring),
     // or if there's any history to undo/redo.
-    // HOWEVER, we hide the action row (Undo, Redo, Magic) during Target Creation.
+    // HOWEVER, we hide the action row (Undo, Reset, Redo) during Target Creation.
     val canShowActionRow = !state.isCapturingTarget
     val isVisible = showKnobs || showColorBalance || (canShowActionRow && (hasImage || isArMode || hasHistory))
 
@@ -94,6 +104,10 @@ fun AdjustmentsPanel(
     val colorBalanceR = activeLayer?.colorBalanceR ?: 1f
     val colorBalanceG = activeLayer?.colorBalanceG ?: 1f
     val colorBalanceB = activeLayer?.colorBalanceB ?: 1f
+
+    // Luminance-aware label color: falls back to white (the historical hardcoded value) when the
+    // caller hasn't threaded a real canvas background through yet.
+    val labelColor = state.canvasBackground?.let { contrastColorFor(it) } ?: Color.White
 
     Column(
         modifier = modifier
@@ -120,6 +134,7 @@ fun AdjustmentsPanel(
                     onAdjustmentStart = onAdjustmentStart,
                     onAdjustmentEnd = onAdjustmentEnd,
                     strings = strings,
+                    labelColor = labelColor,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -141,6 +156,7 @@ fun AdjustmentsPanel(
                     onAdjustmentStart = onAdjustmentStart,
                     onAdjustmentEnd = onAdjustmentEnd,
                     strings = strings,
+                    labelColor = labelColor,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -148,8 +164,8 @@ fun AdjustmentsPanel(
 
         if (canShowActionRow && state.showUndoRedo) {
             UndoRedoRow(
-                canUndo = true, // Logic handled by ViewModel, but we can pass state if needed
-                canRedo = true, // Logic handled by ViewModel
+                canUndo = state.undoCount > 0,
+                canRedo = state.redoCount > 0,
                 undoCount = state.undoCount,
                 redoCount = state.redoCount,
                 onUndo = onUndo,
@@ -159,6 +175,7 @@ fun AdjustmentsPanel(
                 canReset = hasImage,
                 isResetActive = state.isResetActive,
                 onReset = onReset,
+                countColor = labelColor,
             )
         }
     }

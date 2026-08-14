@@ -28,19 +28,14 @@
 
     <string name="nav_trace_info">Используйте свой дизайн в качестве наложения светового стола, чтобы проследить опорные линии на физической поверхности.</string>
 
-    <string name="nav_trace_mode">Лайтбокс</string>
 
 
-    <string name="nav_canvas">Холст</string>
 
-    <string name="nav_mural">Фреска</string>
 
     <string name="nav_scan_mode_toggle_info">Переключайтесь между холстом (оптимизировано для небольших произведений искусства на столе) и настенной росписью (оптимизировано для крупномасштабных стен и гауссовских брызг).</string>
 
 
-    <string name="nav_stencil">Трафарет</string>
 
-    <string name="nav_stencil_info">Создавайте печатные многослойные трафареты на основе своих работ. </string>
 
 
     <string name="nav_grid">Цель</string>
@@ -48,9 +43,7 @@
     <string name="nav_grid_info">Создавайте и управляйте якорными целями AR. </string>
 
 
-    <string name="nav_surveyor">Опрос</string>
 
-    <string name="nav_surveyor_info">Нанесите на карту поверхность стены, чтобы повысить точность отслеживания AR.</string>
 
 
     <string name="nav_create">Создавать</string>
@@ -153,83 +146,51 @@
     <string name="nav_light_info">Включите фонарик устройства, чтобы осветить стену во время работы в условиях низкой освещенности.</string>
 
 
-    <string name="nav_lock">Замок</string>
 
     <string name="nav_lock_info">Заблокируйте сенсорный экран, чтобы предотвратить случайные изменения во время распыления. </string>
 
 
 
-    <string name="info_brush">На этом слое нарисуйте штрихи от руки. </string>
-
-    <string name="info_eraser">Сотрите части этого слоя круглой кистью. </string>
-
-    <string name="info_blur">Размажьте и смягчите участки этого слоя. </string>
-
-    <string name="info_liquify">Толкайте и деформируйте пиксели в любом направлении. </string>
-
-    <string name="info_dodge">Осветлите определенные области, закрасив их.</string>
-
-    <string name="info_burn">Затемните определенные области, закрасив их.</string>
-
-    <string name="info_size">Перетащите вверх/вниз, чтобы изменить диаметр кисти. </string>
-
-    <string name="info_color">Показывает активный цвет кисти. </string>
-
-    <string name="info_draw">Добавьте новый пустой прозрачный слой для рисования от руки.</string>
-
-    <string name="info_keyframe">Сохраните текущую позу камеры AR как ключевой кадр. </string>
-
-    <string name="info_layer">Этот слой. </string>
 
 
 
-    <string name="stencil_layers">Слои</string>
-
-    <string name="stencil_layers_info">Выберите, сколько слоев трафарета нужно создать: 1 (только силуэт), 2 (силуэт + выделение) или 3 (силуэт + средние тона + выделение).</string>
 
 
-    <string name="stencil_rebuild">Восстановить</string>
-
-    <string name="stencil_rebuild_info">Повторно запустите конвейер генерации трафарета на текущем исходном слое.</string>
 
 
-    <string name="stencil_print">Распечатать</string>
-
-    <string name="stencil_print_info">Настройте реальный размер печати и создайте мозаичный PDF-файл для бумаги формата US Letter.</string>
 
 
-    <string name="stencil_print_size">Размер</string>
-
-    <string name="stencil_print_size_info">Перетащите вверх/вниз, чтобы установить реальную ширину или высоту трафарета в сантиметрах. </string>
 
 
-    <string name="stencil_print_dim_toggle">Ж/Ч</string>
-
-    <string name="stencil_print_dim_toggle_info">Нажмите, чтобы переключиться между блокировкой ширины или высоты вывода.</string>
 
 
-    <string name="stencil_export_pdf">Распечатать PDF</string>
-
-    <string name="stencil_export_pdf_info">Создайте мозаичный PDF-файл со всеми слоями трафарета, готовый к печати и вырезанию. </string>
 
 
-    <string name="stencil_save_layers">Сохранить PNG</string>
-
-    <string name="stencil_save_layers_info">Сохраните каждый слой трафарета как отдельное изображение PNG в своей галерее.</string>
 
 
-    <string name="stencil_back">← Редактор</string>
-
-    <string name="stencil_back_info">Вернитесь в главный редактор. </string>
 
 
-    <string name="nav_text">Текст</string>
 
-    <string name="nav_draw">Рисовать</string>
 
-    <string name="nav_edit">Редактировать</string>
 
-    <string name="nav_font">Шрифт</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     <string name="nav_size">Размер</string>
 
@@ -243,15 +204,10 @@
 
     <string name="nav_shadow">Тень</string>
 
-    <string name="nav_eraser">Ластик</string>
 
-    <string name="nav_blur">Размытие</string>
 
-    <string name="nav_liquify">Преобразовать</string>
 
-    <string name="nav_dodge">Уклоняться</string>
 
-    <string name="nav_burn">Гореть</string>
 
 
 
@@ -411,7 +367,6 @@
     <string name="settings_off">Выключенный</string>
     <string name="settings_scan_mode_label">Режим AR-сканирования</string>
     <string name="settings_scan_mode_point_cloud">Облако точек</string>
-    <string name="settings_scan_mode_gaussian_splat">Гауссовский сплат</string>
     <string name="settings_anchor_boundary_label">Показать границу привязки</string>
     <string name="settings_units_label">Единицы расстояния</string>
     <string name="settings_units_imperial">Империал (футы)</string>
@@ -574,35 +529,86 @@
 
 
 
-    <string name="tut_create_anchor_title">Создать якорь</string>
-    <string name="tut_create_anchor_text">Привязывает проекцию к определенному месту на стене. </string>
-    <string name="tut_surface_req_title">Требования к поверхности</string>
-    <string name="tut_surface_req_text">Стене нужна видимая текстура — граффити, грубая штукатурка, кирпич или наклейки подойдут. </string>
-    <string name="tut_blobs_title">Что означают капли</string>
-    <string name="tut_blobs_text">После нажатия вы ненадолго увидите зеленые пятна. </string>
-    <string name="tut_import_img_title">Импортировать изображение</string>
-    <string name="tut_import_img_text">Добавьте эскиз, фотографию или ссылку из своей галереи. </string>
-    <string name="tut_scale_pos_title">Масштаб и положение</string>
-    <string name="tut_scale_pos_text">Сведите два пальца, чтобы изменить размер. </string>
-    <string name="tut_lock_freeze_title">Блокировка/заморозка</string>
-    <string name="tut_lock_freeze_text">В режиме Lightbox (Trace): отключает сенсорное управление, чтобы вы могли положить бумагу на экран, не перемещая ничего случайно.</string>
-    <string name="tut_in_other_modes_title">В других режимах</string>
-    <string name="tut_in_other_modes_text">В режимах AR, Overlay и Mockup: блокирует преобразования слоев, чтобы дизайн нельзя было случайно переместить или масштабировать.</string>
-    <string name="tut_stencil_gen_title">Создать трафарет</string>
-    <string name="tut_stencil_gen_text">Преобразует ваше изображение в трафареты с аэрозольной краской, которые можно распечатать. </string>
-    <string name="tut_how_many_layers_title">Сколько слоев?</string>
-    <string name="tut_how_many_layers_text">При трехцветном дизайне получается 3 листа трафарета. </string>
-    <string name="tut_exporting_title">Экспорт</string>
-    <string name="tut_exporting_text">Каждый трафарет экспортируется в формате PDF. </string>
-    <string name="tut_opacity_brightness_title">Непрозрачность и яркость</string>
-    <string name="tut_opacity_brightness_text">Непрозрачность контролирует прозрачность слоя. </string>
-    <string name="tut_contrast_saturation_title">Контраст и насыщенность</string>
-    <string name="tut_contrast_saturation_text">Контраст отделяет темные участки от светлых — отлично подходит для выделения контуров трафарета. </string>
-    <string name="tut_isolate_subject_title">Изолировать объект</string>
-    <string name="tut_isolate_subject_text">Использует искусственный интеллект для автоматического удаления фона, оставляя только основной объект изображения.</string>
-    <string name="tut_best_results_title">Лучшие результаты</string>
-    <string name="tut_best_results_text">Лучше всего работает на фотографиях с четким объектом на однотонном или контрастном фоне. </string>
     <string name="settings_scan_mode_voxel_hash">Воксельный хеш</string>
     <string name="settings_scan_mode_surface_mesh">Поверхностная сетка</string>
     <string name="settings_mural_method_label">Движок мурала</string>
+
+
+    <!-- Added by audit item 4: missing keys relative to core/design's default table -->
+    <string name="nav_coop">Совместная работа</string>
+    <string name="nav_host_coop">Хост</string>
+    <string name="nav_host_coop_info">Организуйте совместный сеанс, чтобы поделиться своей системой координат AR с пользователями поблизости.</string>
+    <string name="nav_join_coop">Присоединиться</string>
+    <string name="nav_join_coop_info">Присоединитесь к ближайшему совместному сеансу, чтобы согласовать свой вид AR с хостом.</string>
+    <string name="nav_leave_coop">Выйти</string>
+    <string name="nav_leave_coop_info">Выйти из текущего совместного сеанса.</string>
+    <string name="nav_wearable">Носимое устройство</string>
+    <string name="nav_wearable_info">Подключитесь к смарт-очкам для AR-опыта без использования рук с вводом камеры, согласованным с вашей перспективой.</string>
+    <string name="nav_wall_clear">Очистить</string>
+    <string name="nav_wall_clear_info">Удаляет фоновое фото стены, используемое в режиме Макет.</string>
+    <string name="nav_magic">Магия</string>
+    <string name="nav_edges">Края</string>
+    <string name="nav_filter">Фильтр</string>
+    <string name="nav_photo">Фото</string>
+    <string name="nav_file">Файл</string>
+    <string name="shared_image_pick_project">Откройте или создайте проект, чтобы добавить общее изображение</string>
+    <string name="camera_stalled_error">Камера перестала передавать кадры — выход из режима AR. Откройте AR снова, чтобы повторить попытку в более безопасном режиме камеры.</string>
+    <string name="syncing">СИНХРОНИЗАЦИЯ...</string>
+    <string name="adj_reset">Сбросить размещение</string>
+    <string name="adj_restore_placement">Восстановить размещение</string>
+    <string name="status_world_mapped">МИР КАРТИРОВАН: %1$d%%</string>
+    <string name="rotation_axis_feedback">Вращение вокруг оси %1$s</string>
+    <string name="rotation_axis_x">X</string>
+    <string name="rotation_axis_y">Y</string>
+    <string name="rotation_axis_z">Z</string>
+    <string name="settings_language_label">Язык</string>
+    <string name="settings_layer_feature_points">Показывать точки особенностей</string>
+    <string name="settings_layer_plane_grids">Показывать сетки плоскостей</string>
+    <string name="settings_layer_voxels">Показывать воксели</string>
+    <string name="settings_layer_points">Показывать облако точек</string>
+    <string name="settings_layer_mesh">Показывать сетку модели</string>
+    <string name="settings_parallax_threshold">Угол проверки параллакса</string>
+    <string name="settings_camera_fps">Частота кадров камеры</string>
+    <string name="settings_scan_mode_cloud_offset">Смещение облака точек</string>
+    <string name="settings_reset_tutorials_label">Сбросить обучающие материалы</string>
+    <string name="settings_reset_tutorials_value">Показать вводные подсказки заново</string>
+    <string name="help_cloud_offset">Передача смещения якоря: высокоточное отслеживание облака точек для масштабных фресок. Инструкции: завершите сканирование на 360°, затем нажмите, чтобы разместить якорь.</string>
+    <string-array name="onboarding_trace">
+        <item>Это режим Следа.</item>
+        <item>Нажмите «Открыть», чтобы добавить первый слой. После добавления сведите или разведите пальцы и перетащите на холсте, чтобы изменить размер и разместить его.</item>
+        <item>Когда всё будет на месте и так, как вы хотите, нажмите кнопку Заморозить, чтобы превратить телефон в световой стол для перерисовки на бумагу.</item>
+        <item>Для редактирования мы рекомендуем использовать режим Следа или режим Макет.</item>
+        <item>Так ваши изображения будут готовы, и телефон сможет сосредоточиться на дополненной реальности при нажатии кнопки AR.</item>
+    </string-array>
+    <string-array name="onboarding_ar">
+        <item>AR-проекция — проецирует ваш дизайн на настоящую стену с помощью датчика глубины и пространственного отслеживания телефона.</item>
+        <item>Наведите телефон на стену и медленно двигайте его из стороны в сторону. По мере картирования поверхности движком будут появляться цветные фигуры. Дождитесь, пока не будет охвачена вся область стены.</item>
+        <item>Просто коснитесь экрана. Приложение сфотографирует стену, извлечёт отслеживаемые признаки и мгновенно зафиксирует якорь.</item>
+        <item>Нажмите «Открыть», чтобы добавить слой дизайна — он будет проецироваться на стену с использованием только что установленного якоря.</item>
+        <item>Совет — пустые белые стены, гладкий бетон и однотонные поверхности не отслеживаются. Наведите точку привязки на граффити, грубую штукатурку или любой другой отчётливый узор.</item>
+    </string-array>
+    <string-array name="onboarding_overlay">
+        <item>Живое наложение — ваш дизайн парит поверх изображения с камеры в реальном времени, без необходимости сканировать поверхность.</item>
+        <item>Нажмите «Открыть», чтобы добавить слой — выберите фото, и оно появится здесь, паря над изображением с камеры в реальном времени.</item>
+        <item>Сведите пальцы для изменения масштаба, перетаскивайте для перемещения. Наложение остаётся зафиксированным на экране — отойдите назад, чтобы увидеть, как оно вписывается в стену.</item>
+    </string-array>
+    <string-array name="onboarding_ar_unavailable">
+        <item>Это устройство не поддерживает ARCore, поэтому режим AR-проекции недоступен.</item>
+        <item>Вы всё ещё можете использовать режимы След, Макет и Живое наложение — все режимы, кроме AR, работают без ARCore.</item>
+        <item>Нажмите, чтобы закрыть.</item>
+    </string-array>
+    <string-array name="onboarding_mockup">
+        <item>Фотомакет — просмотрите свой дизайн на фотографии, прежде чем вообще браться за кисть.</item>
+        <item>Нажмите «Стена», чтобы выбрать или сделать фото своей поверхности. Сделайте это в первую очередь!</item>
+        <item>Нажмите «Открыть», чтобы добавить слой поверх фото стены. Сведите пальцы и перетаскивайте, чтобы изменить размер и расположение.</item>
+    </string-array>
+    <string-array name="onboarding_design">
+        <item>Это Дизайн — ваше рабочее пространство. Всё, что вы создадите здесь, перенесётся во все остальные режимы.</item>
+        <item>Нажмите «Открыть», чтобы добавить первый слой — выберите фото из галереи, и оно появится здесь как ваша работа.</item>
+        <item>Нажмите на слой, чтобы открыть его инструменты — сгруппированные в папки Рисование, Ретушь, Настройка и Эффекты. Сведите пальцы и перетаскивайте на холсте, чтобы изменить размер и разместить его.</item>
+        <item>Когда всё будет выглядеть так, как нужно, выберите, как это использовать: «След», чтобы превратить телефон в световой стол, «Макет», чтобы просмотреть на фото, или «AR», чтобы спроецировать на стену.</item>
+    </string-array>
+    <string-array name="onboarding_design_layers">
+        <item>Открыть — импортирует фото из галереи; оно появляется как новый слой.</item>
+    </string-array>
 </resources>

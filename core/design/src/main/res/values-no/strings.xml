@@ -28,19 +28,14 @@
     <!-- Description of Trace mode, explaining its use as a light-table for physical tracing. -->
     <string name="nav_trace_info">Bruk designet ditt som et lysbordsoverlegg for å spore referanselinjer på en fysisk overflate.</string>
     <!-- Alternative name for Trace mode, often referred to as Lightbox. -->
-    <string name="nav_trace_mode">Lysboks</string>
 
     <!-- Label for Canvas mode, which is optimized for smaller, desk-scale artwork. -->
-    <string name="nav_canvas">Lerret</string>
     <!-- Label for Mural mode, which is optimized for large-scale wall artwork. -->
-    <string name="nav_mural">Veggmaleri</string>
     <!-- Description for the toggle between Canvas and Mural scanning modes. -->
     <string name="nav_scan_mode_toggle_info">Bytt mellom Canvas (optimalisert for kunst i mindre skrivebordsskala) og Mural (optimalisert for storskala vegger og Gaussisk sprut).</string>
 
     <!-- Label for the Stencil generation tool. -->
-    <string name="nav_stencil">Sjablong</string>
     <!-- Description of the Stencil tool, explaining how it creates multi-layer printable templates. -->
-    <string name="nav_stencil_info">Generer utskrivbare flerlags sjablonger fra kunstverket ditt. Hvert lag skrives ut som konturfliser i størrelse for US Letter-papir.</string>
 
     <!-- Label for the Target/Grid management menu in AR mode. -->
     <string name="nav_grid">Mål</string>
@@ -48,9 +43,7 @@
     <string name="nav_grid_info">Opprett og administrer AR-ankermål. Fotografer malte referansemerker på veggen for å låse projeksjonen på plass.</string>
 
     <!-- Label for the wall survey tool, used to improve AR tracking. -->
-    <string name="nav_surveyor">Undersøkelse</string>
     <!-- Description of the Survey tool, explaining its role in tracking accuracy. -->
-    <string name="nav_surveyor_info">Kartlegg veggoverflaten for å forbedre AR-sporingsnøyaktigheten.</string>
 
     <!-- Label for the action to create a new AR anchor. -->
     <string name="nav_create">Skape</string>
@@ -153,83 +146,51 @@
     <string name="nav_light_info">Slå på enhetens lommelykt for å lyse opp veggen mens du arbeider i dårlig lys.</string>
 
     <!-- Label for the touch input lock feature. -->
-    <string name="nav_lock">Låse</string>
     <!-- Description of the touch lock, explaining how to unlock it. -->
     <string name="nav_lock_info">Lås berøringsskjermen for å forhindre utilsiktede endringer mens du sprayer. Trippeltrykk hvor som helst for å låse opp.</string>
 
 
     <!-- Tooltip info for the brush tool. -->
-    <string name="info_brush">Mal frihåndsstrøk på dette laget. Dra opp/ned på Størrelse-knappen for å endre børstediameteren; dra til venstre/høyre for å justere fjæring (kantmykhet).</string>
     <!-- Tooltip info for the eraser tool. -->
-    <string name="info_eraser">Slett deler av dette laget med en rund børste. Dra opp/ned på Størrelse-knappen for å endre diameter; dra til venstre/høyre for å justere fjæring.</string>
     <!-- Tooltip info for the blur tool. -->
-    <string name="info_blur">Smør og myk opp områder av dette laget. Dra over et område for å gjøre det uskarpt.</string>
     <!-- Tooltip info for the liquify/warp tool. -->
-    <string name="info_liquify">Skyv og vri piksler i alle retninger. Dra over et område for å forvrenge det – nyttig for å justere proporsjoner.</string>
     <!-- Tooltip info for the dodge (lighten) tool. -->
-    <string name="info_dodge">Lys spesifikke områder ved å male over dem.</string>
     <!-- Tooltip info for the burn (darken) tool. -->
-    <string name="info_burn">Gjør bestemte områder mørkere ved å male over dem.</string>
     <!-- Tooltip info for the brush size control, explaining vertical and horizontal drag gestures. -->
-    <string name="info_size">Dra opp/ned for å endre børstediameter. Dra til venstre/høyre for å justere fjæringen - en bredere fjær gir mykere, mer spraybokslignende kanter.</string>
     <!-- Tooltip info for the brush color control, explaining gestures and the color wheel. -->
-    <string name="info_color">Viser den aktive børstefargen. Dra opp/ned for å justere lysstyrken; dra til venstre/høyre for å justere metningen. Trykk for å åpne fullfargehjulet.</string>
     <!-- Tooltip info for adding a new drawing layer. -->
-    <string name="info_draw">Legg til et nytt blankt gjennomsiktig lag for frihåndstegning.</string>
     <!-- Tooltip info for the AR keyframe tool, used for drift correction. -->
-    <string name="info_keyframe">Lagre gjeldende AR-kameraposisjon som et nøkkelbilde. Brukes til å korrigere drift og justere projeksjonen på nytt etter å ha flyttet bort og returnert.</string>
     <!-- Tooltip info for an individual layer in the design rail. -->
-    <string name="info_layer">Dette laget. Trykk for å aktivere den. Åpne den horisontale skinnen for å få tilgang til verktøy. Langt trykk og dra for å omorganisere.</string>
 
 
     <!-- Label for selecting the number of stencil layers. -->
-    <string name="stencil_layers">Lag</string>
     <!-- Description of stencil layer options (silhouette, highlight, midtone). -->
-    <string name="stencil_layers_info">Velg hvor mange sjablonglag som skal genereres: 1 (kun silhuett), 2 (silhuett + utheving) eller 3 (silhuett + mellomtone + utheving).</string>
 
     <!-- Action label to re-generate stencils. -->
-    <string name="stencil_rebuild">Gjenoppbygge</string>
     <!-- Description of the Rebuild action for the stencil pipeline. -->
-    <string name="stencil_rebuild_info">Kjør sjablonggenereringsrørledningen på nytt på det gjeldende kildelaget.</string>
 
     <!-- Label for the stencil printing configuration. -->
-    <string name="stencil_print">Trykk</string>
     <!-- Description of the print tool, mentioning tiled PDF generation. -->
-    <string name="stencil_print_info">Konfigurer den virkelige utskriftsstørrelsen og generer en flislagt PDF for US Letter-papir.</string>
 
     <!-- Label for setting the real-world size of the stencil. -->
-    <string name="stencil_print_size">Størrelse</string>
     <!-- Description of the stencil size control, mentioning centimetre units and live page count. -->
-    <string name="stencil_print_size_info">Dra opp/ned for å angi sjablongens virkelige bredde eller høyde i centimeter. Oppdateringer av sideantall live.</string>
 
     <!-- Label for toggling between width and height locking for print sizing. -->
-    <string name="stencil_print_dim_toggle">W/H</string>
     <!-- Description of the dimension lock toggle. -->
-    <string name="stencil_print_dim_toggle_info">Trykk for å bytte mellom å låse bredden eller høyden på utgangen.</string>
 
     <!-- Action label to generate and print the tiled PDF. -->
-    <string name="stencil_export_pdf">Skriv ut PDF</string>
     <!-- Description of the PDF export, including the mention of overlaps for assembly. -->
-    <string name="stencil_export_pdf_info">Generer en flislagt PDF av alle sjablonglagene klar til å skrives ut og kuttes. Hver flis inkluderer en 3 mm overlapping for monteringsjustering.</string>
 
     <!-- Action label to save stencil layers as PNG images. -->
-    <string name="stencil_save_layers">Lagre PNG-er</string>
     <!-- Description of the PNG save action for stencil layers. -->
-    <string name="stencil_save_layers_info">Lagre hvert sjablonglag som et eget PNG-bilde i galleriet ditt.</string>
 
     <!-- Label for the button to return to the main editor from stencil mode. -->
-    <string name="stencil_back">← Redaktør</string>
     <!-- Description of the back action, noting that stencil layers are preserved. -->
-    <string name="stencil_back_info">Gå tilbake til hovedredaktøren. Sjablonglagene dine blir bevart i økten.</string>
 
     <!-- Action label to add a text layer. -->
-    <string name="nav_text">Tekst</string>
     <!-- Action label to add a blank drawing layer. -->
-    <string name="nav_draw">Tegne</string>
     <!-- Action label to edit layer content (like text). -->
-    <string name="nav_edit">Redigere</string>
     <!-- Action label for font selection. -->
-    <string name="nav_font">Font</string>
     <!-- Action label for size adjustment. -->
     <string name="nav_size">Størrelse</string>
     <!-- Action label for color selection. -->
@@ -243,15 +204,10 @@
     <!-- Action label for drop shadow toggle. -->
     <string name="nav_shadow">Skygge</string>
     <!-- Action label for the eraser tool. -->
-    <string name="nav_eraser">Viskelær</string>
     <!-- Action label for the blur/smudge tool. -->
-    <string name="nav_blur">Uskarphet</string>
     <!-- Action label for the liquify/warp tool. -->
-    <string name="nav_liquify">Gjør flytende</string>
     <!-- Action label for the dodge/lighten tool. -->
-    <string name="nav_dodge">Dodge</string>
     <!-- Action label for the burn/darken tool. -->
-    <string name="nav_burn">Brenne</string>
 
     <!-- MainActivity UI strings -->
     <!-- Label shown when a stencil or process is generating. -->
@@ -411,7 +367,6 @@
     <string name="settings_off">Av</string>
     <string name="settings_scan_mode_label">AR-skannemodus</string>
     <string name="settings_scan_mode_point_cloud">Punktsky</string>
-    <string name="settings_scan_mode_gaussian_splat">Gaussisk Splat</string>
     <string name="settings_anchor_boundary_label">Vis ankergrense</string>
     <string name="settings_units_label">Avstandsenheter</string>
     <string name="settings_units_imperial">Imperial (ft)</string>
@@ -574,35 +529,86 @@
     <!-- Tutorial: Trace Mode -->
 
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
-    <string name="tut_create_anchor_title">Lag anker</string>
-    <string name="tut_create_anchor_text">Låser projeksjonen til et bestemt sted på veggen. Når det er satt, forblir designet på plass selv om du går rundt.</string>
-    <string name="tut_surface_req_title">Overflatekrav</string>
-    <string name="tut_surface_req_text">Veggen trenger synlig tekstur - graffiti, grov gips, murstein eller klistremerker fungerer bra. Glatte, blanke eller ensfargede vegger vil ikke holde et anker.</string>
-    <string name="tut_blobs_title">Hva Blobs betyr</string>
-    <string name="tut_blobs_text">Etter å ha trykket, vil du kort se grønne klatter. Dette er sporingsnøkkelpunktene appen hentet ut. Flere blobs = sterkere lås.</string>
-    <string name="tut_import_img_title">Importer bilde</string>
-    <string name="tut_import_img_text">Legg til en skisse, et bilde eller en referanse fra galleriet ditt. Det vises som et nytt lag stablet oppå de andre.</string>
-    <string name="tut_scale_pos_title">Skala og posisjon</string>
-    <string name="tut_scale_pos_text">Klyp med to fingre for å endre størrelsen. Dra med én finger for å flytte. Laget festes til den projiserte veggoverflaten i AR-modus.</string>
-    <string name="tut_lock_freeze_title">Lås/frys</string>
-    <string name="tut_lock_freeze_text">I lysboksmodus (sporing): deaktiverer berøring slik at du kan legge papir på skjermen uten å flytte noe ved et uhell.</string>
-    <string name="tut_in_other_modes_title">I andre moduser</string>
-    <string name="tut_in_other_modes_text">I AR-, Overleggs- og Mockup-modus: låser lagtransformasjoner slik at design ikke ved et uhell kan flyttes eller skaleres.</string>
-    <string name="tut_stencil_gen_title">Generer sjablong</string>
-    <string name="tut_stencil_gen_text">Konverterer bildet ditt til utskrivbare spraymalingssjablonger. Hver sjablong representerer ett fargelag av designet.</string>
-    <string name="tut_how_many_layers_title">Hvor mange lag?</string>
-    <string name="tut_how_many_layers_text">Et 3-farget design gir 3 sjablongark. Flere farger = flere ark. Enkle bilder med høy kontrast gir de beste resultatene.</string>
-    <string name="tut_exporting_title">Eksporterer</string>
-    <string name="tut_exporting_text">Hver sjablong eksporteres som en PDF. Skriv ut i 100 % skala (ingen skalering) for å få nøyaktige dimensjoner i naturlig størrelse.</string>
-    <string name="tut_opacity_brightness_title">Opasitet og lysstyrke</string>
-    <string name="tut_opacity_brightness_text">Opasitet styrer hvor gjennomsiktig laget er. Lysstyrke forskyver den generelle lysheten - nyttig for å matche laget til veggens tone.</string>
-    <string name="tut_contrast_saturation_title">Kontrast og metning</string>
-    <string name="tut_contrast_saturation_text">Kontrast skiller mørke fra lys – flott for å få sjablongkonturene til å slå ut. Metning kontrollerer fargeintensiteten; dra til null for gråtoner.</string>
-    <string name="tut_isolate_subject_title">Isoler emne</string>
-    <string name="tut_isolate_subject_text">Bruker AI for automatisk å fjerne bakgrunnen, og etterlater bare hovedmotivet i bildet.</string>
-    <string name="tut_best_results_title">Beste resultater</string>
-    <string name="tut_best_results_text">Fungerer best på bilder med et klart motiv mot en vanlig eller kontrastfylt bakgrunn. Komplekse scener med opptatt bakgrunn kan trenge manuelle bearbeiding med viskelæret.</string>
     <string name="settings_scan_mode_voxel_hash">Voxel-hash</string>
     <string name="settings_scan_mode_surface_mesh">Overflatenett</string>
     <string name="settings_mural_method_label">Veggmaleri-motor</string>
+
+
+    <!-- Added by audit item 4: missing keys relative to core/design's default table -->
+    <string name="nav_coop">Samarbeid</string>
+    <string name="nav_host_coop">Vert</string>
+    <string name="nav_host_coop_info">Vert for en samarbeidsøkt for å dele AR-koordinatsystemet ditt med personer i nærheten.</string>
+    <string name="nav_join_coop">Bli med</string>
+    <string name="nav_join_coop_info">Bli med i en samarbeidsøkt i nærheten for å justere AR-visningen din etter verten.</string>
+    <string name="nav_leave_coop">Forlat</string>
+    <string name="nav_leave_coop_info">Forlat den nåværende samarbeidsøkten.</string>
+    <string name="nav_wearable">Wearable</string>
+    <string name="nav_wearable_info">Koble til smartbriller for en håndfri AR-opplevelse med kamerainndata justert etter perspektivet ditt.</string>
+    <string name="nav_wall_clear">Fjern</string>
+    <string name="nav_wall_clear_info">Fjerner bakgrunnsbildet av veggen som brukes i Mockup-modus.</string>
+    <string name="nav_magic">Magi</string>
+    <string name="nav_edges">Kanter</string>
+    <string name="nav_filter">Filter</string>
+    <string name="nav_photo">Foto</string>
+    <string name="nav_file">Fil</string>
+    <string name="shared_image_pick_project">Åpne eller opprett et prosjekt for å legge til det delte bildet</string>
+    <string name="camera_stalled_error">Kameraet leverer ikke bilder lenger – forlater AR. Åpne AR på nytt for å prøve igjen med en tryggere kameramodus.</string>
+    <string name="syncing">SYNKRONISERER...</string>
+    <string name="adj_reset">Tilbakestill plassering</string>
+    <string name="adj_restore_placement">Gjenopprett plassering</string>
+    <string name="status_world_mapped">VERDEN KARTLAGT: %1$d%%</string>
+    <string name="rotation_axis_feedback">Roterer på %1$s-aksen</string>
+    <string name="rotation_axis_x">X</string>
+    <string name="rotation_axis_y">Y</string>
+    <string name="rotation_axis_z">Z</string>
+    <string name="settings_language_label">Språk</string>
+    <string name="settings_layer_feature_points">Vis funksjonspunkter</string>
+    <string name="settings_layer_plane_grids">Vis plangitter</string>
+    <string name="settings_layer_voxels">Vis voksler</string>
+    <string name="settings_layer_points">Vis punktsky</string>
+    <string name="settings_layer_mesh">Vis nett</string>
+    <string name="settings_parallax_threshold">Parallaks-verifiseringsvinkel</string>
+    <string name="settings_camera_fps">Kameraets bildefrekvens</string>
+    <string name="settings_scan_mode_cloud_offset">Sky-forskyvning</string>
+    <string name="settings_reset_tutorials_label">Tilbakestill veiledninger</string>
+    <string name="settings_reset_tutorials_value">Vis oppstartsveiledningene igjen</string>
+    <string name="help_cloud_offset">Ankerforskyvning-overføring: Høypresisjons punktsky-sporing for storskala veggmalerier. Instruksjoner: Fullfør 360°-skanningen, trykk deretter for å plassere ankeret.</string>
+    <string-array name="onboarding_trace">
+        <item>Dette er Spor-modus.</item>
+        <item>Trykk på «Åpne» for å legge til det første laget ditt. Når det er lagt til, kan du klype og dra på lerretet for å skalere og plassere det.</item>
+        <item>Når de er der og slik du vil ha dem, trykk på Frys-knappen for å gjøre telefonen din til et lysbord for sporing på papir.</item>
+        <item>Vi anbefaler å bruke enten Spor-modus eller Mockup-modus for redigering.</item>
+        <item>På den måten er bildene dine klare, og telefonen din kan fokusere på utvidet virkelighet når du trykker på AR-knappen.</item>
+    </string-array>
+    <string-array name="onboarding_ar">
+        <item>AR-projeksjon — projiserer designet ditt på en ekte vegg ved hjelp av telefonens dybdesensor og romlige sporing.</item>
+        <item>Pek på veggen og beveg deg sakte fra side til side. Fargede former dukker opp etter hvert som motoren kartlegger overflaten. Vent til hele veggarealet er dekket.</item>
+        <item>Bare trykk på skjermen. Appen fotograferer veggen, trekker ut sporingsfunksjoner og låser ankeret umiddelbart.</item>
+        <item>Trykk på «Åpne» for å legge til et designlag — det projiseres på veggen ved hjelp av ankeret du nettopp satte.</item>
+        <item>Tips — tomme hvite vegger, glatt betong og ensfargede overflater kan ikke spores. Rett ankerpunktet mot graffiti, ru puss eller andre tydelige merker.</item>
+    </string-array>
+    <string-array name="onboarding_overlay">
+        <item>Live overlegg — designet ditt svever over live kamerabildet, uten behov for overflateskanning.</item>
+        <item>Trykk på «Åpne» for å legge til et lag — velg et bilde, og det vises her, svevende over live kamerabildet.</item>
+        <item>Klyp for å skalere, dra for å flytte. Overlegget blir værende festet til skjermen din — gå bakover for å se hvordan det passer på veggen.</item>
+    </string-array>
+    <string-array name="onboarding_ar_unavailable">
+        <item>Denne enheten støtter ikke ARCore, så AR-projeksjonsmodus er ikke tilgjengelig.</item>
+        <item>Du kan fortsatt bruke Spor, Mockup og Live overlegg — alle moduser unntatt AR fungerer uten ARCore.</item>
+        <item>Trykk for å lukke.</item>
+    </string-array>
+    <string-array name="onboarding_mockup">
+        <item>Fotomockup — forhåndsvis designet ditt på et bilde før du i det hele tatt tar frem en pensel.</item>
+        <item>Trykk på «Vegg» for å velge eller ta et bilde av overflaten din. Gjør dette først!</item>
+        <item>Trykk på «Åpne» for å legge til et lag over veggbildet. Klyp og dra for å skalere og plassere det.</item>
+    </string-array>
+    <string-array name="onboarding_design">
+        <item>Dette er Design — arbeidsområdet ditt. Alt du bygger her følger med til alle andre moduser.</item>
+        <item>Trykk på «Åpne» for å legge til det første laget ditt — velg et bilde fra galleriet, og det havner her som kunstverket ditt.</item>
+        <item>Trykk på et lag for å åpne verktøyene dets — gruppert i mappene Mal, Retusjer, Juster og Effekter. Klyp og dra på lerretet for å skalere og plassere det.</item>
+        <item>Når det ser riktig ut, velg hvordan du vil bruke det: «Spor» for å gjøre telefonen din til et lysbord, «Mockup» for å forhåndsvise på et bilde, eller «AR» for å projisere det på en vegg.</item>
+    </string-array>
+    <string-array name="onboarding_design_layers">
+        <item>Åpne — importerer et bilde fra galleriet ditt; det havner som et nytt lag.</item>
+    </string-array>
 </resources>

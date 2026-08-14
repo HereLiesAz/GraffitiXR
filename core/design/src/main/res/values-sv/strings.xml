@@ -28,19 +28,14 @@
 
     <string name="nav_trace_info">Använd din design som ett ljusbordsöverlägg för att spåra referenslinjer på en fysisk yta.</string>
 
-    <string name="nav_trace_mode">Ljuslåda</string>
 
 
-    <string name="nav_canvas">Duk</string>
 
-    <string name="nav_mural">Väggmålning</string>
 
     <string name="nav_scan_mode_toggle_info">Växla mellan Canvas (optimerad för konst i mindre skrivbordsskala) och Mural (optimerad för storskaliga väggar och Gaussisk stänk).</string>
 
 
-    <string name="nav_stencil">Stencil</string>
 
-    <string name="nav_stencil_info">Skapa utskrivbara schabloner i flera lager från ditt konstverk. Varje lager skrivs ut som enbart konturer i storleken för US Letter-papper.</string>
 
 
     <string name="nav_grid">Mål</string>
@@ -48,9 +43,7 @@
     <string name="nav_grid_info">Skapa och hantera AR-ankarmål. Fotografera målade referensmärken på väggen för att låsa projektionen på plats.</string>
 
 
-    <string name="nav_surveyor">Undersökning</string>
 
-    <string name="nav_surveyor_info">Kartlägg väggytan för att förbättra AR-spårningsnoggrannheten.</string>
 
 
     <string name="nav_create">Skapa</string>
@@ -153,83 +146,51 @@
     <string name="nav_light_info">Växla enhetens ficklampa för att lysa upp din vägg när du arbetar i svagt ljus.</string>
 
 
-    <string name="nav_lock">Låsa</string>
 
     <string name="nav_lock_info">Lås pekskärmen för att förhindra oavsiktliga ändringar medan du sprayar. Tryck tre gånger var som helst för att låsa upp.</string>
 
 
 
-    <string name="info_brush">Måla frihandsdrag på detta lager. Dra upp/ned på knappen Storlek för att ändra borstens diameter; dra åt vänster/höger för att justera fjädring (kantmjukhet).</string>
-
-    <string name="info_eraser">Radera delar av detta lager med en rund borste. Dra upp/ned på knappen Storlek för att ändra diameter; dra åt vänster/höger för att justera fjädring.</string>
-
-    <string name="info_blur">Smörj ut och mjuka upp områden i detta lager. Dra över en region för att sudda ut den.</string>
-
-    <string name="info_liquify">Tryck och förvräng pixlar i valfri riktning. Dra över ett område för att förvränga det - användbart för att justera proportioner.</string>
-
-    <string name="info_dodge">Ljusna upp specifika områden genom att måla över dem.</string>
-
-    <string name="info_burn">Gör specifika områden mörkare genom att måla över dem.</string>
-
-    <string name="info_size">Dra upp/ned för att ändra borstens diameter. Dra åt vänster/höger för att justera fjädern — en bredare fjäder ger mjukare, mer sprayburkliknande kanter.</string>
-
-    <string name="info_color">Visar den aktiva borstfärgen. Dra upp/ned för att justera ljusstyrkan; dra åt vänster/höger för att justera mättnaden. Tryck för att öppna fullfärgshjulet.</string>
-
-    <string name="info_draw">Lägg till ett nytt tomt transparent lager för frihandsteckning.</string>
-
-    <string name="info_keyframe">Spara den aktuella AR-kameraposen som en nyckelbild. Används för att korrigera drift och justera om projektionen efter att ha flyttat iväg och återvänt.</string>
-
-    <string name="info_layer">Detta lager. Tryck för att aktivera den. Öppna den horisontella skenan för att komma åt verktyg. Tryck länge och dra för att ändra ordning.</string>
 
 
 
-    <string name="stencil_layers">Lager</string>
-
-    <string name="stencil_layers_info">Välj hur många stencillager som ska genereras: 1 (endast siluett), 2 (silhuett + högdager) eller 3 (siluett + mellanton + högdager).</string>
 
 
-    <string name="stencil_rebuild">Återuppbygga</string>
-
-    <string name="stencil_rebuild_info">Kör om stencilgenereringspipelinen på det aktuella källskiktet.</string>
 
 
-    <string name="stencil_print">Skriva ut</string>
-
-    <string name="stencil_print_info">Konfigurera den verkliga utskriftsstorleken och generera en sida vid sida PDF för US Letter-papper.</string>
 
 
-    <string name="stencil_print_size">Storlek</string>
-
-    <string name="stencil_print_size_info">Dra upp/ned för att ställa in stencilens verkliga bredd eller höjd i centimeter. Uppdateringar av sidantal live.</string>
 
 
-    <string name="stencil_print_dim_toggle">W/H</string>
-
-    <string name="stencil_print_dim_toggle_info">Tryck för att växla mellan att låsa bredden eller höjden på utmatningen.</string>
 
 
-    <string name="stencil_export_pdf">Skriv ut PDF</string>
-
-    <string name="stencil_export_pdf_info">Skapa en sida vid sida med alla stencillager redo att skriva ut och klippa. Varje platta inkluderar en 3 mm överlappning för monteringsjustering.</string>
 
 
-    <string name="stencil_save_layers">Spara PNG-filer</string>
-
-    <string name="stencil_save_layers_info">Spara varje stencillager som en separat PNG-bild i ditt galleri.</string>
 
 
-    <string name="stencil_back">← Redaktör</string>
-
-    <string name="stencil_back_info">Återgå till huvudredigeraren. Dina stencillager bevaras i sessionen.</string>
 
 
-    <string name="nav_text">Text</string>
 
-    <string name="nav_draw">Dra</string>
 
-    <string name="nav_edit">Redigera</string>
 
-    <string name="nav_font">Font</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     <string name="nav_size">Storlek</string>
 
@@ -243,15 +204,10 @@
 
     <string name="nav_shadow">Skugga</string>
 
-    <string name="nav_eraser">Suddgummi</string>
 
-    <string name="nav_blur">Fläck</string>
 
-    <string name="nav_liquify">Flytande</string>
 
-    <string name="nav_dodge">Undvika</string>
 
-    <string name="nav_burn">Bränna</string>
 
 
 
@@ -411,7 +367,6 @@
     <string name="settings_off">Av</string>
     <string name="settings_scan_mode_label">AR-skanningsläge</string>
     <string name="settings_scan_mode_point_cloud">Punktmoln</string>
-    <string name="settings_scan_mode_gaussian_splat">Gaussisk Splat</string>
     <string name="settings_anchor_boundary_label">Visa ankargräns</string>
     <string name="settings_units_label">Avståndsenheter</string>
     <string name="settings_units_imperial">Imperial (ft)</string>
@@ -574,35 +529,86 @@
 
 
 
-    <string name="tut_create_anchor_title">Skapa ankare</string>
-    <string name="tut_create_anchor_text">Låser din projektion till en specifik plats på väggen. När den väl är inställd sitter designen på plats även om du går runt.</string>
-    <string name="tut_surface_req_title">Ytkrav</string>
-    <string name="tut_surface_req_text">Väggen behöver synlig struktur - graffiti, grov gips, tegel eller klistermärken fungerar bra. Släta, tomma eller enfärgade väggar håller inte ett ankare.</string>
-    <string name="tut_blobs_title">Vad klumparna betyder</string>
-    <string name="tut_blobs_text">Efter att du har tryckt, kommer du kort att se gröna blubbar. Det är de spårningsnyckelpunkter som appen extraherade. Fler blobbar = starkare lås.</string>
-    <string name="tut_import_img_title">Importera bild</string>
-    <string name="tut_import_img_text">Lägg till en skiss, foto eller referens från ditt galleri. Det visas som ett nytt lager staplat ovanpå de andra.</string>
-    <string name="tut_scale_pos_title">Skala och position</string>
-    <string name="tut_scale_pos_text">Nyp med två fingrar för att ändra storlek. Dra med ett finger för att flytta. Skiktet fästs mot den projicerade väggytan i AR-läge.</string>
-    <string name="tut_lock_freeze_title">Lås/frys</string>
-    <string name="tut_lock_freeze_text">I Lightbox-läge (spårning): inaktiverar beröring så att du kan lägga papper på skärmen utan att flytta något av misstag.</string>
-    <string name="tut_in_other_modes_title">I andra lägen</string>
-    <string name="tut_in_other_modes_text">I AR-, Overlay- och Mockup-lägen: låser lagertransformeringar så att mönster inte kan flyttas eller skalas av misstag.</string>
-    <string name="tut_stencil_gen_title">Skapa stencil</string>
-    <string name="tut_stencil_gen_text">Konverterar din bild till utskrivbara sprayfärgsschabloner. Varje stencil representerar ett färglager av designen.</string>
-    <string name="tut_how_many_layers_title">Hur många lager?</string>
-    <string name="tut_how_many_layers_text">En 3-färgad design ger 3 stencilark. Fler färger = fler ark. Enkla bilder med hög kontrast ger bästa resultat.</string>
-    <string name="tut_exporting_title">Exporterar</string>
-    <string name="tut_exporting_text">Varje stencil exporteras som en PDF. Skriv ut i 100 % skala (ingen skalning) för att få exakta dimensioner i naturlig storlek.</string>
-    <string name="tut_opacity_brightness_title">Opacitet och ljusstyrka</string>
-    <string name="tut_opacity_brightness_text">Opacitet styr hur transparent lagret är. Ljusstyrkan ändrar den övergripande ljusheten - användbart för att matcha lagret till din väggs ton.</string>
-    <string name="tut_contrast_saturation_title">Kontrast &amp; Mättnad</string>
-    <string name="tut_contrast_saturation_text">Kontrast skiljer mörker från ljus — perfekt för att få stencilkonturer att slå ut. Mättnad styr färgintensiteten; dra till noll för gråskala.</string>
-    <string name="tut_isolate_subject_title">Isolera ämne</string>
-    <string name="tut_isolate_subject_text">Använder AI för att automatiskt ta bort bakgrunden, vilket bara lämnar bildens huvudmotiv.</string>
-    <string name="tut_best_results_title">Bästa resultat</string>
-    <string name="tut_best_results_text">Fungerar bäst på foton med ett tydligt motiv mot en vanlig eller kontrasterande bakgrund. Komplexa scener med upptagen bakgrund kan behöva korrigeras manuellt med suddgummi.</string>
     <string name="settings_scan_mode_voxel_hash">Voxel-hash</string>
     <string name="settings_scan_mode_surface_mesh">Ytnät</string>
     <string name="settings_mural_method_label">Väggmålningsmotor</string>
+
+
+    <!-- Added by audit item 4: missing keys relative to core/design's default table -->
+    <string name="nav_coop">Samarbete</string>
+    <string name="nav_host_coop">Vara värd</string>
+    <string name="nav_host_coop_info">Var värd för en samarbetssession för att dela ditt AR-koordinatsystem med personer i närheten.</string>
+    <string name="nav_join_coop">Gå med</string>
+    <string name="nav_join_coop_info">Gå med i en samarbetssession i närheten för att justera din AR-vy efter värden.</string>
+    <string name="nav_leave_coop">Lämna</string>
+    <string name="nav_leave_coop_info">Lämna den aktuella samarbetssessionen.</string>
+    <string name="nav_wearable">Bärbar enhet</string>
+    <string name="nav_wearable_info">Anslut till smarta glasögon för en handsfree AR-upplevelse med kamerainmatning anpassad efter ditt perspektiv.</string>
+    <string name="nav_wall_clear">Ta bort</string>
+    <string name="nav_wall_clear_info">Tar bort bakgrundsfotot av väggen som används i Mockup-läget.</string>
+    <string name="nav_magic">Magi</string>
+    <string name="nav_edges">Kanter</string>
+    <string name="nav_filter">Filter</string>
+    <string name="nav_photo">Foto</string>
+    <string name="nav_file">Fil</string>
+    <string name="shared_image_pick_project">Öppna eller skapa ett projekt för att lägga till den delade bilden</string>
+    <string name="camera_stalled_error">Kameran levererar inte längre bildrutor – lämnar AR. Öppna AR igen för att försöka på nytt med ett säkrare kameraläge.</string>
+    <string name="syncing">SYNKRONISERAR...</string>
+    <string name="adj_reset">Återställ placering</string>
+    <string name="adj_restore_placement">Återställ tidigare placering</string>
+    <string name="status_world_mapped">VÄRLD KARTLAGD: %1$d%%</string>
+    <string name="rotation_axis_feedback">Roterar på %1$s-axeln</string>
+    <string name="rotation_axis_x">X</string>
+    <string name="rotation_axis_y">Y</string>
+    <string name="rotation_axis_z">Z</string>
+    <string name="settings_language_label">Språk</string>
+    <string name="settings_layer_feature_points">Visa funktionspunkter</string>
+    <string name="settings_layer_plane_grids">Visa plannät</string>
+    <string name="settings_layer_voxels">Visa voxlar</string>
+    <string name="settings_layer_points">Visa punktmoln</string>
+    <string name="settings_layer_mesh">Visa nätstruktur</string>
+    <string name="settings_parallax_threshold">Parallaxverifieringsvinkel</string>
+    <string name="settings_camera_fps">Kamerans bildfrekvens</string>
+    <string name="settings_scan_mode_cloud_offset">Molnförskjutning</string>
+    <string name="settings_reset_tutorials_label">Återställ handledningar</string>
+    <string name="settings_reset_tutorials_value">Visa introduktionsguiderna igen</string>
+    <string name="help_cloud_offset">Ankarförskjutningsöverföring: Högprecisions punktmolnsspårning för storskaliga väggmålningar. Instruktioner: Slutför 360°-skanningen och tryck sedan för att placera ankaret.</string>
+    <string-array name="onboarding_trace">
+        <item>Det här är Spåra-läget.</item>
+        <item>Tryck på \"Öppna\" för att lägga till ditt första lager. När det är tillagt kan du nypa och dra på duken för att skala och placera det.</item>
+        <item>När de är där och som du vill ha dem, tryck på Frys-knappen för att göra din telefon till ett ljusbord för att spåra på papper.</item>
+        <item>Vi rekommenderar att du använder antingen Spåra-läget eller Mockup-läget för redigering.</item>
+        <item>På så sätt är din bildmaterial redo, och din telefon kan fokusera på förstärkt verklighet när du trycker på AR-knappen.</item>
+    </string-array>
+    <string-array name="onboarding_ar">
+        <item>AR-projicering — projicerar din design på en riktig vägg med hjälp av telefonens djupsensor och rumsliga spårning.</item>
+        <item>Rikta mot väggen och rör dig långsamt i sidled. Färgade former dyker upp allt eftersom motorn kartlägger ytan. Vänta tills väggytan är täckt.</item>
+        <item>Tryck bara på skärmen. Appen fotograferar väggen, extraherar spårningsfunktioner och låser ankaret direkt.</item>
+        <item>Tryck på \"Öppna\" för att lägga till ett designlager — det projiceras på väggen med hjälp av ankaret du just ställde in.</item>
+        <item>Tips — tomma vita väggar, slät betong och enfärgade ytor kan inte spåras. Rikta ditt ankarpunkt mot graffiti, grov puts eller något annat tydligt märke.</item>
+    </string-array>
+    <string-array name="onboarding_overlay">
+        <item>Live-täckning — din design svävar över den direktsända kamerabilden, utan att behöva skanna någon yta.</item>
+        <item>Tryck på \"Öppna\" för att lägga till ett lager — välj ett foto så visas det här, svävande över den direktsända kamerabilden.</item>
+        <item>Nyp för att skala, dra för att flytta. Täckningen förblir fast på din skärm — kliv bakåt för att se hur den passar väggen.</item>
+    </string-array>
+    <string-array name="onboarding_ar_unavailable">
+        <item>Den här enheten stöder inte ARCore, så AR-projiceringsläget är inte tillgängligt.</item>
+        <item>Du kan fortfarande använda Spåra, Mockup och Live-täckning — alla lägen utom AR fungerar utan ARCore.</item>
+        <item>Tryck för att stänga.</item>
+    </string-array>
+    <string-array name="onboarding_mockup">
+        <item>Foto-mockup — förhandsgranska din design på ett foto innan du ens tar fram en pensel.</item>
+        <item>Tryck på \"Vägg\" för att välja eller ta ett foto av din yta. Gör det här först!</item>
+        <item>Tryck på \"Öppna\" för att lägga till ett lager ovanpå väggfotot. Nyp och dra för att skala och placera det.</item>
+    </string-array>
+    <string-array name="onboarding_design">
+        <item>Det här är Design — din arbetsyta. Allt du bygger här förs vidare till alla andra lägen.</item>
+        <item>Tryck på \"Öppna\" för att lägga till ditt första lager — välj ett foto från ditt galleri, och det hamnar här som ditt konstverk.</item>
+        <item>Tryck på ett lager för att öppna dess verktyg — grupperade i mapparna Måla, Retuschera, Justera och Effekter. Nyp och dra på duken för att skala och placera det.</item>
+        <item>När det ser rätt ut, välj hur du vill använda det: \"Spåra\" för att göra din telefon till ett ljusbord, \"Mockup\" för att förhandsgranska på ett foto, eller \"AR\" för att projicera det på en vägg.</item>
+    </string-array>
+    <string-array name="onboarding_design_layers">
+        <item>Öppna — importerar ett foto från ditt galleri; det hamnar som ett nytt lager.</item>
+    </string-array>
 </resources>
