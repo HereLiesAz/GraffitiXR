@@ -152,6 +152,31 @@ class EditorViewModel @Inject constructor(
             }
         }
 
+        // The four perception-debug overlays below this comment used to only dispatch an in-memory
+        // reducer intent — indistinguishable in Settings from isRightHanded just above, which
+        // genuinely persists, until the process was killed and every one of them silently reverted
+        // to its hardcoded default. Restored the same way: a live collector, not a one-shot read.
+        viewModelScope.launch(dispatchers.main) {
+            settingsRepository.showDiagOverlay.collect { on ->
+                _uiState.update { it.copy(showDiagOverlay = on) }
+            }
+        }
+        viewModelScope.launch(dispatchers.main) {
+            settingsRepository.showFeaturePoints.collect { on ->
+                _uiState.update { it.copy(showFeaturePoints = on) }
+            }
+        }
+        viewModelScope.launch(dispatchers.main) {
+            settingsRepository.showPlaneGrids.collect { on ->
+                _uiState.update { it.copy(showPlaneGrids = on) }
+            }
+        }
+        viewModelScope.launch(dispatchers.main) {
+            settingsRepository.showPoints.collect { on ->
+                _uiState.update { it.copy(showPoints = on) }
+            }
+        }
+
         viewModelScope.launch(dispatchers.main) {
             projectRepository.currentProject.collect { project ->
                 if (project != null) {
@@ -465,8 +490,15 @@ class EditorViewModel @Inject constructor(
                     // Atomic read-modify-write: a concurrent AR wall-feature-map save merges into the SAME
                     // currentProject, so writing a full stale copy here would drop its wall map (and vice
                     // versa). The transform only touches the editor-owned fields.
+                    //
+                    // Guarded on id, matching scheduleThumbnailUpdate below: this launches on the IO
+                    // dispatcher, so by the time it runs the user may already have switched to a
+                    // different project, in which case `current` is that new project, not the one
+                    // `updatedDesign`/`modeAdjustments` were captured from — writing them anyway would
+                    // clobber the new project with the old one's design.
                     projectRepository.updateProject { current ->
-                        current.copy(
+                        if (current.id != projectId) current
+                        else current.copy(
                             name = name ?: current.name,
                             design = updatedDesign,
                             modeAdjustments = modeAdjustments,
@@ -676,10 +708,29 @@ class EditorViewModel @Inject constructor(
             settingsRepository.setRightHanded(isRightHanded)
         }
     }
-    fun toggleDiagOverlay() = dispatch(EditorIntent.ToggleDiagOverlay)
-    fun toggleFeaturePoints() = dispatch(EditorIntent.ToggleFeaturePoints)
-    fun togglePlaneGrids() = dispatch(EditorIntent.TogglePlaneGrids)
-    fun togglePoints() = dispatch(EditorIntent.TogglePoints)
+    fun toggleDiagOverlay() {
+        dispatch(EditorIntent.ToggleDiagOverlay)
+        val on = _uiState.value.showDiagOverlay
+        viewModelScope.launch(dispatchers.io) { settingsRepository.setShowDiagOverlay(on) }
+    }
+
+    fun toggleFeaturePoints() {
+        dispatch(EditorIntent.ToggleFeaturePoints)
+        val on = _uiState.value.showFeaturePoints
+        viewModelScope.launch(dispatchers.io) { settingsRepository.setShowFeaturePoints(on) }
+    }
+
+    fun togglePlaneGrids() {
+        dispatch(EditorIntent.TogglePlaneGrids)
+        val on = _uiState.value.showPlaneGrids
+        viewModelScope.launch(dispatchers.io) { settingsRepository.setShowPlaneGrids(on) }
+    }
+
+    fun togglePoints() {
+        dispatch(EditorIntent.TogglePoints)
+        val on = _uiState.value.showPoints
+        viewModelScope.launch(dispatchers.io) { settingsRepository.setShowPoints(on) }
+    }
 
     // ── Placement ─────────────────────────────────────────────────────────────
 
