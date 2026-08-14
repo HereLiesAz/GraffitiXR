@@ -28,19 +28,14 @@
     <!-- Description of Trace mode, explaining its use as a light-table for physical tracing. -->
     <string name="nav_trace_info">Verwenden Sie Ihr Design als Leuchttisch-Overlay, um Referenzlinien auf eine physische Oberfläche zu übertragen.</string>
     <!-- Alternative name for Trace mode, often referred to as Lightbox. -->
-    <string name="nav_trace_mode">Leuchtkasten</string>
 
     <!-- Label for Canvas mode, which is optimized for smaller, desk-scale artwork. -->
-    <string name="nav_canvas">Leinwand</string>
     <!-- Label for Mural mode, which is optimized for large-scale wall artwork. -->
-    <string name="nav_mural">Wandbild</string>
     <!-- Description for the toggle between Canvas and Mural scanning modes. -->
     <string name="nav_scan_mode_toggle_info">Wechseln Sie zwischen Leinwand (optimiert für kleinere Kunstwerke im Schreibtischmaßstab) und Wandbild (optimiert für große Wände und Gaussian Splatting).</string>
 
     <!-- Label for the Stencil generation tool. -->
-    <string name="nav_stencil">Schablone</string>
     <!-- Description of the Stencil tool, explaining how it creates multi-layer printable templates. -->
-    <string name="nav_stencil_info">Erstellen Sie druckbare mehrschichtige Schablonen aus Ihrem Kunstwerk. Jede Ebene wird als reine Umrisskachel in der Größe für US Letter-Papier gedruckt.</string>
 
     <!-- Label for the Target/Grid management menu in AR mode. -->
     <string name="nav_grid">Ziel</string>
@@ -48,9 +43,7 @@
     <string name="nav_grid_info">Erstellen und verwalten Sie AR-Ankerziele. Fotografieren Sie gemalte Referenzmarken an der Wand, um die Projektion an Ort und Stelle zu arretieren.</string>
 
     <!-- Label for the wall survey tool, used to improve AR tracking. -->
-    <string name="nav_surveyor">Vermessung</string>
     <!-- Description of the Survey tool, explaining its role in tracking accuracy. -->
-    <string name="nav_surveyor_info">Kartieren Sie die Wandoberfläche, um die AR-Tracking-Genauigkeit zu verbessern.</string>
 
     <!-- Label for the action to create a new AR anchor. -->
     <string name="nav_create">Erstellen</string>
@@ -153,83 +146,51 @@
     <string name="nav_light_info">Schalten Sie die Gerätetaschenlampe um, um Ihre Wand bei Arbeiten bei schwachem Licht zu beleuchten.</string>
 
     <!-- Label for the touch input lock feature. -->
-    <string name="nav_lock">Sperren</string>
     <!-- Description of the touch lock, explaining how to unlock it. -->
     <string name="nav_lock_info">Sperren Sie den Touchscreen, um versehentliche Änderungen beim Sprühen zu verhindern. Tippen Sie dreimal auf eine beliebige Stelle, um die Sperre aufzuheben.</string>
 
 
     <!-- Tooltip info for the brush tool. -->
-    <string name="info_brush">Malen Sie Freihandstriche auf diese Ebene. Ziehen Sie die Größenschaltfläche nach oben/unten, um den Pinseldurchmesser zu ändern; ziehen Sie nach links/rechts, um die Weichzeichnung (Kantenschärfe) anzupassen.</string>
     <!-- Tooltip info for the eraser tool. -->
-    <string name="info_eraser">Radieren Sie Teile dieser Ebene mit einem runden Pinsel. Ziehen Sie die Größenschaltfläche nach oben/unten, um den Durchmesser zu ändern; ziehen Sie nach links/rechts, um die Weichzeichnung anzupassen.</string>
     <!-- Tooltip info for the blur tool. -->
-    <string name="info_blur">Verwischen und weichzeichnen Sie Bereiche dieser Ebene. Ziehen Sie über einen Bereich, um ihn unscharf zu machen.</string>
     <!-- Tooltip info for the liquify/warp tool. -->
-    <string name="info_liquify">Pixel in eine beliebige Richtung schieben und verzerren. Ziehen Sie über einen Bereich, um ihn zu verzerren – nützlich zum Anpassen von Proportionen.</string>
     <!-- Tooltip info for the dodge (lighten) tool. -->
-    <string name="info_dodge">Hellen Sie bestimmte Bereiche auf, indem Sie darüber malen.</string>
     <!-- Tooltip info for the burn (darken) tool. -->
-    <string name="info_burn">Dunkeln Sie bestimmte Bereiche ab, indem Sie darüber malen.</string>
     <!-- Tooltip info for the brush size control, explaining vertical and horizontal drag gestures. -->
-    <string name="info_size">Ziehen Sie nach oben/unten, um den Pinseldurchmesser zu ändern. Ziehen Sie nach links/rechts, um die Weichzeichnung anzupassen – eine stärkere Weichzeichnung erzeugt weichere, sprühdosenähnlichere Kanten.</string>
     <!-- Tooltip info for the brush color control, explaining gestures and the color wheel. -->
-    <string name="info_color">Zeigt die aktive Pinselfarbe an. Ziehen Sie nach oben/unten, um die Helligkeit anzupassen; ziehen Sie nach links/rechts, um die Sättigung anzupassen. Tippen Sie hier, um das vollständige Farbrad zu öffnen.</string>
     <!-- Tooltip info for adding a new drawing layer. -->
-    <string name="info_draw">Fügen Sie eine neue leere transparente Ebene für Freihandzeichnungen hinzu.</string>
     <!-- Tooltip info for the AR keyframe tool, used for drift correction. -->
-    <string name="info_keyframe">Speichern Sie die aktuelle AR-Kamerapose als Keyframe. Wird verwendet, um Abdrift zu korrigieren und die Projektion nach dem Wegbewegen und Zurückkehren neu auszurichten.</string>
     <!-- Tooltip info for an individual layer in the design rail. -->
-    <string name="info_layer">Diese Ebene. Tippen Sie, um sie zu aktivieren. Öffnen Sie die horizontale Leiste, um auf Werkzeuge zuzugreifen. Lange drücken und ziehen, um die Reihenfolge zu ändern.</string>
 
 
     <!-- Label for selecting the number of stencil layers. -->
-    <string name="stencil_layers">Ebenen</string>
     <!-- Description of stencil layer options (silhouette, highlight, midtone). -->
-    <string name="stencil_layers_info">Wählen Sie, wie viele Schablonenebenen generiert werden sollen: 1 (nur Silhouette), 2 (Silhouette + Highlight) oder 3 (Silhouette + Mittelton + Highlight).</string>
 
     <!-- Action label to re-generate stencils. -->
-    <string name="stencil_rebuild">Neu erstellen</string>
     <!-- Description of the Rebuild action for the stencil pipeline. -->
-    <string name="stencil_rebuild_info">Führen Sie die Schablonengenerierungs-Pipeline auf der aktuellen Quellebene erneut aus.</string>
 
     <!-- Label for the stencil printing configuration. -->
-    <string name="stencil_print">Drucken</string>
     <!-- Description of the print tool, mentioning tiled PDF generation. -->
-    <string name="stencil_print_info">Konfigurieren Sie die reale Druckgröße und generieren Sie ein gekacheltes PDF für US Letter-Papier.</string>
 
     <!-- Label for setting the real-world size of the stencil. -->
-    <string name="stencil_print_size">Größe</string>
     <!-- Description of the stencil size control, mentioning centimetre units and live page count. -->
-    <string name="stencil_print_size_info">Ziehen Sie nach oben/unten, um die reale Breite oder Höhe der Schablone in Zentimetern festzulegen. Die Seitenzahl wird live aktualisiert.</string>
 
     <!-- Label for toggling between width and height locking for print sizing. -->
-    <string name="stencil_print_dim_toggle">B / H</string>
     <!-- Description of the dimension lock toggle. -->
-    <string name="stencil_print_dim_toggle_info">Tippen Sie hier, um zwischen dem Sperren der Breite oder der Höhe der Ausgabe zu wechseln.</string>
 
     <!-- Action label to generate and print the tiled PDF. -->
-    <string name="stencil_export_pdf">PDF drucken</string>
     <!-- Description of the PDF export, including the mention of overlaps for assembly. -->
-    <string name="stencil_export_pdf_info">Generieren Sie ein gekacheltes PDF aller Schablonenebenen, bereit zum Drucken und Schneiden. Jede Kachel enthält eine 3-mm-Überlappung für die Montageausrichtung.</string>
 
     <!-- Action label to save stencil layers as PNG images. -->
-    <string name="stencil_save_layers">PNGs speichern</string>
     <!-- Description of the PNG save action for stencil layers. -->
-    <string name="stencil_save_layers_info">Speichern Sie jede Schablonenebene als separates PNG-Bild in Ihrer Galerie.</string>
 
     <!-- Label for the button to return to the main editor from stencil mode. -->
-    <string name="stencil_back">← Editor</string>
     <!-- Description of the back action, noting that stencil layers are preserved. -->
-    <string name="stencil_back_info">Kehren Sie zum Haupteditor zurück. Ihre Schablonenebenen bleiben in der Sitzung erhalten.</string>
 
     <!-- Action label to add a text layer. -->
-    <string name="nav_text">Text</string>
     <!-- Action label to add a blank drawing layer. -->
-    <string name="nav_draw">Zeichnen</string>
     <!-- Action label to edit layer content (like text). -->
-    <string name="nav_edit">Bearbeiten</string>
     <!-- Action label for font selection. -->
-    <string name="nav_font">Schriftart</string>
     <!-- Action label for size adjustment. -->
     <string name="nav_size">Größe</string>
     <!-- Action label for color selection. -->
@@ -243,15 +204,10 @@
     <!-- Action label for drop shadow toggle. -->
     <string name="nav_shadow">Schatten</string>
     <!-- Action label for the eraser tool. -->
-    <string name="nav_eraser">Radiergummi</string>
     <!-- Action label for the blur/smudge tool. -->
-    <string name="nav_blur">Weichzeichnen</string>
     <!-- Action label for the liquify/warp tool. -->
-    <string name="nav_liquify">Verflüssigen</string>
     <!-- Action label for the dodge/lighten tool. -->
-    <string name="nav_dodge">Abwedler</string>
     <!-- Action label for the burn/darken tool. -->
-    <string name="nav_burn">Nachbelichter</string>
 
     <!-- MainActivity UI strings -->
     <!-- Label shown when a stencil or process is generating. -->
@@ -411,7 +367,6 @@
     <string name="settings_off">Aus</string>
     <string name="settings_scan_mode_label">AR-Scanmodus</string>
     <string name="settings_scan_mode_point_cloud">Punktwolke</string>
-    <string name="settings_scan_mode_gaussian_splat">Gaussian Splat</string>
     <string name="settings_anchor_boundary_label">Ankergrenze anzeigen</string>
     <string name="settings_units_label">Entfernungseinheiten</string>
     <string name="settings_units_imperial">Imperial (ft)</string>
@@ -574,34 +529,6 @@
     <!-- Tutorial: Trace Mode -->
 
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
-    <string name="tut_create_anchor_title">Anker erstellen</string>
-    <string name="tut_create_anchor_text">Fixiert Ihre Projektion auf einen bestimmten Punkt an der Wand. Einmal festgelegt, bleibt das Design an Ort und Stelle, auch wenn Sie herumlaufen.</string>
-    <string name="tut_surface_req_title">Oberflächenanforderungen</string>
-    <string name="tut_surface_req_text">Die Wand benötigt eine sichtbare Textur – Graffiti, rauer Putz, Ziegel oder Aufkleber funktionieren gut. Glatte, leere oder einfarbige Wände bieten keinen Halt für einen Anker.</string>
-    <string name="tut_blobs_title">Was die Blobs bedeuten</string>
-    <string name="tut_blobs_text">Nach dem Tippen sehen Sie kurz grüne Blobs. Das sind die Tracking-Schlüsselpunkte, die die App extrahiert hat. Mehr Blobs = stärkere Fixierung.</string>
-    <string name="tut_import_img_title">Bild importieren</string>
-    <string name="tut_import_img_text">Fügen Sie eine Skizze, ein Foto oder eine Referenz aus Ihrer Galerie hinzu. Es erscheint als neue Ebene, die über den anderen gestapelt ist.</string>
-    <string name="tut_scale_pos_title">Skalieren und Positionieren</string>
-    <string name="tut_scale_pos_text">Zum Ändern der Größe mit zwei Fingern zusammendrücken. Zum Neupositionieren mit einem Finger ziehen. Die Ebene rastet im AR-Modus auf der projizierten Wandoberfläche ein.</string>
-    <string name="tut_lock_freeze_title">Sperren / Einfrieren</string>
-    <string name="tut_lock_freeze_text">Im Leuchtkasten-Modus (Pause): deaktiviert die Berührung, sodass Sie Papier auf den Bildschirm legen können, ohne versehentlich etwas zu verschieben.</string>
-    <string name="tut_in_other_modes_title">In anderen Modi</string>
-    <string name="tut_in_other_modes_text">In den Modi AR, Overlay und Mockup: Sperrt Ebenentransformationen, sodass Designs nicht versehentlich verschoben oder skaliert werden können.</string>
-    <string name="tut_stencil_gen_title">Schablone generieren</string>
-    <string name="tut_stencil_gen_text">Konvertiert Ihr Bild in druckbare Sprühschablonen. Jede Schablone stellt eine Farbebene des Designs dar.</string>
-    <string name="tut_how_many_layers_title">Wie viele Ebenen?</string>
-    <string name="tut_how_many_layers_text">Ein 3-farbiges Design ergibt 3 Schablonenblätter. Mehr Farben = mehr Blätter. Einfache, kontrastreiche Bilder liefern die besten Ergebnisse.</string>
-    <string name="tut_exporting_title">Exportieren</string>
-    <string name="tut_exporting_text">Jede Schablone wird als PDF exportiert. Drucken Sie im 100%-Maßstab (keine Skalierung), um genaue, lebensgroße Abmessungen zu erhalten.</string>
-    <string name="tut_opacity_brightness_title">Deckkraft &amp; Helligkeit</string>
-    <string name="tut_opacity_brightness_text">Die Deckkraft steuert, wie transparent die Ebene ist. Die Helligkeit verschiebt die allgemeine Helligkeit – nützlich, um die Ebene an den Farbton Ihrer Wand anzupassen.</string>
-    <string name="tut_contrast_saturation_title">Kontrast &amp; Sättigung</string>
-    <string name="tut_contrast_saturation_text">Der Kontrast trennt dunkle von hellen Tönen – ideal, um Schablonenumrisse hervorzuheben. Die Sättigung steuert die Farbintensität; ziehen Sie sie auf null, um Graustufen zu erhalten.</string>
-    <string name="tut_isolate_subject_title">Motiv isolieren</string>
-    <string name="tut_isolate_subject_text">Verwendet KI, um den Hintergrund automatisch zu entfernen und nur das Hauptmotiv des Bildes zu hinterlassen.</string>
-    <string name="tut_best_results_title">Beste Ergebnisse</string>
-    <string name="tut_best_results_text">Funktioniert am besten bei Fotos mit einem klaren Motiv vor einem einfachen oder kontrastierenden Hintergrund. Komplexe Szenen mit unruhigen Hintergründen erfordern möglicherweise manuelle Nachbesserungen mit dem Radiergummi.</string>
     <string name="settings_scan_mode_voxel_hash">Voxel-Hash</string>
     <string name="settings_scan_mode_surface_mesh">Oberflächennetz</string>
     <string name="settings_mural_method_label">Mural-Engine</string>

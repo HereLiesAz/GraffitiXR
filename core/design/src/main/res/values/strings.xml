@@ -28,19 +28,14 @@
     <!-- Description of Trace mode, explaining its use as a light-table for physical tracing. -->
     <string name="nav_trace_info">Use your design as a light-table overlay to trace reference lines onto a physical surface.</string>
     <!-- Alternative name for Trace mode, often referred to as Lightbox. -->
-    <string name="nav_trace_mode">Lightbox</string>
 
     <!-- Label for Canvas mode, which is optimized for smaller, desk-scale artwork. -->
-    <string name="nav_canvas">Canvas</string>
     <!-- Label for Mural mode, which is optimized for large-scale wall artwork. -->
-    <string name="nav_mural">Mural</string>
     <!-- Description for the toggle between Canvas and Mural scanning modes. -->
     <string name="nav_scan_mode_toggle_info">Switch between Canvas (optimized for smaller desk-scale art) and Mural (optimized for large-scale walls and Voxel-based spatial tracking).</string>
 
     <!-- Label for the Stencil generation tool. -->
-    <string name="nav_stencil">Stencil</string>
     <!-- Description of the Stencil tool, explaining how it creates multi-layer printable templates. -->
-    <string name="nav_stencil_info">Generate printable multi-layer stencils from your artwork. Each layer prints as outline-only tiles sized for US Letter paper.</string>
 
     <!-- Label for the Target/Grid management menu in AR mode. -->
     <string name="nav_grid">Target</string>
@@ -48,9 +43,7 @@
     <string name="nav_grid_info">Create and manage AR anchor targets. Photograph painted reference marks on the wall to lock the projection in place.</string>
 
     <!-- Label for the wall survey tool, used to improve AR tracking. -->
-    <string name="nav_surveyor">Survey</string>
     <!-- Description of the Survey tool, explaining its role in tracking accuracy. -->
-    <string name="nav_surveyor_info">Map the wall surface to improve AR tracking accuracy.</string>
 
     <!-- Label for the action to create a new AR anchor. -->
     <string name="nav_create">Create</string>
@@ -173,83 +166,51 @@
     <string name="nav_light_info">Toggle the device flashlight to illuminate your wall while working in low light.</string>
 
     <!-- Label for the touch input lock feature. -->
-    <string name="nav_lock">Lock</string>
     <!-- Description of the touch lock, explaining how to unlock it. -->
     <string name="nav_lock_info">Lock the touchscreen to prevent accidental changes while you spray. Triple-tap anywhere to unlock.</string>
 
 
     <!-- Tooltip info for the brush tool. -->
-    <string name="info_brush">Paint freehand strokes on this layer. Drag up/down on the Size button to change brush diameter; drag left/right to adjust feathering (edge softness).</string>
     <!-- Tooltip info for the eraser tool. -->
-    <string name="info_eraser">Erase parts of this layer with a round brush. Drag up/down on the Size button to change diameter; drag left/right to adjust feathering.</string>
     <!-- Tooltip info for the blur tool. -->
-    <string name="info_blur">Smear and soften areas of this layer. Drag across a region to blur it.</string>
     <!-- Tooltip info for the liquify/warp tool. -->
-    <string name="info_liquify">Push and warp pixels in any direction. Drag across an area to distort it — useful for adjusting proportions.</string>
     <!-- Tooltip info for the dodge (lighten) tool. -->
-    <string name="info_dodge">Lighten specific areas by painting over them.</string>
     <!-- Tooltip info for the burn (darken) tool. -->
-    <string name="info_burn">Darken specific areas by painting over them.</string>
     <!-- Tooltip info for the brush size control, explaining vertical and horizontal drag gestures. -->
-    <string name="info_size">Drag up/down to change brush diameter. Drag left/right to adjust feathering — a wider feather gives softer, more spray-can-like edges.</string>
     <!-- Tooltip info for the brush color control, explaining gestures and the color wheel. -->
-    <string name="info_color">Shows the active brush color. Drag up/down to adjust lightness; drag left/right to adjust saturation. Tap to open the full color wheel.</string>
     <!-- Tooltip info for adding a new drawing layer. -->
-    <string name="info_draw">Add a new blank transparent layer for freehand drawing.</string>
     <!-- Tooltip info for the AR keyframe tool, used for drift correction. -->
-    <string name="info_keyframe">Save the current AR camera pose as a keyframe. Used to correct drift and re-align the projection after moving away and returning.</string>
     <!-- Tooltip info for an individual layer in the design rail. -->
-    <string name="info_layer">This layer. Tap to activate it. Open the horizontal rail to access tools. Long-press and drag to reorder.</string>
 
 
     <!-- Label for selecting the number of stencil layers. -->
-    <string name="stencil_layers">Layers</string>
     <!-- Description of stencil layer options (silhouette, highlight, midtone). -->
-    <string name="stencil_layers_info">Choose how many stencil layers to generate: 1 (silhouette only), 2 (silhouette + highlight), or 3 (silhouette + midtone + highlight).</string>
 
     <!-- Action label to re-generate stencils. -->
-    <string name="stencil_rebuild">Rebuild</string>
     <!-- Description of the Rebuild action for the stencil pipeline. -->
-    <string name="stencil_rebuild_info">Re-run the stencil generation pipeline on the current source layer.</string>
 
     <!-- Label for the stencil printing configuration. -->
-    <string name="stencil_print">Print</string>
     <!-- Description of the print tool, mentioning tiled PDF generation. -->
-    <string name="stencil_print_info">Configure the real-world print size and generate a tiled PDF for US Letter paper.</string>
 
     <!-- Label for setting the real-world size of the stencil. -->
-    <string name="stencil_print_size">Size</string>
     <!-- Description of the stencil size control, mentioning centimetre units and live page count. -->
-    <string name="stencil_print_size_info">Drag up/down to set the stencil\'s real-world width or height in centimetres. Page count updates live.</string>
 
     <!-- Label for toggling between width and height locking for print sizing. -->
-    <string name="stencil_print_dim_toggle">W / H</string>
     <!-- Description of the dimension lock toggle. -->
-    <string name="stencil_print_dim_toggle_info">Tap to switch between locking the width or the height of the output.</string>
 
     <!-- Action label to generate and print the tiled PDF. -->
-    <string name="stencil_export_pdf">Print PDF</string>
     <!-- Description of the PDF export, including the mention of overlaps for assembly. -->
-    <string name="stencil_export_pdf_info">Generate a tiled PDF of all stencil layers ready to print and cut. Each tile includes a 3mm overlap for assembly alignment.</string>
 
     <!-- Action label to save stencil layers as PNG images. -->
-    <string name="stencil_save_layers">Save PNGs</string>
     <!-- Description of the PNG save action for stencil layers. -->
-    <string name="stencil_save_layers_info">Save each stencil layer as a separate PNG image to your gallery.</string>
 
     <!-- Label for the button to return to the main editor from stencil mode. -->
-    <string name="stencil_back">← Editor</string>
     <!-- Description of the back action, noting that stencil layers are preserved. -->
-    <string name="stencil_back_info">Return to the main editor. Your stencil layers are preserved in the session.</string>
 
     <!-- Action label to add a text layer. -->
-    <string name="nav_text">Text</string>
     <!-- Action label to add a blank drawing layer. -->
-    <string name="nav_draw">Draw</string>
     <!-- Action label to edit layer content (like text). -->
-    <string name="nav_edit">Edit</string>
     <!-- Action label for font selection. -->
-    <string name="nav_font">Font</string>
     <!-- Action label for size adjustment. -->
     <string name="nav_size">Size</string>
     <!-- Action label for color selection. -->
@@ -263,9 +224,7 @@
     <!-- Action label for drop shadow toggle. -->
     <string name="nav_shadow">Shadow</string>
     <!-- Action label for the eraser tool. -->
-    <string name="nav_eraser">Eraser</string>
     <!-- Action label for the blur/smudge tool. -->
-    <string name="nav_blur">Blur</string>
     <!-- Action label for the filter/adjustments tool. -->
     <string name="nav_filter">Filter</string>
     <!-- Wall background source: take a photo with the camera. -->
@@ -273,11 +232,8 @@
     <!-- Wall background source: pick an existing image file. -->
     <string name="nav_file">File</string>
     <!-- Action label for the liquify/warp tool. -->
-    <string name="nav_liquify">Liquify</string>
     <!-- Action label for the dodge/lighten tool. -->
-    <string name="nav_dodge">Dodge</string>
     <!-- Action label for the burn/darken tool. -->
-    <string name="nav_burn">Burn</string>
 
     <!-- MainActivity UI strings -->
     <!-- Label shown when a stencil or process is generating. -->
@@ -661,32 +617,4 @@
     </string-array>
 
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
-    <string name="tut_create_anchor_title">Create Anchor</string>
-    <string name="tut_create_anchor_text">Locks your projection to a specific spot on the wall. Once set, the design stays in place even if you walk around.</string>
-    <string name="tut_surface_req_title">Surface Requirements</string>
-    <string name="tut_surface_req_text">The wall needs visible texture — graffiti, rough plaster, brick, or stickers all work well. Smooth, blank, or single-colour walls won\'t hold an anchor.</string>
-    <string name="tut_blobs_title">What the Blobs Mean</string>
-    <string name="tut_blobs_text">After tapping, you\'ll briefly see green blobs. Those are the tracking keypoints the app extracted. More blobs = stronger lock.</string>
-    <string name="tut_import_img_title">Import Image</string>
-    <string name="tut_import_img_text">Add a sketch, photo, or reference from your gallery. It appears as a new layer stacked on top of the others.</string>
-    <string name="tut_scale_pos_title">Scale and Position</string>
-    <string name="tut_scale_pos_text">Pinch with two fingers to resize. Drag with one finger to reposition. The layer snaps to the projected wall surface in AR mode.</string>
-    <string name="tut_lock_freeze_title">Lock / Freeze</string>
-    <string name="tut_lock_freeze_text">In Lightbox (Trace) mode: disables touch so you can lay paper on the screen without accidentally moving anything.</string>
-    <string name="tut_in_other_modes_title">In Other Modes</string>
-    <string name="tut_in_other_modes_text">In AR, Overlay, and Mockup modes: locks layer transforms so designs can\'t be accidentally moved or scaled.</string>
-    <string name="tut_stencil_gen_title">Generate Stencil</string>
-    <string name="tut_stencil_gen_text">Converts your image into printable spray-paint stencils. Each stencil represents one colour layer of the design.</string>
-    <string name="tut_how_many_layers_title">How Many Layers?</string>
-    <string name="tut_how_many_layers_text">A 3-colour design produces 3 stencil sheets. More colours = more sheets. Simple high-contrast images give the best results.</string>
-    <string name="tut_exporting_title">Exporting</string>
-    <string name="tut_exporting_text">Each stencil exports as a PDF. Print at 100%% scale (no scaling) to get accurate life-size dimensions.</string>
-    <string name="tut_opacity_brightness_title">Opacity &amp; Brightness</string>
-    <string name="tut_opacity_brightness_text">Opacity controls how transparent the layer is. Brightness shifts the overall lightness — useful to match the layer to your wall\'s tone.</string>
-    <string name="tut_contrast_saturation_title">Contrast &amp; Saturation</string>
-    <string name="tut_contrast_saturation_text">Contrast separates darks from lights — great for making stencil outlines pop. Saturation controls colour intensity; drag to zero for greyscale.</string>
-    <string name="tut_isolate_subject_title">Isolate Subject</string>
-    <string name="tut_isolate_subject_text">Uses AI to automatically remove the background, leaving only the main subject of the image.</string>
-    <string name="tut_best_results_title">Best Results</string>
-    <string name="tut_best_results_text">Works best on photos with a clear subject against a plain or contrasting background. Complex scenes with busy backgrounds may need manual touch-ups with the eraser.</string>
 </resources>

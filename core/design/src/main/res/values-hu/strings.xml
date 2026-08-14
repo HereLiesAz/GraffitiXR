@@ -28,19 +28,14 @@
 
     <string name="nav_trace_info">Használd a tervedet világítótábla rátétként, hogy referenciavonalakat rajzolj egy fizikai felületre.</string>
 
-    <string name="nav_trace_mode">Világítótábla</string>
 
 
-    <string name="nav_canvas">Vászon</string>
 
-    <string name="nav_mural">Falfestmény</string>
 
     <string name="nav_scan_mode_toggle_info">Váltás a Vászon (kisebb, asztali méretű művészetre optimalizálva) és a Falfestmény (nagy méretű falakra és Gauss-splattingra optimalizálva) között.</string>
 
 
-    <string name="nav_stencil">Sablon</string>
 
-    <string name="nav_stencil_info">Generálj nyomtatható, többrétegű sablonokat a művedből. Minden réteg csak körvonalakat tartalmazó csempeként nyomtatódik US Letter papírméretben.</string>
 
 
     <string name="nav_grid">Célpont</string>
@@ -48,9 +43,7 @@
     <string name="nav_grid_info">AR horgony célpontok létrehozása és kezelése. Fényképezz le festett referenciajelöléseket a falon, hogy a vetítést a helyére rögzítsd.</string>
 
 
-    <string name="nav_surveyor">Felmérés</string>
 
-    <string name="nav_surveyor_info">Térképezd fel a falfelületet az AR követési pontosság javítása érdekében.</string>
 
 
     <string name="nav_create">Létrehozás</string>
@@ -153,83 +146,51 @@
     <string name="nav_light_info">Kapcsold be az eszköz zseblámpáját, hogy megvilágítsd a falat, miközben gyenge fényviszonyok között dolgozol.</string>
 
 
-    <string name="nav_lock">Zárolás</string>
 
     <string name="nav_lock_info">Zárold az érintőképernyőt, hogy megelőzd a véletlen módosításokat permetezés közben. Koppints háromszor bárhová a feloldáshoz.</string>
 
 
 
-    <string name="info_brush">Fess szabadkézi vonásokat erre a rétegre. Húzd fel/le a Méret gombot az ecset átmérőjének megváltoztatásához; húzd balra/jobbra a tollasodás (perem lágysága) beállításához.</string>
-
-    <string name="info_eraser">Radírozd le a réteg egyes részeit egy kerek ecsettel. Húzd fel/le a Méret gombot az átmérő megváltoztatásához; húzd balra/jobbra a tollasodás beállításához.</string>
-
-    <string name="info_blur">Kend el és lágyítsd a réteg területeit. Húzz át egy régiót a homályosításhoz.</string>
-
-    <string name="info_liquify">Told és torzítsd a képpontokat bármely irányba. Húzz át egy területet annak torzításához - hasznos az arányok beállításához.</string>
-
-    <string name="info_dodge">Világosíts fel bizonyos területeket úgy, hogy átfested őket.</string>
-
-    <string name="info_burn">Sötétíts el bizonyos területeket úgy, hogy átfested őket.</string>
-
-    <string name="info_size">Húzd fel/le az ecset átmérőjének megváltoztatásához. Húzd balra/jobbra a tollasodás beállításához - a szélesebb toll puhább, inkább spray-szerű éleket ad.</string>
-
-    <string name="info_color">Megmutatja az aktív ecset színét. Húzd fel/le a világosság beállításához; húzd balra/jobbra a telítettség beállításához. Koppints a teljes színkör megnyitásához.</string>
-
-    <string name="info_draw">Adj hozzá egy új, üres átlátszó réteget a szabadkézi rajzoláshoz.</string>
-
-    <string name="info_keyframe">Mentsd a jelenlegi AR kamera pózt kulcsképként. A sodródás korrigálására és a vetítés újraigazítására szolgál, miután eltávolodtál és visszatértél.</string>
-
-    <string name="info_layer">Ez a réteg. Koppints az aktiválásához. Nyisd meg a vízszintes sínt az eszközök eléréséhez. Nyomd hosszan és húzd az átrendezéshez.</string>
 
 
 
-    <string name="stencil_layers">Rétegek</string>
-
-    <string name="stencil_layers_info">Válaszd ki, hány sablonréteget szeretnél generálni: 1 (csak sziluett), 2 (sziluett + kiemelés), vagy 3 (sziluett + középtónus + kiemelés).</string>
 
 
-    <string name="stencil_rebuild">Újraépítés</string>
-
-    <string name="stencil_rebuild_info">Futtasd újra a sablongenerálási folyamatot a jelenlegi forrásrétegen.</string>
 
 
-    <string name="stencil_print">Nyomtatás</string>
-
-    <string name="stencil_print_info">Állítsd be a valós nyomtatási méretet, és generálj egy csempézett PDF-et US Letter papírhoz.</string>
 
 
-    <string name="stencil_print_size">Méret</string>
-
-    <string name="stencil_print_size_info">Húzd fel/le a sablon valós szélességének vagy magasságának centiméterben történő beállításához. Az oldalszám élőben frissül.</string>
 
 
-    <string name="stencil_print_dim_toggle">Sz / M</string>
-
-    <string name="stencil_print_dim_toggle_info">Koppints a kimenet szélességének vagy magasságának rögzítése közötti váltáshoz.</string>
 
 
-    <string name="stencil_export_pdf">PDF Nyomtatás</string>
-
-    <string name="stencil_export_pdf_info">Generálj egy csempézett PDF-et az összes sablonrétegről, készen a nyomtatásra és vágásra. Minden csempe 3 mm-es átfedést tartalmaz az összeszereléshez.</string>
 
 
-    <string name="stencil_save_layers">PNG Mentése</string>
-
-    <string name="stencil_save_layers_info">Ments minden sablonréteget külön PNG képként a galériádba.</string>
 
 
-    <string name="stencil_back">← Szerkesztő</string>
-
-    <string name="stencil_back_info">Visszatérés a főszerkesztőhöz. A sablonrétegek megmaradnak a munkamenetben.</string>
 
 
-    <string name="nav_text">Szöveg</string>
 
-    <string name="nav_draw">Rajz</string>
 
-    <string name="nav_edit">Szerkesztés</string>
 
-    <string name="nav_font">Betűtípus</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     <string name="nav_size">Méret</string>
 
@@ -243,15 +204,10 @@
 
     <string name="nav_shadow">Árnyék</string>
 
-    <string name="nav_eraser">Radír</string>
 
-    <string name="nav_blur">Homályosítás</string>
 
-    <string name="nav_liquify">Cseppfolyósítás</string>
 
-    <string name="nav_dodge">Világosítás</string>
 
-    <string name="nav_burn">Sötétítés</string>
 
 
 
@@ -411,7 +367,6 @@
     <string name="settings_off">Ki</string>
     <string name="settings_scan_mode_label">AR Szkennelési Mód</string>
     <string name="settings_scan_mode_point_cloud">Pontfelhő</string>
-    <string name="settings_scan_mode_gaussian_splat">Gauss-splat</string>
     <string name="settings_anchor_boundary_label">Horgony határának mutatása</string>
     <string name="settings_units_label">Távolság mértékegysége</string>
     <string name="settings_units_imperial">Birodalmi (ft)</string>
@@ -574,34 +529,6 @@
 
 
 
-    <string name="tut_create_anchor_title">Horgony létrehozása</string>
-    <string name="tut_create_anchor_text">A vetítést a fal egy bizonyos pontjához rögzíti. Miután beállítottad, a terv a helyén marad, még akkor is, ha sétálsz.</string>
-    <string name="tut_surface_req_title">Felületi követelmények</string>
-    <string name="tut_surface_req_text">A falnak látható textúrával kell rendelkeznie - graffiti, durva vakolat, tégla vagy matricák mind jól működnek. Sima, üres vagy egyszínű falak nem tartanak meg egy horgonyt.</string>
-    <string name="tut_blobs_title">Mit jelentenek a foltok</string>
-    <string name="tut_blobs_text">Koppintás után röviden zöld foltokat fogsz látni. Ezek azok a követési kulcspontok, amelyeket az alkalmazás kinyert. Több folt = erősebb rögzítés.</string>
-    <string name="tut_import_img_title">Kép Importálása</string>
-    <string name="tut_import_img_text">Adj hozzá egy vázlatot, fotót vagy referenciát a galériádból. Új rétegként jelenik meg, a többi tetején.</string>
-    <string name="tut_scale_pos_title">Méretezés és Pozicionálás</string>
-    <string name="tut_scale_pos_text">Csippents két ujjal a méretezéshez. Húzd egy ujjal a pozicionáláshoz. A réteg AR módban a kivetített falfelületre illeszkedik.</string>
-    <string name="tut_lock_freeze_title">Zárolás / Fagyasztás</string>
-    <string name="tut_lock_freeze_text">Világítótábla (Rajzolás) módban: letiltja az érintést, így papírt tehetsz a képernyőre anélkül, hogy véletlenül elmozdítanál valamit.</string>
-    <string name="tut_in_other_modes_title">Más Módokban</string>
-    <string name="tut_in_other_modes_text">AR, Rétegzés és Makett módokban: zárolja a réteg transzformációit, így a terveket nem lehet véletlenül mozgatni vagy méretezni.</string>
-    <string name="tut_stencil_gen_title">Sablon Generálása</string>
-    <string name="tut_stencil_gen_text">Átalakítja a képedet nyomtatható festékszóró sablonokká. Minden sablon a terv egy színrétegét képviseli.</string>
-    <string name="tut_how_many_layers_title">Hány réteg?</string>
-    <string name="tut_how_many_layers_text">Egy 3 színű terv 3 sablonlapot eredményez. Több szín = több lap. Az egyszerű, nagy kontrasztú képek adják a legjobb eredményt.</string>
-    <string name="tut_exporting_title">Exportálás</string>
-    <string name="tut_exporting_text">Minden sablon PDF formátumban exportálódik. Nyomtass 100%-os méretarányban (méretezés nélkül) a pontos életnagyságú méretek eléréséhez.</string>
-    <string name="tut_opacity_brightness_title">Átlátszatlanság és Fényerő</string>
-    <string name="tut_opacity_brightness_text">Az átlátszatlanság szabályozza a réteg átlátszóságát. A fényerő az általános világosságot tolja el – hasznos a réteg fal tónusához való illesztéséhez.</string>
-    <string name="tut_contrast_saturation_title">Kontraszt és Telítettség</string>
-    <string name="tut_contrast_saturation_text">A kontraszt elválasztja a sötéteket a világosaktól - kiválóan alkalmas a sablon körvonalainak kiemelésére. A telítettség a színintenzitást szabályozza; húzd nullára a szürkeárnyalathoz.</string>
-    <string name="tut_isolate_subject_title">Téma Kizárása</string>
-    <string name="tut_isolate_subject_text">A mesterséges intelligenciát használja a háttér automatikus eltávolítására, így csak a kép fő témája marad.</string>
-    <string name="tut_best_results_title">Legjobb Eredmények</string>
-    <string name="tut_best_results_text">A legjobban azokon a fotókon működik, amelyeken tiszta téma van sima vagy kontrasztos háttér előtt. A zsúfolt hátterű összetett jelenetek manuális javítást igényelhetnek a radírral.</string>
     <string name="settings_scan_mode_voxel_hash">Voxel-hash</string>
     <string name="settings_scan_mode_surface_mesh">Felületháló</string>
     <string name="settings_mural_method_label">Falfestmény-motor</string>

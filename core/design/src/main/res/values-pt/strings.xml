@@ -28,19 +28,14 @@
     <!-- Description of Trace mode, explaining its use as a light-table for physical tracing. -->
     <string name="nav_trace_info">Use seu design como uma sobreposição de mesa de luz para traçar linhas de referência em uma superfície física.</string>
     <!-- Alternative name for Trace mode, often referred to as Lightbox. -->
-    <string name="nav_trace_mode">Mesa de Luz</string>
 
     <!-- Label for Canvas mode, which is optimized for smaller, desk-scale artwork. -->
-    <string name="nav_canvas">Tela</string>
     <!-- Label for Mural mode, which is optimized for large-scale wall artwork. -->
-    <string name="nav_mural">Mural</string>
     <!-- Description for the toggle between Canvas and Mural scanning modes. -->
     <string name="nav_scan_mode_toggle_info">Alterne entre Tela (otimizado para arte em menor escala, de mesa) e Mural (otimizado para paredes em grande escala e Gaussian Splatting).</string>
 
     <!-- Label for the Stencil generation tool. -->
-    <string name="nav_stencil">Estêncil</string>
     <!-- Description of the Stencil tool, explaining how it creates multi-layer printable templates. -->
-    <string name="nav_stencil_info">Gere estênceis imprimíveis em várias camadas a partir da sua arte. Cada camada é impressa como blocos apenas de contorno no tamanho de papel Carta dos EUA.</string>
 
     <!-- Label for the Target/Grid management menu in AR mode. -->
     <string name="nav_grid">Alvo</string>
@@ -48,9 +43,7 @@
     <string name="nav_grid_info">Crie e gerencie alvos de âncora AR. Fotografe marcas de referência pintadas na parede para fixar a projeção no lugar.</string>
 
     <!-- Label for the wall survey tool, used to improve AR tracking. -->
-    <string name="nav_surveyor">Levantamento</string>
     <!-- Description of the Survey tool, explaining its role in tracking accuracy. -->
-    <string name="nav_surveyor_info">Mapeie a superfície da parede para melhorar a precisão do rastreamento AR.</string>
 
     <!-- Label for the action to create a new AR anchor. -->
     <string name="nav_create">Criar</string>
@@ -153,83 +146,51 @@
     <string name="nav_light_info">Alterne a lanterna do dispositivo para iluminar a parede enquanto trabalha com pouca luz.</string>
 
     <!-- Label for the touch input lock feature. -->
-    <string name="nav_lock">Bloquear</string>
     <!-- Description of the touch lock, explaining how to unlock it. -->
     <string name="nav_lock_info">Bloqueie a tela de toque para evitar alterações acidentais enquanto você pinta. Dê três toques em qualquer lugar para desbloquear.</string>
 
 
     <!-- Tooltip info for the brush tool. -->
-    <string name="info_brush">Pinte traços à mão livre nesta camada. Arraste para cima/para baixo no botão Tamanho para alterar o diâmetro do pincel; arraste para a esquerda/para a direita para ajustar a difusão (suavidade da borda).</string>
     <!-- Tooltip info for the eraser tool. -->
-    <string name="info_eraser">Apague partes desta camada com um pincel redondo. Arraste para cima/para baixo no botão Tamanho para alterar o diâmetro; arraste para a esquerda/para a direita para ajustar a difusão.</string>
     <!-- Tooltip info for the blur tool. -->
-    <string name="info_blur">Borre e suavize áreas desta camada. Arraste por uma região para desfocá-la.</string>
     <!-- Tooltip info for the liquify/warp tool. -->
-    <string name="info_liquify">Empurre e distorça pixels em qualquer direção. Arraste por uma área para distorcê-la — útil para ajustar proporções.</string>
     <!-- Tooltip info for the dodge (lighten) tool. -->
-    <string name="info_dodge">Clareie áreas específicas pintando sobre elas.</string>
     <!-- Tooltip info for the burn (darken) tool. -->
-    <string name="info_burn">Escureça áreas específicas pintando sobre elas.</string>
     <!-- Tooltip info for the brush size control, explaining vertical and horizontal drag gestures. -->
-    <string name="info_size">Arraste para cima/para baixo para alterar o diâmetro do pincel. Arraste para a esquerda/para a direita para ajustar a difusão — uma difusão mais ampla proporciona bordas mais suaves, parecidas com as de uma lata de spray.</string>
     <!-- Tooltip info for the brush color control, explaining gestures and the color wheel. -->
-    <string name="info_color">Mostra a cor ativa do pincel. Arraste para cima/para baixo para ajustar a luminosidade; arraste para a esquerda/para a direita para ajustar a saturação. Toque para abrir o círculo cromático completo.</string>
     <!-- Tooltip info for adding a new drawing layer. -->
-    <string name="info_draw">Adicione uma nova camada transparente em branco para desenho à mão livre.</string>
     <!-- Tooltip info for the AR keyframe tool, used for drift correction. -->
-    <string name="info_keyframe">Salve a pose atual da câmera AR como um quadro-chave. Usado para corrigir o desvio e realinhar a projeção depois de se afastar e retornar.</string>
     <!-- Tooltip info for an individual layer in the design rail. -->
-    <string name="info_layer">Esta camada. Toque para ativá-la. Abra a barra horizontal para acessar as ferramentas. Mantenha pressionado e arraste para reordenar.</string>
 
 
     <!-- Label for selecting the number of stencil layers. -->
-    <string name="stencil_layers">Camadas</string>
     <!-- Description of stencil layer options (silhouette, highlight, midtone). -->
-    <string name="stencil_layers_info">Escolha quantas camadas de estêncil gerar: 1 (apenas silhueta), 2 (silhueta + realce) ou 3 (silhueta + tom médio + realce).</string>
 
     <!-- Action label to re-generate stencils. -->
-    <string name="stencil_rebuild">Reconstruir</string>
     <!-- Description of the Rebuild action for the stencil pipeline. -->
-    <string name="stencil_rebuild_info">Execute novamente o fluxo de geração de estêncil na camada de origem atual.</string>
 
     <!-- Label for the stencil printing configuration. -->
-    <string name="stencil_print">Imprimir</string>
     <!-- Description of the print tool, mentioning tiled PDF generation. -->
-    <string name="stencil_print_info">Configure o tamanho de impressão no mundo real e gere um PDF em blocos para papel Carta dos EUA.</string>
 
     <!-- Label for setting the real-world size of the stencil. -->
-    <string name="stencil_print_size">Tamanho</string>
     <!-- Description of the stencil size control, mentioning centimetre units and live page count. -->
-    <string name="stencil_print_size_info">Arraste para cima/para baixo para definir a largura ou altura do estêncil no mundo real em centímetros. A contagem de páginas é atualizada ao vivo.</string>
 
     <!-- Label for toggling between width and height locking for print sizing. -->
-    <string name="stencil_print_dim_toggle">L / A</string>
     <!-- Description of the dimension lock toggle. -->
-    <string name="stencil_print_dim_toggle_info">Toque para alternar entre bloquear a largura ou a altura da saída.</string>
 
     <!-- Action label to generate and print the tiled PDF. -->
-    <string name="stencil_export_pdf">Imprimir PDF</string>
     <!-- Description of the PDF export, including the mention of overlaps for assembly. -->
-    <string name="stencil_export_pdf_info">Gere um PDF em blocos de todas as camadas de estêncil pronto para imprimir e cortar. Cada bloco inclui uma sobreposição de 3 mm para alinhamento de montagem.</string>
 
     <!-- Action label to save stencil layers as PNG images. -->
-    <string name="stencil_save_layers">Salvar PNGs</string>
     <!-- Description of the PNG save action for stencil layers. -->
-    <string name="stencil_save_layers_info">Salve cada camada de estêncil como uma imagem PNG separada na sua galeria.</string>
 
     <!-- Label for the button to return to the main editor from stencil mode. -->
-    <string name="stencil_back">← Editor</string>
     <!-- Description of the back action, noting that stencil layers are preserved. -->
-    <string name="stencil_back_info">Retorne ao editor principal. Suas camadas de estêncil são preservadas na sessão.</string>
 
     <!-- Action label to add a text layer. -->
-    <string name="nav_text">Texto</string>
     <!-- Action label to add a blank drawing layer. -->
-    <string name="nav_draw">Desenhar</string>
     <!-- Action label to edit layer content (like text). -->
-    <string name="nav_edit">Editar</string>
     <!-- Action label for font selection. -->
-    <string name="nav_font">Fonte</string>
     <!-- Action label for size adjustment. -->
     <string name="nav_size">Tamanho</string>
     <!-- Action label for color selection. -->
@@ -243,15 +204,10 @@
     <!-- Action label for drop shadow toggle. -->
     <string name="nav_shadow">Sombra</string>
     <!-- Action label for the eraser tool. -->
-    <string name="nav_eraser">Borracha</string>
     <!-- Action label for the blur/smudge tool. -->
-    <string name="nav_blur">Desfoque</string>
     <!-- Action label for the liquify/warp tool. -->
-    <string name="nav_liquify">Liquefazer</string>
     <!-- Action label for the dodge/lighten tool. -->
-    <string name="nav_dodge">Subexposição</string>
     <!-- Action label for the burn/darken tool. -->
-    <string name="nav_burn">Superxposição</string>
 
     <!-- MainActivity UI strings -->
     <!-- Label shown when a stencil or process is generating. -->
@@ -411,7 +367,6 @@
     <string name="settings_off">Desligado</string>
     <string name="settings_scan_mode_label">Modo de Varredura AR</string>
     <string name="settings_scan_mode_point_cloud">Nuvem de Pontos</string>
-    <string name="settings_scan_mode_gaussian_splat">Gaussian Splat</string>
     <string name="settings_anchor_boundary_label">Mostrar Limite da Âncora</string>
     <string name="settings_units_label">Unidades de Distância</string>
     <string name="settings_units_imperial">Imperial (pés)</string>
@@ -574,34 +529,6 @@
     <!-- Tutorial: Trace Mode -->
 
     <!-- Additional Tutorial Strings from TutorialDefinitions.kt -->
-    <string name="tut_create_anchor_title">Criar Âncora</string>
-    <string name="tut_create_anchor_text">Fixa sua projeção em um ponto específico da parede. Uma vez definida, o design permanece no lugar mesmo se você andar por aí.</string>
-    <string name="tut_surface_req_title">Requisitos de Superfície</string>
-    <string name="tut_surface_req_text">A parede precisa de textura visível — grafite, gesso áspero, tijolo ou adesivos funcionam bem. Paredes lisas, em branco ou de cor única não mantêm uma âncora.</string>
-    <string name="tut_blobs_title">O que Significam as Manchas</string>
-    <string name="tut_blobs_text">Depois de tocar, você verá rapidamente manchas verdes. Esses são os pontos-chave de rastreamento que o aplicativo extraiu. Mais manchas = fixação mais forte.</string>
-    <string name="tut_import_img_title">Importar Imagem</string>
-    <string name="tut_import_img_text">Adicione um esboço, foto ou referência da sua galeria. Aparece como uma nova camada empilhada sobre as outras.</string>
-    <string name="tut_scale_pos_title">Escalar e Posicionar</string>
-    <string name="tut_scale_pos_text">Aperte com dois dedos para redimensionar. Arraste com um dedo para reposicionar. A camada se ajusta à superfície da parede projetada no modo AR.</string>
-    <string name="tut_lock_freeze_title">Bloquear / Congelar</string>
-    <string name="tut_lock_freeze_text">Na Mesa de Luz (Modo de Traçado): desativa o toque para que você possa colocar o papel na tela sem mover nada acidentalmente.</string>
-    <string name="tut_in_other_modes_title">Em Outros Modos</string>
-    <string name="tut_in_other_modes_text">Nos modos AR, Sobreposição e Maquete: bloqueia as transformações da camada para que os designs não possam ser movidos ou dimensionados acidentalmente.</string>
-    <string name="tut_stencil_gen_title">Gerar Estêncil</string>
-    <string name="tut_stencil_gen_text">Converte sua imagem em estênceis de tinta spray para impressão. Cada estêncil representa uma camada de cor do design.</string>
-    <string name="tut_how_many_layers_title">Quantas Camadas?</string>
-    <string name="tut_how_many_layers_text">Um design de 3 cores produz 3 folhas de estêncil. Mais cores = mais folhas. Imagens simples e de alto contraste oferecem os melhores resultados.</string>
-    <string name="tut_exporting_title">Exportando</string>
-    <string name="tut_exporting_text">Cada estêncil é exportado como um PDF. Imprima em escala de 100% (sem dimensionamento) para obter as dimensões exatas no tamanho real.</string>
-    <string name="tut_opacity_brightness_title">Opacidade e Brilho</string>
-    <string name="tut_opacity_brightness_text">A opacidade controla o quanto a camada é transparente. O brilho altera a leveza geral — útil para combinar a camada com o tom da sua parede.</string>
-    <string name="tut_contrast_saturation_title">Contraste e Saturação</string>
-    <string name="tut_contrast_saturation_text">O contraste separa escuros de luzes — ótimo para destacar contornos de estêncil. A saturação controla a intensidade das cores; arraste para zero para tons de cinza.</string>
-    <string name="tut_isolate_subject_title">Isolar Objeto</string>
-    <string name="tut_isolate_subject_text">Usa IA para remover automaticamente o fundo, deixando apenas o objeto principal da imagem.</string>
-    <string name="tut_best_results_title">Melhores Resultados</string>
-    <string name="tut_best_results_text">Funciona melhor em fotos com um objeto nítido em um fundo liso ou contrastante. Cenas complexas com fundos muito detalhados podem precisar de retoques manuais com a borracha.</string>
     <string name="settings_scan_mode_voxel_hash">Hash de voxels</string>
     <string name="settings_scan_mode_surface_mesh">Malha de superfície</string>
     <string name="settings_mural_method_label">Motor de mural</string>

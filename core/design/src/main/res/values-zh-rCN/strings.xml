@@ -28,19 +28,14 @@
 
     <string name="nav_trace_info">将您的设计用作透写台覆盖层，以便将参考线描绘到物理表面上。</string>
 
-    <string name="nav_trace_mode">透写台</string>
 
 
-    <string name="nav_canvas">画布</string>
 
-    <string name="nav_mural">壁画</string>
 
     <string name="nav_scan_mode_toggle_info">在画布（针对较小的桌面级艺术作品进行了优化）和壁画（针对大型墙壁和高斯泼溅进行了优化）扫描模式之间切换。</string>
 
 
-    <string name="nav_stencil">模板</string>
 
-    <string name="nav_stencil_info">从您的艺术作品生成可打印的多层模板。每一层都作为纯轮廓平铺打印，尺寸适合美国信纸。</string>
 
 
     <string name="nav_grid">目标</string>
@@ -48,9 +43,7 @@
     <string name="nav_grid_info">创建和管理 AR 锚点目标。拍摄墙上绘制的参考标记照片以将投影锁定到位。</string>
 
 
-    <string name="nav_surveyor">测量</string>
 
-    <string name="nav_surveyor_info">映射墙壁表面以提高 AR 追踪的准确性。</string>
 
 
     <string name="nav_create">创建</string>
@@ -153,83 +146,51 @@
     <string name="nav_light_info">在弱光下工作时，切换设备手电筒以照亮您的墙壁。</string>
 
 
-    <string name="nav_lock">锁定</string>
 
     <string name="nav_lock_info">锁定触摸屏以防止在喷漆时发生意外更改。在任意位置连按三次即可解锁。</string>
 
 
 
-    <string name="info_brush">在此图层上手绘笔触。向上/向下拖动“大小”按钮以更改画笔直径；向左/向右拖动以调整羽化（边缘柔和度）。</string>
-
-    <string name="info_eraser">使用圆形画笔擦除此图层的部分内容。向上/向下拖动“大小”按钮以更改直径；向左/向右拖动以调整羽化。</string>
-
-    <string name="info_blur">涂抹并柔化此图层的区域。拖动以模糊一个区域。</string>
-
-    <string name="info_liquify">在任何方向推拉和扭曲像素。拖动一个区域使其变形 — 适用于调整比例。</string>
-
-    <string name="info_dodge">通过在上面绘画来变亮特定区域。</string>
-
-    <string name="info_burn">通过在上面绘画来变暗特定区域。</string>
-
-    <string name="info_size">向上/向下拖动以更改画笔直径。向左/向右拖动以调整羽化 — 羽化越大，边缘越柔和，更像喷漆罐的效果。</string>
-
-    <string name="info_color">显示活动的画笔颜色。向上/向下拖动以调整亮度；向左/向右拖动以调整饱和度。点按即可打开完整的色轮。</string>
-
-    <string name="info_draw">添加一个新的透明空白图层以进行手绘。</string>
-
-    <string name="info_keyframe">将当前的 AR 相机姿态保存为关键帧。用于纠正漂移并在离开并返回后重新对齐投影。</string>
-
-    <string name="info_layer">此图层。点按可激活它。打开水平栏以访问工具。长按并拖动可重新排序。</string>
 
 
 
-    <string name="stencil_layers">图层</string>
-
-    <string name="stencil_layers_info">选择要生成的模板图层数：1（仅轮廓）、2（轮廓 + 高光）或 3（轮廓 + 中间调 + 高光）。</string>
 
 
-    <string name="stencil_rebuild">重建</string>
-
-    <string name="stencil_rebuild_info">在当前源图层上重新运行模板生成管道。</string>
 
 
-    <string name="stencil_print">打印</string>
-
-    <string name="stencil_print_info">配置真实世界的打印尺寸并为美国信纸生成平铺的 PDF。</string>
 
 
-    <string name="stencil_print_size">尺寸</string>
-
-    <string name="stencil_print_size_info">向上/向下拖动以设置模板的真实世界宽度或高度（以厘米为单位）。页数实时更新。</string>
 
 
-    <string name="stencil_print_dim_toggle">宽 / 高</string>
-
-    <string name="stencil_print_dim_toggle_info">点按以在锁定输出的宽度或高度之间切换。</string>
 
 
-    <string name="stencil_export_pdf">打印 PDF</string>
-
-    <string name="stencil_export_pdf_info">生成所有模板图层的平铺 PDF，准备打印和切割。每个平铺都包含 3 毫米的重叠部分，以便于组装对齐。</string>
 
 
-    <string name="stencil_save_layers">保存 PNG</string>
-
-    <string name="stencil_save_layers_info">将每个模板图层另存为单独的 PNG 图像到您的图库中。</string>
 
 
-    <string name="stencil_back">← 编辑器</string>
-
-    <string name="stencil_back_info">返回主编辑器。您的模板图层保留在会话中。</string>
 
 
-    <string name="nav_text">文本</string>
 
-    <string name="nav_draw">绘画</string>
 
-    <string name="nav_edit">编辑</string>
 
-    <string name="nav_font">字体</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     <string name="nav_size">大小</string>
 
@@ -243,15 +204,10 @@
 
     <string name="nav_shadow">阴影</string>
 
-    <string name="nav_eraser">橡皮擦</string>
 
-    <string name="nav_blur">模糊</string>
 
-    <string name="nav_liquify">液化</string>
 
-    <string name="nav_dodge">减淡</string>
 
-    <string name="nav_burn">加深</string>
 
 
 
@@ -429,7 +385,6 @@
     <string name="settings_off">关</string>
     <string name="settings_scan_mode_label">AR 扫描模式</string>
     <string name="settings_scan_mode_point_cloud">点云</string>
-    <string name="settings_scan_mode_gaussian_splat">高斯泼溅</string>
     <string name="settings_anchor_boundary_label">显示锚点边界</string>
     <string name="settings_units_label">距离单位</string>
     <string name="settings_units_imperial">英制 (ft)</string>
@@ -592,34 +547,6 @@
 
 
 
-    <string name="tut_create_anchor_title">创建锚点</string>
-    <string name="tut_create_anchor_text">将您的投影锁定在墙上的特定位置。一旦设置，即使您走动，设计也会保持在原位。</string>
-    <string name="tut_surface_req_title">表面要求</string>
-    <string name="tut_surface_req_text">墙壁需要可见的纹理 — 涂鸦、粗糙的灰泥、砖块或贴纸都很好用。光滑的、空白的或单色的墙壁无法固定锚点。</string>
-    <string name="tut_blobs_title">斑点的含义</string>
-    <string name="tut_blobs_text">点击后，您将短暂看到绿色斑点。这些是应用程序提取的追踪关键点。斑点越多 = 锁定越牢固。</string>
-    <string name="tut_import_img_title">导入图像</string>
-    <string name="tut_import_img_text">从您的图库中添加草图、照片或参考。它作为堆叠在其他图层之上的新图层出现。</string>
-    <string name="tut_scale_pos_title">缩放和定位</string>
-    <string name="tut_scale_pos_text">用两根手指捏合以调整大小。用一根手指拖动以重新定位。图层在 AR 模式下会捕捉到投影的墙面。</string>
-    <string name="tut_lock_freeze_title">锁定 / 冻结</string>
-    <string name="tut_lock_freeze_text">在透写台模式下：禁用触摸，以便您可以将纸张放在屏幕上而不会意外移动任何内容。</string>
-    <string name="tut_in_other_modes_title">在其他模式下</string>
-    <string name="tut_in_other_modes_text">在 AR、覆盖和效果图模式下：锁定图层变换，以便设计不会被意外移动或缩放。</string>
-    <string name="tut_stencil_gen_title">生成模板</string>
-    <string name="tut_stencil_gen_text">将您的图像转换为可打印的喷漆模板。每个模板代表设计的一层颜色。</string>
-    <string name="tut_how_many_layers_title">多少层？</string>
-    <string name="tut_how_many_layers_text">一个 3 色设计会产生 3 张模板。颜色越多 = 模板越多。简单的高对比度图像效果最好。</string>
-    <string name="tut_exporting_title">正在导出</string>
-    <string name="tut_exporting_text">每个模板均导出为 PDF。以 100% 比例打印（不缩放）以获得准确的实际尺寸。</string>
-    <string name="tut_opacity_brightness_title">不透明度和亮度</string>
-    <string name="tut_opacity_brightness_text">不透明度控制图层的透明程度。亮度调整整体亮度 — 有助于使图层与您的墙壁色调相匹配。</string>
-    <string name="tut_contrast_saturation_title">对比度和饱和度</string>
-    <string name="tut_contrast_saturation_text">对比度将暗部与亮部分离 — 非常适合突出模板轮廓。饱和度控制色彩强度；拖动到零以变为灰度。</string>
-    <string name="tut_isolate_subject_title">分离主体</string>
-    <string name="tut_isolate_subject_text">使用 AI 自动移除背景，仅保留图像的主要主体。</string>
-    <string name="tut_best_results_title">最佳效果</string>
-    <string name="tut_best_results_text">在具有清晰主体和纯色或对比色背景的照片上效果最佳。背景杂乱的复杂场景可能需要使用橡皮擦进行手动修饰。</string>
     <string name="settings_scan_mode_voxel_hash">体素哈希</string>
     <string name="settings_scan_mode_surface_mesh">表面网格</string>
     <string name="settings_mural_method_label">壁画引擎</string>

@@ -28,19 +28,14 @@
 
     <string name="nav_trace_info">將您的設計用作光台覆蓋層，以在物理表面上追蹤參考線。</string>
 
-    <string name="nav_trace_mode">燈箱</string>
 
 
-    <string name="nav_canvas">畫布</string>
 
-    <string name="nav_mural">壁畫</string>
 
     <string name="nav_scan_mode_toggle_info">在畫布（針對較小的桌面尺寸藝術進行了最佳化）和壁畫（針對大型牆壁和高斯潑濺進行了最佳化）之間切換。</string>
 
 
-    <string name="nav_stencil">模版</string>
 
-    <string name="nav_stencil_info">從您的藝術品生成可列印的多層模板。每層列印為僅輪廓圖塊，尺寸適合美國信紙。</string>
 
 
     <string name="nav_grid">目標</string>
@@ -48,9 +43,7 @@
     <string name="nav_grid_info">建立和管理 AR 錨點目標。照片在牆上畫了參考標記，以將投影鎖定到位。</string>
 
 
-    <string name="nav_surveyor">民調</string>
 
-    <string name="nav_surveyor_info">繪製牆面地圖以提高 AR 追蹤精度。</string>
 
 
     <string name="nav_create">創造</string>
@@ -153,83 +146,51 @@
     <string name="nav_light_info">在低光源條件下工作時，切換設備手電筒以照亮牆壁。</string>
 
 
-    <string name="nav_lock">鎖</string>
 
     <string name="nav_lock_info">鎖定觸控螢幕以防止噴塗時發生意外變更。在任何位置點擊三次即可解鎖。</string>
 
 
 
-    <string name="info_brush">在該圖層上徒手繪製筆觸。向上/向下拖曳「大小」按鈕可變更畫筆直徑；向左/向右拖曳以調整羽化（邊緣柔和度）。</string>
-
-    <string name="info_eraser">用圓形畫筆擦除該圖層的部分內容。向上/向下拖曳“尺寸”按鈕可更改直徑；向左/向右拖曳以調整羽化。</string>
-
-    <string name="info_blur">塗抹並軟化該層的區域。拖曳過某個區域以使其模糊。</string>
-
-    <string name="info_liquify">向任意方向推動和扭曲像素。在某個區域上拖曳可使其變形－對於調整比例很有用。</string>
-
-    <string name="info_dodge">透過在特定區域上繪畫來照亮它們。</string>
-
-    <string name="info_burn">透過在特定區域上繪畫來使它們變暗。</string>
-
-    <string name="info_size">向上/向下拖曳以更改畫筆直徑。向左/向右拖曳以調整羽化 - 較寬的羽化可提供更柔和、更像噴霧罐的邊緣。</string>
-
-    <string name="info_color">顯示活動畫筆顏色。上下拖曳可調整亮度；向左/向右拖曳以調整飽和度。點擊可打開全色輪。</string>
-
-    <string name="info_draw">增加一個新的空白透明圖層用於手繪。</string>
-
-    <string name="info_keyframe">將目前 AR 相機姿勢儲存為關鍵影格。用於在離開和返回後校正漂移並重新對齊投影。</string>
-
-    <string name="info_layer">這一層。點擊以激活它。打開水平導軌即可使用工具。長按並拖曳可重新排序。</string>
 
 
 
-    <string name="stencil_layers">層數</string>
-
-    <string name="stencil_layers_info">選擇要產生的模板層數：1（僅輪廓）、2（輪廓 + 高光）或 3（輪廓 + 中間調 + 高光）。</string>
 
 
-    <string name="stencil_rebuild">重建</string>
-
-    <string name="stencil_rebuild_info">在目前來源層上重新執行模板產生管道。</string>
 
 
-    <string name="stencil_print">列印</string>
-
-    <string name="stencil_print_info">配置實際列印尺寸並為 US Letter 紙產生平鋪 PDF。</string>
 
 
-    <string name="stencil_print_size">尺寸</string>
-
-    <string name="stencil_print_size_info">向上/向下拖曳以設定模板的實際寬度或高度（以公分為單位）。頁數即時更新。</string>
 
 
-    <string name="stencil_print_dim_toggle">寬/高</string>
-
-    <string name="stencil_print_dim_toggle_info">點擊可在鎖定輸出的寬度或高度之間切換。</string>
 
 
-    <string name="stencil_export_pdf">列印 PDF</string>
-
-    <string name="stencil_export_pdf_info">產生所有模板層的平鋪 PDF，準備列印和切割。每個磁磚都有 3 毫米的重疊部分，用於組裝對齊。</string>
 
 
-    <string name="stencil_save_layers">保存 PNG</string>
-
-    <string name="stencil_save_layers_info">將每個模板層作為單獨的 PNG 圖像儲存到您的圖庫中。</string>
 
 
-    <string name="stencil_back">← 編輯</string>
-
-    <string name="stencil_back_info">返回主編輯器。您的模板層將保留在會話中。</string>
 
 
-    <string name="nav_text">文字</string>
 
-    <string name="nav_draw">畫</string>
 
-    <string name="nav_edit">編輯</string>
 
-    <string name="nav_font">字體</string>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     <string name="nav_size">尺寸</string>
 
@@ -243,15 +204,10 @@
 
     <string name="nav_shadow">陰影</string>
 
-    <string name="nav_eraser">橡皮</string>
 
-    <string name="nav_blur">模糊</string>
 
-    <string name="nav_liquify">液化</string>
 
-    <string name="nav_dodge">減淡</string>
 
-    <string name="nav_burn">加深</string>
 
 
 
@@ -411,7 +367,6 @@
     <string name="settings_off">關閉</string>
     <string name="settings_scan_mode_label">AR掃描模式</string>
     <string name="settings_scan_mode_point_cloud">點雲</string>
-    <string name="settings_scan_mode_gaussian_splat">高斯分佈</string>
     <string name="settings_anchor_boundary_label">顯示錨定邊界</string>
     <string name="settings_units_label">距離單位</string>
     <string name="settings_units_imperial">英制（英尺）</string>
@@ -574,34 +529,6 @@
 
 
 
-    <string name="tut_create_anchor_title">建立錨點</string>
-    <string name="tut_create_anchor_text">將投影鎖定到牆上的特定位置。一旦設定完畢，即使您四處走動，設計也會保持在原位。</string>
-    <string name="tut_surface_req_title">表面要求</string>
-    <string name="tut_surface_req_text">牆壁需要可見的紋理——塗鴉​​、粗糙的灰泥、磚塊或貼紙都可以。光滑、空白或單色的牆壁無法固定。</string>
-    <string name="tut_blobs_title">斑點的意思是什麼</string>
-    <string name="tut_blobs_text">點擊後，您會短暫看到綠色斑點。這些是應用程式提取的追蹤關鍵點。更多的斑點=更強的鎖定。</string>
-    <string name="tut_import_img_title">導入影像</string>
-    <string name="tut_import_img_text">新增草圖、照片或圖庫中的參考。它看起來像一個新層堆疊在其他層之上。</string>
-    <string name="tut_scale_pos_title">規模和位置</string>
-    <string name="tut_scale_pos_text">用兩根手指捏合以調整大小。用一根手指拖曳以重新定位。此圖層在 AR 模式下捕捉到投影牆面。</string>
-    <string name="tut_lock_freeze_title">鎖定/凍結</string>
-    <string name="tut_lock_freeze_text">在燈箱（追蹤）模式下：停用觸摸，以便您可以將紙張放在螢幕上而不會意外移動任何東西。</string>
-    <string name="tut_in_other_modes_title">其他模式下</string>
-    <string name="tut_in_other_modes_text">在 AR、疊加和模型模式中：鎖定圖層變換，以便設計不會意外移動或縮放。</string>
-    <string name="tut_stencil_gen_title">產生模板</string>
-    <string name="tut_stencil_gen_text">將您的影像轉換為可列印的噴漆模板。每個模板代表設計的一個顏色層。</string>
-    <string name="tut_how_many_layers_title">有多少層？</string>
-    <string name="tut_how_many_layers_text">3 色設計可產生 3 個模板紙。更多顏色=更多床單。簡單的高對比度影像可提供最佳效果。</string>
-    <string name="tut_exporting_title">匯出</string>
-    <string name="tut_exporting_text">每個模板都會匯出為 PDF。以 100% 比例列印（無縮放）以獲得準確的真人大小尺寸。</string>
-    <string name="tut_opacity_brightness_title">不透明度和亮度</string>
-    <string name="tut_opacity_brightness_text">不透明度控制圖層的透明度。亮度會改變整體亮度 - 有助於將圖層與牆壁的色調相匹配。</string>
-    <string name="tut_contrast_saturation_title">對比度和飽和度</string>
-    <string name="tut_contrast_saturation_text">將深色與淺色進行對比——非常適合使模板輪廓突出。飽和度控制顏色強度；拖曳到零以獲得灰階。</string>
-    <string name="tut_isolate_subject_title">隔離對象</string>
-    <string name="tut_isolate_subject_text">利用AI自動去除背景，只留下影像的主要主體。</string>
-    <string name="tut_best_results_title">最佳結果</string>
-    <string name="tut_best_results_text">最適合拍攝主題清晰、背景簡單或對比鮮明的照片。背景複雜的複雜場景可能需要使用橡皮擦進行手動修飾。</string>
     <string name="settings_scan_mode_voxel_hash">體素雜湊</string>
     <string name="settings_scan_mode_surface_mesh">表面網格</string>
     <string name="settings_mural_method_label">壁畫引擎</string>

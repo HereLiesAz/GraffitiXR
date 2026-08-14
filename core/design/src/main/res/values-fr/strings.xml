@@ -52,7 +52,6 @@
     <string name="settings_off">Désactivé</string>
     <string name="settings_scan_mode_label">Mode de scan AR</string>
     <string name="settings_scan_mode_point_cloud">Nuage de points</string>
-    <string name="settings_scan_mode_gaussian_splat">Splatting Gaussien</string>
     <string name="settings_anchor_boundary_label">Afficher la limite d\'ancre</string>
     <string name="settings_units_label">Unités de distance</string>
     <string name="settings_units_imperial">Impérial (pi)</string>
