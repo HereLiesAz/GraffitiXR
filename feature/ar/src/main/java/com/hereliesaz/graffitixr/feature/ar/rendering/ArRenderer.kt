@@ -108,9 +108,27 @@ class ArRenderer(
      * Latest ARCore frame snapshot. WARNING: do NOT call Session/Frame methods on this from off
      * the GL thread — ARCore is not thread-safe and a hitTest here racing update() corrupts
      * native state. For hit tests, use [requestHitTest], which runs on the GL thread under
-     * [sessionLock].
+     * [sessionLock]. [AtomicReference] only makes the REFERENCE itself safe to read cross-thread;
+     * it does not make the [Frame] object it points to safe to call methods on — see
+     * [latestFrameTimestampNs] for the one piece of it ([Frame.getTimestamp]) that is meant to be
+     * read off-thread.
      */
     val latestFrame: AtomicReference<Frame?> = AtomicReference(null)
+
+    /**
+     * Timestamp (ns) of the most recently processed ARCore frame, or 0 if none has arrived yet —
+     * a plain `@Volatile Long` cached by the GL thread alongside [latestFrame], specifically so
+     * off-thread callers (e.g. [com.hereliesaz.graffitixr.feature.ar.lastArFrameTimestampNs],
+     * polled ~1 Hz from a Compose coroutine to report camera-feeding health) never need to touch
+     * the [Frame] object itself. Reading `latestFrame.get()?.timestamp` directly used to call
+     * [Frame.getTimestamp] — a native ARCore call — from whatever thread the poller ran on, which
+     * is exactly what the warning on [latestFrame] says not to do: the AtomicReference makes the
+     * REFERENCE safe to hand across threads, not the native call inside it. This field is written
+     * only from the GL thread (same place [latestFrame] is set) and is a plain value type, so
+     * reading it off-thread touches no ARCore native state at all.
+     */
+    @Volatile var latestFrameTimestampNs: Long = 0L
+        private set
 
     private class PendingHitTest(
         val x: Float,
@@ -1171,6 +1189,7 @@ class ArRenderer(
             }
 
             latestFrame.set(frame)
+            latestFrameTimestampNs = frame.timestamp
             lastStep = "hitTests"
             drainHitTestQueue(frame)
             // Camera-streaming verdict, surfaced on-screen so we don't need adb. ARCore returns ts=0
@@ -2768,6 +2787,7 @@ class ArRenderer(
         anchorOrchestrator.clear()
         pendingOverlayBitmap = null
         latestFrame.set(null)
+        latestFrameTimestampNs = 0L
     }
 
     private companion object {
