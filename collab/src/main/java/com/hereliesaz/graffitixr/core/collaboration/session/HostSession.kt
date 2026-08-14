@@ -1,6 +1,7 @@
 // collab/src/main/java/com/hereliesaz/graffitixr/core/collaboration/session/HostSession.kt
 package com.hereliesaz.graffitixr.core.collaboration.session
 
+import android.util.Log
 import com.hereliesaz.graffitixr.common.model.CoopSessionState
 import com.hereliesaz.graffitixr.common.model.Op
 import com.hereliesaz.graffitixr.core.collaboration.wire.BulkAckPayload
@@ -167,6 +168,14 @@ internal class HostSession(
      * Encoding runs on the caller's thread; ops carrying large payloads (LayerBitmapReplace)
      * should be enqueued from a background dispatcher, which OpEmitterImpl's editor call sites
      * already do.
+     *
+     * An op whose encoded DELTA frame cannot fit under [Frame.MAX_PAYLOAD_BYTES] is rejected here
+     * rather than queued: [Frame.write] would throw [IllegalArgumentException] the moment this op
+     * reached the wire, and that happens twice over for a bad entry — once (harmlessly) in
+     * [outboundLoop], which treats any write failure as a dropped connection, and then again,
+     * unguarded, on every subsequent reconnect's replay in [handleConnection], permanently
+     * stranding the guest. Refusing it here means it never enters [deltaBuffer] or [outQueue] at
+     * all, so neither path ever sees it.
      */
     fun enqueueOp(op: Op) {
         synchronized(enqueueLock) {
@@ -176,6 +185,15 @@ internal class HostSession(
             if (phase == Phase.Ended) return
             val seq = seqCounter.incrementAndGet()
             val bytes = OpCodec.encode(DeltaPayload(seq, op))
+            if (bytes.size > Frame.MAX_PAYLOAD_BYTES) {
+                Log.w(
+                    TAG,
+                    "dropping op (seq=$seq, ${op.javaClass.simpleName}): encoded size ${bytes.size}B " +
+                        "exceeds Frame.MAX_PAYLOAD_BYTES (${Frame.MAX_PAYLOAD_BYTES}B); it can never " +
+                        "be sent as a single DELTA frame",
+                )
+                return
+            }
             deltaBuffer.append(seq, op, bytes.size)
             outQueue.trySend(EncodedDelta(seq, bytes))
         }
@@ -294,7 +312,18 @@ internal class HostSession(
         val replay = if (isReconnect) deltaBuffer.opsAfter(lastAppliedSeq) else null
         if (replay != null) {
             replay.forEach { (seq, op) ->
-                writeSecure(output, crypto, FrameType.DELTA, OpCodec.encode(DeltaPayload(seq, op)))
+                // Each entry gets its own try/catch: enqueueOp now rejects an op that can't fit a
+                // single Frame before it ever reaches deltaBuffer, but this stays defensive against
+                // any other cause of a bad/oversized buffered entry (e.g. version skew with a peer
+                // running an older cap). Without this, one bad entry threw uncaught here, which
+                // killed this fresh connection on every reconnect attempt — the guest reconnects
+                // successfully at the transport layer and is killed again each time, stranded until
+                // its reconnect window expires. Log and skip instead.
+                try {
+                    writeSecure(output, crypto, FrameType.DELTA, OpCodec.encode(DeltaPayload(seq, op)))
+                } catch (e: Exception) {
+                    Log.w(TAG, "skipping unsendable replay entry (seq=$seq, ${op.javaClass.simpleName})", e)
+                }
             }
         } else {
             sendBulk(output, crypto)
@@ -447,6 +476,8 @@ internal class HostSession(
     }
 
     private companion object {
+        private const val TAG = "HostSession"
+
         // Guests ack every 1s and answer 5s PINGs, so 15s of read silence means a dead or
         // half-open peer. Also bounds handshake reads in handleConnection, so a stalled
         // client can block the accept loop for at most this long.
