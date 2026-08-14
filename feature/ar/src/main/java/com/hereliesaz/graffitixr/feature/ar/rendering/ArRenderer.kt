@@ -2800,12 +2800,23 @@ class ArRenderer(
         const val PERCEPTION_FLOOR_FPS = 30
         // Rolling-average perception-refresh cost (ms) above which the lag trigger floors the rate.
         const val PERCEPTION_LAG_MS = 16f
-        // Per-element view-matrix delta below which the pose is treated as unchanged (skip redraw).
-        const val PERCEPTION_POSE_EPSILON = 1e-4f
+        // Per-element view-matrix delta below which the pose is treated as unchanged (skip the
+        // offscreen perception-FBO redraw and reuse the cached composite). Was 1e-4f — an order of
+        // magnitude BELOW IDLE_POSE_EPSILON's calibrated handheld-jitter noise floor (~0.09°/1.5mm,
+        // see its doc below), so ordinary hand tremor while holding the phone "still" already exceeded
+        // it most frames: perceptionPoseChanged() returned true almost every frame even with no real
+        // motion, and the cache this epsilon exists to enable was never actually used handheld. Set
+        // equal to IDLE_POSE_EPSILON — the same calibrated noise floor already trusted elsewhere in
+        // this file — rather than a new independently-chosen value, and deliberately not looser than
+        // that: plane-grid/point-cloud perception layers should redraw at least as eagerly as heavy
+        // SLAM/VIO work re-arms from idle, so genuine motion (which moves the view matrix far more
+        // than a jitter-scale delta) still triggers an immediate redraw.
+        const val PERCEPTION_POSE_EPSILON = 1.5e-3f
 
         // --- Adaptive idle gating ---
-        // Per-element view-matrix delta below which the phone is treated as "still" for idle. Coarser
-        // than the perception epsilon so handheld micro-jitter doesn't count as motion (≈0.09° / 1.5mm).
+        // Per-element view-matrix delta below which the phone is treated as "still" for idle —
+        // calibrated to sit above handheld micro-jitter so it doesn't count as motion (≈0.09° / 1.5mm).
+        // PERCEPTION_POSE_EPSILON above is intentionally set to this same value.
         const val IDLE_POSE_EPSILON = 1.5e-3f
         // Continuous no-motion + no-interaction time before entering idle (slow to sleep).
         const val IDLE_ENTER_DEBOUNCE_MS = 700L
