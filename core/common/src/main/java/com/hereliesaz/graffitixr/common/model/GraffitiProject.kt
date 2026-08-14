@@ -130,7 +130,6 @@ data class GraffitiProject(
     val cloudAnchorId: String? = null,
 
     val targetFingerprint: String? = null,
-    val isRightHanded: Boolean = true,
     // Per-mode whole-design adjustments, keyed by EditorMode.name. Defaulted for back-compat with
     // projects saved before this field existed.
     val modeAdjustments: Map<String, ModeAdjustment> = emptyMap(),

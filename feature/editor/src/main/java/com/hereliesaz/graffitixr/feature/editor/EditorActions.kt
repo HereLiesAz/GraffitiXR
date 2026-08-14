@@ -46,12 +46,9 @@ interface EditorActions {
     /** Choose (or replace) the design image. */
     fun onAddLayer(uri: Uri)
 
-    // Placement.
-    fun onScaleChanged(s: Float)
-    fun onOffsetChanged(o: Offset)
-    // Rotation is driven by gestures (onTransformGesture / onCycleRotationAxis), not per-axis
-    // setters: the sliders those setters existed for were removed, and the setters outlived them
-    // with no caller.
+    // Placement is driven entirely by gestures (onTransformGesture / onModeTransformGesture /
+    // onCycleRotationAxis), not per-field setters: the sliders that scale/offset/per-axis-rotation
+    // setters existed for were removed, and the setters outlived them with no caller.
     fun onCycleRotationAxis()
 
     fun onGestureStart()

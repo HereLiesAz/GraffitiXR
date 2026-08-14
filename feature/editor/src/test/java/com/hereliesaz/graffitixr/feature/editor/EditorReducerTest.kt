@@ -41,12 +41,6 @@ class EditorReducerTest {
     }
 
     @Test
-    fun `AddOffset accumulates onto the existing offset`() {
-        val s = state(lyr().copy(offset = Offset(10f, 5f)))
-        assertEquals(Offset(13f, 3f), reduce(s, EditorIntent.AddOffset(Offset(3f, -2f))).design!!.offset)
-    }
-
-    @Test
     fun `CycleRotationAxis advances X to Y to Z to X and shows feedback`() {
         var s = state().copy(activeRotationAxis = RotationAxis.X)
         s = reduce(s, EditorIntent.CycleRotationAxis); assertEquals(RotationAxis.Y, s.activeRotationAxis)
@@ -267,7 +261,7 @@ class EditorReducerTest {
         // Once the user has repositioned, "put it back" would put it somewhere they deliberately
         // left — so the next press resets rather than restoring.
         var s = reduce(placedInMode(), EditorIntent.ToggleTransformReset)
-        s = reduce(s, EditorIntent.AddOffset(Offset(12f, 0f)))
+        s = reduce(s, EditorIntent.SetDesignTransform(scale = 1f, offset = Offset(12f, 0f), rx = 0f, ry = 0f, rz = 0f))
         assertNull(s.transformStash)
 
         s = reduce(s, EditorIntent.ToggleTransformReset)

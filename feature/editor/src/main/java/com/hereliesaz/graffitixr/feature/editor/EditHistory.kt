@@ -1,15 +1,29 @@
 package com.hereliesaz.graffitixr.feature.editor
 
+import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.Layer
+import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 
 /**
- * A single undoable step: a snapshot of the design with its bitmap stripped.
+ * A single undoable step: a snapshot of the design with its bitmap stripped, plus — if the edit was
+ * made outside DESIGN mode — the whole-design [ModeAdjustment] for the mode it was made in.
  *
  * Since this app no longer edits pixels — the companion design app owns authoring — every undoable
  * change is a property change (transform, tone, visibility), so one snapshot type covers the whole
- * history. Nullable because "no design yet" is a state the user can undo back to.
+ * history. [oldDesign] is nullable because "no design yet" is a state the user can undo back to.
+ *
+ * [oldMode]/[oldModeAdjustment] exist because outside DESIGN mode, every gesture and tone control
+ * writes to [ModeAdjustment], not to the design layer — a history entry that captured only the
+ * design would restore an unchanged design on Undo (a visible no-op) and, worse, would leave the
+ * real placement nowhere to come back from once Reset had already flattened it to identity. Both
+ * null together means the snapshot was taken in DESIGN mode, where there is no mode adjustment to
+ * restore.
  */
-internal data class EditCommand(val oldDesign: Layer?)
+internal data class EditCommand(
+    val oldDesign: Layer?,
+    val oldMode: EditorMode? = null,
+    val oldModeAdjustment: ModeAdjustment? = null,
+)
 
 /**
  * Owns the undo/redo stacks for the editor. Pure logic — no Android or Compose dependencies — so
@@ -27,12 +41,18 @@ internal class EditHistory(private val maxStackSize: Int = 20) {
     val redoCount: Int get() = redoStack.size
 
     /**
-     * Records a design-property snapshot. Deduplicated: a snapshot identical to the most recent one
-     * is ignored (returns false). Pushing clears the redo stack.
+     * Records a design-property snapshot, and — outside DESIGN mode — the mode adjustment snapshot
+     * alongside it. Deduplicated: a snapshot identical to the most recent one (design AND mode
+     * adjustment both unchanged) is ignored (returns false). Pushing clears the redo stack.
      */
-    fun pushProperty(designWithoutBitmap: Layer?): Boolean {
-        if (undoStack.isNotEmpty() && undoStack.last().oldDesign == designWithoutBitmap) return false
-        undoStack.addLast(EditCommand(designWithoutBitmap))
+    fun pushProperty(
+        designWithoutBitmap: Layer?,
+        mode: EditorMode? = null,
+        modeAdjustment: ModeAdjustment? = null,
+    ): Boolean {
+        val command = EditCommand(designWithoutBitmap, mode, modeAdjustment)
+        if (undoStack.isNotEmpty() && undoStack.last() == command) return false
+        undoStack.addLast(command)
         trim()
         redoStack.clear()
         return true

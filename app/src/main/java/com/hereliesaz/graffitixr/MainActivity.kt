@@ -1486,7 +1486,7 @@ class MainActivity : ComponentActivity() {
                                     initialName = stringResource(DesignR.string.new_project_name),
                                     onDismissRequest = { dashboardViewModel.dismissNewProjectDialog() },
                                     onSaveRequest = { name ->
-                                        dashboardViewModel.onCreateProject(name, editorUiState.isRightHanded)
+                                        dashboardViewModel.onCreateProject(name)
                                         navController.navigate(EditorMode.DESIGN.name) {
                                             popUpTo(LIBRARY_ROUTE) { inclusive = true }
                                             launchSingleTop = true

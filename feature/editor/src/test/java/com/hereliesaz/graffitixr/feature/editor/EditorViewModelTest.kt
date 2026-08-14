@@ -106,6 +106,18 @@ class EditorViewModelTest {
         every { context.contentResolver } returns contentResolver
         every { contentResolver.openInputStream(any()) } returns inputStream
 
+        // A relaxed Context leaves resources.displayMetrics at all-zero fields (plain field reads
+        // aren't interceptable the way method calls are), which made onAddLayer's screen-fit scale
+        // collapse to 0 instead of a sane value — silently poisoning every scale/zoom assertion
+        // downstream. Stub a real DisplayMetrics with plausible dimensions instead.
+        val displayMetrics = android.util.DisplayMetrics().apply {
+            widthPixels = 1080
+            heightPixels = 1920
+        }
+        val resources = mockk<android.content.res.Resources>()
+        every { resources.displayMetrics } returns displayMetrics
+        every { context.resources } returns resources
+
         val testDispatcherProvider = object : DispatcherProvider {
             override val main: CoroutineDispatcher = testDispatcher
             override val io: CoroutineDispatcher = testDispatcher
@@ -168,20 +180,6 @@ class EditorViewModelTest {
 
     private fun assertNotEqualsId(a: String, b: String) =
         assertTrue("expected a fresh design id, both were '$a'", a != b)
-
-    @Test
-    fun `onScaleChanged updates the design`() = runTest {
-        addDesign()
-        viewModel.onScaleChanged(2.0f)
-        assertEquals(2.0f, viewModel.uiState.value.design!!.scale)
-    }
-
-    @Test
-    fun `onOffsetChanged accumulates onto the design offset`() = runTest {
-        addDesign()
-        viewModel.onOffsetChanged(Offset(10f, 20f))
-        assertEquals(Offset(10f, 20f), viewModel.uiState.value.design!!.offset)
-    }
 
     @Test
     fun `toggleImageLock updates state`() = runTest {
@@ -338,8 +336,7 @@ class EditorViewModelTest {
     fun `reset flattens placement and a second press restores it`() = runTest {
         viewModel.setEditorMode(EditorMode.DESIGN)
         addDesign()
-        viewModel.onScaleChanged(2.5f)
-        viewModel.onOffsetChanged(Offset(30f, 40f))
+        viewModel.onTransformGesture(pan = Offset(30f, 40f), zoom = 2.5f, rotationDelta = 0f)
         viewModel.onOpacityChanged(0.4f)
         testDispatcher.scheduler.advanceUntilIdle()
 
