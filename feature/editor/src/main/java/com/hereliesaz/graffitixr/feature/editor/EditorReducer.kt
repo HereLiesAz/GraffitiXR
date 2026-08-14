@@ -29,8 +29,6 @@ internal object EditorReducer {
         is EditorIntent.SetColorBalanceR -> state.mapDesign { it.copy(colorBalanceR = intent.value) }
         is EditorIntent.SetColorBalanceG -> state.mapDesign { it.copy(colorBalanceG = intent.value) }
         is EditorIntent.SetColorBalanceB -> state.mapDesign { it.copy(colorBalanceB = intent.value) }
-        is EditorIntent.SetScale -> state.mapDesign { it.copy(scale = intent.value) }.movedSinceReset()
-        is EditorIntent.AddOffset -> state.mapDesign { it.copy(offset = it.offset + intent.delta) }.movedSinceReset()
         EditorIntent.ToggleInvert -> state.mapDesign { it.copy(isInverted = !it.isInverted) }
         EditorIntent.ToggleImageLock -> state.mapDesign { it.copy(isImageLocked = !it.isImageLocked) }
         EditorIntent.CycleRotationAxis -> {
@@ -150,8 +148,15 @@ internal object EditorReducer {
      * First press stashes the current placement and goes to identity. Second press restores the
      * stash. A stash taken in another mode is not restorable (the mode transform it describes is not
      * the one on screen), so that case resets afresh instead.
+     *
+     * Locked is a no-op: [ModeAdjustment.isTransformLocked] means the user has pinned this mode's
+     * whole-design position (e.g. a Trace reference that must not drift while tracing) — the gesture
+     * handler already honours that lock, and Reset flattening the position out from under it would
+     * defeat the whole point of locking.
      */
     private fun reduceTransformReset(state: EditorUiState): EditorUiState {
+        if (state.modeAdjustments[state.editorMode]?.isTransformLocked == true) return state
+
         val stash = state.transformStash
         if (stash != null && stash.mode == state.editorMode) {
             return state

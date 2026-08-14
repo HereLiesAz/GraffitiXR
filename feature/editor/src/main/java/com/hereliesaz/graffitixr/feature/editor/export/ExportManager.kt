@@ -11,6 +11,7 @@ import android.os.Build
 import android.graphics.BlendMode as NativeBlendMode
 import androidx.compose.ui.graphics.BlendMode
 import com.hereliesaz.graffitixr.common.model.Layer
+import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.feature.editor.createColorMatrix
 import javax.inject.Inject
 
@@ -19,13 +20,30 @@ import javax.inject.Inject
  */
 class ExportManager @Inject constructor() {
 
-    /** Draws [design] (with its tone and transform applied) over the background, if there is one. */
+    /**
+     * Draws [design] (with its tone and transform applied) over the background, if there is one.
+     *
+     * [modeAdj] is the whole-design ModeAdjustment for the mode being exported from (e.g.
+     * `uiState.modeAdjustments[uiState.editorMode]`) — every gesture and tone control outside
+     * DESIGN mode writes here, not to the layer itself, so omitting it meant an Overlay/Mockup/
+     * Trace export always showed the design at its untouched default position/scale/opacity,
+     * regardless of how it had actually been placed on screen. Composed on top of the layer's own
+     * transform/tone exactly the way MainScreen's on-screen graphicsLayer nesting does: tone is
+     * layer*mode (saturation/contrast multiply, brightness adds, invert XORs), opacity multiplies,
+     * and geometry wraps the layer's own screen matrix in an outer scale/rotate/translate pivoted
+     * on the export canvas center. Only the Z rotation is applied — [ModeAdjustment.rotationX]/
+     * [ModeAdjustment.rotationY] are a live 3D tilt the on-screen renderer fakes with a camera
+     * projection; a flat 2D export canvas can't reproduce that, the same limitation
+     * [getLayerScreenMatrix] already accepts for the layer's own rotationX/rotationY. Passing null
+     * (the default) reproduces the pre-existing design-only behaviour exactly.
+     */
     fun composite(
         design: Layer?,
         width: Int,
         height: Int,
         backgroundBitmap: Bitmap? = null,
-        backgroundColor: Int = android.graphics.Color.TRANSPARENT
+        backgroundColor: Int = android.graphics.Color.TRANSPARENT,
+        modeAdj: ModeAdjustment? = null,
     ): Bitmap {
         // Bitmap.createBitmap throws on a non-positive dimension. Callers pass display metrics, and
         // those read back as 0 on a detached/not-yet-laid-out display — clamp here so no call site
@@ -61,31 +79,41 @@ class ExportManager @Inject constructor() {
 
         design?.takeIf { it.isVisible }?.let { layer ->
             layer.bitmap?.let { b ->
+                // Whole-design tone on top of the layer's own — same fold as MainScreen's on-screen
+                // ColorFilter for Overlay/Mockup/Trace. Defaults (1/1/0/false) leave the layer's own
+                // values untouched when modeAdj is null (Design mode / unspecified).
                 val cm = createColorMatrix(
-                    saturation = layer.saturation,
-                    contrast = layer.contrast,
-                    brightness = layer.brightness,
+                    saturation = layer.saturation * (modeAdj?.saturation ?: 1f),
+                    contrast = layer.contrast * (modeAdj?.contrast ?: 1f),
+                    brightness = layer.brightness + (modeAdj?.brightness ?: 0f),
                     colorBalanceR = layer.colorBalanceR,
                     colorBalanceG = layer.colorBalanceG,
                     colorBalanceB = layer.colorBalanceB,
-                    isInverted = layer.isInverted
+                    isInverted = layer.isInverted != (modeAdj?.isInverted ?: false)
                 )
                 val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    alpha = (layer.opacity * 255).toInt().coerceIn(0, 255)
+                    // Nested alpha in the on-screen graphicsLayer is multiplicative (outer mode alpha
+                    // wrapping the inner layer alpha), so it is here too.
+                    alpha = (layer.opacity * (modeAdj?.opacity ?: 1f) * 255).toInt().coerceIn(0, 255)
                     applyLayerBlendMode(layer.blendMode)
                     colorFilter = android.graphics.ColorMatrixColorFilter(
                         android.graphics.ColorMatrix(cm.values)
                     )
                 }
 
-                val matrix = getLayerScreenMatrix(layer, screenWidth, screenHeight)
+                val matrix = getLayerScreenMatrix(layer, screenWidth, screenHeight, modeAdj)
                 canvas.drawBitmap(b, matrix, paint)
             }
         }
         return result
     }
 
-    private fun getLayerScreenMatrix(layer: Layer, screenWidth: Int, screenHeight: Int): Matrix {
+    private fun getLayerScreenMatrix(
+        layer: Layer,
+        screenWidth: Int,
+        screenHeight: Int,
+        modeAdj: ModeAdjustment? = null,
+    ): Matrix {
         val b = layer.bitmap ?: return Matrix()
         val matrix = Matrix()
 
@@ -114,6 +142,18 @@ class ExportManager @Inject constructor() {
 
         // 4. Move to center of screen + apply pan
         matrix.postTranslate(screenWidth / 2f + layer.offset.x, screenHeight / 2f + layer.offset.y)
+
+        // 5. Whole-design (mode) transform, wrapping the layer's own the same way MainScreen's
+        // outer graphicsLayer wraps the inner one on screen — pivoted at screen center, matching
+        // that graphicsLayer's fillMaxSize() + TransformOrigin.Center. Z rotation only; see this
+        // function's caller doc for why X/Y tilt can't be reproduced on a flat export canvas.
+        if (modeAdj != null) {
+            val centerX = screenWidth / 2f
+            val centerY = screenHeight / 2f
+            matrix.postScale(modeAdj.scale, modeAdj.scale, centerX, centerY)
+            matrix.postRotate(modeAdj.rotation, centerX, centerY)
+            matrix.postTranslate(modeAdj.offsetX, modeAdj.offsetY)
+        }
 
         return matrix
     }

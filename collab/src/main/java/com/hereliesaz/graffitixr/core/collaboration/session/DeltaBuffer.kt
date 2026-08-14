@@ -88,8 +88,10 @@ internal class DeltaBuffer(
      *  * [Op.DesignBitmapReplace] defines the pixels outright, so it subsumes earlier pixel ops
      *    (another bitmap replace, or a completed stroke) but NOT transform or tone, which are
      *    separate state a replacement does not carry.
-     *  * [Op.DesignTransform] and [Op.DesignProps] each carry an ABSOLUTE value rather than a
-     *    delta, so the newest one is the only one worth replaying.
+     *  * [Op.DesignTransform], [Op.DesignProps] and [Op.ModeTransform] each carry an ABSOLUTE value
+     *    rather than a delta, so the newest one is the only one worth replaying — [Op.ModeTransform]
+     *    only supersedes a buffered entry for the SAME mode, since each mode's adjustment is
+     *    independent state.
      *
      * This is what bounds the heavy case: repeated warps or repeated slider drags coalesce to the
      * latest instead of accumulating a megabyte apiece.
@@ -100,6 +102,7 @@ internal class DeltaBuffer(
             is Op.DesignBitmapReplace -> { op -> op is Op.DesignBitmapReplace || op is Op.StrokeComplete }
             is Op.DesignTransform -> { op -> op is Op.DesignTransform }
             is Op.DesignProps -> { op -> op is Op.DesignProps }
+            is Op.ModeTransform -> { op -> op is Op.ModeTransform && op.mode == incoming.mode }
             // A completed stroke is incremental: it builds on what came before and subsumes nothing.
             is Op.StrokeComplete, is Op.TextContentChange -> return
         }

@@ -159,4 +159,22 @@ interface SettingsRepository {
 
     /** Clears every completed-tutorial key, allowing first-run flows to fire again. */
     suspend fun clearCompletedTutorials()
+
+    /**
+     * The four AR perception-debug overlays (diagnostic HUD, feature points, plane grids, point
+     * cloud). Previously these only ever dispatched an in-memory reducer intent — indistinguishable
+     * in Settings from the handedness toggle two rows above, which genuinely persists, until the
+     * process was killed and every one of them silently reverted to its hardcoded default.
+     */
+    val showDiagOverlay: Flow<Boolean>
+    suspend fun setShowDiagOverlay(on: Boolean)
+
+    val showFeaturePoints: Flow<Boolean>
+    suspend fun setShowFeaturePoints(on: Boolean)
+
+    val showPlaneGrids: Flow<Boolean>
+    suspend fun setShowPlaneGrids(on: Boolean)
+
+    val showPoints: Flow<Boolean>
+    suspend fun setShowPoints(on: Boolean)
 }

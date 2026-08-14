@@ -25,9 +25,6 @@ internal sealed interface EditorIntent {
     data class SetColorBalanceR(val value: Float) : EditorIntent
     data class SetColorBalanceG(val value: Float) : EditorIntent
     data class SetColorBalanceB(val value: Float) : EditorIntent
-    data class SetScale(val value: Float) : EditorIntent
-    /** Pan is incremental: [delta] is ADDED to the active layer's current offset. */
-    data class AddOffset(val delta: Offset) : EditorIntent
     data object ToggleInvert : EditorIntent
     data object ToggleImageLock : EditorIntent
     data object CycleRotationAxis : EditorIntent
