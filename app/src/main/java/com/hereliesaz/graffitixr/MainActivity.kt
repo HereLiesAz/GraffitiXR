@@ -449,6 +449,13 @@ class MainActivity : ComponentActivity() {
                                 launchSingleTop = true
                             }
                             "settings" -> showSettings = true
+                            // Fired only after openProject's load actually succeeds — see the comment
+                            // at the ProjectLibraryScreen call site. A failed load never reaches here,
+                            // so the editor is never entered without a real loaded project.
+                            DashboardViewModel.DESTINATION_EDITOR -> navController.navigate(EditorMode.DESIGN.name) {
+                                popUpTo(LIBRARY_ROUTE) { inclusive = true }
+                                launchSingleTop = true
+                            }
                         }
                         dashboardViewModel.onNavigationConsumed()
                     }
@@ -1024,11 +1031,15 @@ class MainActivity : ComponentActivity() {
                                             // Switching projects ends any active guest co-op session
                                             // so host ops can't keep mutating the newly-opened project.
                                             if (arUiState.coopRole == CoopRole.GUEST) arViewModel.leaveSession()
+                                            // Navigation itself is NOT triggered here: it used to fire
+                                            // unconditionally right after dispatching the load, so a
+                                            // failed/missing project still carried the UI into the
+                                            // editor. openProject now only navigates (via
+                                            // dashboardNavigation below) once the load actually
+                                            // succeeds, and cancels any still-in-flight load from a
+                                            // previous tap so two rapid taps on different cards can't
+                                            // race — only the most recently tapped project can win.
                                             dashboardViewModel.openProject(project)
-                                            navController.navigate(EditorMode.DESIGN.name) {
-                                                popUpTo(LIBRARY_ROUTE) { inclusive = true }
-                                                launchSingleTop = true
-                                            }
                                         },
                                         onDeleteProject = { dashboardViewModel.deleteProject(it) },
                                         onNewProject = {
@@ -1037,7 +1048,9 @@ class MainActivity : ComponentActivity() {
                                         },
                                         onImportProject = { uri -> dashboardViewModel.importProject(uri) },
                                         onClose = { /* no-op: ProjectLibraryScreen no longer exposes a close affordance */ },
-                                        strings = strings
+                                        strings = strings,
+                                        importErrorMessage = dashboardState.importErrorMessage,
+                                        onDismissImportError = { dashboardViewModel.dismissImportError() }
                                     )
                                 }
                                 composable(EditorMode.AR.name) {
@@ -1466,7 +1479,14 @@ class MainActivity : ComponentActivity() {
 
                             if (showSaveDialog) {
                                 SaveProjectDialog(
-                                    initialName = editorUiState.projectId ?: stringResource(DesignR.string.new_project_name),
+                                    // Pre-fill with the project's actual name, not its id: editorUiState
+                                    // carries only the UUID, which has no business appearing in an
+                                    // editable text field. dashboardUiState.currentProjectName is kept
+                                    // in sync by DashboardViewModel (set on open/create, and below on a
+                                    // successful save) — a bare tap-Save-without-editing here now
+                                    // re-saves under the same real name instead of clobbering it with
+                                    // the UUID.
+                                    initialName = dashboardUiState.currentProjectName ?: stringResource(DesignR.string.new_project_name),
                                     onDismissRequest = { showSaveDialog = false },
                                     onSaveRequest = { name ->
                                         lifecycleScope.launch {
@@ -1474,6 +1494,7 @@ class MainActivity : ComponentActivity() {
                                             // main thread (it was ANR-ing on large maps). UI-state updates stay on main.
                                             withContext(Dispatchers.IO) { arViewModel.saveMapBlocking() }
                                             editorViewModel.saveProject(name)
+                                            dashboardViewModel.onProjectRenamed(name)
                                             showSaveDialog = false
                                         }
                                     },
@@ -1486,6 +1507,13 @@ class MainActivity : ComponentActivity() {
                                     initialName = stringResource(DesignR.string.new_project_name),
                                     onDismissRequest = { dashboardViewModel.dismissNewProjectDialog() },
                                     onSaveRequest = { name ->
+                                        // The dialog stays visible across the async create (it only
+                                        // dismisses once onCreateProject's coroutine finishes), so a
+                                        // second tap here while the first create is still in flight
+                                        // would otherwise spawn a duplicate project. onCreateProject
+                                        // itself now guards on DashboardUiState.isCreatingProject and
+                                        // no-ops on a re-entrant call, so this can be tapped repeatedly
+                                        // without side effects beyond the first.
                                         dashboardViewModel.onCreateProject(name)
                                         navController.navigate(EditorMode.DESIGN.name) {
                                             popUpTo(LIBRARY_ROUTE) { inclusive = true }

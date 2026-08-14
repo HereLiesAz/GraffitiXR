@@ -36,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,7 +45,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import android.widget.Toast
 import com.hereliesaz.aznavrail.AzButton
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.design.theme.AppStrings
@@ -60,12 +63,26 @@ fun ProjectLibraryScreen(
     onNewProject: () -> Unit,
     onImportProject: (Uri) -> Unit,
     onClose: () -> Unit,
-    strings: AppStrings
+    strings: AppStrings,
+    // Set when a just-attempted import failed (corrupt file, wrong type, etc). Surfaced once as a
+    // Toast, matching this codebase's existing pattern for reporting async failures to the user
+    // (see EditorViewModel's Toast usage), then cleared via onDismissImportError so it doesn't
+    // re-fire on the next recomposition.
+    importErrorMessage: String? = null,
+    onDismissImportError: () -> Unit = {}
 ) {
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let { onImportProject(it) }
+    }
+
+    val context = LocalContext.current
+    LaunchedEffect(importErrorMessage) {
+        if (importErrorMessage != null) {
+            Toast.makeText(context, importErrorMessage, Toast.LENGTH_LONG).show()
+            onDismissImportError()
+        }
     }
 
     // Deletion is destructive and unrecoverable (it wipes the project's AR wall
