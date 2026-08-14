@@ -532,4 +532,83 @@
     <string name="settings_scan_mode_voxel_hash">Voxel-hash</string>
     <string name="settings_scan_mode_surface_mesh">Overflatenett</string>
     <string name="settings_mural_method_label">Veggmaleri-motor</string>
+
+
+    <!-- Added by audit item 4: missing keys relative to core/design's default table -->
+    <string name="nav_coop">Samarbeid</string>
+    <string name="nav_host_coop">Vert</string>
+    <string name="nav_host_coop_info">Vert for en samarbeidsøkt for å dele AR-koordinatsystemet ditt med personer i nærheten.</string>
+    <string name="nav_join_coop">Bli med</string>
+    <string name="nav_join_coop_info">Bli med i en samarbeidsøkt i nærheten for å justere AR-visningen din etter verten.</string>
+    <string name="nav_leave_coop">Forlat</string>
+    <string name="nav_leave_coop_info">Forlat den nåværende samarbeidsøkten.</string>
+    <string name="nav_wearable">Wearable</string>
+    <string name="nav_wearable_info">Koble til smartbriller for en håndfri AR-opplevelse med kamerainndata justert etter perspektivet ditt.</string>
+    <string name="nav_wall_clear">Fjern</string>
+    <string name="nav_wall_clear_info">Fjerner bakgrunnsbildet av veggen som brukes i Mockup-modus.</string>
+    <string name="nav_magic">Magi</string>
+    <string name="nav_edges">Kanter</string>
+    <string name="nav_filter">Filter</string>
+    <string name="nav_photo">Foto</string>
+    <string name="nav_file">Fil</string>
+    <string name="shared_image_pick_project">Åpne eller opprett et prosjekt for å legge til det delte bildet</string>
+    <string name="camera_stalled_error">Kameraet leverer ikke bilder lenger – forlater AR. Åpne AR på nytt for å prøve igjen med en tryggere kameramodus.</string>
+    <string name="syncing">SYNKRONISERER...</string>
+    <string name="adj_reset">Tilbakestill plassering</string>
+    <string name="adj_restore_placement">Gjenopprett plassering</string>
+    <string name="status_world_mapped">VERDEN KARTLAGT: %1$d%%</string>
+    <string name="rotation_axis_feedback">Roterer på %1$s-aksen</string>
+    <string name="rotation_axis_x">X</string>
+    <string name="rotation_axis_y">Y</string>
+    <string name="rotation_axis_z">Z</string>
+    <string name="settings_language_label">Språk</string>
+    <string name="settings_layer_feature_points">Vis funksjonspunkter</string>
+    <string name="settings_layer_plane_grids">Vis plangitter</string>
+    <string name="settings_layer_voxels">Vis voksler</string>
+    <string name="settings_layer_points">Vis punktsky</string>
+    <string name="settings_layer_mesh">Vis nett</string>
+    <string name="settings_parallax_threshold">Parallaks-verifiseringsvinkel</string>
+    <string name="settings_camera_fps">Kameraets bildefrekvens</string>
+    <string name="settings_scan_mode_cloud_offset">Sky-forskyvning</string>
+    <string name="settings_reset_tutorials_label">Tilbakestill veiledninger</string>
+    <string name="settings_reset_tutorials_value">Vis oppstartsveiledningene igjen</string>
+    <string name="help_cloud_offset">Ankerforskyvning-overføring: Høypresisjons punktsky-sporing for storskala veggmalerier. Instruksjoner: Fullfør 360°-skanningen, trykk deretter for å plassere ankeret.</string>
+    <string-array name="onboarding_trace">
+        <item>Dette er Spor-modus.</item>
+        <item>Trykk på «Åpne» for å legge til det første laget ditt. Når det er lagt til, kan du klype og dra på lerretet for å skalere og plassere det.</item>
+        <item>Når de er der og slik du vil ha dem, trykk på Frys-knappen for å gjøre telefonen din til et lysbord for sporing på papir.</item>
+        <item>Vi anbefaler å bruke enten Spor-modus eller Mockup-modus for redigering.</item>
+        <item>På den måten er bildene dine klare, og telefonen din kan fokusere på utvidet virkelighet når du trykker på AR-knappen.</item>
+    </string-array>
+    <string-array name="onboarding_ar">
+        <item>AR-projeksjon — projiserer designet ditt på en ekte vegg ved hjelp av telefonens dybdesensor og romlige sporing.</item>
+        <item>Pek på veggen og beveg deg sakte fra side til side. Fargede former dukker opp etter hvert som motoren kartlegger overflaten. Vent til hele veggarealet er dekket.</item>
+        <item>Bare trykk på skjermen. Appen fotograferer veggen, trekker ut sporingsfunksjoner og låser ankeret umiddelbart.</item>
+        <item>Trykk på «Åpne» for å legge til et designlag — det projiseres på veggen ved hjelp av ankeret du nettopp satte.</item>
+        <item>Tips — tomme hvite vegger, glatt betong og ensfargede overflater kan ikke spores. Rett ankerpunktet mot graffiti, ru puss eller andre tydelige merker.</item>
+    </string-array>
+    <string-array name="onboarding_overlay">
+        <item>Live overlegg — designet ditt svever over live kamerabildet, uten behov for overflateskanning.</item>
+        <item>Trykk på «Åpne» for å legge til et lag — velg et bilde, og det vises her, svevende over live kamerabildet.</item>
+        <item>Klyp for å skalere, dra for å flytte. Overlegget blir værende festet til skjermen din — gå bakover for å se hvordan det passer på veggen.</item>
+    </string-array>
+    <string-array name="onboarding_ar_unavailable">
+        <item>Denne enheten støtter ikke ARCore, så AR-projeksjonsmodus er ikke tilgjengelig.</item>
+        <item>Du kan fortsatt bruke Spor, Mockup og Live overlegg — alle moduser unntatt AR fungerer uten ARCore.</item>
+        <item>Trykk for å lukke.</item>
+    </string-array>
+    <string-array name="onboarding_mockup">
+        <item>Fotomockup — forhåndsvis designet ditt på et bilde før du i det hele tatt tar frem en pensel.</item>
+        <item>Trykk på «Vegg» for å velge eller ta et bilde av overflaten din. Gjør dette først!</item>
+        <item>Trykk på «Åpne» for å legge til et lag over veggbildet. Klyp og dra for å skalere og plassere det.</item>
+    </string-array>
+    <string-array name="onboarding_design">
+        <item>Dette er Design — arbeidsområdet ditt. Alt du bygger her følger med til alle andre moduser.</item>
+        <item>Trykk på «Åpne» for å legge til det første laget ditt — velg et bilde fra galleriet, og det havner her som kunstverket ditt.</item>
+        <item>Trykk på et lag for å åpne verktøyene dets — gruppert i mappene Mal, Retusjer, Juster og Effekter. Klyp og dra på lerretet for å skalere og plassere det.</item>
+        <item>Når det ser riktig ut, velg hvordan du vil bruke det: «Spor» for å gjøre telefonen din til et lysbord, «Mockup» for å forhåndsvise på et bilde, eller «AR» for å projisere det på en vegg.</item>
+    </string-array>
+    <string-array name="onboarding_design_layers">
+        <item>Åpne — importerer et bilde fra galleriet ditt; det havner som et nytt lag.</item>
+    </string-array>
 </resources>

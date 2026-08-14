@@ -532,4 +532,83 @@
     <string name="settings_scan_mode_voxel_hash">Voxel-hash</string>
     <string name="settings_scan_mode_surface_mesh">Felületháló</string>
     <string name="settings_mural_method_label">Falfestmény-motor</string>
+
+
+    <!-- Added by audit item 4: missing keys relative to core/design's default table -->
+    <string name="nav_coop">Koop</string>
+    <string name="nav_host_coop">Hoszt</string>
+    <string name="nav_host_coop_info">Indíts egy közös munkamenetet, hogy megoszd az AR-koordinátarendszeredet a közelben lévőkkel.</string>
+    <string name="nav_join_coop">Csatlakozás</string>
+    <string name="nav_join_coop_info">Csatlakozz egy közeli közös munkamenethez, hogy összehangold az AR-nézetedet a hosztéval.</string>
+    <string name="nav_leave_coop">Kilépés</string>
+    <string name="nav_leave_coop_info">Kilépés az aktuális közös munkamenetből.</string>
+    <string name="nav_wearable">Viselhető eszköz</string>
+    <string name="nav_wearable_info">Csatlakozz egy okosszemüveghez a kéz nélküli AR-élményhez és a nézőponthoz igazított kamerabemenethez.</string>
+    <string name="nav_wall_clear">Törlés</string>
+    <string name="nav_wall_clear_info">Eltávolítja a Makett módban használt háttér falfotót.</string>
+    <string name="nav_magic">Varázslat</string>
+    <string name="nav_edges">Élek</string>
+    <string name="nav_filter">Szűrő</string>
+    <string name="nav_photo">Fotó</string>
+    <string name="nav_file">Fájl</string>
+    <string name="shared_image_pick_project">Nyiss meg vagy hozz létre egy projektet a megosztott kép hozzáadásához</string>
+    <string name="camera_stalled_error">A kamera nem küld képkockákat – kilépés az AR módból. Nyisd meg újra az AR módot, hogy egy biztonságosabb kameramóddal próbálkozz.</string>
+    <string name="syncing">SZINKRONIZÁLÁS...</string>
+    <string name="adj_reset">Elhelyezés visszaállítása</string>
+    <string name="adj_restore_placement">Elhelyezés helyreállítása</string>
+    <string name="status_world_mapped">VILÁG FELTÉRKÉPEZVE: %1$d%%</string>
+    <string name="rotation_axis_feedback">Forgatás a(z) %1$s tengely körül</string>
+    <string name="rotation_axis_x">X</string>
+    <string name="rotation_axis_y">Y</string>
+    <string name="rotation_axis_z">Z</string>
+    <string name="settings_language_label">Nyelv</string>
+    <string name="settings_layer_feature_points">Jellegzetes pontok megjelenítése</string>
+    <string name="settings_layer_plane_grids">Síkrácsok megjelenítése</string>
+    <string name="settings_layer_voxels">Voxelek megjelenítése</string>
+    <string name="settings_layer_points">Pontfelhő megjelenítése</string>
+    <string name="settings_layer_mesh">Háló megjelenítése</string>
+    <string name="settings_parallax_threshold">Parallaxis-ellenőrzési szög</string>
+    <string name="settings_camera_fps">Kamera képkockasebessége</string>
+    <string name="settings_scan_mode_cloud_offset">Felhő-eltolás</string>
+    <string name="settings_reset_tutorials_label">Bemutatók visszaállítása</string>
+    <string name="settings_reset_tutorials_value">Kezdő útmutatók újbóli megjelenítése</string>
+    <string name="help_cloud_offset">Horgony-eltolás átadása: nagy pontosságú pontfelhő-követés nagyméretű falfestményekhez. Utasítások: végezd el a 360°-os szkennelést, majd koppints a horgony elhelyezéséhez.</string>
+    <string-array name="onboarding_trace">
+        <item>Ez a Rajzolás mód.</item>
+        <item>Koppints a „Megnyitás” gombra az első réteged hozzáadásához. Miután hozzáadtad, csippentéssel és húzással méretezheted és helyezheted el a vásznon.</item>
+        <item>Amikor ott vannak és úgy néznek ki, ahogy szeretnéd, nyomd meg a Fagyasztás gombot, hogy a telefonod fénydobozzá váljon a papírra való átrajzoláshoz.</item>
+        <item>A szerkesztéshez a Rajzolás vagy a Makett módot ajánljuk.</item>
+        <item>Így a képanyagod készen áll, és a telefonod az AR gomb megnyomásakor teljesen a kiterjesztett valóságra tud koncentrálni.</item>
+    </string-array>
+    <string-array name="onboarding_ar">
+        <item>AR-vetítés — a telefon mélységérzékelőjével és térbeli követésével vetíti a terved egy valódi falra.</item>
+        <item>Irányítsd a telefont a falra, és mozogj lassan oldalirányba. Színes formák jelennek meg, ahogy a motor feltérképezi a felületet. Várj, amíg a fal teljes területe le nem fedésre kerül.</item>
+        <item>Csak koppints a képernyőre. Az alkalmazás lefényképezi a falat, kinyeri a követési jellemzőket, és azonnal rögzíti a horgonyt.</item>
+        <item>Koppints a „Megnyitás” gombra egy tervezési réteg hozzáadásához — ez a most beállított horgony segítségével vetül a falra.</item>
+        <item>Tipp — az üres fehér falak, a sima beton és az egyszínű felületek nem követhetők. Célozd a horgonypontot graffitire, durva vakolatra vagy bármilyen jellegzetes jelre.</item>
+    </string-array>
+    <string-array name="onboarding_overlay">
+        <item>Élő rétegzés — a terved a live kamerakép fölött lebeg, felületszkennelés nélkül.</item>
+        <item>Koppints a „Megnyitás” gombra egy réteg hozzáadásához — válassz ki egy fotót, és az megjelenik itt, a live kamerakép fölött lebegve.</item>
+        <item>Csippentéssel méretezhető, húzással áthelyezhető. A rétegzés a képernyődhöz rögzítve marad — lépj hátrébb, hogy lásd, hogyan illeszkedik a falhoz.</item>
+    </string-array>
+    <string-array name="onboarding_ar_unavailable">
+        <item>Ez az eszköz nem támogatja az ARCore-t, ezért az AR-vetítés mód nem érhető el.</item>
+        <item>A Rajzolás, a Makett és az Élő rétegzés módokat továbbra is használhatod — az AR kivételével minden mód működik ARCore nélkül.</item>
+        <item>Koppints az elvetéshez.</item>
+    </string-array>
+    <string-array name="onboarding_mockup">
+        <item>Fotómakett — nézd meg a terved egy fotón, mielőtt akár ecsetet is fognál.</item>
+        <item>Koppints a „Fal” gombra a felületed fotójának kiválasztásához vagy elkészítéséhez. Ezt csináld először!</item>
+        <item>Koppints a „Megnyitás” gombra egy réteg hozzáadásához a falfotó fölé. Csippentéssel és húzással méretezheted és pozicionálhatod.</item>
+    </string-array>
+    <string-array name="onboarding_design">
+        <item>Ez a Tervezés — a munkaterületed. Amit itt létrehozol, az minden más módba átkerül.</item>
+        <item>Koppints a „Megnyitás” gombra az első réteged hozzáadásához — válassz egy fotót a galériádból, és az ide kerül, mint a műved.</item>
+        <item>Koppints egy rétegre az eszközeinek megnyitásához — ezek a Festés, Retusálás, Beállítás és Effektek mappákba vannak csoportosítva. Csippentéssel és húzással méretezheted és helyezheted el a vásznon.</item>
+        <item>Amikor jónak látod, válaszd ki, hogyan használnád: „Rajzolás” a telefonod fénydobozzá alakításához, „Makett” a fotón történő megtekintéshez, vagy „AR” a falra vetítéshez.</item>
+    </string-array>
+    <string-array name="onboarding_design_layers">
+        <item>Megnyitás — fotót importál a galériádból; új rétegként kerül be.</item>
+    </string-array>
 </resources>
