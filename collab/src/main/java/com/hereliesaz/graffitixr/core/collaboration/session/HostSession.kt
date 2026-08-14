@@ -97,8 +97,36 @@ internal class HostSession(
     // access to crypto's send counter (each of the outbound/inbound/heartbeat loops writes here).
     private suspend fun writeSecure(output: OutputStream, crypto: SessionCrypto, type: FrameType, payload: ByteArray) {
         writeMutex.withLock {
-            Frame.write(output, FrameType.ENC, crypto.seal(type, payload))
-            output.flush()
+            writeFrameTimed(output, FrameType.ENC, crypto.seal(type, payload))
+        }
+    }
+
+    /**
+     * Write one frame with a bound on wall-clock time, so a guest that stops reading
+     * (backgrounded app, throttled network, or a hostile peer that just never calls read())
+     * cannot block this write forever. acceptLoop calls handleConnection synchronously and
+     * single-threaded, so an unbounded write here — the handshake replies, [sendBulk], and the
+     * reconnect replay all go through this path — would wedge the accept loop for every
+     * subsequent joiner indefinitely.
+     *
+     * `java.net.Socket` exposes no write-side timeout (`soTimeout` only bounds reads), so the
+     * actual write runs on a plain IO thread and this coroutine only waits up to
+     * [WRITE_TIMEOUT_MS] for it. If it doesn't finish in time, the coroutine gives up, but the
+     * underlying thread is still parked inside the blocking write call — closing [output] (which,
+     * per `Socket.getOutputStream`'s contract, closes the socket) unblocks that thread with an
+     * IOException, then this function throws so the caller treats it exactly like any other
+     * failed write: a dropped connection, not a wedged one.
+     */
+    private suspend fun writeFrameTimed(output: OutputStream, type: FrameType, payload: ByteArray) {
+        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+            withContext(Dispatchers.IO) {
+                Frame.write(output, type, payload)
+                output.flush()
+            }
+        }
+        if (completed == null) {
+            try { output.close() } catch (_: Exception) {}
+            throw java.io.IOException("write timed out after ${WRITE_TIMEOUT_MS}ms")
         }
     }
 
@@ -202,32 +230,32 @@ internal class HostSession(
         val prk = SessionCrypto.prk(token)
         val expectedProof = SessionCrypto.helloProof(prk, hello.guestNonce)
         if (!java.security.MessageDigest.isEqual(hello.proof, expectedProof)) {
-            Frame.write(
+            writeFrameTimed(
                 output,
                 FrameType.HELLO_REJECTED,
                 OpCodec.encode(HelloRejectedPayload(HelloRejectedPayload.RejectReason.BadToken)),
             )
-            output.flush(); socket.close(); return
+            socket.close(); return
         }
         if (hello.clientVersion != protocolVersion) {
-            Frame.write(
+            writeFrameTimed(
                 output,
                 FrameType.HELLO_REJECTED,
                 OpCodec.encode(HelloRejectedPayload(HelloRejectedPayload.RejectReason.VersionMismatch)),
             )
-            output.flush(); socket.close(); return
+            socket.close(); return
         }
 
         // Single guest only. A reconnecting guest is fine because enterReconnecting() nulls
         // clientSocket before the new connection; a *second* concurrent guest is rejected so
         // two live phases never share (and interleave on) the same outQueue/output.
         if (clientSocket != null) {
-            Frame.write(
+            writeFrameTimed(
                 output,
                 FrameType.HELLO_REJECTED,
                 OpCodec.encode(HelloRejectedPayload(HelloRejectedPayload.RejectReason.AlreadyHosting)),
             )
-            output.flush(); socket.close(); return
+            socket.close(); return
         }
 
         // Accept. Build the per-connection crypto from token + both nonces (fresh keys every
@@ -236,7 +264,7 @@ internal class HostSession(
         val hostProof = SessionCrypto.helloOkProof(prk, hostNonce, hello.guestNonce)
         val crypto = SessionCrypto.forHost(token, sessionId, hello.guestNonce, hostNonce)
         activeCrypto = crypto
-        Frame.write(
+        writeFrameTimed(
             output,
             FrameType.HELLO_OK,
             OpCodec.encode(
@@ -249,7 +277,6 @@ internal class HostSession(
                 )
             ),
         )
-        output.flush()
 
         clientSocket = socket
         val isReconnect = hello.lastAppliedSeq > 0
@@ -408,16 +435,15 @@ internal class HostSession(
      * is plaintext; once a live connection exists it is sealed like every other frame so the
      * guest, which only accepts ENC frames post-handshake, can act on the reason.
      */
-    private fun sendBye(output: OutputStream, reason: CoopSessionState.EndReason, crypto: SessionCrypto?) {
+    private suspend fun sendBye(output: OutputStream, reason: CoopSessionState.EndReason, crypto: SessionCrypto?) {
         try {
             val payload = OpCodec.encode(ByePayload(reason))
             if (crypto != null) {
-                Frame.write(output, FrameType.ENC, crypto.seal(FrameType.BYE, payload))
+                writeFrameTimed(output, FrameType.ENC, crypto.seal(FrameType.BYE, payload))
             } else {
-                Frame.write(output, FrameType.BYE, payload)
+                writeFrameTimed(output, FrameType.BYE, payload)
             }
-            output.flush()
-        } catch (_: Exception) { /* socket may already be closed */ }
+        } catch (_: Exception) { /* socket may already be closed, or the write timed out */ }
     }
 
     private companion object {
@@ -425,6 +451,11 @@ internal class HostSession(
         // half-open peer. Also bounds handshake reads in handleConnection, so a stalled
         // client can block the accept loop for at most this long.
         const val READ_TIMEOUT_MS = 15_000
+
+        // Plain java.net.Socket exposes no write-side timeout, so writeFrameTimed enforces one
+        // itself. Mirrors READ_TIMEOUT_MS: a guest that stops reading for this long (backgrounded,
+        // throttled, or hostile) is treated as gone rather than left to block the accept loop.
+        const val WRITE_TIMEOUT_MS = 15_000L
     }
 
     override suspend fun close(reason: CoopSessionState.EndReason) {
