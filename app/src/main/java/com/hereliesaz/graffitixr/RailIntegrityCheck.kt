@@ -43,9 +43,21 @@ internal object RailIntegrityCheck {
             Log.w(TAG, "no rail items enumerated for mode $mode")
         }
 
-        // (2) hostId matching is enforced by the producer (ConfigureRailItems)
-        //     using string literals; the enumerator mirrors them. A mismatch
-        //     would surface as a missing ID in railIds, caught by (3) and (4).
+        // (2) hostId matching — FATAL. A sub-item whose hostId doesn't match any registered id
+        //     doesn't crash and doesn't warn on its own (AzNavRail just never renders it), and it
+        //     wouldn't necessarily be caught by (3)/(4) either: most sub-items (design.adjust,
+        //     proj.new, wall.file, ...) appear in neither helpList nor the guidance set. Check every
+        //     registered child's declared parent directly.
+        RAIL_ITEM_HOST_ID.forEach { (childId, hostId) ->
+            if (childId in railIds && hostId !in railIds) {
+                error(
+                    "Rail wiring error: '$childId' declares hostId=\"$hostId\", but no item with " +
+                        "that id is registered for mode $mode. The sub-item would silently fail to " +
+                        "render. Fix the hostId in ConfigureRailItems (MainActivity.kt) or its " +
+                        "mirror in RAIL_ITEM_HOST_ID (RailIdEnumerator.kt)."
+                )
+            }
+        }
 
         // (3) helpList orphans
         helpList.keys.forEach { key ->
