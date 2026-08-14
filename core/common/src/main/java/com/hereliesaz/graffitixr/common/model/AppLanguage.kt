@@ -13,7 +13,7 @@ enum class AppLanguage(val code: String, val displayName: String) {
     PORTUGUESE("pt", "Português"),
     HUNGARIAN("hu", "Magyar"),
     SPANISH("es", "Español"),
-    CHINESE_SIMPLIFIED("zh-rCN", "简体中文"),
-    CHINESE_TRADITIONAL("zh-rHK", "繁體中文"),
+    CHINESE_SIMPLIFIED("zh-CN", "简体中文"),
+    CHINESE_TRADITIONAL("zh-HK", "繁體中文"),
     TAGALOG("tl", "Tagalog")
 }
