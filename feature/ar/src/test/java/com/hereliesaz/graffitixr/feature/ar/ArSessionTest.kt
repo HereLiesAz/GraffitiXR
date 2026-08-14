@@ -5,6 +5,7 @@ import com.google.ar.core.Session
 import com.hereliesaz.graffitixr.common.wearable.WearableManager
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
+import com.hereliesaz.graffitixr.feature.ar.rendering.SessionLifecycleOutcome
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 import io.mockk.every
@@ -23,6 +24,7 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -82,6 +84,13 @@ class ArSessionTest {
     // `resumeArSessionInternal`/`pauseArSessionInternal` take the direct-session-call fallback path —
     // the one this harness can actually observe — which is exactly right, because with no renderer
     // there is no GL thread that could be racing the session either.
+    //
+    // That leaves the `SessionLifecycleOutcome.LockTimeout` branch (renderer present, GL thread still
+    // wedged past the bounded wait) permanently unreachable from here — PR #1831 shipped it with zero
+    // coverage because of exactly this mocking gap. Rather than fight the harness to get a fake
+    // `ArRenderer` in, the retry/give-up decision that branch now runs was pulled out into
+    // `retryOnLockTimeout`, a plain top-level function that takes the renderer call as a lambda — see
+    // the tests below, which exercise it directly with zero ARCore/ArRenderer involved at all.
 
     @Test
     fun `resumeArSessionInternal resumes the session and flips isSessionResumed`() {
@@ -143,6 +152,65 @@ class ArSessionTest {
         // not left stuck true — which would otherwise wedge every future onDrawFrame's isDestroying
         // check into early-returning forever.
         assertFalse(getPrivateField(viewModel, "isDestroying") as Boolean)
+    }
+
+    // --- retryOnLockTimeout (finding #2 / #8) ---
+    // The LockTimeout branch previously just logged and gave up on the very first bounded-lock
+    // timeout, with no test able to construct that outcome (see the note above). These assert the
+    // fixed behavior directly against the extracted decision function: retry a bounded number of
+    // times, sleeping between attempts, and stop retrying as soon as a non-LockTimeout outcome (or the
+    // retry cap) is reached.
+
+    @Test
+    fun `retryOnLockTimeout returns the first outcome without retrying when it is not a LockTimeout`() {
+        var calls = 0
+        val sleeps = mutableListOf<Long>()
+        val outcome = retryOnLockTimeout(maxRetries = 3, delayMs = 50L, sleeper = { sleeps.add(it) }) {
+            calls++
+            SessionLifecycleOutcome.Applied
+        }
+        assertEquals(1, calls)
+        assertTrue(sleeps.isEmpty())
+        assertTrue(outcome is SessionLifecycleOutcome.Applied)
+    }
+
+    @Test
+    fun `retryOnLockTimeout retries a persistent LockTimeout up to maxRetries then gives up`() {
+        var calls = 0
+        val sleeps = mutableListOf<Long>()
+        val outcome = retryOnLockTimeout(maxRetries = 3, delayMs = 50L, sleeper = { sleeps.add(it) }) {
+            calls++
+            SessionLifecycleOutcome.LockTimeout
+        }
+        // Initial attempt + 3 retries = 4 total calls, with a sleep before each retry.
+        assertEquals(4, calls)
+        assertEquals(listOf(50L, 50L, 50L), sleeps)
+        assertTrue(outcome is SessionLifecycleOutcome.LockTimeout)
+    }
+
+    @Test
+    fun `retryOnLockTimeout stops retrying as soon as a later attempt succeeds`() {
+        var calls = 0
+        val outcome = retryOnLockTimeout(maxRetries = 3, delayMs = 10L, sleeper = {}) {
+            calls++
+            if (calls < 3) SessionLifecycleOutcome.LockTimeout else SessionLifecycleOutcome.Applied
+        }
+        // Two LockTimeouts, then Applied on the third attempt — must not burn the remaining retry.
+        assertEquals(3, calls)
+        assertTrue(outcome is SessionLifecycleOutcome.Applied)
+    }
+
+    @Test
+    fun `retryOnLockTimeout with zero maxRetries never retries`() {
+        var calls = 0
+        val sleeps = mutableListOf<Long>()
+        val outcome = retryOnLockTimeout(maxRetries = 0, delayMs = 50L, sleeper = { sleeps.add(it) }) {
+            calls++
+            SessionLifecycleOutcome.LockTimeout
+        }
+        assertEquals(1, calls)
+        assertTrue(sleeps.isEmpty())
+        assertTrue(outcome is SessionLifecycleOutcome.LockTimeout)
     }
 
     private fun setPrivateField(obj: Any, fieldName: String, value: Any?) {
