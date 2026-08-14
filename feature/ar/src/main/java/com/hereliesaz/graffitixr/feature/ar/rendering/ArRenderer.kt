@@ -290,11 +290,32 @@ class ArRenderer(
 
     /**
      * How far the primary ARCore anchor's own pose has moved since establishment, in metres, or -1
-     * with no established anchor. See `AnchorOrchestrator.primaryAnchorDriftMeters` — added to give
+     * with no established anchor (or no live session, or the GL thread couldn't be locked out in
+     * time — folded into the same sentinel rather than a new result type, since callers already treat
+     * -1 as "nothing to report"). See `AnchorOrchestrator.primaryAnchorDriftMeters` — added to give
      * a "the overlay is receding" report a number to check FIRST, before anything downstream of the
      * anchor (fusion, relocalization) is even considered.
+     *
+     * Called from `ArViewModel.buildDiagnosticReport()` on the main thread, i.e. off the GL thread.
+     * `AnchorOrchestrator`'s `synchronized(this)` covers only its own Kotlin collection fields —
+     * `primaryAnchorDriftMeters()` also reads `Anchor.pose`, a real ARCore native call, which is not
+     * safe to run concurrently with the GL thread's own ARCore calls under [sessionLock]. Routed
+     * through [withLockedSession] (bounded, like every other off-GL-thread ARCore touch in this class)
+     * so the two cannot race.
      */
-    fun primaryAnchorDriftMeters(): Float = anchorOrchestrator.primaryAnchorDriftMeters()
+    fun primaryAnchorDriftMeters(): Float =
+        withLockedSession { anchorOrchestrator.primaryAnchorDriftMeters() } ?: -1f
+
+    /**
+     * Active (TRACKING) consensus-anchor count, serialized against [onDrawFrame] via
+     * [withLockedSession] for the same reason [primaryAnchorDriftMeters] is: despite
+     * `AnchorOrchestrator`'s `synchronized(this)`, `getActiveAnchorCount()` reads `Anchor.trackingState`
+     * — a real ARCore native call — which off-GL-thread callers must not run concurrently with the GL
+     * thread's own ARCore calls. This is a `ReentrantLock`, so the existing on-GL-thread caller (inside
+     * [onDrawFrame], already holding [sessionLock]) re-enters it for free rather than deadlocking.
+     * Returns 0 if there is no live session or the lock could not be acquired in time.
+     */
+    fun activeAnchorCount(): Int = withLockedSession { anchorOrchestrator.getActiveAnchorCount() } ?: 0
 
     /**
      * The last fusion decision, for the overlay and the eval CSV. Combines [fusionSkipReason] — the
@@ -1681,7 +1702,12 @@ class ArRenderer(
                     val composedDot = overlayRotScratch2[8] * nx + overlayRotScratch2[9] * ny + overlayRotScratch2[10] * nz
                     reproducesNormal = composedDot >= 0.99f
                 }
-                val anchorTracking = normalIsDegenerate || anchorOrchestrator.getActiveAnchorCount() > 0
+                // Goes through activeAnchorCount() (which wraps this same call in withLockedSession)
+                // rather than calling anchorOrchestrator.getActiveAnchorCount() directly, so there is
+                // exactly one call path into it and no direct, unsynchronized route can be reintroduced
+                // later. sessionLock is reentrant and already held on this thread for the whole frame,
+                // so this re-enters for free rather than blocking.
+                val anchorTracking = normalIsDegenerate || activeAnchorCount() > 0
                 val giveUp = overlayRotationCorrectionRetryFrames >= MAX_OVERLAY_CORRECTION_RETRY_FRAMES
                 val valid = anchorTracking && reproducesNormal
 
@@ -2780,11 +2806,17 @@ class ArRenderer(
         }
         try {
             session = null
+            // anchorOrchestrator.clear() calls Anchor.detach() — a real ARCore native call — on this
+            // (main) thread, so it needs the same best-effort serialization against onDrawFrame as
+            // nulling `session` above, not a separate unlocked call afterwards. Kept inside this same
+            // bounded try/finally rather than given its own lock attempt: best-effort and bounded
+            // either way, since blocking here is the exact freeze this method's own doc says an
+            // unconditional lock caused.
+            anchorOrchestrator.clear()
         } finally {
             if (locked) sessionLock.unlock()
         }
         failPendingHitTests()
-        anchorOrchestrator.clear()
         pendingOverlayBitmap = null
         latestFrame.set(null)
         latestFrameTimestampNs = 0L

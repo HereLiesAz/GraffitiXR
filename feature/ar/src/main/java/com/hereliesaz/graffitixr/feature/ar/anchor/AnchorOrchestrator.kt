@@ -15,6 +15,20 @@ import timber.log.Timber
  * access to the shared mutable state (`consensusAnchors`, `masterArtworkPose`, `lastGoodMatrix`,
  * `hasLastGood`) is guarded by `synchronized(this)`. The per-frame path snapshots under the lock and
  * does the (lock-free) math outside it, so contention is limited to the brief snapshot/store.
+ *
+ * That `synchronized(this)` covers ONLY this class's own Kotlin fields — it says nothing about the
+ * ARCore [Anchor] objects those fields hold references to. [primaryAnchorDriftMeters] (`anchor.pose`),
+ * [getActiveAnchorCount] (`anchor.trackingState`), and [clear] (`anchor.detach()`) all make real
+ * ARCore native calls through those references, and ARCore's [Session]/[Anchor] API is not itself
+ * thread-safe: calling any of them concurrently with the GL thread's own ARCore calls (which run under
+ * `ArRenderer.sessionLock`, covering the whole `onDrawFrame` body) can race ARCore internally. Callers
+ * on any thread OTHER than the GL thread — e.g. `ArViewModel.buildDiagnosticReport()`
+ * (`primaryAnchorDriftMeters`) or `ArRenderer.destroy()` (`clear`) — MUST go through
+ * `ArRenderer`'s own serialized wrappers (`primaryAnchorDriftMeters()`/`activeAnchorCount()`, both
+ * via `withLockedSession`; the `clear()` call in `destroy()`, under the same bounded lock it uses to
+ * null `session`) rather than calling these methods on this class directly. [setInitialAnchor]/
+ * [addSupportAnchor] also create/hold anchors but are not currently reached from off the GL thread;
+ * if that changes, they need the same treatment.
  */
 class AnchorOrchestrator {
 
