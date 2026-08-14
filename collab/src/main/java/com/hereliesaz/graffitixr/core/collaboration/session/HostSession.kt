@@ -205,6 +205,13 @@ internal class HostSession(
                 ss.accept()
             } catch (_: Exception) {
                 if (!scope.isActive) return
+                // close() sets phase = Ended and _state.value = Ended(reason) BEFORE closing
+                // serverSocket in its finally block; closing serverSocket is exactly what
+                // unblocks this accept() with a SocketException. Without this guard, that
+                // exception races scope.cancel() (nothing serializes them) and can land here
+                // first, overwriting the deliberate close reason with a misreported
+                // NetworkLost. Mirrors GuestSession.attemptReconnect()'s phase == Ended check.
+                if (phase == Phase.Ended) return
                 _state.value = CoopSessionState.Ended(CoopSessionState.EndReason.NetworkLost)
                 return
             }
