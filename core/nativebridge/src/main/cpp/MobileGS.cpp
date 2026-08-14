@@ -74,10 +74,11 @@ MobileGS::~MobileGS() {
     destroy();
 }
 
-void MobileGS::initialize(int width, int height) {
+void MobileGS::initialize(int /*width*/, int /*height*/) {
+    // width/height are unused: they used to seed mScreenWidth/mScreenHeight, which nothing in this
+    // engine ever read (see setViewportSize's definition). Left in the signature so the JNI call
+    // site (nativeInitialize) doesn't need to change.
     std::lock_guard<std::mutex> lock(mMutex);
-    mScreenWidth = width;
-    mScreenHeight = height;
     // 1500, not 500. This is the QUERY side: the live frame matched against a fingerprint built with
     // ORB(1500) (MetricFingerprintBuilder) or ORB(1000) (generateFingerprint). Detecting a third as
     // many features on the query as exist in the reference throws away matches before the ratio test
@@ -89,10 +90,8 @@ void MobileGS::initialize(int width, int height) {
     mL2Matcher = cv::DescriptorMatcher::create("BruteForce");
 
     memset(mViewMatrix, 0, sizeof(mViewMatrix));
-    memset(mProjMatrix, 0, sizeof(mProjMatrix));
     memset(mAnchorMatrix, 0, sizeof(mAnchorMatrix));
     mViewMatrix[0] = mViewMatrix[5] = mViewMatrix[10] = mViewMatrix[15] = 1.0f;
-    mProjMatrix[0] = mProjMatrix[5] = mProjMatrix[10] = mProjMatrix[15] = 1.0f;
     mAnchorMatrix[0] = mAnchorMatrix[5] = mAnchorMatrix[10] = mAnchorMatrix[15] = 1.0f;
 
     if (!mRelocRunning) {
@@ -104,13 +103,23 @@ void MobileGS::initialize(int width, int height) {
 void MobileGS::updateCamera(float* viewMat, float* projMat) {
     std::lock_guard<std::mutex> lock(mMutex);
     memcpy(mViewMatrix, viewMat, 16 * sizeof(float));
-    memcpy(mProjMatrix, projMat, 16 * sizeof(float));
-    mCameraReady = true;
+    // projMat is deliberately NOT stored: nothing in this engine reads a projection matrix (the
+    // mProjMatrix field it used to feed, and the mCameraReady flag this used to set, were both
+    // write-only). Logged once rather than every call -- this runs on the per-frame render path,
+    // so a warning on every call would flood logcat for a caller who will never see it stop.
+    static std::atomic<bool> sWarned{false};
+    if (!sWarned.exchange(true, std::memory_order_relaxed)) {
+        LOGE("updateCamera: the projection-matrix argument is a no-op -- nothing reads it. "
+             "(This warning is logged once.)");
+    }
 }
 
 void MobileGS::updateLightLevel(float level) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    mLightLevel = level;
+    // Cross-thread scalar (written here on the caller's thread, read unlocked by the reloc worker
+    // thread in runRelocPass / getSuperPointFeatures / getFingerprintKeypoints / generateFingerprint),
+    // so this is atomic like every other piece of cross-thread scalar state in this class rather than
+    // mMutex -- no invariant here ties mLightLevel to anything else the mutex protects.
+    mLightLevel.store(level, std::memory_order_relaxed);
 }
 
 void MobileGS::updateAnchorTransform(float* transformMat) {
@@ -119,9 +128,19 @@ void MobileGS::updateAnchorTransform(float* transformMat) {
 }
 
 void MobileGS::updateDeviceMotion(float* angularVel, float* linearVel) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    memcpy(mLastAngularVelocity, angularVel, 3 * sizeof(float));
-    memcpy(mLastLinearVelocity, linearVel, 3 * sizeof(float));
+    // Deliberately a no-op: neither value is read anywhere in this engine -- there is no deblur or
+    // motion-compensation consumer of angular/linear velocity in this file. The previous
+    // implementation stored into mLastAngularVelocity/mLastLinearVelocity fields that nothing ever
+    // read, so calling this silently did nothing while looking like it fed a consumer. Log it so a
+    // caller relying on this finds out, matching setStageEnabled's pattern -- once, not every call,
+    // since this is fed from IMU samples at sensor rate and a per-call warning would flood logcat.
+    (void)angularVel;
+    (void)linearVel;
+    static std::atomic<bool> sWarned{false};
+    if (!sWarned.exchange(true, std::memory_order_relaxed)) {
+        LOGE("updateDeviceMotion is a no-op: no consumer in this engine reads angular/linear "
+             "velocity. (This warning is logged once.)");
+    }
 }
 
 void MobileGS::getAnchorTransform(float* outMat16) const {
@@ -236,7 +255,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
 
     // Optionally enhance the RGB frame under low light before grayscale conversion
     cv::Mat workFrame = frame;
-    if (mEnhancer.isLoaded() && mLightLevel < kLowLightThreshold) {
+    if (mEnhancer.isLoaded() && mLightLevel.load(std::memory_order_relaxed) < kLowLightThreshold) {
         cv::Mat enhanced;
         if (mEnhancer.enhance(frame, enhanced)) workFrame = enhanced;
     }
@@ -1290,8 +1309,24 @@ void MobileGS::destroy() {
     if (mRelocThread.joinable()) mRelocThread.join();
 }
 
-void MobileGS::setViewportSize(int w, int h) { mScreenWidth = w; mScreenHeight = h; }
+void MobileGS::setViewportSize(int w, int h) {
+    // No stored screen size is read by anything in this engine (see the declaration's comment).
+    // Called infrequently (surface/config changes), so an every-call log is fine here, unlike the
+    // per-frame updateCamera/updateDeviceMotion no-ops.
+    (void)w;
+    (void)h;
+    LOGE("setViewportSize(%d, %d) is a no-op: no viewport-dependent state in this engine reads it.",
+         w, h);
+}
 void MobileGS::setRelocEnabled(bool e) { mRelocEnabled = e; }
+
+void MobileGS::setMappingPaused(bool paused) {
+    // No-op: there is no gaussian-splat mapper in this engine for this to pause, so no work is
+    // actually gated by this flag. Called infrequently (UI pause/resume), so an every-call log is
+    // fine here, matching setStageEnabled's pattern.
+    LOGE("setMappingPaused(%d) is a no-op: this engine has no mapper for it to pause.",
+         paused ? 1 : 0);
+}
 
 void MobileGS::setEvalRngSeed(long long seed) { mEvalRngSeed.store(seed, std::memory_order_relaxed); }
 
@@ -1745,7 +1780,7 @@ bool MobileGS::getSuperPointFeatures(const cv::Mat& image, std::vector<cv::KeyPo
     // frames in the same low light get the full enhance-then-CLAHE treatment -- making the two
     // incomparable.
     cv::Mat workFrame = image;
-    if (mEnhancer.isLoaded() && mLightLevel < kLowLightThreshold) {
+    if (mEnhancer.isLoaded() && mLightLevel.load(std::memory_order_relaxed) < kLowLightThreshold) {
         cv::Mat enhanced; if (mEnhancer.enhance(image, enhanced)) workFrame = enhanced;
     }
     cv::Mat gray;
@@ -1765,7 +1800,7 @@ void MobileGS::getFingerprintKeypoints(const cv::Mat& image, const cv::Mat& mask
     // Mirror generateFingerprint's detection so the overlay shows the REAL fingerprint features (not a
     // different ORB config): low-light enhance, grayscale, the marks mask, SuperPoint then ORB-1000.
     cv::Mat workFrame = image;
-    if (mEnhancer.isLoaded() && mLightLevel < kLowLightThreshold) {
+    if (mEnhancer.isLoaded() && mLightLevel.load(std::memory_order_relaxed) < kLowLightThreshold) {
         cv::Mat enhanced; if (mEnhancer.enhance(image, enhanced)) workFrame = enhanced;
     }
     cv::Mat gray;
@@ -1802,7 +1837,7 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
 
     // Optionally enhance the RGB frame under low light before grayscale conversion
     cv::Mat workFrame = image;
-    if (mEnhancer.isLoaded() && mLightLevel < kLowLightThreshold) {
+    if (mEnhancer.isLoaded() && mLightLevel.load(std::memory_order_relaxed) < kLowLightThreshold) {
         cv::Mat enhanced;
         if (mEnhancer.enhance(image, enhanced)) workFrame = enhanced;
     }
@@ -1948,7 +1983,11 @@ void MobileGS::getStageTimingsAndReset(float* out) {
         }
         uint64_t n = mStageSamples[i].exchange(0, std::memory_order_relaxed);
         double acc = mStageAccumMs[i].exchange(0.0, std::memory_order_relaxed);
-        out[i] = (n > 0) ? static_cast<float>(acc / static_cast<double>(n)) : 0.0f;
+        // n==0 means no reloc pass ran between this poll and the last one (the worker only samples
+        // a frame with >=8 correspondences, and the eval consumer polls at ~15Hz) -- that is
+        // "not measured this interval", not "measured and cost nothing". -1.0f, same as every other
+        // slot's sentinel, not a fabricated 0.0 that reads downstream as a genuinely free stage.
+        out[i] = (n > 0) ? static_cast<float>(acc / static_cast<double>(n)) : -1.0f;
     }
 }
 

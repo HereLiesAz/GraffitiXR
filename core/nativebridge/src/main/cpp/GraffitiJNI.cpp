@@ -353,7 +353,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallPatchBytes(
         JNIEnv* env, jobject thiz, jbyteArray data, jint size) {
     std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !data || size <= 0) return;
-    if (env->GetArrayLength(data) < size * size) return; // expect a size x size single-channel gray buffer
+    // 64-bit product, like every sibling restore path in this file (nativeRestoreWallFingerprint /
+    // nativeRestoreWallFingerprintMetric / nativeRestoreWallFeatureMap): size*size in 32-bit jint can
+    // overflow for a hostile/corrupt size and wrap past this check into a too-small buffer.
+    if ((jlong)size * (jlong)size > (jlong)env->GetArrayLength(data)) return; // expect a size x size single-channel gray buffer
     jbyte* p = env->GetByteArrayElements(data, nullptr);
     cv::Mat gray(size, size, CV_8UC1, reinterpret_cast<uchar*>(p));
     gSlamEngine->setWallPatch(gray); // clones internally; safe to release after
@@ -430,6 +433,18 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     uint8_t* vData = static_cast<uint8_t*>(env->GetDirectBufferAddress(vBuffer));
 
     if (!yData || !uData || !vData) return;
+
+    // The U/V planes below are bounded by GetDirectBufferCapacity; the Y plane wasn't, despite the
+    // comment a few lines down claiming all copies here are "bounded by the buffer capacities" --
+    // yMat.copyTo reads (height-1)*yStride+width bytes from yData, so a short/truncated yBuffer would
+    // read past its end. Same guard style as uCap/vCap: skip the check only when the capacity query
+    // itself is unavailable (<=0), matching those call sites.
+    jlong yCap = env->GetDirectBufferCapacity(yBuffer);
+    size_t yNeeded = (size_t)(height - 1) * (size_t)yStride + (size_t)width;
+    if (yCap > 0 && (size_t)yCap < yNeeded) {
+        LOGE("nativeFeedYuvFrame: Y buffer too small (cap=%lld, need=%zu)", (long long)yCap, yNeeded);
+        return;
+    }
 
     cv::Mat yMat(height, width, CV_8UC1, yData, yStride);
 
@@ -533,6 +548,16 @@ Java_com_hereliesaz_graffitixr_nativebridge_YuvConverter_nativeYuvToRgbaBitmap(
     uint8_t* uData = static_cast<uint8_t*>(env->GetDirectBufferAddress(uBuffer));
     uint8_t* vData = static_cast<uint8_t*>(env->GetDirectBufferAddress(vBuffer));
     if (!yData || !uData || !vData) return;
+
+    // Same Y-plane guard as nativeFeedYuvFrame above: the U/V planes below are bounded by
+    // GetDirectBufferCapacity, and the Y plane needs the same check before yMat.copyTo reads
+    // (height-1)*yStride+width bytes out of yData.
+    jlong yCap = env->GetDirectBufferCapacity(yBuffer);
+    size_t yNeeded = (size_t)(height - 1) * (size_t)yStride + (size_t)width;
+    if (yCap > 0 && (size_t)yCap < yNeeded) {
+        LOGE("nativeYuvToRgbaBitmap: Y buffer too small (cap=%lld, need=%zu)", (long long)yCap, yNeeded);
+        return;
+    }
 
     // Build the packed NV21 buffer OpenCV's cvtColor understands. This matches the NV21 layout
     // camera frames from Camera2 / CameraX / ARCore ship in (Y plane, then interleaved V/U).
@@ -1292,6 +1317,14 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetStageTimings(JNIEnv* env, jobject, jfloatArray out) {
     std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
+    // SetFloatArrayRegion bounds-checks and throws on a short array, so this is not a memory-safety
+    // hole either way -- but every other array-taking function in this file validates length before
+    // writing, and a short `out` here should behave the same way (a clear log line) rather than an
+    // opaque ArrayIndexOutOfBoundsException surfacing from inside SetFloatArrayRegion.
+    if (!out || env->GetArrayLength(out) < 5) {
+        LOGE("nativeGetStageTimings: out array too short (need 5)");
+        return;
+    }
     float buf[5] = {0,0,0,0,0};
     gSlamEngine->getStageTimingsAndReset(buf);
     env->SetFloatArrayRegion(out, 0, 5, buf);
@@ -1307,6 +1340,12 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocResult(JNIEnv* env, jobject, jfloatArray out) {
     std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
+    // See nativeGetStageTimings above for why this is validated even though SetFloatArrayRegion
+    // itself would already reject a short array.
+    if (!out || env->GetArrayLength(out) < 19) {
+        LOGE("nativeGetRelocResult: out array too short (need 19)");
+        return;
+    }
     float buf[19];
     gSlamEngine->getRelocResult(buf);
     env->SetFloatArrayRegion(out, 0, 19, buf);
@@ -1316,6 +1355,12 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintAnchor(JNIEnv* env, jobject, jfloatArray out) {
     std::lock_guard<std::mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
+    // See nativeGetStageTimings above for why this is validated even though SetFloatArrayRegion
+    // itself would already reject a short array.
+    if (!out || env->GetArrayLength(out) < 16) {
+        LOGE("nativeGetFingerprintAnchor: out array too short (need 16)");
+        return;
+    }
     float buf[16];
     gSlamEngine->getFingerprintAnchor(buf);
     env->SetFloatArrayRegion(out, 0, 16, buf);
