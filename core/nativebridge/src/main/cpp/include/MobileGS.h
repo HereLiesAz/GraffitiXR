@@ -25,9 +25,16 @@ public:
     ~MobileGS();
 
     void initialize(int width, int height);
+    // Only viewMat is actually stored (mViewMatrix, read by the rectification pass and the reloc
+    // worker's frame snapshot). projMat has no reader anywhere in this engine; see updateCamera's
+    // definition for why that half is a logged no-op rather than a real write.
     void updateCamera(float* viewMat, float* projMat);
     void updateLightLevel(float level);
     void updateAnchorTransform(float* transformMat);
+    // Deliberately a no-op: neither the angular nor linear velocity this receives is read anywhere
+    // in this engine (there is no deblur or motion-compensation consumer). Kept as a callable,
+    // logged no-op (same pattern as setStageEnabled below) rather than deleted so existing
+    // JNI/Kotlin call sites don't need to change.
     void updateDeviceMotion(float* angularVel, float* linearVel);
 
     void setArCoreTrackingState(bool isTracking);
@@ -432,6 +439,11 @@ public:
     // Stored as a raw 256x256 gray (NO CLAHE — the head's frozen SuperPoint was trained on raw gray).
     void setWallPatch(const cv::Mat& img);
     bool loadLowLightEnhancer(const std::vector<uchar>& onnxBytes);
+    // Deliberately a no-op: mScreenWidth/mScreenHeight (the only state this used to write) are never
+    // read anywhere in this engine -- there is no viewport-dependent computation here to size. Kept
+    // as a callable, logged no-op (same pattern as setStageEnabled below) rather than deleted so
+    // existing JNI/Kotlin call sites don't need to change; a caller relying on this to configure
+    // rendering will see a warning in logcat instead of a silently-ignored request.
     void setViewportSize(int width, int height);
     // Eval: fill out[kStageCount] with average ms/stage since last reset, then reset accumulators.
     // Only index 4 (pnpReloc) is ever actually timed in this file today -- indices 0-3
@@ -476,7 +488,12 @@ public:
         return mEvalSyncReloc.load(std::memory_order_relaxed)
             ? mEvalSyncEveryN.load(std::memory_order_relaxed) : 0;
     }
-    void setMappingPaused(bool paused) { mMappingPaused = paused; }
+    // Deliberately a no-op: there is no gaussian-splat mapper in this engine for this to pause (the
+    // reloc/fingerprint pipeline is not "mapping" and is never gated by this flag). Kept as a
+    // callable, logged no-op (same pattern as setStageEnabled below) rather than deleted so the
+    // seven ArViewModel call sites don't need to change; a caller relying on this to actually pause
+    // work will see a warning in logcat instead of a silently-ignored request.
+    void setMappingPaused(bool paused);
 
     /**
      * How much of the registered design the wall now answers for: a PROGRESS measurement, on the
@@ -691,18 +708,14 @@ private:
     cv::Mat mWallPatch; // raw 256x256 gray canonical patch for the distortion head (desc_fp source)
     // VIO view snapshot captured alongside the reloc frame, so the rectifying warp matches that frame.
     float mRelocViewMatrix[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
-    uint64_t mFrameCounter = 0;
-    float mLightLevel = 1.0f;
-    float mLastAngularVelocity[3] = {0,0,0};
-    float mLastLinearVelocity[3] = {0,0,0};
+    // Written by updateLightLevel() on the caller's thread, read (unlocked) by the reloc worker
+    // thread in runRelocPass / getSuperPointFeatures / getFingerprintKeypoints / generateFingerprint
+    // to decide whether to run the low-light enhancer. Atomic, like every other piece of cross-thread
+    // scalar state in this class, rather than mMutex: the reads are on a hot per-frame path and this
+    // is a single float with no invariant linking it to anything else the mutex protects.
+    std::atomic<float> mLightLevel{1.0f};
 
-    float mViewMatrix[16];
-    float mProjMatrix[16];
-    bool mCameraReady = false;
-
-    int mScreenWidth = 1920;
-    int mScreenHeight = 1080;
-    std::atomic<bool> mMappingPaused{false};
+    float mViewMatrix[16]; // the only camera state anything reads; see updateCamera's definition.
 
     // --- Evaluation instrumentation (Sub-project A) ---
     // Accumulated wall-time per stage and a sample count, for averaging. Indexes match the Kotlin
