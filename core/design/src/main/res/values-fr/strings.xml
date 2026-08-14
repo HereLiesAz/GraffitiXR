@@ -265,4 +265,83 @@
     <string name="unit_feet">pi</string>
     <string name="unit_centimeters">cm</string>
     <string name="unit_meters">m</string>
+
+
+    <!-- Added by audit item 4: missing keys relative to core/design's default table -->
+    <string name="nav_coop">Coop</string>
+    <string name="nav_host_coop">Héberger</string>
+    <string name="nav_host_coop_info">Hébergez une session coopérative pour partager votre système de coordonnées AR avec des utilisateurs à proximité.</string>
+    <string name="nav_join_coop">Rejoindre</string>
+    <string name="nav_join_coop_info">Rejoignez une session coopérative à proximité pour aligner votre vue AR sur celle de l\'hôte.</string>
+    <string name="nav_leave_coop">Quitter</string>
+    <string name="nav_leave_coop_info">Quittez la session coopérative en cours.</string>
+    <string name="nav_wearable">Objet connecté</string>
+    <string name="nav_wearable_info">Connectez-vous à des lunettes connectées pour une expérience AR mains libres avec une entrée caméra alignée sur votre perspective.</string>
+    <string name="nav_wall_clear">Effacer</string>
+    <string name="nav_wall_clear_info">Supprime la photo de mur en arrière-plan utilisée en mode Maquette.</string>
+    <string name="nav_magic">Magie</string>
+    <string name="nav_edges">Contours</string>
+    <string name="nav_filter">Filtre</string>
+    <string name="nav_photo">Photo</string>
+    <string name="nav_file">Fichier</string>
+    <string name="shared_image_pick_project">Ouvrez ou créez un projet pour ajouter l\'image partagée</string>
+    <string name="camera_stalled_error">La caméra ne fournit plus d\'images — sortie du mode AR. Rouvrez AR pour réessayer avec un mode caméra plus sûr.</string>
+    <string name="syncing">SYNCHRONISATION...</string>
+    <string name="adj_reset">Réinitialiser le placement</string>
+    <string name="adj_restore_placement">Restaurer le placement</string>
+    <string name="status_world_mapped">MONDE CARTOGRAPHIÉ : %1$d %%</string>
+    <string name="rotation_axis_feedback">Rotation sur l\'axe %1$s</string>
+    <string name="rotation_axis_x">X</string>
+    <string name="rotation_axis_y">Y</string>
+    <string name="rotation_axis_z">Z</string>
+    <string name="settings_language_label">Langue</string>
+    <string name="settings_layer_feature_points">Afficher les points caractéristiques</string>
+    <string name="settings_layer_plane_grids">Afficher les grilles de plan</string>
+    <string name="settings_layer_voxels">Afficher les voxels</string>
+    <string name="settings_layer_points">Afficher le nuage de points</string>
+    <string name="settings_layer_mesh">Afficher le maillage</string>
+    <string name="settings_parallax_threshold">Angle de vérification de parallaxe</string>
+    <string name="settings_camera_fps">Fréquence d\'images de la caméra</string>
+    <string name="settings_scan_mode_cloud_offset">Décalage du nuage</string>
+    <string name="settings_reset_tutorials_label">Réinitialiser les tutoriels</string>
+    <string name="settings_reset_tutorials_value">Réafficher les guides de première utilisation</string>
+    <string name="help_cloud_offset">Transfert du décalage d\'ancrage : suivi de nuage de points haute précision pour les fresques à grande échelle. Instructions : effectuez le scan à 360°, puis appuyez pour placer l\'ancre.</string>
+    <string-array name="onboarding_trace">
+        <item>Ceci est le mode Calque.</item>
+        <item>Appuyez sur « Ouvrir » pour ajouter votre première couche. Une fois ajoutée, pincez et faites glisser sur le canevas pour la redimensionner et la placer.</item>
+        <item>Quand elles sont où et comme vous le souhaitez, appuyez sur le bouton Geler pour transformer votre téléphone en table lumineuse pour le calque sur papier.</item>
+        <item>Nous recommandons d\'utiliser le mode Calque ou le mode Maquette pour l\'édition.</item>
+        <item>Ainsi, vos visuels sont prêts et votre téléphone peut se concentrer sur la réalité augmentée quand vous appuyez sur le bouton AR.</item>
+    </string-array>
+    <string-array name="onboarding_ar">
+        <item>Projection AR — projette votre design sur un vrai mur à l\'aide du capteur de profondeur et du suivi spatial du téléphone.</item>
+        <item>Pointez le mur et déplacez-vous lentement d\'un côté à l\'autre. Des formes colorées apparaissent au fur et à mesure que le moteur cartographie la surface. Attendez que toute la zone du mur soit couverte.</item>
+        <item>Appuyez simplement sur l\'écran. L\'application photographie le mur, extrait des points de suivi et verrouille l\'ancre instantanément.</item>
+        <item>Appuyez sur « Ouvrir » pour ajouter une couche de design — elle se projette sur le mur à l\'aide de l\'ancre que vous venez de définir.</item>
+        <item>Astuce — les murs blancs vides, le béton lisse et les surfaces unies ne peuvent pas être suivis. Visez votre point d\'ancrage sur un graffiti, un enduit rugueux ou toute marque distincte.</item>
+    </string-array>
+    <string-array name="onboarding_overlay">
+        <item>Superposition en direct — votre design flotte au-dessus du flux caméra en direct, sans avoir besoin de scanner une surface.</item>
+        <item>Appuyez sur « Ouvrir » pour ajouter une couche — choisissez une photo, elle apparaît ici, flottant au-dessus du flux caméra en direct.</item>
+        <item>Pincez pour redimensionner, faites glisser pour repositionner. La superposition reste fixée à votre écran — reculez pour voir comment elle s\'adapte au mur.</item>
+    </string-array>
+    <string-array name="onboarding_ar_unavailable">
+        <item>Cet appareil ne prend pas en charge ARCore, le mode Projection AR n\'est donc pas disponible.</item>
+        <item>Vous pouvez toujours utiliser Calque, Maquette et Superposition en direct — tous les modes sauf AR fonctionnent sans ARCore.</item>
+        <item>Appuyez pour fermer.</item>
+    </string-array>
+    <string-array name="onboarding_mockup">
+        <item>Maquette photo — prévisualisez votre design sur une photo avant même de prendre un pinceau.</item>
+        <item>Appuyez sur « Mur » pour choisir ou prendre une photo de votre surface. Faites-le en premier !</item>
+        <item>Appuyez sur « Ouvrir » pour ajouter une couche sur la photo du mur. Pincez et faites glisser pour la redimensionner et la positionner.</item>
+    </string-array>
+    <string-array name="onboarding_design">
+        <item>Ceci est Conception — votre espace de travail. Tout ce que vous créez ici se retrouve dans tous les autres modes.</item>
+        <item>Appuyez sur « Ouvrir » pour ajouter votre première couche — choisissez une photo dans votre galerie, elle atterrit ici en tant qu\'œuvre.</item>
+        <item>Appuyez sur une couche pour ouvrir ses outils — regroupés dans les dossiers Peindre, Retoucher, Ajuster et Effets. Pincez et faites glisser sur le canevas pour la redimensionner et la placer.</item>
+        <item>Quand le rendu vous convient, choisissez comment l\'utiliser : « Calque » pour transformer votre téléphone en table lumineuse, « Maquette » pour prévisualiser sur une photo, ou « AR » pour le projeter sur un mur.</item>
+    </string-array>
+    <string-array name="onboarding_design_layers">
+        <item>Ouvrir — importe une photo depuis votre galerie ; elle atterrit comme nouvelle couche.</item>
+    </string-array>
 </resources>

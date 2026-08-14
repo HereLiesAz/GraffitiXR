@@ -532,4 +532,83 @@
     <string name="settings_scan_mode_voxel_hash">Hash de vóxeles</string>
     <string name="settings_scan_mode_surface_mesh">Malla de superficie</string>
     <string name="settings_mural_method_label">Motor de mural</string>
+
+
+    <!-- Added by audit item 4: missing keys relative to core/design's default table -->
+    <string name="nav_coop">Cooperativo</string>
+    <string name="nav_host_coop">Anfitrión</string>
+    <string name="nav_host_coop_info">Aloja una sesión cooperativa para compartir tu sistema de coordenadas AR con usuarios cercanos.</string>
+    <string name="nav_join_coop">Unirse</string>
+    <string name="nav_join_coop_info">Únete a una sesión cooperativa cercana para alinear tu vista AR con la del anfitrión.</string>
+    <string name="nav_leave_coop">Salir</string>
+    <string name="nav_leave_coop_info">Abandona la sesión cooperativa actual.</string>
+    <string name="nav_wearable">Dispositivo</string>
+    <string name="nav_wearable_info">Conéctate a unas gafas inteligentes para una experiencia AR manos libres con entrada de cámara alineada a tu perspectiva.</string>
+    <string name="nav_wall_clear">Quitar</string>
+    <string name="nav_wall_clear_info">Elimina la foto de fondo de la pared usada en el modo Maqueta.</string>
+    <string name="nav_magic">Magia</string>
+    <string name="nav_edges">Bordes</string>
+    <string name="nav_filter">Filtro</string>
+    <string name="nav_photo">Foto</string>
+    <string name="nav_file">Archivo</string>
+    <string name="shared_image_pick_project">Abre o crea un proyecto para añadir la imagen compartida</string>
+    <string name="camera_stalled_error">La cámara no está entregando fotogramas; saliendo de AR. Vuelve a abrir AR para reintentarlo con un modo de cámara más seguro.</string>
+    <string name="syncing">SINCRONIZANDO...</string>
+    <string name="adj_reset">Restablecer colocación</string>
+    <string name="adj_restore_placement">Restaurar colocación</string>
+    <string name="status_world_mapped">MUNDO MAPEADO: %1$d%%</string>
+    <string name="rotation_axis_feedback">Girando en el eje %1$s</string>
+    <string name="rotation_axis_x">X</string>
+    <string name="rotation_axis_y">Y</string>
+    <string name="rotation_axis_z">Z</string>
+    <string name="settings_language_label">Idioma</string>
+    <string name="settings_layer_feature_points">Mostrar puntos característicos</string>
+    <string name="settings_layer_plane_grids">Mostrar cuadrículas de plano</string>
+    <string name="settings_layer_voxels">Mostrar vóxeles</string>
+    <string name="settings_layer_points">Mostrar nube de puntos</string>
+    <string name="settings_layer_mesh">Mostrar malla</string>
+    <string name="settings_parallax_threshold">Ángulo de verificación de paralaje</string>
+    <string name="settings_camera_fps">Velocidad de fotogramas de la cámara</string>
+    <string name="settings_scan_mode_cloud_offset">Desplazamiento de nube</string>
+    <string name="settings_reset_tutorials_label">Restablecer tutoriales</string>
+    <string name="settings_reset_tutorials_value">Mostrar de nuevo las guías iniciales</string>
+    <string name="help_cloud_offset">Transferencia de desplazamiento de ancla: seguimiento de nube de puntos de alta precisión para murales a gran escala. Instrucciones: completa el escaneo de 360° y luego toca para colocar el ancla.</string>
+    <string-array name="onboarding_trace">
+        <item>Este es el modo Calco.</item>
+        <item>Toca «Abrir» para añadir tu primera capa. Una vez añadida, pellizca y arrastra sobre el lienzo para ajustar su tamaño y posición.</item>
+        <item>Cuando estén donde y como quieras, pulsa el botón Congelar para convertir tu teléfono en una mesa de luz para calcar en papel.</item>
+        <item>Te recomendamos usar el modo Calco o el modo Maqueta para editar.</item>
+        <item>Así tus imágenes estarán listas y tu teléfono podrá centrarse en la realidad aumentada al pulsar el botón AR.</item>
+    </string-array>
+    <string-array name="onboarding_ar">
+        <item>Proyección AR — proyecta tu diseño sobre una pared real usando el sensor de profundidad y el seguimiento espacial del teléfono.</item>
+        <item>Apunta a la pared y muévete despacio de lado a lado. Aparecerán formas de colores mientras el motor mapea la superficie. Espera hasta que se cubra toda el área de la pared.</item>
+        <item>Simplemente toca la pantalla. La app fotografía la pared, extrae puntos de seguimiento y fija el ancla al instante.</item>
+        <item>Toca «Abrir» para añadir una capa de diseño — se proyectará sobre la pared usando el ancla que acabas de fijar.</item>
+        <item>Consejo — las paredes blancas lisas, el hormigón liso y las superficies de un solo color no se pueden rastrear. Apunta tu ancla a grafitis, yeso rugoso o cualquier marca distintiva.</item>
+    </string-array>
+    <string-array name="onboarding_overlay">
+        <item>Superposición en vivo — tu diseño flota sobre la imagen de la cámara en vivo, sin necesidad de escanear ninguna superficie.</item>
+        <item>Toca «Abrir» para añadir una capa — elige una foto y aparecerá aquí, flotando sobre la imagen de la cámara en vivo.</item>
+        <item>Pellizca para escalar, arrastra para reposicionar. La superposición permanece fija en tu pantalla — aléjate para ver cómo encaja en la pared.</item>
+    </string-array>
+    <string-array name="onboarding_ar_unavailable">
+        <item>Este dispositivo no admite ARCore, por lo que el modo de Proyección AR no está disponible.</item>
+        <item>Aún puedes usar Calco, Maqueta y Superposición en vivo — todos los modos excepto AR funcionan sin ARCore.</item>
+        <item>Toca para cerrar.</item>
+    </string-array>
+    <string-array name="onboarding_mockup">
+        <item>Maqueta fotográfica — previsualiza tu diseño sobre una foto antes de siquiera coger un pincel.</item>
+        <item>Toca «Pared» para elegir o tomar una foto de tu superficie. ¡Hazlo primero!</item>
+        <item>Toca «Abrir» para añadir una capa sobre la foto de la pared. Pellizca y arrastra para ajustar su tamaño y posición.</item>
+    </string-array>
+    <string-array name="onboarding_design">
+        <item>Esto es Diseño — tu espacio de trabajo. Todo lo que crees aquí se traslada a los demás modos.</item>
+        <item>Toca «Abrir» para añadir tu primera capa — elige una foto de tu galería y aparecerá aquí como tu obra.</item>
+        <item>Toca una capa para abrir sus herramientas — agrupadas en las carpetas Pintar, Retocar, Ajustar y Efectos. Pellizca y arrastra sobre el lienzo para ajustar su tamaño y posición.</item>
+        <item>Cuando quede como quieres, elige cómo usarlo: «Calco» para convertir tu teléfono en una mesa de luz, «Maqueta» para previsualizarlo sobre una foto, o «AR» para proyectarlo sobre una pared.</item>
+    </string-array>
+    <string-array name="onboarding_design_layers">
+        <item>Abrir — importa una foto de tu galería; se añade como una nueva capa.</item>
+    </string-array>
 </resources>

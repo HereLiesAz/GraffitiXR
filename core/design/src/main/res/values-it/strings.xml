@@ -532,4 +532,83 @@
     <string name="settings_scan_mode_voxel_hash">Voxel hash</string>
     <string name="settings_scan_mode_surface_mesh">Mesh di superficie</string>
     <string name="settings_mural_method_label">Motore murale</string>
+
+
+    <!-- Added by audit item 4: missing keys relative to core/design's default table -->
+    <string name="nav_coop">Coop</string>
+    <string name="nav_host_coop">Ospita</string>
+    <string name="nav_host_coop_info">Ospita una sessione cooperativa per condividere il tuo sistema di coordinate AR con altri utenti nelle vicinanze.</string>
+    <string name="nav_join_coop">Unisciti</string>
+    <string name="nav_join_coop_info">Unisciti a una sessione cooperativa nelle vicinanze per allineare la tua vista AR con quella dell\'host.</string>
+    <string name="nav_leave_coop">Esci</string>
+    <string name="nav_leave_coop_info">Esci dalla sessione cooperativa corrente.</string>
+    <string name="nav_wearable">Indossabile</string>
+    <string name="nav_wearable_info">Connettiti a un visore smart per un\'esperienza AR a mani libere con input della fotocamera allineato alla tua prospettiva.</string>
+    <string name="nav_wall_clear">Rimuovi</string>
+    <string name="nav_wall_clear_info">Rimuove la foto del muro di sfondo usata nella modalità Mockup.</string>
+    <string name="nav_magic">Magia</string>
+    <string name="nav_edges">Bordi</string>
+    <string name="nav_filter">Filtro</string>
+    <string name="nav_photo">Foto</string>
+    <string name="nav_file">File</string>
+    <string name="shared_image_pick_project">Apri o crea un progetto per aggiungere l\'immagine condivisa</string>
+    <string name="camera_stalled_error">La fotocamera non sta più inviando fotogrammi: uscita dalla modalità AR. Riapri AR per riprovare con una modalità fotocamera più sicura.</string>
+    <string name="syncing">SINCRONIZZAZIONE...</string>
+    <string name="adj_reset">Reimposta posizionamento</string>
+    <string name="adj_restore_placement">Ripristina posizionamento</string>
+    <string name="status_world_mapped">MONDO MAPPATO: %1$d%%</string>
+    <string name="rotation_axis_feedback">Rotazione sull\'asse %1$s</string>
+    <string name="rotation_axis_x">X</string>
+    <string name="rotation_axis_y">Y</string>
+    <string name="rotation_axis_z">Z</string>
+    <string name="settings_language_label">Lingua</string>
+    <string name="settings_layer_feature_points">Mostra punti caratteristici</string>
+    <string name="settings_layer_plane_grids">Mostra griglie del piano</string>
+    <string name="settings_layer_voxels">Mostra voxel</string>
+    <string name="settings_layer_points">Mostra nuvola di punti</string>
+    <string name="settings_layer_mesh">Mostra mesh</string>
+    <string name="settings_parallax_threshold">Angolo di verifica della parallasse</string>
+    <string name="settings_camera_fps">Frequenza fotogrammi fotocamera</string>
+    <string name="settings_scan_mode_cloud_offset">Offset nuvola</string>
+    <string name="settings_reset_tutorials_label">Reimposta tutorial</string>
+    <string name="settings_reset_tutorials_value">Mostra di nuovo le guide iniziali</string>
+    <string name="help_cloud_offset">Trasferimento offset ancora: tracciamento ad alta precisione della nuvola di punti per murales su larga scala. Istruzioni: completa la scansione a 360°, poi tocca per posizionare l\'ancora.</string>
+    <string-array name="onboarding_trace">
+        <item>Questa è la modalità Ricalco.</item>
+        <item>Tocca «Apri» per aggiungere il tuo primo livello. Una volta inserito, pizzica e trascina sulla tela per ridimensionarlo e posizionarlo.</item>
+        <item>Quando sono dove e come li vuoi, premi il pulsante Blocca per trasformare il telefono in un tavolo luminoso per ricalcare su carta.</item>
+        <item>Ti consigliamo di usare la modalità Ricalco o Mockup per la modifica.</item>
+        <item>Così le tue immagini sono pronte e il telefono può concentrarsi sulla realtà aumentata quando premi il pulsante AR.</item>
+    </string-array>
+    <string-array name="onboarding_ar">
+        <item>Proiezione AR — proietta il tuo design su un muro reale usando il sensore di profondità e il tracciamento spaziale del telefono.</item>
+        <item>Punta il muro e muoviti lentamente da un lato all\'altro. Appariranno forme colorate mentre il motore mappa la superficie. Attendi finché l\'area del muro non è coperta.</item>
+        <item>Basta toccare lo schermo. L\'app fotografa il muro, estrae punti di tracciamento e blocca l\'ancora all\'istante.</item>
+        <item>Tocca «Apri» per aggiungere un livello di design — verrà proiettato sul muro usando l\'ancora appena impostata.</item>
+        <item>Consiglio — muri bianchi vuoti, cemento liscio e superfici a tinta unita non possono essere tracciati. Punta l\'ancora su graffiti, intonaco ruvido o qualsiasi segno distintivo.</item>
+    </string-array>
+    <string-array name="onboarding_overlay">
+        <item>Overlay dal vivo — il tuo design fluttua sopra il flusso della fotocamera in diretta, senza bisogno di scansionare alcuna superficie.</item>
+        <item>Tocca «Apri» per aggiungere un livello — scegli una foto e apparirà qui, fluttuando sopra il flusso della fotocamera in diretta.</item>
+        <item>Pizzica per ridimensionare, trascina per riposizionare. L\'overlay resta fisso sullo schermo — allontanati per vedere come si adatta al muro.</item>
+    </string-array>
+    <string-array name="onboarding_ar_unavailable">
+        <item>Questo dispositivo non supporta ARCore, quindi la modalità Proiezione AR non è disponibile.</item>
+        <item>Puoi comunque usare Ricalco, Mockup e Overlay dal vivo — tutte le modalità tranne AR funzionano senza ARCore.</item>
+        <item>Tocca per chiudere.</item>
+    </string-array>
+    <string-array name="onboarding_mockup">
+        <item>Mockup fotografico — visualizza in anteprima il tuo design su una foto prima ancora di prendere un pennello.</item>
+        <item>Tocca «Muro» per scegliere o scattare una foto della tua superficie. Fallo per primo!</item>
+        <item>Tocca «Apri» per aggiungere un livello sopra la foto del muro. Pizzica e trascina per ridimensionarlo e posizionarlo.</item>
+    </string-array>
+    <string-array name="onboarding_design">
+        <item>Questo è Design — il tuo spazio di lavoro. Tutto ciò che crei qui si riporta in ogni altra modalità.</item>
+        <item>Tocca «Apri» per aggiungere il tuo primo livello — scegli una foto dalla galleria e apparirà qui come tua opera.</item>
+        <item>Tocca un livello per aprire i suoi strumenti — raggruppati nelle cartelle Dipingi, Ritocca, Regola ed Effetti. Pizzica e trascina sulla tela per ridimensionarlo e posizionarlo.</item>
+        <item>Quando è come lo vuoi, scegli come usarlo: «Ricalco» per trasformare il telefono in un tavolo luminoso, «Mockup» per visualizzarlo su una foto, o «AR» per proiettarlo su un muro.</item>
+    </string-array>
+    <string-array name="onboarding_design_layers">
+        <item>Apri — importa una foto dalla galleria; viene aggiunta come nuovo livello.</item>
+    </string-array>
 </resources>

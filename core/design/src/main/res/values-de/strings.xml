@@ -532,4 +532,83 @@
     <string name="settings_scan_mode_voxel_hash">Voxel-Hash</string>
     <string name="settings_scan_mode_surface_mesh">Oberflächennetz</string>
     <string name="settings_mural_method_label">Mural-Engine</string>
+
+
+    <!-- Added by audit item 4: missing keys relative to core/design's default table -->
+    <string name="nav_coop">Koop</string>
+    <string name="nav_host_coop">Hosten</string>
+    <string name="nav_host_coop_info">Starte eine Koop-Sitzung, um dein AR-Koordinatensystem mit Personen in der Nähe zu teilen.</string>
+    <string name="nav_join_coop">Beitreten</string>
+    <string name="nav_join_coop_info">Tritt einer Koop-Sitzung in der Nähe bei, um deine AR-Ansicht mit dem Host abzugleichen.</string>
+    <string name="nav_leave_coop">Verlassen</string>
+    <string name="nav_leave_coop_info">Verlasse die aktuelle Koop-Sitzung.</string>
+    <string name="nav_wearable">Wearable</string>
+    <string name="nav_wearable_info">Verbinde dich mit einer Datenbrille für eine freihändige AR-Erfahrung mit perspektivisch abgestimmter Kameraeingabe.</string>
+    <string name="nav_wall_clear">Entfernen</string>
+    <string name="nav_wall_clear_info">Entfernt das Wandfoto im Hintergrund, das im Mockup-Modus verwendet wird.</string>
+    <string name="nav_magic">Magie</string>
+    <string name="nav_edges">Kanten</string>
+    <string name="nav_filter">Filter</string>
+    <string name="nav_photo">Foto</string>
+    <string name="nav_file">Datei</string>
+    <string name="shared_image_pick_project">Öffne oder erstelle ein Projekt, um das geteilte Bild hinzuzufügen</string>
+    <string name="camera_stalled_error">Die Kamera liefert keine Bilder mehr – AR wird beendet. Öffne AR erneut, um es mit einem sichereren Kameramodus zu versuchen.</string>
+    <string name="syncing">SYNCHRONISIERE …</string>
+    <string name="adj_reset">Platzierung zurücksetzen</string>
+    <string name="adj_restore_placement">Platzierung wiederherstellen</string>
+    <string name="status_world_mapped">WELT ERFASST: %1$d%%</string>
+    <string name="rotation_axis_feedback">Rotation um %1$s-Achse</string>
+    <string name="rotation_axis_x">X</string>
+    <string name="rotation_axis_y">Y</string>
+    <string name="rotation_axis_z">Z</string>
+    <string name="settings_language_label">Sprache</string>
+    <string name="settings_layer_feature_points">Merkmalspunkte anzeigen</string>
+    <string name="settings_layer_plane_grids">Ebenenraster anzeigen</string>
+    <string name="settings_layer_voxels">Voxel anzeigen</string>
+    <string name="settings_layer_points">Punktwolke anzeigen</string>
+    <string name="settings_layer_mesh">Netz anzeigen</string>
+    <string name="settings_parallax_threshold">Parallaxen-Prüfwinkel</string>
+    <string name="settings_camera_fps">Kamera-Bildrate</string>
+    <string name="settings_scan_mode_cloud_offset">Wolken-Offset</string>
+    <string name="settings_reset_tutorials_label">Tutorials zurücksetzen</string>
+    <string name="settings_reset_tutorials_value">Einführungshinweise erneut anzeigen</string>
+    <string name="help_cloud_offset">Anker-Offset-Übergabe: Hochpräzises Punktwolken-Tracking für großflächige Wandbilder. Anleitung: Führe zuerst den 360°-Scan durch und tippe dann, um den Anker zu platzieren.</string>
+    <string-array name="onboarding_trace">
+        <item>Das ist der Pause-Modus.</item>
+        <item>Tippe auf „Öffnen“, um deine erste Ebene hinzuzufügen. Sobald sie eingefügt ist, kannst du sie mit Ziehen und Zusammenziehen auf der Leinwand skalieren und platzieren.</item>
+        <item>Wenn alles so ist, wie du es willst, drücke die Einfrieren-Taste, damit dein Handy zum Leuchttisch zum Durchpausen auf Papier wird.</item>
+        <item>Wir empfehlen, zum Bearbeiten entweder den Pause- oder den Mockup-Modus zu verwenden.</item>
+        <item>So ist dein Bildmaterial startklar, und dein Handy kann sich beim Drücken der AR-Taste ganz auf die erweiterte Realität konzentrieren.</item>
+    </string-array>
+    <string-array name="onboarding_ar">
+        <item>AR-Projektion — projiziert dein Design mithilfe des Tiefensensors und der räumlichen Verfolgung des Handys auf eine echte Wand.</item>
+        <item>Richte das Handy auf die Wand und bewege es langsam hin und her. Farbige Formen erscheinen, während die Engine die Oberfläche erfasst. Warte, bis der Wandbereich abgedeckt ist.</item>
+        <item>Tippe einfach auf den Bildschirm. Die App fotografiert die Wand, extrahiert Tracking-Merkmale und verankert sofort.</item>
+        <item>Tippe auf „Öffnen“, um eine Design-Ebene hinzuzufügen — sie wird mithilfe des soeben gesetzten Ankers auf die Wand projiziert.</item>
+        <item>Tipp — leere weiße Wände, glatter Beton und einfarbige Flächen lassen sich nicht verfolgen. Richte deinen Ankerpunkt auf Graffiti, rauen Putz oder ein anderes markantes Merkmal.</item>
+    </string-array>
+    <string-array name="onboarding_overlay">
+        <item>Live-Overlay — dein Design schwebt über dem Live-Kamerabild, ohne dass eine Oberfläche gescannt werden muss.</item>
+        <item>Tippe auf „Öffnen“, um eine Ebene hinzuzufügen — wähle ein Foto, und es erscheint hier, schwebend über dem Live-Kamerabild.</item>
+        <item>Zum Skalieren zusammenziehen, zum Verschieben ziehen. Das Overlay bleibt fest auf deinem Bildschirm — tritt zurück, um zu sehen, wie es zur Wand passt.</item>
+    </string-array>
+    <string-array name="onboarding_ar_unavailable">
+        <item>Dieses Gerät unterstützt ARCore nicht, daher ist der AR-Projektionsmodus nicht verfügbar.</item>
+        <item>Du kannst weiterhin Pause, Mockup und Live-Overlay nutzen — jeder Modus außer AR funktioniert ohne ARCore.</item>
+        <item>Zum Schließen tippen.</item>
+    </string-array>
+    <string-array name="onboarding_mockup">
+        <item>Foto-Mockup — sieh dir dein Design auf einem Foto an, bevor du auch nur zum Pinsel greifst.</item>
+        <item>Tippe auf „Wand“, um ein Foto deiner Oberfläche auszuwählen oder aufzunehmen. Mach das zuerst!</item>
+        <item>Tippe auf „Öffnen“, um eine Ebene über dem Wandfoto hinzuzufügen. Zum Skalieren und Positionieren zusammenziehen und ziehen.</item>
+    </string-array>
+    <string-array name="onboarding_design">
+        <item>Das ist Design — dein Arbeitsbereich. Was du hier erstellst, wird in jeden anderen Modus übernommen.</item>
+        <item>Tippe auf „Öffnen“, um deine erste Ebene hinzuzufügen — wähle ein Foto aus deiner Galerie, und es landet hier als dein Kunstwerk.</item>
+        <item>Tippe auf eine Ebene, um ihre Werkzeuge zu öffnen — gruppiert in die Ordner Malen, Retusche, Anpassen und Effekte. Zum Skalieren und Platzieren auf der Leinwand zusammenziehen und ziehen.</item>
+        <item>Wenn es passt, entscheide, wie du es verwenden möchtest: „Pause“, um dein Handy zum Leuchttisch zu machen, „Mockup“, um es auf einem Foto zu sehen, oder „AR“, um es auf eine Wand zu projizieren.</item>
+    </string-array>
+    <string-array name="onboarding_design_layers">
+        <item>Öffnen — importiert ein Foto aus deiner Galerie; es landet als neue Ebene.</item>
+    </string-array>
 </resources>
