@@ -344,7 +344,7 @@
     <string name="status_tap_surface">Toca una superficie para colocar el anclaje.</string>
     <string name="status_looking_grid">Buscando tu Cuadrícula...</string>
     <string name="status_ready">Listo. (%1$d pts)</string>
-    <string name="unlock_hint">Toca 4 veces para desbloquear</string>
+    <string name="unlock_hint">Sube, baja, sube, baja el volumen — rápido — para desbloquear</string>
 
     <!-- Library Screen -->
     <string name="lib_app_title">GraffitiXR</string>
@@ -431,7 +431,7 @@
     <!-- Mockup Mode help text. -->
     <string name="help_mockup">Modo Maqueta: Previsualiza diseño en una foto estática. Instrucciones: Usa \'Pared\' para establecer una imagen de fondo, luego organiza capas encima.</string>
     <!-- Lightbox Mode help text. -->
-    <string name="help_trace">Modo Mesa de Luz: Superficie de calco de alto brillo. Instrucciones: Coloca papel sobre la pantalla y calca. Toca tres veces para salir.</string>
+    <string name="help_trace">Modo Mesa de Luz: Superficie de calco de alto brillo. Instrucciones: Coloca papel sobre la pantalla y calca. Pulsa Subir, Bajar, Subir, Bajar el volumen rápido para salir.</string>
     <!-- Target Management help text. -->
     <string name="help_target_host">Gestión de Objetivos: Herramientas para anclajes AR. Instrucciones: Toca para acceder a herramientas para crear o realinear la posición del mural.</string>
     <!-- Scan Resolution help text. -->

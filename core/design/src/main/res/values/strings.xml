@@ -380,7 +380,7 @@
     <string name="status_looking_grid">Looking for your Grid...</string>
     <string name="status_world_mapped">WORLD MAPPED: %1$d%%</string>
     <string name="status_ready">Ready. (%1$d pts)</string>
-    <string name="unlock_hint">Tap 4 times to unlock</string>
+    <string name="unlock_hint">Volume Up, Down, Up, Down — quickly — to unlock</string>
     <string name="rotation_axis_feedback">Rotating on %1$s axis</string>
     <string name="rotation_axis_x">X</string>
     <string name="rotation_axis_y">Y</string>
@@ -485,7 +485,7 @@
     <!-- Mockup Mode help text. -->
     <string name="help_mockup">Mockup Mode: Preview design on a static photo. Instructions: Use \'Wall\' to set a background image, then arrange layers on top.</string>
     <!-- Lightbox Mode help text. -->
-    <string name="help_trace">Lightbox Mode: High-brightness tracing surface. Instructions: Place paper over the screen and trace. Triple-tap anywhere to exit.</string>
+    <string name="help_trace">Lightbox Mode: High-brightness tracing surface. Instructions: Place paper over the screen and trace. Press Volume Up, Down, Up, Down quickly to exit.</string>
     <!-- Target Management help text. -->
     <string name="help_target_host">Target Management: Tools for AR anchors. Instructions: Tap to access tools for creating or re-aligning the mural\'s position.</string>
     <!-- Scan Resolution help text. -->

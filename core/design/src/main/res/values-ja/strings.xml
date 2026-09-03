@@ -351,7 +351,7 @@
     <string name="status_tap_surface">表面をタップしてアンカーを配置します。</string>
     <string name="status_looking_grid">ターゲットを探しています...</string>
     <string name="status_ready">準備完了。 (%1$d pts)</string>
-    <string name="unlock_hint">3回タップしてロック解除</string>
+    <string name="unlock_hint">音量を上・下・上・下、素早く押してロック解除</string>
 
 
     <string name="lib_app_title">GraffitiXR</string>
@@ -449,7 +449,7 @@
 
     <string name="help_mockup">モックアップモード: 静止画でデザインをプレビューします。手順:「壁」を使用して背景画像を設定し、その上にレイヤーを配置します。</string>
 
-    <string name="help_trace">ライトボックスモード: 高輝度のトレース面。手順: 画面の上に紙を置き、トレースします。どこでも3回タップすると終了します。</string>
+    <string name="help_trace">ライトボックスモード: 高輝度のトレース面。手順: 画面の上に紙を置き、トレースします。音量を上・下・上・下、素早く押すと終了します。</string>
 
     <string name="help_target_host">ターゲット管理: ARアンカー用のツール。手順: タップして、壁画の位置を作成または再調整するツールにアクセスします。</string>
 

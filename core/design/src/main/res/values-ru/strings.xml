@@ -344,7 +344,7 @@
     <string name="status_tap_surface">Коснитесь поверхности, чтобы разместить якорь.</string>
     <string name="status_looking_grid">Ищем свою сетку...</string>
     <string name="status_ready">Готовый. </string>
-    <string name="unlock_hint">Нажмите 4 раза, чтобы разблокировать</string>
+    <string name="unlock_hint">Громкость: Вверх, Вниз, Вверх, Вниз — быстро — для разблокировки</string>
 
 
     <string name="lib_app_title">ГраффитиXR</string>
@@ -431,7 +431,7 @@
 
     <string name="help_mockup">Режим макета: предварительный просмотр дизайна на статичной фотографии. </string>
 
-    <string name="help_trace">Режим Lightbox: поверхность трассировки высокой яркости. </string>
+    <string name="help_trace">Режим Lightbox: поверхность трассировки высокой яркости. Быстро нажмите Громкость Вверх, Вниз, Вверх, Вниз, чтобы выйти.</string>
 
     <string name="help_target_host">Управление целями: инструменты для якорей AR. </string>
 
