@@ -802,15 +802,10 @@ class MainActivity : ComponentActivity() {
                         helpList = allHelpItems,
                     )
 
-                    // Trace ▸ Freeze locks touch so a resting hand tracing on paper can't smear the
-                    // layers — the same moment the rail is most in the way and least reachable (the
-                    // off-hand is pinning paper down, not free to tap the icon). Fold it away for
-                    // them. This is the one deliberate exception to the "fold state is the user's
-                    // call, not app state's" rule below: unfreezing does NOT re-expand it, so a
-                    // manual re-fold elsewhere in the session is still respected.
-                    LaunchedEffect(mainUiState.isTouchLocked) {
-                        if (mainUiState.isTouchLocked) isFoldedUp = true
-                    }
+                    // Captured here (this DSL block is a plain, non-@Composable AzNavHostScope
+                    // receiver — LaunchedEffect can't run in it directly) so the auto-retract effect
+                    // below, inside the `background { }` composable slot, can still reach isFoldedUp.
+                    val hostScope = this
 
                     // Reactive status-driven guidance (replaces the old adaptive coach and the removed
                     // scripted-tutorial API): milestone statuses, edges that reuse the existing
@@ -825,8 +820,8 @@ class MainActivity : ComponentActivity() {
                     // Target starts a capture), so the button that got you in was the same button that
                     // vanished. Whether items are on screen is AzNavRail's fold state, driven by the
                     // user tapping the icon; it is not app state's call to gate registration on — the
-                    // one deliberate exception is the auto-retract above, which folds it (not empties
-                    // it) and only on entering Freeze.
+                    // one deliberate exception is the auto-retract below (in `background { }`), which
+                    // folds it (not empties it) and only on entering Freeze.
                     //
                     // Nothing needed those gates for correctness. hideUiForCapture is dead state (no
                     // code ever sets it). Export never screenshots the Compose window — AR reads its GL
@@ -915,6 +910,16 @@ class MainActivity : ComponentActivity() {
                     )
 
                     background(weight = 0) {
+                        // Trace ▸ Freeze locks touch so a resting hand tracing on paper can't smear
+                        // the layers — the same moment the rail is most in the way and least
+                        // reachable (the off-hand is pinning paper down, not free to tap the icon).
+                        // Fold it away for them. This is the one deliberate exception to the "fold
+                        // state is the user's call, not app state's" rule below: unfreezing does NOT
+                        // re-expand it, so a manual re-fold elsewhere in the session is respected.
+                        LaunchedEffect(mainUiState.isTouchLocked) {
+                            if (mainUiState.isTouchLocked) hostScope.isFoldedUp = true
+                        }
+
                         MainScreen(
                             uiState = editorUiState,
                             arUiState = arUiState,
