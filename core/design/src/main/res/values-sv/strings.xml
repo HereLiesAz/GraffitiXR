@@ -344,7 +344,7 @@
     <string name="status_tap_surface">Tryck på en yta för att placera ankare.</string>
     <string name="status_looking_grid">Letar du efter ditt Grid...</string>
     <string name="status_ready">Redo. (%1$d poäng)</string>
-    <string name="unlock_hint">Tryck 4 gånger för att låsa upp</string>
+    <string name="unlock_hint">Volym Upp, Ner, Upp, Ner — snabbt — för att låsa upp</string>
 
 
     <string name="lib_app_title">GraffitiXR</string>
@@ -431,7 +431,7 @@
 
     <string name="help_mockup">Mockup-läge: Förhandsgranska design på ett statiskt foto. Instruktioner: Använd \'Vägg\' för att ställa in en bakgrundsbild och arrangera sedan lager ovanpå.</string>
 
-    <string name="help_trace">Lightbox-läge: Spårningsyta med hög ljusstyrka. Instruktioner: Lägg papper över skärmen och rita. Tryck tre gånger var som helst för att avsluta.</string>
+    <string name="help_trace">Lightbox-läge: Spårningsyta med hög ljusstyrka. Instruktioner: Lägg papper över skärmen och rita. Tryck snabbt Volym Upp, Ner, Upp, Ner för att avsluta.</string>
 
     <string name="help_target_host">Målhantering: Verktyg för AR-ankare. Instruktioner: Tryck för att komma åt verktyg för att skapa eller justera väggmålningens position.</string>
 

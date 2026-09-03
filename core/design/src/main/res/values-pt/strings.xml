@@ -344,7 +344,7 @@
     <string name="status_tap_surface">Toque em uma superfície para posicionar a âncora.</string>
     <string name="status_looking_grid">Procurando sua Grade...</string>
     <string name="status_ready">Pronto. (%1$d pts)</string>
-    <string name="unlock_hint">Toque 4 vezes para desbloquear</string>
+    <string name="unlock_hint">Volume Aumentar, Diminuir, Aumentar, Diminuir — rápido — para desbloquear</string>
 
     <!-- Library Screen -->
     <string name="lib_app_title">GraffitiXR</string>
@@ -431,7 +431,7 @@
     <!-- Mockup Mode help text. -->
     <string name="help_mockup">Modo Maquete: Visualize o design em uma foto estática. Instruções: Use \'Parede\' para definir uma imagem de fundo e organize as camadas por cima.</string>
     <!-- Lightbox Mode help text. -->
-    <string name="help_trace">Modo Mesa de Luz: Superfície de traçado de alto brilho. Instruções: Coloque o papel sobre a tela e trace. Dê três toques em qualquer lugar para sair.</string>
+    <string name="help_trace">Modo Mesa de Luz: Superfície de traçado de alto brilho. Instruções: Coloque o papel sobre a tela e trace. Pressione rapidamente Volume Aumentar, Diminuir, Aumentar, Diminuir para sair.</string>
     <!-- Target Management help text. -->
     <string name="help_target_host">Gerenciamento de Alvo: Ferramentas para âncoras AR. Instruções: Toque para acessar ferramentas para criar ou realinhar a posição do mural.</string>
     <!-- Scan Resolution help text. -->
