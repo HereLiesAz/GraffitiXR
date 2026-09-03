@@ -344,7 +344,7 @@
     <string name="status_tap_surface">Tocca una superficie per posizionare l\'ancora.</string>
     <string name="status_looking_grid">Cerco la tua Griglia...</string>
     <string name="status_ready">Pronto. (%1$d punti)</string>
-    <string name="unlock_hint">Tocca 4 volte per sbloccare</string>
+    <string name="unlock_hint">Volume Su, Giù, Su, Giù — rapidamente — per sbloccare</string>
 
     <!-- Library Screen -->
     <string name="lib_app_title">GraffitiXR</string>
@@ -431,7 +431,7 @@
     <!-- Mockup Mode help text. -->
     <string name="help_mockup">Modalità Mockup: Visualizza in anteprima il design su una foto statica. Istruzioni: Usa \'Muro\' per impostare un\'immagine di sfondo, poi disponi i livelli sopra.</string>
     <!-- Lightbox Mode help text. -->
-    <string name="help_trace">Modalità Tavolo luminoso: Superficie di tracciamento ad alta luminosità. Istruzioni: Posiziona la carta sullo schermo e traccia. Tocca tre volte ovunque per uscire.</string>
+    <string name="help_trace">Modalità Tavolo luminoso: Superficie di tracciamento ad alta luminosità. Istruzioni: Posiziona la carta sullo schermo e traccia. Premi rapidamente Volume Su, Giù, Su, Giù per uscire.</string>
     <!-- Target Management help text. -->
     <string name="help_target_host">Gestione Bersaglio: Strumenti per le ancore AR. Istruzioni: Tocca per accedere agli strumenti per creare o riallineare la posizione del murale.</string>
     <!-- Scan Resolution help text. -->

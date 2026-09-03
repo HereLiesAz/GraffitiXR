@@ -29,7 +29,7 @@
     <string name="status_tap_surface">Appuyez sur une surface pour placer l\'ancre.</string>
     <string name="status_looking_grid">Recherche de votre Grille...</string>
     <string name="status_ready">Prêt. (%1$d pts)</string>
-    <string name="unlock_hint">Appuyez 3 fois pour déverrouiller</string>
+    <string name="unlock_hint">Volume Haut, Bas, Haut, Bas — rapidement — pour déverrouiller</string>
 
     <!-- Library Screen -->
     <string name="lib_app_title">GraffitiXR</string>
@@ -223,7 +223,7 @@
     <string name="help_ar">Mode AR : Projeter la conception sur un mur à l\'aide de la cartographie spatiale. Instructions : Scannez l\'environnement jusqu\'à ce que le mur soit détecté, puis appuyez pour placer l\'ancre.</string>
     <string name="help_overlay">Mode Superposition : Afficher la conception sur la caméra en direct sans suivi spatial. Instructions : Mettez à l\'échelle et déplacez manuellement la conception pour l\'adapter à votre cadre.</string>
     <string name="help_mockup">Mode Maquette : Prévisualiser la conception sur une photo statique. Instructions : Utilisez \'Mur\' pour définir une image d\'arrière-plan, puis organisez les calques par-dessus.</string>
-    <string name="help_trace">Mode Table lumineuse : Surface de traçage haute luminosité. Instructions : Placez du papier sur l\'écran et tracez. Appuyez trois fois n\'importe où pour quitter.</string>
+    <string name="help_trace">Mode Table lumineuse : Surface de traçage haute luminosité. Instructions : Placez du papier sur l\'écran et tracez. Appuyez rapidement sur Volume Haut, Bas, Haut, Bas pour quitter.</string>
     <string name="help_target_host">Gestion de cible : Outils pour les ancres AR. Instructions : Appuyez pour accéder aux outils de création ou de réalignement de la position de la fresque.</string>
     <string name="help_scan_mode_toggle">Résolution de scan : Basculer entre Fresque (grande échelle) et Toile (petite échelle). Fresque utilise des Splats Gaussiens pour les murs ; Toile utilise des Nuages de Points pour les œuvres détaillées à l\'échelle d\'un bureau.</string>
     <string name="help_create">Créer une Ancre : Photographier une marque sur le mur pour verrouiller la projection. Instructions : Pointez sur une texture distincte et appuyez. L\'application suivra cette marque.</string>

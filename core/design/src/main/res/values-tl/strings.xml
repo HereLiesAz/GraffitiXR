@@ -133,7 +133,7 @@
     <string name="status_tap_surface">I-tap ang isang ibabaw upang ilagay ang anchor.</string>
     <string name="status_looking_grid">Hinahanap ang iyong Grid...</string>
     <string name="status_ready">handa na. (%1$d pts)</string>
-    <string name="unlock_hint">I-tap ng 4 na beses para i-unlock</string>
+    <string name="unlock_hint">Volume Up, Down, Up, Down — mabilis — para i-unlock</string>
     <string name="lib_app_title">GraffitiXR</string>
     <string name="lib_app_description">I-project ang iyong likhang sining sa isang tunay na dingding o isang canvas gamit ang AR o isang pangunahing overlay ng camera.\n\nMabilis na gumawa ng mockup sa isang larawan upang ipakita kung ano ang magiging hitsura ng natapos na gawain.\n\nO bakas ang isang larawan sa papel sa pamamagitan ng paggamit ng iyong device bilang isang lightbox.</string>
     <string name="lib_new_project">Bago</string>
@@ -199,7 +199,7 @@
     <string name="help_ar">AR Mode: Ang disenyo ng proyekto sa isang pader gamit ang spatial mapping. Mga Tagubilin: I-scan ang kapaligiran hanggang sa matukoy ang pader, pagkatapos ay tapikin upang ilagay ang anchor.</string>
     <string name="help_overlay">Overlay Mode: Ipakita ang disenyo sa ibabaw ng live na camera nang walang spatial na pagsubaybay. Mga Tagubilin: Manu-manong sukat at ilipat ang disenyo upang magkasya sa iyong frame.</string>
     <string name="help_mockup">Mockup Mode: I-preview ang disenyo sa isang static na larawan. Mga Tagubilin: Gamitin ang \'Wall\' upang magtakda ng larawan sa background, pagkatapos ay ayusin ang mga layer sa itaas.</string>
-    <string name="help_trace">Lightbox Mode: High-brightness tracing surface. Mga Tagubilin: Ilagay ang papel sa ibabaw ng screen at i-trace. Mag-triple-tap kahit saan para lumabas.</string>
+    <string name="help_trace">Lightbox Mode: High-brightness tracing surface. Mga Tagubilin: Ilagay ang papel sa ibabaw ng screen at i-trace. Pindutin nang mabilis ang Volume Up, Down, Up, Down para lumabas.</string>
     <string name="help_target_host">Pamamahala ng Target: Mga tool para sa mga AR anchor. Mga Tagubilin: I-tap para ma-access ang mga tool para sa paggawa o muling pag-align sa posisyon ng mural.</string>
     <string name="help_scan_mode_toggle">Scan Resolution: Lumipat sa pagitan ng Mural (malaking sukat) at Canvas (maliit na sukat). Gumagamit ang Mural ng Gaussian Splats para sa mga dingding; Ginagamit ng Canvas ang Point Clouds para sa detalyadong desk-scale art.</string>
     <string name="help_create">Gumawa ng Anchor: Kuhanan ng larawan ang isang marka sa dingding upang i-lock ang projection. Mga Tagubilin: Ituro ang isang natatanging texture at i-tap. Susubaybayan ng app ang markang ito.</string>
