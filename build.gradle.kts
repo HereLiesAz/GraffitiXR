@@ -12,7 +12,15 @@ buildscript {
         "org.apache.commons:commons-lang3:3.20.0",
         "org.apache.httpcomponents:httpclient:4.5.14",
         "com.google.guava:guava:33.6.0-jre",
-        "com.google.android.gms:play-services-basement:18.10.0",
+        // play-services-base 18.10.1 (see libs.versions.toml) itself depends on
+        // play-services-basement 18.11.0 (confirmed against its published POM) -- forcing
+        // basement below that strips classes base's own obfuscated internals reference
+        // (com.google.android.gms.common.internal.ConnectionThrottlingConfig,
+        // InternalClientFlagRegistry, InternalClientFlags) off the classpath entirely,
+        // which R8 then reports as missing rather than merely unused. 18.11.0 also still
+        // satisfies play-services-location (needs 18.9.0) and the mlkit segmentation
+        // artifact (needs 18.1.0), the two other basement consumers on this classpath.
+        "com.google.android.gms:play-services-basement:18.11.0",
         // Bouncy Castle: 1.79 (transitive, via the build + app classpaths) is vulnerable to
         // a covert timing channel (HIGH), LDAP injection, and a risky-crypto-algo issue in
         // bcpkix — all first patched in 1.84. The bcprov/bcpkix/bcutil versions must match.
