@@ -344,7 +344,7 @@
     <string name="status_tap_surface">Tik op een oppervlak om het anker te plaatsen.</string>
     <string name="status_looking_grid">Op zoek naar jouw raster...</string>
     <string name="status_ready">Klaar. (%1$d punten)</string>
-    <string name="unlock_hint">Tik 4 keer om te ontgrendelen</string>
+    <string name="unlock_hint">Volume Omhoog, Omlaag, Omhoog, Omlaag — snel — om te ontgrendelen</string>
 
 
     <string name="lib_app_title">GraffitiXR</string>
@@ -431,7 +431,7 @@
 
     <string name="help_mockup">Mockup-modus: bekijk een voorbeeld van het ontwerp op een statische foto. Instructies: Gebruik \'Muur\' om een ​​achtergrondafbeelding in te stellen en plaats vervolgens de lagen erbovenop.</string>
 
-    <string name="help_trace">Lightbox-modus: traceeroppervlak met hoge helderheid. Instructies: Plaats papier over het scherm en trek over. Tik driemaal ergens om af te sluiten.</string>
+    <string name="help_trace">Lightbox-modus: traceeroppervlak met hoge helderheid. Instructies: Plaats papier over het scherm en trek over. Druk snel op Volume Omhoog, Omlaag, Omhoog, Omlaag om af te sluiten.</string>
 
     <string name="help_target_host">Doelbeheer: hulpmiddelen voor AR-ankers. Instructies: Tik om toegang te krijgen tot hulpmiddelen voor het maken of opnieuw uitlijnen van de positie van de muurschildering.</string>
 

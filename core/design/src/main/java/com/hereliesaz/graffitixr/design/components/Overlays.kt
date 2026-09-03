@@ -15,7 +15,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -25,8 +24,12 @@ import androidx.compose.ui.zIndex
 import com.hereliesaz.graffitixr.design.R
 
 @Composable
-fun TouchLockOverlay(isLocked: Boolean, onUnlockRequested: () -> Unit) {
+fun TouchLockOverlay(isLocked: Boolean) {
     if (!isLocked) return
+    // Unlock is no longer a touch gesture on this surface — a resting hand or paper being traced
+    // over it could brush a tap sequence by accident, the exact thing the lock exists to prevent.
+    // It now takes a deliberate press on the physical volume buttons instead (see
+    // MainActivity.dispatchKeyEvent), so this overlay's only job left is blocking every touch.
     Box(
         Modifier
             .fillMaxSize()
@@ -34,24 +37,8 @@ fun TouchLockOverlay(isLocked: Boolean, onUnlockRequested: () -> Unit) {
             .background(Color.Transparent)
             .pointerInput(Unit) {
                 awaitPointerEventScope {
-                    var tapCount = 0
-                    var lastTapTime = 0L
                     while (true) {
-                        // Await once per iteration: counting the up-event from one awaitPointerEvent
-                        // and consuming a *different* event from a second await dropped/under-counted
-                        // taps, so the 4-tap unlock often never fired.
-                        val event = awaitPointerEvent(PointerEventPass.Main)
-                        val change = event.changes.firstOrNull()
-                        if (change != null && change.changedToUp()) {
-                            val now = System.currentTimeMillis()
-                            if (now - lastTapTime < 500) tapCount++ else tapCount = 1
-                            lastTapTime = now
-                            if (tapCount == 4) {
-                                onUnlockRequested()
-                                tapCount = 0
-                            }
-                        }
-                        event.changes.forEach { it.consume() }
+                        awaitPointerEvent(PointerEventPass.Main).changes.forEach { it.consume() }
                     }
                 }
             }

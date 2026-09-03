@@ -344,7 +344,7 @@
     <string name="status_tap_surface">Koppints egy felületre a horgony elhelyezéséhez.</string>
     <string name="status_looking_grid">A Rácsod keresése...</string>
     <string name="status_ready">Kész. (%1$d pont)</string>
-    <string name="unlock_hint">Koppints 4-szer a feloldáshoz</string>
+    <string name="unlock_hint">Hangerő Fel, Le, Fel, Le — gyorsan — a feloldáshoz</string>
 
 
     <string name="lib_app_title">GraffitiXR</string>
@@ -431,7 +431,7 @@
 
     <string name="help_mockup">Makett Mód: A terv előnézete egy statikus fotón. Utasítások: Használd a \'Fal\' lehetőséget háttérkép beállításához, majd rendezd a rétegeket felülre.</string>
 
-    <string name="help_trace">Világítótábla Mód: Nagy fényerejű rajzoló felület. Utasítások: Helyezz papírt a képernyőre és rajzolj. Koppints háromszor bárhová a kilépéshez.</string>
+    <string name="help_trace">Világítótábla Mód: Nagy fényerejű rajzoló felület. Utasítások: Helyezz papírt a képernyőre és rajzolj. Nyomd meg gyorsan a Hangerő Fel, Le, Fel, Le gombokat a kilépéshez.</string>
 
     <string name="help_target_host">Célpont Kezelés: Eszközök az AR horgonyokhoz. Utasítások: Koppints a falfestmény pozíciójának létrehozásához vagy újraigazításához szükséges eszközök eléréséhez.</string>
 

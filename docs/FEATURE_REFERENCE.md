@@ -96,8 +96,10 @@ region, review. The result becomes the static backdrop the design composes onto.
 ### 1.4 TRACE (lightbox) behaviour
 
 Full-brightness surface for copying onto paper. Locks the image in place, **keeps the screen on with
-brightness maxed**, and **blocks all touches until a deliberate four-tap exit** so a resting hand can't
-disturb the reference. Exports a transparent-background PNG (not a solid fill).
+brightness maxed**, **retracts the nav rail automatically**, and **blocks all touches until a
+deliberate Volume Up-Down-Up-Down exit** — a physical-button sequence, not a touch gesture, so a
+resting hand or the paper itself can't trigger it by accident. Exports a transparent-background PNG
+(not a solid fill).
 
 ---
 
