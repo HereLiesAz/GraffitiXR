@@ -351,7 +351,7 @@
     <string name="status_tap_surface">点按一个表面以放置锚点。</string>
     <string name="status_looking_grid">正在寻找您的网格...</string>
     <string name="status_ready">准备就绪。(%1$d 点)</string>
-    <string name="unlock_hint">连按 4 次解锁</string>
+    <string name="unlock_hint">快速按 音量上、下、上、下 解锁</string>
 
 
     <string name="lib_app_title">GraffitiXR</string>
@@ -449,7 +449,7 @@
 
     <string name="help_mockup">效果图模式：在静态照片上预览设计。说明：使用“墙壁”设置背景图像，然后在顶部排列图层。</string>
 
-    <string name="help_trace">透写台模式：高亮度描摹表面。说明：将纸张放在屏幕上进行描摹。在任意位置连按三次即可退出。</string>
+    <string name="help_trace">透写台模式：高亮度描摹表面。说明：将纸张放在屏幕上进行描摹。快速按 音量上、下、上、下 即可退出。</string>
 
     <string name="help_target_host">目标管理：AR 锚点工具。说明：点按以访问用于创建或重新对齐壁画位置的工具。</string>
 

@@ -5,6 +5,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -160,6 +161,16 @@ private const val LIBRARY_ROUTE = "library"
 // bounds that wait so a stuck export fails visibly instead of hanging the UI.
 private const val EXPORT_TIMEOUT_MS = 7000L
 
+// Trace ▸ Freeze's volume-button unlock (see MainActivity.dispatchKeyEvent): the beat pattern and
+// how long a whole attempt has to land before it resets.
+private val VOLUME_UNLOCK_SEQUENCE = intArrayOf(
+    KeyEvent.KEYCODE_VOLUME_UP,
+    KeyEvent.KEYCODE_VOLUME_DOWN,
+    KeyEvent.KEYCODE_VOLUME_UP,
+    KeyEvent.KEYCODE_VOLUME_DOWN,
+)
+private const val VOLUME_UNLOCK_WINDOW_MS = 1500L
+
 /**
  * Stages of the first-run "drawing in 60 seconds" flow. Split because the two halves need different
  * things from the device: DRAW is a plain screen (no camera), DETECT needs AR.
@@ -180,6 +191,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private val arViewModel: ArViewModel by viewModels()
+    // Same Hilt-scoped instance the composable tree reaches via hiltViewModel() below — needed
+    // here too so the physical-volume-button unlock (dispatchKeyEvent, below) can read/clear the
+    // touch lock without a Compose frame in the loop.
+    private val mainViewModel: MainViewModel by viewModels()
 
     var showSaveDialog by mutableStateOf(false)
     var showSettings by mutableStateOf(false)
@@ -272,6 +287,43 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // Trace ▸ Freeze's touch lock (mainUiState.isTouchLocked) used to fall to a 4-tap gesture to
+    // undo — easy to trigger by accident with a resting hand, the exact thing the lock exists to
+    // prevent. The physical volume rocker can't be brushed by paper or a palm the way the glass
+    // can, so unlock now requires a deliberate Up-Down-Up-Down press on it instead, within
+    // [VOLUME_UNLOCK_WINDOW_MS] of the first press. Intercepted here (not a Compose key modifier)
+    // because volume keys reach dispatchKeyEvent before anything else gets a look, locked or not.
+    private var volumeUnlockStage = 0
+    private var volumeUnlockLastPressAt = 0L
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val isVolumeKey = event.keyCode == KeyEvent.KEYCODE_VOLUME_UP ||
+            event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+        if (isVolumeKey && mainViewModel.uiState.value.isTouchLocked) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                val now = System.currentTimeMillis()
+                if (now - volumeUnlockLastPressAt > VOLUME_UNLOCK_WINDOW_MS) volumeUnlockStage = 0
+                volumeUnlockLastPressAt = now
+
+                val expected = VOLUME_UNLOCK_SEQUENCE[volumeUnlockStage]
+                volumeUnlockStage = if (event.keyCode == expected) {
+                    volumeUnlockStage + 1
+                } else if (event.keyCode == VOLUME_UNLOCK_SEQUENCE[0]) {
+                    1 // wrong beat, but this press could still be starting a fresh attempt
+                } else {
+                    0
+                }
+                if (volumeUnlockStage == VOLUME_UNLOCK_SEQUENCE.size) {
+                    volumeUnlockStage = 0
+                    mainViewModel.setTouchLocked(false)
+                }
+            }
+            // Consume both DOWN and UP while locked — locked means no volume changes either.
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -351,7 +403,8 @@ class MainActivity : ComponentActivity() {
                 // "library visible" so the editor doesn't flash before AzNavHost mounts.
                 val showLibrary = currentRoute == null || currentRoute == LIBRARY_ROUTE
 
-                val mainViewModel: MainViewModel = hiltViewModel()
+                // mainViewModel is the Activity-level field above (by viewModels()) — same Hilt
+                // ViewModelStore as hiltViewModel() would resolve to here, so no separate lookup.
                 val editorViewModel: EditorViewModel = hiltViewModel()
                 val dashboardViewModel: DashboardViewModel = hiltViewModel()
                 val settingsViewModel: SettingsViewModel = hiltViewModel()
@@ -749,6 +802,16 @@ class MainActivity : ComponentActivity() {
                         helpList = allHelpItems,
                     )
 
+                    // Trace ▸ Freeze locks touch so a resting hand tracing on paper can't smear the
+                    // layers — the same moment the rail is most in the way and least reachable (the
+                    // off-hand is pinning paper down, not free to tap the icon). Fold it away for
+                    // them. This is the one deliberate exception to the "fold state is the user's
+                    // call, not app state's" rule below: unfreezing does NOT re-expand it, so a
+                    // manual re-fold elsewhere in the session is still respected.
+                    LaunchedEffect(mainUiState.isTouchLocked) {
+                        if (mainUiState.isTouchLocked) isFoldedUp = true
+                    }
+
                     // Reactive status-driven guidance (replaces the old adaptive coach and the removed
                     // scripted-tutorial API): milestone statuses, edges that reuse the existing
                     // onboarding text, and per-mode goals that self-activate on mode entry.
@@ -761,7 +824,9 @@ class MainActivity : ComponentActivity() {
                     // some of those states are reached FROM the rail (Trace ▸ Freeze locks touch;
                     // Target starts a capture), so the button that got you in was the same button that
                     // vanished. Whether items are on screen is AzNavRail's fold state, driven by the
-                    // user tapping the icon; it is not app state's call.
+                    // user tapping the icon; it is not app state's call to gate registration on — the
+                    // one deliberate exception is the auto-retract above, which folds it (not empties
+                    // it) and only on entering Freeze.
                     //
                     // Nothing needed those gates for correctness. hideUiForCapture is dead state (no
                     // code ever sets it). Export never screenshots the Compose window — AR reads its GL
@@ -1013,10 +1078,11 @@ class MainActivity : ComponentActivity() {
 
                         var fullSize by remember { mutableStateOf(IntSize.Zero) }
 
-                        // The 4-tap touch-unlock gesture is handled once, by TouchLockOverlay below
-                        // (core/design's Overlays.kt) — it already blocks and counts every touch while
-                        // locked (fillMaxSize + zIndex(100f) + its own consuming pointerInput), so this
-                        // Box does not need — and used to duplicate — a second, independent recognizer.
+                        // Touch is blocked once, by TouchLockOverlay below (core/design's Overlays.kt)
+                        // — it already consumes every touch while locked (fillMaxSize + zIndex(100f) +
+                        // its own consuming pointerInput), so this Box does not need — and used to
+                        // duplicate — a second, independent recognizer. Unlock itself no longer lives
+                        // here at all: it's the volume-button sequence in dispatchKeyEvent above.
                         Box(Modifier
                             .fillMaxSize()
                             .onSizeChanged { fullSize = it }
@@ -1081,10 +1147,7 @@ class MainActivity : ComponentActivity() {
                                     kotlinx.coroutines.delay(3000)
                                     showUnlockInstructions = false
                                 }
-                                TouchLockOverlay(
-                                    isLocked = true,
-                                    onUnlockRequested = { mainViewModel.setTouchLocked(false) }
-                                )
+                                TouchLockOverlay(isLocked = true)
                                 UnlockInstructionsPopup(visible = showUnlockInstructions)
                             }
 
