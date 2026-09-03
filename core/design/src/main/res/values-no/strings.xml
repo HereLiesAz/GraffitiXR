@@ -344,7 +344,7 @@
     <string name="status_tap_surface">Trykk på en overflate for å plassere anker.</string>
     <string name="status_looking_grid">Ser du etter rutenettet ditt...</string>
     <string name="status_ready">Ferdig. (%1$d poeng)</string>
-    <string name="unlock_hint">Trykk 4 ganger for å låse opp</string>
+    <string name="unlock_hint">Volum Opp, Ned, Opp, Ned — raskt — for å låse opp</string>
 
     <!-- Library Screen -->
     <string name="lib_app_title">GraffitiXR</string>
@@ -431,7 +431,7 @@
     <!-- Mockup Mode help text. -->
     <string name="help_mockup">Mockup-modus: Forhåndsvis design på et statisk bilde. Instruksjoner: Bruk \'Vegg\' for å sette et bakgrunnsbilde, og arranger deretter lag på toppen.</string>
     <!-- Lightbox Mode help text. -->
-    <string name="help_trace">Lysboksmodus: Sporingsoverflate med høy lysstyrke. Instruksjoner: Legg papir over skjermen og spor. Trippeltrykk hvor som helst for å avslutte.</string>
+    <string name="help_trace">Lysboksmodus: Sporingsoverflate med høy lysstyrke. Instruksjoner: Legg papir over skjermen og spor. Trykk raskt Volum Opp, Ned, Opp, Ned for å avslutte.</string>
     <!-- Target Management help text. -->
     <string name="help_target_host">Målstyring: Verktøy for AR-ankre. Instruksjoner: Trykk for å få tilgang til verktøy for å lage eller justere veggmaleriets posisjon.</string>
     <!-- Scan Resolution help text. -->

@@ -344,7 +344,7 @@
     <string name="status_tap_surface">點擊表面以放置錨點。</string>
     <string name="status_looking_grid">正在尋找您的網格...</string>
     <string name="status_ready">準備好。（%1$d 分）</string>
-    <string name="unlock_hint">點擊4次即可解鎖</string>
+    <string name="unlock_hint">快速按 音量上、下、上、下 即可解鎖</string>
 
 
     <string name="lib_app_title">塗鴉XR</string>
@@ -431,7 +431,7 @@
 
     <string name="help_mockup">樣機模式：在靜態照片上預覽設計。說明：使用「牆」設定背景影像，然後在上面排列圖層。</string>
 
-    <string name="help_trace">燈箱模式：高亮度追蹤表面。說明：將紙放在螢幕上並描畫。在任何位置點擊三次即可退出。</string>
+    <string name="help_trace">燈箱模式：高亮度追蹤表面。說明：將紙放在螢幕上並描畫。快速按 音量上、下、上、下 即可退出。</string>
 
     <string name="help_target_host">目標管理：AR 錨點工具。說明： 點擊可存取用於創建或重新對齊壁畫位置的工具。</string>
 

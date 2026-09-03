@@ -344,7 +344,7 @@
     <string name="status_tap_surface">Tippen Sie auf eine Oberfläche, um einen Anker zu platzieren.</string>
     <string name="status_looking_grid">Suche nach Ihrem Raster...</string>
     <string name="status_ready">Bereit. (%1$d Pkt.)</string>
-    <string name="unlock_hint">Tippen Sie 4 Mal zum Entsperren</string>
+    <string name="unlock_hint">Lautstärke Hoch, Runter, Hoch, Runter — schnell — zum Entsperren</string>
 
     <!-- Library Screen -->
     <string name="lib_app_title">GraffitiXR</string>
@@ -431,7 +431,7 @@
     <!-- Mockup Mode help text. -->
     <string name="help_mockup">Mockup-Modus: Sehen Sie sich eine Vorschau des Designs auf einem statischen Foto an. Anweisungen: Verwenden Sie \'Wand\', um ein Hintergrundbild festzulegen, und ordnen Sie dann die Ebenen darauf an.</string>
     <!-- Lightbox Mode help text. -->
-    <string name="help_trace">Leuchtkasten-Modus: Pausoberfläche mit hoher Helligkeit. Anweisungen: Legen Sie Papier auf den Bildschirm und pausen Sie ab. Tippen Sie dreimal auf eine beliebige Stelle, um den Vorgang zu beenden.</string>
+    <string name="help_trace">Leuchtkasten-Modus: Pausoberfläche mit hoher Helligkeit. Anweisungen: Legen Sie Papier auf den Bildschirm und pausen Sie ab. Drücken Sie schnell Lautstärke Hoch, Runter, Hoch, Runter, um zu beenden.</string>
     <!-- Target Management help text. -->
     <string name="help_target_host">Zielverwaltung: Werkzeuge für AR-Anker. Anweisungen: Tippen Sie, um auf Werkzeuge zum Erstellen oder Neuausrichten der Position des Wandbildes zuzugreifen.</string>
     <!-- Scan Resolution help text. -->
