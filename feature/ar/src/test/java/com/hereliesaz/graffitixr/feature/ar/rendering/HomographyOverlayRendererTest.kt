@@ -25,11 +25,14 @@ class HomographyOverlayRendererTest {
 
     @Test
     fun `a frame narrower than the surface is letterboxed left and right`() {
-        // 3:4 frame (0.75) inside a 9:16 surface (0.5625): fit height, bar left/right.
-        val vp = letterboxViewport(surfaceWidth = 1080, surfaceHeight = 1920, frameAspect = 3f / 4f)
+        // A 9:16 phone surface is already fairly narrow (aspect 0.5625) — 3:4 (0.75) is WIDER than
+        // that, not narrower (a common mistake: "portrait" doesn't mean "narrower than a phone
+        // screen"). Use something actually narrower than 0.5625, e.g. 1:2 (0.5): fit height, bar
+        // left/right.
+        val vp = letterboxViewport(surfaceWidth = 1080, surfaceHeight = 1920, frameAspect = 1f / 2f)
         requireNotNull(vp)
-        // height = 1920, width = 1920 * 0.75 = 1440
-        assertArrayEquals(intArrayOf((1080 - 1440) / 2, 0, 1440, 1920), vp)
+        // height = 1920, width = 1920 * 0.5 = 960
+        assertArrayEquals(intArrayOf((1080 - 960) / 2, 0, 960, 1920), vp)
     }
 
     @Test
