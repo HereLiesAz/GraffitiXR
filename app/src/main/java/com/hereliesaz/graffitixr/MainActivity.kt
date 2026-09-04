@@ -1268,7 +1268,12 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && !arUiState.isAnchorEstablished) {
+                            // RelocState.IDLE means "target not yet confirmed" (UiState.kt) — SEARCHING/
+                            // TRACKING both require the fingerprint to be active, i.e. an established
+                            // anchor. This badge is therefore only meaningful once anchored; gating it on
+                            // `!isAnchorEstablished` made every branch but IDLE dead (the badge always
+                            // returned immediately, per RelocStatusBadge's own state machine below).
+                            if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && arUiState.isAnchorEstablished) {
                                 RelocStatusBadge(
                                     isAnchorEstablished = arUiState.isAnchorEstablished,
                                     paintingProgress = arUiState.paintingProgress,
@@ -1629,7 +1634,11 @@ class MainActivity : ComponentActivity() {
                                 androidx.compose.material3.AlertDialog(
                                     onDismissRequest = { showDesignInstructionsDialog = false },
                                     title = { Text("Design Your Mural", color = Color.White) },
-                                    text = { Text("Tap the menu icon, then tap 'Open' to choose a photo of your artwork.", color = Color.White) },
+                                    // noMenu=true (railMenuDisabled) means every rail item is always
+                                    // visible — there is no menu to open, and tapping the app icon
+                                    // instead FOLDS the rail away (AzNavRail 11.0's noMenu behaviour).
+                                    // The old copy sent the user to collapse their own navigation.
+                                    text = { Text("Tap 'Open' on the rail to choose a photo of your artwork.", color = Color.White) },
                                     containerColor = Color(0xEE1A1A1A),
                                     confirmButton = {
                                         AzButton(text = "Got it", onClick = { showDesignInstructionsDialog = false }, shape = AzButtonShape.RECTANGLE)
@@ -2939,7 +2948,9 @@ private fun PostTargetInstructionOverlay(modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "Now tap the menu icon and choose 'Open' to add a photo of your artwork.",
+                // noMenu=true means every rail item is always visible; there is no menu, and
+                // tapping the app icon instead folds the rail away.
+                text = "Now tap 'Open' on the rail to add a photo of your artwork.",
                 color = Color.White,
                 textAlign = TextAlign.Center,
                 fontSize = 15.sp,

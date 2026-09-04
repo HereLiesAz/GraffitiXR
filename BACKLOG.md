@@ -118,13 +118,17 @@ freeze-preview, bidirectional co-op, and a short list of unreferenced diagnostic
 
 Correctness bugs, worst first:
 
-- **Relocalization status chip can never render** — `MainActivity.kt`'s gate condition
-  (`!arUiState.isAnchorEstablished`) and the state computation's own early-return
-  (`if (relocState == RelocState.IDLE) return`) are mutually exclusive; `SEARCHING`/`TRACKING`
-  are dead branches.
-- **First-run AR instruction tells the user to tap the icon that hides the rail** — the
-  `showDesignInstructionsDialog` copy ("Tap the menu icon, then tap 'Open'") targets a `noMenu`
-  rail whose icon collapses it, not opens it.
+- ~~Relocalization status chip can never render~~ — **fixed.** `MainActivity.kt`'s gate condition
+  (`!arUiState.isAnchorEstablished`) and `RelocStatusBadge`'s own early-return
+  (`if (relocState == RelocState.IDLE) return`) were mutually exclusive, so `SEARCHING`/`TRACKING`
+  were dead branches. `RelocState.IDLE` means "target not yet confirmed" (`UiState.kt`) —
+  SEARCHING/TRACKING both require an established anchor — so the call site's gate is now
+  `arUiState.isAnchorEstablished` (was negated).
+- ~~First-run AR instruction tells the user to tap the icon that hides the rail~~ — **fixed**, in
+  both places it appeared (`showDesignInstructionsDialog` and `PostTargetInstructionOverlay`).
+  `noMenu=true` (`railMenuDisabled`) means every rail item is always visible — there is no menu —
+  and tapping the app icon instead folds the rail away (AzNavRail 11.0's `noMenu` behaviour, see
+  `docs/AZNAVRAIL_COMPLETE_GUIDE.md`). Both now say "Tap 'Open' on the rail" instead.
 - ~~README claims snap-back is an opt-in toggle, off by default~~ — **re-checked, not a bug.**
   `setRelocEnabled`/`mRelocEnabled` (always-on, no caller) only gates the native engine's
   *computation* of a relocalized pose; whether the app actually *uses* that pose is
