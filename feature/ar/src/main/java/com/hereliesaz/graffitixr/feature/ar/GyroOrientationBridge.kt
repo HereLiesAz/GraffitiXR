@@ -23,11 +23,20 @@ import timber.log.Timber
  * internal consistency" character as [HomographyArTracker]'s own pose, which is the right
  * character for a SHORT bridge.
  *
- * **Why rotation only, never position:** see `HomographyTracker.h`'s and the broader design
- * discussion this was scoped from — bridging translation needs the accelerometer, which means
- * double integration (drift grows with time², not linearly) plus gravity subtraction (circular
- * with orientation) plus per-device bias calibration. None of that is here. A bridged pose keeps
- * the last confidently-tracked pose's TRANSLATION unchanged and only rotates it.
+ * **Why this never ESTIMATES new position:** see `HomographyTracker.h`'s and the broader design
+ * discussion this was scoped from — bridging genuine camera displacement needs the accelerometer,
+ * which means double integration (drift grows with time², not linearly) plus gravity subtraction
+ * (circular with orientation) plus per-device bias calibration. None of that is here.
+ *
+ * That is a different claim from "translation is left unchanged," which was this class's original
+ * (incorrect) behavior: a view matrix's translation column is the ROTATED camera position
+ * (`t = -R·C`), so holding `t` fixed while rotating `R` moves the camera centre `C` even though
+ * the phone's actual position hasn't changed — exactly the drift this bridge exists to prevent.
+ * The fix, applied by [com.hereliesaz.graffitixr.feature.ar.BridgedHomographyTracker] using
+ * [cameraRotationDelta], is to rotate translation by the SAME delta as rotation: `t' = ΔR · t`.
+ * That is not a translation estimate — it is the algebraically correct way to carry an unmoved 3D
+ * point (the camera centre) through a rotation this bridge already knows, with zero new
+ * assumptions and zero accelerometer involvement.
  *
  * **The one piece that is asserted, not verified — read before shipping.** [bridgedRotation]'s
  * result depends on a fixed rotation `A` relating the phone's IMU body axes to the rear camera's
@@ -116,19 +125,23 @@ class GyroOrientationBridge(context: Context) : SensorEventListener {
     }
 
     /**
-     * The tracked camera-from-plane rotation, held through the vision dropout since
-     * [markReference] — i.e. [lastGoodRotation] rotated by however much the phone has physically
-     * rotated since then. Null when there is no reference (nothing was ever locked, or
-     * [clearReference] was called) or no live sensor sample yet.
+     * How much the CAMERA has rotated (in camera-optical axes) since [markReference] — i.e. the
+     * `ΔR` such that a pose held from that reference should become `ΔR · pose`. Null when there is
+     * no reference (nothing was ever locked, or [clearReference] was called) or no live sensor
+     * sample yet.
      *
-     * @param lastGoodRotation the row-major 3x3 rotation block of the last confidently-tracked
-     *   [HomographyArTracker.HomographyPose.viewMatrix] (its column-major upper-left 3x3,
-     *   transposed to row-major — see [RotationDeltaMath]'s doc on the convention split).
+     * This is the primitive the whole bridge is built from: applying it to a held rotation gives
+     * [bridgedRotation]'s result, and applying it to a held translation is what keeps a bridged
+     * pose's CAMERA CENTRE fixed in space during a pure pan/tilt (see
+     * [com.hereliesaz.graffitixr.feature.ar.BridgedHomographyTracker], which does both) — still not
+     * a translation *estimate* (that needs the accelerometer, per this class's doc), just the
+     * correct way to carry a fixed 3D point through a known rotation.
+     *
      * @param rotationDeg the same sensor-to-display quarter-turn (0/90/180/270) every other
      *   geometric conversion in this codebase uses — see this class's doc for what is and isn't
      *   verified about its sign here.
      */
-    fun bridgedRotation(lastGoodRotation: FloatArray, rotationDeg: Int): FloatArray? {
+    fun cameraRotationDelta(rotationDeg: Int): FloatArray? {
         val qNow = latestQuaternion ?: return null
         val qRef = referenceQuaternion ?: return null
 
@@ -139,9 +152,20 @@ class GyroOrientationBridge(context: Context) : SensorEventListener {
         val deltaBody = RotationDeltaMath.toRotationMatrix3x3(RotationDeltaMath.normalize(qDeltaBody))
         val a = RotationDeltaMath.rotationAboutZ(rotationDeg)
         val aT = RotationDeltaMath.transposeMat3(a)
-        val deltaCamera = RotationDeltaMath.multiplyMat3(
-            RotationDeltaMath.multiplyMat3(a, deltaBody), aT,
-        )
+        return RotationDeltaMath.multiplyMat3(RotationDeltaMath.multiplyMat3(a, deltaBody), aT)
+    }
+
+    /**
+     * The tracked camera-from-plane rotation, held through the vision dropout since
+     * [markReference] — i.e. [lastGoodRotation] rotated by [cameraRotationDelta]. Null under the
+     * same conditions as [cameraRotationDelta].
+     *
+     * @param lastGoodRotation the row-major 3x3 rotation block of the last confidently-tracked
+     *   [HomographyArTracker.HomographyPose.viewMatrix] (its column-major upper-left 3x3,
+     *   transposed to row-major — see [RotationDeltaMath]'s doc on the convention split).
+     */
+    fun bridgedRotation(lastGoodRotation: FloatArray, rotationDeg: Int): FloatArray? {
+        val deltaCamera = cameraRotationDelta(rotationDeg) ?: return null
         return RotationDeltaMath.multiplyMat3(deltaCamera, lastGoodRotation)
     }
 }

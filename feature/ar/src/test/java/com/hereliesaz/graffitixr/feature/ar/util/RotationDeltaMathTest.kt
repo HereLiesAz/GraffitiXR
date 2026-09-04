@@ -94,6 +94,22 @@ class RotationDeltaMathTest {
     }
 
     @Test
+    fun `multiplyMat3Vec3 rotates a vector the same way multiplyMat3 rotates a matrix column`() {
+        // 90 degrees about Z: (x,y,z) -> (-y,x,z). rotationAboutZ is [[c,-s,0],[s,c,0],[0,0,1]].
+        val rot = RotationDeltaMath.rotationAboutZ(90)
+        val v = floatArrayOf(1f, 0f, 0f)
+        val rotated = RotationDeltaMath.multiplyMat3Vec3(rot, v)
+        assertMatEquals(floatArrayOf(0f, 1f, 0f), rotated)
+    }
+
+    @Test
+    fun `multiplyMat3Vec3 by the identity matrix leaves the vector unchanged`() {
+        val identity3x3 = floatArrayOf(1f, 0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f)
+        val v = floatArrayOf(3f, -2f, 5f)
+        assertMatEquals(v, RotationDeltaMath.multiplyMat3Vec3(identity3x3, v))
+    }
+
+    @Test
     fun `a rotation delta between a quaternion and itself is the identity`() {
         val q = quaternionAboutAxis(floatArrayOf(0.267f, 0.535f, 0.802f), 0.77)
         val delta = RotationDeltaMath.multiplyQuaternions(RotationDeltaMath.conjugate(q), q)
