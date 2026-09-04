@@ -76,6 +76,19 @@ interface SettingsRepository {
     suspend fun setSelfGrowEnabled(on: Boolean)
 
     /**
+     * Whether the artist has opted in to auto-uploading a crash report (device model, OS version,
+     * and recent logcat) to this project's public GitHub issue tracker after a crash.
+     *
+     * Off by default, and must stay that way: this app's own pitch is "no cloud dependencies, zero
+     * data collection," for artists who — per the README — are frequently doing something illegal.
+     * Uploading a device identifier and a logcat dump to a PUBLIC tracker without asking is exactly
+     * the kind of silent collection that pitch promises doesn't happen. See `CrashUploadWorker`.
+     */
+    val crashReportingConsent: Flow<Boolean>
+
+    suspend fun setCrashReportingConsent(on: Boolean)
+
+    /**
      * The persistent wall FEATURE MAP (`IMPLEMENTATION.md` phases 2b/3): grow it from
      * relocalization-locked frames, and match against it as a second relocalization source.
      *

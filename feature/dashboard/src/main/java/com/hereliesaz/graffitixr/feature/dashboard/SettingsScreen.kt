@@ -75,6 +75,8 @@ fun SettingsScreen(
     onLanguageChanged: (AppLanguage) -> Unit,
     isRightHanded: Boolean,
     onHandednessChanged: (Boolean) -> Unit,
+    crashReportingConsent: Boolean,
+    onCrashReportingConsentChanged: (Boolean) -> Unit,
     showDiagOverlay: Boolean,
     onDiagOverlayChanged: () -> Unit,
     showFeaturePoints: Boolean,
@@ -243,6 +245,21 @@ fun SettingsScreen(
                                 label = strings.settings.dominantHand,
                                 value = if (isRightHanded) strings.settings.handRight else strings.settings.handLeft,
                                 modifier = Modifier.clickable { onHandednessChanged(!isRightHanded) }
+                            )
+                            // Off by default and must ask, not assume: this is the one setting in the
+                            // app that sends anything off the device. On a crash, the report (device
+                            // model + recent logcat) goes to this project's PUBLIC GitHub issue
+                            // tracker — never silently, and never anywhere else.
+                            Text(
+                                text = "On a crash, send the device model and recent logs to a public bug report? Off by default.",
+                                color = Color.Gray,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                            SettingsItem(
+                                label = "Crash reports",
+                                value = if (crashReportingConsent) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable { onCrashReportingConsentChanged(!crashReportingConsent) }
                             )
                             SettingsItem(
                                 label = strings.settings.diagOverlay,

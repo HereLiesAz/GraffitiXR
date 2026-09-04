@@ -421,6 +421,7 @@ class MainActivity : ComponentActivity() {
                 val railExpansion by editorViewModel.railExpansion.collectAsState()
                 val mainUiState by mainViewModel.uiState.collectAsState()
                 val arUiState by arViewModel.uiState.collectAsState()
+                val crashReportingConsent by settingsViewModel.crashReportingConsent.collectAsState()
                 val coopState = arUiState.coopSessionState
                 var showJoinScanner by remember { mutableStateOf(false) }
                 val hostQr by arViewModel.hostQrPayload.collectAsState()
@@ -1637,6 +1638,8 @@ class MainActivity : ComponentActivity() {
                                     onLanguageChanged = { settingsViewModel.setLanguage(it) },
                                     isRightHanded = editorUiState.isRightHanded,
                                     onHandednessChanged = { editorViewModel.toggleHandedness() },
+                                    crashReportingConsent = crashReportingConsent,
+                                    onCrashReportingConsentChanged = { settingsViewModel.setCrashReportingConsent(it) },
                                     showDiagOverlay = editorUiState.showDiagOverlay,
                                     onDiagOverlayChanged = { editorViewModel.toggleDiagOverlay() },
                                     showFeaturePoints = editorUiState.showFeaturePoints,
