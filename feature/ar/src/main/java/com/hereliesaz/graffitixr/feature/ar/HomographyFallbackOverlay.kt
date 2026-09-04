@@ -179,7 +179,7 @@ fun HomographyFallbackOverlay(
                 onPoseTracked(frame?.pose)
                 isTrackingLost = frame == null
                 if (frame != null) {
-                    glRenderer.updatePose(frame.pose.viewMatrix, frame.projMatrix)
+                    glRenderer.updatePose(frame.pose.viewMatrix, frame.projMatrix, frame.frameAspect)
                 } else {
                     glRenderer.clearPose()
                 }
