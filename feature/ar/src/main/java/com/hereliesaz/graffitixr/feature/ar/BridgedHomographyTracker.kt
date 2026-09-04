@@ -4,13 +4,16 @@ package com.hereliesaz.graffitixr.feature.ar
 import android.content.Context
 import android.graphics.Bitmap
 import com.hereliesaz.graffitixr.feature.ar.HomographyArTracker.HomographyPose
+import com.hereliesaz.graffitixr.feature.ar.util.RotationDeltaMath
 
 /**
  * [HomographyArTracker] plus [GyroOrientationBridge]: tracks each frame with vision when it can,
  * and for a short window after the last good lock, holds the pose steady by rotating it with the
  * gyroscope instead of dropping tracking outright — see [GyroOrientationBridge]'s doc for what
- * that bridge does and does not cover (rotation only, never position; its Z-axis alignment is
- * platform-guaranteed, its `rotationDeg` quarter-turn sign is asserted but not yet device-verified).
+ * that bridge does and does not cover (no accelerometer, no estimated displacement — only ever the
+ * algebraically correct carry of a fixed camera centre through a known rotation; its Z-axis
+ * alignment is platform-guaranteed, its `rotationDeg` quarter-turn sign is asserted but not yet
+ * device-verified).
  *
  * This is still upstream of Phase 2's CameraX/`OverlayRenderer`/`EditorMode` wiring — it composes
  * the two Phase-1 pieces into the one call a live-tracking loop will actually want
@@ -55,7 +58,7 @@ class BridgedHomographyTracker(
     /**
      * Track one live camera frame, bridging through a brief vision failure with gyro rotation.
      *
-     * @param rotationDeg the sensor-to-display quarter-turn — see [GyroOrientationBridge.bridgedRotation].
+     * @param rotationDeg the sensor-to-display quarter-turn — see [GyroOrientationBridge.cameraRotationDelta].
      * @return a fresh vision-tracked pose, a gyro-bridged hold of the last one, or null once both
      *   vision has failed AND the bridge window has elapsed (or gyro isn't available at all).
      */
@@ -74,14 +77,23 @@ class BridgedHomographyTracker(
             return null
         }
 
-        val bridgedRotation = bridge.bridgedRotation(rowMajorRotationOf(held.viewMatrix), rotationDeg)
+        // Apply the SAME rotation delta to both the rotation block and the translation column —
+        // holding translation fixed while only rotating moves the camera centre even when the
+        // phone hasn't actually moved (see GyroOrientationBridge's class doc). `t' = ΔR · t` is
+        // the correct way to carry the (unmoved) camera centre through a known rotation; it is
+        // still not a translation ESTIMATE — no accelerometer, no new displacement assumed.
+        val deltaCamera = bridge.cameraRotationDelta(rotationDeg)
             ?: return null // no sensor sample yet — nothing to bridge with.
+        val heldRotation = rowMajorRotationOf(held.viewMatrix)
+        val heldTranslation = translationOf(held.viewMatrix)
+        val bridgedRotation = RotationDeltaMath.multiplyMat3(deltaCamera, heldRotation)
+        val bridgedTranslation = RotationDeltaMath.multiplyMat3Vec3(deltaCamera, heldTranslation)
 
         // Confidence decays linearly across the bridge window so a caller/UI can visibly distinguish
         // "just locked" from "about to lose it entirely", the same role ARCore's TrackingState plays.
         val decayedConfidence = held.confidence * (1f - elapsed.toFloat() / maxBridgeMs.toFloat())
         return HomographyPose(
-            viewMatrix = viewMatrixOf(bridgedRotation, translationOf(held.viewMatrix)),
+            viewMatrix = viewMatrixOf(bridgedRotation, bridgedTranslation),
             confidence = decayedConfidence.coerceAtLeast(0f),
         )
     }
