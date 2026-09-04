@@ -1,4 +1,5 @@
 #include <jni.h>
+#include <shared_mutex>
 #include <android/log.h>
 #include <android/asset_manager_jni.h>
 #include <android/bitmap.h>
@@ -26,10 +27,22 @@ MobileGS* gSlamEngine = nullptr;
 // does) and its deletion in nativeDestroy. Without this, nativeDestroy's `delete gSlamEngine` races
 // every other entry point that dereferences the same raw pointer with no lock of its own --
 // SlamManager.kt's destroy() holds initLock, but feedYuvFrame/updateCamera/getRelocResult/etc do
-// not, and Kotlin has no way to serialize against destroy() from those call sites. A single mutex,
-// held for the duration of each function's gSlamEngine access (not just the null check -- releasing
-// it before the call would let destroy free the object mid-call), is the simplest correct fix.
-std::mutex gEngineMutex;
+// not, and Kotlin has no way to serialize against destroy() from those call sites.
+//
+// This only protects the *pointer's* lifetime, not MobileGS's internal state -- that's MobileGS's
+// own job (mMutex/mRelocMutex/std::atomic members; see include/MobileGS.h). So it's a
+// shared_mutex: nativeInitialize/nativeDestroy (which write the pointer itself) take an exclusive
+// std::unique_lock; every entry point that only dereferences it takes a std::shared_lock and can
+// run concurrently with other readers -- that's the actual fix for heavy OpenCV/SuperPoint work
+// (fingerprint generation, relocalization) blocking the per-frame camera/render path behind one
+// global lock. Three more entry points also need std::unique_lock despite not touching the
+// pointer: nativeLoadSuperPoint/nativeLoadDistortionHead/nativeLoadLowLightEnhancer mutate
+// mSuperPoint/mDistortionHead/mEnhancer in place via their load() calls, and every other reader of
+// those (runRelocPass, tryUpdateFingerprint, getSuperPointFeatures, getFingerprintKeypoints,
+// generateFingerprint) reads them with no MobileGS-internal lock of its own -- gEngineMutex is the
+// only thing serializing a live reload against an in-flight detect()/enhance()/run() call. See
+// tools/check_native_locking.py, which finds exactly this class of gap mechanically.
+std::shared_mutex gEngineMutex;
 cv::Mat gLastColorFrame; // MANDATE: Kept in Sensor-Native (Landscape) orientation
 JavaVM* gJvm = nullptr;
 
@@ -263,7 +276,7 @@ extern "C" {
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateDeviceMotion(JNIEnv* env, jobject thiz, jfloatArray angularVel, jfloatArray linearVel) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         // updateDeviceMotion memcpy's 3 floats out of each; a shorter array (or a null one) would
         // read past the end. Validate before pinning rather than trusting the Kotlin caller.
@@ -279,7 +292,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateDeviceMotion
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitialize(JNIEnv* env, jobject thiz) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::unique_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) {
         gSlamEngine = new MobileGS();
         gSlamEngine->initialize(1920, 1080);
@@ -288,37 +301,37 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitialize(JNIEnv*
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDestroy(JNIEnv* env, jobject thiz) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::unique_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) { delete gSlamEngine; gSlamEngine = nullptr; }
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArCoreTrackingState(JNIEnv* env, jobject thiz, jboolean isTracking) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setArCoreTrackingState(isTracking);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetViewportSize(JNIEnv* env, jobject thiz, jint width, jint height) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setViewportSize(width, height);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetRelocEnabled(JNIEnv* env, jobject thiz, jboolean enabled) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setRelocEnabled(enabled);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetSelfGrowEnabled(JNIEnv* env, jobject thiz, jboolean enabled) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setSelfGrowEnabled(enabled);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetEvalRngSeed(JNIEnv* env, jobject thiz, jlong seed) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setEvalRngSeed((long long)seed);
 }
 
@@ -326,7 +339,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetEvalRngSeed(JNI
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetEvalSyncReloc(
         JNIEnv* env, jobject thiz, jboolean enabled, jint everyN) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setEvalSyncReloc(enabled == JNI_TRUE, (int)everyN);
 }
 
@@ -336,19 +349,19 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetEvalSyncReloc(
 // a sidecar claiming otherwise would be the kind of evidence that is worse than none.
 JNIEXPORT jint JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetEvalSyncRelocEveryN(JNIEnv* env, jobject thiz) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     return gSlamEngine ? (jint)gSlamEngine->evalSyncEveryN() : 0;
 }
 
 JNIEXPORT jint JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetWallKeypointCount(JNIEnv* env, jobject thiz) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     return gSlamEngine ? gSlamEngine->getWallKeypointCount() : 0;
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallPatch(JNIEnv* env, jobject thiz, jobject bitmap) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !bitmap) return;
     cv::Mat img; bitmapToMat(env, bitmap, img);
     gSlamEngine->setWallPatch(img);
@@ -357,7 +370,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallPatch(JNIEn
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallPatchBytes(
         JNIEnv* env, jobject thiz, jbyteArray data, jint size) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !data || size <= 0) return;
     // 64-bit product, like every sibling restore path in this file (nativeRestoreWallFingerprint /
     // nativeRestoreWallFingerprintMetric / nativeRestoreWallFeatureMap): size*size in 32-bit jint can
@@ -371,7 +384,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallPatchBytes(
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMappingPaused(JNIEnv* env, jobject thiz, jboolean paused) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setMappingPaused(paused);
 }
 
@@ -380,7 +393,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(
         JNIEnv* env, jobject thiz,
         jfloatArray viewMatrix, jfloatArray projMatrix,
         jlong timestampNs) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         // Both are memcpy'd as 16 floats below (and read as 4x4 by updateCamera), so a short
         // array would read past the end. Validate both before pinning either.
@@ -406,13 +419,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateLightLevel(JNIEnv* env, jobject thiz, jfloat level) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->updateLightLevel(level);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateAnchorTransform(JNIEnv* env, jobject thiz, jfloatArray transform) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         // updateAnchorTransform memcpy's 16 floats out of this. A short or null array is dropped
         // here — the Kotlin side must not read that as "an anchor was written", which is why the
@@ -429,7 +442,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
         JNIEnv* env, jobject thiz, jobject yBuffer, jobject uBuffer, jobject vBuffer,
         jint width, jint height, jint yStride, jint uvStride, jint uvPixelStride, jlong timestampNs, jint cvRotateCode) {
 
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
 
     try {
@@ -621,7 +634,7 @@ JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
         JNIEnv* env, jobject thiz, jobject colorBuffer, jint width, jint height, jlong timestampNs, jint cvRotateCode) {
 
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     uint8_t* buffer = static_cast<uint8_t*>(env->GetDirectBufferAddress(colorBuffer));
     if (!buffer || !gSlamEngine) return;
 
@@ -647,7 +660,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
 JNIEXPORT jboolean JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadSuperPoint(
         JNIEnv* env, jobject thiz, jobject assetManager) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::unique_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return JNI_FALSE;
     AAssetManager* mgr = AAssetManager_fromJava(env, assetManager);
     AAsset* asset = AAssetManager_open(mgr, "superpoint.onnx", AASSET_MODE_BUFFER);
@@ -663,7 +676,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadSuperPoint(
 JNIEXPORT jboolean JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadDistortionHead(
         JNIEnv* env, jobject thiz, jobject assetManager) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::unique_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return JNI_FALSE;
     AAssetManager* mgr = AAssetManager_fromJava(env, assetManager);
     AAsset* asset = AAssetManager_open(mgr, "distortion_head.onnx", AASSET_MODE_BUFFER);
@@ -682,7 +695,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadDistortionHead
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadLowLightEnhancer(
         JNIEnv* env, jobject thiz, jobject assetManager) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::unique_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
     AAssetManager* mgr = AAssetManager_fromJava(env, assetManager);
     AAsset* asset = AAssetManager_open(mgr, "zerodce.onnx", AASSET_MODE_BUFFER);
@@ -705,7 +718,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
     // since JNI can't catch C++ exceptions), and a descriptor blob at least rows*cols*elemSize.
     // The size product is computed in 64-bit so a hostile rows*cols can't overflow past the check.
     // Mirrors the guarded nativeRestoreWallFeatureMap path; the metric sibling below does the same.
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !descArray || !ptsArray) return;
     if (rows < 0 || cols < 0) return;
     int depth = CV_MAT_DEPTH(type);
@@ -741,7 +754,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
     // wraps the descriptor blob (valid OpenCV type + 64-bit overflow-safe size check), and only pass
     // anchor/intrinsics when correctly sized (native copies a fixed 16 / 4 floats and tolerates null),
     // else leave the native defaults.
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !descArray || !ptsArray) return;
     if (rows < 0 || cols < 0) return;
     int depth = CV_MAT_DEPTH(type);
@@ -805,7 +818,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFeature
     // 64-bit (a jsize/jint product here would let a hostile rows*cols overflow past the check and
     // wrap a tiny buffer in a huge cv::Mat -> OOB read), and parallel arrays of matching length.
     // Mirrors nativeRestoreWallFingerprint / nativeRestoreWallFingerprintMetric above.
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !descArray || !ptsArray) return;
     if (rows < 0 || cols < 0) return;
     int depth = CV_MAT_DEPTH(type);
@@ -864,37 +877,37 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFeature
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearWallFeatureMap(JNIEnv*, jobject) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->clearWallFeatureMap();
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearWallFingerprint(JNIEnv*, jobject) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->clearWallFingerprint();
 }
 
 JNIEXPORT jint JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetMapPointCount(JNIEnv*, jobject) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     return gSlamEngine ? gSlamEngine->getMapPointCount() : 0;
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMapRelocEnabled(JNIEnv*, jobject, jboolean enabled) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setMapRelocEnabled(enabled == JNI_TRUE);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMapBuildEnabled(JNIEnv*, jobject, jboolean enabled) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setMapBuildEnabled(enabled == JNI_TRUE);
 }
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportWallFeatureMap(JNIEnv* env, jobject) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
     std::vector<uint8_t> blob = gSlamEngine->exportWallFeatureMap();
     if (blob.empty()) return nullptr;
@@ -997,7 +1010,7 @@ JNIEXPORT jobject JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallFingerprint(
         JNIEnv* env, jobject thiz, jobject bitmap, jobject mask, jobject depthBuffer, jint depthW, jint depthH, jint depthStride, jfloatArray intrArray, jfloatArray viewMatArray) {
 
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
     // generateFingerprint dereferences intr[0..3] and viewMat[0..15] unconditionally (unlike the
     // optional-pointer restore paths above), so a null or short array here is an OOB read past
@@ -1038,7 +1051,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArtworkFingerpr
     // intr[0..3] / viewMat[0..15] unconditionally. Validate before touching either array.
     if (!intrArray || env->GetArrayLength(intrArray) < 4) return;
     if (!viewMatArray || env->GetArrayLength(viewMatArray) < 16) return;
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         cv::Mat composite;
         bitmapToMat(env, bitmap, composite);
@@ -1060,7 +1073,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArtworkFingerpr
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
         JNIEnv* env, jobject thiz, jobject bitmap) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
     cv::Mat frame;
     bitmapToMat(env, bitmap, frame);
@@ -1101,7 +1114,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
 JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDetectSuperPoint(
         JNIEnv* env, jobject thiz, jobject bitmap) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
     cv::Mat image; bitmapToMat(env, bitmap, image);
     if (image.empty()) return nullptr;
@@ -1137,7 +1150,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDetectSuperPoint(
 JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintKeypoints(
         JNIEnv* env, jobject thiz, jobject bitmap, jobject mask) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
     cv::Mat image; bitmapToMat(env, bitmap, image);
     if (image.empty()) return nullptr;
@@ -1166,7 +1179,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintKeyp
 JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetKeypoints(
         JNIEnv* env, jobject thiz, jobject bitmap) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
     cv::Mat frame;
     bitmapToMat(env, bitmap, frame);
@@ -1207,7 +1220,7 @@ extern "C" JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetAnchorTransform(JNIEnv* env, jobject) {
     jfloatArray result = env->NewFloatArray(16);
     if (!result) return nullptr;
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         float mat[16];
         gSlamEngine->getAnchorTransform(mat);
@@ -1218,7 +1231,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetAnchorTransform
 
 extern "C" JNIEXPORT jfloat JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPaintingProgress(JNIEnv* env, jobject) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) return gSlamEngine->getPaintingProgress();
     return 0.0f;
 }
@@ -1228,7 +1241,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPaintingProgres
 // there is certainly no measurement, so the fallback is the sentinel and not a confident zero.
 extern "C" JNIEXPORT jfloat JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCorroborationConfidence(JNIEnv* env, jobject) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) return gSlamEngine->getCorroborationConfidence();
     return -1.0f;
 }
@@ -1259,7 +1272,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostic
     // [12] and [13] default to the "not run" ordinals (kCorrobNotRun = 6, kGrowNotRun = 0) rather
     // than -1: they are enums, and with no engine nothing ran, which is exactly what those say.
     jint vals[14] = {kRelocUnknownOrdinal, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 6, 0};
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         vals[0] = gSlamEngine->lastRelocReject();
         vals[1] = gSlamEngine->lastRelocMatches();
@@ -1293,7 +1306,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostic
 extern "C" JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCorroborationDiagnostics(JNIEnv* env, jobject) {
     jfloat vals[3] = {-1.0f, -1.0f, -1.0f};
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         vals[0] = gSlamEngine->corrobSearchRadiusPx();
         vals[1] = gSlamEngine->lastRelocReprojPx();
@@ -1312,7 +1325,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCorroborationDi
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetDesignPlacement(
         JNIEnv* env, jobject, jfloatArray fpFromDesign16, jfloat halfW, jfloat halfH) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
     if (!fpFromDesign16 || env->GetArrayLength(fpFromDesign16) != 16) {
         gSlamEngine->setDesignPlacement(nullptr, 0.0f, 0.0f);
@@ -1325,7 +1338,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetDesignPlacement
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetStageTimings(JNIEnv* env, jobject, jfloatArray out) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
     // SetFloatArrayRegion bounds-checks and throws on a short array, so this is not a memory-safety
     // hole either way -- but every other array-taking function in this file validates length before
@@ -1342,13 +1355,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetStageTimings(JN
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetStageEnabled(JNIEnv* env, jobject, jint stage, jboolean enabled) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setStageEnabled((int) stage, enabled == JNI_TRUE);
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocResult(JNIEnv* env, jobject, jfloatArray out) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
     // See nativeGetStageTimings above for why this is validated even though SetFloatArrayRegion
     // itself would already reject a short array.
@@ -1363,7 +1376,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocResult(JNI
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintAnchor(JNIEnv* env, jobject, jfloatArray out) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
     // See nativeGetStageTimings above for why this is validated even though SetFloatArrayRegion
     // itself would already reject a short array.
@@ -1379,7 +1392,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintAnch
 JNIEXPORT jbyteArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportFingerprint(
         JNIEnv* env, jobject thiz) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
     std::vector<uint8_t> fingerprint = gSlamEngine->exportFingerprint();
     if (fingerprint.empty()) return nullptr;
@@ -1393,7 +1406,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportFingerprint(
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAlignToFingerprint(
         JNIEnv* env, jobject thiz, jbyteArray data) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !data) return;
     jsize size = env->GetArrayLength(data);
     jbyte* buffer = env->GetByteArrayElements(data, nullptr);
