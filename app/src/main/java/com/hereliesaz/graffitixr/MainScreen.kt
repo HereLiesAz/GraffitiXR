@@ -400,6 +400,20 @@ fun MainScreen(
                         controller = cameraController,
                         modifier = Modifier.fillMaxSize()
                     )
+
+                    // ARCore-unavailable fallback: live-track a captured reference shape via
+                    // BridgedHomographyTracker instead of leaving the design a manually-dragged,
+                    // untracked overlay. Self-contained (owns its own capture UI, tracker, and GL
+                    // surface) — see HomographyFallbackOverlay's doc. The manual 2D design-layer
+                    // draw below is suppressed for this exact combination (editorMode/isArCoreAvailable
+                    // guard on its own `if`) so the two don't render the design twice.
+                    if (!arUiState.isArCoreAvailable) {
+                        com.hereliesaz.graffitixr.feature.ar.HomographyFallbackOverlay(
+                            cameraController = cameraController,
+                            designBitmap = uiState.design?.takeIf { it.isVisible }?.bitmap,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
 
                 EditorMode.MOCKUP, EditorMode.TRACE -> {}
@@ -446,7 +460,11 @@ fun MainScreen(
             }
 
 
-        if (uiState.editorMode != EditorMode.AR) {
+        // Overlay mode on an ARCore-unavailable device renders the design GL-side, tracked, inside
+        // HomographyFallbackOverlay above — this manual, untracked 2D draw would otherwise show a
+        // second, unaligned copy of the same design on top of it.
+        val isOverlayFallbackActive = uiState.editorMode == EditorMode.OVERLAY && !arUiState.isArCoreAvailable
+        if (uiState.editorMode != EditorMode.AR && !isOverlayFallbackActive) {
             // Per-mode whole-design adjustment: position/scale/rotate/fade and tone the entire
             // composited design as a unit for this mode (DESIGN mode is the global, unadjusted view).
             val modeAdj = if (uiState.editorMode != EditorMode.DESIGN) {

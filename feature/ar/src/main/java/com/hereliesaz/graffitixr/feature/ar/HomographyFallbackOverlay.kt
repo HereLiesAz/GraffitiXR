@@ -8,18 +8,32 @@ import androidx.annotation.OptIn
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.view.LifecycleCameraController
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.hereliesaz.graffitixr.feature.ar.rendering.HomographyOverlayRenderer
 import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -29,16 +43,18 @@ import kotlinx.coroutines.withContext
  * `GLSurfaceView` over its camera background: `setZOrderMediaOverlay(true)` +
  * `PixelFormat.TRANSLUCENT` so this draws on top while staying otherwise invisible.
  *
- * Self-contained on purpose — owns its [BridgedHomographyTracker], [HomographyTrackingAnalyzer],
- * and [HomographyOverlayRenderer] internally, attaching/detaching the CameraX analyzer as this
- * enters/leaves composition — so wiring it into `MainScreen.kt`'s existing `EditorMode.OVERLAY`
- * branch is a small, mechanical addition rather than a deep change to that file or `ArViewModel`.
+ * Self-contained on purpose — owns its own reference capture (a "Capture Target" button, shown
+ * until the artist taps it), [BridgedHomographyTracker], [HomographyTrackingAnalyzer], and
+ * [HomographyOverlayRenderer], attaching/detaching the CameraX analyzer as this enters/leaves
+ * composition — so wiring it into `MainScreen.kt`'s existing `EditorMode.OVERLAY` branch is a
+ * small, mechanical addition rather than a deep change to that file or `ArViewModel`.
  *
- * No-ops (renders nothing) until [referenceBitmap] is non-null — the caller is responsible for
- * getting one, e.g. via a `TargetCreationFlow`-style capture reused for this purpose.
+ * The captured reference photo's own full frame is treated as the tracked rectangle (half-width
+ * fixed at 1.0, half-height at its aspect ratio) — a placeholder convention, not a measurement of
+ * anything on the wall; a future pass that lets the artist mark the shape's actual corners (e.g.
+ * reusing `TargetCreationFlow`'s `UnwarpScreen`, as AR mode's own target capture does) would
+ * replace this, not the tracking underneath it.
  *
- * @param referenceBitmap the traced/painted shape's reference photo — see
- *   `HomographyArTracker.setReference`'s doc for what [objectHalfW]/[objectHalfH] must match.
  * @param designBitmap the current design composite to texture the tracked quad with; null draws
  *   nothing (tracking still runs, so a design supplied later appears without re-tracking).
  * @param onPoseTracked observes each frame's tracking result — null means lost. Optional; mainly
@@ -49,16 +65,36 @@ import kotlinx.coroutines.withContext
 @Composable
 fun HomographyFallbackOverlay(
     cameraController: LifecycleCameraController,
-    referenceBitmap: Bitmap?,
-    objectHalfW: Float,
-    objectHalfH: Float,
     designBitmap: Bitmap?,
     onPoseTracked: (HomographyArTracker.HomographyPose?) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    if (referenceBitmap == null) return
-
     val context = LocalContext.current
+    var referenceBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+    if (referenceBitmap == null) {
+        val scope = rememberCoroutineScope()
+        Box(modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+            Button(
+                onClick = {
+                    scope.launch {
+                        referenceBitmap = runCatching { cameraController.takePictureAsBitmap(context) }
+                            .getOrNull()
+                    }
+                },
+                modifier = Modifier
+                    .padding(32.dp)
+                    .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
+            ) {
+                Text("Capture Target")
+            }
+        }
+        return
+    }
+    val reference = referenceBitmap!!
+    val objectHalfW = 1f
+    val objectHalfH = reference.height.toFloat() / reference.width.toFloat()
+
     val bridgedTracker = remember(context) { BridgedHomographyTracker(context) }
     val glRenderer = remember(context) { HomographyOverlayRenderer(context) }
 
@@ -67,11 +103,11 @@ fun HomographyFallbackOverlay(
         onDispose { bridgedTracker.stop() }
     }
 
-    LaunchedEffect(bridgedTracker, referenceBitmap, objectHalfW, objectHalfH) {
+    LaunchedEffect(bridgedTracker, reference, objectHalfW, objectHalfH) {
         // setReference runs synchronous native ORB detection over a full photo — off the Main
         // dispatcher LaunchedEffect otherwise runs on, so it doesn't jank composition.
         withContext(Dispatchers.Default) {
-            bridgedTracker.setReference(referenceBitmap, objectHalfW, objectHalfH)
+            bridgedTracker.setReference(reference, objectHalfW, objectHalfH)
         }
         glRenderer.setExtent(objectHalfW, objectHalfH)
     }
