@@ -72,5 +72,8 @@ internal fun buildHelpItems(strings: AppStrings): Map<String, Any> = mapOf(
     "proj.settings" to strings.help.appSettings,
 
     // Global
-    "item.help" to strings.nav.help,
+    // strings.nav.help is the rail label ("Help"); strings.nav.helpInfo is the actual guidance
+    // text ("Tap any button while Help is active to see what it does.") — using the label here
+    // made Help's own help entry just repeat its own name.
+    "item.help" to strings.nav.helpInfo,
 )

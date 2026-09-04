@@ -66,6 +66,14 @@ fixed this pass:
   28 unused `AppStrings.Help` fields (`targetHost` through `cloudOffset` — an old per-layer
   authoring toolset with zero call sites) plus their string resources across all 15 locale
   `strings.xml` files and the orphaned `ic_ps_liquify.xml` drawable.
+- **Two UX-audit help-text findings, fixed:** `HelpItemsBuilder`'s `"item.help"` entry mapped to
+  `strings.nav.help` (the rail label "Help") instead of `strings.nav.helpInfo` (the actual guidance,
+  "Tap any button while Help is active to see what it does") — Help's own help entry just repeated
+  its own name. Fixed to use `helpInfo`. Separately, Trace mode's `help_lock_trace` string described
+  Freeze (which locks the *entire touchscreen*, escapable only via a Volume Up/Down/Up/Down
+  sequence) without ever mentioning that escape sequence — a stranded user reading the one help
+  entry that should tell them how out had no way to find out. Added it (English only this pass; the
+  other 14 locale strings still carry the old text and should be brought in line).
 
 #### Dead-features clearance pass
 
