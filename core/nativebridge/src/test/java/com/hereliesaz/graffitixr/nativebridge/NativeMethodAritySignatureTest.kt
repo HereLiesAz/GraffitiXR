@@ -154,7 +154,12 @@ class NativeMethodAritySignatureTest {
         fun countCppParams(params: String): Int = splitTopLevel(params)
 
         fun splitTopLevel(params: String): Int {
-            val body = params.trim()
+            // A multi-line Kotlin parameter list conventionally ends with a trailing comma (e.g.
+            // HomographyTrackerNative.nativeHomographyTrack, YuvConverter.nativeYuvToRgbaBitmap) —
+            // without stripping it, that comma counts as one more separator than there are
+            // parameters, over-counting by exactly one and false-failing this test against C++
+            // declarations (which have no such convention) even when both sides genuinely agree.
+            val body = params.trim().removeSuffix(",")
             if (body.isEmpty()) return 0
             var depth = 0
             var count = 1
