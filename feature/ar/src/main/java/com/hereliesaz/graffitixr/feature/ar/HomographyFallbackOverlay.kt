@@ -68,9 +68,9 @@ private val DEFAULT_UNWARP_POINTS = listOf(
  *
  * @param designBitmap the current design composite to texture the tracked quad with; null draws
  *   nothing (tracking still runs, so a design supplied later appears without re-tracking).
- * @param onPoseTracked observes each frame's tracking result — null means lost. Optional; mainly
- *   for a caller that wants to surface a "reacquiring…" indicator (ARCore's `TrackingState`
- *   equivalent) alongside this composable.
+ * @param onPoseTracked observes each frame's tracking result — null means lost, which also
+ *   drives this composable's own "Reacquiring target…" banner (ARCore's `TrackingState`
+ *   equivalent). Optional — for a caller that additionally wants the raw pose stream.
  */
 @OptIn(ExperimentalCamera2Interop::class)
 @Composable
@@ -138,6 +138,10 @@ fun HomographyFallbackOverlay(
 
     val bridgedTracker = remember(context) { BridgedHomographyTracker(context) }
     val glRenderer = remember(context) { HomographyOverlayRenderer(context) }
+    // AR mode's own TrackingState equivalent — HomographyTrackingAnalyzer's callback runs on a
+    // background executor, but Compose's Snapshot state supports writes from any thread and
+    // schedules recomposition correctly, so this needs no dispatcher hop.
+    var isTrackingLost by remember { mutableStateOf(false) }
 
     DisposableEffect(bridgedTracker) {
         bridgedTracker.start()
@@ -173,6 +177,7 @@ fun HomographyFallbackOverlay(
             val executor = Executors.newSingleThreadExecutor()
             val analyzer = HomographyTrackingAnalyzer(context, id, bridgedTracker) { frame ->
                 onPoseTracked(frame?.pose)
+                isTrackingLost = frame == null
                 if (frame != null) {
                     glRenderer.updatePose(frame.pose.viewMatrix, frame.projMatrix)
                 } else {
@@ -200,4 +205,20 @@ fun HomographyFallbackOverlay(
         onRelease = { view -> view.queueEvent { glRenderer.release() } },
         modifier = modifier.fillMaxSize(),
     )
+
+    // TrackingState.TRACKING == false, ARCore mode's own equivalent (see ArViewModel's
+    // scan_hint_recover) — this fallback had no such signal at all before, silently drawing
+    // nothing with no explanation why.
+    if (isTrackingLost) {
+        Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            Text(
+                text = "Reacquiring target…",
+                color = Color.White,
+                modifier = Modifier
+                    .padding(top = 32.dp)
+                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
+    }
 }
