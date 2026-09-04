@@ -78,6 +78,7 @@ internal sealed interface EditorIntent {
      * may then turn any layer back on manually until the method changes again.
      */
     data object FeedbackShown : EditorIntent
+    data object LockedFeedbackShown : EditorIntent
 
     // ── Spectator / remote-op application (no panel or gesture side effects) ──
     data class SetDesignTransform(val scale: Float, val offset: Offset, val rx: Float, val ry: Float, val rz: Float) : EditorIntent

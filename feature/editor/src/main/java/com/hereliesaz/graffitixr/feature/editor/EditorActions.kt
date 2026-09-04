@@ -67,6 +67,7 @@ interface EditorActions {
     fun onAdjustmentEnd()
 
     fun onFeedbackShown()
+    fun onLockedFeedbackShown()
 
     fun onAdjustClicked()
     fun onDismissPanel()

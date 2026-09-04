@@ -23,8 +23,9 @@ one-at-a-time.
 Run it after any change to MobileGS.cpp/.h, or as part of CI, to keep that invariant honest
 instead of taking it on faith.
 
-WHAT THIS SCRIPT DOES NOT COVER (found the hard way -- a glee audit caught both after this
-script reported clean):
+WHAT THIS SCRIPT STILL DOES NOT COVER (found the hard way -- a glee audit caught all of this,
+including two items previously listed here as known gaps and since closed: brace-initialized
+members and header-inline method bodies are now handled; see the fixes below):
   1. JNI-LEVEL GLOBALS. This script only parses MobileGS.h/MobileGS.cpp -- it has no idea
      GraffitiJNI.cpp exists. `gLastColorFrame`, a plain `cv::Mat` global written by both
      nativeFeedYuvFrame and nativeFeedColorFrame, needed its own mutex (gColorFrameMutex) once
@@ -38,15 +39,21 @@ script reported clean):
      lock on the loader entry points only protects them against JNI-entry readers, not that
      thread. This script cannot see any of it; don't read its clean output as proof those
      classes are safe.
-  3. BRACE-INITIALIZED MEMBERS. `std::atomic<int> mFoo{0};` does not match MEMBER_DECL_RE
-     (which expects `= ...;`), so such members are silently invisible to this script rather
-     than counted as atomic or plain. They happen to currently all be atomic (safe by
-     accident), but a future `int mFoo{0};` (non-atomic, brace-initialized) would be invisible
-     too, and any unguarded access to it would pass with no warning.
 
-In short: a clean run means "no unguarded access to a plain MobileGS.h member, referenced with
-`= ...;`-style initialization, in a function body inside MobileGS.cpp" -- not "this file's
-locking is correct," and definitely not "GraffitiJNI.cpp's locking is correct."
+A second glee audit, run specifically to distrust this script's own coverage claims, measured
+that the two "handled" gaps below were in fact still open at the time: the header declares
+roughly 30 std::atomic members, and this script's member regex saw only 2 of them before the
+brace-init fix; getMapPointCount()/getWallKeypointCount() (both inline in MobileGS.h, both
+touching plain members) were entirely unexamined before the header-inline-body fix; the
+destructor (~MobileGS) was skipped by FUNC_START_RE before the tilde fix. All three are fixed
+now (verify by re-running: the OK message reports the actual counts), but the fact that a
+"docstring says it's fixed" claim was wrong before is itself the reason to verify the counts
+look right after any future change to this script, not just trust its own text.
+
+In short: a clean run means "no unguarded access to a plain MobileGS.h member (including
+brace-initialized ones) in a MobileGS:: function body, whether defined in MobileGS.cpp or
+inline in the header" -- not "this file's locking is correct" in any deeper sense, and
+definitely not "GraffitiJNI.cpp's locking is correct" (see gap 1 above).
 
 Exit code 0 = clean. Exit code 1 = at least one unguarded access found.
 """
@@ -62,13 +69,22 @@ HEADER = REPO_ROOT / "core/nativebridge/src/main/cpp/include/MobileGS.h"
 SOURCE = REPO_ROOT / "core/nativebridge/src/main/cpp/MobileGS.cpp"
 
 MEMBER_DECL_RE = re.compile(
-    r"^\s*(?:mutable\s+)?[A-Za-z_][\w:<>,\*\& ]*\bm([A-Z]\w*)\s*(\[[^\]]*\])?\s*(=.*)?;\s*(//.*)?$"
+    r"^\s*(?:mutable\s+)?[A-Za-z_][\w:<>,\*\& ]*\bm([A-Z]\w*)\s*(\[[^\]]*\])?"
+    r"\s*(=.*|\{[^{}]*\})?;\s*(//.*)?$"
 )
 ATOMIC_DECL_RE = re.compile(r"std::atomic<")
 LOCK_DECL_RE = re.compile(
     r"std::(?:lock_guard|unique_lock|shared_lock)<[^>]*>\s+\w+\s*\(\s*(m\w+)\s*\)"
 )
-FUNC_START_RE = re.compile(r"^[\w:<>,\*\&\s]+\bMobileGS::(\w+)\s*\(")
+FUNC_START_RE = re.compile(r"^[\w:<>,\*\&\s]*\bMobileGS::(~?\w+)\s*\(")
+# A method defined entirely inline in the header, body and all on one line -- e.g.
+# `int getMapPointCount() const { std::lock_guard<std::mutex> lock(mMutex); return ...; }`.
+# MobileGS.cpp's split_functions() handles multi-line bodies via brace-depth tracking; every
+# inline body in this header happens to be single-line, so a same-line { ... } is enough here
+# rather than reimplementing that tracker for the header too.
+HEADER_INLINE_FUNC_RE = re.compile(
+    r"^\s*[\w:<>,\*\&]+[\s\*\&]+(\w+)\s*\([^;{}]*\)\s*(?:const)?\s*\{.*\}\s*;?\s*$"
+)
 
 # Members that are legitimately touched outside any lock by design, with the reasoning
 # cited below. Keep this list short and cited -- it is an explicit allowlist of
@@ -101,6 +117,13 @@ KNOWN_UNLOCKED_OK = {
     "mSuperPoint",
     "mEnhancer",
     "mDistortionHead",
+    # getMutex() returns a reference to mMutex ITSELF so several GraffitiJNI.cpp call sites can
+    # lock_guard it externally (grep getMutex() -- all four callers do exactly that). Requiring
+    # a lock already be held to read a reference to the lock object would be circular; this is
+    # the correct, intentional escape hatch that pattern needs, not an unguarded access to a
+    # protected member. Found by split_header_inline_functions() once it started examining
+    # header-inline bodies -- a real new finding from that fix, reviewed and allowlisted.
+    "mMutex",
 }
 
 
@@ -167,6 +190,18 @@ def split_functions(source_text: str) -> list[tuple[str, int, list[str]]]:
     return functions
 
 
+def split_header_inline_functions(header_text: str) -> list[tuple[str, int, list[str]]]:
+    """Return [(function_name, line_no, [the one line])] for single-line inline method bodies
+    defined directly in the header (e.g. `int getMapPointCount() const { ...; }`)."""
+    functions: list[tuple[str, int, list[str]]] = []
+    for i, line in enumerate(header_text.splitlines()):
+        m = HEADER_INLINE_FUNC_RE.match(line)
+        if not m:
+            continue
+        functions.append((m.group(1), i + 1, [line]))
+    return functions
+
+
 def check_function(name: str, body: list[str], plain_members: set[str]) -> list[Finding]:
     findings: list[Finding] = []
     depth = 0
@@ -210,9 +245,11 @@ def main() -> int:
         return 2
 
     functions = split_functions(source_text)
+    header_functions = split_header_inline_functions(header_text)
     if not functions:
         print("ERROR: parsed zero MobileGS:: function bodies -- source regex is out of sync.", file=sys.stderr)
         return 2
+    functions = functions + header_functions
 
     all_findings: list[Finding] = []
     for name, _start, body in functions:

@@ -61,7 +61,9 @@ internal object EditorReducer {
         is EditorIntent.ApplyModeTransformGesture -> {
             val cur = state.modeAdjustments[intent.mode] ?: ModeAdjustment()
             // Locked: the user pinned this mode's whole-design position, so ignore transform gestures.
-            if (cur.isTransformLocked) state
+            // showLockedFeedback flags this so the UI can surface it (see that field's doc) instead
+            // of the gesture just silently doing nothing.
+            if (cur.isTransformLocked) state.copy(showLockedFeedback = true)
             else {
                 // Rotation goes to the axis selected by the double-tap cycle (activeRotationAxis): X/Y
                 // tilt the whole design about its width/height, Z spins it in-plane. All four
@@ -96,6 +98,7 @@ internal object EditorReducer {
         EditorIntent.TogglePlaneGrids -> state.copy(showPlaneGrids = !state.showPlaneGrids)
         EditorIntent.TogglePoints -> state.copy(showPoints = !state.showPoints)
         EditorIntent.FeedbackShown -> state.copy(showRotationAxisFeedback = false)
+        EditorIntent.LockedFeedbackShown -> state.copy(showLockedFeedback = false)
 
         is EditorIntent.SetDesignTransform -> state.mapDesign {
             it.copy(scale = intent.scale, offset = intent.offset, rotationX = intent.rx, rotationY = intent.ry, rotationZ = intent.rz)
@@ -156,7 +159,9 @@ internal object EditorReducer {
      * defeat the whole point of locking.
      */
     private fun reduceTransformReset(state: EditorUiState): EditorUiState {
-        if (state.modeAdjustments[state.editorMode]?.isTransformLocked == true) return state
+        if (state.modeAdjustments[state.editorMode]?.isTransformLocked == true) {
+            return state.copy(showLockedFeedback = true)
+        }
 
         val stash = state.transformStash
         if (stash != null && stash.mode == state.editorMode) {
