@@ -484,19 +484,46 @@ device, no ARCore) and a half-built AR interaction is worse than a documented pl
   exist and Trace's usage in the field is visible against them — revisiting the taxonomy before
   that would be guessing at a UX that doesn't exist yet.
 
-### Phase 7 — Test backfill (land alongside, not after, the fix each covers)
+### Phase 7 — Test backfill (blocked on test infra this sandbox doesn't have)
+
+All four items below were investigated, not skipped on assumption. Each needs test
+infrastructure that does not exist in this repo/environment, verified directly rather than
+inferred:
 
 - [ ] `HomographyTracker`: a known-answer-pose test for the CV→GL conversion (would have caught
-  Phase 2's sign-error bug directly — this is the concrete instance of "zero executable tests for
-  the most convention-sensitive line in the file").
+  Phase 2's sign-error bug directly). **Blocked**: pure native C++ (OpenCV), no host OpenCV
+  available (`pkg-config --exists opencv4` fails, no `libopencv_core*` anywhere on this machine)
+  and no `androidTest` source set exists anywhere in the repo to run it on-device instead.
 - [ ] `HomographyFallbackOverlay`: behavioral tests for the texture-clear-on-null path and the
-  `cameraId` wiring, once Phase 2/4's related fixes land — currently one "doesn't throw" test per
-  class.
+  `cameraId` wiring. **Blocked**, for two different reasons per path: `clearPose()`'s texture
+  path is a real `GLSurfaceView.Renderer.onDrawFrame` — needs a live EGL/GL context, not
+  reachable from a plain JVM unit test (see `HomographyOverlayRendererTest`'s own existing tests,
+  which cover only the pure-math `letterboxViewport`, never `onDrawFrame` itself, for the same
+  reason). `cameraId` feeds `CameraIntrinsicsEstimator.estimate`, which calls Android's real
+  `CameraManager` — throws "not mocked" on plain JVM; this module has no Robolectric dependency
+  to shadow it (checked: no `robolectric` reference in `feature/ar/build.gradle.kts`, no
+  `@RunWith(RobolectricTestRunner)` anywhere under its `src/test`). Adding Robolectric is a real
+  infra decision (new dependency, config across every module with native/Android-framework
+  seams) — out of scope for a test-backfill pass, flagged here rather than added silently.
 - [ ] `restoreWallFingerprint`/`alignToFingerprint`: tests asserting stale co-registration state
   (`mHasFingerprintView`, `mFingerprintAnchorMatrix`, `mWallPatch`) is actually cleared on the
-  paths fixed in Phase 1.
-- [ ] `nativeFeedColorFrame`: a contract test mirroring `nativeFeedYuvFrame`'s existing
-  buffer-too-small guard test, once Phase 1's fix lands.
+  paths fixed in Phase 1. **Blocked**: same as the `HomographyTracker` item — native C++ methods
+  on `MobileGS`, no gtest/native test binary in the repo, no `androidTest` to exercise the real
+  `.so` on-device.
+- [ ] `nativeFeedColorFrame`: a contract test mirroring `nativeFeedYuvFrame`'s buffer-too-small
+  guard. **Note the premise was already slightly off**: no *executable* guard test for
+  `nativeFeedYuvFrame` exists to mirror either (checked: nothing under
+  `core/nativebridge/src/test` or `feature/ar/src/test` references `feedYuvFrame`/
+  `feedColorFrame`/`sliceDirect`) — the guard itself is real code
+  (`GraffitiJNI.cpp`'s `yCap`/`uCap`/`vCap` checks), just as untested as the one Phase 1 added to
+  `nativeFeedColorFrame`, for the same native-test-infra gap as the other three items here.
+
+None of these are stub tests waiting to be filled in — each would need new test infrastructure
+(host-buildable OpenCV, a native gtest target wired into the build, an `androidTest` source set
+with device/emulator CI, or Robolectric) that is a project-level decision, not something to
+bootstrap silently inside a backlog cleanup pass. Recommended next step for whoever picks this
+up: decide which of those four infra investments the project wants (they are not mutually
+exclusive, but do not share setup cost), then this list becomes actionable.
 
 ### Sequencing notes
 
