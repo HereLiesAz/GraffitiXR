@@ -10,6 +10,7 @@ import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.view.LifecycleCameraController
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -62,9 +63,12 @@ private val DEFAULT_UNWARP_POINTS = listOf(
  * `EditorMode.OVERLAY` branch is a small, mechanical addition rather than a deep change to that
  * file or `ArViewModel`.
  *
- * The rectified bitmap's own aspect ratio becomes the tracked rectangle's half-extents — an
- * accurate measurement of the marked shape (in the rectified image's own pixel units), not the
- * whole camera frame.
+ * The rectified bitmap's own aspect ratio becomes the tracked rectangle's half-extents — a
+ * measurement of the marked shape in the RECTIFIED image's own pixel units (not the whole camera
+ * frame), exact when the corners were marked square-on and increasingly approximate the more
+ * obliquely they were marked (`PerspectiveProcessor.unwarpImage` sizes the rectified output from
+ * each edge's longest visible length, not a true metric aspect — that needs the camera intrinsics
+ * and a plane-normal decomposition, which nothing here computes).
  *
  * @param designBitmap the current design composite to texture the tracked quad with; null draws
  *   nothing (tracking still runs, so a design supplied later appears without re-tracking).
@@ -84,24 +88,41 @@ fun HomographyFallbackOverlay(
     var rawCaptureBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var unwarpPoints by remember { mutableStateOf(DEFAULT_UNWARP_POINTS) }
     var referenceBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    // Set when a marked patch was rejected (too plain/blurry — HomographyTracker::setReference
+    // needs >= 30 ORB features) so the "Capture Target" screen can say why instead of the user
+    // just landing back there with no explanation. Cleared on the next capture attempt.
+    var referenceRejected by remember { mutableStateOf(false) }
 
     if (referenceBitmap == null) {
         val scope = rememberCoroutineScope()
         val raw = rawCaptureBitmap
         if (raw == null) {
             Box(modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-                Button(
-                    onClick = {
-                        scope.launch {
-                            rawCaptureBitmap = runCatching { cameraController.takePictureAsBitmap(context) }
-                                .getOrNull()
-                        }
-                    },
-                    modifier = Modifier
-                        .padding(32.dp)
-                        .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
-                ) {
-                    Text("Capture Target")
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (referenceRejected) {
+                        Text(
+                            text = "That patch didn't have enough detail to track — try a spot with more texture or pattern.",
+                            color = Color.White,
+                            modifier = Modifier
+                                .padding(bottom = 12.dp)
+                                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                    Button(
+                        onClick = {
+                            referenceRejected = false
+                            scope.launch {
+                                rawCaptureBitmap = runCatching { cameraController.takePictureAsBitmap(context) }
+                                    .getOrNull()
+                            }
+                        },
+                        modifier = Modifier
+                            .padding(bottom = 32.dp)
+                            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
+                    ) {
+                        Text("Capture Target")
+                    }
                 }
             }
         } else {
@@ -150,11 +171,20 @@ fun HomographyFallbackOverlay(
 
     LaunchedEffect(bridgedTracker, reference, objectHalfW, objectHalfH) {
         // setReference runs synchronous native ORB detection over a full photo — off the Main
-        // dispatcher LaunchedEffect otherwise runs on, so it doesn't jank composition.
-        withContext(Dispatchers.Default) {
+        // dispatcher LaunchedEffect otherwise runs on, so it doesn't jank composition. Its result
+        // was previously discarded: a rejected reference (too plain/blurry — under
+        // HomographyTracker's minimum feature count) left the user reading "Reacquiring target…"
+        // forever, with no control on screen that could get them back to recapture.
+        val accepted = withContext(Dispatchers.Default) {
             bridgedTracker.setReference(reference, objectHalfW, objectHalfH)
         }
-        glRenderer.setExtent(objectHalfW, objectHalfH)
+        if (accepted) {
+            glRenderer.setExtent(objectHalfW, objectHalfH)
+        } else {
+            referenceRejected = true
+            referenceBitmap = null
+            rawCaptureBitmap = null
+        }
     }
 
     LaunchedEffect(glRenderer, designBitmap) {
@@ -179,7 +209,7 @@ fun HomographyFallbackOverlay(
                 onPoseTracked(frame?.pose)
                 isTrackingLost = frame == null
                 if (frame != null) {
-                    glRenderer.updatePose(frame.pose.viewMatrix, frame.projMatrix)
+                    glRenderer.updatePose(frame.pose.viewMatrix, frame.projMatrix, frame.frameAspect)
                 } else {
                     glRenderer.clearPose()
                 }
