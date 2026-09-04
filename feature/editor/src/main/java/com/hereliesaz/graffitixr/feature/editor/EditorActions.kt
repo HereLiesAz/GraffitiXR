@@ -43,8 +43,18 @@ interface EditorActions {
 
     fun toggleImageLock()
 
-    /** Choose (or replace) the design image. */
+    /**
+     * Choose the design image. If one is already placed, this stages the pick behind a
+     * confirmation ([confirmReplaceDesign] / [cancelReplaceDesign]) rather than replacing it
+     * outright — see [com.hereliesaz.graffitixr.common.model.EditorUiState.pendingReplaceUri].
+     */
     fun onAddLayer(uri: Uri)
+
+    /** Confirms a pending replace staged by [onAddLayer], applying it. No-op if none is pending. */
+    fun confirmReplaceDesign()
+
+    /** Discards a pending replace staged by [onAddLayer], keeping the current design. */
+    fun cancelReplaceDesign()
 
     // Placement is driven entirely by gestures (onTransformGesture / onModeTransformGesture /
     // onCycleRotationAxis), not per-field setters: the sliders that scale/offset/per-axis-rotation

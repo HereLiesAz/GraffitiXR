@@ -1,6 +1,12 @@
 # Distortion Head — viewpoint/partial-aware relocalization
 
-**Status:** spec + offline training pipeline (no device wiring yet).
+**Status:** the model is bundled and wired — `distortion_head.onnx` ships as an asset,
+`ArViewModel` loads it unconditionally every AR session, and `MobileGS::runRelocPass` runs it every
+reloc attempt. Of the five integration steps in §5 below, only step 5 (`coverage` →
+`mPaintingProgress`, plus the `matchability` gate feeding `mCorroborationConfidence` — see
+`docs/TELEOLOGICAL_SLAM.md`) has actually landed. Steps 2-4 (matchability-gated early-out, corners/H
+guiding rectification, pose-adaptive thresholds) remain unimplemented — the sections below describing
+them are still the original, unbuilt spec.
 **Owns:** the "does the relocalizer *know* it's seeing the target obliquely / up-close / partially?" problem.
 **Slots into:** the relocalization-first build (replaces the "IPPE + flip-resolution +
 distance/FOV-adaptive thresholds" sub-item with a learned version that *also* emits a
@@ -144,14 +150,21 @@ Self-supervised **homographic adaptation**; the head only ever sees frozen Super
 
 Insert between SuperPoint detection (`MobileGS.cpp:299`) and PnP (`:306+`):
 
-1. `head(desc_cur, desc_fp)` → `corners, pose, matchability, coverage`.
-2. **matchability low → `continue`** (kills wasted-PnP on non-matches).
+1. `head(desc_cur, desc_fp)` → `corners, pose, matchability, coverage`. **Shipped**, though not in
+   this exact shape: `MobileGS::runRelocPass` crops the live frame around the coarse match centroid
+   and runs it against the wall's canonical patch.
+2. **matchability low → `continue`** (kills wasted-PnP on non-matches). **Not implemented** — a low
+   `matchability` currently only suppresses the progress/confidence publish (`decayCorroboration()`),
+   it never short-circuits PnP.
 3. **Use the warp to guide, never to decide:** rectify current keypoints toward the canonical frame
    so descriptor matching survives the tilt, and seed PnP (`SOLVEPNP_IPPE` with the planar
    correspondences, or `useExtrinsicGuess=true` from the `corners`-derived pose). Geometry stays the
-   source of truth — a regressed `H` never writes the pose directly; PnP inliers verify it.
-4. **`pose` → adaptive thresholds** (replace fixed `0.75` / `12` / `8px`).
-5. **`coverage` → `mPaintingProgress`.**
+   source of truth — a regressed `H` never writes the pose directly; PnP inliers verify it. **Not
+   implemented** — `corners`/`H` (`dist[0..7]`) are decoded and never read again.
+4. **`pose` → adaptive thresholds** (replace fixed `0.75` / `12` / `8px`). **Not implemented** —
+   `kRelocLoweRatio` is still the fixed `0.75`.
+5. **`coverage` → `mPaintingProgress`.** **Shipped**, alongside `matchability` →
+   `mCorroborationConfidence`, gated at `matchability > 0.5f`. See `docs/TELEOLOGICAL_SLAM.md`.
 
 ### Why this is load-bearing, not decoration
 

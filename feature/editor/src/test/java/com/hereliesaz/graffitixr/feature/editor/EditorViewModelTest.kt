@@ -13,7 +13,6 @@ import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import com.hereliesaz.graffitixr.common.coop.OpEmitter
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
-import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.*
@@ -47,7 +46,6 @@ class EditorViewModelTest {
     private val context: Context = mockk(relaxed = true)
     private val projectManager: ProjectManager = mockk(relaxed = true)
     private val exportManager: com.hereliesaz.graffitixr.feature.editor.export.ExportManager = mockk(relaxed = true)
-    private val slamManager: SlamManager = mockk(relaxed = true)
     private val opEmitter: OpEmitter = mockk(relaxed = true)
     private val subjectIsolator: SubjectIsolator = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
@@ -127,7 +125,7 @@ class EditorViewModelTest {
 
         viewModel = EditorViewModel(
             projectRepository, settingsRepository, projectManager, exportManager, context,
-            slamManager, testDispatcherProvider, opEmitter, subjectIsolator
+            testDispatcherProvider, opEmitter, subjectIsolator
         )
     }
 
@@ -374,7 +372,7 @@ class EditorViewModelTest {
         every { settingsRepository.isRightHanded } returns kotlinx.coroutines.flow.flowOf(false)
         val restoredViewModel = EditorViewModel(
             projectRepository, settingsRepository, projectManager, exportManager, context,
-            slamManager, object : DispatcherProvider {
+            object : DispatcherProvider {
                 override val main: kotlinx.coroutines.CoroutineDispatcher = testDispatcher
                 override val io: kotlinx.coroutines.CoroutineDispatcher = testDispatcher
                 override val default: kotlinx.coroutines.CoroutineDispatcher = testDispatcher

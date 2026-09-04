@@ -17,6 +17,31 @@
 - **Voxel Memory — Frustum Culling.** Implemented true NDC-based visible splat confidence calculation in `VoxelHash`.
 - **Relocalization — Thread Safety.** Added mutex locking to `mWallDescriptors` and `mWallKeypoints3D` in `MobileGS` to prevent races between JNI updates and the background PnP thread.
 
+#### Glee audit pass (2026-09-04)
+
+Five parallel adversarial audits (code-vs-claims, UX/interaction, conceptual/product design,
+architecture/engineering, docs cross-consistency). Full findings are in that session's transcript;
+fixed this pass:
+
+- **`EditorViewModel` had a second, dumber project-load path racing `ArViewModel`'s.**
+  `restoreWorld`/`internal val slamManager` skipped fingerprint-region partitioning, the
+  legacy-frame refusal, and clearing stale design placement — silently corrupting reloc state on a
+  project switch. Deleted the whole path; `ArViewModel.loadFingerprintIfExists` is now the only
+  loader. Also dropped `:feature:editor`'s `:core:nativebridge` dependency, which existed only for
+  this.
+- **"Open" replaced the design outright with no confirmation**, contradicted by four
+  strings/comments calling it "add a layer." Added a stage-then-confirm step
+  (`EditorUiState.pendingReplaceUri`, `EditorActions.confirmReplaceDesign`/`cancelReplaceDesign`) —
+  a picker result only replaces immediately when there's nothing to lose; otherwise it asks first.
+  Undo already covered this (`pushHistory()` runs before the replace), so the dialog says so.
+- **`docs/TELEOLOGICAL_SLAM.md` and `docs/DISTORTION_HEAD.md` described the wrong mechanism as the
+  one producing painting-progress/confidence.** The bundled `distortion_head.onnx` (loaded
+  unconditionally every AR session) is the actual producer in a normal install; the
+  descriptor-similarity test they described in detail is an inert fallback for a build with the
+  asset stripped. Corrected both docs and the stale `confGlobal` KDoc in `PoseFusion.kt` (which
+  still described the pre-Phase-5b whole-design-progress semantics `CONF_FLOOR`'s own doc, five
+  lines above it, had already retracted).
+
 #### Dead-features clearance pass
 
 The audit's "Dead / unreachable features" section is closed. Actions:
@@ -74,3 +99,60 @@ Verified by `testDebugUnitTest` (413 tests), `externalNativeBuildDebug`, `detekt
 
 Remaining open items (all in `docs/AUDIT.md` under "Still open"): Glasses AR session, AR
 freeze-preview, bidirectional co-op, and a short list of unreferenced diagnostic/eval knobs.
+
+#### Glee audit pass (2026-09-04) — not yet acted on
+
+Correctness bugs, worst first:
+
+- **Relocalization status chip can never render** — `MainActivity.kt`'s gate condition
+  (`!arUiState.isAnchorEstablished`) and the state computation's own early-return
+  (`if (relocState == RelocState.IDLE) return`) are mutually exclusive; `SEARCHING`/`TRACKING`
+  are dead branches.
+- **First-run AR instruction tells the user to tap the icon that hides the rail** — the
+  `showDesignInstructionsDialog` copy ("Tap the menu icon, then tap 'Open'") targets a `noMenu`
+  rail whose icon collapses it, not opens it.
+- **README claims snap-back is an opt-in toggle, off by default; it is unconditionally on with no
+  UI path to disable it.** `setRelocEnabled` has no caller anywhere; `mRelocEnabled` defaults
+  `true` in `MobileGS.h`. (Self-grow's toggle is real and correctly described — only snap-back is
+  wrong.) Either wire a real toggle or fix `README.md:13,22`.
+- **`nativeGetAnchorTransform` is declared non-null (`FloatArray`) in `SlamManager.kt` but the JNI
+  can return null under allocation pressure** — an OOM-triggered NPE on the GL thread with no null
+  visible at the Kotlin call site. Declare it `FloatArray?` and handle it.
+- **`:core:nativebridge`'s ProGuard rules never reach R8** — no `consumerProguardFiles`, so release
+  builds only survive because `:app/proguard-rules.pro` happens to duplicate the JNI keep rules by
+  hand. `:core:common` (which owns `Fingerprint`, constructed from native) has the same gap in the
+  other direction: its `build.gradle.kts` references a `proguard-rules.pro` that doesn't exist, and
+  its actual `consumer-rules.pro` is the unmodified AGP template with zero rules in it.
+  `Fingerprint.kt`'s own comment notes this binding has already broken twice.
+- **`gEngineMutex` (JNI) serializes the GL/render thread behind full-resolution OpenCV work** —
+  target-capture fingerprint generation and SuperPoint inference hold the same global lock the
+  per-frame camera/YUV callbacks need, which is a likely visible freeze at exactly the moment the
+  artist confirms a target. Fixing it to a `shared_mutex` needs care: `MobileGS.cpp`'s
+  `mRelocViewMatrix` copy is *only* race-free today because `gEngineMutex` happens to also
+  serialize it against `updateCamera`'s writes to `mViewMatrix` — a plain reader/writer split would
+  reintroduce that torn read. Needs its own lock, not just relaxing the JNI one.
+- **A dead AI-glasses subsystem is still fully wired** (~400 LOC: `startGlassesSession` has zero
+  callers, `WearableModule`'s only bound provider can never match the "Meta" name lookup) despite
+  README.md:60 describing it as already removed. Either delete it or actually remove it.
+- **Live docs (`docs/BLUEPRINT.md`, `docs/index.html`, 9+ translated `docs/*/README.md`, and most of
+  `docs/testing.md`/`docs/performance.md`/`docs/ARCHITECTURE.md`/`docs/FEATURE_REFERENCE.md`) still
+  describe the deleted voxel/splat engine, a stencil generator with no source files, and other
+  removed features as shipping.** The 2026-09-04 correction pass touched 5 files; ~25 more still
+  contradict them. Full list with file:line citations is in the docs-cross-consistency audit
+  transcript.
+
+Conceptual, needs a product decision rather than a code fix:
+
+- **The two features that most directly solve "get the design onto the wall without holding the
+  phone up" are unshipped**: `onFreezeRequested`'s freeze-to-paint chain has no caller (see the
+  existing WIP note above), and stencil/tiled-PDF export has no implementation despite being
+  marketed on the live site and documented in `docs/STENCILS.md`/`docs/FEATURE_REFERENCE.md` as if
+  it ships.
+- **No way anywhere in the app to enter real wall dimensions** — scale comes from a depth guess
+  adjusted by pinch, for a target user (commissioned muralist) who prices per square foot.
+- **The "no cloud" anti-goal blocks encrypted crew fingerprint-sharing** (Co-op stays host→guest
+  only) without changing the risk profile it's meant to protect (an E2E relay holding no identity
+  would serve the stated illegal-graffiti threat model equally well).
+- Five "modes" (AR/Overlay/Mockup/Trace/Design) are one renderer with three boolean axes
+  (background source × world-locked × editable) wearing five names and duplicating adjustment
+  state per mode.

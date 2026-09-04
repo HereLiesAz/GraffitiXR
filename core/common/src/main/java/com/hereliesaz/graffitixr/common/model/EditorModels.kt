@@ -195,6 +195,12 @@ data class EditorUiState(
      * its name because it still carries exactly the per-image state the adjustment knobs drive.
      */
     val design: Layer? = null,
+    /**
+     * A picked image awaiting confirmation because it would replace [design] rather than add
+     * alongside it — there is exactly one design slot (see [design]'s doc), so a second pick is
+     * destructive to the first. Null when no picker result is pending confirmation.
+     */
+    val pendingReplaceUri: Uri? = null,
     val backgroundBitmap: Bitmap? = null,
     val activePanel: EditorPanel = EditorPanel.NONE,
     val editorMode: EditorMode = EditorMode.AR,

@@ -20,11 +20,23 @@ on top of the OpenCV relocalizer:
 1. **Baseline fingerprint.** When the artist registers the wall, the engine
    stores ORB/feature descriptors of the clean surface (the relocalization
    fingerprint used by `relocThreadFunc` for snap-back).
-2. **Progress measurement (`MobileGS::tryUpdateFingerprint`).** On a clean
-   camera frame, the engine measures how much of the registered artwork base is
-   now corroborated by real wall content, writing the result to
-   `mPaintingProgress`. This stage is read-only with respect to the reloc
-   fingerprint.
+2. **Progress measurement.** Two producers exist, and only one runs in a
+   shipped build:
+   - `core/nativebridge/src/main/assets/distortion_head.onnx` is bundled and
+     `ArViewModel` loads it unconditionally on every AR session
+     (`slamManager.loadDistortionHead`). When it is loaded — which is the
+     default, out-of-the-box state — `MobileGS::runRelocPass` (the block
+     guarded by `mDistortionHead.isLoaded()`) is the sole producer of both
+     `mPaintingProgress` and `mCorroborationConfidence`: it crops the live
+     frame around the coarse match centroid, runs it against the wall's
+     canonical patch, and reads `coverage`/`matchability` straight off the
+     model's output (`dist[12]`/`dist[11]`), gated at `matchability > 0.5f`.
+     See `docs/DISTORTION_HEAD.md`.
+   - `MobileGS::tryUpdateFingerprint`'s descriptor-similarity test (below,
+     "What matching the image does and does not mean") is the fallback: it
+     only runs — and only then, via the `!mDistortionHead.isLoaded()` guard
+     around the whole publication block — in a build with the ONNX asset
+     stripped or missing. It is not what a normal install runs.
 3. **Confidence weighting.** As `mPaintingProgress` rises, the corroborated
    marks contribute more to the pose solution, so global drift correction
    becomes more aggressive — the overlay "snaps" more tightly the more of the
@@ -60,15 +72,25 @@ degrades as the original reference marks disappear under paint.
 
 ## What "matching the image" does and does not mean
 
-The corroboration test is **descriptor similarity, not geometric accuracy**. A
-live feature corroborates the artwork when its nearest neighbour among the
-design composite's descriptors passes a Lowe ratio of 0.85
-(`kCorrobLoweRatio`, `MobileGS::tryUpdateFingerprint`) — a looser test than
-relocalization's own 0.75 (`kRelocLoweRatio`), and, per `PARAMETERS.md`,
-one that has not itself been validated against real painted-wall photos. There is no positional tolerance, no scale
-or colour check, and nothing anywhere compares your brushwork to the design
+This section describes the **fallback** descriptor path
+(`MobileGS::tryUpdateFingerprint`), which only runs in a build without
+`distortion_head.onnx` — not the shipped default; see the mechanism section
+above. In that fallback, the corroboration test is **descriptor similarity,
+not geometric accuracy**. A live feature corroborates the artwork when its
+nearest neighbour among the design composite's descriptors passes a Lowe
+ratio of 0.85 (`kCorrobLoweRatio`, `MobileGS::tryUpdateFingerprint`) — a
+looser test than relocalization's own 0.75 (`kRelocLoweRatio`), and, per
+`PARAMETERS.md`, one that has not itself been validated against real
+painted-wall photos. There is no positional tolerance, no scale or colour
+check, and nothing anywhere compares your brushwork to the design
 geometrically. Painting "more accurately" only helps insofar as it makes the
 wall's local appearance descriptor-match the design image.
+
+In the shipped default (distortion head loaded), corroboration is instead
+whatever the ONNX model's `matchability`/`coverage` outputs encode — an
+opaque, learned equivalent of the same idea, trained on synthetic
+homographies with occlusion masks (`docs/DISTORTION_HEAD.md`), not on real
+painted murals.
 
 Tracking itself never consults the artwork at all: relocalization matches the
 live camera against the **photograph of the wall taken at target creation**.
@@ -160,4 +182,4 @@ feature count point at capture problems instead, which are covered above.
   enabled, not what a normal install experiences out of the box.
 
 ---
-*Documentation updated on 2026-09-04: corrected the confGlobal formula's input (corroboration confidence, not painting progress), self-grow's actual default (off, not on), the corroboration Lowe ratio (0.85, not 0.75), and removed a stale reference to the deleted voxel/splat map. Prior update: 2026-06-22, SLAM right-size and documentation-accuracy pass.*
+*Documentation updated on 2026-09-04 (later pass): corrected the mechanism section — the bundled ONNX distortion head, not the descriptor-similarity test, is the producer of `mPaintingProgress`/`mCorroborationConfidence` in a normal (asset-present) install; the descriptor test only runs as a fallback when that asset is stripped. Earlier same-day pass corrected the confGlobal formula's input (corroboration confidence, not painting progress), self-grow's actual default (off, not on), the corroboration Lowe ratio (0.85, not 0.75), and removed a stale reference to the deleted voxel/splat map. Prior update: 2026-06-22, SLAM right-size and documentation-accuracy pass.*

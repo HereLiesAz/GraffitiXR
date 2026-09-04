@@ -45,6 +45,7 @@ internal object EditorReducer {
             activePanel = if (intent.resetActivePanel) EditorPanel.NONE else state.activePanel,
             transformStash = null,
         )
+        is EditorIntent.SetPendingReplaceUri -> state.copy(pendingReplaceUri = intent.uri)
 
         EditorIntent.ToggleTransformReset -> reduceTransformReset(state)
 

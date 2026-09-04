@@ -1,6 +1,7 @@
 package com.hereliesaz.graffitixr.feature.editor
 
 import android.graphics.Bitmap
+import android.net.Uri
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import com.hereliesaz.graffitixr.common.model.EditorMode
@@ -32,6 +33,13 @@ internal sealed interface EditorIntent {
     // ── The design ────────────────────────────────────────────────────────────
     /** Replaces the design with [layer]. [resetActivePanel] dismisses any open panel. */
     data class SetDesign(val layer: Layer, val resetActivePanel: Boolean = true) : EditorIntent
+
+    /**
+     * A picker result that would replace an existing design is held here pending user
+     * confirmation, rather than applied immediately. Null clears the pending confirmation
+     * (dismissed, confirmed, or cancelled).
+     */
+    data class SetPendingReplaceUri(val uri: Uri?) : EditorIntent
 
     // ── Panel / mode / gesture ────────────────────────────────────────────────
     /**
