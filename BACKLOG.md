@@ -254,67 +254,67 @@ than after.
 
 ### Phase 1 — Native crash / data-corruption risks
 
-- [ ] `GraffitiJNI.cpp` `nativeFeedColorFrame` — wraps the caller's `DirectByteBuffer` in a
+- [x] `GraffitiJNI.cpp` `nativeFeedColorFrame` — wraps the caller's `DirectByteBuffer` in a
   `cv::Mat` with no capacity or dimension check (its sibling `nativeFeedYuvFrame` has exactly
   this guard). Add the same `GetDirectBufferCapacity` bounds check before constructing the Mat.
-- [ ] `MobileGS::restoreWallFingerprint` (the descriptors-only restore path) — doesn't reset
+- [x] `MobileGS::restoreWallFingerprint` (the descriptors-only restore path) — doesn't reset
   `mHasFingerprintView`/`mFingerprintAnchorMatrix`/`mWallPatch` from a previously-loaded metric
   fingerprint, so switching to a descriptors-only project can silently co-register against the
   old project's capture pose. Mirror the guard `restoreWallFingerprintMetric` and
   `alignToFingerprint` already have.
-- [ ] `MobileGS::alignToFingerprint` — resets `mFingerprintIntrinsics`/`mHasFingerprintView` but
+- [x] `MobileGS::alignToFingerprint` — resets `mFingerprintIntrinsics`/`mHasFingerprintView` but
   not `mFingerprintAnchorMatrix`; a co-op peer's fingerprint can inherit this device's stale
   local anchor. Reset it alongside the other two (match `clearWallFingerprint`'s identity reset).
-- [ ] `nativeGetAnchorTransform` — returns a non-null all-zero `FloatArray(16)` when
+- [x] `nativeGetAnchorTransform` — returns a non-null all-zero `FloatArray(16)` when
   `gSlamEngine` is null, contradicting the null-on-failure contract every Kotlin call site
   (`ArRenderer.kt`, `ArViewModel.kt`) explicitly documents and relies on. Return `nullptr`
   instead, matching `nativeGetFingerprintAnchor`'s sibling behavior.
-- [ ] `SuperPointDetector.cpp` `extractKeypoints` — the `cv::resize` call for a degenerate
+- [x] `SuperPointDetector.cpp` `extractKeypoints` — the `cv::resize` call for a degenerate
   (near-zero-width) input sits outside the function's `try` block; an escaped exception on the
   reloc worker thread (no `try` at that specific call site) kills relocalization for the session
   with no error surfaced. Move the resize inside the guarded region, or add an explicit
   minimum-size check before it.
-- [ ] `DistortionHead::run` — `reinterpret_cast<const float*>(o.data)` with no `o.type() ==
+- [x] `DistortionHead::run` — `reinterpret_cast<const float*>(o.data)` with no `o.type() ==
   CV_32F` check; a non-fp32 model output is an out-of-bounds heap read reinterpreted as
   painting-progress/confidence. Add the type check alongside the existing total()/layout checks.
-- [ ] `MobileGS.cpp:456` — `mPaintingProgress.store(coverage)` from the raw distortion-head
+- [x] `MobileGS.cpp:456` — `mPaintingProgress.store(coverage)` from the raw distortion-head
   output with no clamp or finiteness check. Clamp to `[0, 1]` and reject non-finite before
   storing (the neighboring `matchability` value is already gated, `coverage` isn't).
 
 ### Phase 2 — ARCore-fallback tracker correctness (isolated subsystem)
 
-- [ ] `HomographyTracker.cpp:178` — the CV→GL pose conversion applies the handedness flip
+- [x] `HomographyTracker.cpp:178` — the CV→GL pose conversion applies the handedness flip
   `C·Rcv·C` when the object frame (built in `setReference`) is already GL-convention (+Y up);
   it needs `C·Rcv` only. **Every fallback-tracked overlay currently renders upside-down and
   back-facing.** Fix the sandwich, correct the comment that (wrongly) cites `MobileGS`'s
   camera-to-camera case as precedent, and add the known-answer-pose test called out in Phase 7
   — this is the one subsystem in the whole audit round with zero executable tests, which is how
   an unconditional sign error shipped.
-- [ ] `HomographyTracker.cpp:112-134` — the inlier/match-count gates (`objPts.size() >= 12`,
+- [x] `HomographyTracker.cpp:112-134` — the inlier/match-count gates (`objPts.size() >= 12`,
   `inliers.size() >= 8`, `ratio >= 0.35`) have no spatial-conditioning check; a tight cluster of
   matches (e.g. all inside one logo) passes every gate and produces a high-confidence garbage
   pose. Add a bounding-box-area or condition-number check on `objPts` before the PnP solve.
-- [ ] `SuperPointDetector.cpp:108-120` — masked detection (`generateFingerprint`'s isolated-marks
+- [x] `SuperPointDetector.cpp:108-120` — masked detection (`generateFingerprint`'s isolated-marks
   path) truncates to `maxKps` *before* applying the mask, so a small mask can yield zero
   survivors and silently fall back to ORB, permanently downgrading that project's wall
   fingerprint to binary descriptors. Apply the mask before the top-K truncation, or detect with a
   higher provisional cap when a mask is present.
-- [ ] `LowLightEnhancer` — silently a no-op on all three bitmap-sourced call sites
+- [x] `LowLightEnhancer` — silently a no-op on all three bitmap-sourced call sites
   (`getSuperPointFeatures`, `getFingerprintKeypoints`, `generateFingerprint`): they hand it
   `CV_8UC4` (from `bitmapToMat`), the model wants 3-channel, OpenCV throws, the catch swallows
   it. Only the reloc live-frame path (which converts to RGB first) actually works. Convert
   RGBA→RGB before the three broken calls, or make `LowLightEnhancer::enhance` accept and convert
   4-channel input itself so every caller doesn't have to remember to.
-- [ ] `include/SuperPointDetector.h:23` — default `scoreThresh = 0.005f` is below the uniform-
+- [x] `include/SuperPointDetector.h:23` — default `scoreThresh = 0.005f` is below the uniform-
   softmax floor (`1/65 ≈ 0.01538`), so the threshold filters nothing on an uninformative heatmap;
   the only real bound is the `maxKps` truncation. Raise to at least the MagicLeap reference value
   (0.015) with a cited comment.
-- [ ] `SuperPointDetector.cpp:164` — NMS uses `>=`, so exact score ties mutually eliminate
+- [x] `SuperPointDetector.cpp:164` — NMS uses `>=`, so exact score ties mutually eliminate
   instead of one surviving. Low severity (softmax ties are rare) but trivial: change to `>`.
-- [ ] Wire the fallback tracker's `outConfidence` (already computed, plumbed through 17 floats
+- [x] Wire the fallback tracker's `outConfidence` (already computed, plumbed through 17 floats
   and a gyro decay) into the "Reacquiring target…" UI — currently computed and then read by
   nothing.
-- [ ] Comment corrections (no behavior change, but actively misleading as written):
+- [x] Comment corrections (no behavior change, but actively misleading as written):
   `HomographyArTracker.kt`/`BridgedHomographyTracker.kt` both still say CameraX/OverlayRenderer/
   EditorMode wiring "is Phase 2" and hasn't happened — it has, fully, and trusting the comment is
   plausibly how the pose-flip bug above went unnoticed. `KeypointGrid.h`'s "floored at 1px so a

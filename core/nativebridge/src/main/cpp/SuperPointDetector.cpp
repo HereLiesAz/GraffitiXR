@@ -3,6 +3,7 @@
 #include <android/log.h>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <numeric>
 
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "SuperPoint", __VA_ARGS__)
@@ -44,25 +45,22 @@ bool SuperPointDetector::detect(const cv::Mat& gray,
                                 float scoreThresh,
                                 int   maxKps) {
     if (!mLoaded) return false;
+    // A sub-8-pixel-wide/tall input floors (cols/8)*8 to 0 below, which makes cv::resize throw
+    // (Size(0,0), fx=fy=0) from outside the try block a few lines down -- on the reloc worker
+    // thread specifically, nothing catches that and the worker dies silently for the session.
+    // Reject degenerate input up front instead.
+    if (gray.empty() || gray.cols < 8 || gray.rows < 8) return false;
     std::lock_guard<std::mutex> lock(mMutex);
     if (mNet.empty()) return false;
 
     cv::Mat input;
     cv::Mat resizedMask;
     float scaleX = 1.0f, scaleY = 1.0f;
-    if (gray.cols > 640 || gray.rows > 480) {
-        int targetW = 640;
-        int targetH = 480;
-        cv::resize(gray, input, cv::Size(targetW, targetH), 0, 0, cv::INTER_AREA);
-        if (!mask.empty()) {
-            cv::resize(mask, resizedMask, cv::Size(targetW, targetH), 0, 0, cv::INTER_NEAREST);
-        }
-        scaleX = (float)gray.cols / (float)targetW;
-        scaleY = (float)gray.rows / (float)targetH;
-    } else {
-        int targetW = (gray.cols / 8) * 8;
-        int targetH = (gray.rows / 8) * 8;
-        if (targetW != gray.cols || targetH != gray.rows) {
+
+    try {
+        if (gray.cols > 640 || gray.rows > 480) {
+            int targetW = 640;
+            int targetH = 480;
             cv::resize(gray, input, cv::Size(targetW, targetH), 0, 0, cv::INTER_AREA);
             if (!mask.empty()) {
                 cv::resize(mask, resizedMask, cv::Size(targetW, targetH), 0, 0, cv::INTER_NEAREST);
@@ -70,16 +68,25 @@ bool SuperPointDetector::detect(const cv::Mat& gray,
             scaleX = (float)gray.cols / (float)targetW;
             scaleY = (float)gray.rows / (float)targetH;
         } else {
-            input = gray;
-            resizedMask = mask;
+            int targetW = (gray.cols / 8) * 8;
+            int targetH = (gray.rows / 8) * 8;
+            if (targetW != gray.cols || targetH != gray.rows) {
+                cv::resize(gray, input, cv::Size(targetW, targetH), 0, 0, cv::INTER_AREA);
+                if (!mask.empty()) {
+                    cv::resize(mask, resizedMask, cv::Size(targetW, targetH), 0, 0, cv::INTER_NEAREST);
+                }
+                scaleX = (float)gray.cols / (float)targetW;
+                scaleY = (float)gray.rows / (float)targetH;
+            } else {
+                input = gray;
+                resizedMask = mask;
+            }
         }
-    }
 
-    cv::Mat f;
-    input.convertTo(f, CV_32F, 1.0 / 255.0);
-    cv::Mat blob = cv::dnn::blobFromImage(f);
+        cv::Mat f;
+        input.convertTo(f, CV_32F, 1.0 / 255.0);
+        cv::Mat blob = cv::dnn::blobFromImage(f);
 
-    try {
         mNet.setInput(blob);
         std::vector<cv::String> outNames = mNet.getUnconnectedOutLayersNames();
         std::vector<cv::Mat> outputs;
@@ -105,7 +112,16 @@ bool SuperPointDetector::detect(const cv::Mat& gray,
         if (!semiPtr || !descPtr) return false;
 
         kps.clear();
-        extractKeypoints(*semiPtr, kps, scoreThresh, maxKps);
+        // extractKeypoints sorts by score and truncates to its maxKps argument BEFORE any mask is
+        // applied below. When a mask is present (generateFingerprint's isolated-marks path,
+        // typically a few percent of the frame), requesting the caller's maxKps here means the
+        // top-K is chosen from the WHOLE FRAME, and the mask then keeps only whichever of those
+        // survive intersecting a small region -- often a handful, sometimes zero, silently
+        // demoting the caller to its ORB fallback. Request an uncapped candidate set when masked,
+        // so the mask filters the FULL detected set and the true top-K is chosen from what
+        // actually survives inside the mask.
+        const int extractCap = resizedMask.empty() ? maxKps : std::numeric_limits<int>::max();
+        extractKeypoints(*semiPtr, kps, scoreThresh, extractCap);
 
         if (!resizedMask.empty()) {
             std::vector<cv::KeyPoint> filtered;
@@ -116,6 +132,10 @@ bool SuperPointDetector::detect(const cv::Mat& gray,
                     if (resizedMask.at<uchar>(iy, ix) > 0) filtered.push_back(kp);
                 }
             }
+            // extractKeypoints already sorted candidates by descending score; filtering by mask
+            // preserves that relative order, so truncating here still keeps the best-scoring
+            // survivors rather than an arbitrary subset.
+            if ((int)filtered.size() > maxKps) filtered.resize(maxKps);
             kps = std::move(filtered);
         }
 
@@ -161,7 +181,11 @@ void SuperPointDetector::extractKeypoints(const cv::Mat& semiTensor, std::vector
             bool isMax = true;
             for (int dr = -4; dr <= 4 && isMax; ++dr)
                 for (int dc = -4; dc <= 4 && isMax; ++dc)
-                    if (!(dr == 0 && dc == 0) && scores.at<float>(r + dr, c + dc) >= v) isMax = false;
+                    // Strict >: with >=, an exact score tie between two adjacent pixels makes each
+                    // see the other as >= itself, so BOTH lose local-max status and neither is
+                    // emitted -- on an exactly-uniform heatmap this drops every keypoint. One pixel
+                    // in a tied run should still win; which one is an arbitrary but harmless choice.
+                    if (!(dr == 0 && dc == 0) && scores.at<float>(r + dr, c + dc) > v) isMax = false;
             if (isMax) tmp.push_back(cv::KeyPoint((float)c, (float)r, 1.0f, -1.0f, v));
         }
     }
