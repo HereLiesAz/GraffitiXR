@@ -37,13 +37,40 @@ MobileGS* gSlamEngine = nullptr;
 // (fingerprint generation, relocalization) blocking the per-frame camera/render path behind one
 // global lock. Three more entry points also need std::unique_lock despite not touching the
 // pointer: nativeLoadSuperPoint/nativeLoadDistortionHead/nativeLoadLowLightEnhancer mutate
-// mSuperPoint/mDistortionHead/mEnhancer in place via their load() calls, and every other reader of
-// those (runRelocPass, tryUpdateFingerprint, getSuperPointFeatures, getFingerprintKeypoints,
-// generateFingerprint) reads them with no MobileGS-internal lock of its own -- gEngineMutex is the
-// only thing serializing a live reload against an in-flight detect()/enhance()/run() call. See
-// tools/check_native_locking.py, which finds exactly this class of gap mechanically.
+// mSuperPoint/mDistortionHead/mEnhancer in place via their load() calls.
+//
+// CORRECTION: an earlier version of this comment claimed gEngineMutex was "the only thing"
+// serializing those reloads against an in-flight detect()/enhance()/run() -- false, and dangerous
+// to believe. relocThreadFunc's background worker (MobileGS.cpp) calls runRelocPass/
+// tryUpdateFingerprint, which call into SuperPointDetector/DistortionHead/LowLightEnhancer,
+// WITHOUT ever taking gEngineMutex -- it's a std::thread, not a JNI entry point. What actually
+// makes a live reload safe against that thread is each of those three classes' own internal
+// std::mutex (SuperPointDetector.h/DistortionHead.h/LowLightEnhancer.h each declare `mMutex`,
+// taken in both load() and the inference call). gEngineMutex's exclusive lock on the three loader
+// entry points is still correct and still necessary -- it's what protects them against the OTHER
+// JNI-entry readers (getSuperPointFeatures, getFingerprintKeypoints, generateFingerprint, all
+// called only via JNI) -- it just isn't sufficient on its own, and the reloc-thread path was never
+// covered by it in the first place.
+//
+// tools/check_native_locking.py finds gaps like the load-vs-JNI-reader one, but it only parses
+// MobileGS.h/MobileGS.cpp member declarations -- it cannot see JNI-level globals (gLastColorFrame
+// below is exactly such a case: written by both nativeFeedYuvFrame and nativeFeedColorFrame, which
+// now both take only a shared_lock, so it needs its own mutex -- see gColorFrameMutex) or classes
+// declared elsewhere (SuperPointDetector etc., which is how it also can't see the mMutex that
+// actually protects the load-vs-reloc-thread race above). Don't treat a clean run of that script as
+// proof gEngineMutex's shared/exclusive split is sufficient by itself anywhere in this file.
 std::shared_mutex gEngineMutex;
 cv::Mat gLastColorFrame; // MANDATE: Kept in Sensor-Native (Landscape) orientation
+// gLastColorFrame is written by BOTH nativeFeedYuvFrame and nativeFeedColorFrame, which (since the
+// shared_mutex conversion above) both take only gEngineMutex's shared_lock and so can now run
+// concurrently -- e.g. the normal camera feed on the GL thread racing a glasses-session feed on
+// its own coroutine (see ArViewModel.startGlassesSession/SlamManager's forwardFrame). The old
+// exclusive std::mutex incidentally serialized these two writers; nothing does now except this
+// dedicated mutex. Lock it only around the read-modify-write of gLastColorFrame itself (assign,
+// then take a cheap header-copy snapshot), never around the heavy YUV/RGBA conversion or the
+// reloc-frame build that follows -- those must stay outside the lock or this reintroduces the
+// stall the shared_mutex conversion exists to remove.
+std::mutex gColorFrameMutex;
 JavaVM* gJvm = nullptr;
 
 // ARCore-unavailable fallback (see HomographyTracker.h). Entirely independent of gSlamEngine —
@@ -475,47 +502,57 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     cv::Mat yuv(height + height / 2, width, CV_8UC1);
     yMat.copyTo(yuv(cv::Rect(0, 0, width, height)));
 
-    if (uvPixelStride == 1) {
-        // I420 planar (separate U and V planes) → NV21-style interleaved V,U so the reloc decode
-        // (COLOR_YUV2RGB_NV21 below) is correct. The old code copied each full height/2-row plane
-        // into a height/4-row ROI — a size mismatch that left half the chroma uninitialized and
-        // produced wrong colours. Build the VU block explicitly, bounded by the buffer capacities.
-        jlong uCap = env->GetDirectBufferCapacity(uBuffer);
-        jlong vCap = env->GetDirectBufferCapacity(vBuffer);
-        cv::Mat chroma = yuv(cv::Rect(0, height, width, height / 2));
-        for (int r = 0; r < height / 2; ++r) {
-            uint8_t* dst = chroma.ptr(r);
-            size_t rowOff = (size_t)r * uvStride;
-            for (int c = 0; c < width / 2; ++c) {
-                size_t idx = rowOff + c;
-                dst[2 * c]     = (vCap <= 0 || (jlong)idx < vCap) ? vData[idx] : 0; // V
-                dst[2 * c + 1] = (uCap <= 0 || (jlong)idx < uCap) ? uData[idx] : 0; // U
+    // frameSnapshot is a cheap header-copy (shares yuv's/converted buffer, not a deep copy) taken
+    // under gColorFrameMutex right alongside the write to gLastColorFrame, so the heavy conversion
+    // and reloc-frame work below can safely run unlocked -- see gColorFrameMutex's declaration
+    // comment for why gEngineMutex's shared_lock (taken above) no longer serializes this against a
+    // concurrent nativeFeedColorFrame call.
+    cv::Mat frameSnapshot;
+    {
+        std::lock_guard<std::mutex> colorLock(gColorFrameMutex);
+        if (uvPixelStride == 1) {
+            // I420 planar (separate U and V planes) → NV21-style interleaved V,U so the reloc decode
+            // (COLOR_YUV2RGB_NV21 below) is correct. The old code copied each full height/2-row plane
+            // into a height/4-row ROI — a size mismatch that left half the chroma uninitialized and
+            // produced wrong colours. Build the VU block explicitly, bounded by the buffer capacities.
+            jlong uCap = env->GetDirectBufferCapacity(uBuffer);
+            jlong vCap = env->GetDirectBufferCapacity(vBuffer);
+            cv::Mat chroma = yuv(cv::Rect(0, height, width, height / 2));
+            for (int r = 0; r < height / 2; ++r) {
+                uint8_t* dst = chroma.ptr(r);
+                size_t rowOff = (size_t)r * uvStride;
+                for (int c = 0; c < width / 2; ++c) {
+                    size_t idx = rowOff + c;
+                    dst[2 * c]     = (vCap <= 0 || (jlong)idx < vCap) ? vData[idx] : 0; // V
+                    dst[2 * c + 1] = (uCap <= 0 || (jlong)idx < uCap) ? uData[idx] : 0; // U
+                }
             }
+            // No conversion on GL thread; pass raw YUV to map thread. Plain assignment, not clone():
+            // `yuv` is a local whose buffer nothing else writes, so cv::Mat's refcount hands ownership
+            // over for free. The clone() this replaces copied the whole frame a second time, on the GL
+            // thread, every call.
+            gLastColorFrame = yuv;
+        } else if (uvPixelStride == 2) {
+            // Semi-planar (NV12/NV21): the interleaved chroma can be memcpy'd straight into the YUV
+            // block's rows. The previous version built a separate zero-filled full-chroma Mat and then
+            // copyTo'd it across — an extra allocation, an extra zero-fill and an extra copy per frame.
+            jlong vCap = env->GetDirectBufferCapacity(vBuffer);
+            cv::Mat chroma = yuv(cv::Rect(0, height, width, height / 2));
+            size_t limit = (vCap > 0) ? (size_t)vCap : (size_t)((height / 2 - 1) * uvStride + width);
+            for (int r = 0; r < height / 2; ++r) {
+                uint8_t* dst = chroma.ptr(r);
+                size_t rowStart = (size_t)r * uvStride;
+                size_t rowLen = std::min((size_t)width, (size_t)(limit > rowStart ? limit - rowStart : 0));
+                if (rowLen > 0) std::memcpy(dst, vData + rowStart, rowLen);
+                // Rows the source can't fill must still be cleared: a fresh cv::Mat is uninitialised,
+                // whereas the scratch Mat this replaces was zero-filled.
+                if (rowLen < (size_t)width) std::memset(dst + rowLen, 0, (size_t)width - rowLen);
+            }
+            gLastColorFrame = yuv;
+        } else {
+            cv::cvtColor(yMat, gLastColorFrame, cv::COLOR_GRAY2RGB);
         }
-        // No conversion on GL thread; pass raw YUV to map thread. Plain assignment, not clone():
-        // `yuv` is a local whose buffer nothing else writes, so cv::Mat's refcount hands ownership
-        // over for free. The clone() this replaces copied the whole frame a second time, on the GL
-        // thread, every call.
-        gLastColorFrame = yuv;
-    } else if (uvPixelStride == 2) {
-        // Semi-planar (NV12/NV21): the interleaved chroma can be memcpy'd straight into the YUV
-        // block's rows. The previous version built a separate zero-filled full-chroma Mat and then
-        // copyTo'd it across — an extra allocation, an extra zero-fill and an extra copy per frame.
-        jlong vCap = env->GetDirectBufferCapacity(vBuffer);
-        cv::Mat chroma = yuv(cv::Rect(0, height, width, height / 2));
-        size_t limit = (vCap > 0) ? (size_t)vCap : (size_t)((height / 2 - 1) * uvStride + width);
-        for (int r = 0; r < height / 2; ++r) {
-            uint8_t* dst = chroma.ptr(r);
-            size_t rowStart = (size_t)r * uvStride;
-            size_t rowLen = std::min((size_t)width, (size_t)(limit > rowStart ? limit - rowStart : 0));
-            if (rowLen > 0) std::memcpy(dst, vData + rowStart, rowLen);
-            // Rows the source can't fill must still be cleared: a fresh cv::Mat is uninitialised,
-            // whereas the scratch Mat this replaces was zero-filled.
-            if (rowLen < (size_t)width) std::memset(dst + rowLen, 0, (size_t)width - rowLen);
-        }
-        gLastColorFrame = yuv;
-    } else {
-        cv::cvtColor(yMat, gLastColorFrame, cv::COLOR_GRAY2RGB);
+        frameSnapshot = gLastColorFrame;
     }
 
     // Relocalization MATCHING still uses the Display-Aligned frame for best user feedback.
@@ -527,17 +564,17 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     // work used to be done unconditionally, so during the entire scanning phase (no fingerprint
     // exists yet, by definition) every single conversion was built and immediately thrown away,
     // several times a second, stalling the render loop for nothing.
-    if (gLastColorFrame.empty() || !gSlamEngine->relocWantsFrame()) return;
+    if (frameSnapshot.empty() || !gSlamEngine->relocWantsFrame()) return;
 
-    if (gLastColorFrame.rows == height + height/2) {
+    if (frameSnapshot.rows == height + height/2) {
         cv::Mat relocFrame;
-        cv::cvtColor(gLastColorFrame, relocFrame, cv::COLOR_YUV2RGB_NV21);
+        cv::cvtColor(frameSnapshot, relocFrame, cv::COLOR_YUV2RGB_NV21);
         if (cvRotateCode >= 0) {
             cv::rotate(relocFrame, relocFrame, cvRotateCode);
         }
         gSlamEngine->scheduleRelocCheck(relocFrame);
     } else {
-        cv::Mat relocFrame = gLastColorFrame.clone();
+        cv::Mat relocFrame = frameSnapshot.clone();
         if (cvRotateCode >= 0) {
             cv::rotate(relocFrame, relocFrame, cvRotateCode);
         }
@@ -640,9 +677,19 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
 
     try {
         cv::Mat frame(height, width, CV_8UC4, buffer);
-        cv::cvtColor(frame, gLastColorFrame, cv::COLOR_RGBA2RGB);
-
-        cv::Mat relocFrame = gLastColorFrame.clone();
+        cv::Mat relocFrame;
+        {
+            // See gColorFrameMutex's declaration comment: this and nativeFeedYuvFrame both only
+            // hold gEngineMutex's shared_lock now, so they need their own mutex around the
+            // read-modify-write of gLastColorFrame. The clone() (the actual per-frame cost) stays
+            // inside the lock here -- unlike nativeFeedYuvFrame's snapshot-then-unlock, this
+            // conversion is cheap enough (a single RGBA->RGB cvtColor + clone, not a multi-branch
+            // YUV assembly) that splitting it wouldn't measurably reduce contention, and keeping
+            // it simple avoids a second place to get the snapshot pattern wrong.
+            std::lock_guard<std::mutex> colorLock(gColorFrameMutex);
+            cv::cvtColor(frame, gLastColorFrame, cv::COLOR_RGBA2RGB);
+            relocFrame = gLastColorFrame.clone();
+        }
         if (cvRotateCode >= 0) {
             cv::rotate(relocFrame, relocFrame, cvRotateCode);
         }

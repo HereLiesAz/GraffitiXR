@@ -190,6 +190,21 @@ Correctness bugs, worst first:
   suite including `NativeMethodAritySignatureTest`, all green. Not device- or TSan-verified — no
   device or sanitizer tooling is available in this sandbox; the fix is proven by the documented
   reasoning above and the static check, not by observed absence of a race under real load.
+  **Follow-up fix:** the conversion missed one JNI-level global outside the checker's reach —
+  `gLastColorFrame` (`GraffitiJNI.cpp`), written by both `nativeFeedYuvFrame` and
+  `nativeFeedColorFrame`, both of which now hold only `gEngineMutex`'s shared lock and can run
+  concurrently (e.g. the normal camera feed racing a glasses-session feed). A glee audit caught
+  this immediately after the shared_mutex PR merged. Fixed with a dedicated `gColorFrameMutex`,
+  held only around the read-modify-write of `gLastColorFrame` itself (assign, then take a cheap
+  header-copy snapshot) — never around the heavy YUV/RGBA conversion or reloc-frame build that
+  follows, so the fix doesn't reintroduce the stall the original conversion removed. Also
+  corrected the `gEngineMutex` comment's false claim that it was "the only thing" serializing a
+  live model reload against the background reloc-thread worker — that worker never takes
+  `gEngineMutex` at all (it's a `std::thread`, not a JNI entry point); the actual protection is
+  each ONNX wrapper class's own internal `mMutex`. `tools/check_native_locking.py`'s docstring
+  now states plainly what it does and doesn't cover (JNI-level globals and classes outside
+  `MobileGS.cpp` are both invisible to it) rather than implying a clean run proves more than it
+  does.
 - **A dead AI-glasses subsystem is still fully wired** — `startGlassesSession` has zero callers and
   `WearableModule`'s only bound provider can never match its "Meta" name lookup, despite
   README.md:60 describing the subsystem as already removed. **Re-checked, not a simple deletion**:
