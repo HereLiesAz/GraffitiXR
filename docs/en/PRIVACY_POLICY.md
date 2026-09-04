@@ -1,6 +1,6 @@
 # Privacy Policy for GraffitiXR
 
-**Last Updated:** 2026-04-07
+**Last Updated:** 2026-09-04
 
 HereLiesAZ built the GraffitiXR app as a source-available app (see the repository's LICENSE and docs/LICENSING.md for terms). This SERVICE is provided by HereLiesAZ at no cost and is intended for use as is.
 
@@ -16,9 +16,20 @@ For a better experience, while using our Service, we may require you to provide 
 *   **Storage / Photos:** We require access to your device's storage (Read/Write External Storage or Photo Library) to load images for overlays, save your projects, and export captured images.
 *   **Location Data (Optional):** If you grant location permissions, the app may collect GPS data (latitude, longitude, altitude) to geotag your projects. This data is saved locally within your project files.
 
-## Log Data
+## Crash Reports (Opt-In)
 
-We want to inform you that whenever you use our Service, in a case of an error in the app we collect data and information (through third party products) on your phone called Log Data. This Log Data may include information such as your device Internet Protocol (“IP”) address, device name, operating system version, the configuration of the app when utilizing our Service, the time and date of your use of the Service, and other statistics.
+Nothing about a crash leaves your device by default. If the app crashes or recovers from an internal error, a report is written to a local, temporary file on your device so the app can show you a "last run crashed" notice the next time you open it — that file never leaves the device on its own.
+
+Sending that report to us is off unless you turn it on yourself, in **Settings > Crash reports**. If — and only if — you have opted in, the app uploads the report the next time it starts, as a **public issue** in this project's GitHub issue tracker (github.com/HereLiesAz/GraffitiXR). The report contains only:
+
+*   whether the crash was fatal (the app was killed) or recovered (caught and the app kept running);
+*   the date and time of the crash;
+*   your device's manufacturer and model, and your Android version;
+*   the app's version name;
+*   the exception's stack trace; and
+*   up to the last 1,000 lines of the app's own logcat output (limited to this app's process — not system-wide logs).
+
+Because the report is filed as a public GitHub issue, its contents (including the device and log information above) are visible to anyone who can view this project's issue tracker. Turn crash reports on only if you're comfortable with that. You can turn the setting off again at any time, and it will not affect crashes that already occurred.
 
 ## Service Providers
 
@@ -31,7 +42,9 @@ We may employ third-party companies and individuals due to the following reasons
 
 We use **Google ML Kit** for subject segmentation (background removal). This processing happens locally on your device.
 
-We access the **GitHub API** to check for application updates. Your IP address may be visible to GitHub during these requests.
+## Update Checks
+
+The Settings screen has a "Check for updates" button. Nothing is checked automatically — only when you press it. Pressing it makes a request to the **GitHub API** (api.github.com) to look up this project's latest release. GitHub is a third party outside our control, and your IP address is visible to GitHub for the duration of that one request, the same as it would be for any web request you make to github.com. No other information is sent as part of this request.
 
 ## Security
 
@@ -57,4 +70,4 @@ If you have any questions or suggestions about our Privacy Policy, do not hesita
 
 
 ---
-*Documentation updated on 2026-03-17 during website redesign and Stencil generation integration phase.*
+*Documentation updated on 2026-09-04: corrected the Log Data section, which described crash data as collected automatically and without consent — the app actually requires an explicit opt-in (Settings > Crash reports, off by default) before any crash report leaves the device, and the report is filed as a public GitHub issue, not sent to "our servers." Gave the existing GitHub-API update-check disclosure its own section and clarified it is user-initiated (the Settings "Check for updates" button), not automatic. Prior update: 2026-03-17, during website redesign and Stencil generation integration phase.*

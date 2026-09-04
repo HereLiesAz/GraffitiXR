@@ -316,7 +316,7 @@
 
     <div class="marquee-container">
         <div class="marquee">
-            // OFFLINE AR TOOLKIT // ZERO TRACKING // NATIVE C++ ENGINE // SLAM // PERSISTENT VOXEL MEMORY // MULTI-LAYER STENCILS // OPENCV // OFFLINE AR TOOLKIT // ZERO TRACKING // NATIVE C++ ENGINE // SLAM // PERSISTENT VOXEL MEMORY // MULTI-LAYER STENCILS // OPENCV //
+            // OFFLINE AR TOOLKIT // ZERO TRACKING // NATIVE C++ ENGINE // FINGERPRINT RELOCALIZATION // CO-OP MODE // TRACE LIGHTBOX // OPENCV // OFFLINE AR TOOLKIT // ZERO TRACKING // NATIVE C++ ENGINE // FINGERPRINT RELOCALIZATION // CO-OP MODE // TRACE LIGHTBOX // OPENCV //
         </div>
     </div>
 
@@ -350,18 +350,18 @@
                     </div>
                 </div>
 
-                <!-- Stencil Mode -->
+                <!-- Co-op Mode -->
                 <div class="feature-card bg-[#07070a] p-10 border-2 border-slate-800 hover:border-pink-500 rounded-xl relative overflow-hidden group shadow-[0_10px_30px_rgba(0,0,0,0.8)] hover:shadow-[0_0_40px_rgba(255,0,255,0.15)] md:translate-y-12">
                     <div class="absolute -right-10 -top-10 text-[10rem] font-display text-slate-800 opacity-20 group-hover:text-pink-500 group-hover:opacity-10 transition-colors duration-500">02</div>
                     <div class="absolute top-0 left-0 w-2 h-full bg-pink-500"></div>
 
-                    <h3 class="text-4xl font-bold text-white mb-4 font-display tracking-wider relative z-10 group-hover:text-pink-400 transition-colors">POCHOIRS_MULTICOUCHES</h3>
+                    <h3 class="text-4xl font-bold text-white mb-4 font-display tracking-wider relative z-10 group-hover:text-pink-400 transition-colors">MODE_CO_OP</h3>
                     <div class="w-16 h-1 bg-pink-500 mb-6 group-hover:w-32 transition-all duration-500"></div>
                     <p class="text-slate-300 text-lg leading-relaxed font-mono relative z-10">
-                        Extract 1-3 layer physical stencils from any image automatically. Export the result as a tiled PDF, ready for immediate standard US Letter printing.
+                        Un partage de session chiffré, apparié par QR code, permet à un collaborateur de suivre votre toile en direct en réalité augmentée. Pour l'instant, uniquement de l'hôte vers l'invité — les modifications de l'invité ne sont pas encore synchronisées en retour.
                     </p>
                     <div class="mt-8 font-mono text-pink-500 text-sm font-bold opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-4 group-hover:translate-y-0 duration-300">
-                        > PROCESS_IMAGE_DATA
+                        > APPARIER_APPAREIL
                     </div>
                 </div>
 
@@ -426,7 +426,7 @@
                     <ul class="space-y-6 text-slate-400 font-mono text-lg">
                         <li class="flex items-start bg-[#0a0a0e] p-5 border border-slate-800 hover:border-cyan-500 transition-colors shadow-lg hover:-translate-y-1 transform duration-300">
                             <span class="text-cyan-500 text-2xl mr-4 mt-1 font-bold">>></span>
-                            <span><strong class="text-white font-display text-2xl tracking-wide block mb-1">Splatting Gaussien 3D :</strong> Cartographie de voxels basée sur la confiance pour la compréhension structurelle.</span>
+                            <span><strong class="text-white font-display text-2xl tracking-wide block mb-1">Relocalisation par empreinte :</strong> Une carte de points ORB/SuperPoint pondérée par confiance raccroche votre référence au mur via PnP hors ligne — résiste à la mise en poche, aux changements de lumière et au recouvrement des traits par la peinture.</span>
                         </li>
                         <li class="flex items-start bg-[#0a0a0e] p-5 border border-slate-800 hover:border-pink-500 transition-colors shadow-lg hover:-translate-y-1 transform duration-300">
                             <span class="text-pink-500 text-2xl mr-4 mt-1 font-bold">>></span>
@@ -585,8 +585,8 @@
 > ARCore: Session Bound [DEPTH16 Supported]
 > Loading OpenCV Module... v4.8.0 loaded
 > Initializing DualAnalyzer...
-> SLAM: Point cloud mapping initialized.
-> Voxel generation matrix standing by.
+> Fingerprint relocalizer initialized.
+> Plane back-projection matrix standing by.
 > Teleological correction active.
 > Status: PRÊT
 >

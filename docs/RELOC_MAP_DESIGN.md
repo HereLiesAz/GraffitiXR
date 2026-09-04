@@ -1,8 +1,13 @@
 # Relocalization Robustness — Persistent Spatial Map (Design for Review)
 
 > Status: **direction confirmed — lean feature map (Option A/D), co-registered to the
-> fingerprint** (see §4a). Options A–D are retained for context. Nothing built yet; Phase 1
-> (data model + persistence + tests) is next, before touching the relocalizer.
+> fingerprint** (see §4a). Options A–D are retained for context. **Phases 1–2 of §6 below have
+> shipped**: `WallFeatureMap` persists in the `.gxr` project record, and native map storage +
+> reloc matching are wired behind a persisted **Feature map** settings toggle
+> (`SlamManager.setMapBuildEnabled`/`setMapRelocEnabled`, both called from `ArViewModel`), off by
+> default alongside the drift-correction and self-grow switches. **Phases 3–4 — passive
+> accumulation-rate tuning and on-device confidence/pruning validation — have not been verified**;
+> treat the sequencing below as still accurate for what remains open.
 
 ## 1. The goal (your concern, restated)
 Relocalization that is **thorough and smooth over a whole mural** — locks back on from
@@ -153,6 +158,12 @@ budget bounded by the configurable cap + frustum gating (§4b).
    background accumulation rate, not user effort.
 
 ---
-*If A/D looks right, I'll turn §5–6 into a phased implementation plan and start with Phase 1
-(data model + persistence + tests) — zero relocalizer risk — for your review before going near
-`relocThreadFunc`.*
+*Phases 1–2 above (data model + persistence + tests; native map storage + reloc matching behind a
+flag) have shipped — see the status line at the top of this document. Phases 3–4 (passive
+accumulation tuning, on-device confidence/pruning validation) remain open.*
+
+---
+*Documentation updated on 2026-09-04: corrected the status line — this was previously stated as
+"nothing built yet," but `docs/AUDIT.md` and the current code (`WallFeatureMap`,
+`setMapBuildEnabled`/`setMapRelocEnabled`, the Feature map settings toggle) show Phases 1–2 have
+landed. Left the rest of the design content as-is; Phases 3–4 genuinely remain unverified.*

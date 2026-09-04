@@ -1560,7 +1560,10 @@ class ArRenderer(
             if (anchorEstablished) {
                 anchorOrchestrator.getConsensusMatrix(backbone)
             } else {
-                System.arraycopy(slamManager.getAnchorTransform(), 0, backbone, 0, 16)
+                // Null only under severe allocation pressure (see SlamManager.getAnchorTransform's
+                // doc) — leave backbone at whatever it already held (previous frame / identity)
+                // rather than crash on a null-array arraycopy.
+                slamManager.getAnchorTransform()?.let { System.arraycopy(it, 0, backbone, 0, 16) }
             }
             // Fuse in the corrected mark-PnP snap (smoothed) when anchored; the flag lets the eval
             // harness A/B fusion vs the old toggle. Off → exact previous behavior.
@@ -1806,8 +1809,11 @@ class ArRenderer(
                     val marksVisible = relocDiag.reject == com.hereliesaz.graffitixr.common.model
                         .RelocReject.OK && relocDiag.inliers >= MIN_TRUTH_INLIERS
                     val truth = if (marksVisible) {
-                        System.arraycopy(slamManager.getAnchorTransform(), 0, truthPoseScratch, 0, 16)
-                        truthPoseScratch
+                        val a = slamManager.getAnchorTransform()
+                        if (a != null) {
+                            System.arraycopy(a, 0, truthPoseScratch, 0, 16)
+                            truthPoseScratch
+                        } else null
                     } else null
                     probe.onTick(
                         candidatePose = anchorMatrix,

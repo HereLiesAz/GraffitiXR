@@ -29,7 +29,7 @@ the code and, where possible, pinned by a unit test.
 - [x] `feature/editor/util/ImageProcessor.kt:162` — BLUR tool painted opaque BLACK instead of blurring. ✅ blurred copy stamped through the stroke as an alpha mask.
 - [x] `core/design/rendering/ProjectedImageRenderer.kt:49` — empty bodies behind comments claiming JNI. ✅ deleted (never instantiated, no native impl).
 - [x] `feature/editor/EditorViewModel.kt:797` — uncancelled per-tick K-means. ✅ `segmentationInfluenceJob`.
-- [x] `feature/editor/stencil/StencilPrintEngine.kt:178` — OOB tile sampling. ✅ clamped.
+- [x] `feature/editor/stencil/StencilPrintEngine.kt:178` — OOB tile sampling. ✅ clamped. **2026-09-04 correction: this entire class no longer exists in the tree — stencil generation has since been removed wholesale (see `README.md`'s changelog and `docs/STENCILS.md`). This line records a fix to code that was later deleted, not a live control.**
 - [x] `feature/ar/rendering/ArRenderer.kt:1133` — depth acquire raced `session.update()`. ✅ moved to the GL thread.
 - [x] `feature/ar/ArViewModel.kt:674` — `setImperialUnits()` never persisted. ✅ persists.
 - [x] `core/common/model/Fingerprint.kt:11` — no `init{}` size invariant. ✅ added.
@@ -61,7 +61,7 @@ the code and, where possible, pinned by a unit test.
 - [x] `ArViewModel.eraseUndoStack`/`eraseRedoStack`/`eraseOpMutex`/`MAX_ERASE_UNDO`, `scheduleKeypointRecompute`, `ArRenderer.diagFrameCount`, `HostSession.localDeviceName` (see above), `Overlays.CaptureAnimation.af`, `CrashUploadWorker`'s unused `context`. ✅ removed.
 - [x] `EditorActions.onRotationXChanged/Y/Z`, `setLayerTransform`, `onLayerWarpChanged` and their intents/reducer branches — leftovers of a slider UI that no longer exists (rotation is gesture-driven), and a warp mesh that was written to the model and never read by any renderer. ✅ deleted, including the `warpMesh` field on `Layer`/`OverlayLayer` (safe: `ProjectManager`'s Json sets `ignoreUnknownKeys`).
 - [x] `GraffitiProject.mapPath`, `ProjectManager.getMapPath`, `ProjectRepository.updateMapPath` — a path to a `map.bin` that nothing has written since `saveModel` became a no-op. ✅ removed, along with the two self-referential mockk tests that verified a call they had just made.
-- [x] `core/common/util/YuvToRgbConverter.kt`, `StencilProcessor.processSingle`, `StencilPrintEngine.saveLayerPngs`. ✅ already gone; re-verified this pass. `feature/editor`'s orphan dialogs/gesture detectors were NOT gone on the previous pass despite this line — `feature/editor/.../ui/StatusOverlay.kt` (zero references anywhere) and `feature/editor/.../ui/RotationAxisFeedback.kt` (a byte-for-byte duplicate of `core/design`'s, which is the one `MainScreen.kt` actually calls) were both still present and have now actually been deleted.
+- [x] `core/common/util/YuvToRgbConverter.kt`, `StencilProcessor.processSingle`, `StencilPrintEngine.saveLayerPngs`. ✅ already gone; re-verified this pass (and, as of 2026-09-04, the whole stencil pipeline — not just these two methods — is gone; see the correction on the `StencilPrintEngine.kt:178` line above). `feature/editor`'s orphan dialogs/gesture detectors were NOT gone on the previous pass despite this line — `feature/editor/.../ui/StatusOverlay.kt` (zero references anywhere) and `feature/editor/.../ui/RotationAxisFeedback.kt` (a byte-for-byte duplicate of `core/design`'s, which is the one `MainScreen.kt` actually calls) were both still present and have now actually been deleted.
 
 ## Native — the vestigial voxel/splat layer
 

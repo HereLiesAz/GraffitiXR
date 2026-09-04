@@ -1,6 +1,12 @@
 # STENCILS: Architectural Bible
 
-This document details the design specifics, intricacies, and reasoning behind the GraffitiXR Stencil Creation feature, reflecting the active implementation.
+**Status: historical/unimplemented.** This document was written as an "Architectural Bible...
+reflecting the active implementation," but there is no implementing code anywhere in the current
+tree — `StencilProcessor.kt`, `StencilPrintEngine.kt`, and `ExportManager`'s stencil path do not
+exist (`find . -iname "*stencil*"` returns only this doc file); `EditorMode.STENCIL` was deleted
+from the mode enum with no route. Stencil generation was removed per `README.md`'s 2026-09-04
+changelog for having no implementing code. The design content below is preserved as reference for a
+future reimplementation — read it as a proposal, not as documentation of shipped behavior.
 
 ## 1. Core Philosophy and Topology
 The Stencil Creation feature in GraffitiXR is designed to generate physically reproducible stencils from digital assets. 
@@ -50,3 +56,8 @@ Previously, compositing operated in *Screen Space*, tying the generated bitmap d
 4. **Property Synchronization:** Once processing finishes, the new Stencil Layer object inherits identical `scale`, `offset`, and `rotationZ` transform parameters as the original anchor layer. 
 
 **Result:** Sharing identically scaled pixel grids and synchronized UI transformation properties ensures the Stencil output accurately mirrors the source element and behaves identically inside the Editor/AR space.
+
+---
+*Documentation updated on 2026-09-04: marked the whole document historical/unimplemented — no
+stencil-generation code exists in the current tree. Design content below the status line preserved
+unchanged as reference.*
