@@ -458,7 +458,7 @@
     <!-- Flashlight help text. -->
     <string name="help_light">Lommelykt: Slå på enhetens LED. Instruksjoner: Bruk denne til å lyse opp mørke vegger for bedre AR-sporing.</string>
     <!-- Lock/Freeze help text. -->
-    <string name="help_lock_trace">Frys: låser hele berøringsskjermen slik at kalkerpapir ikke drar i designet — i motsetning til Lås blokkerer dette også rulling og trykk. For å avslutte, trykk Volum Opp, Ned, Opp, Ned.</string>
+    <string name="help_lock_trace">Frys: låser hele berøringsskjermen slik at kalkerpapir ikke drar i designet — i motsetning til Lås blokkerer dette også rulling og trykk. For å avslutte, trykk raskt Volum Opp, Ned, Opp, Ned.</string>
     <!-- Interactive 'Help' help text. -->
     <!-- Individual Layer help text. -->
 

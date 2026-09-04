@@ -458,7 +458,7 @@
     <!-- Flashlight help text. -->
     <string name="help_light">Torcia: Attiva/disattiva il LED del dispositivo. Istruzioni: Usa questo per illuminare muri scuri per un migliore tracciamento AR.</string>
     <!-- Lock/Freeze help text. -->
-    <string name="help_lock_trace">Congela: blocca l\'intero touchscreen in modo che la carta da lucido non trascini il disegno — a differenza di Blocca, questo blocca anche lo scorrimento e i tocchi. Per uscire, premi Volume Su, Giù, Su, Giù.</string>
+    <string name="help_lock_trace">Congela: blocca l\'intero touchscreen in modo che la carta da lucido non trascini il disegno — a differenza di Blocca, questo blocca anche lo scorrimento e i tocchi. Per uscire, premi rapidamente Volume Su, Giù, Su, Giù.</string>
     <!-- Interactive \'Help\' help text. -->
     <!-- Individual Layer help text. -->
 

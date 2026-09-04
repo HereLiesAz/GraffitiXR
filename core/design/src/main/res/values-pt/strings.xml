@@ -458,7 +458,7 @@
     <!-- Flashlight help text. -->
     <string name="help_light">Lanterna: Alterne o LED do dispositivo. Instruções: Use isso para iluminar paredes escuras para melhor rastreamento AR.</string>
     <!-- Lock/Freeze help text. -->
-    <string name="help_lock_trace">Congelar: bloqueia toda a tela sensível ao toque para que o papel vegetal não arraste o design — diferente de Bloquear, isso também bloqueia rolagem e toques. Para sair, pressione Volume Aumentar, Diminuir, Aumentar, Diminuir.</string>
+    <string name="help_lock_trace">Congelar: bloqueia toda a tela sensível ao toque para que o papel vegetal não arraste o design — diferente de Bloquear, isso também bloqueia rolagem e toques. Para sair, pressione rápido Volume Aumentar, Diminuir, Aumentar, Diminuir.</string>
     <!-- Interactive 'Help' help text. -->
     <!-- Individual Layer help text. -->
 

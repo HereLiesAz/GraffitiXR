@@ -234,7 +234,7 @@
     <string name="help_export">Exporter l\'Image : Enregistrer un instantané haute résolution. Instructions : Rendu de tous les calques visibles en un seul PNG dans votre galerie photo.</string>
     <string name="help_settings">Paramètres de l\'Appli : Configurer les préférences. Instructions : Ouvrir pour ajuster la manualité, les unités et les paramètres de numérisation.</string>
     <string name="help_light">Lampe de poche : Basculer la LED de l\'appareil. Instructions : Utilisez-la pour éclairer les murs sombres pour un meilleur suivi AR.</string>
-    <string name="help_lock_trace">Geler : verrouille tout l\'écran tactile pour que le papier calque ne déplace pas le dessin — contrairement à Verrouiller, cela bloque aussi le défilement et les appuis. Pour quitter, appuyez sur Volume Haut, Bas, Haut, Bas.</string>
+    <string name="help_lock_trace">Geler : verrouille tout l\'écran tactile pour que le papier calque ne déplace pas le dessin — contrairement à Verrouiller, cela bloque aussi le défilement et les appuis. Pour quitter, appuyez rapidement sur Volume Haut, Bas, Haut, Bas.</string>
     <string name="unit_feet">pi</string>
     <string name="unit_centimeters">cm</string>
     <string name="unit_meters">m</string>
