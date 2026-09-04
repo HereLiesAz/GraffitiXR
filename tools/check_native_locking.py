@@ -50,6 +50,19 @@ now (verify by re-running: the OK message reports the actual counts), but the fa
 "docstring says it's fixed" claim was wrong before is itself the reason to verify the counts
 look right after any future change to this script, not just trust its own text.
 
+A THIRD pass found the header-inline-body fix above was itself still incomplete, plus a
+second, independent bug in the guard check: the header scanner only matched a method whose
+ENTIRE body was on one line, silently skipping any multi-line inline method (e.g.
+evalSyncEveryN/getCorroborationConfidence/decayCorroboration -- all inline in MobileGS.h, all
+multiple lines) with no warning if one of them ever touched a plain member unguarded; and
+guardedness was computed once per LINE rather than by token position, so `consume(mFoo);
+lock_guard<...> lock(mMutex);` (member touched BEFORE the lock) and `{ lock_guard<...>
+lock(mMutex); } return mFoo;` (member touched AFTER that lock's scope closed, same line) both
+read as "a lock is somewhere on this line" and were silently treated as guarded either way.
+Fixed by replacing the two brace-tracking splitters with one shared split_brace_bodies() (any
+body length, either file) and replacing check_function's per-line guardedness with a single
+ordered token scan (braces/locks/members interleaved by actual position, not by line).
+
 In short: a clean run means "no unguarded access to a plain MobileGS.h member (including
 brace-initialized ones) in a MobileGS:: function body, whether defined in MobileGS.cpp or
 inline in the header" -- not "this file's locking is correct" in any deeper sense, and
@@ -73,18 +86,14 @@ MEMBER_DECL_RE = re.compile(
     r"\s*(=.*|\{[^{}]*\})?;\s*(//.*)?$"
 )
 ATOMIC_DECL_RE = re.compile(r"std::atomic<")
-LOCK_DECL_RE = re.compile(
-    r"std::(?:lock_guard|unique_lock|shared_lock)<[^>]*>\s+\w+\s*\(\s*(m\w+)\s*\)"
-)
 FUNC_START_RE = re.compile(r"^[\w:<>,\*\&\s]*\bMobileGS::(~?\w+)\s*\(")
-# A method defined entirely inline in the header, body and all on one line -- e.g.
-# `int getMapPointCount() const { std::lock_guard<std::mutex> lock(mMutex); return ...; }`.
-# MobileGS.cpp's split_functions() handles multi-line bodies via brace-depth tracking; every
-# inline body in this header happens to be single-line, so a same-line { ... } is enough here
-# rather than reimplementing that tracker for the header too.
-HEADER_INLINE_FUNC_RE = re.compile(
-    r"^\s*[\w:<>,\*\&]+[\s\*\&]+(\w+)\s*\([^;{}]*\)\s*(?:const)?\s*\{.*\}\s*;?\s*$"
-)
+# A method defined inline in the header -- unqualified (no `MobileGS::`), unlike FUNC_START_RE.
+# Deliberately lenient (name + opening paren is enough, mirroring FUNC_START_RE's own leniency
+# for multi-line signatures): a header line this matches that turns out to be a bare prototype
+# (ends in `;` before any `{` is found) or something else entirely is harmlessly skipped by
+# split_brace_bodies' own bail-on-`;` check, the same way it already tolerates FUNC_START_RE
+# matching a prototype in the .cpp file.
+HEADER_METHOD_START_RE = re.compile(r"^\s*[\w:<>,\*\&]+[\s\*\&]+(\w+)\s*\(")
 
 # Members that are legitimately touched outside any lock by design, with the reasoning
 # cited below. Keep this list short and cited -- it is an explicit allowlist of
@@ -150,14 +159,18 @@ def parse_members(header_text: str) -> tuple[set[str], set[str]]:
     return plain, atomic
 
 
-def split_functions(source_text: str) -> list[tuple[str, int, list[str]]]:
-    """Return [(function_name, start_line_no, body_lines)] for each MobileGS:: method."""
-    lines = source_text.splitlines()
+def split_brace_bodies(text: str, start_re: "re.Pattern[str]") -> list[tuple[str, int, list[str]]]:
+    """Return [(function_name, start_line_no, body_lines)] for each block whose start line
+    matches start_re, by brace-depth-tracking the body -- handles bodies of any length, not just
+    single-line ones (that gap let split_header_inline_functions silently skip every multi-line
+    inline method in MobileGS.h, e.g. evalSyncEveryN/getCorroborationConfidence/decayCorroboration,
+    with no warning if one of them ever touched a plain member unguarded)."""
+    lines = text.splitlines()
     functions: list[tuple[str, int, list[str]]] = []
     i = 0
     n = len(lines)
     while i < n:
-        m = FUNC_START_RE.match(lines[i])
+        m = start_re.match(lines[i])
         if not m:
             i += 1
             continue
@@ -167,7 +180,7 @@ def split_functions(source_text: str) -> list[tuple[str, int, list[str]]]:
         j = i
         while j < n and "{" not in lines[j]:
             if lines[j].rstrip().endswith(";"):
-                break  # this was a declaration, not a definition
+                break  # this was a declaration/prototype, not a definition
             j += 1
         if j >= n or "{" not in lines[j]:
             i += 1
@@ -190,48 +203,48 @@ def split_functions(source_text: str) -> list[tuple[str, int, list[str]]]:
     return functions
 
 
-def split_header_inline_functions(header_text: str) -> list[tuple[str, int, list[str]]]:
-    """Return [(function_name, line_no, [the one line])] for single-line inline method bodies
-    defined directly in the header (e.g. `int getMapPointCount() const { ...; }`)."""
-    functions: list[tuple[str, int, list[str]]] = []
-    for i, line in enumerate(header_text.splitlines()):
-        m = HEADER_INLINE_FUNC_RE.match(line)
-        if not m:
-            continue
-        functions.append((m.group(1), i + 1, [line]))
-    return functions
+# Tokens relevant to lock-scope tracking, in a single pass so brace/lock/member order WITHIN a
+# line is respected -- the previous per-line design computed one `guarded` bool for an entire
+# line after scanning it for a lock anywhere on it, so `consume(mFoo); lock_guard<...>
+# lock(mMutex);` (member touched BEFORE the lock is even declared) and `{ lock_guard<...>
+# lock(mMutex); } return mFoo;` (member touched AFTER that lock's scope already closed, same
+# line) both read as "a lock is present on this line" and were silently treated as guarded.
+TOKEN_RE = re.compile(
+    r"(?P<lbrace>\{)"
+    r"|(?P<rbrace>\})"
+    r"|(?P<lock>std::(?:lock_guard|unique_lock|shared_lock)<[^>]*>\s+\w+\s*\(\s*m\w+\s*\))"
+    r"|(?P<member>\bm[A-Z]\w*\b)"
+)
 
 
 def check_function(name: str, body: list[str], plain_members: set[str]) -> list[Finding]:
     findings: list[Finding] = []
     depth = 0
-    # Stack of (depth_at_which_lock_was_declared,) -- any depth >= a locked depth is "guarded".
+    # Stack of depths at which a lock_guard/unique_lock/shared_lock was declared -- any depth
+    # equal to the top of this stack (we never re-enter a shallower depth without popping first,
+    # since braces are processed in the same pass) means "currently inside that lock's scope".
     lock_depths: list[int] = []
-    member_pattern = re.compile(r"\bm[A-Z]\w*\b")
 
     for offset, raw_line in enumerate(body):
-        line = raw_line
         # Strip line comments (crude, but this codebase doesn't nest // inside strings here).
-        code = line.split("//", 1)[0]
-
-        pre_depth = depth
-        depth += code.count("{") - code.count("}")
-
-        # Pop lock scopes that just closed.
-        while lock_depths and lock_depths[-1] > depth:
-            lock_depths.pop()
-
-        if LOCK_DECL_RE.search(code):
-            lock_depths.append(pre_depth if pre_depth > 0 else depth)
-
-        guarded = bool(lock_depths)
-        for match in member_pattern.finditer(code):
-            member = match.group(0)
-            if member not in plain_members:
-                continue
-            if guarded:
-                continue
-            findings.append(Finding(name, member, offset, line.strip()))
+        code = raw_line.split("//", 1)[0]
+        for match in TOKEN_RE.finditer(code):
+            kind = match.lastgroup
+            if kind == "lbrace":
+                depth += 1
+            elif kind == "rbrace":
+                depth -= 1
+                while lock_depths and lock_depths[-1] > depth:
+                    lock_depths.pop()
+            elif kind == "lock":
+                lock_depths.append(depth)
+            else:  # member
+                member = match.group(0)
+                if member not in plain_members:
+                    continue
+                if lock_depths:
+                    continue
+                findings.append(Finding(name, member, offset, raw_line.strip()))
     return findings
 
 
@@ -244,10 +257,13 @@ def main() -> int:
         print("ERROR: parsed zero MobileGS members -- header regex is out of sync.", file=sys.stderr)
         return 2
 
-    functions = split_functions(source_text)
-    header_functions = split_header_inline_functions(header_text)
+    functions = split_brace_bodies(source_text, FUNC_START_RE)
+    header_functions = split_brace_bodies(header_text, HEADER_METHOD_START_RE)
     if not functions:
         print("ERROR: parsed zero MobileGS:: function bodies -- source regex is out of sync.", file=sys.stderr)
+        return 2
+    if not header_functions:
+        print("ERROR: parsed zero header-inline method bodies -- header regex is out of sync.", file=sys.stderr)
         return 2
     functions = functions + header_functions
 
