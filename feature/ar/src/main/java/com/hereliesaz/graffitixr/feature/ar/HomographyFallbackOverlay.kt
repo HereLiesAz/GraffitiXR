@@ -26,15 +26,26 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
+import com.hereliesaz.graffitixr.design.theme.rememberAppStrings
 import com.hereliesaz.graffitixr.feature.ar.rendering.HomographyOverlayRenderer
 import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+/** TL, TR, BR, BL — a centered inset rectangle, matching [UnwarpScreen]'s expected point order. */
+private val DEFAULT_UNWARP_POINTS = listOf(
+    Offset(0.25f, 0.25f),
+    Offset(0.75f, 0.25f),
+    Offset(0.75f, 0.75f),
+    Offset(0.25f, 0.75f),
+)
 
 /**
  * Drop-in fallback tracking + rendering for `EditorMode.OVERLAY` on ARCore-unavailable devices —
@@ -43,17 +54,17 @@ import kotlinx.coroutines.withContext
  * `GLSurfaceView` over its camera background: `setZOrderMediaOverlay(true)` +
  * `PixelFormat.TRANSLUCENT` so this draws on top while staying otherwise invisible.
  *
- * Self-contained on purpose — owns its own reference capture (a "Capture Target" button, shown
- * until the artist taps it), [BridgedHomographyTracker], [HomographyTrackingAnalyzer], and
- * [HomographyOverlayRenderer], attaching/detaching the CameraX analyzer as this enters/leaves
- * composition — so wiring it into `MainScreen.kt`'s existing `EditorMode.OVERLAY` branch is a
- * small, mechanical addition rather than a deep change to that file or `ArViewModel`.
+ * Self-contained on purpose — owns its own reference capture ("Capture Target" -> drag the
+ * corners onto the shape via the same [UnwarpScreen] AR mode's own target capture uses -> the
+ * rectified rectangle becomes the tracked reference), [BridgedHomographyTracker],
+ * [HomographyTrackingAnalyzer], and [HomographyOverlayRenderer], attaching/detaching the CameraX
+ * analyzer as this enters/leaves composition — so wiring it into `MainScreen.kt`'s existing
+ * `EditorMode.OVERLAY` branch is a small, mechanical addition rather than a deep change to that
+ * file or `ArViewModel`.
  *
- * The captured reference photo's own full frame is treated as the tracked rectangle (half-width
- * fixed at 1.0, half-height at its aspect ratio) — a placeholder convention, not a measurement of
- * anything on the wall; a future pass that lets the artist mark the shape's actual corners (e.g.
- * reusing `TargetCreationFlow`'s `UnwarpScreen`, as AR mode's own target capture does) would
- * replace this, not the tracking underneath it.
+ * The rectified bitmap's own aspect ratio becomes the tracked rectangle's half-extents — an
+ * accurate measurement of the marked shape (in the rectified image's own pixel units), not the
+ * whole camera frame.
  *
  * @param designBitmap the current design composite to texture the tracked quad with; null draws
  *   nothing (tracking still runs, so a design supplied later appears without re-tracking).
@@ -70,24 +81,54 @@ fun HomographyFallbackOverlay(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    var rawCaptureBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var unwarpPoints by remember { mutableStateOf(DEFAULT_UNWARP_POINTS) }
     var referenceBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
     if (referenceBitmap == null) {
         val scope = rememberCoroutineScope()
-        Box(modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
-            Button(
-                onClick = {
-                    scope.launch {
-                        referenceBitmap = runCatching { cameraController.takePictureAsBitmap(context) }
-                            .getOrNull()
+        val raw = rawCaptureBitmap
+        if (raw == null) {
+            Box(modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            rawCaptureBitmap = runCatching { cameraController.takePictureAsBitmap(context) }
+                                .getOrNull()
+                        }
+                    },
+                    modifier = Modifier
+                        .padding(32.dp)
+                        .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
+                ) {
+                    Text("Capture Target")
+                }
+            }
+        } else {
+            val strings = rememberAppStrings()
+            UnwarpScreen(
+                bitmap = raw,
+                points = unwarpPoints,
+                onUpdatePoints = { unwarpPoints = it },
+                onConfirm = { points ->
+                    scope.launch(Dispatchers.Default) {
+                        val pixelPoints = points.map { Offset(it.x * raw.width, it.y * raw.height) }
+                        val unwarped = PerspectiveProcessor.unwarpImage(raw, pixelPoints)
+                        withContext(Dispatchers.Main) {
+                            if (unwarped != null) {
+                                referenceBitmap = unwarped
+                            } else {
+                                rawCaptureBitmap = null
+                            }
+                        }
                     }
                 },
-                modifier = Modifier
-                    .padding(32.dp)
-                    .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
-            ) {
-                Text("Capture Target")
-            }
+                onCancel = {
+                    rawCaptureBitmap = null
+                    unwarpPoints = DEFAULT_UNWARP_POINTS
+                },
+                strings = strings,
+            )
         }
         return
     }
