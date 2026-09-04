@@ -1627,13 +1627,23 @@ void MobileGS::scheduleRelocCheck(const cv::Mat& f) {
         runRelocPass(f, view);
         return;
     }
+    float viewSnapshot[16];
+    {
+        // Snapshot the latest VIO view under mMutex -- the same lock updateCamera writes it
+        // under -- rather than reading it here unlocked. This used to rely on gEngineMutex's
+        // incidental global exclusivity (every JNI entry point serialized against updateCamera)
+        // to avoid a torn read; now that gEngineMutex is a shared_mutex and most JNI entries
+        // (including this one's caller, nativeFeedColorFrame) only take a shared lock, that
+        // incidental protection is gone and this needs its own correct lock. Scoped so it never
+        // nests with mRelocMutex below, matching the pattern above.
+        std::lock_guard<std::mutex> lock(mMutex);
+        memcpy(viewSnapshot, mViewMatrix, 16 * sizeof(float));
+    }
     {
         std::lock_guard<std::mutex> lock(mRelocMutex);
         if (mRelocRequested) return;
         f.copyTo(mRelocColorFrame);
-        // Snapshot the latest VIO view alongside the frame so the rectifying warp matches it. A torn
-        // read vs. updateCamera is harmless here — the warp is approximate and PnP refines it.
-        memcpy(mRelocViewMatrix, mViewMatrix, 16 * sizeof(float));
+        memcpy(mRelocViewMatrix, viewSnapshot, 16 * sizeof(float));
         mRelocRequested = true;
     }
     mRelocCv.notify_one();

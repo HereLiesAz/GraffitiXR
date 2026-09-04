@@ -168,13 +168,28 @@ Correctness bugs, worst first:
   and defaults **off**. So the user-visible "does the overlay snap back" behavior genuinely is
   opt-in, off by default, exactly as README.md describes — the dead `setRelocEnabled` flag is real
   vestigial API-surface (worth deleting) but not a docs bug.
-- **`gEngineMutex` (JNI) serializes the GL/render thread behind full-resolution OpenCV work** —
-  target-capture fingerprint generation and SuperPoint inference hold the same global lock the
-  per-frame camera/YUV callbacks need, which is a likely visible freeze at exactly the moment the
-  artist confirms a target. Fixing it to a `shared_mutex` needs care: `MobileGS.cpp`'s
-  `mRelocViewMatrix` copy is *only* race-free today because `gEngineMutex` happens to also
-  serialize it against `updateCamera`'s writes to `mViewMatrix` — a plain reader/writer split would
-  reintroduce that torn read. Needs its own lock, not just relaxing the JNI one.
+- ~~`gEngineMutex` (JNI) serializes the GL/render thread behind full-resolution OpenCV work~~ —
+  **fixed.** `gEngineMutex`'s own doc comment establishes it only ever protected the *lifetime* of
+  the `gSlamEngine` pointer (against `nativeDestroy`'s `delete` racing a dereference) — not
+  `MobileGS`'s internal state, which is already its own job (`mMutex`/`mRelocMutex`/`std::atomic`
+  members). So it's now a `std::shared_mutex`: `nativeInitialize`/`nativeDestroy` (which write the
+  pointer) and `nativeLoadSuperPoint`/`nativeLoadDistortionHead`/`nativeLoadLowLightEnhancer`
+  (which mutate `mSuperPoint`/`mDistortionHead`/`mEnhancer` in place, read by several paths with no
+  lock of their own) take `std::unique_lock`; the other 44 entry points take `std::shared_lock` and
+  can now run concurrently — the actual fix for heavy OpenCV/SuperPoint work blocking the
+  per-frame camera path behind one global lock. The one real hazard this exposed —
+  `MobileGS::scheduleRelocCheck`'s `mRelocViewMatrix` snapshot relied on `gEngineMutex`'s
+  incidental global exclusivity to stay race-free against `updateCamera`'s writes to
+  `mViewMatrix`, rather than any `MobileGS`-internal lock — is fixed: it now takes its own
+  `mMutex`-guarded snapshot first, matching `updateCamera`'s writer lock, non-nested with
+  `mRelocMutex` per the file's existing pattern. Verified two ways: `tools/check_native_locking.py`
+  (new — a static lock-discipline checker that flags any plain `MobileGS` member touched with no
+  engine-owned lock active in scope; it found the three live-reloadable model members above and,
+  by design, does *not* catch "wrong lock held" bugs like the `mRelocViewMatrix` one, which was
+  fixed by hand) and a real native/CMake build (`arm64-v8a` + `armeabi-v7a`) plus the full unit
+  suite including `NativeMethodAritySignatureTest`, all green. Not device- or TSan-verified — no
+  device or sanitizer tooling is available in this sandbox; the fix is proven by the documented
+  reasoning above and the static check, not by observed absence of a race under real load.
 - **A dead AI-glasses subsystem is still fully wired** — `startGlassesSession` has zero callers and
   `WearableModule`'s only bound provider can never match its "Meta" name lookup, despite
   README.md:60 describing the subsystem as already removed. **Re-checked, not a simple deletion**:
