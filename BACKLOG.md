@@ -325,16 +325,16 @@ than after.
 
 ### Phase 3 — Static-checker hardening (`tools/check_native_locking.py`)
 
-- [ ] Fix `MEMBER_DECL_RE` to also match brace-initializer declarations
+- [x] Fix `MEMBER_DECL_RE` to also match brace-initializer declarations
   (`std::atomic<int> mFoo{0};`) — it currently only matches `= ...;`/`;` endings, so ~28 of
   `MobileGS.h`'s 30 atomic members are invisible to the script rather than classified. Currently
   harmless (no *plain* member happens to use brace-init) but silently exempts the next one that
   does.
-- [ ] Parse header-inline method bodies too (`getMapPointCount()`, `getWallKeypointCount()` in
+- [x] Parse header-inline method bodies too (`getMapPointCount()`, `getWallKeypointCount()` in
   `MobileGS.h` both touch plain members and are entirely unexamined today).
-- [ ] Fix `FUNC_START_RE` to match the destructor (`~MobileGS`) — currently skipped because `~`
+- [x] Fix `FUNC_START_RE` to match the destructor (`~MobileGS`) — currently skipped because `~`
   isn't `\w`.
-- [ ] Re-run against current `MobileGS.cpp`/`.h` after the above and update the allowlist/OK
+- [x] Re-run against current `MobileGS.cpp`/`.h` after the above and update the allowlist/OK
   message if the true member/function counts change materially from what's currently reported.
 
 ### Phase 4 — AR core-workflow bugs (Kotlin/Compose, highest user impact)
