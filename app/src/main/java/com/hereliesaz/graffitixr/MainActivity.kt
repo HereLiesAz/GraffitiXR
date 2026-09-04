@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -1193,6 +1194,29 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
+                            // Confirming a target unmounts TargetCreationUi (and its own isLoading
+                            // spinner) immediately via resetCaptureUi(), well before the async
+                            // fingerprint-build work (awaitAnchorTransform's up-to-2s timeout, then a
+                            // full ORB/SuperPoint pass) finishes — see MainViewModel's
+                            // isConfirmingTarget doc. Without a separate indicator surviving that
+                            // unmount, the artist saw a plain AR feed with no sign anything was
+                            // happening between tapping Confirm and the eventual toast.
+                            if (mainUiState.isConfirmingTarget) {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        CircularProgressIndicator(color = Color.White)
+                                        Spacer(Modifier.height(12.dp))
+                                        Text(
+                                            text = "Saving target…",
+                                            color = Color.White,
+                                            modifier = Modifier
+                                                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
+                                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                                        )
+                                    }
+                                }
+                            }
+
                             // isAnchorEstablished means ARCore made an anchor. It says NOTHING about
                             // whether the wall fingerprint got built, and gating the success banner
                             // on it alone told artists a target was ready when back-projection had
@@ -1515,10 +1539,13 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onRetake = {
                                         mainViewModel.onRetakeCapture()
-                                        if (mainUiState.captureOriginatedFromTap) {
-                                            arViewModel.clearTapHighlights()
-                                        } else {
-                                            arViewModel.clearTapHighlights()
+                                        // clearCaptureForRetry (not clearTapHighlights) — it also nulls
+                                        // tempCaptureBitmap/annotatedCaptureBitmap/targetWallPlane.
+                                        // Without that, the LaunchedEffect above sees the SAME rejected
+                                        // capture still non-null and immediately re-fires straight back
+                                        // to Review with the identical bitmap: Retake was a no-op loop.
+                                        arViewModel.clearCaptureForRetry()
+                                        if (!mainUiState.captureOriginatedFromTap) {
                                             arViewModel.requestCapture()
                                         }
                                     },
@@ -1632,7 +1659,12 @@ class MainActivity : ComponentActivity() {
                                     // visible — there is no menu to open, and tapping the app icon
                                     // instead FOLDS the rail away (AzNavRail 11.0's noMenu behaviour).
                                     // The old copy sent the user to collapse their own navigation.
-                                    text = { Text("Tap 'Open' on the rail to choose a photo of your artwork.", color = Color.White) },
+                                    // "Open" itself lives under the "mode.design" host, which
+                                    // expandWhen auto-collapses outside Design mode — this dialog can
+                                    // fire from AR (see showDesignInstructionsDialog's callers), where
+                                    // "tap Open" alone pointed at an invisible control. Route through
+                                    // Design first.
+                                    text = { Text("Tap 'Design' on the rail, then 'Open', to choose a photo of your artwork.", color = Color.White) },
                                     containerColor = Color(0xEE1A1A1A),
                                     confirmButton = {
                                         AzButton(text = "Got it", onClick = { showDesignInstructionsDialog = false }, shape = AzButtonShape.RECTANGLE)
@@ -1962,6 +1994,13 @@ class MainActivity : ComponentActivity() {
                         if (isWaitingForTap) {
                             mainViewModel.cancelTapMode()
                         } else if (hasCameraPermission) {
+                            // Clear any previous capture (tempCaptureBitmap etc.) BEFORE re-arming.
+                            // Without this, re-arming Target after a successful capture left the old
+                            // bitmap/wall-plane in ArUiState; the review-effect saw it was still
+                            // non-null and jumped straight to Review with the stale photo — an artist
+                            // confirming it would register an old target against a freshly-established
+                            // anchor.
+                            arViewModel.clearCaptureForRetry()
                             mainViewModel.startTargetCapture()
                         } else {
                             requestPermissions()
@@ -2943,8 +2982,11 @@ private fun PostTargetInstructionOverlay(modifier: Modifier = Modifier) {
             Spacer(Modifier.height(12.dp))
             Text(
                 // noMenu=true means every rail item is always visible; there is no menu, and
-                // tapping the app icon instead folds the rail away.
-                text = "Now tap 'Open' on the rail to add a photo of your artwork.",
+                // tapping the app icon instead folds the rail away. "Open" itself lives under the
+                // "mode.design" host, which expandWhen auto-collapses outside Design mode — this
+                // overlay only ever shows in AR, so "tap Open" alone pointed at an invisible
+                // control. Route through Design first.
+                text = "Now tap 'Design' on the rail, then 'Open', to add a photo of your artwork.",
                 color = Color.White,
                 textAlign = TextAlign.Center,
                 fontSize = 15.sp,
