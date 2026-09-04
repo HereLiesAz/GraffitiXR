@@ -283,38 +283,38 @@ than after.
 
 ### Phase 2 — ARCore-fallback tracker correctness (isolated subsystem)
 
-- [ ] `HomographyTracker.cpp:178` — the CV→GL pose conversion applies the handedness flip
+- [x] `HomographyTracker.cpp:178` — the CV→GL pose conversion applies the handedness flip
   `C·Rcv·C` when the object frame (built in `setReference`) is already GL-convention (+Y up);
   it needs `C·Rcv` only. **Every fallback-tracked overlay currently renders upside-down and
   back-facing.** Fix the sandwich, correct the comment that (wrongly) cites `MobileGS`'s
   camera-to-camera case as precedent, and add the known-answer-pose test called out in Phase 7
   — this is the one subsystem in the whole audit round with zero executable tests, which is how
   an unconditional sign error shipped.
-- [ ] `HomographyTracker.cpp:112-134` — the inlier/match-count gates (`objPts.size() >= 12`,
+- [x] `HomographyTracker.cpp:112-134` — the inlier/match-count gates (`objPts.size() >= 12`,
   `inliers.size() >= 8`, `ratio >= 0.35`) have no spatial-conditioning check; a tight cluster of
   matches (e.g. all inside one logo) passes every gate and produces a high-confidence garbage
   pose. Add a bounding-box-area or condition-number check on `objPts` before the PnP solve.
-- [ ] `SuperPointDetector.cpp:108-120` — masked detection (`generateFingerprint`'s isolated-marks
+- [x] `SuperPointDetector.cpp:108-120` — masked detection (`generateFingerprint`'s isolated-marks
   path) truncates to `maxKps` *before* applying the mask, so a small mask can yield zero
   survivors and silently fall back to ORB, permanently downgrading that project's wall
   fingerprint to binary descriptors. Apply the mask before the top-K truncation, or detect with a
   higher provisional cap when a mask is present.
-- [ ] `LowLightEnhancer` — silently a no-op on all three bitmap-sourced call sites
+- [x] `LowLightEnhancer` — silently a no-op on all three bitmap-sourced call sites
   (`getSuperPointFeatures`, `getFingerprintKeypoints`, `generateFingerprint`): they hand it
   `CV_8UC4` (from `bitmapToMat`), the model wants 3-channel, OpenCV throws, the catch swallows
   it. Only the reloc live-frame path (which converts to RGB first) actually works. Convert
   RGBA→RGB before the three broken calls, or make `LowLightEnhancer::enhance` accept and convert
   4-channel input itself so every caller doesn't have to remember to.
-- [ ] `include/SuperPointDetector.h:23` — default `scoreThresh = 0.005f` is below the uniform-
+- [x] `include/SuperPointDetector.h:23` — default `scoreThresh = 0.005f` is below the uniform-
   softmax floor (`1/65 ≈ 0.01538`), so the threshold filters nothing on an uninformative heatmap;
   the only real bound is the `maxKps` truncation. Raise to at least the MagicLeap reference value
   (0.015) with a cited comment.
-- [ ] `SuperPointDetector.cpp:164` — NMS uses `>=`, so exact score ties mutually eliminate
+- [x] `SuperPointDetector.cpp:164` — NMS uses `>=`, so exact score ties mutually eliminate
   instead of one surviving. Low severity (softmax ties are rare) but trivial: change to `>`.
-- [ ] Wire the fallback tracker's `outConfidence` (already computed, plumbed through 17 floats
+- [x] Wire the fallback tracker's `outConfidence` (already computed, plumbed through 17 floats
   and a gyro decay) into the "Reacquiring target…" UI — currently computed and then read by
   nothing.
-- [ ] Comment corrections (no behavior change, but actively misleading as written):
+- [x] Comment corrections (no behavior change, but actively misleading as written):
   `HomographyArTracker.kt`/`BridgedHomographyTracker.kt` both still say CameraX/OverlayRenderer/
   EditorMode wiring "is Phase 2" and hasn't happened — it has, fully, and trusting the comment is
   plausibly how the pose-flip bug above went unnoticed. `KeypointGrid.h`'s "floored at 1px so a

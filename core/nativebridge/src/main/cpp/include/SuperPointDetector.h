@@ -20,7 +20,12 @@ public:
     bool detect(const cv::Mat& gray,
                 std::vector<cv::KeyPoint>& kps,
                 cv::Mat& descs,
-                float scoreThresh = 0.005f,
+                // Softmax over 65 bins means a completely uninformative heatmap is uniform at
+                // 1/65 ~= 0.01538 -- a threshold below that filters nothing (every pixel of pure
+                // noise clears it), leaving maxKps' top-K truncation as the only real bound. Set
+                // at the MagicLeap reference implementation's value, right at that floor, so the
+                // threshold actually means something.
+                float scoreThresh = 0.015f,
                 int   maxKps      = 500);
 
     /** Masked detection */
@@ -28,7 +33,12 @@ public:
                 std::vector<cv::KeyPoint>& kps,
                 cv::Mat& descs,
                 const cv::Mat& mask,
-                float scoreThresh = 0.005f,
+                // Softmax over 65 bins means a completely uninformative heatmap is uniform at
+                // 1/65 ~= 0.01538 -- a threshold below that filters nothing (every pixel of pure
+                // noise clears it), leaving maxKps' top-K truncation as the only real bound. Set
+                // at the MagicLeap reference implementation's value, right at that floor, so the
+                // threshold actually means something.
+                float scoreThresh = 0.015f,
                 int   maxKps      = 500);
 
 private:

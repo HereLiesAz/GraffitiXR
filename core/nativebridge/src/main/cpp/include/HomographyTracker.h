@@ -23,12 +23,17 @@
  * frame (mirroring `MobileGS::runRelocPass`'s own solvePnPRansac + `SOLVEPNP_IPPE`-refine pattern
  * for its coplanar wall marks) — there is no separate "real-world distance" to guess at, and
  * nothing here reintroduces one. Pass the SAME half-extents the renderer will draw the design
- * quad at and the tracked pose reproduces the reference shape's on-screen size and skew exactly,
- * not approximately. What genuinely IS an approximation, because there is no depth sensor or VIO
- * baseline behind it: the pose's absolute distance from the (unknown, un-calibrated) camera has
- * no ground truth to check against, only internal geometric consistency (reprojection error) — so
- * this tracks size/position/skew precisely but cannot promise the same 6DoF stability under rapid
- * motion that ARCore's sensor fusion provides.
+ * quad at and the tracked pose reproduces the reference shape's on-screen size and skew by
+ * construction — that's a property of solving PnP directly against object points built in the
+ * caller's own units, not an approximation layered on top. What genuinely IS an approximation,
+ * because there is no depth sensor or VIO baseline behind it: the pose's absolute distance from
+ * the (unknown, un-calibrated) camera has no ground truth to check against, only internal
+ * geometric consistency (reprojection error) — so this class targets size/position/skew
+ * precision by design but cannot promise the same 6DoF stability under rapid motion that
+ * ARCore's sensor fusion provides. That design intent has no automated check behind it: there is
+ * no host-buildable or instrumented test exercising this class's actual pose math against a
+ * known-answer input (see BACKLOG.md's remediation-plan Phase 7) — the sign error this file's
+ * CV->GL conversion once had is exactly the kind of bug that gap let ship silently.
  *
  * The one real ambiguity a coplanar PnP solve carries — the classic "flip" a purely planar target
  * admits, where the plane could equally be tilted the other way and still reproject correctly —
@@ -84,6 +89,11 @@ public:
     static constexpr int kMinInliers = 8;
     static constexpr float kMinInlierRatio = 0.35f;
     static constexpr float kLoweRatio = 0.75f;
+    /** Minimum fraction of the frame's width/height the RANSAC inlier set must span, in each
+     *  axis independently, before the pose is trusted -- guards against a confidently-wrong pose
+     *  from a spatially-degenerate (tightly clustered) inlier set that passes every count-based
+     *  gate above. See track()'s spread check for the failure mode this exists to catch. */
+    static constexpr float kMinInlierSpreadFrac = 0.25f;
     /** solvePnPRansac's reprojection-error inlier threshold, in pixels. Matches MobileGS's own. */
     static constexpr float kRansacReprojThresholdPx = 8.0f;
 

@@ -32,8 +32,14 @@ public:
     /**
      * Bucket the keypoints.
      *
-     * @param cellSize edge length of a bucket in pixels — pass the search radius. Floored at 1 px so
-     *   a degenerate radius cannot produce an unbounded grid.
+     * @param cellSize edge length of a bucket in pixels — pass the search radius. Floored at 1 px
+     *   only to keep it a valid, non-zero divisor below; that floor bounds the CELL size, not the
+     *   grid's cols*rows, which is also driven by the keypoints' spatial extent (maxX-minX,
+     *   maxY-minY) — an unbounded extent with cellSize pinned at its 1px floor still produces an
+     *   unbounded grid. The one current caller (MobileGS.cpp) floors its radius well above 1px
+     *   before calling this, which is what actually keeps mCols*mRows bounded today; a future
+     *   caller passing a very small cellSize against a very large keypoint spread would not be.
+     *   Capped defensively below regardless.
      */
     void build(const std::vector<cv::KeyPoint>& kps, float cellSize) {
         mCell = (std::isfinite(cellSize) && cellSize >= 1.0f) ? cellSize : 1.0f;
@@ -59,6 +65,16 @@ public:
         mMinX = minX; mMinY = minY;
         mCols = std::max(1, (int)((maxX - minX) / mCell) + 1);
         mRows = std::max(1, (int)((maxY - minY) / mCell) + 1);
+        // Defensive cap independent of the cellSize floor above -- see this method's doc. A cell
+        // count in the low millions is already far more than any real keypoint distribution
+        // needs; this only ever engages for a degenerate (huge-spread, tiny-cell) combination.
+        static constexpr int kMaxCellCount = 4'000'000;
+        if ((int64_t)mCols * (int64_t)mRows > kMaxCellCount) {
+            const double scale = std::sqrt((double)kMaxCellCount / ((double)mCols * (double)mRows));
+            mCols = std::max(1, (int)(mCols * scale));
+            mRows = std::max(1, (int)(mRows * scale));
+            mCell = std::max(mCell, (maxX - minX) / (float)mCols);
+        }
         mCells.assign((size_t)mCols * (size_t)mRows, {});
         for (int i = 0; i < (int)kps.size(); ++i) {
             const auto& p = kps[(size_t)i].pt;

@@ -1,5 +1,7 @@
 #include "HomographyTracker.h"
 #include <android/log.h>
+#include <algorithm>
+#include <cfloat>
 #include <cmath>
 
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "HomographyTracker", __VA_ARGS__)
@@ -23,8 +25,16 @@ cv::Mat toGray(const cv::Mat& rgbaOrRgb) {
 } // namespace
 
 HomographyTracker::HomographyTracker() {
-    // Mirrors MobileGS's ORB config (1500 features) so the two engines behave comparably on the
-    // same device; BruteForce-Hamming is the correct matcher for ORB's binary descriptors.
+    // BruteForce-Hamming is the correct matcher for ORB's binary descriptors; that part of
+    // "mirrors MobileGS's config" holds. The 1500-feature count itself doesn't have the
+    // justification an earlier version of this comment gave ("so the two engines behave
+    // comparably on the same device") -- this class and MobileGS never run on the same device
+    // (this is an ARCore-UNAVAILABLE fallback, i.e. only active on the weakest hardware in the
+    // fleet), and nothing compares their outputs. 1500 ref x 1500 frame descriptors at k=2 is
+    // ~2.25M brute-force Hamming distance evaluations per frame, entirely inside mMutex on the
+    // CameraX analysis executor. Left as-is pending a real measurement on low-end hardware
+    // (see BACKLOG.md's remediation-plan Phase 2) rather than lowered on guesswork, since a
+    // wrong-direction guess would just trade this problem for missed detections.
     mDetector = cv::ORB::create(1500);
     mMatcher = cv::DescriptorMatcher::create("BruteForce-Hamming");
 }
@@ -133,14 +143,37 @@ bool HomographyTracker::track(const cv::Mat& frameRgba, float fx, float fy, floa
         return false;
     }
 
+    std::vector<cv::Point3f> inObj; std::vector<cv::Point2f> inImg;
+    inObj.reserve(inliers.size()); inImg.reserve(inliers.size());
+    for (int idx : inliers) { inObj.push_back(objPts[idx]); inImg.push_back(imgPts[idx]); }
+
+    // The gates above are all cardinality: enough matches, enough inliers, high enough inlier
+    // ratio. None of them checks whether the inliers are actually spread out enough to constrain
+    // the plane's orientation. A tight cluster inside one small textured patch (a logo, a poster
+    // corner) can pass every count gate while the PnP solve is near-degenerate -- the plane's
+    // tilt is essentially unconstrained by a point cluster with no spatial extent, yet RANSAC and
+    // IPPE will both happily report a confident, wrong pose. Require the inlier set to span a
+    // real fraction of the frame before trusting it.
+    {
+        float minX = FLT_MAX, minY = FLT_MAX, maxX = -FLT_MAX, maxY = -FLT_MAX;
+        for (const auto& p : inImg) {
+            minX = std::min(minX, p.x); maxX = std::max(maxX, p.x);
+            minY = std::min(minY, p.y); maxY = std::max(maxY, p.y);
+        }
+        const float spreadFracW = (maxX - minX) / (float)gray.cols;
+        const float spreadFracH = (maxY - minY) / (float)gray.rows;
+        if (spreadFracW < kMinInlierSpreadFrac || spreadFracH < kMinInlierSpreadFrac) {
+            LOGD("track: inliers too clustered (spread %.2f x %.2f of frame, need >= %.2f each)",
+                 spreadFracW, spreadFracH, kMinInlierSpreadFrac);
+            return false;
+        }
+    }
+
     // IPPE-refine on the inlier set: a purely planar target admits a "flip" ambiguity plain PnP
     // does not resolve on its own. IPPE enumerates the flip candidates explicitly; keep whichever
     // pose (RANSAC's own, or an IPPE candidate) reprojects the inliers best. Never makes the pose
     // worse — a failed/degenerate IPPE solve (caught below) just keeps the RANSAC pose.
     {
-        std::vector<cv::Point3f> inObj; std::vector<cv::Point2f> inImg;
-        inObj.reserve(inliers.size()); inImg.reserve(inliers.size());
-        for (int idx : inliers) { inObj.push_back(objPts[idx]); inImg.push_back(imgPts[idx]); }
 
         auto reprojError = [&](const cv::Mat& rv, const cv::Mat& tv) {
             std::vector<cv::Point2f> proj;
@@ -170,12 +203,21 @@ bool HomographyTracker::track(const cv::Mat& frameRgba, float fx, float fy, floa
         Rmat.at<double>(2, 0), Rmat.at<double>(2, 1), Rmat.at<double>(2, 2));
     cv::Vec3d tcv(tvec.at<double>(0), tvec.at<double>(1), tvec.at<double>(2));
 
-    // OpenCV (+Z forward, +Y down) -> OpenGL (-Z forward, +Y up), same self-inverse flip
-    // MobileGS.cpp uses for its own reloc pose (see computeRectifyHomography): C = diag(1,-1,-1),
-    // R_gl = C R_cv C, t_gl = C t_cv. Without this the pose would be upside down and mirrored on
-    // screen relative to every other renderer in this app.
+    // OpenCV camera convention (+Z forward, +Y down) -> OpenGL camera convention (-Z forward,
+    // +Y up): C = diag(1,-1,-1) flips the CAMERA side only, once: R_gl = C R_cv, t_gl = C t_cv.
+    //
+    // This is NOT the same situation as MobileGS.cpp's computeRectifyHomography, despite the
+    // superficially similar-looking sandwich there (R_gl = C R_cv C) -- that function converts a
+    // camera-to-camera transform where BOTH sides are already GL-convention cameras, so both
+    // sides need the flip. Here, Rcv/tcv map the OBJECT frame (built in setReference with +Y up
+    // by construction -- see that function's comment) into the CV CAMERA frame; only the camera
+    // side is in CV convention, so only one flip applies. The double-flip this replaced rotated
+    // every fallback-tracked overlay 180 degrees about the design's X axis -- upside-down and
+    // back-facing on every device without ARCore, unconditionally, for any pose. There is
+    // currently no test exercising this line against a known-answer pose; see BACKLOG.md's
+    // remediation-plan Phase 7 for the test that should have caught this and should land now.
     const cv::Matx33d C(1, 0, 0, 0, -1, 0, 0, 0, -1);
-    cv::Matx33d Rgl = C * Rcv * C;
+    cv::Matx33d Rgl = C * Rcv;
     cv::Vec3d tgl = C * tcv;
 
     // Column-major 4x4: columns are the rotated basis vectors, then translation.
