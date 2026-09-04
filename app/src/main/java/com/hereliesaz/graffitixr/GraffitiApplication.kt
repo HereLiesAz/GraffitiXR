@@ -8,9 +8,11 @@ import com.google.android.gms.security.ProviderInstaller
 import com.hereliesaz.graffitixr.common.crash.CrashReporter
 import com.hereliesaz.graffitixr.common.crash.CrashUploadWorker
 import com.hereliesaz.graffitixr.common.util.NativeLibLoader
+import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
@@ -25,6 +27,9 @@ class GraffitiApplication : Application() {
 
     @Inject
     lateinit var securityProviderManager: SecurityProviderManager
+
+    @Inject
+    lateinit var settingsRepository: SettingsRepository
 
     override fun onCreate() {
         super.onCreate()
@@ -52,14 +57,20 @@ class GraffitiApplication : Application() {
 
         // 1.2. Setup Crash Reporting
         CrashReporter(this).initialize()
-        // Auto-report the previous run's crash(es) as a GitHub issue. CAPTURE the file contents NOW,
-        // synchronously, before MainActivity.onCreate reads + deletes them for its on-screen dialog
-        // (same startup transaction) — otherwise the async upload races that delete and finds nothing.
-        // Then upload off the main thread and delete each file on success. Covers both the JVM crash
-        // dump and the native (SIGSEGV/SIGABRT) backtrace. The benign isolated ":probe" native crash is
-        // intentionally NOT reported. Empty GH_TOKEN (local/dev builds) -> uploadCaptured no-ops.
-        // CoroutineExceptionHandler is belt-and-suspenders: the crash-reporting path must never itself
-        // crash the app on launch.
+        // Auto-report the previous run's crash(es) as a GitHub issue — but ONLY if the artist has
+        // explicitly opted in (Settings > Crash reports; off by default). This app's own pitch is
+        // "no cloud dependencies, zero data collection" for artists who, per the README, are often
+        // doing something illegal; uploading a device model + logcat to a PUBLIC issue tracker
+        // without asking is exactly the silent collection that pitch promises doesn't happen.
+        // The crash FILES themselves are still written and still read by MainActivity for its
+        // on-screen "last run crashed" dialog regardless of this setting — only the network upload
+        // is gated. CAPTURE the file contents NOW, synchronously, before MainActivity.onCreate reads
+        // + deletes them for that dialog (same startup transaction) — otherwise the async upload
+        // races that delete and finds nothing. Then upload off the main thread and delete each file
+        // on success. Covers both the JVM crash dump and the native (SIGSEGV/SIGABRT) backtrace. The
+        // benign isolated ":probe" native crash is intentionally NOT reported. Empty GH_TOKEN
+        // (local/dev builds) -> uploadCaptured no-ops. CoroutineExceptionHandler is
+        // belt-and-suspenders: the crash-reporting path must never itself crash the app on launch.
         val crashUploadErrorHandler = CoroutineExceptionHandler { _, e ->
             Log.e("GraffitiApplication", "Crash upload failed at startup; ignored", e)
         }
@@ -76,6 +87,10 @@ class GraffitiApplication : Application() {
             }
             if (capturedCrashes.isNotEmpty()) {
                 MainScope().launch(crashUploadErrorHandler) {
+                    if (!settingsRepository.crashReportingConsent.first()) {
+                        Log.i("GraffitiApplication", "Crash reporting not opted in; not uploading.")
+                        return@launch
+                    }
                     val worker = CrashUploadWorker()
                     capturedCrashes.forEach { (file, title, report) ->
                         if (worker.uploadCaptured(crashToken, title, report)) {
