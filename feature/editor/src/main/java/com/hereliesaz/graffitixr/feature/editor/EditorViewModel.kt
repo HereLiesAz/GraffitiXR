@@ -220,7 +220,10 @@ class EditorViewModel @Inject constructor(
                 // uri is always the untouched import, so this is the effect source; the saved
                 // Outline / isolation flags are then re-derived on top of it.
                 val source = ImageUtils.loadBitmapAsync(context, pendingUri)
-                val shown = source?.let { applyDesignEffects(it, loaded) }
+                // Project-load restore, not a fresh user toggle -- don't surface the failure toast
+                // here even if a stage falls back; recomputeDesignEffects handles the live-toggle
+                // case where the user just took an action and needs to see it didn't apply.
+                val shown = source?.let { applyDesignEffects(it, loaded).first }
                 withContext(dispatchers.main) {
                     designSourceBitmap = source
                     dispatch(EditorIntent.RestoreDesign(loaded.copy(bitmap = shown)))
@@ -384,15 +387,23 @@ class EditorViewModel @Inject constructor(
      * Each stage falls back to its input on failure, so a segmenter that can't find a subject or an
      * OpenCV pass that throws costs the user that one effect, not their image.
      */
-    private suspend fun applyDesignEffects(source: Bitmap, design: Layer): Bitmap {
+    /** @return the resulting bitmap, plus a user-facing message if a REQUESTED stage fell back to
+     * its input rather than actually applying (null if every requested stage succeeded, or none
+     * were requested). */
+    private suspend fun applyDesignEffects(source: Bitmap, design: Layer): Pair<Bitmap, String?> {
         var out = source
+        var failure: String? = null
         if (design.isSubjectIsolated) {
-            out = subjectIsolator.isolate(out).getOrNull()?.isolatedBitmap ?: out
+            val isolated = subjectIsolator.isolate(out).getOrNull()?.isolatedBitmap
+            if (isolated != null) out = isolated
+            else failure = "Couldn't isolate a subject in this image."
         }
         if (design.isSketch) {
-            out = SketchProcessor.sketchEffect(out) ?: out
+            val sketched = SketchProcessor.sketchEffect(out)
+            if (sketched != null) out = sketched
+            else failure = "Couldn't generate an outline for this image."
         }
-        return out
+        return out to failure
     }
 
     /**
@@ -404,14 +415,21 @@ class EditorViewModel @Inject constructor(
         designEffectJob?.cancel()
         designEffectJob = viewModelScope.launch(dispatchers.default) {
             val design = _uiState.value.design ?: return@launch
-            val rendered = applyDesignEffects(source, design)
+            val (rendered, failureMessage) = applyDesignEffects(source, design)
             withContext(dispatchers.main) {
                 updateDesign { it.copy(bitmap = rendered) }
+                if (failureMessage != null) {
+                    _uiState.update { it.copy(effectFailureMessage = failureMessage) }
+                }
                 saveProject()
                 // Guests are shown pixels, not a pipeline, so ship the result rather than the flag.
                 opEmitter.emit(Op.DesignBitmapReplace(ImageUtils.bitmapToByteArray(rendered)))
             }
         }
+    }
+
+    fun onEffectFailureMessageShown() {
+        _uiState.update { it.copy(effectFailureMessage = null) }
     }
 
     /** Outline: turn the image into a sketch that is actually traceable. */
@@ -446,7 +464,10 @@ class EditorViewModel @Inject constructor(
                     dispatch(EditorIntent.SetLoading(false))
                 }
             } else {
-                withContext(dispatchers.main) { dispatch(EditorIntent.SetLoading(false)) }
+                withContext(dispatchers.main) {
+                    dispatch(EditorIntent.SetLoading(false))
+                    _uiState.update { it.copy(effectFailureMessage = "Couldn't load that image.") }
+                }
             }
         }
     }
@@ -908,6 +929,7 @@ class EditorViewModel @Inject constructor(
     }
 
     override fun onFeedbackShown() = dispatch(EditorIntent.FeedbackShown)
+    override fun onLockedFeedbackShown() = dispatch(EditorIntent.LockedFeedbackShown)
 
     // ── Co-op ─────────────────────────────────────────────────────────────────
 

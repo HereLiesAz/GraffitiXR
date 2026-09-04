@@ -438,6 +438,32 @@ fun MainScreen(
             }
         }
 
+        // A locked mode's transform gestures and Reset are silently ignored by the reducer (see
+        // EditorUiState.showLockedFeedback's doc) — previously the ONLY cue was a color highlight
+        // on the "Lock" rail sub-item, which can be on a collapsed accordion host. Surface it once,
+        // clearing the flag immediately so it doesn't repeat on every subsequent blocked gesture.
+        LaunchedEffect(uiState.showLockedFeedback) {
+            if (uiState.showLockedFeedback) {
+                android.widget.Toast.makeText(
+                    context,
+                    "Locked — tap Lock again to move this",
+                    android.widget.Toast.LENGTH_SHORT,
+                ).show()
+                editorViewModel.onLockedFeedbackShown()
+            }
+        }
+
+        // Isolate/Outline falling back to the unchanged input (see EditorUiState.
+        // effectFailureMessage's doc) used to leave the rail's "done" highlight lit with no other
+        // sign the effect didn't apply.
+        LaunchedEffect(uiState.effectFailureMessage) {
+            val message = uiState.effectFailureMessage
+            if (message != null) {
+                android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                editorViewModel.onEffectFailureMessageShown()
+            }
+        }
+
         uiState.backgroundBitmap?.takeIf { uiState.editorMode == EditorMode.MOCKUP }
             ?.let { bmp ->
                 Image(

@@ -1176,7 +1176,11 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            if (editorUiState.editorMode == EditorMode.AR
+                            // MainScreen's own camera-preview gate (hasCameraPermission &&
+                            // isCameraActive && mode != TRACE) needs the camera in Overlay too, not
+                            // just AR — Overlay with permission denied was a blank screen with no
+                            // explanation and no route to Settings, since this banner was AR-only.
+                            if ((editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY)
                                 && permissionRequestedAtLeastOnce
                                 && !arUiState.hasCameraPermission
                                 && !showLibrary && !showSettings
@@ -1263,11 +1267,16 @@ class MainActivity : ComponentActivity() {
                                     && !mainUiState.isCapturingTarget
                                     && !showLibrary && !showSettings
                             if (showProgress) {
+                                // TopEnd is RelocStatusBadge's corner (below), and both can be visible
+                                // at once (this gates on paintingProgress > 0.01, that on
+                                // isAnchorEstablished alone) — they used to render stacked at the
+                                // identical TopEnd/16dp/16dp position, showing the same number under
+                                // two different labels. BottomEnd is otherwise unused by this Box.
                                 PaintingProgressIndicator(
                                     progress = arUiState.paintingProgress,
                                     modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(top = 16.dp, end = 16.dp)
+                                        .align(Alignment.BottomEnd)
+                                        .padding(bottom = 16.dp, end = 16.dp)
                                 )
                             }
 

@@ -208,6 +208,19 @@ data class EditorUiState(
     val isRightHanded: Boolean = true,
     val gestureInProgress: Boolean = false,
     val showRotationAxisFeedback: Boolean = false,
+    // Transient, self-clearing (mirrors showRotationAxisFeedback's pattern) — set true when a
+    // transform gesture or Reset is silently ignored because the current mode's transform is
+    // locked. Without this, a locked mode swallowed gestures and Reset with zero feedback: no
+    // toast, no shake, no dimmed control, only a color highlight on a rail sub-item that may be
+    // on a collapsed or folded-away host.
+    val showLockedFeedback: Boolean = false,
+    // Transient, self-clearing — a one-shot failure toast for editor actions that used to fail
+    // silently: Isolate/Outline falling back to their unchanged input (the rail highlight for the
+    // effect still lit up as "done" regardless, since it's keyed on the boolean toggle, not on
+    // whether the bitmap actually changed), and a Mockup wall-photo pick the decoder rejected
+    // (spinner, then nothing). Generic text rather than a sealed type since every current use is
+    // "tell the user this one action didn't work," with no differing UI per cause.
+    val effectFailureMessage: String? = null,
     val activeRotationAxis: RotationAxis = RotationAxis.Z,
     val undoCount: Int = 0,
     val redoCount: Int = 0,
