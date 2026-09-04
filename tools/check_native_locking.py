@@ -23,6 +23,31 @@ one-at-a-time.
 Run it after any change to MobileGS.cpp/.h, or as part of CI, to keep that invariant honest
 instead of taking it on faith.
 
+WHAT THIS SCRIPT DOES NOT COVER (found the hard way -- a glee audit caught both after this
+script reported clean):
+  1. JNI-LEVEL GLOBALS. This script only parses MobileGS.h/MobileGS.cpp -- it has no idea
+     GraffitiJNI.cpp exists. `gLastColorFrame`, a plain `cv::Mat` global written by both
+     nativeFeedYuvFrame and nativeFeedColorFrame, needed its own mutex (gColorFrameMutex) once
+     those two entry points stopped sharing gEngineMutex's exclusive lock -- this script's "OK"
+     said nothing about it, because it never looked at that file. Any new JNI-level mutable
+     global needs the same manual check this script cannot do.
+  2. CLASSES DECLARED ELSEWHERE. SuperPointDetector/DistortionHead/LowLightEnhancer (each in
+     their own .h/.cpp under core/nativebridge/src/main/cpp/) each declare their own internal
+     mMutex, which is what actually protects a live model reload (nativeLoadSuperPoint etc.)
+     against the background reloc-thread worker calling into them -- gEngineMutex's exclusive
+     lock on the loader entry points only protects them against JNI-entry readers, not that
+     thread. This script cannot see any of it; don't read its clean output as proof those
+     classes are safe.
+  3. BRACE-INITIALIZED MEMBERS. `std::atomic<int> mFoo{0};` does not match MEMBER_DECL_RE
+     (which expects `= ...;`), so such members are silently invisible to this script rather
+     than counted as atomic or plain. They happen to currently all be atomic (safe by
+     accident), but a future `int mFoo{0};` (non-atomic, brace-initialized) would be invisible
+     too, and any unguarded access to it would pass with no warning.
+
+In short: a clean run means "no unguarded access to a plain MobileGS.h member, referenced with
+`= ...;`-style initialization, in a function body inside MobileGS.cpp" -- not "this file's
+locking is correct," and definitely not "GraffitiJNI.cpp's locking is correct."
+
 Exit code 0 = clean. Exit code 1 = at least one unguarded access found.
 """
 from __future__ import annotations
