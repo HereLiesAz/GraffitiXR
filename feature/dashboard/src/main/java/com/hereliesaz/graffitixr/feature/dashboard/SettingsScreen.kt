@@ -12,8 +12,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -347,7 +348,25 @@ fun SettingsScreen(
                                 value = strings.settings.resetTutorialsValue,
                                 modifier = Modifier.clickable { onResetTutorials() }
                             )
-                            SettingRow(label = strings.settings.canvasBg) {
+                            // A label-left/swatches-right Row (SettingRow's shape) can't fit five
+                            // 48dp touch targets + 4×8dp gaps (272dp) plus any label width on a
+                            // compact/split-screen card — Compose doesn't wrap a plain Row, so it
+                            // clipped or shrank targets below the accessibility fix's own minimum.
+                            // Label on its own line, swatches in a horizontally scrollable row
+                            // below: every swatch stays reachable (via scroll) at any width, and
+                            // none of the 48dp targets are ever compressed.
+                            Text(
+                                strings.settings.canvasBg,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState())
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
                                 listOf(
                                     "Black" to 0xFF000000.toInt(),
                                     "Dark"  to 0xFF1A1A2E.toInt(),
@@ -356,11 +375,12 @@ fun SettingsScreen(
                                     "Navy"  to 0xFF0D1B2A.toInt(),
                                 ).forEach { (label, argb) ->
                                     val isSelected = backgroundColor == argb
-                                    // The swatch itself stays 32dp (five in a row need the space),
-                                    // but the clickable region is padded out to Android's 48dp minimum
-                                    // touch target, and the color-only Box gets a contentDescription +
-                                    // Button role via clickable's onClickLabel/role so a screen reader
-                                    // hears "Black, selected" instead of nothing at all.
+                                    // The visible color circle stays 32dp (8dp padding inside a 48dp
+                                    // box), matching Android's 48dp minimum touch target without the
+                                    // swatch itself looking oversized. The color-only Box also gets a
+                                    // contentDescription + Button role via clickable's onClickLabel/
+                                    // role so a screen reader hears "Black, selected" instead of
+                                    // nothing at all.
                                     Box(
                                         modifier = Modifier
                                             .size(48.dp)
@@ -482,20 +502,6 @@ fun SettingsItem(label: String, value: String, modifier: Modifier = Modifier) {
     ) {
         Text(text = label, fontWeight = FontWeight.Medium)
         Text(text = value, color = Color.Gray)
-    }
-}
-
-@Composable
-private fun SettingRow(label: String, content: @Composable RowScope.() -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(label, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), content = content)
     }
 }
 

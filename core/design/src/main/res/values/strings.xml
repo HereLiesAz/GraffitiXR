@@ -585,6 +585,18 @@
         <item>Tap a layer to open its tools — grouped into Paint, Retouch, Adjust and Effects folders. Pinch and drag on the canvas to size and place it.</item>
         <item>When it looks right, choose how to use it: \'Trace\' to turn your phone into a lightbox, \'Mockup\' to preview on a photo, or \'AR\' to project it onto a wall.</item>
     </string-array>
+    <!-- Guidance steps for "add a layer" outside Design mode, where the rail's Open item lives
+         under the Design host and is hidden until Design is opened first (expandWhen collapses
+         it in every other mode) — unlike onboarding_overlay[1]/onboarding_mockup[2]/
+         onboarding_trace[1]/onboarding_ar[3] above, which say "Tap Open" alone and point at a
+         control that isn't actually visible yet. Not yet translated into this app's other 14
+         locales (matches the pre-existing, same-shaped gap in MainActivity's
+         showDesignInstructionsDialog, which is also English-only) — tracked in BACKLOG.md rather
+         than left undocumented. -->
+    <string name="guidance_open_via_design_overlay">Tap \'Design\' on the rail, then \'Open\', to add a layer — pick a photo and it appears here, floating over the live camera view.</string>
+    <string name="guidance_open_via_design_mockup">Tap \'Design\' on the rail, then \'Open\', to add a layer on top of the wall photo. Pinch and drag to size and position it.</string>
+    <string name="guidance_open_via_design_trace">Tap \'Design\' on the rail, then \'Open\', to add your first layer. Once it\'s in, pinch and drag on the canvas to size and place it.</string>
+    <string name="guidance_open_via_design_ar">Tap \'Design\' on the rail, then \'Open\', to add a design layer — it projects onto the wall using the anchor you just set.</string>
     <!-- Currently unreferenced by any guidance edge (kept for a possible future walkthrough).
          Only one rail button adds a layer today — Open, which imports a photo from the gallery;
          there is no separate Sketch or Text layer source. -->
