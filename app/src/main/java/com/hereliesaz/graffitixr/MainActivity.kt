@@ -528,6 +528,13 @@ class MainActivity : ComponentActivity() {
 
                 LaunchedEffect(mainUiState.isTouchLocked, editorUiState.editorMode, arUiState.batteryTier) {
                     val params = window.attributes
+                    // Touch-lock always keeps the screen on (below). AR mode ALSO keeps it on even
+                    // unlocked: a muralist looks at the wall through the camera for the whole task,
+                    // often hands-off for tens of seconds at a stretch (spraying) — the system display
+                    // timeout would otherwise sleep the screen and pause ARCore mid-mural, repeatedly.
+                    // No brightness override here (unlike touch-locked TRACE below): AR just needs to
+                    // stay awake, not stay bright.
+                    val keepAwake = mainUiState.isTouchLocked || editorUiState.editorMode == EditorMode.AR
                     if (mainUiState.isTouchLocked) {
                         // Keep the screen on in every mode while locked, but force MAX brightness only
                         // where it's functionally needed — the TRACE lightbox. Other modes keep system
@@ -539,11 +546,13 @@ class MainActivity : ComponentActivity() {
                             arUiState.batteryTier >= 2 -> 0.85f
                             else -> 1.0f
                         }
-                        window.attributes = params
-                        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     } else {
                         params.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-                        window.attributes = params
+                    }
+                    window.attributes = params
+                    if (keepAwake) {
+                        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    } else {
                         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     }
                 }

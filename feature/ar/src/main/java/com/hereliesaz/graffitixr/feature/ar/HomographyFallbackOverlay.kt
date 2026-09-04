@@ -113,8 +113,17 @@ fun HomographyFallbackOverlay(
                         onClick = {
                             referenceRejected = false
                             scope.launch {
-                                rawCaptureBitmap = runCatching { cameraController.takePictureAsBitmap(context) }
-                                    .getOrNull()
+                                val result = runCatching { cameraController.takePictureAsBitmap(context) }
+                                result.onFailure {
+                                    // Previously silent: the button just did nothing on failure (camera
+                                    // busy, e.g. mid-bind), which on a ladder reads as a frozen app.
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "Couldn't take that photo — try again.",
+                                        android.widget.Toast.LENGTH_SHORT,
+                                    ).show()
+                                }
+                                rawCaptureBitmap = result.getOrNull()
                             }
                         },
                         modifier = Modifier
