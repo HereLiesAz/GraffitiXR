@@ -1126,7 +1126,8 @@ class MainActivity : ComponentActivity() {
                                         onClose = { /* no-op: ProjectLibraryScreen no longer exposes a close affordance */ },
                                         strings = strings,
                                         importErrorMessage = dashboardState.importErrorMessage,
-                                        onDismissImportError = { dashboardViewModel.dismissImportError() }
+                                        onDismissImportError = { dashboardViewModel.dismissImportError() },
+                                        onOpenSettings = { showSettings = true }
                                     )
                                 }
                                 composable(EditorMode.AR.name) {
