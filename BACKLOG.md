@@ -1,5 +1,17 @@
 # Backlog
 
+## Build verification
+
+This session's sandbox previously had no Android SDK, so every fix above the Freeze-cleanup
+commit was verified by manual code review and grep, not a build — a real gap: it's how the
+`addImg` field got mistakenly deleted and broke `main` (caught by CI, not by me). Fixed by
+provisioning the SDK/NDK locally (`platforms;android-37.0`, `build-tools;35.0.0`, `cmake;3.22.1`,
+`ndk;27.2.12479018` under `/opt/android-sdk`, `local.properties` pointed at it) rather than
+continuing to defer verification to some future session. `compileDebugKotlin`,
+`testDebugUnitTest` (705 tests, 0 failures) and `detekt` all now run for real here. Fixed two
+`SwallowedException` findings detekt caught in test-only catch blocks (`WallFeatureMapTest.kt`,
+`CaptureEnvironmentTest.kt`) — unnamed the caught exceptions per the project's `_` convention.
+
 ## Security alerts
 
 ### Done
