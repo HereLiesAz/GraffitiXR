@@ -339,8 +339,14 @@ private fun FeatureSelectionReview(
     }
 }
 
+/**
+ * The 4-corner drag-to-align UI used by AR mode's own target capture ([TargetCreationUi]'s
+ * `RECTIFY` step) — internal (not private) so [HomographyFallbackOverlay] can reuse the exact
+ * same corner-marking interaction for the ARCore-fallback tracker's reference capture, rather
+ * than re-implementing it.
+ */
 @Composable
-private fun UnwarpScreen(
+internal fun UnwarpScreen(
     bitmap: Bitmap,
     points: List<Offset>,
     onUpdatePoints: (List<Offset>) -> Unit,
