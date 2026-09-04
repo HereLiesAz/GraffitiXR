@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <exception>
 #include "include/MobileGS.h"
+#include "include/HomographyTracker.h"
 
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "GraffitiJNI", __VA_ARGS__)
 
@@ -31,6 +32,11 @@ MobileGS* gSlamEngine = nullptr;
 std::mutex gEngineMutex;
 cv::Mat gLastColorFrame; // MANDATE: Kept in Sensor-Native (Landscape) orientation
 JavaVM* gJvm = nullptr;
+
+// ARCore-unavailable fallback (see HomographyTracker.h). Entirely independent of gSlamEngine —
+// no shared state, no lifecycle coupling — and internally mutex-guarded, so unlike gSlamEngine it
+// needs neither gEngineMutex nor an explicit destroy: a single process-lifetime instance is fine.
+HomographyTracker gHomographyTracker;
 
 // ── Native crash capture ─────────────────────────────────────────────────────
 // A SIGSEGV/SIGABRT in the AR/SLAM native code kills the process before the JVM
@@ -1401,6 +1407,65 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAlignToFingerprint
     }
 
     env->ReleaseByteArrayElements(data, buffer, JNI_ABORT);
+}
+
+// ── ARCore-unavailable fallback (HomographyTrackerNative.kt / HomographyTracker.h) ──────────────
+
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_HomographyTrackerNative_nativeHomographySetReference(
+        JNIEnv* env, jobject thiz, jobject bitmap, jfloat objectHalfW, jfloat objectHalfH) {
+    if (!bitmap) return JNI_FALSE;
+    try {
+        cv::Mat img;
+        bitmapToMat(env, bitmap, img);
+        return gHomographyTracker.setReference(img, objectHalfW, objectHalfH) ? JNI_TRUE : JNI_FALSE;
+    } catch (const std::exception& e) {
+        LOGE("nativeHomographySetReference: exception: %s", e.what());
+        return JNI_FALSE;
+    } catch (...) {
+        LOGE("nativeHomographySetReference: unknown exception");
+        return JNI_FALSE;
+    }
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_HomographyTrackerNative_nativeHomographyHasReference(
+        JNIEnv* env, jobject thiz) {
+    return gHomographyTracker.hasReference() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_HomographyTrackerNative_nativeHomographyReset(
+        JNIEnv* env, jobject thiz) {
+    gHomographyTracker.reset();
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_HomographyTrackerNative_nativeHomographyTrack(
+        JNIEnv* env, jobject thiz, jobject bitmap, jfloat fx, jfloat fy, jfloat cx, jfloat cy,
+        jfloatArray out) {
+    if (!bitmap || !out || env->GetArrayLength(out) < 17) {
+        LOGE("nativeHomographyTrack: bad args (out array too short — need 17)");
+        return JNI_FALSE;
+    }
+    try {
+        cv::Mat img;
+        bitmapToMat(env, bitmap, img);
+        float pose[16];
+        float confidence = 0.0f;
+        if (!gHomographyTracker.track(img, fx, fy, cx, cy, pose, &confidence)) return JNI_FALSE;
+        float buf[17];
+        std::memcpy(buf, pose, sizeof(pose));
+        buf[16] = confidence;
+        env->SetFloatArrayRegion(out, 0, 17, buf);
+        return JNI_TRUE;
+    } catch (const std::exception& e) {
+        LOGE("nativeHomographyTrack: exception: %s", e.what());
+        return JNI_FALSE;
+    } catch (...) {
+        LOGE("nativeHomographyTrack: unknown exception");
+        return JNI_FALSE;
+    }
 }
 
 } // extern "C"
