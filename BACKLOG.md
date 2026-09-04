@@ -239,3 +239,249 @@ Conceptual, needs a product decision rather than a code fix:
 - Five "modes" (AR/Overlay/Mockup/Trace/Design) are one renderer with three boolean axes
   (background source × world-locked × editable) wearing five names and duplicating adjustment
   state per mode.
+
+## Glee audit round 2 (2026-09-04) — remediation plan
+
+Seven parallel audits (code correctness, UX, conceptual/product, and four native-subsystem
+passes — core SLAM engine, ML inference, ARCore-fallback tracker, plus a re-run of the SLAM
+engine pass with no exclusions after the first one was cut short) against `main` post-#1874.
+One finding (`gLastColorFrame` race) was already fixed in #1875 before this plan was written.
+Everything else below is open. Phased by risk and dependency; phases 1–5 are pure bug fixes I
+can execute without further sign-off, phase 6 needs a product decision first (bolded items in
+the existing "Conceptual" list above are the same items, not duplicates — cross-referenced here
+for sequencing), phase 7 is test backfill that should land alongside the fixes it covers rather
+than after.
+
+### Phase 1 — Native crash / data-corruption risks
+
+- [ ] `GraffitiJNI.cpp` `nativeFeedColorFrame` — wraps the caller's `DirectByteBuffer` in a
+  `cv::Mat` with no capacity or dimension check (its sibling `nativeFeedYuvFrame` has exactly
+  this guard). Add the same `GetDirectBufferCapacity` bounds check before constructing the Mat.
+- [ ] `MobileGS::restoreWallFingerprint` (the descriptors-only restore path) — doesn't reset
+  `mHasFingerprintView`/`mFingerprintAnchorMatrix`/`mWallPatch` from a previously-loaded metric
+  fingerprint, so switching to a descriptors-only project can silently co-register against the
+  old project's capture pose. Mirror the guard `restoreWallFingerprintMetric` and
+  `alignToFingerprint` already have.
+- [ ] `MobileGS::alignToFingerprint` — resets `mFingerprintIntrinsics`/`mHasFingerprintView` but
+  not `mFingerprintAnchorMatrix`; a co-op peer's fingerprint can inherit this device's stale
+  local anchor. Reset it alongside the other two (match `clearWallFingerprint`'s identity reset).
+- [ ] `nativeGetAnchorTransform` — returns a non-null all-zero `FloatArray(16)` when
+  `gSlamEngine` is null, contradicting the null-on-failure contract every Kotlin call site
+  (`ArRenderer.kt`, `ArViewModel.kt`) explicitly documents and relies on. Return `nullptr`
+  instead, matching `nativeGetFingerprintAnchor`'s sibling behavior.
+- [ ] `SuperPointDetector.cpp` `extractKeypoints` — the `cv::resize` call for a degenerate
+  (near-zero-width) input sits outside the function's `try` block; an escaped exception on the
+  reloc worker thread (no `try` at that specific call site) kills relocalization for the session
+  with no error surfaced. Move the resize inside the guarded region, or add an explicit
+  minimum-size check before it.
+- [ ] `DistortionHead::run` — `reinterpret_cast<const float*>(o.data)` with no `o.type() ==
+  CV_32F` check; a non-fp32 model output is an out-of-bounds heap read reinterpreted as
+  painting-progress/confidence. Add the type check alongside the existing total()/layout checks.
+- [ ] `MobileGS.cpp:456` — `mPaintingProgress.store(coverage)` from the raw distortion-head
+  output with no clamp or finiteness check. Clamp to `[0, 1]` and reject non-finite before
+  storing (the neighboring `matchability` value is already gated, `coverage` isn't).
+
+### Phase 2 — ARCore-fallback tracker correctness (isolated subsystem)
+
+- [ ] `HomographyTracker.cpp:178` — the CV→GL pose conversion applies the handedness flip
+  `C·Rcv·C` when the object frame (built in `setReference`) is already GL-convention (+Y up);
+  it needs `C·Rcv` only. **Every fallback-tracked overlay currently renders upside-down and
+  back-facing.** Fix the sandwich, correct the comment that (wrongly) cites `MobileGS`'s
+  camera-to-camera case as precedent, and add the known-answer-pose test called out in Phase 7
+  — this is the one subsystem in the whole audit round with zero executable tests, which is how
+  an unconditional sign error shipped.
+- [ ] `HomographyTracker.cpp:112-134` — the inlier/match-count gates (`objPts.size() >= 12`,
+  `inliers.size() >= 8`, `ratio >= 0.35`) have no spatial-conditioning check; a tight cluster of
+  matches (e.g. all inside one logo) passes every gate and produces a high-confidence garbage
+  pose. Add a bounding-box-area or condition-number check on `objPts` before the PnP solve.
+- [ ] `SuperPointDetector.cpp:108-120` — masked detection (`generateFingerprint`'s isolated-marks
+  path) truncates to `maxKps` *before* applying the mask, so a small mask can yield zero
+  survivors and silently fall back to ORB, permanently downgrading that project's wall
+  fingerprint to binary descriptors. Apply the mask before the top-K truncation, or detect with a
+  higher provisional cap when a mask is present.
+- [ ] `LowLightEnhancer` — silently a no-op on all three bitmap-sourced call sites
+  (`getSuperPointFeatures`, `getFingerprintKeypoints`, `generateFingerprint`): they hand it
+  `CV_8UC4` (from `bitmapToMat`), the model wants 3-channel, OpenCV throws, the catch swallows
+  it. Only the reloc live-frame path (which converts to RGB first) actually works. Convert
+  RGBA→RGB before the three broken calls, or make `LowLightEnhancer::enhance` accept and convert
+  4-channel input itself so every caller doesn't have to remember to.
+- [ ] `include/SuperPointDetector.h:23` — default `scoreThresh = 0.005f` is below the uniform-
+  softmax floor (`1/65 ≈ 0.01538`), so the threshold filters nothing on an uninformative heatmap;
+  the only real bound is the `maxKps` truncation. Raise to at least the MagicLeap reference value
+  (0.015) with a cited comment.
+- [ ] `SuperPointDetector.cpp:164` — NMS uses `>=`, so exact score ties mutually eliminate
+  instead of one surviving. Low severity (softmax ties are rare) but trivial: change to `>`.
+- [ ] Wire the fallback tracker's `outConfidence` (already computed, plumbed through 17 floats
+  and a gyro decay) into the "Reacquiring target…" UI — currently computed and then read by
+  nothing.
+- [ ] Comment corrections (no behavior change, but actively misleading as written):
+  `HomographyArTracker.kt`/`BridgedHomographyTracker.kt` both still say CameraX/OverlayRenderer/
+  EditorMode wiring "is Phase 2" and hasn't happened — it has, fully, and trusting the comment is
+  plausibly how the pose-flip bug above went unnoticed. `KeypointGrid.h`'s "floored at 1px so a
+  degenerate radius cannot produce an unbounded grid" is false — the floor bounds the cell, not
+  the keypoint-extent numerator that actually sizes the grid (currently unreachable via the one
+  call site's own upstream floor, but the comment should say that instead of claiming a
+  guarantee this file doesn't provide).
+
+### Phase 3 — Static-checker hardening (`tools/check_native_locking.py`)
+
+- [ ] Fix `MEMBER_DECL_RE` to also match brace-initializer declarations
+  (`std::atomic<int> mFoo{0};`) — it currently only matches `= ...;`/`;` endings, so ~28 of
+  `MobileGS.h`'s 30 atomic members are invisible to the script rather than classified. Currently
+  harmless (no *plain* member happens to use brace-init) but silently exempts the next one that
+  does.
+- [ ] Parse header-inline method bodies too (`getMapPointCount()`, `getWallKeypointCount()` in
+  `MobileGS.h` both touch plain members and are entirely unexamined today).
+- [ ] Fix `FUNC_START_RE` to match the destructor (`~MobileGS`) — currently skipped because `~`
+  isn't `\w`.
+- [ ] Re-run against current `MobileGS.cpp`/`.h` after the above and update the allowlist/OK
+  message if the true member/function counts change materially from what's currently reported.
+
+### Phase 4 — AR core-workflow bugs (Kotlin/Compose, highest user impact)
+
+- [ ] **Retake is a no-op loop**: `onRetakeCapture()`/`clearTapHighlights()` don't clear
+  `tempCaptureBitmap`/`annotatedCaptureBitmap`/`targetWallPlane`, so the review screen
+  immediately re-renders the same rejected capture. Use `clearCaptureForRetry()` (which already
+  does this correctly) instead of `clearTapHighlights()` on this path.
+- [ ] **Re-arming Target after a successful capture replays the stale one**: same root cause —
+  `startTargetCapture()` doesn't clear the previous capture's state, so the artist can confirm an
+  old photo against a freshly-established anchor. Same fix as above, applied to this entry point.
+- [ ] **"Tap 'Open' on the rail" instructions are wrong in AR**: both post-target-lock prompts
+  point at `item.open`, hosted under `mode.design`'s `expandWhen`-gated accordion, which
+  auto-collapses the instant the artist is in AR (i.e. always, when these prompts fire). Either
+  change the copy to describe the actual reachable action, or change the rail so `Open` stays
+  visible in AR when there's no design loaded yet — pick whichever matches intended navigation;
+  flag to the user if unclear which.
+- [ ] Depth-branch target confirm on a device with no open project silently discards the capture
+  with no message (`MainViewModel.kt:202`) — the sibling no-depth branch already has the fix and
+  explains why in its own comment. Apply the same fix here.
+- [ ] Target-confirmation feedback latency: `resetCaptureUi()` unmounts the capture UI (and its
+  spinner) immediately, then the coroutine blocks on `awaitAnchorTransform` (up to 2s) plus a
+  full ORB build with zero visible indicator. Keep a loading indicator visible across that gap.
+- [ ] `PaintingProgressIndicator` and `RelocStatusBadge` render at the identical
+  `TopEnd`/16dp/16dp position showing the same number under different labels. Reposition one or
+  merge them into a single indicator.
+- [ ] Overlay-mode camera-permission-denied is a blank screen with no message and no recovery —
+  `CameraPermissionDeniedBanner` is gated to AR-only. Show it (or an equivalent) in Overlay too.
+- [ ] A locked transform (Trace ▸ Lock) swallows gestures *and* the Reset button with zero
+  feedback — no toast, no shake, no dimmed control, and the one color-highlight cue can be on a
+  collapsed rail. Add a discoverable "locked" signal on a failed gesture/Reset attempt.
+- [ ] Isolate/Outline effects that fail (fall back to unchanged input) still trigger the
+  "done"-state highlight, telling the artist a no-op succeeded. Gate the highlight on an actual
+  change, or surface an explicit failure state.
+- [ ] Mockup wall-photo load failure (`setBackgroundImage`, decoder rejects the file) shows a
+  spinner then silently nothing. Add a toast/error state on the null-bitmap branch.
+- [ ] Settings is unreachable from the Project Library, the app's start destination (no rail
+  items are registered there at all, and the `DashboardViewModel`'s `"settings"`/
+  `"project_library"` navigation branches are dead). Add a reachable entry point before a project
+  exists — at minimum language/handedness, which a new user may need immediately.
+- [ ] System Back from the editor quits the app outright (single-entry back stack after
+  `popUpTo(LIBRARY_ROUTE){inclusive=true}}`, and the enabled `BackHandler`s don't cover the
+  no-dialog-open case). Add a confirmation, or route back to the Library instead of finishing the
+  Activity.
+- [ ] `SettingsScreen.kt` toggle rows are ~28dp tall against a 48dp minimum touch target — bump
+  `SettingsItem` to a real minimum height.
+- [ ] Canvas-background color swatches are unlabeled 32dp circles with only a border-color state
+  cue — add `contentDescription` from the already-destructured (and currently unused) `label`.
+- [ ] Touch lock's volume-sequence unlock is defeated by the back gesture, which unlocks
+  unconditionally regardless of touch-lock state — intercept back the same way pointer input is
+  intercepted, or explicitly document that back is a second, intentional unlock path (currently
+  contradicts the on-screen hint, which names only the volume sequence).
+- [ ] Dead code cleanup, once confirmed still dead post-fixes above: `showWallSourceDialog`
+  (never set true anywhere), `CaptureStep.RECTIFY`/`UnwarpScreen`/`onUnwarpConfirm` (superseded
+  by plane-guided rectification per `USER_FLOW.md`, but still the only writer of `isProcessing` —
+  removing it needs the target-confirm loading-indicator fix above landed first so nothing
+  regresses).
+- [ ] `RotationAxisFeedback` and `GestureFeedback` render overlapping "Axis: X" chips at the same
+  position in every non-Design mode; consolidate to one.
+- [ ] `toggleImageLock()` has no rail/UI entry point despite gating DESIGN-mode gestures and
+  suppressing `GestureFeedback` when true (reachable via co-op `SetDesignProps` from a host, or a
+  project saved by an older build) — add a control to unlock, or confirm the state is meant to be
+  host-controlled only and surface *that* instead.
+- [ ] Verify (Compose tooling, not code reading) whether AzNavRail's `disabled` parameter
+  suppresses `onClick` — if so, `ArViewModel.startHosting()`'s "tap Host always yields an
+  explanation" comment is false the same way the rail-instruction bug above is; fix by moving the
+  explanation to fire on tap regardless of `disabled`.
+
+### Phase 5 — Onboarding activation
+
+- [ ] `GuidanceDefinitions.kt`'s ~155 lines of authored per-mode guidance (`azGoal` entries) are
+  declared and never activated — no `autoStartWhen`, no `.activate()` call anywhere in the tree.
+  Wire mode-entry activation for Overlay/Mockup/Trace/Design to match the AR behavior
+  `MainActivity.kt`'s own comment already claims exists. Spot-check the authored copy against
+  current UI before flipping it on (it was written before some of the Phase 4 changes above).
+
+### Phase 6 — Product decisions needed before implementation (not mine to decide unilaterally)
+
+These are the bolded items in the "Conceptual, needs a product decision" list above, resolved or
+sharpened by this audit round:
+
+- **Scale/measurement is the highest-leverage gap.** The mural's physical size is never
+  established anywhere — it's an accident of where the artist was standing (screen-fill
+  heuristic) plus an unused, undocumented `0.18` FOV constant that never reaches the rendered
+  quad. A tap-to-measure-the-wall feature (the AR plane + existing tap-to-distance already
+  supply the geometry) feeding a "design width = N ft" field would unlock quoting, paint
+  estimation, a true-scale printable output, and a real completion metric — see the next three
+  items, all of which depend on this one shipping first. Recommend: build this before any of the
+  below.
+- **The README's founding premise ("repurposing the grid method") has no grid anywhere in the
+  product** — replaced by fingerprint relocalization, which requires the phone to stay up for
+  the whole session instead of ten minutes of chalking. Depends on scale/measurement above.
+  Recommend: ship a proportional grid overlay + AR-projected true-scale grid; this also mostly
+  subsumes the unshipped stencil/tiled-PDF export item already tracked above.
+- **No workflow for a wall bigger than one camera frame** — nothing in the app has a concept of
+  "the section I'm currently painting." Depends on scale/measurement; pairs naturally with the
+  grid item (a section = a grid cell).
+- **"Painted %" is a relocalizer-confidence byproduct mislabeled as work progress** — it cannot
+  go down when the artist paints over a mistake, and its fallback path is a raw ORB descriptor
+  ratio. Either drop the "Painted" framing now (cheap, no dependency) or replace it with real
+  section-done tracking once the section item above exists. Recommend the cheap fix now
+  regardless of the larger item's timeline — the current label is actively misleading.
+- **The tracked "no-cloud blocks crew fingerprint-sharing" tension is factually resolved, not
+  open**: `.gxr` project export already round-trips the wall fingerprint and is byte-identical to
+  Co-op's own bulk-sync payload (`ProjectManager.exportProjectToUri`/`serializeCurrentProject`
+  both call the same `zipFolder`). The real gap is affordance, not architecture — it's buried
+  under a generic "Import project" button. Recommend: promote/rename this path ("Share this
+  wall", ideally via `ACTION_SEND`) rather than building new crypto. Replace this bullet in the
+  Conceptual list above once actioned.
+- **Co-op's op protocol (`Op.StrokeComplete`/`Op.TextContentChange`) is built for collaborative
+  editing the app no longer has** — painting/stencil/text authoring moved to a companion app, so
+  those ops have zero emitters; what actually crosses the wire is design-replace/transform/props.
+  The tracked "bidirectional co-op" item needs this resolved first: decide what Co-op is *for*
+  (crew painting → the bulk fingerprint transfer above is the whole feature, drop the dead op
+  types; client review → move it out of AR-only gating so a client can watch Mockup) before
+  building a guest→host channel for op types the app can't generate.
+- **No obstacle/mask handling** for windows, doors, downspouts, signage — almost no commissioned
+  exterior wall is a clean rectangle, and nothing lets the artist exclude paintable area at
+  quoting or placement time. Cheapest version (tap-outline on the wall plane, subtract from a
+  paintable-area figure) depends on scale/measurement above for the area figure to mean anything.
+- **Mode taxonomy**: the existing "one renderer, three boolean axes, five names" framing is
+  sharpened — all five modes are "design composited over some background"; none is about
+  surveying/measuring the wall, which is the first hour of every job, and Trace (the README's own
+  words: "just for shirts and goggles") is arguably a different persona entirely. Revisit once
+  the scale/measurement and grid items above land, since they're the natural candidates for the
+  taxonomy slot Trace would vacate.
+
+### Phase 7 — Test backfill (land alongside, not after, the fix each covers)
+
+- [ ] `HomographyTracker`: a known-answer-pose test for the CV→GL conversion (would have caught
+  Phase 2's sign-error bug directly — this is the concrete instance of "zero executable tests for
+  the most convention-sensitive line in the file").
+- [ ] `HomographyFallbackOverlay`: behavioral tests for the texture-clear-on-null path and the
+  `cameraId` wiring, once Phase 2/4's related fixes land — currently one "doesn't throw" test per
+  class.
+- [ ] `restoreWallFingerprint`/`alignToFingerprint`: tests asserting stale co-registration state
+  (`mHasFingerprintView`, `mFingerprintAnchorMatrix`, `mWallPatch`) is actually cleared on the
+  paths fixed in Phase 1.
+- [ ] `nativeFeedColorFrame`: a contract test mirroring `nativeFeedYuvFrame`'s existing
+  buffer-too-small guard test, once Phase 1's fix lands.
+
+### Sequencing notes
+
+Phases 1–3 are independent of each other and of Phase 4; can proceed immediately and in
+parallel. Phase 4 is large — worth splitting into several smaller PRs by sub-area (target-
+creation loop; feedback/latency; accessibility; dead-code removal) rather than one. Phase 5
+depends on nothing but a content spot-check. Phase 6 items are ordered by dependency
+(scale/measurement first) and need the user's direction before any code is written — everything
+else in this plan is a bug fix with one correct answer; these are design calls with several
+defensible answers.
