@@ -254,30 +254,30 @@ than after.
 
 ### Phase 1 — Native crash / data-corruption risks
 
-- [ ] `GraffitiJNI.cpp` `nativeFeedColorFrame` — wraps the caller's `DirectByteBuffer` in a
+- [x] `GraffitiJNI.cpp` `nativeFeedColorFrame` — wraps the caller's `DirectByteBuffer` in a
   `cv::Mat` with no capacity or dimension check (its sibling `nativeFeedYuvFrame` has exactly
   this guard). Add the same `GetDirectBufferCapacity` bounds check before constructing the Mat.
-- [ ] `MobileGS::restoreWallFingerprint` (the descriptors-only restore path) — doesn't reset
+- [x] `MobileGS::restoreWallFingerprint` (the descriptors-only restore path) — doesn't reset
   `mHasFingerprintView`/`mFingerprintAnchorMatrix`/`mWallPatch` from a previously-loaded metric
   fingerprint, so switching to a descriptors-only project can silently co-register against the
   old project's capture pose. Mirror the guard `restoreWallFingerprintMetric` and
   `alignToFingerprint` already have.
-- [ ] `MobileGS::alignToFingerprint` — resets `mFingerprintIntrinsics`/`mHasFingerprintView` but
+- [x] `MobileGS::alignToFingerprint` — resets `mFingerprintIntrinsics`/`mHasFingerprintView` but
   not `mFingerprintAnchorMatrix`; a co-op peer's fingerprint can inherit this device's stale
   local anchor. Reset it alongside the other two (match `clearWallFingerprint`'s identity reset).
-- [ ] `nativeGetAnchorTransform` — returns a non-null all-zero `FloatArray(16)` when
+- [x] `nativeGetAnchorTransform` — returns a non-null all-zero `FloatArray(16)` when
   `gSlamEngine` is null, contradicting the null-on-failure contract every Kotlin call site
   (`ArRenderer.kt`, `ArViewModel.kt`) explicitly documents and relies on. Return `nullptr`
   instead, matching `nativeGetFingerprintAnchor`'s sibling behavior.
-- [ ] `SuperPointDetector.cpp` `extractKeypoints` — the `cv::resize` call for a degenerate
+- [x] `SuperPointDetector.cpp` `extractKeypoints` — the `cv::resize` call for a degenerate
   (near-zero-width) input sits outside the function's `try` block; an escaped exception on the
   reloc worker thread (no `try` at that specific call site) kills relocalization for the session
   with no error surfaced. Move the resize inside the guarded region, or add an explicit
   minimum-size check before it.
-- [ ] `DistortionHead::run` — `reinterpret_cast<const float*>(o.data)` with no `o.type() ==
+- [x] `DistortionHead::run` — `reinterpret_cast<const float*>(o.data)` with no `o.type() ==
   CV_32F` check; a non-fp32 model output is an out-of-bounds heap read reinterpreted as
   painting-progress/confidence. Add the type check alongside the existing total()/layout checks.
-- [ ] `MobileGS.cpp:456` — `mPaintingProgress.store(coverage)` from the raw distortion-head
+- [x] `MobileGS.cpp:456` — `mPaintingProgress.store(coverage)` from the raw distortion-head
   output with no clamp or finiteness check. Clamp to `[0, 1]` and reject non-finite before
   storing (the neighboring `matchability` value is already gated, `coverage` isn't).
 

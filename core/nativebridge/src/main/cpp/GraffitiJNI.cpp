@@ -673,7 +673,18 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
 
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     uint8_t* buffer = static_cast<uint8_t*>(env->GetDirectBufferAddress(colorBuffer));
-    if (!buffer || !gSlamEngine) return;
+    if (!buffer || !gSlamEngine || width <= 0 || height <= 0) return;
+
+    // Same guard as nativeFeedYuvFrame's Y-plane check: wrapping the caller's buffer in a cv::Mat
+    // with no bounds check lets a short/truncated colorBuffer (wrong stride assumption on the
+    // caller's side, e.g. a glasses-forwarded frame) read past its end. Skip the check only when
+    // the capacity query itself is unavailable, matching that call site's style.
+    jlong colorCap = env->GetDirectBufferCapacity(colorBuffer);
+    size_t colorNeeded = (size_t)height * (size_t)width * 4;
+    if (colorCap > 0 && (size_t)colorCap < colorNeeded) {
+        LOGE("nativeFeedColorFrame: buffer too small (cap=%lld, need=%zu)", (long long)colorCap, colorNeeded);
+        return;
+    }
 
     try {
         cv::Mat frame(height, width, CV_8UC4, buffer);
@@ -1265,14 +1276,18 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetKeypoints(
 
 extern "C" JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetAnchorTransform(JNIEnv* env, jobject) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    // Every Kotlin call site (ArRenderer.kt, ArViewModel.kt) treats a null return as "no engine /
+    // allocation pressure" and falls back accordingly -- returning a non-null all-zero array here
+    // instead silently collapsed the caller's model matrix / fed a garbage pose into
+    // MetricFingerprintBuilder. Match nativeGetFingerprintAnchor's sibling behavior: only allocate
+    // and populate the array once there's an engine to read from.
+    if (!gSlamEngine) return nullptr;
     jfloatArray result = env->NewFloatArray(16);
     if (!result) return nullptr;
-    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
-    if (gSlamEngine) {
-        float mat[16];
-        gSlamEngine->getAnchorTransform(mat);
-        env->SetFloatArrayRegion(result, 0, 16, mat);
-    }
+    float mat[16];
+    gSlamEngine->getAnchorTransform(mat);
+    env->SetFloatArrayRegion(result, 0, 16, mat);
     return result;
 }
 
