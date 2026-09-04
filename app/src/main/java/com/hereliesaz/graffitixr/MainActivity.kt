@@ -584,7 +584,15 @@ class MainActivity : ComponentActivity() {
                     enabled = !showLibrary && !showSettings && !mainUiState.isInPlaneRealignment &&
                         !mainUiState.isCapturingTarget && !mainUiState.isTouchLocked
                 ) {
-                    navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
+                    // Pop the editor route being left, not just push Library on top of it — a plain
+                    // navigate() here left [Editor, Library] on the stack, so the NEXT Back press
+                    // popped Library and reopened the same editor instead of leaving the app: an
+                    // editor -> library -> editor loop instead of Library (the app's home) actually
+                    // being reachable as a place Back can exit from.
+                    navController.navigate(LIBRARY_ROUTE) {
+                        currentRoute?.let { popUpTo(it) { inclusive = true } }
+                        launchSingleTop = true
+                    }
                 }
 
                 // noMenu (AzNavRail 11.0) removes the side drawer entirely — all entries become rail
@@ -796,7 +804,15 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                AzHostActivityLayout(navController = navController, currentDestination = currentRoute, initiallyExpanded = false) {
+                // Captured so Settings' "Reset Tutorials" (below, but lexically INSIDE this same
+                // call's content lambda — its own onResetTutorials closure can't see a `val`
+                // assigned from this call's return value, since that assignment only completes
+                // after the whole call, including this content lambda, finishes) can also clear
+                // this controller's own persisted completion state. AzHostActivityLayout returns
+                // the controller instance directly; recomposition keeps this var current well
+                // before Settings' button is ever tapped.
+                var guidanceControllerRef: com.hereliesaz.aznavrail.tutorial.AzGuidanceController? = null
+                val guidanceController = AzHostActivityLayout(navController = navController, currentDestination = currentRoute, initiallyExpanded = false) {
                     azTheme(
                         activeColor = Cyan,
                         focusColor = Cyan,
@@ -826,7 +842,7 @@ class MainActivity : ComponentActivity() {
                     // Reactive status-driven guidance (replaces the old adaptive coach and the removed
                     // scripted-tutorial API): milestone statuses, edges that reuse the existing
                     // onboarding text, and per-mode goals that self-activate on mode entry.
-                    ConfigureGuidance(editorUiState, arUiState, context, strings)
+                    ConfigureGuidance(editorUiState, arUiState, mainUiState.isCapturingTarget, context, strings)
 
                     // Registered UNCONDITIONALLY. This used to be gated on an isRailVisible built from
                     // hideUiForCapture / isTouchLocked / isCapturingTarget / showSettings /
@@ -1720,7 +1736,17 @@ class MainActivity : ComponentActivity() {
                                     onBackgroundColorChanged = { argb -> settingsViewModel.setBackgroundColor(argb) },
                                     onCheckForUpdates = { dashboardViewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
                                     onOpenUpdatePage = { dashboardViewModel.openUpdatePage(this@MainActivity) },
-                                    onResetTutorials = { settingsViewModel.resetCompletedTutorials() },
+                                    onResetTutorials = {
+                                        settingsViewModel.resetCompletedTutorials()
+                                        // The reactive per-mode guidance tours (ConfigureGuidance)
+                                        // persist their own completed/dismissed goals in
+                                        // AzGuidanceController's SharedPreferences, separate from
+                                        // the app's own DataStore that resetCompletedTutorials()
+                                        // clears above — without this, a mode tour the user already
+                                        // finished or dismissed could never be made to reappear from
+                                        // this button.
+                                        guidanceControllerRef?.resetGuidance()
+                                    },
                                     onClose = { showSettings = false },
                                     strings = strings
                                 )
@@ -1787,6 +1813,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+                guidanceControllerRef = guidanceController
             }
         }
     }
@@ -2747,12 +2774,16 @@ private fun RelocDiagnosticsOverlay(
                 androidx.compose.ui.graphics.Color.White,
             )
         }
-        // paintingProgress is a relocalizer-confidence byproduct (fraction of the wall's ORB
-        // descriptors the live frame corroborates), not work progress — it can't go down when the
-        // artist paints over a mistake, and RelocStatusBadge already labels the same number
-        // "Matched X%" for exactly this reason. "Painted" here made the same number read as two
-        // different things depending which corner of the screen you looked at.
-        DiagnosticRow("Matched", "${(paintingProgress * 100).toInt()}%", androidx.compose.ui.graphics.Color.White)
+        // paintingProgress IS a genuine progress signal, not a confidence readout — MobileGS.cpp's
+        // own comment on its producer is explicit and deliberate: "Coverage says how much of the
+        // design is realized (progress); matchability says how much to trust this frame
+        // (confidence)" — two different, intentionally-separate channels (mCorroborationConfidence
+        // is the latter, surfaced in the Corrob/Spread/Reproj rows above). A prior pass here
+        // mislabeled this "Matched", inheriting RelocStatusBadge's own pre-existing mislabeling of
+        // the same value (a separate, not-yet-fixed issue) instead of correcting it — caught by
+        // review before merge. "Painted" wasn't wrong about WHAT this is, only imprecise about how
+        // literally to take it (it's realized-descriptor coverage, not a physical paint sensor).
+        DiagnosticRow("Progress", "${(paintingProgress * 100).toInt()}%", androidx.compose.ui.graphics.Color.White)
 
         // Drift correction. Off means the overlay rides the raw ARCore anchor and will drift as
         // tracking does; on means each accepted relocalization pulls it back. The `Fusion` row above
@@ -3180,9 +3211,13 @@ private fun SyncingBadge(
 }
 
 /**
- * Renders [progress] (relocalizer match confidence, not work-done) as a colored bar. Explicitly
- * labelled "Matched" — unlabelled next to a traffic-light color scheme, this read as literal
- * painting progress, a number that can't go down when the artist paints over a mistake.
+ * Renders [progress] as a colored bar. [progress] IS a genuine progress signal (fraction of the
+ * design's descriptors the wall has ever corroborated — see MobileGS.cpp's mPaintingProgress
+ * producer comment, which explicitly separates it from mCorroborationConfidence's instantaneous
+ * confidence). Explicitly labelled "Progress": unlabelled next to a traffic-light color scheme it
+ * still reads correctly as progress, but a bare number invites confusion with the *other*,
+ * genuinely confidence-flavored numbers elsewhere on screen (RelocStatusBadge, the diagnostic
+ * overlay's Corrob/Spread/Reproj rows).
  */
 @Composable
 private fun PaintingProgressIndicator(
@@ -3206,7 +3241,7 @@ private fun PaintingProgressIndicator(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "Matched",
+                text = "Progress",
                 color = Color.White.copy(alpha = 0.7f),
                 style = MaterialTheme.typography.labelSmall
             )

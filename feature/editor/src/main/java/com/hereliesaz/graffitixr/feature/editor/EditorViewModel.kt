@@ -652,9 +652,34 @@ class EditorViewModel @Inject constructor(
                 return@launch
             }
             try {
+                // exportProjectToUri reads project.json straight off disk — it isn't routed through
+                // currentProject's in-memory state. saveProject()'s own writes go through
+                // ProjectRepositoryImpl's saveMutex-guarded updateProject(transform), so a save
+                // still in flight when this runs could have this read a stale or torn file. An
+                // identity transform through that same call serializes behind any in-flight save
+                // (the mutex admits only one writer at a time) and re-persists the latest in-memory
+                // state, guaranteeing the file on disk is current before the zip below reads it.
+                projectRepository.updateProject { it }
+
                 val shareDir = File(context.cacheDir, "share").apply { mkdirs() }
-                val file = File(shareDir, "${project.name.replace(" ", "_")}.gxr")
+                // project.name is free-form user text (SaveProjectDialog only rejects blank), so a
+                // name like "North/Wall" must not reach the filesystem as a path — File(shareDir,
+                // "North/Wall.gxr") resolves into a nonexistent "North/" subdirectory, silently
+                // failing the export (exportProjectToUri catches and logs internally, never
+                // throwing) and leaving this code to hand the share sheet a URI for a file that was
+                // never written. Collapse anything that isn't alphanumeric/dot/dash/underscore.
+                val safeName = project.name.map { c ->
+                    if (c.isLetterOrDigit() || c == '.' || c == '-' || c == '_') c else '_'
+                }.joinToString("").ifBlank { "wall" }
+                val file = File(shareDir, "$safeName.gxr")
                 projectManager.exportProjectToUri(context, project.id, Uri.fromFile(file))
+                // exportProjectToUri never throws on failure (catch-and-log only) and never reports
+                // success either, so the only way to know the zip actually landed is to check for it
+                // — without this, a failed export still reached the share sheet with a URI for a
+                // file that doesn't exist, an attachment nothing could open.
+                if (!file.exists() || file.length() == 0L) {
+                    throw java.io.IOException("Export produced no file")
+                }
                 val contentUri = androidx.core.content.FileProvider.getUriForFile(
                     context, "${context.packageName}.fileprovider", file
                 )

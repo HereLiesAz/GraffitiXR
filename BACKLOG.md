@@ -378,11 +378,23 @@ than after.
 - [x] System Back from the editor quits the app outright (single-entry back stack after
   `popUpTo(LIBRARY_ROUTE){inclusive=true}}`, and the enabled `BackHandler`s don't cover the
   no-dialog-open case). Add a confirmation, or route back to the Library instead of finishing the
-  Activity.
+  Activity. **Post-merge review on the PR (Codex) caught a real bug in the first landing, fixed
+  before merge:** the handler pushed `LIBRARY_ROUTE` on top of the editor route instead of
+  replacing it, leaving `[Editor, Library]` on the stack — the NEXT Back press popped Library and
+  reopened the same editor instead of leaving the app, an editor→library→editor loop. Now pops
+  the editor route being left (`popUpTo(currentRoute)`) so Library is reached with an empty stack
+  beneath it, as originally intended.
 - [x] `SettingsScreen.kt` toggle rows are ~28dp tall against a 48dp minimum touch target — bump
   `SettingsItem` to a real minimum height.
 - [x] Canvas-background color swatches are unlabeled 32dp circles with only a border-color state
   cue — add `contentDescription` from the already-destructured (and currently unused) `label`.
+  **Post-merge review on the PR (Codex) caught a real bug in the first landing, fixed before
+  merge:** the initial fix bumped each swatch to a 48dp touch target inside a plain (non-wrapping)
+  `Row` sharing space with a label — five 48dp boxes plus gaps (272dp) don't fit a compact/
+  split-screen card's available width, so Compose would clip or shrink the final swatches below
+  the fix's own minimum. Restructured to a label-on-its-own-line layout with the swatches in a
+  horizontally scrollable row below, so every swatch stays reachable at any width without ever
+  being compressed.
 - [x] Touch lock's volume-sequence unlock is defeated by the back gesture, which unlocks
   unconditionally regardless of touch-lock state — intercept back the same way pointer input is
   intercepted, or explicitly document that back is a second, intentional unlock path (currently
@@ -405,11 +417,26 @@ than after.
 
 ### Phase 5 — Onboarding activation
 
-- [ ] `GuidanceDefinitions.kt`'s ~155 lines of authored per-mode guidance (`azGoal` entries) are
+- [x] `GuidanceDefinitions.kt`'s ~155 lines of authored per-mode guidance (`azGoal` entries) are
   declared and never activated — no `autoStartWhen`, no `.activate()` call anywhere in the tree.
   Wire mode-entry activation for Overlay/Mockup/Trace/Design to match the AR behavior
   `MainActivity.kt`'s own comment already claims exists. Spot-check the authored copy against
   current UI before flipping it on (it was written before some of the Phase 4 changes above).
+  **Post-merge review on the PR (Codex) caught two real bugs in the first landing, both fixed
+  before merge:** (1) AR's own `TargetCreationUi` capture modal isn't covered by
+  `MainActivity`'s `anyModalActive` gate (that only guards its own `onscreen{}` overlays; this
+  reactive guidance renders separately via `AzHostActivityLayout`) — added a second
+  `azSuppressGuide` predicate on `isCapturingTarget` so the rail callout stops stacking over the
+  capture card. (2) Every mode's goal shared `gx.hasDesign` as its completion target, so a
+  returning user who already had a design (the common case) skipped a mode's tour entirely on
+  first entry — worst for Mockup, which lost its wall-photo steps. Gave Mockup its own
+  `gx.mockupReady` status (`hasWallPhoto && hasDesign`); Overlay/Trace/Design have no analogous
+  secondary prerequisite to combine with and keep the shared target as a documented, real,
+  unfixed gap rather than a guessed-at fix. Also caught: the "route through Design" copy was
+  hardcoded English composed with the localized `onboarding_*` arrays, producing a mixed-language
+  tour in every other locale — moved into proper (still English-only, not yet translated)
+  `guidance_open_via_design_*` string resources instead, so a future translation pass has
+  somewhere to put the other 14 languages.
 
 ### Phase 6 — Product decisions (resolved this round; user authorized making the call directly)
 
@@ -418,11 +445,18 @@ actioned where the fix was well-scoped and low-risk; the larger features are dec
 below rather than shipped blind, since none of them can be manually verified in this sandbox (no
 device, no ARCore) and a half-built AR interaction is worse than a documented plan.
 
-- [x] **"Painted %" is a relocalizer-confidence byproduct mislabeled as work progress.** Fixed
-  now, cheaply, independent of the items below: the debug-overlay row read "Painted", the
-  persistent HUD bar next to it carried the same number with no label at all (inviting exactly
-  that misreading, per its own traffic-light coloring), while `RelocStatusBadge` already labeled
-  the identical number "Matched X%". Both now say "Matched" — one true label for one true number.
+- [x] **"Painted %" — the original audit's framing was itself wrong; corrected, not relabeled to
+  "Matched".** `mPaintingProgress`'s own producer in `MobileGS.cpp` is explicit and deliberate:
+  *"Coverage says how much of the design is realized (progress); matchability says how much to
+  trust this frame (confidence)"* — two intentionally separate channels
+  (`mCorroborationConfidence` is the confidence one). `paintingProgress` genuinely IS a progress
+  signal, not a confidence byproduct. A first pass here relabeled it "Matched", inheriting
+  `RelocStatusBadge`'s own **pre-existing, separate** mislabeling of the same value instead of
+  fixing anything — caught by a Codex review on the PR before merge. Landed as "Progress" instead,
+  in both the debug-overlay row and the persistent HUD bar (which previously had no label at all,
+  inviting exactly this confusion via its traffic-light coloring). `RelocStatusBadge`'s own
+  "Matched X%" wording is a separate, not-yet-fixed issue — not touched here to keep this fix
+  minimal to what was actually wrong.
 - [x] **The tracked "no-cloud blocks crew fingerprint-sharing" tension is factually resolved, not
   open**: `.gxr` project export already round-trips the wall fingerprint and is byte-identical to
   Co-op's own bulk-sync payload. The real gap was affordance: it was buried inside "Save", landing
@@ -431,7 +465,18 @@ device, no ARCore) and a half-built AR interaction is worse than a documented pl
   Export/Save. (Left `ProjectLibraryScreen`'s "Import Project" copy as-is: promoting it to also
   read as "receive a shared wall" only helps if done in every one of the app's 15 locales, and
   guessing 14 machine translations for one hint line risked shipping worse copy than the status
-  quo it would replace.)
+  quo it would replace.) **Post-merge review on the PR (Codex) caught two real bugs in the first
+  landing, both fixed before merge:** project names are free-form user text, and a name like
+  "North/Wall" resolved to a nonexistent `cache/share/North/` subdirectory — `exportProjectToUri`
+  catches and logs its own write failure internally rather than throwing, so this code would have
+  handed the share sheet a `FileProvider` URI for a file that was never written (an attachment
+  nothing could open); now sanitizes the filename (collapses anything outside
+  alphanumeric/dot/dash/underscore) and verifies the file actually exists before building the URI.
+  Separately, `shareProject()` read `project.json` straight off disk without going through
+  `ProjectRepositoryImpl`'s `saveMutex`, so tapping Share right after an edit could race that
+  edit's own in-flight `saveProject()` and zip a stale or torn file; now runs an identity
+  `updateProject { it }` first, which serializes behind any in-flight save via the same mutex and
+  re-persists current state before the zip reads it.
 - **Co-op's op protocol (`Op.StrokeComplete`/`Op.TextContentChange`) — investigated, NOT removed.**
   These have zero emitters in this app, but `EditorViewModel.applySpectatorOp`'s own comment notes
   a *"peer running the design-side build"* may still send them, and "companion design app" is a

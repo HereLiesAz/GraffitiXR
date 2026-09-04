@@ -65,6 +65,7 @@ internal val DECORATED_IDS = setOf(
 internal fun AzNavHostScope.ConfigureGuidance(
     editorUiState: EditorUiState,
     arUiState: ArUiState,
+    isCapturingTarget: Boolean,
     context: Context,
     strings: AppStrings,
 ) {
@@ -85,11 +86,28 @@ internal fun AzNavHostScope.ConfigureGuidance(
     // Stay quiet during an active gesture; re-show after a short settle. Mirrors the old coach, which
     // hid mid-gesture and waited ~700 ms before surfacing the next step.
     azSuppressGuide(settleMs = 700L) { editorUiState.gestureInProgress }
+    // AR's own TargetCreationUi (TargetInstructionCard) is a full-screen capture modal with its
+    // own instructions; this reactive guidance overlay is rendered automatically by
+    // AzHostActivityLayout and isn't covered by MainActivity's anyModalActive gate (that only
+    // guards overlays mounted in its own onscreen{} block), so without this the AR goal's rail
+    // callout stayed stacked on top of the capture card for the whole scan-to-lock sequence.
+    azSuppressGuide(settleMs = 0L) { isCapturingTarget }
 
     // --- Milestone statuses: the exact predicates rememberCoachStep derived steps from. ---
     azStatus("gx.hasDesign") { editorUiState.design != null }
     azStatus("gx.hasWallPhoto") { editorUiState.backgroundBitmap != null }
     azStatus("gx.hasTarget") { arUiState.isAnchorEstablished }
+    // A goal's own target status must NOT already be true the moment it auto-starts, or the
+    // routing engine finds itself already at the destination and shows nothing — the concrete bug
+    // this caused: a returning user who already has a design (the common case, since Design is
+    // usually visited before Mockup) entering Mockup for the first time skipped the wall-photo
+    // steps entirely, because gx.hasDesign (the goal's target) was already true. Combining it with
+    // Mockup's own prerequisite means the goal can't be "already done" without that prerequisite
+    // also being met, so the wall-photo chain always gets walked for a first-time visitor. Overlay/
+    // Trace/Design have no analogous secondary prerequisite to combine with — see BACKLOG.md for
+    // why those three keep the shared target as a documented, real, un-fixed gap rather than a
+    // guessed-at one.
+    azStatus("gx.mockupReady") { editorUiState.backgroundBitmap != null && editorUiState.design != null }
 
     // --- DESIGN: add a layer, then tap it to open its tools. ---
     azEdge(
@@ -105,8 +123,12 @@ internal fun AzNavHostScope.ConfigureGuidance(
     // outside Design mode (see MainActivity.kt's ConfigureRailItems and showDesignInstructionsDialog,
     // which hit this exact bug for AR's hard-coded post-target prompt: "tap Open" alone pointed at an
     // invisible control, fixed there by routing through Design first). Every "add a layer" step below
-    // that fires outside Design mode highlights "mode.design" and says so, for the same reason.
-    val openViaDesign = "Tap 'Design' on the rail, then 'Open', "
+    // that fires outside Design mode highlights "mode.design" instead of "item.open" for the same
+    // reason, and reads from the guidance_open_via_design_* resources (localized copy, not composed
+    // English fragments) so translated locales aren't left with an English sentence spliced into an
+    // otherwise-translated tour — not yet translated into this app's other 14 locales (a known,
+    // documented gap; see BACKLOG.md), same as the pre-existing showDesignInstructionsDialog text.
+    fun res(id: Int) = context.resources.getString(id)
 
     // --- OVERLAY: add a layer. ---
     azEdge(
@@ -116,7 +138,7 @@ internal fun AzNavHostScope.ConfigureGuidance(
         steps = listOf(
             AzInstructionStep(text = ln(overlay, 0), highlightItemId = "mode.design"),
             AzInstructionStep(
-                text = openViaDesign + "to add a layer — pick a photo and it appears here, floating over the live camera view.",
+                text = res(DesignR.string.guidance_open_via_design_overlay),
                 highlightItemId = "mode.design",
                 advanceWhen = "gx.hasDesign",
             ),
@@ -135,8 +157,8 @@ internal fun AzNavHostScope.ConfigureGuidance(
     )
     azEdge(
         from = "gx.hasWallPhoto",
-        to = "gx.hasDesign",
-        text = openViaDesign + "to add a layer on top of the wall photo. Pinch and drag to size and position it.",
+        to = "gx.mockupReady",
+        text = res(DesignR.string.guidance_open_via_design_mockup),
         highlightItemId = "mode.design",
     )
 
@@ -148,7 +170,7 @@ internal fun AzNavHostScope.ConfigureGuidance(
         steps = listOf(
             AzInstructionStep(text = ln(trace, 0), highlightItemId = "mode.design"),
             AzInstructionStep(
-                text = openViaDesign + "to add your first layer. Once it's in, pinch and drag on the canvas to size and place it.",
+                text = res(DesignR.string.guidance_open_via_design_trace),
                 highlightItemId = "mode.design",
                 advanceWhen = "gx.hasDesign",
             ),
@@ -170,17 +192,18 @@ internal fun AzNavHostScope.ConfigureGuidance(
     azEdge(
         from = "gx.hasTarget",
         to = "gx.hasDesign",
-        text = openViaDesign + "to add a design layer — it projects onto the wall using the anchor you just set.",
+        text = res(DesignR.string.guidance_open_via_design_ar),
         highlightItemId = "mode.design",
     )
 
     // --- Per-mode goals: each auto-starts the first time its mode is entered (autoStartWhen bound
     // to that mode's screen status) and routes from the current screen to that mode's milestone.
     // AzGuidanceController tracks completed/dismissed goals in SharedPreferences, so a goal the
-    // user already finished or dismissed does not restart on a later visit. ---
+    // user already finished or dismissed does not restart on a later visit. Mockup's target is
+    // gx.mockupReady, not the shared gx.hasDesign — see that status's own comment above for why. ---
     azGoal(id = "gx.design", target = "gx.hasDesign", label = nav.design, autoStartWhen = design0)
     azGoal(id = "gx.overlay", target = "gx.hasDesign", label = nav.overlay, autoStartWhen = overlay0)
-    azGoal(id = "gx.mockup", target = "gx.hasDesign", label = nav.mockup, autoStartWhen = mockup0)
+    azGoal(id = "gx.mockup", target = "gx.mockupReady", label = nav.mockup, autoStartWhen = mockup0)
     azGoal(id = "gx.trace", target = "gx.hasDesign", label = nav.trace, autoStartWhen = trace0)
     azGoal(id = "gx.ar", target = "gx.hasTarget", label = nav.arMode, autoStartWhen = ar0)
 }
