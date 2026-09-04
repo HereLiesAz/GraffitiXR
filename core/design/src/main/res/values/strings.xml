@@ -487,21 +487,15 @@
     <!-- Lightbox Mode help text. -->
     <string name="help_trace">Lightbox Mode: High-brightness tracing surface. Instructions: Place paper over the screen and trace. Press Volume Up, Down, Up, Down quickly to exit.</string>
     <!-- Target Management help text. -->
-    <string name="help_target_host">Target Management: Tools for AR anchors. Instructions: Tap to access tools for creating or re-aligning the mural\'s position.</string>
     <!-- Scan Resolution help text. -->
-    <string name="help_scan_mode_toggle">Scan Resolution: Switch between Mural (large scale) and Canvas (small scale). Mural uses Voxel-based tracking for walls; Canvas uses Point Clouds for detailed desk-scale art.</string>
     <!-- Cloud Offset help text. -->
-    <string name="help_cloud_offset">Anchor Offset Handoff: High-precision point cloud tracking for large-scale murals. Instructions: Complete 360-scan, then tap to place anchor.</string>
     <!-- Create Anchor help text. -->
     <string name="help_create">Create Anchor: Photograph a mark on the wall to lock projection. Instructions: Point at a distinct texture and tap. The app will track this mark.</string>
     <!-- Layer Management help text. -->
-    <string name="help_design_host">Layer Management: Add images, text, or sketches. Instructions: Tap to expand. Long-press any layer button to open its secondary menu.</string>
     <!-- Import Image help text. -->
     <string name="help_add_img">Import Image: Add a sketch or reference photo. Instructions: Select an image from your gallery. It will appear as a new design layer.</string>
     <!-- New Sketch help text. -->
-    <string name="help_add_draw">New Sketch: Add a blank layer for freehand drawing. Instructions: Select the layer to reveal brush, eraser, and smudge tools.</string>
     <!-- Add Text help text. -->
-    <string name="help_add_text">Add Text: Create a typography layer. Instructions: Tap the layer\'s \'Edit\' button to change content and formatting.</string>
     <!-- Change Wall help text. -->
     <string name="help_wall">Change Wall: Set background for Mockup mode. Instructions: Select a photo of the physical wall you plan to paint on.</string>
     <!-- Project Management help text. -->
@@ -522,51 +516,29 @@
     <string name="help_lock_trace">Lock/Freeze: Prevent accidental changes. Instructions: In Trace mode, disables screen. In other modes, locks layer transforms.</string>
     <!-- Interactive 'Help' help text. -->
     <!-- Individual Layer help text. -->
-    <string name="help_layer">Layer \'%1$s\': Active mural element. Instructions: Tap to select. Drag button up/down to reorder. Transform on screen with gestures.</string>
 
     <!-- Help strings for layer-specific tools. -->
     <!-- Edit Text tool help. -->
-    <string name="help_edit_text">Edit Text: Change words in typography layer. Instructions: Tap to open the keyboard and update the text content.</string>
     <!-- Brush/Text Size tool help. -->
-    <string name="help_size">Brush/Text Size: Adjust scale and softness. Instructions: Drag up/down for size. Drag left/right for brush feathering.</string>
     <!-- Font Picker tool help. -->
-    <string name="help_font">Font Picker: Select typography style. Instructions: Tap to browse available fonts and apply them to the text layer.</string>
     <!-- Color Tool help. -->
-    <string name="help_color">Color Tool: Set active color. Instructions: Drag up/down for brightness, left/right for saturation. Tap for full color wheel.</string>
     <!-- Text Kerning tool help. -->
-    <string name="help_kern">Text Kerning: Adjust letter spacing. Instructions: Drag left/right to tighten or loosen the text layout.</string>
     <!-- Bold Toggle help. -->
-    <string name="help_bold">Bold Toggle: Thick font weight. Instructions: Tap to toggle bold styling on the active text layer.</string>
     <!-- Italic Toggle help. -->
-    <string name="help_italic">Italic Toggle: Slanted styling. Instructions: Tap to toggle italic styling on the active text layer.</string>
     <!-- Text Outline toggle help. -->
-    <string name="help_outline">Text Outline: Character stroke. Instructions: Tap to toggle a visible outline around the text characters.</string>
     <!-- Drop Shadow toggle help. -->
-    <string name="help_shadow">Drop Shadow: Text depth. Instructions: Tap to toggle a soft shadow behind the typography for better legibility.</string>
     <!-- Generate Stencil help. -->
-    <string name="help_stencil_gen">Generate Stencil: Create printable templates. Instructions: Tap to begin multi-layer stencil generation for this image.</string>
     <!-- Blend Mode help. -->
-    <string name="help_blend">Blend Mode: Composite style. Instructions: Tap to cycle through modes like Multiply, Screen, and Overlay.</string>
     <!-- Image Adjustments help. -->
-    <string name="help_adj">Image Adjustments: Fine-tune appearance. Instructions: Tap to reveal sliders for Opacity, Brightness, Contrast, and Saturation.</string>
     <!-- Invert Colors help. -->
-    <string name="help_invert">Invert Colors: High-contrast negative. Instructions: Tap to flip colors. Whites become black and vice-versa—useful for tracing.</string>
     <!-- Color Balance help. -->
-    <string name="help_balance">Color Balance: RGB channel tuning. Instructions: Tap to reveal sliders for precise Red, Green, and Blue adjustment.</string>
     <!-- Eraser Brush help. -->
-    <string name="help_eraser">Eraser Brush: Remove layer content. Instructions: Paint on screen to erase. Use \'Size\' button to adjust diameter.</string>
     <!-- Blur/Smudge tool help. -->
-    <string name="help_blur">Blur/Smudge Tool: Blend colors. Instructions: Paint over regions to soften edges or smudge details together.</string>
     <!-- Warp Tool help. -->
-    <string name="help_liquify">Warp Tool: Reshape design. Instructions: Drag on screen to push and pull pixels—great for adjusting proportions.</string>
     <!-- Dodge Tool help. -->
-    <string name="help_dodge">Dodge Tool: Lighten areas. Instructions: Paint over parts of the layer to increase their luminance.</string>
     <!-- Burn Tool help. -->
-    <string name="help_burn">Burn Tool: Darken areas. Instructions: Paint over parts of the layer to decrease their luminance.</string>
     <!-- Isolate Subject help. -->
-    <string name="help_iso">Isolate Subject: Auto-background removal. Instructions: Tap to extract the main subject from its background using AI.</string>
     <!-- Sketch Outline help. -->
-    <string name="help_line">Sketch Outline: Line art filter. Instructions: Tap to convert the photo into a black-and-white transparent outline.</string>
     <!-- Layer Help toggle help. -->
 
     <!-- Unit labels -->

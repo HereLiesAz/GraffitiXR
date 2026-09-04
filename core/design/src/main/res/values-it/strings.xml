@@ -433,19 +433,14 @@
     <!-- Lightbox Mode help text. -->
     <string name="help_trace">Modalità Tavolo luminoso: Superficie di tracciamento ad alta luminosità. Istruzioni: Posiziona la carta sullo schermo e traccia. Premi rapidamente Volume Su, Giù, Su, Giù per uscire.</string>
     <!-- Target Management help text. -->
-    <string name="help_target_host">Gestione Bersaglio: Strumenti per le ancore AR. Istruzioni: Tocca per accedere agli strumenti per creare o riallineare la posizione del murale.</string>
     <!-- Scan Resolution help text. -->
-    <string name="help_scan_mode_toggle">Risoluzione Scansione: Passa da Murale (larga scala) a Tela (piccola scala). Murale usa i Gaussian Splats per i muri; Tela usa Nuvole di Punti per opere d\'arte dettagliate su scrivania.</string>
     <!-- Create Anchor help text. -->
     <string name="help_create">Crea Ancora: Fotografa un segno sul muro per bloccare la proiezione. Istruzioni: Punta verso una texture distinta e tocca. L\'app traccerà questo segno.</string>
     <!-- Layer Management help text. -->
-    <string name="help_design_host">Gestione Livelli: Aggiungi immagini, testo o schizzi. Istruzioni: Tocca per espandere. Tieni premuto a lungo qualsiasi pulsante del livello per aprire il suo menu secondario.</string>
     <!-- Import Image help text. -->
     <string name="help_add_img">Importa Immagine: Aggiungi uno schizzo o una foto di riferimento. Istruzioni: Seleziona un\'immagine dalla tua galleria. Apparirà come un nuovo livello di design.</string>
     <!-- New Sketch help text. -->
-    <string name="help_add_draw">Nuovo Schizzo: Aggiungi un livello vuoto per il disegno a mano libera. Istruzioni: Seleziona il livello per rivelare pennello, gomma e strumenti di sfumino.</string>
     <!-- Add Text help text. -->
-    <string name="help_add_text">Aggiungi Testo: Crea un livello di tipografia. Istruzioni: Tocca il pulsante \'Modifica\' del livello per cambiare contenuto e formattazione.</string>
     <!-- Change Wall help text. -->
     <string name="help_wall">Cambia Muro: Imposta lo sfondo per la modalità Mockup. Istruzioni: Seleziona una foto del muro fisico su cui intendi dipingere.</string>
     <!-- Project Management help text. -->
@@ -466,51 +461,29 @@
     <string name="help_lock_trace">Blocca/Congela: Previeni modifiche accidentali. Istruzioni: Nella modalità Ricalco disabilita lo schermo. In altre modalità, blocca le trasformazioni dei livelli.</string>
     <!-- Interactive \'Help\' help text. -->
     <!-- Individual Layer help text. -->
-    <string name="help_layer">Livello \'%1$s\': Elemento attivo del murale. Istruzioni: Tocca per selezionare. Trascina il pulsante su/giù per riordinare. Trasforma sullo schermo con i gesti.</string>
 
     <!-- Help strings for layer-specific tools. -->
     <!-- Edit Text tool help. -->
-    <string name="help_edit_text">Modifica Testo: Cambia le parole nel livello di tipografia. Istruzioni: Tocca per aprire la tastiera e aggiornare il contenuto del testo.</string>
     <!-- Brush/Text Size tool help. -->
-    <string name="help_size">Dimensione Pennello/Testo: Regola scala e morbidezza. Istruzioni: Trascina su/giù per la dimensione. Trascina a sinistra/destra per la sfumatura del pennello.</string>
     <!-- Font Picker tool help. -->
-    <string name="help_font">Selettore Font: Seleziona lo stile della tipografia. Istruzioni: Tocca per sfogliare i font disponibili e applicarli al livello di testo.</string>
     <!-- Color Tool help. -->
-    <string name="help_color">Strumento Colore: Imposta il colore attivo. Istruzioni: Trascina su/giù per la luminosità, a sinistra/destra per la saturazione. Tocca per la ruota dei colori completa.</string>
     <!-- Text Kerning tool help. -->
-    <string name="help_kern">Crenatura Testo: Regola la spaziatura delle lettere. Istruzioni: Trascina a sinistra/destra per stringere o allargare il layout del testo.</string>
     <!-- Bold Toggle help. -->
-    <string name="help_bold">Attiva Grassetto: Spessore del font in grassetto. Istruzioni: Tocca per attivare o disattivare lo stile in grassetto sul livello di testo attivo.</string>
     <!-- Italic Toggle help. -->
-    <string name="help_italic">Attiva Corsivo: Stile inclinato. Istruzioni: Tocca per attivare o disattivare lo stile corsivo sul livello di testo attivo.</string>
     <!-- Text Outline toggle help. -->
-    <string name="help_outline">Contorno Testo: Tratto del carattere. Istruzioni: Tocca per attivare o disattivare un contorno visibile attorno ai caratteri di testo.</string>
     <!-- Drop Shadow toggle help. -->
-    <string name="help_shadow">Ombra: Profondità del testo. Istruzioni: Tocca per attivare o disattivare un\'ombra morbida dietro la tipografia per una migliore leggibilità.</string>
     <!-- Generate Stencil help. -->
-    <string name="help_stencil_gen">Genera Stencil: Crea modelli stampabili. Istruzioni: Tocca per iniziare la generazione di stencil a più livelli per questa immagine.</string>
     <!-- Blend Mode help. -->
-    <string name="help_blend">Modalità Fusione: Stile di composizione. Istruzioni: Tocca per scorrere tra le modalità come Moltiplica, Scolora e Sovrapponi.</string>
     <!-- Image Adjustments help. -->
-    <string name="help_adj">Regolazioni Immagine: Messa a punto dell\'aspetto. Istruzioni: Tocca per rivelare i cursori di Opacità, Luminosità, Contrasto e Saturazione.</string>
     <!-- Invert Colors help. -->
-    <string name="help_invert">Inverti Colori: Negativo ad alto contrasto. Istruzioni: Tocca per invertire i colori. I bianchi diventano neri e viceversa—utile per il ricalco.</string>
     <!-- Color Balance help. -->
-    <string name="help_balance">Bilanciamento Colore: Sintonizzazione dei canali RGB. Istruzioni: Tocca per rivelare i cursori per una regolazione precisa di Rosso, Verde e Blu.</string>
     <!-- Eraser Brush help. -->
-    <string name="help_eraser">Pennello Gomma: Rimuovi il contenuto del livello. Istruzioni: Dipingi sullo schermo per cancellare. Usa il pulsante \'Dimensione\' per regolare il diametro.</string>
     <!-- Blur/Smudge tool help. -->
-    <string name="help_blur">Strumento Sfoca/Sfumino: Sfuma i colori. Istruzioni: Dipingi su regioni per ammorbidire i bordi o sfumare i dettagli insieme.</string>
     <!-- Warp Tool help. -->
-    <string name="help_liquify">Strumento Altera: Rimodella il design. Istruzioni: Trascina sullo schermo per spingere e tirare i pixel—ottimo per regolare le proporzioni.</string>
     <!-- Dodge Tool help. -->
-    <string name="help_dodge">Strumento Scherma: Schiarisci le aree. Istruzioni: Dipingi sulle parti del livello per aumentare la loro luminosità.</string>
     <!-- Burn Tool help. -->
-    <string name="help_burn">Strumento Brucia: Scurisci le aree. Istruzioni: Dipingi sulle parti del livello per diminuire la loro luminosità.</string>
     <!-- Isolate Subject help. -->
-    <string name="help_iso">Isola Soggetto: Rimozione automatica dello sfondo. Istruzioni: Tocca per estrarre il soggetto principale dal suo sfondo usando l\'IA.</string>
     <!-- Sketch Outline help. -->
-    <string name="help_line">Contorno Schizzo: Filtro line art. Istruzioni: Tocca per convertire la foto in un contorno trasparente in bianco e nero.</string>
     <!-- Layer Help toggle help. -->
 
     <!-- Unit labels -->
@@ -572,7 +545,6 @@
     <string name="settings_scan_mode_cloud_offset">Offset nuvola</string>
     <string name="settings_reset_tutorials_label">Reimposta tutorial</string>
     <string name="settings_reset_tutorials_value">Mostra di nuovo le guide iniziali</string>
-    <string name="help_cloud_offset">Trasferimento offset ancora: tracciamento ad alta precisione della nuvola di punti per murales su larga scala. Istruzioni: completa la scansione a 360°, poi tocca per posizionare l\'ancora.</string>
     <string-array name="onboarding_trace">
         <item>Questa è la modalità Ricalco.</item>
         <item>Tocca «Apri» per aggiungere il tuo primo livello. Una volta inserito, pizzica e trascina sulla tela per ridimensionarlo e posizionarlo.</item>

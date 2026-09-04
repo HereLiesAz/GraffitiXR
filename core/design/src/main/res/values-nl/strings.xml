@@ -433,19 +433,14 @@
 
     <string name="help_trace">Lightbox-modus: traceeroppervlak met hoge helderheid. Instructies: Plaats papier over het scherm en trek over. Druk snel op Volume Omhoog, Omlaag, Omhoog, Omlaag om af te sluiten.</string>
 
-    <string name="help_target_host">Doelbeheer: hulpmiddelen voor AR-ankers. Instructies: Tik om toegang te krijgen tot hulpmiddelen voor het maken of opnieuw uitlijnen van de positie van de muurschildering.</string>
 
-    <string name="help_scan_mode_toggle">Scanresolutie: Schakel tussen Muurschildering (grootschalig) en Canvas (kleinschalig). Muurschildering gebruikt Gaussiaanse markeringen voor muren; Canvas gebruikt puntenwolken voor gedetailleerde kunst op bureauschaal.</string>
 
     <string name="help_create">Anker maken: Maak een foto van een markering op de muur om de projectie te vergrendelen. Instructies: Wijs naar een duidelijke textuur en tik erop. De app houdt deze markering bij.</string>
 
-    <string name="help_design_host">Laagbeheer: voeg afbeeldingen, tekst of schetsen toe. Instructies: Tik om uit te vouwen. Druk lang op een laagknop om het secundaire menu te openen.</string>
 
     <string name="help_add_img">Afbeelding importeren: Voeg een schets- of referentiefoto toe. Instructies: Selecteer een afbeelding uit uw galerij. Het zal verschijnen als een nieuwe ontwerplaag.</string>
 
-    <string name="help_add_draw">Nieuwe schets: voeg een lege laag toe voor tekenen uit de vrije hand. Instructies: Selecteer de laag om de gereedschappen Penseel, Gum en Uitsmeren weer te geven.</string>
 
-    <string name="help_add_text">Tekst toevoegen: Maak een typografielaag. Instructies: Tik op de knop \'Bewerken\' van de laag om de inhoud en opmaak te wijzigen.</string>
 
     <string name="help_wall">Wand wijzigen: stel de achtergrond in voor de Mockup-modus. Instructies: Selecteer een foto van de fysieke muur waarop u wilt schilderen.</string>
 
@@ -466,51 +461,29 @@
     <string name="help_lock_trace">Vergrendelen/bevriezen: Voorkom onbedoelde wijzigingen. Instructies: Schakelt in de Trace-modus het scherm uit. In andere modi worden laagtransformaties vergrendeld.</string>
 
 
-    <string name="help_layer">Laag \'%1$s\': Actief muurschilderingelement. Instructies: Tik om te selecteren. Sleep de knop omhoog/omlaag om de volgorde te wijzigen. Transformeer op het scherm met gebaren.</string>
 
 
 
-    <string name="help_edit_text">Tekst bewerken: verander woorden in de typografielaag. Instructies: Tik om het toetsenbord te openen en de tekstinhoud bij te werken.</string>
 
-    <string name="help_size">Penseel-/tekstgrootte: pas de schaal en zachtheid aan. Instructies: Sleep omhoog/omlaag voor de maat. Sleep naar links/rechts voor penseelbevedering.</string>
 
-    <string name="help_font">Lettertypekiezer: Selecteer typografiestijl. Instructies: Tik om door de beschikbare lettertypen te bladeren en deze op de tekstlaag toe te passen.</string>
 
-    <string name="help_color">Kleurtool: actieve kleur instellen. Instructies: Sleep omhoog/omlaag voor helderheid, naar links/rechts voor verzadiging. Tik voor het volledige kleurenwiel.</string>
 
-    <string name="help_kern">Tekstspatiëring: Pas de letterafstand aan. Instructies: Sleep naar links/rechts om de tekstlay-out strakker of losser te maken.</string>
 
-    <string name="help_bold">Vet schakelen: dik lettertype. Instructies: Tik om de vetgedrukte stijl op de actieve tekstlaag in of uit te schakelen.</string>
 
-    <string name="help_italic">Cursief schakelen: schuine styling. Instructies: Tik om de cursieve stijl op de actieve tekstlaag in of uit te schakelen.</string>
 
-    <string name="help_outline">Tekstoverzicht: tekenstreek. Instructies: Tik om te schakelen tussen een zichtbare omtrek rond de teksttekens.</string>
 
-    <string name="help_shadow">Slagschaduw: tekstdiepte. Instructies: Tik om een ​​zachte schaduw achter de typografie in te schakelen voor een betere leesbaarheid.</string>
 
-    <string name="help_stencil_gen">Genereer stencil: maak afdrukbare sjablonen. Instructies: Tik op om het genereren van meerlaagse stencils voor deze afbeelding te starten.</string>
 
-    <string name="help_blend">Mengmodus: samengestelde stijl. Instructies: Tik om door modi zoals Vermenigvuldigen, Scherm en Overlay te bladeren.</string>
 
-    <string name="help_adj">Beeldaanpassingen: Pas het uiterlijk aan. Instructies: Tik om schuifregelaars voor Dekking, Helderheid, Contrast en Verzadiging weer te geven.</string>
 
-    <string name="help_invert">Kleuren omkeren: negatief met hoog contrast. Instructies: Tik om kleuren om te draaien. Blanken worden zwart en omgekeerd – handig voor tracering.</string>
 
-    <string name="help_balance">Kleurbalans: RGB-kanaalafstemming. Instructies: Tik om schuifregelaars weer te geven voor nauwkeurige aanpassing van Rood, Groen en Blauw.</string>
 
-    <string name="help_eraser">Gumpenseel: verwijder de laaginhoud. Instructies: Verf op het scherm om te wissen. Gebruik de knop \'Grootte\' om de diameter aan te passen.</string>
 
-    <string name="help_blur">Gereedschap Vervagen/vlekken: kleuren mengen. Instructies: Verf over gebieden om randen te verzachten of details samen te vegen.</string>
 
-    <string name="help_liquify">Verdraaitool: ontwerp opnieuw vormgeven. Instructies: Sleep op het scherm om pixels te duwen en te trekken, ideaal voor het aanpassen van de verhoudingen.</string>
 
-    <string name="help_dodge">Dodge Tool: gebieden lichter maken. Instructies: Verf delen van de laag om de helderheid ervan te vergroten.</string>
 
-    <string name="help_burn">Gereedschap Branden: gebieden donkerder maken. Instructies: Verf over delen van de laag om de helderheid ervan te verminderen.</string>
 
-    <string name="help_iso">Isoleer onderwerp: automatische achtergrondverwijdering. Instructies: Tik om het hoofdonderwerp uit de achtergrond te halen met behulp van AI.</string>
 
-    <string name="help_line">Schetsoverzicht: lijntekeningenfilter. Instructies: Tik op om de foto om te zetten in een zwart-wit transparante omtrek.</string>
 
 
 
@@ -572,7 +545,6 @@
     <string name="settings_scan_mode_cloud_offset">Wolk-offset</string>
     <string name="settings_reset_tutorials_label">Tutorials resetten</string>
     <string name="settings_reset_tutorials_value">Introductiegidsen opnieuw weergeven</string>
-    <string name="help_cloud_offset">Ankerverschuiving-overdracht: puntenwolktracking met hoge precisie voor grootschalige muurschilderingen. Instructies: voltooi de 360°-scan en tik dan om het anker te plaatsen.</string>
     <string-array name="onboarding_trace">
         <item>Dit is de Spoor-modus.</item>
         <item>Tik op \'Open\' om je eerste laag toe te voegen. Zodra deze is toegevoegd, kun je knijpen en slepen op het canvas om hem te schalen en te plaatsen.</item>

@@ -433,19 +433,14 @@
     <!-- Lightbox Mode help text. -->
     <string name="help_trace">Modo Mesa de Luz: Superficie de calco de alto brillo. Instrucciones: Coloca papel sobre la pantalla y calca. Pulsa Subir, Bajar, Subir, Bajar el volumen rápido para salir.</string>
     <!-- Target Management help text. -->
-    <string name="help_target_host">Gestión de Objetivos: Herramientas para anclajes AR. Instrucciones: Toca para acceder a herramientas para crear o realinear la posición del mural.</string>
     <!-- Scan Resolution help text. -->
-    <string name="help_scan_mode_toggle">Resolución de Escaneo: Cambia entre Mural (gran escala) y Lienzo (pequeña escala). Mural usa Splats Gaussianos para paredes; Lienzo usa Nubes de Puntos para arte detallado de escritorio.</string>
     <!-- Create Anchor help text. -->
     <string name="help_create">Crear Anclaje: Fotografía una marca en la pared para bloquear proyección. Instrucciones: Apunta a una textura distinta y toca. La app seguirá esta marca.</string>
     <!-- Layer Management help text. -->
-    <string name="help_design_host">Gestión de Capas: Añade imágenes, texto o bocetos. Instrucciones: Toca para expandir. Mantén presionado cualquier botón de capa para abrir su menú secundario.</string>
     <!-- Import Image help text. -->
     <string name="help_add_img">Importar Imagen: Añade un boceto o foto de referencia. Instrucciones: Selecciona una imagen de tu galería. Aparecerá como una nueva capa de diseño.</string>
     <!-- New Sketch help text. -->
-    <string name="help_add_draw">Nuevo Boceto: Añade capa en blanco para dibujar a mano alzada. Instrucciones: Selecciona la capa para revelar herramientas de pincel, borrador y difuminado.</string>
     <!-- Add Text help text. -->
-    <string name="help_add_text">Añadir Texto: Crea capa de tipografía. Instrucciones: Toca el botón \'Editar\' de la capa para cambiar contenido y formato.</string>
     <!-- Change Wall help text. -->
     <string name="help_wall">Cambiar Pared: Establece fondo para modo Maqueta. Instrucciones: Selecciona una foto de la pared física que planeas pintar.</string>
     <!-- Project Management help text. -->
@@ -466,51 +461,29 @@
     <string name="help_lock_trace">Bloquear/Congelar: Evita cambios accidentales. Instrucciones: En modo Calco, desactiva la pantalla. En otros modos, bloquea las transformaciones de capa.</string>
     <!-- Interactive \'Help\' help text. -->
     <!-- Individual Layer help text. -->
-    <string name="help_layer">Capa \'%1$s\': Elemento activo del mural. Instrucciones: Toca para seleccionar. Arrastra botón arriba/abajo para reordenar. Transforma en pantalla con gestos.</string>
 
     <!-- Help strings for layer-specific tools. -->
     <!-- Edit Text tool help. -->
-    <string name="help_edit_text">Editar Texto: Cambia palabras en capa de tipografía. Instrucciones: Toca para abrir teclado y actualizar contenido.</string>
     <!-- Brush/Text Size tool help. -->
-    <string name="help_size">Tamaño de Pincel/Texto: Ajusta escala y suavidad. Instrucciones: Arrastra arriba/abajo para tamaño. Arrastra izquierda/derecha para difuminado.</string>
     <!-- Font Picker tool help. -->
-    <string name="help_font">Selector de Fuentes: Elige estilo tipográfico. Instrucciones: Toca para explorar fuentes disponibles y aplicarlas.</string>
     <!-- Color Tool help. -->
-    <string name="help_color">Herramienta Color: Establecer color activo. Instrucciones: Arrastra arriba/abajo para brillo, izquierda/derecha para saturación. Toca para rueda de colores completa.</string>
     <!-- Text Kerning tool help. -->
-    <string name="help_kern">Interletraje: Ajusta espacio entre letras. Instrucciones: Arrastra izquierda/derecha para apretar o aflojar disposición de texto.</string>
     <!-- Bold Toggle help. -->
-    <string name="help_bold">Negrita: Grosor grueso de fuente. Instrucciones: Toca para alternar estilo negrita en capa de texto activa.</string>
     <!-- Italic Toggle help. -->
-    <string name="help_italic">Cursiva: Estilo inclinado. Instrucciones: Toca para alternar estilo cursiva en capa de texto activa.</string>
     <!-- Text Outline toggle help. -->
-    <string name="help_outline">Contorno de Texto: Trazo de caracteres. Instrucciones: Toca para alternar contorno visible alrededor de caracteres de texto.</string>
     <!-- Drop Shadow toggle help. -->
-    <string name="help_shadow">Sombra: Profundidad de texto. Instrucciones: Toca para alternar sombra suave detrás de tipografía para mejor legibilidad.</string>
     <!-- Generate Stencil help. -->
-    <string name="help_stencil_gen">Generar Plantilla: Crea plantillas imprimibles. Instrucciones: Toca para comenzar generación de plantilla multicapa para esta imagen.</string>
     <!-- Blend Mode help. -->
-    <string name="help_blend">Modo de Mezcla: Estilo de composición. Instrucciones: Toca para recorrer modos como Multiplicar, Trama y Superponer.</string>
     <!-- Image Adjustments help. -->
-    <string name="help_adj">Ajustes de Imagen: Afinar apariencia. Instrucciones: Toca para revelar deslizadores de Opacidad, Brillo, Contraste y Saturación.</string>
     <!-- Invert Colors help. -->
-    <string name="help_invert">Invertir Colores: Negativo de alto contraste. Instrucciones: Toca para invertir colores. Blancos se vuelven negros y viceversa—útil para calcar.</string>
     <!-- Color Balance help. -->
-    <string name="help_balance">Balance de Color: Ajuste de canales RGB. Instrucciones: Toca para revelar deslizadores para ajuste preciso de Rojo, Verde y Azul.</string>
     <!-- Eraser Brush help. -->
-    <string name="help_eraser">Borrador: Eliminar contenido de capa. Instrucciones: Pinta en pantalla para borrar. Usa botón \'Tamaño\' para ajustar diámetro.</string>
     <!-- Blur/Smudge tool help. -->
-    <string name="help_blur">Desenfocar/Difuminar: Mezclar colores. Instrucciones: Pinta sobre regiones para suavizar bordes o difuminar detalles juntos.</string>
     <!-- Warp Tool help. -->
-    <string name="help_liquify">Herramienta Licuar: Remodelar diseño. Instrucciones: Arrastra en pantalla para empujar y tirar píxeles—ideal para ajustar proporciones.</string>
     <!-- Dodge Tool help. -->
-    <string name="help_dodge">Herramienta Sobreexponer: Aclarar áreas. Instrucciones: Pinta sobre partes de la capa para aumentar su luminosidad.</string>
     <!-- Burn Tool help. -->
-    <string name="help_burn">Herramienta Subexponer: Oscurecer áreas. Instrucciones: Pinta sobre partes de la capa para disminuir su luminosidad.</string>
     <!-- Isolate Subject help. -->
-    <string name="help_iso">Aislar Sujeto: Eliminación automática de fondo. Instrucciones: Toca para extraer sujeto principal de su fondo usando IA.</string>
     <!-- Sketch Outline help. -->
-    <string name="help_line">Boceto de Contorno: Filtro de arte de línea. Instrucciones: Toca para convertir foto en contorno transparente blanco y negro.</string>
     <!-- Layer Help toggle help. -->
 
     <!-- Unit labels -->
@@ -572,7 +545,6 @@
     <string name="settings_scan_mode_cloud_offset">Desplazamiento de nube</string>
     <string name="settings_reset_tutorials_label">Restablecer tutoriales</string>
     <string name="settings_reset_tutorials_value">Mostrar de nuevo las guías iniciales</string>
-    <string name="help_cloud_offset">Transferencia de desplazamiento de ancla: seguimiento de nube de puntos de alta precisión para murales a gran escala. Instrucciones: completa el escaneo de 360° y luego toca para colocar el ancla.</string>
     <string-array name="onboarding_trace">
         <item>Este es el modo Calco.</item>
         <item>Toca «Abrir» para añadir tu primera capa. Una vez añadida, pellizca y arrastra sobre el lienzo para ajustar su tamaño y posición.</item>

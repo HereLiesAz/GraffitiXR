@@ -433,19 +433,14 @@
     <!-- Lightbox Mode help text. -->
     <string name="help_trace">Lysboksmodus: Sporingsoverflate med høy lysstyrke. Instruksjoner: Legg papir over skjermen og spor. Trykk raskt Volum Opp, Ned, Opp, Ned for å avslutte.</string>
     <!-- Target Management help text. -->
-    <string name="help_target_host">Målstyring: Verktøy for AR-ankre. Instruksjoner: Trykk for å få tilgang til verktøy for å lage eller justere veggmaleriets posisjon.</string>
     <!-- Scan Resolution help text. -->
-    <string name="help_scan_mode_toggle">Skanneoppløsning: Bytt mellom veggmaleri (stor skala) og lerret (liten skala). Veggmaleri bruker Gaussian Splats for vegger; Canvas bruker Point Clouds for detaljert kunst på skrivebordsskala.</string>
     <!-- Create Anchor help text. -->
     <string name="help_create">Lag anker: Fotografer et merke på veggen for å låse projeksjonen. Instruksjoner: Pek på en distinkt tekstur og trykk. Appen vil spore dette merket.</string>
     <!-- Layer Management help text. -->
-    <string name="help_design_host">Lagbehandling: Legg til bilder, tekst eller skisser. Instruksjoner: Trykk for å utvide. Trykk lenge på hvilken som helst lagknapp for å åpne sekundærmenyen.</string>
     <!-- Import Image help text. -->
     <string name="help_add_img">Importer bilde: Legg til en skisse eller referansebilde. Instruksjoner: Velg et bilde fra galleriet ditt. Det vil vises som et nytt designlag.</string>
     <!-- New Sketch help text. -->
-    <string name="help_add_draw">Ny skisse: Legg til et tomt lag for frihåndstegning. Instruksjoner: Velg laget for å avsløre pensel-, viskelær- og flekkerverktøy.</string>
     <!-- Add Text help text. -->
-    <string name="help_add_text">Legg til tekst: Lag et typografilag. Instruksjoner: Trykk på lagets \'Rediger\'-knapp for å endre innhold og formatering.</string>
     <!-- Change Wall help text. -->
     <string name="help_wall">Endre vegg: Angi bakgrunn for Mockup-modus. Instruksjoner: Velg et bilde av den fysiske veggen du planlegger å male på.</string>
     <!-- Project Management help text. -->
@@ -466,51 +461,29 @@
     <string name="help_lock_trace">Lås/frys: Forhindr tilfeldige endringer. Instruksjoner: I sporingsmodus, deaktiverer skjermen. I andre moduser, låser laget transformeres.</string>
     <!-- Interactive 'Help' help text. -->
     <!-- Individual Layer help text. -->
-    <string name="help_layer">Lag \'%1$s\': Aktivt veggmalerielement. Instruksjoner: Trykk for å velge. Dra knappen opp/ned for å omorganisere. Transformer på skjermen med bevegelser.</string>
 
     <!-- Help strings for layer-specific tools. -->
     <!-- Edit Text tool help. -->
-    <string name="help_edit_text">Rediger tekst: Endre ord i typografilaget. Instruksjoner: Trykk for å åpne tastaturet og oppdatere tekstinnholdet.</string>
     <!-- Brush/Text Size tool help. -->
-    <string name="help_size">Pensel/tekststørrelse: Juster skala og mykhet. Instruksjoner: Dra opp/ned for størrelse. Dra til venstre/høyre for penselfjæring.</string>
     <!-- Font Picker tool help. -->
-    <string name="help_font">Fontvelger: Velg typografistil. Instruksjoner: Trykk for å bla gjennom tilgjengelige skrifter og bruke dem på tekstlaget.</string>
     <!-- Color Tool help. -->
-    <string name="help_color">Fargeverktøy: Angi aktiv farge. Instruksjoner: Dra opp/ned for lysstyrke, venstre/høyre for metning. Trykk for fullfargehjul.</string>
     <!-- Text Kerning tool help. -->
-    <string name="help_kern">Tekstkjerning: Juster bokstavavstanden. Instruksjoner: Dra til venstre/høyre for å stramme eller løsne tekstoppsettet.</string>
     <!-- Bold Toggle help. -->
-    <string name="help_bold">Fet veksling: Tykk skriftvekt. Instruksjoner: Trykk for å bytte fet stil på det aktive tekstlaget.</string>
     <!-- Italic Toggle help. -->
-    <string name="help_italic">Kursiv Toggle: Skråstilt. Instruksjoner: Trykk for å bytte kursiv stil på det aktive tekstlaget.</string>
     <!-- Text Outline toggle help. -->
-    <string name="help_outline">Tekstomriss: Tegnstrek. Instruksjoner: Trykk for å bytte en synlig kontur rundt teksttegnene.</string>
     <!-- Drop Shadow toggle help. -->
-    <string name="help_shadow">Drop Shadow: Tekstdybde. Instruksjoner: Trykk for å veksle mellom en myk skygge bak typografien for bedre lesbarhet.</string>
     <!-- Generate Stencil help. -->
-    <string name="help_stencil_gen">Generer sjablong: Lag utskrivbare maler. Instruksjoner: Trykk for å starte generering av flerlags sjablong for dette bildet.</string>
     <!-- Blend Mode help. -->
-    <string name="help_blend">Blandingsmodus: Sammensatt stil. Instruksjoner: Trykk for å bla gjennom moduser som Multiplisere, Skjerm og Overlegg.</string>
     <!-- Image Adjustments help. -->
-    <string name="help_adj">Bildejusteringer: Finjuster utseendet. Instruksjoner: Trykk for å avsløre glidebryterne for opasitet, lysstyrke, kontrast og metning.</string>
     <!-- Invert Colors help. -->
-    <string name="help_invert">Inverter farger: Negativ med høy kontrast. Instruksjoner: Trykk for å snu farger. Hvite blir svarte og omvendt – nyttig for sporing.</string>
     <!-- Color Balance help. -->
-    <string name="help_balance">Fargebalanse: RGB-kanalinnstilling. Instruksjoner: Trykk for å avsløre glidebryterne for nøyaktig rød, grønn og blå justering.</string>
     <!-- Eraser Brush help. -->
-    <string name="help_eraser">Eraser Brush: Fjern laginnhold. Instruksjoner: Mal på skjermen for å slette. Bruk \'Størrelse\'-knappen for å justere diameteren.</string>
     <!-- Blur/Smudge tool help. -->
-    <string name="help_blur">Verktøy for uskarphet/flekker: Bland farger. Instruksjoner: Mal over områder for å myke opp kanter eller flette ut detaljer sammen.</string>
     <!-- Warp Tool help. -->
-    <string name="help_liquify">Warp Tool: Omform design. Instruksjoner: Dra på skjermen for å skyve og trekke piksler – flott for å justere proporsjoner.</string>
     <!-- Dodge Tool help. -->
-    <string name="help_dodge">Dodge Tool: Gjør områder lysere. Instruksjoner: Mal over deler av laget for å øke luminansen.</string>
     <!-- Burn Tool help. -->
-    <string name="help_burn">Brennverktøy: Gjør områder mørkere. Instruksjoner: Mal over deler av laget for å redusere luminansen.</string>
     <!-- Isolate Subject help. -->
-    <string name="help_iso">Isoler Emne: Automatisk fjerning av bakgrunn. Instruksjoner: Trykk for å trekke ut hovedmotivet fra bakgrunnen ved hjelp av AI.</string>
     <!-- Sketch Outline help. -->
-    <string name="help_line">Sketch Outline: Line art-filter. Instruksjoner: Trykk for å konvertere bildet til en svart-hvitt gjennomsiktig kontur.</string>
     <!-- Layer Help toggle help. -->
 
     <!-- Unit labels -->
@@ -572,7 +545,6 @@
     <string name="settings_scan_mode_cloud_offset">Sky-forskyvning</string>
     <string name="settings_reset_tutorials_label">Tilbakestill veiledninger</string>
     <string name="settings_reset_tutorials_value">Vis oppstartsveiledningene igjen</string>
-    <string name="help_cloud_offset">Ankerforskyvning-overføring: Høypresisjons punktsky-sporing for storskala veggmalerier. Instruksjoner: Fullfør 360°-skanningen, trykk deretter for å plassere ankeret.</string>
     <string-array name="onboarding_trace">
         <item>Dette er Spor-modus.</item>
         <item>Trykk på «Åpne» for å legge til det første laget ditt. Når det er lagt til, kan du klype og dra på lerretet for å skalere og plassere det.</item>

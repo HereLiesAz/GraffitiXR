@@ -55,6 +55,17 @@ fixed this pass:
   file that *is* wired — carried zero real rules despite owning `Fingerprint`, which is constructed
   from native via a frozen JNI factory. Added the `Fingerprint` keep rules there so they travel with
   the class that needs them, rather than living only in the app's copy.
+- **Removed confirmed-zero-caller dead code found during this pass:** the `mobilegs::exportFingerprint`
+  /`alignToFingerprint` free-function wrappers in `MobileGS.cpp` (unlocked reads of `gSlamEngine` —
+  the real, correctly-locked callers are `MobileGS::exportFingerprint`/`alignToFingerprint`, called
+  directly under `gEngineMutex` from `GraffitiJNI.cpp`; the wrapper namespace had no callers and no
+  header declaration anywhere); the eight inert `core/nativebridge/libs/litert_npu_runtime_libraries/`
+  Gradle modules (never `include()`d in `settings.gradle.kts`, one of them declaring a
+  `:core:nativebridge`→`:app` dependency inversion that would have mattered had it ever been wired
+  in) and the now-unused `android-dynamic-feature` plugin alias they were the only reference to; and
+  28 unused `AppStrings.Help` fields (`targetHost` through `cloudOffset` — an old per-layer
+  authoring toolset with zero call sites) plus their string resources across all 15 locale
+  `strings.xml` files and the orphaned `ic_ps_liquify.xml` drawable.
 
 #### Dead-features clearance pass
 
@@ -143,15 +154,23 @@ Correctness bugs, worst first:
   `mRelocViewMatrix` copy is *only* race-free today because `gEngineMutex` happens to also
   serialize it against `updateCamera`'s writes to `mViewMatrix` — a plain reader/writer split would
   reintroduce that torn read. Needs its own lock, not just relaxing the JNI one.
-- **A dead AI-glasses subsystem is still fully wired** (~400 LOC: `startGlassesSession` has zero
-  callers, `WearableModule`'s only bound provider can never match the "Meta" name lookup) despite
-  README.md:60 describing it as already removed. Either delete it or actually remove it.
-- **Live docs (`docs/BLUEPRINT.md`, `docs/index.html`, 9+ translated `docs/*/README.md`, and most of
-  `docs/testing.md`/`docs/performance.md`/`docs/ARCHITECTURE.md`/`docs/FEATURE_REFERENCE.md`) still
-  describe the deleted voxel/splat engine, a stencil generator with no source files, and other
-  removed features as shipping.** The 2026-09-04 correction pass touched 5 files; ~25 more still
-  contradict them. Full list with file:line citations is in the docs-cross-consistency audit
-  transcript.
+- **A dead AI-glasses subsystem is still fully wired** — `startGlassesSession` has zero callers and
+  `WearableModule`'s only bound provider can never match its "Meta" name lookup, despite
+  README.md:60 describing the subsystem as already removed. **Re-checked, not a simple deletion**:
+  it's ~640 LOC (per this file's own earlier "Still open" note above), not ~400, and it's tracked
+  there as deliberate WIP (`glassesWorldHitForTimestamp` needs a real glasses-side world lookup —
+  substantial new native/SDK integration — not dead code with no intent behind it). Deleting it
+  reverses that prior decision; that's a product call, not a cleanup. Left for the repo owner:
+  either commit to finishing it or explicitly kill it — either way, fix the README claim to match
+  whichever is chosen.
+- ~~Live docs still describe the deleted voxel/splat engine, a stencil generator with no source
+  files, and other removed features as shipping~~ — **fixed.** All core English docs
+  (`ARCHITECTURE.md`, `BLUEPRINT.md`, `file_descriptions.md`, `performance.md`, `testing.md`,
+  `contributing.md`, `API_REFERENCE.md`, `AUDIT.md`, `FUTURE_STRATEGY.md`, `FEATURE_REFERENCE.md`,
+  `en/USER_FLOW.md`, `en/screens.md`, `misc.md`, `RELOC_MAP_DESIGN.md`, `STENCILS.md`,
+  `en/PRIVACY_POLICY.md`), the live marketing site (`index.html`, `fr/index.html`), and every
+  localized doc (13 languages) have been corrected and swept clean by direct grep verification —
+  see the doc-accuracy-pass PRs.
 
 Conceptual, needs a product decision rather than a code fix:
 

@@ -433,19 +433,14 @@
     <!-- Lightbox Mode help text. -->
     <string name="help_trace">Leuchtkasten-Modus: Pausoberfläche mit hoher Helligkeit. Anweisungen: Legen Sie Papier auf den Bildschirm und pausen Sie ab. Drücken Sie schnell Lautstärke Hoch, Runter, Hoch, Runter, um zu beenden.</string>
     <!-- Target Management help text. -->
-    <string name="help_target_host">Zielverwaltung: Werkzeuge für AR-Anker. Anweisungen: Tippen Sie, um auf Werkzeuge zum Erstellen oder Neuausrichten der Position des Wandbildes zuzugreifen.</string>
     <!-- Scan Resolution help text. -->
-    <string name="help_scan_mode_toggle">Scanauflösung: Wechseln Sie zwischen Wandbild (großer Maßstab) und Leinwand (kleiner Maßstab). Wandbild verwendet Gaussian Splats für Wände; Leinwand verwendet Punktwolken für detaillierte Kunst im Schreibtischmaßstab.</string>
     <!-- Create Anchor help text. -->
     <string name="help_create">Anker erstellen: Fotografieren Sie eine Marke an der Wand, um die Projektion zu arretieren. Anweisungen: Zielen Sie auf eine deutlich sichtbare Textur und tippen Sie. Die App verfolgt diese Marke.</string>
     <!-- Layer Management help text. -->
-    <string name="help_design_host">Ebenenverwaltung: Bilder, Text oder Skizzen hinzufügen. Anweisungen: Tippen Sie zum Erweitern. Drücken Sie lange auf eine beliebige Ebenenschaltfläche, um ihr sekundäres Menü zu öffnen.</string>
     <!-- Import Image help text. -->
     <string name="help_add_img">Bild importieren: Fügen Sie eine Skizze oder ein Referenzfoto hinzu. Anweisungen: Wählen Sie ein Bild aus Ihrer Galerie. Es erscheint als neue Designebene.</string>
     <!-- New Sketch help text. -->
-    <string name="help_add_draw">Neue Skizze: Fügen Sie eine leere Ebene für Freihandzeichnungen hinzu. Anweisungen: Wählen Sie die Ebene aus, um Pinsel-, Radiergummi- und Wischwerkzeuge anzuzeigen.</string>
     <!-- Add Text help text. -->
-    <string name="help_add_text">Text hinzufügen: Erstellen Sie eine Typografieebene. Anweisungen: Tippen Sie auf die Schaltfläche \'Bearbeiten\' der Ebene, um Inhalt und Formatierung zu ändern.</string>
     <!-- Change Wall help text. -->
     <string name="help_wall">Wand ändern: Legen Sie den Hintergrund für den Mockup-Modus fest. Anweisungen: Wählen Sie ein Foto der physischen Wand aus, die Sie bemalen möchten.</string>
     <!-- Project Management help text. -->
@@ -466,51 +461,29 @@
     <string name="help_lock_trace">Sperren/Einfrieren: Verhindern Sie versehentliche Änderungen. Anweisungen: Im Pause-Modus wird der Bildschirm deaktiviert. In anderen Modi werden Ebenentransformationen gesperrt.</string>
     <!-- Interactive 'Help' help text. -->
     <!-- Individual Layer help text. -->
-    <string name="help_layer">Ebene \'%1$s\': Aktives Wandbildelement. Anweisungen: Tippen Sie zum Auswählen. Ziehen Sie die Schaltfläche nach oben/unten, um die Reihenfolge zu ändern. Transformieren Sie auf dem Bildschirm mit Gesten.</string>
 
     <!-- Help strings for layer-specific tools. -->
     <!-- Edit Text tool help. -->
-    <string name="help_edit_text">Text bearbeiten: Ändern Sie Wörter in der Typografieebene. Anweisungen: Tippen Sie, um die Tastatur zu öffnen und den Textinhalt zu aktualisieren.</string>
     <!-- Brush/Text Size tool help. -->
-    <string name="help_size">Pinsel-/Textgröße: Passen Sie Maßstab und Weichheit an. Anweisungen: Ziehen Sie für die Größe nach oben/unten. Ziehen Sie für die Pinselweichzeichnung nach links/rechts.</string>
     <!-- Font Picker tool help. -->
-    <string name="help_font">Schriftauswahl: Wählen Sie den Typografiestil. Anweisungen: Tippen Sie, um verfügbare Schriftarten zu durchsuchen und sie auf die Textebene anzuwenden.</string>
     <!-- Color Tool help. -->
-    <string name="help_color">Farbwerkzeug: Aktive Farbe festlegen. Anweisungen: Ziehen Sie nach oben/unten für die Helligkeit, nach links/rechts für die Sättigung. Tippen Sie für das vollständige Farbrad.</string>
     <!-- Text Kerning tool help. -->
-    <string name="help_kern">Textunterschneidung: Zeichenabstand anpassen. Anweisungen: Ziehen Sie nach links/rechts, um das Textlayout zu verengen oder zu lockern.</string>
     <!-- Bold Toggle help. -->
-    <string name="help_bold">Fett-Umschalter: Dicke Schriftstärke. Anweisungen: Tippen Sie, um die fette Formatierung auf der aktiven Textebene umzuschalten.</string>
     <!-- Italic Toggle help. -->
-    <string name="help_italic">Kursiv-Umschalter: Schräg gestellte Formatierung. Anweisungen: Tippen Sie, um die kursive Formatierung auf der aktiven Textebene umzuschalten.</string>
     <!-- Text Outline toggle help. -->
-    <string name="help_outline">Textumriss: Zeichenkontur. Anweisungen: Tippen Sie, um einen sichtbaren Umriss um die Textzeichen umzuschalten.</string>
     <!-- Drop Shadow toggle help. -->
-    <string name="help_shadow">Schlagschatten: Texttiefe. Anweisungen: Tippen Sie, um für eine bessere Lesbarkeit einen weichen Schatten hinter der Typografie umzuschalten.</string>
     <!-- Generate Stencil help. -->
-    <string name="help_stencil_gen">Schablone generieren: Erstellen Sie druckbare Vorlagen. Anweisungen: Tippen Sie, um mit der mehrschichtigen Schablonengenerierung für dieses Bild zu beginnen.</string>
     <!-- Blend Mode help. -->
-    <string name="help_blend">Mischmodus: Zusammensetzungsstil. Anweisungen: Tippen Sie, um durch Modi wie Multiplizieren, Negativ multiplizieren und Ineinanderkopieren zu wechseln.</string>
     <!-- Image Adjustments help. -->
-    <string name="help_adj">Bildanpassungen: Erscheinungsbild feinabstimmen. Anweisungen: Tippen Sie, um Schieberegler für Deckkraft, Helligkeit, Kontrast und Sättigung anzuzeigen.</string>
     <!-- Invert Colors help. -->
-    <string name="help_invert">Farben umkehren: Kontrastreiches Negativ. Anweisungen: Tippen Sie, um Farben umzuwandeln. Weißtöne werden schwarz und umgekehrt – nützlich zum Abpausen.</string>
     <!-- Color Balance help. -->
-    <string name="help_balance">Farbbalance: RGB-Kanal-Abstimmung. Anweisungen: Tippen Sie, um Schieberegler für die präzise Anpassung von Rot, Grün und Blau anzuzeigen.</string>
     <!-- Eraser Brush help. -->
-    <string name="help_eraser">Radiergummi: Ebeneninhalt entfernen. Anweisungen: Malen Sie auf dem Bildschirm, um zu radieren. Verwenden Sie die Schaltfläche \'Größe\', um den Durchmesser anzupassen.</string>
     <!-- Blur/Smudge tool help. -->
-    <string name="help_blur">Weichzeichnen-/Wischwerkzeug: Farben mischen. Anweisungen: Malen Sie über Bereiche, um Kanten weicher zu machen oder Details miteinander zu verwischen.</string>
     <!-- Warp Tool help. -->
-    <string name="help_liquify">Verzerrungswerkzeug: Design umformen. Anweisungen: Ziehen Sie auf dem Bildschirm, um Pixel zu verschieben – ideal zum Anpassen von Proportionen.</string>
     <!-- Dodge Tool help. -->
-    <string name="help_dodge">Abwedler: Bereiche aufhellen. Anweisungen: Malen Sie über Teile der Ebene, um deren Luminanz zu erhöhen.</string>
     <!-- Burn Tool help. -->
-    <string name="help_burn">Nachbelichter: Bereiche abdunkeln. Anweisungen: Malen Sie über Teile der Ebene, um deren Luminanz zu verringern.</string>
     <!-- Isolate Subject help. -->
-    <string name="help_iso">Motiv isolieren: Automatische Hintergrundentfernung. Anweisungen: Tippen Sie, um das Hauptmotiv mithilfe von KI aus dem Hintergrund zu extrahieren.</string>
     <!-- Sketch Outline help. -->
-    <string name="help_line">Skizzenumriss: Strichzeichnungsfilter. Anweisungen: Tippen Sie, um das Foto in einen transparenten Schwarzweiß-Umriss zu konvertieren.</string>
     <!-- Layer Help toggle help. -->
 
     <!-- Unit labels -->
@@ -572,7 +545,6 @@
     <string name="settings_scan_mode_cloud_offset">Wolken-Offset</string>
     <string name="settings_reset_tutorials_label">Tutorials zurücksetzen</string>
     <string name="settings_reset_tutorials_value">Einführungshinweise erneut anzeigen</string>
-    <string name="help_cloud_offset">Anker-Offset-Übergabe: Hochpräzises Punktwolken-Tracking für großflächige Wandbilder. Anleitung: Führe zuerst den 360°-Scan durch und tippe dann, um den Anker zu platzieren.</string>
     <string-array name="onboarding_trace">
         <item>Das ist der Pause-Modus.</item>
         <item>Tippe auf „Öffnen“, um deine erste Ebene hinzuzufügen. Sobald sie eingefügt ist, kannst du sie mit Ziehen und Zusammenziehen auf der Leinwand skalieren und platzieren.</item>

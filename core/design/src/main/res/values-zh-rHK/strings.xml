@@ -433,19 +433,14 @@
 
     <string name="help_trace">燈箱模式：高亮度追蹤表面。說明：將紙放在螢幕上並描畫。快速按 音量上、下、上、下 即可退出。</string>
 
-    <string name="help_target_host">目標管理：AR 錨點工具。說明： 點擊可存取用於創建或重新對齊壁畫位置的工具。</string>
 
-    <string name="help_scan_mode_toggle">掃描解析度：在壁畫（大比例）和畫布（小比例）之間切換。壁畫使用 Gaussian Splats 進行牆壁； Canvas 使用點雲來繪製詳細的桌面尺寸藝術。</string>
 
     <string name="help_create">建立錨點：在牆上拍攝一個標記以鎖定投影。說明：指向明顯的紋理並點擊。該應用程式將追蹤該標記。</string>
 
-    <string name="help_design_host">圖層管理：新增圖像、文字或草圖。說明： 點選展開。長按任一圖層按鈕可開啟其二級選單。</string>
 
     <string name="help_add_img">匯入影像：新增草圖或參考照片。說明：從您的圖庫中選擇一張圖像。它將作為一個新的設計層出現。</string>
 
-    <string name="help_add_draw">新建草圖：新增空白圖層以進行手繪。說明： 選擇圖層以顯示畫筆、橡皮擦和塗抹工具。</string>
 
-    <string name="help_add_text">新增文字：建立排版圖層。說明： 點選圖層的「編輯」按鈕來變更內容和格式。</string>
 
     <string name="help_wall">更改牆：設定樣機模式的背景。說明：選擇您打算在其上繪畫的實體牆的照片。</string>
 
@@ -466,51 +461,29 @@
     <string name="help_lock_trace">鎖定/凍結：防止意外變更。說明： 在追蹤模式下，停用螢幕。在其他模式下，鎖定圖層變換。</string>
 
 
-    <string name="help_layer">圖層「%1$s」：活動壁畫元素。說明：點選選擇。向上/向下拖曳按鈕以重新排序。透過手勢在螢幕上變換。</string>
 
 
 
-    <string name="help_edit_text">編輯文字：更改版式圖層中的文字。使用說明：點選開啟鍵盤，更新文字內容。</string>
 
-    <string name="help_size">畫筆/文字大小：調整比例和柔軟度。說明：向上/向下拖曳以調整大小。向左/向右拖曳以進行筆刷羽化。</string>
 
-    <string name="help_font">字體選擇器：選擇排版樣式。說明： 點選可瀏覽可用字體並將其套用至文字圖層。</string>
 
-    <string name="help_color">顏色工具：設定活動顏色。說明：向上/向下拖曳可調整亮度，向左/向右拖曳可調整飽和度。點擊全色輪。</string>
 
-    <string name="help_kern">文字字距調整：調整字母間距。說明：向左/向右拖曳以收緊或放鬆文字佈局。</string>
 
-    <string name="help_bold">粗體切換：粗字體粗細。說明： 點選可在活動文字圖層切換粗體樣式。</string>
 
-    <string name="help_italic">斜體切換：傾斜樣式。說明： 點選可在活動文字圖層上切換斜體樣式。</string>
 
-    <string name="help_outline">文字輪廓：字符筆畫。說明：點選可切換文字字元周圍的可見輪廓。</string>
 
-    <string name="help_shadow">投影：文字深度。說明：點選可在版式後方切換軟陰影，以獲得更好的易讀性。</string>
 
-    <string name="help_stencil_gen">產生模板：建立可列印模板。說明： 點選開始為此圖片產生多層模板。</string>
 
-    <string name="help_blend">混合模式：複合風格。說明：點選可循環選擇「正片疊底」、「螢幕」和「疊加」等模式。</string>
 
-    <string name="help_adj">影像調整：微調外觀。說明：點選可顯示不透明度、亮度、對比和飽和度的滑桿。</string>
 
-    <string name="help_invert">反轉顏色：高對比負片。說明： 點選可翻轉顏色。白色變成黑色，反之亦然——對於追蹤很有用。</string>
 
-    <string name="help_balance">色彩平衡：RGB 頻道調整。說明：點擊以顯示滑桿以進行精確的紅色、綠色和藍色調整。</string>
 
-    <string name="help_eraser">橡皮擦刷：刪除圖層內容。說明： 在螢幕上繪畫並擦除。使用“尺寸”按鈕調整直徑。</string>
 
-    <string name="help_blur">模糊/塗抹工具：混合顏色。說明：在區域上繪畫以柔化邊緣或將細節塗抹在一起。</string>
 
-    <string name="help_liquify">變形工具：重塑設計。說明： 在螢幕上拖曳以推動和拉動像素 - 非常適合調整比例。</string>
 
-    <string name="help_dodge">減淡工具：減亮區域。說明：在圖層的某些部分上繪畫以增加其亮度。</string>
 
-    <string name="help_burn">加深工具：使區域變暗。說明：在圖層的某些部分上繪畫以降低其亮度。</string>
 
-    <string name="help_iso">隔離主題：自動背景刪除。說明： 點擊以使用人工智慧從背景中提取主要主題。</string>
 
-    <string name="help_line">草圖輪廓：線條藝術濾鏡。使用說明：點選可將照片轉換為黑白透明輪廓。</string>
 
 
 
@@ -572,7 +545,6 @@
     <string name="settings_scan_mode_cloud_offset">點雲偏移</string>
     <string name="settings_reset_tutorials_label">重設教學</string>
     <string name="settings_reset_tutorials_value">重新顯示新手指南</string>
-    <string name="help_cloud_offset">錨點偏移傳遞：適用於大型壁畫的高精度點雲追蹤。操作說明：完成360°掃描後，點按以放置錨點。</string>
     <string-array name="onboarding_trace">
         <item>這是痕跡模式。</item>
         <item>點按「開啟」加入您的第一個圖層。加入後，可在畫布上雙指縮放和拖曳來調整大小和位置。</item>

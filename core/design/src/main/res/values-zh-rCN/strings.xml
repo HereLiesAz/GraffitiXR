@@ -451,19 +451,14 @@
 
     <string name="help_trace">透写台模式：高亮度描摹表面。说明：将纸张放在屏幕上进行描摹。快速按 音量上、下、上、下 即可退出。</string>
 
-    <string name="help_target_host">目标管理：AR 锚点工具。说明：点按以访问用于创建或重新对齐壁画位置的工具。</string>
 
-    <string name="help_scan_mode_toggle">扫描分辨率：在壁画（大型）和画布（小型）之间切换。壁画模式对面墙使用高斯泼溅；画布对精细的桌面级艺术作品使用点云。</string>
 
     <string name="help_create">创建锚点：拍摄墙上的标记以锁定投影。说明：指向明显的纹理并点按。应用程序将追踪此标记。</string>
 
-    <string name="help_design_host">图层管理：添加图像、文本或草图。说明：点按以展开。长按任何图层按钮以打开其二级菜单。</string>
 
     <string name="help_add_img">导入图像：添加草图或参考照片。说明：从您的图库中选择一张图片。它将作为新的设计图层出现。</string>
 
-    <string name="help_add_draw">新建草图：添加用于手绘的空白图层。说明：选择图层以显示画笔、橡皮擦和涂抹工具。</string>
 
-    <string name="help_add_text">添加文本：创建一个排版图层。说明：点击图层的“编辑”按钮以更改内容和格式。</string>
 
     <string name="help_wall">更换墙壁：设置效果图模式的背景。说明：选择您计划在上面作画的实体墙的照片。</string>
 
@@ -484,51 +479,29 @@
     <string name="help_lock_trace">锁定/冻结：防止意外更改。说明：在透写模式下，禁用屏幕。在其他模式下，锁定图层变换。</string>
 
 
-    <string name="help_layer">图层“%1$s”：活动的壁画元素。说明：点击以选择。向上/向下拖动按钮以重新排序。通过手势在屏幕上进行变换。</string>
 
 
 
-    <string name="help_edit_text">编辑文本：更改排版图层中的文字。说明：点击打开键盘并更新文本内容。</string>
 
-    <string name="help_size">画笔/文本大小：调整比例和柔和度。说明：向上/向下拖动改变大小。向左/向右拖动调整画笔羽化。</string>
 
-    <string name="help_font">字体选择器：选择排版样式。说明：点击浏览可用字体并将其应用于文本图层。</string>
 
-    <string name="help_color">颜色工具：设置当前颜色。说明：向上/向下拖动亮度，向左/向右拖动饱和度。点击打开完整的色轮。</string>
 
-    <string name="help_kern">文本字距：调整字母间距。说明：向左/向右拖动以紧凑或放松文本布局。</string>
 
-    <string name="help_bold">粗体切换：加粗字体。说明：点按以切换活动文本图层上的粗体样式。</string>
 
-    <string name="help_italic">斜体切换：倾斜样式。说明：点按以切换活动文本图层上的斜体样式。</string>
 
-    <string name="help_outline">文本轮廓：字符描边。说明：点击以切换文本字符周围的可见轮廓。</string>
 
-    <string name="help_shadow">投影：文本深度。说明：点击以切换排版背后的柔和阴影，以便于阅读。</string>
 
-    <string name="help_stencil_gen">生成模板：创建可打印的模板。说明：点按开始为此图像生成多层模板。</string>
 
-    <string name="help_blend">混合模式：合成样式。说明：点按循环切换如正片叠底、滤色、叠加等模式。</string>
 
-    <string name="help_adj">图像调整：微调外观。说明：点击显示不透明度、亮度、对比度和饱和度的滑块。</string>
 
-    <string name="help_invert">反色：高对比度负片。说明：点按以翻转颜色。白色变为黑色，反之亦然 — 对于追踪非常有用。</string>
 
-    <string name="help_balance">色彩平衡：RGB 通道调优。说明：点按显示红色、绿色和蓝色的精确调整滑块。</string>
 
-    <string name="help_eraser">橡皮擦画笔：擦除图层内容。说明：在屏幕上绘画以擦除。使用“大小”按钮调整直径。</string>
 
-    <string name="help_blur">模糊/涂抹工具：混合颜色。说明：在区域上绘制以柔化边缘或将细节融合在一起。</string>
 
-    <string name="help_liquify">变形工具：重塑设计。说明：在屏幕上拖动以推拉像素 — 非常适合调整比例。</string>
 
-    <string name="help_dodge">减淡工具：提亮区域。说明：在此图层的部分区域上绘画以增加其亮度。</string>
 
-    <string name="help_burn">加深工具：加深区域。说明：在此图层的部分区域上绘画以降低其亮度。</string>
 
-    <string name="help_iso">分离主体：自动去除背景。说明：点击使用 AI 自动从背景中提取主要主体。</string>
 
-    <string name="help_line">草图轮廓：线条艺术滤镜。说明：点击将照片转换为黑白透明轮廓。</string>
 
 
 
@@ -590,7 +563,6 @@
     <string name="settings_scan_mode_cloud_offset">点云偏移</string>
     <string name="settings_reset_tutorials_label">重置教程</string>
     <string name="settings_reset_tutorials_value">重新显示新手指南</string>
-    <string name="help_cloud_offset">锚点偏移传递：适用于大型壁画的高精度点云追踪。操作说明：完成360°扫描后，点击以放置锚点。</string>
     <string-array name="onboarding_trace">
         <item>这是追踪模式。</item>
         <item>点击“打开”添加你的第一个图层。添加后，可在画布上双指缩放和拖动来调整大小和位置。</item>

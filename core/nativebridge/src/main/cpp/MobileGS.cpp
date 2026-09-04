@@ -1639,17 +1639,6 @@ void MobileGS::scheduleRelocCheck(const cv::Mat& f) {
     mRelocCv.notify_one();
 }
 
-extern MobileGS* gSlamEngine;
-namespace mobilegs {
-    std::vector<uint8_t> exportFingerprint() {
-        if (gSlamEngine) return gSlamEngine->exportFingerprint();
-        return {};
-    }
-    void alignToFingerprint(const uint8_t* data, size_t size) {
-        if (gSlamEngine) gSlamEngine->alignToFingerprint(data, size);
-    }
-}
-
 bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) { return mSuperPoint.load(onnxBytes); }
 bool MobileGS::loadLowLightEnhancer(const std::vector<uchar>& onnxBytes) { return mEnhancer.load(onnxBytes); }
 // Teleological SLAM, stage 1: store the TARGET artwork as the validator reference. Its features +
