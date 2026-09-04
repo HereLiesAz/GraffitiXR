@@ -27,7 +27,7 @@ class HomographyTrackingAnalyzerTest {
             context = mockk<Context>(),
             cameraId = "0",
             tracker = mockk(relaxed = true),
-            onPoseTracked = { callbackInvocations++ },
+            onFrameTracked = { callbackInvocations++ },
         )
 
         val imageProxy = mockk<ImageProxy> {
@@ -38,6 +38,6 @@ class HomographyTrackingAnalyzerTest {
         analyzer.analyze(imageProxy)
 
         verify(exactly = 1) { imageProxy.close() }
-        assertEquals("onPoseTracked must not fire for a frame that was skipped", 0, callbackInvocations)
+        assertEquals("onFrameTracked must not fire for a frame that was skipped", 0, callbackInvocations)
     }
 }

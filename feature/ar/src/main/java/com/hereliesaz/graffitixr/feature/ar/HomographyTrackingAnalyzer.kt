@@ -10,7 +10,11 @@ import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsics
 import com.hereliesaz.graffitixr.common.sensor.CameraIntrinsicsEstimator
 import com.hereliesaz.graffitixr.feature.ar.HomographyArTracker.HomographyPose
 import com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation
+import com.hereliesaz.graffitixr.feature.ar.rendering.ProjectionMatrix
 import com.hereliesaz.graffitixr.nativebridge.YuvConverter
+
+/** One frame's tracked pose plus the GL projection matrix it was solved against — see [HomographyTrackingAnalyzer]. */
+data class HomographyTrackedFrame(val pose: HomographyPose, val projMatrix: FloatArray)
 
 /**
  * The CameraX `ImageAnalysis.Analyzer` that actually drives [BridgedHomographyTracker] from a
@@ -33,7 +37,7 @@ class HomographyTrackingAnalyzer(
     private val context: Context,
     private val cameraId: String,
     private val tracker: BridgedHomographyTracker,
-    private val onPoseTracked: (HomographyPose?) -> Unit,
+    private val onFrameTracked: (HomographyTrackedFrame?) -> Unit,
 ) : ImageAnalysis.Analyzer {
 
     // Reused across frames at a stable resolution — CameraX delivers a fixed ImageAnalysis
@@ -71,7 +75,19 @@ class HomographyTrackingAnalyzer(
                 rotatedIntrinsics[0], rotatedIntrinsics[1], rotatedIntrinsics[2], rotatedIntrinsics[3],
                 rotationDeg,
             )
-            onPoseTracked(pose)
+            if (pose != null) {
+                // rotated.width/height, not rawW/rawH: a 90/270 rotation swaps them, and
+                // rotatedIntrinsics above already accounts for that same swap (CaptureRotation) —
+                // the projection matrix must be built against the SAME frame the pose was solved in.
+                val rotatedFrameIntrinsics = CameraIntrinsics(
+                    fx = rotatedIntrinsics[0], fy = rotatedIntrinsics[1],
+                    cx = rotatedIntrinsics[2], cy = rotatedIntrinsics[3],
+                    width = rotated.width, height = rotated.height,
+                )
+                onFrameTracked(HomographyTrackedFrame(pose, ProjectionMatrix.buildFrom(rotatedFrameIntrinsics)))
+            } else {
+                onFrameTracked(null)
+            }
 
             if (rotated !== raw) rotated.recycle()
         } finally {
