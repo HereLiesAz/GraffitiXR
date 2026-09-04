@@ -185,11 +185,16 @@ class PoseFusion {
      *   camera's CV frame, `V_cv(capture) · anchorModel`. Renamed from `fpAnchor` as part of 0.9:
      *   the old name and the old value were both a world-frame model matrix, which is the frame
      *   error that item fixes. See [composeCorrected].
-     * @param confGlobal teleological corroboration in [0,1] — the fraction of the registered artwork's
-     *        features the real wall currently answers for (MobileGS painting progress). Raises smooth
-     *        correction strength from [CONF_FLOOR] at 0% painted to full at 100%, which is the
-     *        "the further along, the tighter it locks" behaviour. Never lowers it below the floor, so
-     *        a bare wall still corrects on the PnP inlier ratio alone.
+     * @param confGlobal corroboration CONFIDENCE, not painting progress — see [CONF_FLOOR]'s doc for
+     *        why that distinction matters and why this replaced the whole-design progress ratio.
+     *        `matched / predicted` over the design features the current pose predicts are visible
+     *        right now, in [0,1] but in practice capped well below 1 (see [CONF_FLOOR]). Raises
+     *        smooth correction strength from [CONF_FLOOR] toward full as corroboration rises, which
+     *        is the "the further along, the tighter it locks" behaviour — but per-frame, not
+     *        monotonic across the mural's progress the way the name suggests. Never lowers it below
+     *        the floor, so a bare wall still corrects on the PnP inlier ratio alone. Produced by
+     *        `MobileGS::runRelocPass`, either from the bundled distortion-head model (shipped
+     *        default) or a descriptor-similarity fallback — see `docs/TELEOLOGICAL_SLAM.md`.
      */
     fun currentAnchor(
         backbone: FloatArray,

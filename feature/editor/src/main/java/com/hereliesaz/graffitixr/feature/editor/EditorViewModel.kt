@@ -19,7 +19,6 @@ import com.hereliesaz.graffitixr.common.util.imageStats
 import com.hereliesaz.graffitixr.common.util.saveBitmapToGallery
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
-import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.feature.editor.export.ExportManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -61,7 +60,6 @@ class EditorViewModel @Inject constructor(
     private val projectManager: ProjectManager,
     private val exportManager: ExportManager,
     @ApplicationContext private val context: Context,
-    internal val slamManager: SlamManager,
     private val dispatchers: DispatcherProvider,
     private val opEmitter: OpEmitter,
     private val subjectIsolator: SubjectIsolator,
@@ -230,42 +228,16 @@ class EditorViewModel @Inject constructor(
             }
         }
 
-        viewModelScope.launch(dispatchers.io) { restoreWorld(project) }
+        // Wall-fingerprint restore is ArViewModel's job (loadFingerprintIfExists) — it owns the
+        // SlamManager singleton and does the partition/legacy-frame/design-placement handling that
+        // this class does not replicate. A second loader here used to race it: same currentProject
+        // flow, same native engine, undefined order, and this one skipped every one of those steps.
 
         project.backgroundImageUri?.let { uri ->
             viewModelScope.launch(dispatchers.io) {
                 val bitmap = ImageUtils.loadBitmapAsync(context, uri)
                 withContext(dispatchers.main) { dispatch(EditorIntent.SetBackgroundBitmap(bitmap)) }
             }
-        }
-    }
-
-    /** Restores the wall fingerprint so AR relocalizes against the saved target. */
-    private fun restoreWorld(project: GraffitiProject) {
-        val fp = project.fingerprint ?: return
-        val intr = project.fingerprintIntrinsics
-        val anchor = project.fingerprintAnchor
-        if (intr.size >= 4 && anchor.size == 16) {
-            // Metric fingerprint: replay the true capture intrinsics + anchor so reload reloc
-            // matches the live capture, not a default guess.
-            slamManager.restoreWallFingerprintMetric(
-                fp.descriptorsData, fp.descriptorsRows, fp.descriptorsCols, fp.descriptorsType,
-                fp.points3d.toFloatArray(), anchor.toFloatArray(), intr.toFloatArray(),
-                // Capture view, so reload keeps the plane-guided rectification for oblique views.
-                // Empty on projects saved before it was persisted — native then skips that pass.
-                viewMatrix = project.fingerprintViewMatrix
-                    .takeIf { it.size == 16 }?.toFloatArray() ?: FloatArray(0),
-            )
-        } else {
-            slamManager.restoreWallFingerprint(
-                fp.descriptorsData, fp.descriptorsRows, fp.descriptorsCols, fp.descriptorsType,
-                fp.points3d.toFloatArray()
-            )
-        }
-        // Restore the distortion-head canonical patch (256x256 raw gray).
-        if (fp.patchData.isNotEmpty()) {
-            val s = kotlin.math.sqrt(fp.patchData.size.toDouble()).toInt()
-            if (s * s == fp.patchData.size) slamManager.setWallPatchBytes(fp.patchData, s)
         }
     }
 
@@ -334,6 +306,28 @@ class EditorViewModel @Inject constructor(
     // ── The design ────────────────────────────────────────────────────────────
 
     override fun onAddLayer(uri: Uri) {
+        // A design already sitting on the wall is placement work an artist can lose minutes of —
+        // replacing it outright with no confirmation is how "Open" ends up eating a mural in
+        // progress. Ask first when there is something to lose; a first import has nothing to
+        // confirm away.
+        if (_uiState.value.design != null) {
+            dispatch(EditorIntent.SetPendingReplaceUri(uri))
+        } else {
+            applyNewDesign(uri)
+        }
+    }
+
+    override fun confirmReplaceDesign() {
+        val uri = _uiState.value.pendingReplaceUri ?: return
+        dispatch(EditorIntent.SetPendingReplaceUri(null))
+        applyNewDesign(uri)
+    }
+
+    override fun cancelReplaceDesign() {
+        dispatch(EditorIntent.SetPendingReplaceUri(null))
+    }
+
+    private fun applyNewDesign(uri: Uri) {
         pushHistory()
         viewModelScope.launch(dispatchers.io) {
             // Cap the imported image at a screen-reasonable size. A full 12MP+ photo is ~48MB as ARGB;

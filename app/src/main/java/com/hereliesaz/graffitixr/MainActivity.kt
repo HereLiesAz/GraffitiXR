@@ -1637,6 +1637,38 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
+                            // "Open" stages a replace instead of applying it immediately when a
+                            // design is already placed (EditorViewModel.onAddLayer) — surface that
+                            // as a confirmation here rather than silently losing the artist's
+                            // placement work.
+                            if (editorUiState.pendingReplaceUri != null) {
+                                androidx.compose.material3.AlertDialog(
+                                    onDismissRequest = { editorViewModel.cancelReplaceDesign() },
+                                    title = { Text("Replace design?", color = Color.White) },
+                                    text = {
+                                        Text(
+                                            "This swaps out the current design and its placement. This can be undone.",
+                                            color = Color.White
+                                        )
+                                    },
+                                    containerColor = Color(0xEE1A1A1A),
+                                    confirmButton = {
+                                        AzButton(
+                                            text = "Replace",
+                                            onClick = { editorViewModel.confirmReplaceDesign() },
+                                            shape = AzButtonShape.RECTANGLE
+                                        )
+                                    },
+                                    dismissButton = {
+                                        AzButton(
+                                            text = "Cancel",
+                                            onClick = { editorViewModel.cancelReplaceDesign() },
+                                            shape = AzButtonShape.RECTANGLE
+                                        )
+                                    }
+                                )
+                            }
+
                             if (showSettings) {
                                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
                                 SettingsScreen(
