@@ -1,34 +1,36 @@
 # Performance Guide
 
-GraffitiXR is optimized for a rock-solid 60fps tracking experience on mobile hardware by prioritizing functional mapping over visual fluff.
+GraffitiXR is optimized for stable AR tracking on mobile hardware without a persistent 3D map to
+maintain — there is no voxel/splat rendering loop; see [`NATIVE_ENGINE.md`](NATIVE_ENGINE.md) and
+[`ARCHITECTURE.md`](ARCHITECTURE.md).
 
-## The Rendering Loop (16ms Budget)
+## Relocalization
 
-### 1. Opaque Pipeline
-We render the world map using opaque `GL_POINTS` with hardware Z-buffering.
-* **Win:** Eliminates the need for expensive back-to-front sorting.
-* **Win:** O(1) rendering time relative to pixel coverage, not layer count.
-* **MANDATE:** `glDisable(GL_BLEND)` must be called before `slamManager.draw()`.
+The native engine's background thread (`relocThreadFunc`) matches the live camera against the wall
+fingerprint and re-attempts at two cadences: ~5 Hz once locked, ~16 Hz while hunting for a lock — see
+[`TELEOLOGICAL_SLAM.md`](TELEOLOGICAL_SLAM.md). This runs off the render thread; heavier one-off work
+(fingerprint generation at target-capture time, SuperPoint inference) currently shares a single
+engine-wide native lock with the per-frame camera/YUV feed, so a capture can visibly stall rendering
+— a known cost, not yet addressed.
 
-### 2. Stochastic Integration
-Instead of processing every pixel of the $160 \times 120$ depth map, we sample a random subset of 2048 pixels.
-* **Optimization:** Reduces depth processing load by ~90%.
-* **Stability:** Still provides enough data to build a dense voxel map within seconds.
+## Camera / Perception Throttling
 
-### 3. Zero-Allocation Spatial Hash
-We use a fixed-size `int32_t` array for spatial voxel indexing.
-* **Optimization:** Eliminates heap allocations and garbage collection pauses during active mapping.
-* **Speed:** Lookup time is O(1) constant, regardless of map size.
-
-### 4. Mandatory Hardware Stereo
-The app forces dual-lens depth mapping on supported devices.
-* **Benefit:** Significantly more stable tracking and relocalization fingerprints.
-* **Efficiency:** High-quality hardware depth allows for faster "locking" of voxels, reducing optimization churn.
+Camera target frame rate is user-configurable from Settings (`CameraTargetFps`: 30, 60, device
+default, device max), and the app can automatically throttle further under load — on thermal
+throttling, Android power-save mode, low battery, and detected lag — each independently toggleable
+from Settings. See [`FEATURE_REFERENCE.md`](FEATURE_REFERENCE.md) §"Performance & throttling" for
+the current defaults and exact toggles.
 
 ## Battery & Thermal Management
-ARCore and 3D reconstruction are power-intensive.
-* **JNI Throttle:** We feed frames to the native engine at 10Hz to save battery while the user is stationary.
-* **Background Offloading:** Relocalization (PnP matching) and persistent saving are handled on dedicated low-priority threads.
+
+* **Background offloading:** relocalization (PnP matching) and project persistence run on dedicated
+  low-priority threads, off the render/UI thread.
+* **Perception layers are opt-in visual overlays**, not part of the tracking pipeline itself — see
+  `docs/UI_UX.md` for what each one shows.
 
 ---
-*Documentation updated on 2026-04-24 during Persistent Voxel Memory and Pocket-Ready recovery implementation.*
+*Documentation updated on 2026-09-04: removed the fictional opaque-voxel rendering loop, "mandatory
+hardware stereo," and stochastic-depth-integration claims (none of that ships — see
+`NATIVE_ENGINE.md`); replaced with the actual relocalization cadence and the real, user-configurable
+throttle settings. Prior update: 2026-04-24, Persistent Voxel Memory and Pocket-Ready recovery
+implementation — the subsystem that update described was later deleted.*
