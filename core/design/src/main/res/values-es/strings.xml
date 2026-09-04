@@ -458,7 +458,7 @@
     <!-- Flashlight help text. -->
     <string name="help_light">Linterna: Alternar LED del dispositivo. Instrucciones: Usa esto para iluminar paredes oscuras para un mejor seguimiento AR.</string>
     <!-- Lock/Freeze help text. -->
-    <string name="help_lock_trace">Bloquear/Congelar: Evita cambios accidentales. Instrucciones: En modo Calco, desactiva la pantalla. En otros modos, bloquea las transformaciones de capa.</string>
+    <string name="help_lock_trace">Congelar: Bloquea toda la pantalla táctil para que el papel de calco no arrastre el diseño — a diferencia de Bloquear, esto también bloquea el desplazamiento y los toques. Para salir, presiona Volumen Sube, Baja, Sube, Baja.</string>
     <!-- Interactive \'Help\' help text. -->
     <!-- Individual Layer help text. -->
 

@@ -458,7 +458,7 @@
 
     <string name="help_light">Zaklamp: Schakel apparaat-LED in. Instructies: Gebruik dit om donkere muren te verlichten voor betere AR-tracking.</string>
 
-    <string name="help_lock_trace">Vergrendelen/bevriezen: Voorkom onbedoelde wijzigingen. Instructies: Schakelt in de Trace-modus het scherm uit. In andere modi worden laagtransformaties vergrendeld.</string>
+    <string name="help_lock_trace">Bevriezen: vergrendelt het hele touchscreen zodat calqueerpapier het ontwerp niet verschuift — in tegenstelling tot Vergrendelen blokkeert dit ook scrollen en tikken. Om te stoppen: Volume Omhoog, Omlaag, Omhoog, Omlaag indrukken.</string>
 
 
 

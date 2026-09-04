@@ -210,7 +210,7 @@
     <string name="help_export">I-export ang Larawan: I-save ang high-res na snapshot. Mga Tagubilin: Nire-render ang lahat ng nakikitang layer sa isang PNG sa iyong photo gallery.</string>
     <string name="help_settings">Mga Setting ng App: I-configure ang mga kagustuhan. Mga Tagubilin: Buksan para isaayos ang handedness, mga unit, at mga parameter ng pag-scan.</string>
     <string name="help_light">Flashlight: I-toggle ang LED ng device. Mga Tagubilin: Gamitin ito upang maipaliwanag ang madilim na pader para sa mas mahusay na pagsubaybay sa AR.</string>
-    <string name="help_lock_trace">I-lock/I-freeze: Pigilan ang mga hindi sinasadyang pagbabago. Mga Tagubilin: Sa Trace mode, hindi pinapagana ang screen. Sa ibang mga mode, nagbabago ang layer ng mga lock.</string>
+    <string name="help_lock_trace">I-freeze: ni-lock ang buong touchscreen para hindi maigalaw ang disenyo ng tracing paper — hindi tulad ng Lock, ino-block din nito ang pag-scroll at pagtap. Para lumabas, pindutin ang Volume Up, Down, Up, Down.</string>
     <string name="unit_feet">ft</string>
     <string name="unit_centimeters">cm</string>
     <string name="unit_meters">m</string>

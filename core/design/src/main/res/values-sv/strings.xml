@@ -458,7 +458,7 @@
 
     <string name="help_light">Ficklampa: Växla enhetens LED. Instruktioner: Använd detta för att belysa mörka väggar för bättre AR-spårning.</string>
 
-    <string name="help_lock_trace">Lås/frys: Förhindra oavsiktliga ändringar. Instruktioner: Inaktiverar skärmen i spårningsläge. I andra lägen transformeras låslager.</string>
+    <string name="help_lock_trace">Frys: låser hela pekskärmen så att kalkerpapper inte drar i designen — till skillnad från Lås blockerar detta även skrollning och tryck. För att avsluta, tryck Volym Upp, Ner, Upp, Ner.</string>
 
 
 
