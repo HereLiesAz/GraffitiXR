@@ -72,8 +72,9 @@ fixed this pass:
   its own name. Fixed to use `helpInfo`. Separately, Trace mode's `help_lock_trace` string described
   Freeze (which locks the *entire touchscreen*, escapable only via a Volume Up/Down/Up/Down
   sequence) without ever mentioning that escape sequence — a stranded user reading the one help
-  entry that should tell them how out had no way to find out. Added it (English only this pass; the
-  other 14 locale strings still carry the old text and should be brought in line).
+  entry that should tell them how out had no way to find out. Added it, in all 15 locales (English
+  first, then translated the remaining 14 — de/es/fr/hu/it/ja/nl/no/pt/ru/sv/tl/zh-rCN/zh-rHK —
+  reusing each locale's existing `unlock_hint` string's terminology for the volume sequence).
 
 #### Dead-features clearance pass
 
