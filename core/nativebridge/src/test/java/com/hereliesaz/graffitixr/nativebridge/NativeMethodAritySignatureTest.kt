@@ -21,29 +21,36 @@ import java.io.File
  * So: parameter counts, both sides, from source. A count is not a full descriptor check, but it
  * catches the failure that actually happens — a parameter added or removed on one side of the
  * boundary. Types are still the reviewer's job.
+ *
+ * Covers every `native*`-exporting Kotlin class in this module, not just `SlamManager` — an
+ * earlier version of this test covered only `SlamManager`, which meant the 6 natives on
+ * `HomographyTrackerNative`, `YuvConverter`, and `NativeCrashHandler` had no cross-file arity
+ * check at all (a class-specific reflection test,
+ * [HomographyTrackerNativeContractTest], separately pins Kotlin's own descriptors but never opens
+ * `GraffitiJNI.cpp` — it would stay green through exactly the reorder this test exists to catch).
  */
 class NativeMethodAritySignatureTest {
 
     @Test
     fun `every native method declares the same parameter count on both sides`() {
-        val kotlin = File(repoRoot(), KOTLIN_SRC).readText()
+        val kotlin = KOTLIN_SRCS.joinToString("\n") { File(repoRoot(), it).readText() }
         val cpp = File(repoRoot(), CPP_SRC).readText()
 
         val kotlinArities = Regex(
-            """private external fun (native\w+)\s*\(([^)]*)\)""",
+            """(?:private\s+)?external fun (native\w+)\s*\(([^)]*)\)""",
             RegexOption.DOT_MATCHES_ALL,
         ).findAll(kotlin).associate { m ->
             m.groupValues[1] to countKotlinParams(m.groupValues[2])
         }
 
         assertTrue(
-            "found no `private external fun native*` declarations in $KOTLIN_SRC — the regex, not " +
-                "the code, is probably what changed",
+            "found no `external fun native*` declarations in ${KOTLIN_SRCS.joinToString()} — the " +
+                "regex, not the code, is probably what changed",
             kotlinArities.size > 20,
         )
 
         val cppArities = Regex(
-            """Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_(\w+)\s*\(([^)]*)\)""",
+            """Java_com_hereliesaz_graffitixr_nativebridge_(?:$JNI_CLASSES)_(\w+)\s*\(([^)]*)\)""",
             RegexOption.DOT_MATCHES_ALL,
         ).findAll(cpp).associate { m ->
             // Every JNI entry point begins with (JNIEnv*, jobject); the Kotlin declaration has
@@ -58,8 +65,9 @@ class NativeMethodAritySignatureTest {
         // runtime with UnsatisfiedLinkError; a C++ orphan fails silently, forever.
         val orphans = (cppArities.keys - kotlinArities.keys).sorted()
         assertTrue(
-            "GraffitiJNI.cpp exports $orphans with no matching `external fun` in SlamManager.kt. " +
-                "Nothing can call them; delete the export or add the declaration.",
+            "GraffitiJNI.cpp exports $orphans with no matching `external fun` in any of " +
+                "${KOTLIN_SRCS.joinToString()}. Nothing can call them; delete the export or add " +
+                "the declaration.",
             orphans.isEmpty(),
         )
 
@@ -83,7 +91,7 @@ class NativeMethodAritySignatureTest {
      */
     @Test
     fun `the metric fingerprint restore carries the Phase 2 regions array`() {
-        val kotlin = File(repoRoot(), KOTLIN_SRC).readText()
+        val kotlin = File(repoRoot(), SLAM_MANAGER_SRC).readText()
         val cpp = File(repoRoot(), CPP_SRC).readText()
         assertTrue(
             "Kotlin's nativeRestoreWallFingerprintMetric no longer declares `regions`",
@@ -123,8 +131,21 @@ class NativeMethodAritySignatureTest {
     }
 
     private companion object {
-        const val KOTLIN_SRC =
-            "core/nativebridge/src/main/java/com/hereliesaz/graffitixr/nativebridge/SlamManager.kt"
+        private const val NATIVEBRIDGE_KOTLIN_DIR =
+            "core/nativebridge/src/main/java/com/hereliesaz/graffitixr/nativebridge"
+        const val SLAM_MANAGER_SRC = "$NATIVEBRIDGE_KOTLIN_DIR/SlamManager.kt"
+
+        /** Every Kotlin class in this module that exports `native*` methods. */
+        val KOTLIN_SRCS = listOf(
+            SLAM_MANAGER_SRC,
+            "$NATIVEBRIDGE_KOTLIN_DIR/HomographyTrackerNative.kt",
+            "$NATIVEBRIDGE_KOTLIN_DIR/YuvConverter.kt",
+            "$NATIVEBRIDGE_KOTLIN_DIR/NativeCrashHandler.kt",
+        )
+
+        /** The JNI class-name alternation for [KOTLIN_SRCS] — keep the two lists in sync. */
+        const val JNI_CLASSES = "SlamManager|HomographyTrackerNative|YuvConverter|NativeCrashHandler"
+
         const val CPP_SRC = "core/nativebridge/src/main/cpp/GraffitiJNI.cpp"
 
         /** Split a parameter list on top-level commas; generics/defaults don't appear in these decls. */
@@ -151,7 +172,7 @@ class NativeMethodAritySignatureTest {
     private fun repoRoot(): File {
         var dir: File? = File("").absoluteFile
         while (dir != null) {
-            if (File(dir, KOTLIN_SRC).isFile) return dir
+            if (File(dir, SLAM_MANAGER_SRC).isFile) return dir
             dir = dir.parentFile
         }
         throw AssertionError("could not locate the repo root from ${File("").absolutePath}")
