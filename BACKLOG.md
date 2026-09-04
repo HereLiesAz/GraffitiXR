@@ -339,66 +339,66 @@ than after.
 
 ### Phase 4 — AR core-workflow bugs (Kotlin/Compose, highest user impact)
 
-- [ ] **Retake is a no-op loop**: `onRetakeCapture()`/`clearTapHighlights()` don't clear
+- [x] **Retake is a no-op loop**: `onRetakeCapture()`/`clearTapHighlights()` don't clear
   `tempCaptureBitmap`/`annotatedCaptureBitmap`/`targetWallPlane`, so the review screen
   immediately re-renders the same rejected capture. Use `clearCaptureForRetry()` (which already
   does this correctly) instead of `clearTapHighlights()` on this path.
-- [ ] **Re-arming Target after a successful capture replays the stale one**: same root cause —
+- [x] **Re-arming Target after a successful capture replays the stale one**: same root cause —
   `startTargetCapture()` doesn't clear the previous capture's state, so the artist can confirm an
   old photo against a freshly-established anchor. Same fix as above, applied to this entry point.
-- [ ] **"Tap 'Open' on the rail" instructions are wrong in AR**: both post-target-lock prompts
+- [x] **"Tap 'Open' on the rail" instructions are wrong in AR**: both post-target-lock prompts
   point at `item.open`, hosted under `mode.design`'s `expandWhen`-gated accordion, which
   auto-collapses the instant the artist is in AR (i.e. always, when these prompts fire). Either
   change the copy to describe the actual reachable action, or change the rail so `Open` stays
   visible in AR when there's no design loaded yet — pick whichever matches intended navigation;
   flag to the user if unclear which.
-- [ ] Depth-branch target confirm on a device with no open project silently discards the capture
+- [x] Depth-branch target confirm on a device with no open project silently discards the capture
   with no message (`MainViewModel.kt:202`) — the sibling no-depth branch already has the fix and
   explains why in its own comment. Apply the same fix here.
-- [ ] Target-confirmation feedback latency: `resetCaptureUi()` unmounts the capture UI (and its
+- [x] Target-confirmation feedback latency: `resetCaptureUi()` unmounts the capture UI (and its
   spinner) immediately, then the coroutine blocks on `awaitAnchorTransform` (up to 2s) plus a
   full ORB build with zero visible indicator. Keep a loading indicator visible across that gap.
-- [ ] `PaintingProgressIndicator` and `RelocStatusBadge` render at the identical
+- [x] `PaintingProgressIndicator` and `RelocStatusBadge` render at the identical
   `TopEnd`/16dp/16dp position showing the same number under different labels. Reposition one or
   merge them into a single indicator.
-- [ ] Overlay-mode camera-permission-denied is a blank screen with no message and no recovery —
+- [x] Overlay-mode camera-permission-denied is a blank screen with no message and no recovery —
   `CameraPermissionDeniedBanner` is gated to AR-only. Show it (or an equivalent) in Overlay too.
-- [ ] A locked transform (Trace ▸ Lock) swallows gestures *and* the Reset button with zero
+- [x] A locked transform (Trace ▸ Lock) swallows gestures *and* the Reset button with zero
   feedback — no toast, no shake, no dimmed control, and the one color-highlight cue can be on a
   collapsed rail. Add a discoverable "locked" signal on a failed gesture/Reset attempt.
-- [ ] Isolate/Outline effects that fail (fall back to unchanged input) still trigger the
+- [x] Isolate/Outline effects that fail (fall back to unchanged input) still trigger the
   "done"-state highlight, telling the artist a no-op succeeded. Gate the highlight on an actual
   change, or surface an explicit failure state.
-- [ ] Mockup wall-photo load failure (`setBackgroundImage`, decoder rejects the file) shows a
+- [x] Mockup wall-photo load failure (`setBackgroundImage`, decoder rejects the file) shows a
   spinner then silently nothing. Add a toast/error state on the null-bitmap branch.
-- [ ] Settings is unreachable from the Project Library, the app's start destination (no rail
+- [x] Settings is unreachable from the Project Library, the app's start destination (no rail
   items are registered there at all, and the `DashboardViewModel`'s `"settings"`/
   `"project_library"` navigation branches are dead). Add a reachable entry point before a project
   exists — at minimum language/handedness, which a new user may need immediately.
-- [ ] System Back from the editor quits the app outright (single-entry back stack after
+- [x] System Back from the editor quits the app outright (single-entry back stack after
   `popUpTo(LIBRARY_ROUTE){inclusive=true}}`, and the enabled `BackHandler`s don't cover the
   no-dialog-open case). Add a confirmation, or route back to the Library instead of finishing the
   Activity.
-- [ ] `SettingsScreen.kt` toggle rows are ~28dp tall against a 48dp minimum touch target — bump
+- [x] `SettingsScreen.kt` toggle rows are ~28dp tall against a 48dp minimum touch target — bump
   `SettingsItem` to a real minimum height.
-- [ ] Canvas-background color swatches are unlabeled 32dp circles with only a border-color state
+- [x] Canvas-background color swatches are unlabeled 32dp circles with only a border-color state
   cue — add `contentDescription` from the already-destructured (and currently unused) `label`.
-- [ ] Touch lock's volume-sequence unlock is defeated by the back gesture, which unlocks
+- [x] Touch lock's volume-sequence unlock is defeated by the back gesture, which unlocks
   unconditionally regardless of touch-lock state — intercept back the same way pointer input is
   intercepted, or explicitly document that back is a second, intentional unlock path (currently
   contradicts the on-screen hint, which names only the volume sequence).
-- [ ] Dead code cleanup, once confirmed still dead post-fixes above: `showWallSourceDialog`
+- [x] Dead code cleanup, once confirmed still dead post-fixes above: `showWallSourceDialog`
   (never set true anywhere), `CaptureStep.RECTIFY`/`UnwarpScreen`/`onUnwarpConfirm` (superseded
   by plane-guided rectification per `USER_FLOW.md`, but still the only writer of `isProcessing` —
   removing it needs the target-confirm loading-indicator fix above landed first so nothing
   regresses).
-- [ ] `RotationAxisFeedback` and `GestureFeedback` render overlapping "Axis: X" chips at the same
+- [x] `RotationAxisFeedback` and `GestureFeedback` render overlapping "Axis: X" chips at the same
   position in every non-Design mode; consolidate to one.
-- [ ] `toggleImageLock()` has no rail/UI entry point despite gating DESIGN-mode gestures and
+- [x] `toggleImageLock()` has no rail/UI entry point despite gating DESIGN-mode gestures and
   suppressing `GestureFeedback` when true (reachable via co-op `SetDesignProps` from a host, or a
   project saved by an older build) — add a control to unlock, or confirm the state is meant to be
   host-controlled only and surface *that* instead.
-- [ ] Verify (Compose tooling, not code reading) whether AzNavRail's `disabled` parameter
+- [x] Verify (Compose tooling, not code reading) whether AzNavRail's `disabled` parameter
   suppresses `onClick` — if so, `ArViewModel.startHosting()`'s "tap Host always yields an
   explanation" comment is false the same way the rail-instruction bug above is; fix by moving the
   explanation to fire on tap regardless of `disabled`.
@@ -411,70 +411,119 @@ than after.
   `MainActivity.kt`'s own comment already claims exists. Spot-check the authored copy against
   current UI before flipping it on (it was written before some of the Phase 4 changes above).
 
-### Phase 6 — Product decisions needed before implementation (not mine to decide unilaterally)
+### Phase 6 — Product decisions (resolved this round; user authorized making the call directly)
 
-These are the bolded items in the "Conceptual, needs a product decision" list above, resolved or
-sharpened by this audit round:
+These were the bolded items in the "Conceptual, needs a product decision" list above. Decided and
+actioned where the fix was well-scoped and low-risk; the larger features are decided and specified
+below rather than shipped blind, since none of them can be manually verified in this sandbox (no
+device, no ARCore) and a half-built AR interaction is worse than a documented plan.
 
-- **Scale/measurement is the highest-leverage gap.** The mural's physical size is never
-  established anywhere — it's an accident of where the artist was standing (screen-fill
-  heuristic) plus an unused, undocumented `0.18` FOV constant that never reaches the rendered
-  quad. A tap-to-measure-the-wall feature (the AR plane + existing tap-to-distance already
-  supply the geometry) feeding a "design width = N ft" field would unlock quoting, paint
-  estimation, a true-scale printable output, and a real completion metric — see the next three
-  items, all of which depend on this one shipping first. Recommend: build this before any of the
-  below.
-- **The README's founding premise ("repurposing the grid method") has no grid anywhere in the
-  product** — replaced by fingerprint relocalization, which requires the phone to stay up for
-  the whole session instead of ten minutes of chalking. Depends on scale/measurement above.
-  Recommend: ship a proportional grid overlay + AR-projected true-scale grid; this also mostly
-  subsumes the unshipped stencil/tiled-PDF export item already tracked above.
-- **No workflow for a wall bigger than one camera frame** — nothing in the app has a concept of
-  "the section I'm currently painting." Depends on scale/measurement; pairs naturally with the
-  grid item (a section = a grid cell).
-- **"Painted %" is a relocalizer-confidence byproduct mislabeled as work progress** — it cannot
-  go down when the artist paints over a mistake, and its fallback path is a raw ORB descriptor
-  ratio. Either drop the "Painted" framing now (cheap, no dependency) or replace it with real
-  section-done tracking once the section item above exists. Recommend the cheap fix now
-  regardless of the larger item's timeline — the current label is actively misleading.
-- **The tracked "no-cloud blocks crew fingerprint-sharing" tension is factually resolved, not
+- [x] **"Painted %" is a relocalizer-confidence byproduct mislabeled as work progress.** Fixed
+  now, cheaply, independent of the items below: the debug-overlay row read "Painted", the
+  persistent HUD bar next to it carried the same number with no label at all (inviting exactly
+  that misreading, per its own traffic-light coloring), while `RelocStatusBadge` already labeled
+  the identical number "Matched X%". Both now say "Matched" — one true label for one true number.
+- [x] **The tracked "no-cloud blocks crew fingerprint-sharing" tension is factually resolved, not
   open**: `.gxr` project export already round-trips the wall fingerprint and is byte-identical to
-  Co-op's own bulk-sync payload (`ProjectManager.exportProjectToUri`/`serializeCurrentProject`
-  both call the same `zipFolder`). The real gap is affordance, not architecture — it's buried
-  under a generic "Import project" button. Recommend: promote/rename this path ("Share this
-  wall", ideally via `ACTION_SEND`) rather than building new crypto. Replace this bullet in the
-  Conceptual list above once actioned.
-- **Co-op's op protocol (`Op.StrokeComplete`/`Op.TextContentChange`) is built for collaborative
-  editing the app no longer has** — painting/stencil/text authoring moved to a companion app, so
-  those ops have zero emitters; what actually crosses the wire is design-replace/transform/props.
-  The tracked "bidirectional co-op" item needs this resolved first: decide what Co-op is *for*
-  (crew painting → the bulk fingerprint transfer above is the whole feature, drop the dead op
-  types; client review → move it out of AR-only gating so a client can watch Mockup) before
-  building a guest→host channel for op types the app can't generate.
-- **No obstacle/mask handling** for windows, doors, downspouts, signage — almost no commissioned
-  exterior wall is a clean rectangle, and nothing lets the artist exclude paintable area at
-  quoting or placement time. Cheapest version (tap-outline on the wall plane, subtract from a
-  paintable-area figure) depends on scale/measurement above for the area figure to mean anything.
-- **Mode taxonomy**: the existing "one renderer, three boolean axes, five names" framing is
-  sharpened — all five modes are "design composited over some background"; none is about
-  surveying/measuring the wall, which is the first hour of every job, and Trace (the README's own
-  words: "just for shirts and goggles") is arguably a different persona entirely. Revisit once
-  the scale/measurement and grid items above land, since they're the natural candidates for the
-  taxonomy slot Trace would vacate.
+  Co-op's own bulk-sync payload. The real gap was affordance: it was buried inside "Save", landing
+  silently in Downloads with no hand-off. Added `EditorViewModel.shareProject()` — same export,
+  routed through cache + `FileProvider` + `ACTION_SEND` — and a "Share Wall" rail item next to
+  Export/Save. (Left `ProjectLibraryScreen`'s "Import Project" copy as-is: promoting it to also
+  read as "receive a shared wall" only helps if done in every one of the app's 15 locales, and
+  guessing 14 machine translations for one hint line risked shipping worse copy than the status
+  quo it would replace.)
+- **Co-op's op protocol (`Op.StrokeComplete`/`Op.TextContentChange`) — investigated, NOT removed.**
+  These have zero emitters in this app, but `EditorViewModel.applySpectatorOp`'s own comment notes
+  a *"peer running the design-side build"* may still send them, and "companion design app" is a
+  real, separate, actively-referenced product throughout this codebase (README, `EditorActions`,
+  `ProjectManager`, this file). `Op` is `@Serializable`; kotlinx.serialization's polymorphic
+  decoder throws on an unrecognized sealed subtype instead of skipping it, so removing these two
+  variants risks turning "ignored gracefully" into "co-op session dies" the next time that peer
+  sends one — a correctness regression I cannot verify is safe without that peer's source. Kept
+  them, at zero runtime cost. Co-op's *purpose*, separately: everything the UI implements (Host /
+  Join / Leave, a nearby-peer AR coordinate share) is crew-painting-shaped; nothing resembles
+  remote client review. Treat "Co-op = crew painting" as decided; no code change was needed to
+  reach that state, since nothing currently gates it toward client-review use.
+- **Scale/measurement, the grid overlay, the wall-section/tiling workflow, and obstacle/mask
+  handling — decided, specified, not built this round.** These four are one dependency chain
+  (scale first; grid, section-tracking and obstacle-area all consume the resulting real-world
+  width) and together are a multi-feature AR interaction surface with no way to manually verify
+  behavior against a real wall in this environment. Shipping that blind — new tap-to-measure
+  gesture handling, a persisted `designWidthFeet`/unit field, a grid renderer, section
+  bookkeeping — risks exactly the kind of half-finished, unverifiable AR change the earlier
+  phases in this same plan had to root-cause and fix. Decided spec, for whoever picks this up
+  next (a fresh session or a human, with a device to test against):
+    1. **Measure.** In AR, after a target lock, add a "Measure" tool: tap two points on the
+         established plane; reuse the existing tap→ray→plane-intersection math the target-capture
+         tap path already has (`MainActivity`'s tap handling under `mainUiState.isWaitingForTap`)
+         to get both points' world coordinates, and the existing plane/anchor transform to convert
+         their distance to meters. Store the result as `GraffitiProject.wallWidthMeters: Float?`
+         (null = unmeasured, matching every other "not yet set" field in that model).
+    2. **Grid.** Once `wallWidthMeters` is non-null, derive a proportional grid (N ft cells, N
+         from Settings) two ways: an in-editor overlay (cheap, all modes) and an AR-projected
+         true-scale grid (reuses the existing wall-anchored quad renderer AR already has for the
+         design layer — add a second quad, gridded, same anchor). This is most of the unshipped
+         stencil/tiled-PDF export item already tracked elsewhere in this file — a gridded
+         true-scale PDF is the grid renderer's output format, not a separate feature.
+    3. **Sections.** A "section" is one grid cell. Track a `Set<GridCell>` of cells marked
+         painted (project-persisted, artist-toggled by tapping a cell — no automatic detection;
+         `paintingProgress`'s whole problem was pretending an automatic proxy was ground truth).
+         This is the honest replacement for "Painted %" the item above deferred: real, artist-
+         confirmed, monotonic progress, gated on this shipping.
+    4. **Obstacles.** Tap-outline a closed polygon on the wall plane (same plane math as Measure);
+         subtract its area from `wallWidthMeters × height` for a paintable-area figure. Lowest
+         priority of the four — needs Measure's height counterpart (currently only width is
+         planned) to produce a real area, not just a width.
+  Each step is independently shippable in that order; do not start #2–4 before #1 lands, since all
+  three read `wallWidthMeters`.
+- **Mode taxonomy: revisit deferred, tied to the same dependency chain.** The "one renderer, three
+  boolean axes, five names" framing is sharpened, not resolved — all five modes are "design
+  composited over some background", none is about surveying/measuring the wall (the first hour of
+  every real job), and Trace (the README's own words: "just for shirts and goggles") reads as a
+  different persona entirely. The natural slot for a taxonomy change is once Measure/grid above
+  exist and Trace's usage in the field is visible against them — revisiting the taxonomy before
+  that would be guessing at a UX that doesn't exist yet.
 
-### Phase 7 — Test backfill (land alongside, not after, the fix each covers)
+### Phase 7 — Test backfill (blocked on test infra this sandbox doesn't have)
+
+All four items below were investigated, not skipped on assumption. Each needs test
+infrastructure that does not exist in this repo/environment, verified directly rather than
+inferred:
 
 - [ ] `HomographyTracker`: a known-answer-pose test for the CV→GL conversion (would have caught
-  Phase 2's sign-error bug directly — this is the concrete instance of "zero executable tests for
-  the most convention-sensitive line in the file").
+  Phase 2's sign-error bug directly). **Blocked**: pure native C++ (OpenCV), no host OpenCV
+  available (`pkg-config --exists opencv4` fails, no `libopencv_core*` anywhere on this machine)
+  and no `androidTest` source set exists anywhere in the repo to run it on-device instead.
 - [ ] `HomographyFallbackOverlay`: behavioral tests for the texture-clear-on-null path and the
-  `cameraId` wiring, once Phase 2/4's related fixes land — currently one "doesn't throw" test per
-  class.
+  `cameraId` wiring. **Blocked**, for two different reasons per path: `clearPose()`'s texture
+  path is a real `GLSurfaceView.Renderer.onDrawFrame` — needs a live EGL/GL context, not
+  reachable from a plain JVM unit test (see `HomographyOverlayRendererTest`'s own existing tests,
+  which cover only the pure-math `letterboxViewport`, never `onDrawFrame` itself, for the same
+  reason). `cameraId` feeds `CameraIntrinsicsEstimator.estimate`, which calls Android's real
+  `CameraManager` — throws "not mocked" on plain JVM; this module has no Robolectric dependency
+  to shadow it (checked: no `robolectric` reference in `feature/ar/build.gradle.kts`, no
+  `@RunWith(RobolectricTestRunner)` anywhere under its `src/test`). Adding Robolectric is a real
+  infra decision (new dependency, config across every module with native/Android-framework
+  seams) — out of scope for a test-backfill pass, flagged here rather than added silently.
 - [ ] `restoreWallFingerprint`/`alignToFingerprint`: tests asserting stale co-registration state
   (`mHasFingerprintView`, `mFingerprintAnchorMatrix`, `mWallPatch`) is actually cleared on the
-  paths fixed in Phase 1.
-- [ ] `nativeFeedColorFrame`: a contract test mirroring `nativeFeedYuvFrame`'s existing
-  buffer-too-small guard test, once Phase 1's fix lands.
+  paths fixed in Phase 1. **Blocked**: same as the `HomographyTracker` item — native C++ methods
+  on `MobileGS`, no gtest/native test binary in the repo, no `androidTest` to exercise the real
+  `.so` on-device.
+- [ ] `nativeFeedColorFrame`: a contract test mirroring `nativeFeedYuvFrame`'s buffer-too-small
+  guard. **Note the premise was already slightly off**: no *executable* guard test for
+  `nativeFeedYuvFrame` exists to mirror either (checked: nothing under
+  `core/nativebridge/src/test` or `feature/ar/src/test` references `feedYuvFrame`/
+  `feedColorFrame`/`sliceDirect`) — the guard itself is real code
+  (`GraffitiJNI.cpp`'s `yCap`/`uCap`/`vCap` checks), just as untested as the one Phase 1 added to
+  `nativeFeedColorFrame`, for the same native-test-infra gap as the other three items here.
+
+None of these are stub tests waiting to be filled in — each would need new test infrastructure
+(host-buildable OpenCV, a native gtest target wired into the build, an `androidTest` source set
+with device/emulator CI, or Robolectric) that is a project-level decision, not something to
+bootstrap silently inside a backlog cleanup pass. Recommended next step for whoever picks this
+up: decide which of those four infra investments the project wants (they are not mutually
+exclusive, but do not share setup cost), then this list becomes actionable.
 
 ### Sequencing notes
 

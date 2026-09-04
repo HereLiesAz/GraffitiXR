@@ -625,6 +625,55 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    /**
+     * The wall fingerprint a project's `.gxr` carries is exactly what a crew needs to hand a
+     * peer's phone the same coordinate system — [saveProject]/[exportProjectInternal] already
+     * write byte-identical output to what Co-op's own bulk sync sends
+     * ([com.hereliesaz.graffitixr.data.ProjectManager.exportProjectToUri]/`serializeCurrentProject`
+     * both call the same `zipFolder`) — but that only ever lands silently in Downloads, with no
+     * hand-off to another person. This is the same export, routed through an ACTION_SEND share
+     * sheet instead, so "give this wall to the next painter" is an actual, discoverable action
+     * rather than a step buried inside Save.
+     *
+     * Written to cacheDir (not Downloads/MediaStore) since this copy is a share intermediate, not
+     * a thing the user manages — matching MainActivity's `shareDiagnosticBundle`'s existing
+     * cache+FileProvider pattern elsewhere in the app. Result reaches the UI via
+     * [EditorUiState.shareProjectUri], a
+     * one-shot signal cleared by [onShareProjectUriConsumed] once MainActivity has launched the
+     * chooser, mirroring this file's other transient-signal fields (see [onLockedFeedbackShown]).
+     */
+    fun shareProject() {
+        viewModelScope.launch(dispatchers.io) {
+            val project = projectRepository.currentProject.value
+            if (project == null) {
+                withContext(dispatchers.main) {
+                    Toast.makeText(context, "Nothing to share yet — save a project first.", Toast.LENGTH_SHORT).show()
+                }
+                return@launch
+            }
+            try {
+                val shareDir = File(context.cacheDir, "share").apply { mkdirs() }
+                val file = File(shareDir, "${project.name.replace(" ", "_")}.gxr")
+                projectManager.exportProjectToUri(context, project.id, Uri.fromFile(file))
+                val contentUri = androidx.core.content.FileProvider.getUriForFile(
+                    context, "${context.packageName}.fileprovider", file
+                )
+                withContext(dispatchers.main) {
+                    _uiState.update { it.copy(shareProjectUri = contentUri) }
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                withContext(dispatchers.main) {
+                    Toast.makeText(context, "Couldn't prepare this wall to share: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    fun onShareProjectUriConsumed() {
+        _uiState.update { it.copy(shareProjectUri = null) }
+    }
+
     // ── Export / interop ──────────────────────────────────────────────────────
 
     /**

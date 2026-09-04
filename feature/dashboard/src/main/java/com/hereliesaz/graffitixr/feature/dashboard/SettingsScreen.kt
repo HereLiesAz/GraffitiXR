@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
@@ -47,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -354,16 +356,30 @@ fun SettingsScreen(
                                     "Navy"  to 0xFF0D1B2A.toInt(),
                                 ).forEach { (label, argb) ->
                                     val isSelected = backgroundColor == argb
+                                    // The swatch itself stays 32dp (five in a row need the space),
+                                    // but the clickable region is padded out to Android's 48dp minimum
+                                    // touch target, and the color-only Box gets a contentDescription +
+                                    // Button role via clickable's onClickLabel/role so a screen reader
+                                    // hears "Black, selected" instead of nothing at all.
                                     Box(
                                         modifier = Modifier
-                                            .size(32.dp)
+                                            .size(48.dp)
+                                            .clickable(
+                                                role = Role.Button,
+                                                onClickLabel = label,
+                                                onClick = { onBackgroundColorChanged(argb) }
+                                            )
+                                            .semantics(mergeDescendants = true) {
+                                                contentDescription = label
+                                                stateDescription = if (isSelected) "Selected" else ""
+                                            }
+                                            .padding(8.dp)
                                             .background(Color(argb.toLong() and 0xFFFFFFFFL), CircleShape)
                                             .border(
                                                 width = if (isSelected) 2.dp else 0.5.dp,
                                                 color = if (isSelected) Color.Cyan else Color.Gray,
                                                 shape = CircleShape
                                             )
-                                            .clickable { onBackgroundColorChanged(argb) }
                                     )
                                 }
                             }
@@ -453,10 +469,16 @@ fun SettingsSectionTitle(title: String) {
 @Composable
 fun SettingsItem(label: String, value: String, modifier: Modifier = Modifier) {
     Row(
+        // Each row's clickable modifier is passed in by the caller and sized only to its Text
+        // children (~24dp), well under Android's 48dp minimum touch target — every toggle in this
+        // list was harder to hit than it needed to be. heightIn enforces the minimum without
+        // affecting rows that pass a non-clickable modifier (the read-only Version row).
         modifier = modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(text = label, fontWeight = FontWeight.Medium)
         Text(text = value, color = Color.Gray)

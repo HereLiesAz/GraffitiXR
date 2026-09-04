@@ -464,6 +464,24 @@ fun MainScreen(
             }
         }
 
+        // "Share this wall" — see EditorUiState.shareProjectUri's doc. The launch itself has to
+        // happen here (an Activity Context), not in the ViewModel that prepared the file.
+        LaunchedEffect(uiState.shareProjectUri) {
+            val uri = uiState.shareProjectUri
+            if (uri != null) {
+                val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "application/zip"
+                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                    putExtra(android.content.Intent.EXTRA_SUBJECT, "GraffitiXR wall")
+                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                runCatching {
+                    context.startActivity(android.content.Intent.createChooser(send, "Share this wall"))
+                }
+                editorViewModel.onShareProjectUriConsumed()
+            }
+        }
+
         uiState.backgroundBitmap?.takeIf { uiState.editorMode == EditorMode.MOCKUP }
             ?.let { bmp ->
                 Image(

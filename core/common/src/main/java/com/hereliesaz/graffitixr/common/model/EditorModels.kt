@@ -221,6 +221,12 @@ data class EditorUiState(
     // (spinner, then nothing). Generic text rather than a sealed type since every current use is
     // "tell the user this one action didn't work," with no differing UI per cause.
     val effectFailureMessage: String? = null,
+    /**
+     * Transient, self-clearing — a content:// Uri for the current project's `.gxr`, freshly
+     * written to cache, ready for MainActivity to hand to an ACTION_SEND chooser ("share this
+     * wall with a crewmate"). Cleared once the chooser has been launched.
+     */
+    val shareProjectUri: Uri? = null,
     val activeRotationAxis: RotationAxis = RotationAxis.Z,
     val undoCount: Int = 0,
     val redoCount: Int = 0,
