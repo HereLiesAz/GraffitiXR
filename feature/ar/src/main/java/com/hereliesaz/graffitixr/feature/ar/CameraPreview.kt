@@ -27,7 +27,13 @@ fun rememberCameraController(): LifecycleCameraController {
     val context = LocalContext.current
     return remember {
         LifecycleCameraController(context).apply {
-            setEnabledUseCases(LifecycleCameraController.IMAGE_CAPTURE)
+            // IMAGE_ANALYSIS is enabled unconditionally alongside IMAGE_CAPTURE — this is the one
+            // shared controller for every non-AR mode (AR mode drives its own ARCore Session, not
+            // CameraX), and Overlay mode needs live frames when ARCore is unavailable
+            // (HomographyTrackingAnalyzer, feature:ar). Enabling the use case is not the cost:
+            // nothing runs per-frame until a caller actually attaches an analyzer via
+            // setImageAnalysisAnalyzer, which only the ARCore-fallback path does.
+            setEnabledUseCases(LifecycleCameraController.IMAGE_CAPTURE or LifecycleCameraController.IMAGE_ANALYSIS)
             initializationFuture.addListener({
                 cameraControl?.let { control ->
                     val c2Control = androidx.camera.camera2.interop.Camera2CameraControl.from(control)
