@@ -200,7 +200,6 @@ class MainActivity : ComponentActivity() {
     var showSaveDialog by mutableStateOf(false)
     var showSettings by mutableStateOf(false)
     var hasCameraPermission by mutableStateOf(false)
-    var showWallSourceDialog by mutableStateOf(false)
     var isExporting by mutableStateOf(false)
     // Crash report captured on the previous run (native SIGSEGV and/or JVM), shown on launch.
     var pendingCrashReport by mutableStateOf<String?>(null)
@@ -572,8 +571,23 @@ class MainActivity : ComponentActivity() {
                     mainViewModel.cancelTapMode()
                     arViewModel.clearTapHighlights()
                 }
-                BackHandler(enabled = mainUiState.isTouchLocked) {
-                    mainViewModel.setTouchLocked(false)
+                // Intentionally does NOT unlock. The Up-Down-Up-Down volume sequence above exists
+                // because touch lock must survive an accidental brush of the screen — a gesture-nav
+                // edge swipe (or a hardware Back button) is exactly as easy to trigger by accident as
+                // that touch, so letting it fall through to the default "finish/pop" behavior would
+                // reopen the same failure mode from a different input path. This handler only exists
+                // to consume the event so it can't do that; deliberate unlock stays volume-key only.
+                BackHandler(enabled = mainUiState.isTouchLocked) {}
+                // Editor modes are reached via popUpTo(LIBRARY_ROUTE) { inclusive = true } (see
+                // DashboardViewModel.DESTINATION_EDITOR and the AR/Design nav calls below), so the
+                // Library is never on the back stack under an editor mode — System Back had nothing
+                // to pop to and fell through to finishing the Activity, quitting the app with no
+                // confirmation. Route back to the Library instead, matching "proj.load"'s handler.
+                BackHandler(
+                    enabled = !showLibrary && !showSettings && !mainUiState.isInPlaneRealignment &&
+                        !mainUiState.isCapturingTarget && !mainUiState.isTouchLocked
+                ) {
+                    navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
                 }
 
                 // noMenu (AzNavRail 11.0) removes the side drawer entirely — all entries become rail
@@ -1639,28 +1653,6 @@ class MainActivity : ComponentActivity() {
                             }
 
 
-                            if (showWallSourceDialog) {
-                                WallSourceDialog(
-                                    onDismiss = { showWallSourceDialog = false },
-                                    onGallery = {
-                                        showWallSourceDialog = false
-                                        backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                                    },
-                                    onCamera = {
-                                        showWallSourceDialog = false
-                                        if (hasCameraPermission) {
-                                            val tmpFile = File(context.cacheDir, "wall_camera_${System.currentTimeMillis()}.jpg")
-                                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tmpFile)
-                                            cameraUri = uri.toString()
-                                            takePictureLauncher.launch(uri)
-                                        } else {
-                                            permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
-                                        }
-                                    },
-                                    strings = strings
-                                )
-                            }
-
                             if (showDesignInstructionsDialog) {
                                 androidx.compose.material3.AlertDialog(
                                     onDismissRequest = { showDesignInstructionsDialog = false },
@@ -1965,6 +1957,15 @@ class MainActivity : ComponentActivity() {
                 color = navItemColor, classifiers = setOf("toggle", "effect"),
                 shape = AzButtonShape.NONE,
             ) { editorViewModel.onToggleSubjectIsolation() }
+            // Layer.isImageLocked gates whether taps/gestures reach the design image at all (see
+            // MainScreen.kt's pointerInput guards) — distinct from a mode's isTransformLocked, which
+            // only blocks pan/zoom/rotate. toggleImageLock() was implemented and tested but had no
+            // rail entry, so it could never actually be reached from the UI.
+            azRailSubItem(
+                id = "design.lock", hostId = "host.design", text = "Lock",
+                color = navItemColor, classifiers = setOf("toggle", "lock"),
+                shape = AzButtonShape.NONE,
+            ) { editorViewModel.toggleImageLock() }
 
             azDivider()
 
@@ -2180,6 +2181,7 @@ class MainActivity : ComponentActivity() {
             if (editorUiState.design?.isInverted == true) azHighlight("design.invert", active = Cyan)
             if (editorUiState.design?.isSketch == true) azHighlight("design.outline", active = Cyan)
             if (editorUiState.design?.isSubjectIsolated == true) azHighlight("design.isolate", active = Cyan)
+            if (editorUiState.design?.isImageLocked == true) azHighlight("design.lock", active = Cyan)
 
             // State badges: surface important conditions as rail-item alerts.
             if (arUiState.guestEditWasDropped) azItemState("coop", alert = AzItemAlert.NOTICE)
@@ -2188,26 +2190,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-
-@Composable
-private fun WallSourceDialog(
-    onDismiss: () -> Unit,
-    onGallery: () -> Unit,
-    onCamera: () -> Unit,
-    strings: AppStrings
-) {
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(DesignR.string.wall_source_title)) },
-        text = { Text(stringResource(DesignR.string.wall_source_text)) },
-        confirmButton = {
-            AzButton(text = stringResource(DesignR.string.take_photo), onClick = onCamera, shape = AzButtonShape.RECTANGLE)
-        },
-        dismissButton = {
-            AzButton(text = stringResource(DesignR.string.choose_from_gallery), onClick = onGallery, shape = AzButtonShape.RECTANGLE)
-        }
-    )
-}
 
 @Composable
 private fun ArCoreUnavailableOverlay(modifier: Modifier = Modifier) {
