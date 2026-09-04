@@ -2100,6 +2100,13 @@ class MainActivity : ComponentActivity() {
                 // asynchronous captures). This handler just tells the caller "user pressed Export".
                 onExportRequested()
             }
+            // Distinct from "proj.export" (a screenshot of the mode's content) — this hands the
+            // project's .gxr, wall fingerprint included, to another person via a share sheet. See
+            // EditorViewModel.shareProject's doc: this is the same export Co-op's bulk sync already
+            // sends, just with an actual hand-off affordance instead of a silent Downloads copy.
+            azRailSubItem(id = "proj.share", hostId = "host.project", text = "Share Wall", color = navItemColor, shape = AzButtonShape.NONE) {
+                editorViewModel.shareProject()
+            }
             azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {
                 navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
             }
@@ -2740,9 +2747,12 @@ private fun RelocDiagnosticsOverlay(
                 androidx.compose.ui.graphics.Color.White,
             )
         }
-        // Painting progress, labelled as such. It was labelled "Corroborated" while being fed
-        // paintingProgress — a name for the value one row up, on a number that is not it.
-        DiagnosticRow("Painted", "${(paintingProgress * 100).toInt()}%", androidx.compose.ui.graphics.Color.White)
+        // paintingProgress is a relocalizer-confidence byproduct (fraction of the wall's ORB
+        // descriptors the live frame corroborates), not work progress — it can't go down when the
+        // artist paints over a mistake, and RelocStatusBadge already labels the same number
+        // "Matched X%" for exactly this reason. "Painted" here made the same number read as two
+        // different things depending which corner of the screen you looked at.
+        DiagnosticRow("Matched", "${(paintingProgress * 100).toInt()}%", androidx.compose.ui.graphics.Color.White)
 
         // Drift correction. Off means the overlay rides the raw ARCore anchor and will drift as
         // tracking does; on means each accepted relocalization pulls it back. The `Fusion` row above
@@ -3169,6 +3179,11 @@ private fun SyncingBadge(
     }
 }
 
+/**
+ * Renders [progress] (relocalizer match confidence, not work-done) as a colored bar. Explicitly
+ * labelled "Matched" — unlabelled next to a traffic-light color scheme, this read as literal
+ * painting progress, a number that can't go down when the artist paints over a mistake.
+ */
 @Composable
 private fun PaintingProgressIndicator(
     progress: Float,
@@ -3190,6 +3205,11 @@ private fun PaintingProgressIndicator(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            Text(
+                text = "Matched",
+                color = Color.White.copy(alpha = 0.7f),
+                style = MaterialTheme.typography.labelSmall
+            )
             LinearProgressIndicator(
                 progress = { progress.coerceIn(0f, 1f) },
                 modifier = Modifier.width(90.dp),
@@ -3199,8 +3219,7 @@ private fun PaintingProgressIndicator(
             Text(
                 text = "$pct%",
                 color = Color.White,
-
-                )
+            )
         }
     }
 }

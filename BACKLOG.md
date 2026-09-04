@@ -411,56 +411,78 @@ than after.
   `MainActivity.kt`'s own comment already claims exists. Spot-check the authored copy against
   current UI before flipping it on (it was written before some of the Phase 4 changes above).
 
-### Phase 6 — Product decisions needed before implementation (not mine to decide unilaterally)
+### Phase 6 — Product decisions (resolved this round; user authorized making the call directly)
 
-These are the bolded items in the "Conceptual, needs a product decision" list above, resolved or
-sharpened by this audit round:
+These were the bolded items in the "Conceptual, needs a product decision" list above. Decided and
+actioned where the fix was well-scoped and low-risk; the larger features are decided and specified
+below rather than shipped blind, since none of them can be manually verified in this sandbox (no
+device, no ARCore) and a half-built AR interaction is worse than a documented plan.
 
-- **Scale/measurement is the highest-leverage gap.** The mural's physical size is never
-  established anywhere — it's an accident of where the artist was standing (screen-fill
-  heuristic) plus an unused, undocumented `0.18` FOV constant that never reaches the rendered
-  quad. A tap-to-measure-the-wall feature (the AR plane + existing tap-to-distance already
-  supply the geometry) feeding a "design width = N ft" field would unlock quoting, paint
-  estimation, a true-scale printable output, and a real completion metric — see the next three
-  items, all of which depend on this one shipping first. Recommend: build this before any of the
-  below.
-- **The README's founding premise ("repurposing the grid method") has no grid anywhere in the
-  product** — replaced by fingerprint relocalization, which requires the phone to stay up for
-  the whole session instead of ten minutes of chalking. Depends on scale/measurement above.
-  Recommend: ship a proportional grid overlay + AR-projected true-scale grid; this also mostly
-  subsumes the unshipped stencil/tiled-PDF export item already tracked above.
-- **No workflow for a wall bigger than one camera frame** — nothing in the app has a concept of
-  "the section I'm currently painting." Depends on scale/measurement; pairs naturally with the
-  grid item (a section = a grid cell).
-- **"Painted %" is a relocalizer-confidence byproduct mislabeled as work progress** — it cannot
-  go down when the artist paints over a mistake, and its fallback path is a raw ORB descriptor
-  ratio. Either drop the "Painted" framing now (cheap, no dependency) or replace it with real
-  section-done tracking once the section item above exists. Recommend the cheap fix now
-  regardless of the larger item's timeline — the current label is actively misleading.
-- **The tracked "no-cloud blocks crew fingerprint-sharing" tension is factually resolved, not
+- [x] **"Painted %" is a relocalizer-confidence byproduct mislabeled as work progress.** Fixed
+  now, cheaply, independent of the items below: the debug-overlay row read "Painted", the
+  persistent HUD bar next to it carried the same number with no label at all (inviting exactly
+  that misreading, per its own traffic-light coloring), while `RelocStatusBadge` already labeled
+  the identical number "Matched X%". Both now say "Matched" — one true label for one true number.
+- [x] **The tracked "no-cloud blocks crew fingerprint-sharing" tension is factually resolved, not
   open**: `.gxr` project export already round-trips the wall fingerprint and is byte-identical to
-  Co-op's own bulk-sync payload (`ProjectManager.exportProjectToUri`/`serializeCurrentProject`
-  both call the same `zipFolder`). The real gap is affordance, not architecture — it's buried
-  under a generic "Import project" button. Recommend: promote/rename this path ("Share this
-  wall", ideally via `ACTION_SEND`) rather than building new crypto. Replace this bullet in the
-  Conceptual list above once actioned.
-- **Co-op's op protocol (`Op.StrokeComplete`/`Op.TextContentChange`) is built for collaborative
-  editing the app no longer has** — painting/stencil/text authoring moved to a companion app, so
-  those ops have zero emitters; what actually crosses the wire is design-replace/transform/props.
-  The tracked "bidirectional co-op" item needs this resolved first: decide what Co-op is *for*
-  (crew painting → the bulk fingerprint transfer above is the whole feature, drop the dead op
-  types; client review → move it out of AR-only gating so a client can watch Mockup) before
-  building a guest→host channel for op types the app can't generate.
-- **No obstacle/mask handling** for windows, doors, downspouts, signage — almost no commissioned
-  exterior wall is a clean rectangle, and nothing lets the artist exclude paintable area at
-  quoting or placement time. Cheapest version (tap-outline on the wall plane, subtract from a
-  paintable-area figure) depends on scale/measurement above for the area figure to mean anything.
-- **Mode taxonomy**: the existing "one renderer, three boolean axes, five names" framing is
-  sharpened — all five modes are "design composited over some background"; none is about
-  surveying/measuring the wall, which is the first hour of every job, and Trace (the README's own
-  words: "just for shirts and goggles") is arguably a different persona entirely. Revisit once
-  the scale/measurement and grid items above land, since they're the natural candidates for the
-  taxonomy slot Trace would vacate.
+  Co-op's own bulk-sync payload. The real gap was affordance: it was buried inside "Save", landing
+  silently in Downloads with no hand-off. Added `EditorViewModel.shareProject()` — same export,
+  routed through cache + `FileProvider` + `ACTION_SEND` — and a "Share Wall" rail item next to
+  Export/Save. (Left `ProjectLibraryScreen`'s "Import Project" copy as-is: promoting it to also
+  read as "receive a shared wall" only helps if done in every one of the app's 15 locales, and
+  guessing 14 machine translations for one hint line risked shipping worse copy than the status
+  quo it would replace.)
+- **Co-op's op protocol (`Op.StrokeComplete`/`Op.TextContentChange`) — investigated, NOT removed.**
+  These have zero emitters in this app, but `EditorViewModel.applySpectatorOp`'s own comment notes
+  a *"peer running the design-side build"* may still send them, and "companion design app" is a
+  real, separate, actively-referenced product throughout this codebase (README, `EditorActions`,
+  `ProjectManager`, this file). `Op` is `@Serializable`; kotlinx.serialization's polymorphic
+  decoder throws on an unrecognized sealed subtype instead of skipping it, so removing these two
+  variants risks turning "ignored gracefully" into "co-op session dies" the next time that peer
+  sends one — a correctness regression I cannot verify is safe without that peer's source. Kept
+  them, at zero runtime cost. Co-op's *purpose*, separately: everything the UI implements (Host /
+  Join / Leave, a nearby-peer AR coordinate share) is crew-painting-shaped; nothing resembles
+  remote client review. Treat "Co-op = crew painting" as decided; no code change was needed to
+  reach that state, since nothing currently gates it toward client-review use.
+- **Scale/measurement, the grid overlay, the wall-section/tiling workflow, and obstacle/mask
+  handling — decided, specified, not built this round.** These four are one dependency chain
+  (scale first; grid, section-tracking and obstacle-area all consume the resulting real-world
+  width) and together are a multi-feature AR interaction surface with no way to manually verify
+  behavior against a real wall in this environment. Shipping that blind — new tap-to-measure
+  gesture handling, a persisted `designWidthFeet`/unit field, a grid renderer, section
+  bookkeeping — risks exactly the kind of half-finished, unverifiable AR change the earlier
+  phases in this same plan had to root-cause and fix. Decided spec, for whoever picks this up
+  next (a fresh session or a human, with a device to test against):
+    1. **Measure.** In AR, after a target lock, add a "Measure" tool: tap two points on the
+         established plane; reuse the existing tap→ray→plane-intersection math the target-capture
+         tap path already has (`MainActivity`'s tap handling under `mainUiState.isWaitingForTap`)
+         to get both points' world coordinates, and the existing plane/anchor transform to convert
+         their distance to meters. Store the result as `GraffitiProject.wallWidthMeters: Float?`
+         (null = unmeasured, matching every other "not yet set" field in that model).
+    2. **Grid.** Once `wallWidthMeters` is non-null, derive a proportional grid (N ft cells, N
+         from Settings) two ways: an in-editor overlay (cheap, all modes) and an AR-projected
+         true-scale grid (reuses the existing wall-anchored quad renderer AR already has for the
+         design layer — add a second quad, gridded, same anchor). This is most of the unshipped
+         stencil/tiled-PDF export item already tracked elsewhere in this file — a gridded
+         true-scale PDF is the grid renderer's output format, not a separate feature.
+    3. **Sections.** A "section" is one grid cell. Track a `Set<GridCell>` of cells marked
+         painted (project-persisted, artist-toggled by tapping a cell — no automatic detection;
+         `paintingProgress`'s whole problem was pretending an automatic proxy was ground truth).
+         This is the honest replacement for "Painted %" the item above deferred: real, artist-
+         confirmed, monotonic progress, gated on this shipping.
+    4. **Obstacles.** Tap-outline a closed polygon on the wall plane (same plane math as Measure);
+         subtract its area from `wallWidthMeters × height` for a paintable-area figure. Lowest
+         priority of the four — needs Measure's height counterpart (currently only width is
+         planned) to produce a real area, not just a width.
+  Each step is independently shippable in that order; do not start #2–4 before #1 lands, since all
+  three read `wallWidthMeters`.
+- **Mode taxonomy: revisit deferred, tied to the same dependency chain.** The "one renderer, three
+  boolean axes, five names" framing is sharpened, not resolved — all five modes are "design
+  composited over some background", none is about surveying/measuring the wall (the first hour of
+  every real job), and Trace (the README's own words: "just for shirts and goggles") reads as a
+  different persona entirely. The natural slot for a taxonomy change is once Measure/grid above
+  exist and Trace's usage in the field is visible against them — revisiting the taxonomy before
+  that would be guessing at a UX that doesn't exist yet.
 
 ### Phase 7 — Test backfill (land alongside, not after, the fix each covers)
 
