@@ -10,29 +10,26 @@ I had to invent a custom **fingerprinted relocalizer** that works on Android wit
 
 And I followed it up with what I call a **Teleological SLAM**—since we know what the result is supposed to look like, I use OpenCV to look for your progress, meaning that the further along you are, the more tightly the overlay sticks to the wall. Without this, you'd cover those marks up with the painting itself, making the app less accurate as you go. That's exactly where other apps like this truly fail.
 
+Both of those—snap-back and the self-extending fingerprint—currently ship as an opt-in toggle (Settings > diagnostic overlay, off by default) while I validate them on real hardware, so don't expect either out of the box just yet.
+
 Just for shirts and goggles, I included the non-AR, image overlay functionality for image tracing, just like you get with those other apps, in case you cray like that. Or if you cray-cray, there's **Mockup mode**. Nab a picture of the wall, then I got some quick tools for a quick mockup. And if you've got nothing to prove, you just want something copied onto paper perfectly, **Trace mode** allows you to use your phone as a lightbox, keeping your screen on with the brightness turned up, locking your image into place and blocking all touches until you're finished.
 
 And then, there's a decent suite of pertinent design tools, with support for multi-layer graphical creation. I could go on, but I feel like I already have.
 
 ## Key Features
-*   **Offline-First:** Zero cloud dependencies; 100% local processing and zero data collection.
-*   **Pocket-Ready:** Built-in relocalization ensures your mural stays "stuck" even after putting the phone in your pocket.
-*   **Fingerprint Relocalization:** C++17 native OpenCV pipeline (ORB/SuperPoint descriptors + PnP/RANSAC) that snaps the overlay back onto the wall after tracking loss — fully offline, no room pre-scan.
-*   **Teleological Self-Grow:** the wall fingerprint can extend itself from validated new marks as you paint, so snap-back survives the original reference being painted over.
-*   **Dual-Lens Aware:** Auto-selects hardware stereo depth on devices that expose it; falls back to single-camera tracking with motion-based (VIO-baseline) depth elsewhere.
-*   **AI Glasses Support:** Integrated support for **Meta Ray-Bans** and **Xreal Air/Ultra** via a provider-based abstraction layer.
-*   **Co-op Mode:** Robust peer-to-peer AR synchronization for collaborative painting.
-*   **AzNavRail UI:** Thumb-driven, one-handed navigation designed for artists holding a spray can, with a reactive, status-driven in-app guide that adapts to what you're doing.
+*   **Offline-First:** No cloud dependencies for anything the app does — tracking, rendering, and design work are all local. The one thing that ever leaves the device is a crash report, and that's opt-in and off by default (Settings > Crash reports); see [`docs/en/PRIVACY_POLICY.md`](docs/en/PRIVACY_POLICY.md).
+*   **Fingerprint Relocalization:** a C++17 native OpenCV pipeline (ORB/SuperPoint descriptors + PnP/RANSAC) fingerprints the marks you draw on the wall and snaps the overlay back after tracking loss — fully offline, no room pre-scan.
+*   **Pocket-Ready (experimental, off by default):** drift correction and a self-extending fingerprint (so snap-back can survive the original reference being painted over) exist and can be turned on from Settings > diagnostic overlay, but neither has been validated on real hardware yet — see [Teleological SLAM](docs/TELEOLOGICAL_SLAM.md).
+*   **Dual-Lens Aware:** auto-selects hardware stereo depth on devices that expose it; other devices track via ARCore's monocular pose with no separate depth estimate.
+*   **Co-op Mode:** encrypted, QR-paired session sharing so a collaborator can watch the host's live canvas in AR. Currently host → guest only — a guest's own edits don't sync back yet.
+*   **AzNavRail UI:** thumb-driven, one-handed navigation designed for artists holding a spray can.
 
 ## Modes
-*   **AR Mural:** The core precision instrument for anchoring digital concepts to physical surfaces using confidence-based voxel mapping.
+*   **AR Mural:** The core precision instrument for anchoring digital concepts to physical surfaces, tracked via the fingerprint relocalizer above.
 *   **Mockup Mode:** Fast tools for visualizing layers and blend modes on top of static wall photos.
 *   **Trace (Lightbox):** Full-brightness surface for copying onto paper with touch-lock, rail auto-retract, and physical-volume-button exit (Up, Down, Up, Down).
-*   **Overlay:** Non-AR image tracing — your reference image overlaid on the live camera (CameraX) with adjustable opacity, no spatial anchoring (the classic tracing-app workflow).
-*   **Design:** Multi-layer image composition and editing — layers, blend modes, and GPU-accelerated Liquify — for preparing the artwork.
-
-## Tools
-*   **Stencil generation:** A layer-level tool (not a mode) — automated multi-layer printable stencils (1-3 colors) with tiled PDF export.
+*   **Overlay:** Non-AR image tracing — your reference image overlaid on the live camera (CameraX) with adjustable opacity. On the small number of devices without ARCore, this mode can instead track a shape you mark on the wall using the same OpenCV pipeline, planar-only.
+*   **Design:** Multi-layer image composition and editing — layers, blend modes, opacity/color adjustments, and outline extraction — for preparing the artwork.
 
 ## Licensing
 GraffitiXR is **source-available, not open source.** The app, the `core:*` modules, and the AR / SLAM / teleological engine are licensed under **PolyForm Noncommercial 1.0.0** ([`/LICENSE`](LICENSE)); the declared extension API surface and asset importers are **MIT** ([`docs/licenses/MIT.txt`](docs/licenses/MIT.txt)). The **compiled app is free for anyone to use, including paid commissions** — the noncommercial term binds re-use of the *source*, not muralists doing paid work. See [`docs/LICENSING.md`](docs/LICENSING.md) for the authoritative, path-by-path layout and precedence. Bundled third parties (OpenCV, ML Kit, …) keep their own upstream licenses.
@@ -41,11 +38,10 @@ GraffitiXR is **source-available, not open source.** The app, the `core:*` modul
 Strictly decoupled multi-module Clean Architecture:
 *   `:app` — Navigation, camera orchestration, and Hilt dependency injection.
 *   `:feature:ar` — ARCore session management, `ArRenderer`, and SLAM data processing.
-*   `:feature:editor` — Multi-layer image manipulation and GPU-accelerated Liquify.
+*   `:feature:editor` — Multi-layer image manipulation and adjustments.
 *   `:feature:dashboard` — Project library, onboarding, and settings.
-*   `:core:nativebridge` — Native C++ engine (`MobileGS`), JNI bridge, and relocalization threads.
-*   `:android_collaboration_module` — Peer-to-peer networking and project sync.
-*   `:opencv` — Static OpenCV SDK for computer vision tasks.
+*   `:core:nativebridge` — Native C++ engine (`MobileGS`), JNI bridge, and relocalization threads. OpenCV itself is a Maven Central dependency (`org.opencv:opencv`), not a vendored module.
+*   `:android_collaboration_module` — peer-to-peer networking for Co-op Mode (host → guest; see Key Features above).
 *   `:core:data` / `:core:domain` / `:core:common` — Unified data layer and wearable abstraction.
 *   `:core:design` — Shared Compose design system (reusable controls and overlays).
 
@@ -54,7 +50,6 @@ Strictly decoupled multi-module Clean Architecture:
 - [Native Engine Details](docs/NATIVE_ENGINE.md)
 - [SLAM Setup & Relocalization](docs/SLAM_SETUP.md)
 - [Teleological SLAM](docs/TELEOLOGICAL_SLAM.md)
-- [Stencil Pipeline](docs/STENCILS.md)
 - [Performance Guide](docs/performance.md)
 - [Testing Strategy](docs/testing.md)
 - [Data Formats](docs/data_formats.md)
@@ -62,4 +57,4 @@ Strictly decoupled multi-module Clean Architecture:
 - [Release & Google Play Delivery](docs/RELEASE.md)
 
 ---
-*Documentation updated on 2026-07-12 for AzNavRail 11.0 and the PolyForm/MIT licensing layout.*
+*Documentation updated on 2026-09-04: corrected feature claims against the current codebase — see the audit this pass was based on for details. Removed AI Glasses Support (Meta Ray-Ban provider deleted; the Xreal provider can never activate), stencil generation, and GPU-accelerated Liquify, none of which have implementing code; marked snap-back/self-grow as the opt-in, unvalidated toggles they currently are; corrected Co-op Mode and Dual-Lens Aware to their real (narrower) behavior; fixed the crash-report claim to describe the new opt-in consent flow. Prior update: 2026-07-12, for AzNavRail 11.0 and the PolyForm/MIT licensing layout.*
