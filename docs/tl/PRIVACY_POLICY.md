@@ -40,9 +40,11 @@ Maaari kaming gumamit ng mga third-party na kumpanya at indibidwal dahil sa mga 
 * Upang magsagawa ng mga serbisyong nauugnay sa Serbisyo;o
 * Upang tulungan kami sa pagsusuri kung paano ginagamit ang aming Serbisyo.
 
-Ginagamit namin ang **Google ML Kit** para sa pagse-segment ng paksa (pag-alis ng background).Nangyayari ang pagproseso na ito nang lokal sa iyong device.
+Ginagamit namin ang **Google ML Kit** para sa pagse-segment ng paksa (pag-alis ng background). Nangyayari ang pagproseso na ito nang lokal sa iyong device.
 
-Ina-access namin ang **GitHub API** upang tingnan kung may mga update sa application. Ang iyong IP address ay maaaring makita ng GitHub sa panahon ng mga kahilingang ito.
+## Pagsusuri ng mga Update
+
+May "Suriin ang mga update" na button sa Settings screen. Walang awtomatikong sinusuri — tanging kapag pinindot mo ito. Ang pagpindot dito ay gumagawa ng kahilingan sa **GitHub API** (api.github.com) para tingnan ang pinakabagong release ng proyektong ito. Ang GitHub ay isang third party na nasa labas ng aming kontrol, at makikita ng GitHub ang iyong IP address sa buong tagal ng isang kahilingang iyon, kagaya lang ng anumang web request na gagawin mo sa github.com. Walang ibang impormasyon ang ipinapadala bilang bahagi ng kahilingang ito.
 
 ## Seguridad
 
@@ -64,7 +66,7 @@ Ang patakarang ito ay may bisa noong 2024-01-01
 
 ## Makipag-ugnayan sa Amin
 
-Kung mayroon kang anumang mga tanong o mungkahi tungkol sa aming Patakaran sa Privacy, huwag mag-atubiling makipag-ugnayan sa amin sa [Insert Contact Email o GitHub Repository Link].
+Kung mayroon kang anumang mga tanong o mungkahi tungkol sa aming Patakaran sa Privacy, huwag mag-atubiling makipag-ugnayan sa amin sa https://github.com/HereLiesAz/GraffitiXR/issues.
 
 ---
-*Na-update ang dokumentasyon noong 2026-03-17 sa panahon ng muling pagdidisenyo ng website at yugto ng pagsasama ng Stencil Mode.*
+*Na-update ang dokumentasyon noong 2026-09-04: itinama ang seksyong Data ng Log, na naglalarawan sa crash data bilang awtomatikong kinokolekta at walang pahintulot — sa totoo lang, nangangailangan ang app ng tahasang opt-in (Settings > Crash reports, naka-off bilang default) bago umalis sa device ang anumang crash report, at isinasampa ang ulat bilang isang pampublikong GitHub issue, hindi ipinapadala sa "aming mga server." Binigyan ng sariling seksyon ang dating hindi-nailathalang GitHub API update-check disclosure at nilinaw na user-initiated ito (ang "Suriin ang mga update" na button sa Settings), hindi awtomatiko. Pinalitan din ang lumang "Open Source" na claim ng tamang "source-available" na paglalarawan. Naunang update: 2026-03-17, sa panahon ng muling pagdidisenyo ng website at yugto ng pagsasama ng Stencil Mode.*
