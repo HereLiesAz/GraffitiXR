@@ -8,12 +8,10 @@ maintainer must perform.
 ## TL;DR
 
 ```bash
-# Local signed AAB (uses your own keystore via injected signing properties)
-./gradlew bundleRelease \
-  -Pandroid.injected.signing.store.file=$(pwd)/app/keystore.jks \
-  -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
-  -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
-  -Pandroid.injected.signing.key.password=$KEY_PASSWORD
+# Local signed AAB — set these env vars to your own keystore first
+export KEYSTORE_FILE=$(pwd)/app/keystore.jks
+export KEYSTORE_PASSWORD=... KEY_ALIAS=... KEY_PASSWORD=...
+./gradlew bundleRelease
 # → app/build/outputs/bundle/release/app-release.aab
 ```
 
@@ -27,37 +25,28 @@ Publishing is automated by the **Build & Publish AAB (Play)**
 The release artifact is an `.aab`, not an APK. Google Play uses the bundle to
 generate optimized per‑device APKs (see [Modular delivery](#3-modular-delivery--size)).
 
-Signing matches the existing repo convention used by `release-apk.yml`:
-**CI‑injected signing** via `-Pandroid.injected.signing.*` properties. There is
-**no** `signingConfigs.release` block checked into `app/build.gradle.kts`, and
-**no keystore is committed** (`*.jks` / `*.keystore` are git‑ignored).
+Signing is a checked-in `signingConfigs.release` block in `app/build.gradle.kts`
+(not CI-injected `-Pandroid.injected.signing.*` properties, despite an earlier
+version of this document), populated from **environment variables**:
+`KEYSTORE_FILE` (path, defaults to `app/keystore.jks`), `KEYSTORE_PASSWORD`,
+`KEY_ALIAS`, `KEY_PASSWORD`. **No keystore is committed** (`*.jks` /
+`*.keystore` are git‑ignored) — CI decodes the base64 `KEYSTORE_RAW` secret to
+that path and exports the three credential env vars before building.
 
-To build a signed bundle locally you provide your own keystore on the command
-line, exactly as shown in the TL;DR above. Without the injected signing
-properties, `bundleRelease` produces an **unsigned** bundle (fine for
-inspection, not for upload).
+The `release` signing config is only created when the keystore file exists
+*and* all three credentials are present; otherwise `bundleRelease` produces an
+**unsigned** bundle (fine for inspection, not for upload) rather than failing.
 
-### versionCode override
+### versionCode
 
-`app/build.gradle.kts` resolves `versionCode` in this order:
-
-1. **`-PversionBuild=<n>` override (CI):** if supplied it is used verbatim, and
-   the build does **not** auto‑increment or rewrite `version.properties`.
-2. **`version.properties` fallback (local):** the stored `versionBuild` value is
-   used and auto‑incremented on local release builds, preserving the previous
-   behaviour.
-
-CI passes a **monotonic** value so Play never rejects an upload for a duplicate
-or lower code:
-
-```
-versionCode = (git rev-list --count HEAD) + 10000
-```
-
-The `+10000` baseline keeps the Play `versionCode` strictly above the legacy
-file‑based codes (`version.properties` reached ~151 via local / GitHub‑release
-builds) while still increasing by exactly 1 per commit. `versionName` remains
-`major.minor.patch` from `version.properties`.
+`app/build.gradle.kts` derives `versionCode` from `version.properties`'
+`versionBuild` value, which **auto‑increments on every build** (local or CI —
+there is no `-PversionBuild` override and no git-commit-count formula, despite
+an earlier version of this document). It never resets and is not
+git‑history‑dependent, so it stays monotonic across both local and CI builds
+by construction. `versionName` is `major.minor.patch`, also from
+`version.properties`, with the patch component likewise auto‑incrementing per
+build (see the file's own comments for the minor‑bump‑resets‑patch rule).
 
 ---
 
@@ -75,15 +64,23 @@ Inputs:
 
 What it does:
 
-1. Checks out with `fetch-depth: 0` (needed for the commit‑count versionCode).
-2. Injects `google-services.json` and materializes `app/keystore.jks` from
-   secrets (same steps as `release-apk.yml`). OpenCV needs no fetch step — it's
-   a Maven Central dependency (`org.opencv:opencv`, Java + native via Prefab).
+1. Checks out with `fetch-depth: 0` and write access, so a publish run can
+   commit the incremented `versionBuild` in `version.properties` back to `main`.
+2. Injects `google-services.json` and decodes the base64 `KEYSTORE_RAW` secret
+   to `app/keystore.jks` (same steps as `release-apk.yml`). OpenCV needs no
+   fetch step — it's a Maven Central dependency (`org.opencv:opencv`, Java +
+   native via Prefab).
 3. Sets up JDK 17 (Temurin) + Gradle.
-4. Reads `applicationId` from `app/build.gradle.kts` (not hardcoded) and computes
-   the versionCode.
-5. Runs `bundleRelease` with the versionCode and injected signing.
-6. Uploads the `.aab` as a build artifact (`graffitixr-release-aab`).
+4. Reads `applicationId` from `app/build.gradle.kts` (not hardcoded), for the
+   later Play-upload step.
+5. Runs `bundleRelease` — no `-PversionBuild` override; `versionCode` comes
+   from `version.properties`' auto-incrementing `versionBuild`, and signing
+   from the `KEYSTORE_FILE`/`KEYSTORE_PASSWORD`/`KEY_ALIAS`/`KEY_PASSWORD` env
+   vars (see §1).
+6. Uploads the `.aab` as a build artifact (`graffitixr-release-aab`), then —
+   only once the Play upload (next step) has actually succeeded — commits the
+   new `versionBuild` back to `main` so it never falls behind builds already
+   shipped.
 7. **Only if `publish == true`:** uploads to Play with
    [`r0adkll/upload-google-play@v1`](https://github.com/r0adkll/upload-google-play)
    using `serviceAccountJsonPlainText`, the resolved `packageName`
