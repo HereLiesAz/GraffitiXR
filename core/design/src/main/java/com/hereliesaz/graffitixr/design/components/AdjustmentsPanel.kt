@@ -35,11 +35,11 @@ data class AdjustmentsState(
     // Undo/redo belongs to the Design screen only; Modes show the finished design (no history controls).
     val showUndoRedo: Boolean = true,
     /**
-     * The canvas/wall background currently behind these controls, if known. When set, knob labels
-     * and undo/redo counts switch to black or white for contrast (see [contrastColorFor]) instead
-     * of always rendering white -- which otherwise vanishes against light canvas-background presets
-     * (e.g. the app's own "White" preset). Left null (falling back to white, the prior behavior)
-     * until a caller threads the real canvas background through.
+     * The canvas/wall background currently behind these controls. When set, knob labels and
+     * undo/redo counts switch to black or white for contrast (see [contrastColorFor]) instead of
+     * always rendering white — which otherwise vanishes against light canvas-background presets
+     * (e.g. the app's own "White" preset). `feature:editor`'s `EditorUi` now threads the real
+     * canvas background through; null (falling back to white) only for a caller that hasn't.
      */
     val canvasBackground: Color? = null
 )
