@@ -91,7 +91,6 @@ import com.hereliesaz.graffitixr.onboarding.ArUnavailableOverlay
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.hereliesaz.graffitixr.common.security.SecurityProviderState
-import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
@@ -467,8 +466,6 @@ class MainActivity : ComponentActivity() {
                         ).show()
                     }
                 }
-
-                var isProcessing by remember { mutableStateOf(false) }
 
                 val currentTempCapture = arUiState.tempCaptureBitmap
                 val currentCaptureStep = mainUiState.captureStep
@@ -1540,7 +1537,6 @@ class MainActivity : ComponentActivity() {
                                     uiState = arUiState,
                                     captureStep = mainUiState.captureStep,
                                     isWaitingForTap = mainUiState.isWaitingForTap,
-                                    isLoading = isProcessing,
                                     strings = strings,
                                     onConfirmTarget = { bitmap, mask ->
                                         arViewModel.setInitialAnchorFromCapture()
@@ -1576,30 +1572,6 @@ class MainActivity : ComponentActivity() {
                                     onCancel = {
                                         mainViewModel.onCancelCaptureClicked()
                                     },
-                                    onUnwarpConfirm = { points ->
-                                        val currentBitmap = arUiState.tempCaptureBitmap
-                                        if (currentBitmap != null && points.size == 4) {
-                                            isProcessing = true
-                                            lifecycleScope.launch(Dispatchers.Default) {
-                                                val pixelPoints = points.map {
-                                                    Offset(it.x * currentBitmap.width, it.y * currentBitmap.height)
-                                                }
-                                                val unwarped = PerspectiveProcessor.unwarpImage(currentBitmap, pixelPoints)
-
-                                                withContext(Dispatchers.Main) {
-                                                    if (unwarped != null) {
-                                                        arViewModel.setTempCapture(unwarped)
-                                                        arViewModel.setAnnotatedCapture(unwarped.isolateMarkings())
-                                                        mainViewModel.setCaptureStep(CaptureStep.REVIEW)
-                                                    } else {
-                                                        mainViewModel.setCaptureStep(CaptureStep.NONE)
-                                                    }
-                                                    isProcessing = false
-                                                }
-                                            }
-                                        }
-                                    },
-                                    onUpdateUnwarpPoints = { arViewModel.setUnwarpPoints(it) },
                                     onEraseAtPoint = { nx, ny -> arViewModel.removeMarkAt(nx, ny) }
                                 )
 
