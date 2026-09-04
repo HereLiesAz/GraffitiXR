@@ -476,7 +476,7 @@
 
     <string name="help_light">手电筒：切换设备 LED。说明：使用它照亮黑暗的墙壁以获得更好的 AR 追踪。</string>
 
-    <string name="help_lock_trace">锁定/冻结：防止意外更改。说明：在透写模式下，禁用屏幕。在其他模式下，锁定图层变换。</string>
+    <string name="help_lock_trace">冻结：锁定整个触摸屏，以免描图纸拖动设计——与锁定不同，这也会阻止滚动和点按。要退出，请快速按 音量上、下、上、下。</string>
 
 
 

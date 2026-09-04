@@ -458,7 +458,7 @@
 
     <string name="help_light">手電筒：切換設備 LED。說明：使用它來照亮黑暗的牆壁，以實現更好的 AR 追蹤。</string>
 
-    <string name="help_lock_trace">鎖定/凍結：防止意外變更。說明： 在追蹤模式下，停用螢幕。在其他模式下，鎖定圖層變換。</string>
+    <string name="help_lock_trace">凍結：鎖定整個觸控螢幕，避免描圖紙拖動設計——與鎖定不同，這也會封鎖捲動與點按。要退出，請快速按 音量上、下、上、下。</string>
 
 
 

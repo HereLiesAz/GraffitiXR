@@ -458,7 +458,7 @@
 
     <string name="help_light">Zseblámpa: Kapcsold be az eszköz LED-jét. Utasítások: Használd ezt sötét falak megvilágítására a jobb AR követés érdekében.</string>
 
-    <string name="help_lock_trace">Zárolás/Fagyasztás: Véletlen változtatások megelőzése. Utasítások: Rajzolás módban letiltja a képernyőt. Más módokban zárolja a réteg transzformációit.</string>
+    <string name="help_lock_trace">Fagyasztás: zárolja a teljes érintőképernyőt, hogy a pauszpapír ne mozdítsa el a tervet — a Zárolással ellentétben ez a görgetést és az érintéseket is blokkolja. Kilépéshez nyomja meg gyorsan: Hangerő Fel, Le, Fel, Le.</string>
 
 
 
