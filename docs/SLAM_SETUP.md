@@ -1,60 +1,39 @@
-# SLAM & MobileGS Configuration
+# Relocalization Configuration
 
-This document outlines the tuning of the Persistent Voxel Memory engine.
+This document covers tuning and troubleshooting for `MobileGS`'s relocalizer — see `docs/NATIVE_ENGINE.md` for what the engine is. There is no voxel or splat mapping layer to configure; earlier drafts of this document described tuning one, but no such layer exists in `core/nativebridge`.
 
-## The Engine (`MobileGS.cpp`)
+## Key parameters
 
-The engine operates on a **Stochastic Voxel Hashing** system designed for instant relocalization.
-
-**MANDATE:** We use opaque surfel rendering with hardware Z-buffering. Soft, alpha-blended Gaussian splatting is explicitly rejected for performance reasons.
-
-### Key Parameters
+The relocalizer's real constants live in `core/nativebridge/src/main/cpp/include/MobileGS.h`; the authoritative record of which ones have been measured on real hardware versus set by informed guess is `docs/research/PARAMETERS.md` — read that before treating any of these as settled:
 
 | Parameter | Value | Description |
 | :--- | :--- | :--- |
-| `VOXEL_SIZE` | `0.02f` (20mm) | Physical resolution of the spatial hash. |
-| `STOCHASTIC_SAMPLES`| `2048` | Random pixels processed per frame to save CPU. |
-| `MAX_SPLATS` | `250,000` | Hard limit for mobile tracking memory. |
+| `kRelocLoweRatio` | `0.75` | Lowe's-ratio threshold for a relocalization descriptor match. |
+| `kCorrobLoweRatio` | `0.85` | Same test, for the teleological corroboration path (see `TELEOLOGICAL_SLAM.md`). |
+| `kBigLockInliers` | `20` | Inlier count above which a PnP solve is accepted outright. |
+| `kMaxWallMarks` | `5000` | Cap on fingerprint points, including any self-grow additions. |
+| RANSAC | `100` iterations, `8px` reprojection threshold, `0.99` confidence | `cv::solvePnPRansac`'s own parameters for the reloc solve. |
 
-### Coordinate System & Storage
+## Sensor input pipeline
 
-**CRITICAL MANDATE: Functional Voxel Memory**
-1.  **Ingestion**: Depth maps are stochasticly sampled (random subset) to minimize overhead.
-2.  **Unprojection**: Uses physical sensor intrinsics. 
-    *   `xc = (c_px - cx_px) * depth / fx_px`
-    *   `yc = -(r_px - cy_px) * depth / fy_px` (MANDATORY Y-FLIP)
-3.  **Transformation**: All points are stored in **World Space**.
-4.  **Hardware Reward**: Dual-lens HW stereo is MANDATORY. 
-    *   **HW Stereo**: New voxels start with **0.9** confidence (Immutable).
-    *   **Mono Depth**: New voxels start with **0.5** confidence.
-5.  **Rendering**: Uses high-performance opaque `GL_POINTS`.
-    *   `MVP = Projection * View`
-    *   `glDisable(GL_BLEND)` and `glDepthMask(GL_TRUE)` are mandatory.
+### Color frame (`feedYuvFrame` / `feedColorFrame`)
+The live camera feed, offloaded to `relocThreadFunc` for background ORB/SuperPoint matching against the stored fingerprint and a `solvePnPRansac` pose solve.
 
-## Sensor Input Pipeline
+### Depth (hardware stereo where available)
+Depth is used for triangulating the fingerprint's 3D points at capture time on devices with real hardware stereo; there is no separate mapping/fusion pipeline that consumes it afterward.
 
-### Step 1 — Color frame (`feedColorFrame`)
-RGBA buffer for relocalization. Offloaded to the `relocThreadFunc` for background PnP matching.
+## Tuning guide
 
-### Step 2 — Metric depth (`feedArCoreDepth`)
-1. **Selection**: HW Stereo is forced if available.
-2. **Sampling**: 2048 random points are projected to world space.
-3. **Hashing**: Spatial hash table ensures O(1) lookup speed for discovery.
-4. **Locking**: Once a voxel reaches 1.0 confidence, its position is "locked" to prevent jitter.
+**"The tracking doesn't snap back after pocketing"**
+Cause: no wall fingerprint was captured, or relocalization is failing its RANSAC/inlier gates against the live frame (a near-featureless or highly repetitive surface — smooth stucco, running-bond brick — starves the correspondence set the solver needs).
+Fix: confirm a target was actually captured and locked; for a low-texture wall, capture the fingerprint over a patch with more visible variation (an edge, a stain, a fixture) rather than the flattest part of the surface.
 
-## Tuning Guide
+**"The overlay is placed correctly at capture but drifts off over a session"**
+Cause: drift correction (`driftCorrectionEnabled`) is off by default — see `docs/TELEOLOGICAL_SLAM.md` for how to enable it from the diagnostic overlay, and its own caveats before doing so.
 
-"The tracking doesn't snap back after pocketing"
-Cause: No wall fingerprints captured.
-Fix: Scan the wall slowly from multiple angles. Check "Lens Mode" in diagnostics—`MANDATORY HW` provides significantly better fingerprints than `SINGLE`.
-
-"The map is slow or the phone is hot"
-Cause: `MAX_SPLATS` is too high for this device.
-Fix: The engine automatically caps at 250k. Verify that `STOCHASTIC_SAMPLES` has not been increased beyond 2048.
-
-"The geometry looks skewed"
-Cause: Incorrect rotation code in JNI.
-Fix: Ensure `ArRenderer` is passing the correct `cvRotateCode` to both color and depth feeds.
+**"The geometry looks skewed after rotating the phone"**
+Cause: the fingerprint's stored intrinsics were captured at one display rotation and the live frame is being matched at another — see `MobileGS.cpp`'s `restoreWallFingerprintMetric`/reloc PnP path and `ArRenderer`'s `cvRotateCode` handling.
+Fix: re-capture the target at the orientation painting will actually happen in, or file this as the open bug it currently is if it reproduces.
 
 ---
-*Documentation updated on 2026-06-22 during the SLAM right-size and documentation-accuracy pass.*
+*Rewritten 2026-09-04 to describe the relocalizer actually in the tree — the previous "Persistent Voxel Memory" tuning guide (voxel size, stochastic sampling, `MAX_SPLATS`, `feedArCoreDepth`) had no corresponding code anywhere in `core/nativebridge`.*
