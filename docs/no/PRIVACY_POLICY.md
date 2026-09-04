@@ -1,6 +1,6 @@
 # Personvernerklæring for GraffitiXR
 
-**Sist oppdatert:** [Gjeldende dato]
+**Sist oppdatert:** 2026-09-04
 
 HereLiesAZ bygde GraffitiXR-appen som en kildetilgjengelig app (source-available) (se LICENSE og docs/LICENSING.md i repositoriet for vilkårene). Denne TJENESTEN leveres av HereLiesAZ uten kostnad og er beregnet for bruk som den er.
 
@@ -42,7 +42,9 @@ Vi kan ansette tredjepartsselskaper og enkeltpersoner på grunn av følgende år
 
 Vi bruker **Google ML Kit** for emnesegmentering (bakgrunnsfjerning). Denne behandlingen skjer lokalt på enheten din.
 
-Vi får tilgang til **GitHub API** for å se etter applikasjonsoppdateringer. Din IP-adresse kan være synlig for GitHub under disse forespørslene.
+## Oppdateringssjekker
+
+Innstillinger-skjermen har en «Se etter oppdateringer»-knapp. Ingenting sjekkes automatisk — bare når du trykker på den. Å trykke på den sender en forespørsel til **GitHub API** (api.github.com) for å slå opp prosjektets siste utgivelse. GitHub er en tredjepart utenfor vår kontroll, og IP-adressen din er synlig for GitHub i løpet av den ene forespørselen, på samme måte som den ville vært for enhver nettforespørsel du gjør til github.com. Ingen annen informasjon sendes som en del av denne forespørselen.
 
 ## Sikkerhet
 
@@ -64,8 +66,8 @@ Denne policyen trer i kraft fra 2024-01-01
 
 ## Kontakt oss
 
-Hvis du har spørsmål eller forslag om personvernreglene våre, ikke nøl med å kontakte oss på [Sett inn kontakt e-post eller GitHub Repository Link].
+Hvis du har spørsmål eller forslag om personvernreglene våre, ikke nøl med å kontakte oss på https://github.com/HereLiesAz/GraffitiXR/issues.
 
 
 ---
-*Dokumentasjonen ble oppdatert 2026-03-17 under redesign av nettstedet og integreringsfasen for sjablongmodus.*
+*Dokumentasjonen ble oppdatert 2026-09-04: rettet avsnittet om krasjrapporter, som tidligere beskrev automatisk og ikke-samtykkebasert innsamling — appen krever faktisk et eksplisitt opt-in (Innstillinger > Krasjrapporter, av som standard) før noen krasjrapport forlater enheten, og rapporten sendes inn som en offentlig GitHub-sak, ikke til «våre servere». Ga den eksisterende GitHub API-oppdateringssjekken en egen seksjon og presiserte at den er brukerinitiert (knappen «Se etter oppdateringer» i Innstillinger), ikke automatisk. Fylte inn dato- og kontaktplassholdere. Forrige oppdatering: 2026-03-17, under redesign av nettstedet og integreringsfasen for sjablongmodus.*

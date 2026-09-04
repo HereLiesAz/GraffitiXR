@@ -32,7 +32,9 @@ Vi kan anställa tredjepartsföretag och individer av följande skäl:
 * Att utföra tjänsterelaterade tjänster; eller
 * För att hjälpa oss att analysera hur vår tjänst används.
 Vi använder **Google ML Kit** för ämnessegmentering (bakgrundsborttagning). Denna bearbetning sker lokalt på din enhet.
-Vi har tillgång till **GitHub API** för att söka efter programuppdateringar. Din IP-adress kan vara synlig för GitHub under dessa förfrågningar.
+## Uppdateringskontroller
+
+Inställningsskärmen har en knapp för "Sök efter uppdateringar". Ingenting kontrolleras automatiskt — bara när du trycker på knappen. Ett tryck skickar en förfrågan till **GitHub API** (api.github.com) för att slå upp projektets senaste utgåva. GitHub är en tredje part utanför vår kontroll, och din IP-adress är synlig för GitHub under den enskilda förfrågan, precis som den skulle vara för vilken webbförfrågan som helst du gör till github.com. Ingen annan information skickas som en del av denna förfrågan.
 ## Säkerhet
 
 Vi värdesätter ditt förtroende för att tillhandahålla oss din personliga information, därför strävar vi efter att använda kommersiellt acceptabla metoder för att skydda den. Men kom ihåg att ingen metod för överföring över internet, eller metod för elektronisk lagring är 100% säker och pålitlig, och vi kan inte garantera dess absoluta säkerhet.
@@ -48,7 +50,7 @@ Vi kan uppdatera vår integritetspolicy då och då. Därför rekommenderas du a
 Denna policy gäller från och med 2024-01-01
 ## Kontakta oss
 
-Om du har några frågor eller förslag om vår integritetspolicy, tveka inte att kontakta oss på [Infoga kontakt e-post eller GitHub Repository Link].
+Om du har några frågor eller förslag om vår integritetspolicy, tveka inte att kontakta oss på https://github.com/HereLiesAz/GraffitiXR/issues.
 
 ---
-*Dokumentationen uppdaterades 2026-03-17 under webbsidans omdesign och integrationsfasen för stencilläge.*
+*Dokumentationen uppdaterades 2026-09-04: rättade avsnittet om kraschrapporter, som tidigare beskrev automatisk insamling utan samtycke — appen kräver i själva verket ett explicit opt-in (Inställningar > Kraschrapporter, avstängt som standard) innan någon kraschrapport lämnar enheten, och rapporten skickas in som ett offentligt GitHub-ärende, inte till "våra servrar". Gav den befintliga GitHub API-uppdateringskontrollen ett eget avsnitt och förtydligade att den är användarinitierad (knappen "Sök efter uppdateringar" i Inställningar), inte automatisk. Fyllde i kontaktplatshållaren. Tidigare uppdatering: 2026-03-17, under webbsidans omdesign och integrationsfasen för stencilläge.*
