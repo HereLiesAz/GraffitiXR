@@ -628,12 +628,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                LaunchedEffect(Unit) {
-                    arViewModel.unfreezeRequested.collect {
-                        editorViewModel.toggleImageLock()
-                    }
-                }
-
                 LaunchedEffect(arViewModel, editorViewModel) {
                     // Also flushes, in order, any spectator ops that arrived before this effect ran.
                     arViewModel.setSpectatorOpHandler { op -> editorViewModel.applySpectatorOp(op) }
