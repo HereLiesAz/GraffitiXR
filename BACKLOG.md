@@ -41,6 +41,20 @@ fixed this pass:
   asset stripped. Corrected both docs and the stale `confGlobal` KDoc in `PoseFusion.kt` (which
   still described the pre-Phase-5b whole-design-progress semantics `CONF_FLOOR`'s own doc, five
   lines above it, had already retracted).
+- **`nativeGetAnchorTransform` was typed non-null in Kotlin but the JNI can return null** (an
+  allocation failure on the 16-float result array, `GraffitiJNI.cpp`). `SlamManager.getAnchorTransform`
+  is now `FloatArray?`; all three call sites (`ArViewModel`'s doodle-capture precondition check,
+  and `ArRenderer`'s backbone-fallback and eval-truth-pose reads) handle the null case instead of
+  risking an NPE on the GL thread. This also makes `awaitAnchorTransform`'s existing `m == null`
+  guard live — it was dead code under the old non-null signature.
+- **`:core:nativebridge`'s ProGuard rules never reached R8** — no `consumerProguardFiles`, so
+  release builds survived only because `app/proguard-rules.pro` duplicated the JNI keep rules by
+  hand. Added `consumerProguardFiles("consumer-rules.pro")` and moved the real rules there.
+  `:core:common` had the mirror-image bug: its `build.gradle.kts` referenced a `proguard-rules.pro`
+  that doesn't exist (removed the dangling reference) while its actual `consumer-rules.pro` — the
+  file that *is* wired — carried zero real rules despite owning `Fingerprint`, which is constructed
+  from native via a frozen JNI factory. Added the `Fingerprint` keep rules there so they travel with
+  the class that needs them, rather than living only in the app's copy.
 
 #### Dead-features clearance pass
 
@@ -111,19 +125,13 @@ Correctness bugs, worst first:
 - **First-run AR instruction tells the user to tap the icon that hides the rail** — the
   `showDesignInstructionsDialog` copy ("Tap the menu icon, then tap 'Open'") targets a `noMenu`
   rail whose icon collapses it, not opens it.
-- **README claims snap-back is an opt-in toggle, off by default; it is unconditionally on with no
-  UI path to disable it.** `setRelocEnabled` has no caller anywhere; `mRelocEnabled` defaults
-  `true` in `MobileGS.h`. (Self-grow's toggle is real and correctly described — only snap-back is
-  wrong.) Either wire a real toggle or fix `README.md:13,22`.
-- **`nativeGetAnchorTransform` is declared non-null (`FloatArray`) in `SlamManager.kt` but the JNI
-  can return null under allocation pressure** — an OOM-triggered NPE on the GL thread with no null
-  visible at the Kotlin call site. Declare it `FloatArray?` and handle it.
-- **`:core:nativebridge`'s ProGuard rules never reach R8** — no `consumerProguardFiles`, so release
-  builds only survive because `:app/proguard-rules.pro` happens to duplicate the JNI keep rules by
-  hand. `:core:common` (which owns `Fingerprint`, constructed from native) has the same gap in the
-  other direction: its `build.gradle.kts` references a `proguard-rules.pro` that doesn't exist, and
-  its actual `consumer-rules.pro` is the unmodified AGP template with zero rules in it.
-  `Fingerprint.kt`'s own comment notes this binding has already broken twice.
+- ~~README claims snap-back is an opt-in toggle, off by default~~ — **re-checked, not a bug.**
+  `setRelocEnabled`/`mRelocEnabled` (always-on, no caller) only gates the native engine's
+  *computation* of a relocalized pose; whether the app actually *uses* that pose is
+  `SettingsRepository.driftCorrectionEnabled`, which maps directly to `ArRenderer.fusionEnabled`
+  and defaults **off**. So the user-visible "does the overlay snap back" behavior genuinely is
+  opt-in, off by default, exactly as README.md describes — the dead `setRelocEnabled` flag is real
+  vestigial API-surface (worth deleting) but not a docs bug.
 - **`gEngineMutex` (JNI) serializes the GL/render thread behind full-resolution OpenCV work** —
   target-capture fingerprint generation and SuperPoint inference hold the same global lock the
   per-frame camera/YUV callbacks need, which is a likely visible freeze at exactly the moment the

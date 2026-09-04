@@ -8,6 +8,7 @@ android {
     compileSdk = 37
     defaultConfig {
         minSdk = 26
+        consumerProguardFiles("consumer-rules.pro")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // Build only for ARM architectures (skip x86/x86_64 emulator builds)

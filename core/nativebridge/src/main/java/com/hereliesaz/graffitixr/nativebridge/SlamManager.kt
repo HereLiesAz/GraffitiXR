@@ -344,7 +344,12 @@ class SlamManager @Inject constructor(
         nativeSetDesignPlacement(fpFromDesign16, halfW, halfH)
     }
 
-    fun getAnchorTransform(): FloatArray = nativeGetAnchorTransform()
+    /**
+     * Null only under allocation pressure severe enough that the native side couldn't allocate the
+     * 16-float result array (`GraffitiJNI.cpp`'s `nativeGetAnchorTransform`) — vanishingly rare, but
+     * real; callers must handle it rather than assume this can't fail.
+     */
+    fun getAnchorTransform(): FloatArray? = nativeGetAnchorTransform()
 
     fun setWallFingerprint(
         bitmap: Bitmap,
@@ -763,7 +768,7 @@ class SlamManager @Inject constructor(
     private external fun nativeLoadLowLightEnhancer(assetManager: AssetManager)
     private external fun nativeUpdateAnchorTransform(transform: FloatArray)
     private external fun nativeUpdateDeviceMotion(angularVel: FloatArray, linearVel: FloatArray)
-    private external fun nativeGetAnchorTransform(): FloatArray
+    private external fun nativeGetAnchorTransform(): FloatArray?
     private external fun nativeGetPaintingProgress(): Float
     private external fun nativeGetCorroborationConfidence(): Float
     private external fun nativeGetRelocDiagnostics(): IntArray?

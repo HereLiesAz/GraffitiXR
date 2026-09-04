@@ -3396,12 +3396,17 @@ class ArViewModel @Inject constructor(
         // reach the builder.
         val planeNormalOk = plane != null && plane.size >= 6 &&
             (plane[3] * plane[3] + plane[4] * plane[4] + plane[5] * plane[5]) > 1e-8f
-        if (!planeNormalOk || intr == null) {
+        // Native hands back null only under allocation pressure severe enough that it couldn't
+        // allocate a 16-float array (GraffitiJNI.cpp's nativeGetAnchorTransform) — vanishingly
+        // rare, but a real possibility the Kotlin signature used to hide behind a non-null type.
+        val anchor = slamManager.getAnchorTransform()
+        if (!planeNormalOk || intr == null || anchor == null) {
             val reason = when {
                 plane == null -> "no wall plane yet — ARCore has not produced a usable surface to project onto"
                 plane.size < 6 -> "wall plane malformed (${plane.size} floats, need 6)"
                 !planeNormalOk -> "wall plane has a degenerate normal — nothing can back-project onto it"
-                else -> "no camera intrinsics for this frame"
+                intr == null -> "no camera intrinsics for this frame"
+                else -> "native engine could not produce an anchor transform (allocation failure)"
             }
             com.hereliesaz.graffitixr.feature.ar.anchor.MetricFingerprintBuilder
                 .recordPreconditionFailure(reason)
@@ -3416,7 +3421,6 @@ class ArViewModel @Inject constructor(
         } else bitmap
         val planePoint = floatArrayOf(plane[0], plane[1], plane[2])
         val planeNormal = floatArrayOf(plane[3], plane[4], plane[5])
-        val anchor = slamManager.getAnchorTransform()
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 // Capture the wall's colour/luminance so the artwork can be auto-tuned to it on the
