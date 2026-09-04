@@ -339,66 +339,66 @@ than after.
 
 ### Phase 4 — AR core-workflow bugs (Kotlin/Compose, highest user impact)
 
-- [ ] **Retake is a no-op loop**: `onRetakeCapture()`/`clearTapHighlights()` don't clear
+- [x] **Retake is a no-op loop**: `onRetakeCapture()`/`clearTapHighlights()` don't clear
   `tempCaptureBitmap`/`annotatedCaptureBitmap`/`targetWallPlane`, so the review screen
   immediately re-renders the same rejected capture. Use `clearCaptureForRetry()` (which already
   does this correctly) instead of `clearTapHighlights()` on this path.
-- [ ] **Re-arming Target after a successful capture replays the stale one**: same root cause —
+- [x] **Re-arming Target after a successful capture replays the stale one**: same root cause —
   `startTargetCapture()` doesn't clear the previous capture's state, so the artist can confirm an
   old photo against a freshly-established anchor. Same fix as above, applied to this entry point.
-- [ ] **"Tap 'Open' on the rail" instructions are wrong in AR**: both post-target-lock prompts
+- [x] **"Tap 'Open' on the rail" instructions are wrong in AR**: both post-target-lock prompts
   point at `item.open`, hosted under `mode.design`'s `expandWhen`-gated accordion, which
   auto-collapses the instant the artist is in AR (i.e. always, when these prompts fire). Either
   change the copy to describe the actual reachable action, or change the rail so `Open` stays
   visible in AR when there's no design loaded yet — pick whichever matches intended navigation;
   flag to the user if unclear which.
-- [ ] Depth-branch target confirm on a device with no open project silently discards the capture
+- [x] Depth-branch target confirm on a device with no open project silently discards the capture
   with no message (`MainViewModel.kt:202`) — the sibling no-depth branch already has the fix and
   explains why in its own comment. Apply the same fix here.
-- [ ] Target-confirmation feedback latency: `resetCaptureUi()` unmounts the capture UI (and its
+- [x] Target-confirmation feedback latency: `resetCaptureUi()` unmounts the capture UI (and its
   spinner) immediately, then the coroutine blocks on `awaitAnchorTransform` (up to 2s) plus a
   full ORB build with zero visible indicator. Keep a loading indicator visible across that gap.
-- [ ] `PaintingProgressIndicator` and `RelocStatusBadge` render at the identical
+- [x] `PaintingProgressIndicator` and `RelocStatusBadge` render at the identical
   `TopEnd`/16dp/16dp position showing the same number under different labels. Reposition one or
   merge them into a single indicator.
-- [ ] Overlay-mode camera-permission-denied is a blank screen with no message and no recovery —
+- [x] Overlay-mode camera-permission-denied is a blank screen with no message and no recovery —
   `CameraPermissionDeniedBanner` is gated to AR-only. Show it (or an equivalent) in Overlay too.
-- [ ] A locked transform (Trace ▸ Lock) swallows gestures *and* the Reset button with zero
+- [x] A locked transform (Trace ▸ Lock) swallows gestures *and* the Reset button with zero
   feedback — no toast, no shake, no dimmed control, and the one color-highlight cue can be on a
   collapsed rail. Add a discoverable "locked" signal on a failed gesture/Reset attempt.
-- [ ] Isolate/Outline effects that fail (fall back to unchanged input) still trigger the
+- [x] Isolate/Outline effects that fail (fall back to unchanged input) still trigger the
   "done"-state highlight, telling the artist a no-op succeeded. Gate the highlight on an actual
   change, or surface an explicit failure state.
-- [ ] Mockup wall-photo load failure (`setBackgroundImage`, decoder rejects the file) shows a
+- [x] Mockup wall-photo load failure (`setBackgroundImage`, decoder rejects the file) shows a
   spinner then silently nothing. Add a toast/error state on the null-bitmap branch.
-- [ ] Settings is unreachable from the Project Library, the app's start destination (no rail
+- [x] Settings is unreachable from the Project Library, the app's start destination (no rail
   items are registered there at all, and the `DashboardViewModel`'s `"settings"`/
   `"project_library"` navigation branches are dead). Add a reachable entry point before a project
   exists — at minimum language/handedness, which a new user may need immediately.
-- [ ] System Back from the editor quits the app outright (single-entry back stack after
+- [x] System Back from the editor quits the app outright (single-entry back stack after
   `popUpTo(LIBRARY_ROUTE){inclusive=true}}`, and the enabled `BackHandler`s don't cover the
   no-dialog-open case). Add a confirmation, or route back to the Library instead of finishing the
   Activity.
-- [ ] `SettingsScreen.kt` toggle rows are ~28dp tall against a 48dp minimum touch target — bump
+- [x] `SettingsScreen.kt` toggle rows are ~28dp tall against a 48dp minimum touch target — bump
   `SettingsItem` to a real minimum height.
-- [ ] Canvas-background color swatches are unlabeled 32dp circles with only a border-color state
+- [x] Canvas-background color swatches are unlabeled 32dp circles with only a border-color state
   cue — add `contentDescription` from the already-destructured (and currently unused) `label`.
-- [ ] Touch lock's volume-sequence unlock is defeated by the back gesture, which unlocks
+- [x] Touch lock's volume-sequence unlock is defeated by the back gesture, which unlocks
   unconditionally regardless of touch-lock state — intercept back the same way pointer input is
   intercepted, or explicitly document that back is a second, intentional unlock path (currently
   contradicts the on-screen hint, which names only the volume sequence).
-- [ ] Dead code cleanup, once confirmed still dead post-fixes above: `showWallSourceDialog`
+- [x] Dead code cleanup, once confirmed still dead post-fixes above: `showWallSourceDialog`
   (never set true anywhere), `CaptureStep.RECTIFY`/`UnwarpScreen`/`onUnwarpConfirm` (superseded
   by plane-guided rectification per `USER_FLOW.md`, but still the only writer of `isProcessing` —
   removing it needs the target-confirm loading-indicator fix above landed first so nothing
   regresses).
-- [ ] `RotationAxisFeedback` and `GestureFeedback` render overlapping "Axis: X" chips at the same
+- [x] `RotationAxisFeedback` and `GestureFeedback` render overlapping "Axis: X" chips at the same
   position in every non-Design mode; consolidate to one.
-- [ ] `toggleImageLock()` has no rail/UI entry point despite gating DESIGN-mode gestures and
+- [x] `toggleImageLock()` has no rail/UI entry point despite gating DESIGN-mode gestures and
   suppressing `GestureFeedback` when true (reachable via co-op `SetDesignProps` from a host, or a
   project saved by an older build) — add a control to unlock, or confirm the state is meant to be
   host-controlled only and surface *that* instead.
-- [ ] Verify (Compose tooling, not code reading) whether AzNavRail's `disabled` parameter
+- [x] Verify (Compose tooling, not code reading) whether AzNavRail's `disabled` parameter
   suppresses `onClick` — if so, `ArViewModel.startHosting()`'s "tap Host always yields an
   explanation" comment is false the same way the rail-instruction bug above is; fix by moving the
   explanation to fire on tap regardless of `disabled`.
