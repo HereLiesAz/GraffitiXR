@@ -88,7 +88,7 @@ The audit's "Dead / unreachable features" section is closed. Actions:
 Still open, not touched this pass:
 
 - **Glasses AR session** — ~640 LOC of overlays + calibration exists, but `glassesWorldHitForTimestamp` hit-tests the same phone screen point for src/dst so Procrustes always returns identity. A real fix needs a glasses-side world lookup — substantial new native/SDK integration. Left as WIP.
-- **AR freeze-preview** — `onFreezeRequested`/`FreezePreviewScreen`/`unfreezeRequested` chain is complete but nothing calls `onFreezeRequested`. Held pending a UX decision vs. the transform-lock (which covers a similar "hold the design still" intent for many use cases).
+- ~~AR freeze-preview~~ — **resolved, was mistaken identity.** `onFreezeRequested`/`FreezePreviewScreen`/`unfreezeRequested` was never a "hold the design still while painting" feature — it was an unused diagnostic screen (ORB feature blobs + a depth-warning banner) for reviewing target-capture quality, with no caller anywhere. The real Freeze is Trace mode's touchscreen lock (`isTransformLocked`, escapable via Volume Up/Down/Up/Down — see `help_lock_trace` above), already shipped. Deleted the diagnostic chain: `FreezePreviewScreen.kt`, `ArViewModel.onFreezeRequested`/`onFreezeDismissed`/`onUnfreezeRequested`/`unfreezeRequested`, `UiState.freezePreviewBitmap`/`freezeDepthWarning`, and the `MainScreen`/`MainActivity` wiring.
 
 #### Export & YUV clearance pass
 
@@ -131,8 +131,8 @@ Verified by `testDebugUnitTest` (413 tests), `externalNativeBuildDebug`, `detekt
 
 - _No open security alerts._ (CodeQL #3/#4/#5 SRI and the Bouncy Castle advisories #23/#24/#25 are resolved — see the Done section above.)
 
-Remaining open items (all in `docs/AUDIT.md` under "Still open"): Glasses AR session, AR
-freeze-preview, bidirectional co-op, and a short list of unreferenced diagnostic/eval knobs.
+Remaining open items (all in `docs/AUDIT.md` under "Still open"): Glasses AR session,
+bidirectional co-op, and a short list of unreferenced diagnostic/eval knobs.
 
 #### Glee audit pass (2026-09-04) — not yet acted on
 
@@ -183,11 +183,12 @@ Correctness bugs, worst first:
 
 Conceptual, needs a product decision rather than a code fix:
 
-- **The two features that most directly solve "get the design onto the wall without holding the
-  phone up" are unshipped**: `onFreezeRequested`'s freeze-to-paint chain has no caller (see the
-  existing WIP note above), and stencil/tiled-PDF export has no implementation despite being
-  marketed on the live site and documented in `docs/STENCILS.md`/`docs/FEATURE_REFERENCE.md` as if
-  it ships.
+- **The feature that most directly solves "get the design onto the wall without holding the
+  phone up" is unshipped**: stencil/tiled-PDF export has no implementation despite being marketed
+  on the live site and documented in `docs/STENCILS.md`/`docs/FEATURE_REFERENCE.md` as if it
+  ships. (Trace mode's Freeze — the touchscreen lock — already covers "hold the design still";
+  the `onFreezeRequested` chain once mistaken for a second such feature was dead diagnostic code
+  and has been deleted, see above.)
 - **No way anywhere in the app to enter real wall dimensions** — scale comes from a depth guess
   adjusted by pinch, for a target user (commissioned muralist) who prices per square foot.
 - **The "no cloud" anti-goal blocks encrypted crew fingerprint-sharing** (Co-op stays host→guest

@@ -45,7 +45,6 @@ import com.hereliesaz.graffitixr.common.model.FeedbackEvent
 import android.widget.Toast
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.CameraPreview
-import com.hereliesaz.graffitixr.feature.ar.FreezePreviewScreen
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
@@ -423,16 +422,6 @@ fun MainScreen(
                 EditorMode.DESIGN -> {}
                 else -> {}
             }
-        }
-
-        // Freeze preview — shown when user freezes layers in AR mode
-        arUiState.freezePreviewBitmap?.let { annotated ->
-            FreezePreviewScreen(
-                annotatedBitmap = annotated,
-                showDepthWarning = arUiState.freezeDepthWarning,
-                onDismiss = { arViewModel.onFreezeDismissed() },
-                onUnfreeze = { arViewModel.onUnfreezeRequested() }
-            )
         }
 
         // Camera modes: which rotation axis the last double-tap selected. Shown for every non-Design

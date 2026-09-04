@@ -121,9 +121,6 @@ class ArViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ArUiState())
     val uiState: StateFlow<ArUiState> = _uiState.asStateFlow()
 
-    private val _unfreezeRequested = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    val unfreezeRequested: SharedFlow<Unit> = _unfreezeRequested.asSharedFlow()
-
     // One-off, user-facing feedback (e.g. "camera unavailable") so AR failures surface
     // instead of leaving a silent black screen. Collected by the screen and shown as a toast.
     private val _feedback = MutableSharedFlow<com.hereliesaz.graffitixr.common.model.FeedbackEvent>(extraBufferCapacity = 4)
@@ -2911,23 +2908,6 @@ class ArViewModel @Inject constructor(
             } finally {
                 artworkRegInFlight.set(false)
             }
-        }
-    }
-
-    fun onFreezeRequested(bitmap: Bitmap) {
-        _uiState.update { it.copy(freezePreviewBitmap = bitmap) }
-        renderer?.hideVisualization = true
-    }
-
-    fun onFreezeDismissed() {
-        _uiState.update { it.copy(freezePreviewBitmap = null) }
-        renderer?.hideVisualization = false
-    }
-
-    fun onUnfreezeRequested() {
-        viewModelScope.launch {
-            _unfreezeRequested.emit(Unit)
-            onFreezeDismissed()
         }
     }
 

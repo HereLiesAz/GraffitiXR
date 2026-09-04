@@ -215,11 +215,6 @@ data class ArUiState(
     // X > 0 is right, Y > 0 is up, Z < 0 is in front.
     val anchorRelativeDirection: Triple<Float, Float, Float>? = null,
 
-    // Freeze preview — non-null while FreezePreviewScreen is shown
-    val freezePreviewBitmap: Bitmap? = null,
-    // True when target was captured without depth data; shown as banner in FreezePreviewScreen
-    val freezeDepthWarning: Boolean = false,
-
     val coopRole: CoopRole = CoopRole.NONE,
     val coopSessionState: CoopSessionState = CoopSessionState.Idle,
     val showCoopNotFoundDialog: Boolean = false,
