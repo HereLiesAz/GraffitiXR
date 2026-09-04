@@ -2,7 +2,7 @@
 
 **Sist oppdatert:** [Gjeldende dato]
 
-HereLiesAZ bygde GraffitiXR-appen som en åpen kildekode-app. Denne TJENESTEN leveres av HereLiesAZ uten kostnad og er beregnet for bruk som den er.
+HereLiesAZ bygde GraffitiXR-appen som en kildetilgjengelig app (source-available) (se LICENSE og docs/LICENSING.md i repositoriet for vilkårene). Denne TJENESTEN leveres av HereLiesAZ uten kostnad og er beregnet for bruk som den er.
 
 Denne siden brukes til å informere besøkende om våre retningslinjer for innsamling, bruk og avsløring av personlig informasjon hvis noen bestemte seg for å bruke tjenesten vår.
 
@@ -16,9 +16,20 @@ For en bedre opplevelse, mens du bruker tjenesten vår, kan vi kreve at du gir o
 * **Lagring / Bilder:** Vi krever tilgang til enhetens lagring (lese/skrive ekstern lagring eller fotobibliotek) for å laste inn bilder for overlegg, lagre prosjektene dine og eksportere bilder.
 * **Stedsdata (valgfritt):** Hvis du gir plasseringstillatelser, kan appen samle inn GPS-data (breddegrad, lengdegrad, høyde) for å geomerke prosjektene dine. Disse dataene lagres lokalt i prosjektfilene dine.
 
-## Logg data
+## Krasjrapporter (opt-in)
 
-Vi ønsker å informere deg om at når du bruker tjenesten vår, i tilfelle feil i appen samler vi inn data og informasjon (gjennom tredjepartsprodukter) på telefonen din kalt Loggdata. Disse loggdataene kan inkludere informasjon som enhetens Internett-protokoll (“IP”)-adresse, enhetsnavn, operativsystemversjon, konfigurasjonen av appen når du bruker tjenesten vår, klokkeslett og dato for din bruk av tjenesten og annen statistikk.
+Ingenting om et krasj forlater enheten din som standard. Hvis appen krasjer eller gjenoppretter etter en intern feil, skrives en rapport til en lokal, midlertidig fil på enheten din, slik at appen kan vise deg et varsel om at «forrige økt krasjet» neste gang du åpner den — den filen forlater aldri enheten av seg selv.
+
+Å sende den rapporten til oss er avslått med mindre du selv slår det på, under **Innstillinger > Krasjrapporter**. Bare hvis — og bare hvis — du har valgt å delta, laster appen opp rapporten neste gang den starter, som en **offentlig sak (issue)** i dette prosjektets GitHub-feilsporing (github.com/HereLiesAz/GraffitiXR). Rapporten inneholder kun:
+
+*   om krasjet var fatalt (appen ble drept) eller gjenopprettet (fanget opp, og appen fortsatte å kjøre);
+*   dato og klokkeslett for krasjet;
+*   enhetens produsent og modell, samt Android-versjonen din;
+*   appens versjonsnavn;
+*   unntakets stack trace; og
+*   opptil de siste 1000 linjene av appens egen logcat-utdata (begrenset til denne appens prosess — ikke systemomfattende logger).
+
+Fordi rapporten sendes inn som en offentlig GitHub-sak, er innholdet (inkludert enhets- og logginformasjonen ovenfor) synlig for alle som kan se dette prosjektets feilsporing. Slå bare på krasjrapporter hvis du er komfortabel med det. Du kan slå av innstillingen igjen når som helst, og det vil ikke påvirke krasj som allerede har skjedd.
 
 ## Tjenesteleverandører
 

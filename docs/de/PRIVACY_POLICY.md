@@ -1,8 +1,8 @@
 # Datenschutzerklärung für GraffitiXR
 
-**Zuletzt aktualisiert:** [Aktuelles Datum]
+**Zuletzt aktualisiert:** 2026-09-04
 
-HereLiesAZ hat die GraffitiXR-App als Open-Source-App entwickelt. Dieser DIENST wird von HereLiesAZ kostenlos zur Verfügung gestellt und ist für die Nutzung im Ist-Zustand vorgesehen.
+HereLiesAZ hat die GraffitiXR-App als Source-Available-App entwickelt (Details zu den Lizenzbedingungen siehe die LICENSE-Datei und docs/LICENSING.md im Repository). Dieser DIENST wird von HereLiesAZ kostenlos zur Verfügung gestellt und ist für die Nutzung im Ist-Zustand vorgesehen.
 
 Diese Seite dient dazu, Besucher über unsere Richtlinien bezüglich der Erfassung, Verwendung und Offenlegung personenbezogener Daten zu informieren, falls sich jemand entscheidet, unseren Dienst zu nutzen.
 
@@ -53,7 +53,7 @@ Diese Richtlinie ist gültig ab dem 01.01.2024.
 
 ## Kontaktiere uns
 
-Wenn Sie Fragen oder Anregungen zu unserer Datenschutzerklärung haben, zögern Sie nicht, uns unter [Geben Sie hier Ihre Kontakt-E-Mail-Adresse oder den GitHub-Repository-Link ein] zu kontaktieren.
+Wenn Sie Fragen oder Anregungen zu unserer Datenschutzerklärung haben, zögern Sie nicht, uns unter https://github.com/HereLiesAz/GraffitiXR/issues zu kontaktieren.
 
 ---
-*Dokumentation aktualisiert am 2026-03-17 während der Website-Neugestaltungs- und Schablonenmodus-Integrationsphase.*
+*Dokumentation aktualisiert am 2026-09-04: "Open-Source" auf "Source-Available" korrigiert (siehe LICENSE / docs/LICENSING.md) und den Platzhalter für die Kontakt-E-Mail durch den echten Issue-Link des Repositorys ersetzt. Vorheriges Update: 2026-03-17.*

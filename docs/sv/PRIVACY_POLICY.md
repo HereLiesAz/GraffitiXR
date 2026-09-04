@@ -1,7 +1,7 @@
 # Sekretesspolicy för GraffitiXR
 
-**Senast uppdaterad:** [aktuellt datum]
-HereLiesAZ byggde GraffitiXR-appen som en öppen källkodsapp. Denna TJÄNST tillhandahålls av HereLiesAZ utan kostnad och är avsedd att användas som den är.
+**Senast uppdaterad:** 2026-09-04
+HereLiesAZ byggde GraffitiXR-appen som en källkodstillgänglig (source-available) app (se repots LICENSE-fil och docs/LICENSING.md för villkoren). Denna TJÄNST tillhandahålls av HereLiesAZ utan kostnad och är avsedd att användas som den är.
 Denna sida används för att informera besökare om vår policy med insamling, användning och avslöjande av personlig information om någon bestämt sig för att använda vår tjänst.
 Om du väljer att använda vår tjänst, samtycker du till insamling och användning av information i samband med denna policy. Personuppgifterna som vi samlar in används för att tillhandahålla och förbättra Tjänsten. Vi kommer inte att använda eller dela din information med någon förutom enligt beskrivningen i denna integritetspolicy.
 ## Informationsinsamling och användning
@@ -10,9 +10,20 @@ För en bättre upplevelse när vi använder vår tjänst kan vi kräva att du f
 * **Kameradata:** Appen kräver åtkomst till enhetens kamera för att visa Augmented Reality (AR)-vyn, överlagringsläge och för att ta bilder för projektmål. Kameradata bearbetas lokalt på din enhet och överförs inte till våra servrar om du inte uttryckligen väljer att dela en projektfil.
 * **Lagring/foton:** Vi kräver åtkomst till din enhets lagring (läs/skriv extern lagring eller fotobibliotek) för att ladda bilder för överlägg, spara dina projekt och exportera tagna bilder.
 * **Platsdata (valfritt):** Om du ger platsbehörighet kan appen samla in GPS-data (latitud, longitud, höjd) för att geotagga dina projekt. Dessa data sparas lokalt i dina projektfiler.
-## Loggdata
+## Kraschrapporter (valbart)
 
-Vi vill informera dig om att när du använder vår tjänst samlar vi in ​​data och information (genom tredjepartsprodukter) på din telefon som kallas Log Data i ett fall av fel i appen. Denna loggdata kan inkludera information som din enhets Internet Protocol (“IP”) adress, enhetsnamn, operativsystemversion, konfigurationen av appen när du använder vår tjänst, tid och datum för din användning av tjänsten och annan statistik.
+Ingenting som rör en krasch lämnar din enhet som standard. Om appen kraschar eller återhämtar sig från ett internt fel skrivs en rapport till en lokal, tillfällig fil på din enhet så att appen kan visa dig en "senaste körningen kraschade"-notis nästa gång du öppnar den — den filen lämnar aldrig enheten av sig själv.
+
+Att skicka den rapporten till oss är avstängt om du inte själv slår på det, under **Inställningar > Kraschrapporter**. Om — och bara om — du har valt att aktivera detta, laddar appen upp rapporten nästa gång den startar, som ett **offentligt ärende (issue)** i det här projektets GitHub-ärendehanterare (github.com/HereLiesAz/GraffitiXR). Rapporten innehåller endast:
+
+*   om kraschen var ödesdiger (appen dödades) eller återhämtad (fångad och appen fortsatte köras);
+*   datum och tid för kraschen;
+*   din enhets tillverkare och modell, samt din Android-version;
+*   appens versionsnamn;
+*   undantagets stackspårning; och
+*   upp till de senaste 1 000 raderna av appens egen logcat-utdata (begränsat till den här appens process — inte systemomfattande loggar).
+
+Eftersom rapporten läggs upp som ett offentligt GitHub-ärende är dess innehåll (inklusive enhets- och logginformationen ovan) synligt för alla som kan se det här projektets ärendehanterare. Slå bara på kraschrapporter om du är bekväm med det. Du kan när som helst stänga av inställningen igen, och det påverkar inte krascher som redan inträffat.
 ## Tjänsteleverantörer
 
 Vi kan anställa tredjepartsföretag och individer av följande skäl:
