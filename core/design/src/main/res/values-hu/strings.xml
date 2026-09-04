@@ -433,19 +433,14 @@
 
     <string name="help_trace">Világítótábla Mód: Nagy fényerejű rajzoló felület. Utasítások: Helyezz papírt a képernyőre és rajzolj. Nyomd meg gyorsan a Hangerő Fel, Le, Fel, Le gombokat a kilépéshez.</string>
 
-    <string name="help_target_host">Célpont Kezelés: Eszközök az AR horgonyokhoz. Utasítások: Koppints a falfestmény pozíciójának létrehozásához vagy újraigazításához szükséges eszközök eléréséhez.</string>
 
-    <string name="help_scan_mode_toggle">Szkennelési Felbontás: Váltás a Falfestmény (nagy lépték) és a Vászon (kis lépték) között. A falfestmény Gauss-splatteket használ a falakhoz; a Vászon Pontfelhőket használ a részletes asztali méretű művészethez.</string>
 
     <string name="help_create">Horgony Létrehozása: Fényképezz le egy jelölést a falon a vetítés rögzítéséhez. Utasítások: Mutass egy jellegzetes textúrára, és koppints. Az alkalmazás követni fogja ezt a jelölést.</string>
 
-    <string name="help_design_host">Réteg Kezelés: Képek, szöveg vagy vázlatok hozzáadása. Utasítások: Koppints a kibontáshoz. Nyomd hosszan bármelyik réteg gombot a másodlagos menü megnyitásához.</string>
 
     <string name="help_add_img">Kép Importálása: Vázlat vagy referenciafotó hozzáadása. Utasítások: Válassz egy képet a galériádból. Új tervezési rétegként fog megjelenni.</string>
 
-    <string name="help_add_draw">Új Vázlat: Üres réteg hozzáadása szabadkézi rajzoláshoz. Utasítások: Válaszd ki a réteget az ecset, a radír és a maszatolási eszközök megjelenítéséhez.</string>
 
-    <string name="help_add_text">Szöveg Hozzáadása: Hozz létre egy tipográfiai réteget. Utasítások: Koppints a réteg \'Szerkesztés\' gombjára a tartalom és a formázás módosításához.</string>
 
     <string name="help_wall">Fal Módosítása: Háttér beállítása Makett módhoz. Utasítások: Válassz egy fotót a fizikai falról, amelyre festeni tervezel.</string>
 
@@ -466,51 +461,29 @@
     <string name="help_lock_trace">Zárolás/Fagyasztás: Véletlen változtatások megelőzése. Utasítások: Rajzolás módban letiltja a képernyőt. Más módokban zárolja a réteg transzformációit.</string>
 
 
-    <string name="help_layer">\'%1$s\' Réteg: Aktív falfestmény elem. Utasítások: Koppints a kiválasztáshoz. Húzd a gombot fel/le az átrendezéshez. Alakítsd át a képernyőn gesztusokkal.</string>
 
 
 
-    <string name="help_edit_text">Szöveg Szerkesztése: Szavak módosítása a tipográfiai rétegben. Utasítások: Koppints a billentyűzet megnyitásához és a szöveg tartalmának frissítéséhez.</string>
 
-    <string name="help_size">Ecset/Szöveg Méret: Állítsd be a léptéket és a puhaságot. Utasítások: Húzd fel/le a mérethez. Húzd balra/jobbra az ecset tollasodásához.</string>
 
-    <string name="help_font">Betűtípus Választó: Válassz tipográfiai stílust. Utasítások: Koppints a rendelkezésre álló betűtípusok böngészéséhez és alkalmazásához a szövegrétegen.</string>
 
-    <string name="help_color">Szín Eszköz: Aktív szín beállítása. Utasítások: Húzd fel/le a fényerőhöz, balra/jobbra a telítettséghez. Koppints a teljes színkörhöz.</string>
 
-    <string name="help_kern">Szöveg Alávágás: Betűközök beállítása. Utasítások: Húzd balra/jobbra a szöveg elrendezésének szűkítéséhez vagy lazításához.</string>
 
-    <string name="help_bold">Félkövér Váltó: Vastag betűvastagság. Utasítások: Koppints a félkövér stílus bekapcsolásához az aktív szövegrétegen.</string>
 
-    <string name="help_italic">Dőlt Váltó: Ferde stílus. Utasítások: Koppints a dőlt stílus bekapcsolásához az aktív szövegrétegen.</string>
 
-    <string name="help_outline">Szöveg Körvonal: Karakter vonás. Utasítások: Koppints egy látható körvonal bekapcsolásához a szövegkarakterek körül.</string>
 
-    <string name="help_shadow">Vetett Árnyék: Szövegmélység. Utasítások: Koppints egy puha árnyék bekapcsolásához a tipográfia mögött a jobb olvashatóság érdekében.</string>
 
-    <string name="help_stencil_gen">Sablon Generálása: Nyomtatható sablonok létrehozása. Utasítások: Koppints a többrétegű sablon generálásának megkezdéséhez a képhez.</string>
 
-    <string name="help_blend">Keverési Mód: Kompozit stílus. Utasítások: Koppints a módok, például a Szorzás, a Képernyő és a Rétegzés közötti váltáshoz.</string>
 
-    <string name="help_adj">Képigazítások: Finomhangold a megjelenést. Utasítások: Koppints a csúszkák megjelenítéséhez az Átlátszatlanság, a Fényerő, a Kontraszt és a Telítettség érdekében.</string>
 
-    <string name="help_invert">Színek Invertálása: Nagy kontrasztú negatív. Utasítások: Koppints a színek megfordításához. A fehérek feketévé válnak és fordítva – hasznos a rajzoláshoz.</string>
 
-    <string name="help_balance">Színegyensúly: RGB csatorna hangolás. Utasítások: Koppints a csúszkák megjelenítéséhez a pontos Piros, Zöld és Kék beállításhoz.</string>
 
-    <string name="help_eraser">Radírecset: Távolítsd el a réteg tartalmát. Utasítások: Fess a képernyőn a törléshez. Használd a \'Méret\' gombot az átmérő beállításához.</string>
 
-    <string name="help_blur">Homályosító/Maszatoló Eszköz: Keverd össze a színeket. Utasítások: Fess a régiókon, hogy lágyítsd a széleket, vagy maszatold össze a részleteket.</string>
 
-    <string name="help_liquify">Torzító Eszköz: Terv átalakítása. Utasítások: Húzd a képernyőn a képpontok tolásához és húzásához – nagyszerű az arányok beállításához.</string>
 
-    <string name="help_dodge">Világosító Eszköz: Világosíts területeket. Utasítások: Fess a réteg bizonyos részeire a fénysűrűségük növeléséhez.</string>
 
-    <string name="help_burn">Sötétítő Eszköz: Sötétíts területeket. Utasítások: Fess a réteg bizonyos részeire a fénysűrűségük csökkentéséhez.</string>
 
-    <string name="help_iso">Téma Kizárása: Automatikus háttér-eltávolítás. Utasítások: Koppints a fő téma MI segítségével történő kivonásához a hátteréből.</string>
 
-    <string name="help_line">Vázlat Körvonal: Vonalrajz szűrő. Utasítások: Koppints a fotó fekete-fehér átlátszó körvonallá alakításához.</string>
 
 
 
@@ -572,7 +545,6 @@
     <string name="settings_scan_mode_cloud_offset">Felhő-eltolás</string>
     <string name="settings_reset_tutorials_label">Bemutatók visszaállítása</string>
     <string name="settings_reset_tutorials_value">Kezdő útmutatók újbóli megjelenítése</string>
-    <string name="help_cloud_offset">Horgony-eltolás átadása: nagy pontosságú pontfelhő-követés nagyméretű falfestményekhez. Utasítások: végezd el a 360°-os szkennelést, majd koppints a horgony elhelyezéséhez.</string>
     <string-array name="onboarding_trace">
         <item>Ez a Rajzolás mód.</item>
         <item>Koppints a „Megnyitás” gombra az első réteged hozzáadásához. Miután hozzáadtad, csippentéssel és húzással méretezheted és helyezheted el a vásznon.</item>

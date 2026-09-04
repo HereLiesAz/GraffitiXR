@@ -433,19 +433,14 @@
 
     <string name="help_trace">Режим Lightbox: поверхность трассировки высокой яркости. Быстро нажмите Громкость Вверх, Вниз, Вверх, Вниз, чтобы выйти.</string>
 
-    <string name="help_target_host">Управление целями: инструменты для якорей AR. </string>
 
-    <string name="help_scan_mode_toggle">Разрешение сканирования: переключение между «Фреска» (крупный масштаб) и «Холст» (маленький масштаб). </string>
 
     <string name="help_create">Создать якорь: сфотографируйте отметку на стене, чтобы зафиксировать проекцию. </string>
 
-    <string name="help_design_host">Управление слоями: добавляйте изображения, текст или эскизы. </string>
 
     <string name="help_add_img">Импортировать изображение: добавьте эскиз или эталонную фотографию. </string>
 
-    <string name="help_add_draw">Новый эскиз: добавьте пустой слой для рисования от руки. </string>
 
-    <string name="help_add_text">Добавить текст: создайте типографский слой. </string>
 
     <string name="help_wall">Изменить стену: установите фон для режима макета. </string>
 
@@ -466,51 +461,29 @@
     <string name="help_lock_trace">Блокировка/заморозка: предотвращение случайных изменений. </string>
 
 
-    <string name="help_layer">Слой \'%1$s\': активный элемент росписи. </string>
 
 
 
-    <string name="help_edit_text">Редактировать текст: изменить слова на типографском слое. </string>
 
-    <string name="help_size">Размер кисти/текста: отрегулируйте масштаб и мягкость. </string>
 
-    <string name="help_font">Выбор шрифта: выберите стиль оформления. </string>
 
-    <string name="help_color">Инструмент «Цвет»: установите активный цвет. </string>
 
-    <string name="help_kern">Кернинг текста: регулировка интервала между буквами. </string>
 
-    <string name="help_bold">Переключатель жирного шрифта: толстый шрифт. </string>
 
-    <string name="help_italic">Переключатель курсива: наклонный стиль. </string>
 
-    <string name="help_outline">Контур текста: обводка символа. </string>
 
-    <string name="help_shadow">Тень: глубина текста. </string>
 
-    <string name="help_stencil_gen">Создать трафарет: создание шаблонов для печати. </string>
 
-    <string name="help_blend">Режим наложения: Композитный стиль. </string>
 
-    <string name="help_adj">Регулировка изображения: точная настройка внешнего вида. </string>
 
-    <string name="help_invert">Инвертировать цвета: высококонтрастный негатив. </string>
 
-    <string name="help_balance">Цветовой баланс: настройка канала RGB. </string>
 
-    <string name="help_eraser">Кисть-ластик: удаление содержимого слоя. </string>
 
-    <string name="help_blur">Инструмент «Размытие/Размазывание»: смешайте цвета. </string>
 
-    <string name="help_liquify">Инструмент «Деформация»: изменение формы дизайна. </string>
 
-    <string name="help_dodge">Инструмент Dodge: осветляет области. </string>
 
-    <string name="help_burn">Инструмент «Затемнитель»: затемнение областей. </string>
 
-    <string name="help_iso">Изолировать объект: автоматическое удаление фона. </string>
 
-    <string name="help_line">Контур эскиза: фильтр линейного искусства. </string>
 
 
 
@@ -572,7 +545,6 @@
     <string name="settings_scan_mode_cloud_offset">Смещение облака точек</string>
     <string name="settings_reset_tutorials_label">Сбросить обучающие материалы</string>
     <string name="settings_reset_tutorials_value">Показать вводные подсказки заново</string>
-    <string name="help_cloud_offset">Передача смещения якоря: высокоточное отслеживание облака точек для масштабных фресок. Инструкции: завершите сканирование на 360°, затем нажмите, чтобы разместить якорь.</string>
     <string-array name="onboarding_trace">
         <item>Это режим Следа.</item>
         <item>Нажмите «Открыть», чтобы добавить первый слой. После добавления сведите или разведите пальцы и перетащите на холсте, чтобы изменить размер и разместить его.</item>
