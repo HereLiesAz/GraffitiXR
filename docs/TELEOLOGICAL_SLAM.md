@@ -30,18 +30,25 @@ on top of the OpenCV relocalizer:
    becomes more aggressive — the overlay "snaps" more tightly the more of the
    mural exists on the wall.
 
-   Concretely: `ArRenderer` passes the progress as `PoseFusion.currentAnchor`'s
-   `confGlobal`, which scales the smoothing rate as
-   `alpha = BASE_ALPHA * inlierRatio * (CONF_FLOOR + (1 - CONF_FLOOR) * progress)`.
+   Concretely: `ArRenderer` passes the CORROBORATION CONFIDENCE — not painting
+   progress; `slamManager.getCorroborationConfidence()`, per the comment beside
+   that call site — as `PoseFusion.currentAnchor`'s `confGlobal`, which scales
+   the smoothing rate as
+   `alpha = BASE_ALPHA * inlierRatio * (CONF_FLOOR + (1 - CONF_FLOOR) * confGlobal)`.
    The floor means a bare wall still corrects at half strength on the PnP inlier
-   ratio alone; a fully corroborated one earns twice that.
+   ratio alone. `PoseFusion`'s own doc is explicit that the "twice that" ceiling
+   this formula implies is not reachable on any real wall — read it before citing
+   the 2x figure as a property of the system rather than arithmetic at an input
+   the system cannot produce.
 
    (Until 2026-07 this stage was **not wired**: `confGlobal` was pinned at `1f`
    with a comment about the retired voxel map, so progress reached the HUD and
    nothing else and correction strength was identical at 0% and 100% painted.)
 
 4. **Self-grow.** Live features that pass the same corroboration test are
-   promoted into the reloc fingerprint (`mSelfGrowEnabled`, default on), so
+   promoted into the reloc fingerprint (`mSelfGrowEnabled`, default **off** —
+   reachable only from the diagnostic overlay, not the artist-facing UI; see
+   the note at the end of this document), so
    relocalization survives the original marks being painted over. The promotion
    gate is `MobileGS::growTrusted` — a strong inlier ratio qualifies at a lower
    absolute count, because a half-covered wall rarely reaches a large raw inlier
@@ -55,8 +62,10 @@ degrades as the original reference marks disappear under paint.
 
 The corroboration test is **descriptor similarity, not geometric accuracy**. A
 live feature corroborates the artwork when its nearest neighbour among the
-design composite's descriptors passes a Lowe ratio of 0.75
-(`MobileGS::tryUpdateFingerprint`). There is no positional tolerance, no scale
+design composite's descriptors passes a Lowe ratio of 0.85
+(`kCorrobLoweRatio`, `MobileGS::tryUpdateFingerprint`) — a looser test than
+relocalization's own 0.75 (`kRelocLoweRatio`), and, per `PARAMETERS.md`,
+one that has not itself been validated against real painted-wall photos. There is no positional tolerance, no scale
 or colour check, and nothing anywhere compares your brushwork to the design
 geometrically. Painting "more accurately" only helps insofar as it makes the
 wall's local appearance descriptor-match the design image.
@@ -142,9 +151,13 @@ feature count point at capture problems instead, which are covered above.
   `relocThreadFunc` background thread — see [NATIVE_ENGINE.md](NATIVE_ENGINE.md)
   and [SLAM_SETUP.md](SLAM_SETUP.md).
 - **Pose tracking** itself is provided by ARCore; the native engine layers
-  relocalization, the persistent voxel map, and this teleological correction on
-  top of ARCore's poses.
+  relocalization and this teleological correction on top of ARCore's poses.
+  There is no persistent voxel or splat map — see `NATIVE_ENGINE.md`.
 - Pose smoothing/fusion lives in the Kotlin `PoseFusion` layer, not in C++.
+- **Drift correction and self-grow both ship off by default**, reachable only
+  from the diagnostic overlay (Settings > diagnostic overlay), not the
+  artist-facing UI. Everything above describes what these mechanisms DO when
+  enabled, not what a normal install experiences out of the box.
 
 ---
-*Documentation updated on 2026-06-22 during the SLAM right-size and documentation-accuracy pass.*
+*Documentation updated on 2026-09-04: corrected the confGlobal formula's input (corroboration confidence, not painting progress), self-grow's actual default (off, not on), the corroboration Lowe ratio (0.85, not 0.75), and removed a stale reference to the deleted voxel/splat map. Prior update: 2026-06-22, SLAM right-size and documentation-accuracy pass.*
