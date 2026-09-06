@@ -172,6 +172,11 @@ fun HomographyFallbackOverlay(
     // background executor, but Compose's Snapshot state supports writes from any thread and
     // schedules recomposition correctly, so this needs no dispatcher hop.
     var isTrackingLost by remember { mutableStateOf(false) }
+    // HomographyTracker.h documents outConfidence (the RANSAC inlier ratio) as this fallback's
+    // stand-in for ARCore's TrackingState -- "a low value means about to lose the target" -- but
+    // nothing read it anywhere before this: it was computed, plumbed through 17 floats and a gyro
+    // decay, and then discarded. Surface it as an early warning distinct from full loss below.
+    var trackingConfidence by remember { mutableStateOf(1f) }
 
     DisposableEffect(bridgedTracker) {
         bridgedTracker.start()
@@ -217,6 +222,7 @@ fun HomographyFallbackOverlay(
             val analyzer = HomographyTrackingAnalyzer(context, id, bridgedTracker) { frame ->
                 onPoseTracked(frame?.pose)
                 isTrackingLost = frame == null
+                trackingConfidence = frame?.pose?.confidence ?: 0f
                 if (frame != null) {
                     glRenderer.updatePose(frame.pose.viewMatrix, frame.projMatrix, frame.frameAspect)
                 } else {
@@ -259,5 +265,23 @@ fun HomographyFallbackOverlay(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             )
         }
+    } else if (trackingConfidence < kWeakLockConfidenceThreshold) {
+        // A weaker but still-locked frame — HomographyTracker.h's own doc calls its confidence
+        // output "the caller's stand-in for ARCore's TrackingState; a low value means about to
+        // lose the target". This is that warning, one step before isTrackingLost's hard loss.
+        Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            Text(
+                text = "Hold steady — weak lock",
+                color = Color.White,
+                modifier = Modifier
+                    .padding(top = 32.dp)
+                    .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
     }
 }
+
+// track()'s post-gate confidence range is [kMinInlierRatio (0.35), 1.0] -- anything in the lower
+// portion of that range is a real "about to lose lock" signal, not just noise near the gate.
+private const val kWeakLockConfidenceThreshold = 0.5f

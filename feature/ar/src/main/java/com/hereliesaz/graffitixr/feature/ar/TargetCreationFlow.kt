@@ -44,30 +44,21 @@ fun TargetCreationUi(
     uiState: ArUiState,
     captureStep: CaptureStep,
     isWaitingForTap: Boolean,
-    isLoading: Boolean,
     strings: AppStrings,
     onConfirmTarget: (bitmap: Bitmap?, mask: Bitmap?) -> Unit,
     onRetake: () -> Unit,
     onCancel: () -> Unit,
-    onUnwarpConfirm: (List<Offset>) -> Unit,
-    onUpdateUnwarpPoints: (List<Offset>) -> Unit,
     onEraseAtPoint: (Float, Float) -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
+        // CaptureStep.RECTIFY (a manual 4-corner unwarp step) is never set by any writer of
+        // captureStep (MainViewModel only ever sets NONE/CAPTURE/REVIEW) — AR's own target
+        // capture went straight from CAPTURE to REVIEW once plane-guided rectification landed.
+        // UnwarpScreen/UnwarpOverlay themselves are NOT dead: HomographyFallbackOverlay still
+        // uses them directly, with its own local state, for the ARCore-fallback reference
+        // capture — only this unreachable branch and the onUnwarpConfirm/isLoading wiring that
+        // existed solely to feed it were removed.
         when (captureStep) {
-            CaptureStep.RECTIFY -> {
-                uiState.tempCaptureBitmap?.let { bitmap ->
-                    UnwarpScreen(
-                        bitmap = bitmap,
-                        points = uiState.unwarpPoints,
-                        onUpdatePoints = onUpdateUnwarpPoints,
-                        onConfirm = onUnwarpConfirm,
-                        onCancel = onCancel,
-                        strings = strings
-                    )
-                }
-            }
-
             CaptureStep.MASK, CaptureStep.REVIEW -> {
                 FeatureSelectionReview(
                     annotatedBitmap = uiState.annotatedCaptureBitmap,
@@ -99,17 +90,6 @@ fun TargetCreationUi(
                         )
                     }
                 }
-            }
-        }
-
-        if (isLoading) {
-            Box(modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f))) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center),
-                    color = HotPink
-                )
             }
         }
     }

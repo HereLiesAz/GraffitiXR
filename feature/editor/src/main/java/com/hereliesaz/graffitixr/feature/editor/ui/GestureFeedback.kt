@@ -22,7 +22,12 @@ import com.hereliesaz.graffitixr.common.model.RotationAxis
  */
 @Composable
 fun GestureFeedback(state: EditorUiState, modifier: Modifier = Modifier) {
-    val showFeedback = state.gestureInProgress || state.showRotationAxisFeedback
+    // showRotationAxisFeedback is deliberately NOT included here: MainScreen.kt already mounts
+    // the dedicated RotationAxisFeedback composable for that exact transient signal (localized,
+    // properly animated in/out, and self-clearing via onFeedbackShown) in every mode. Including
+    // it here too rendered two "Axis: X" chips stacked at the same TopCenter position whenever
+    // the axis was cycled.
+    val showFeedback = state.gestureInProgress
     val activeLayer = state.design
     val isLocked = activeLayer?.isImageLocked ?: false
 

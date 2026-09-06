@@ -1,7 +1,7 @@
 # Sekretesspolicy för GraffitiXR
 
-**Senast uppdaterad:** 08 april 2026
-HereLiesAZ byggde GraffitiXR-appen som en öppen källkodsapp. Denna TJÄNST tillhandahålls av HereLiesAZ utan kostnad och är avsedd att användas som den är.
+**Senast uppdaterad:** 2026-09-04
+HereLiesAZ byggde GraffitiXR-appen som en källkodstillgänglig (source-available) app (se repots LICENSE-fil och docs/LICENSING.md för villkoren). Denna TJÄNST tillhandahålls av HereLiesAZ utan kostnad och är avsedd att användas som den är.
 Denna sida används för att informera besökare om vår policy med insamling, användning och avslöjande av personlig information om någon bestämt sig för att använda vår tjänst.
 Om du väljer att använda vår tjänst, samtycker du till insamling och användning av information i samband med denna policy. Personuppgifterna som vi samlar in används för att tillhandahålla och förbättra Tjänsten. Vi kommer inte att använda eller dela din information med någon förutom enligt beskrivningen i denna integritetspolicy.
 ## Informationsinsamling och användning
@@ -10,9 +10,20 @@ För en bättre upplevelse när vi använder vår tjänst kan vi kräva att du f
 * **Kameradata:** Appen kräver åtkomst till enhetens kamera för att visa Augmented Reality (AR)-vyn, överlagringsläge och för att ta bilder för projektmål. Kameradata bearbetas lokalt på din enhet och överförs inte till våra servrar om du inte uttryckligen väljer att dela en projektfil.
 * **Lagring/foton:** Vi kräver åtkomst till din enhets lagring (läs/skriv extern lagring eller fotobibliotek) för att ladda bilder för överlägg, spara dina projekt och exportera tagna bilder.
 * **Platsdata (valfritt):** Om du ger platsbehörighet kan appen samla in GPS-data (latitud, longitud, höjd) för att geotagga dina projekt. Dessa data sparas lokalt i dina projektfiler.
-## Loggdata
+## Kraschrapporter (valbart)
 
-Vi vill informera dig om att när du använder vår tjänst samlar vi in ​​data och information (genom tredjepartsprodukter) på din telefon som kallas Log Data i ett fall av fel i appen. Denna loggdata kan inkludera information som din enhets Internet Protocol (“IP”) adress, enhetsnamn, operativsystemversion, konfigurationen av appen när du använder vår tjänst, tid och datum för din användning av tjänsten och annan statistik.
+Ingenting som rör en krasch lämnar din enhet som standard. Om appen kraschar eller återhämtar sig från ett internt fel skrivs en rapport till en lokal, tillfällig fil på din enhet så att appen kan visa dig en "senaste körningen kraschade"-notis nästa gång du öppnar den — den filen lämnar aldrig enheten av sig själv.
+
+Att skicka den rapporten till oss är avstängt om du inte själv slår på det, under **Inställningar > Kraschrapporter**. Om — och bara om — du har valt att aktivera detta, laddar appen upp rapporten nästa gång den startar, som ett **offentligt ärende (issue)** i det här projektets GitHub-ärendehanterare (github.com/HereLiesAz/GraffitiXR). Rapporten innehåller endast:
+
+*   om kraschen var ödesdiger (appen dödades) eller återhämtad (fångad och appen fortsatte köras);
+*   datum och tid för kraschen;
+*   din enhets tillverkare och modell, samt din Android-version;
+*   appens versionsnamn;
+*   undantagets stackspårning; och
+*   upp till de senaste 1 000 raderna av appens egen logcat-utdata (begränsat till den här appens process — inte systemomfattande loggar).
+
+Eftersom rapporten läggs upp som ett offentligt GitHub-ärende är dess innehåll (inklusive enhets- och logginformationen ovan) synligt för alla som kan se det här projektets ärendehanterare. Slå bara på kraschrapporter om du är bekväm med det. Du kan när som helst stänga av inställningen igen, och det påverkar inte krascher som redan inträffat.
 ## Tjänsteleverantörer
 
 Vi kan anställa tredjepartsföretag och individer av följande skäl:
@@ -21,7 +32,9 @@ Vi kan anställa tredjepartsföretag och individer av följande skäl:
 * Att utföra tjänsterelaterade tjänster; eller
 * För att hjälpa oss att analysera hur vår tjänst används.
 Vi använder **Google ML Kit** för ämnessegmentering (bakgrundsborttagning). Denna bearbetning sker lokalt på din enhet.
-Vi har tillgång till **GitHub API** för att söka efter programuppdateringar. Din IP-adress kan vara synlig för GitHub under dessa förfrågningar.
+## Uppdateringskontroller
+
+Inställningsskärmen har en knapp för "Sök efter uppdateringar". Ingenting kontrolleras automatiskt — bara när du trycker på knappen. Ett tryck skickar en förfrågan till **GitHub API** (api.github.com) för att slå upp projektets senaste utgåva. GitHub är en tredje part utanför vår kontroll, och din IP-adress är synlig för GitHub under den enskilda förfrågan, precis som den skulle vara för vilken webbförfrågan som helst du gör till github.com. Ingen annan information skickas som en del av denna förfrågan.
 ## Säkerhet
 
 Vi värdesätter ditt förtroende för att tillhandahålla oss din personliga information, därför strävar vi efter att använda kommersiellt acceptabla metoder för att skydda den. Men kom ihåg att ingen metod för överföring över internet, eller metod för elektronisk lagring är 100% säker och pålitlig, och vi kan inte garantera dess absoluta säkerhet.
@@ -37,7 +50,7 @@ Vi kan uppdatera vår integritetspolicy då och då. Därför rekommenderas du a
 Denna policy gäller från och med 2024-01-01
 ## Kontakta oss
 
-Om du har några frågor eller förslag om vår integritetspolicy, tveka inte att kontakta oss på [Infoga kontakt e-post eller GitHub Repository Link].
+Om du har några frågor eller förslag om vår integritetspolicy, tveka inte att kontakta oss på https://github.com/HereLiesAz/GraffitiXR/issues.
 
 ---
-*Dokumentationen uppdaterades 2026-03-17 under webbsidans omdesign och integrationsfasen för stencilläge.*
+*Dokumentationen uppdaterades 2026-09-04: den här filen är en duplicerad kopia av [`docs/sv/PRIVACY_POLICY.md`](sv/PRIVACY_POLICY.md) (ingen annan fil i repot länkar hit) och hade blivit inaktuell — den påstod felaktigt att appen var öppen källkod, saknade avsnittet om opt-in-kraschrapporter (beskrev istället automatisk, samtyckeslös loggdatainsamling) och saknade avslöjandet om GitHub API-uppdateringskontrollen. Innehållet har nu synkroniserats med `docs/sv/PRIVACY_POLICY.md`. Överväg att ta bort den här dubblettfilen och länka direkt till `docs/sv/PRIVACY_POLICY.md` i stället. Tidigare uppdatering: 08 april 2026.*

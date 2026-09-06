@@ -15,9 +15,11 @@ import com.hereliesaz.graffitixr.feature.ar.util.RotationDeltaMath
  * alignment is platform-guaranteed, its `rotationDeg` quarter-turn sign is asserted but not yet
  * device-verified).
  *
- * This is still upstream of Phase 2's CameraX/`OverlayRenderer`/`EditorMode` wiring — it composes
- * the two Phase-1 pieces into the one call a live-tracking loop will actually want
- * (`trackFrame`), but nothing here touches the camera pipeline or the renderer yet.
+ * Composes the tracker and the gyro bridge into the one call a live-tracking loop actually wants
+ * (`trackFrame`). [HomographyFallbackOverlay] is what wires this to CameraX, the camera pipeline,
+ * and [com.hereliesaz.graffitixr.feature.ar.rendering.OverlayRenderer] — that wiring exists and is
+ * live, despite an earlier version of this comment (and [HomographyArTracker]'s) describing it as
+ * a future "Phase 2."
  */
 class BridgedHomographyTracker(
     context: Context,
@@ -27,7 +29,7 @@ class BridgedHomographyTracker(
      * How long a lost vision lock stays bridged by gyro rotation before this gives up and reports
      * true loss. Kept short deliberately — see [GyroOrientationBridge]'s doc on why gyro-only
      * drift is small over a few hundred ms and not meant to stand in for vision indefinitely.
-     * Not yet tuned against real device/tracking-loss behavior; Phase 2's on-device pass should
+     * Not yet tuned against real device/tracking-loss behavior — a future on-device pass should
      * treat this as a starting point, not a settled constant.
      */
     private val maxBridgeMs: Long = 400L,

@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -90,7 +91,6 @@ import com.hereliesaz.graffitixr.onboarding.ArUnavailableOverlay
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.hereliesaz.graffitixr.common.security.SecurityProviderState
-import com.hereliesaz.graffitixr.common.util.PerspectiveProcessor
 import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
@@ -199,7 +199,6 @@ class MainActivity : ComponentActivity() {
     var showSaveDialog by mutableStateOf(false)
     var showSettings by mutableStateOf(false)
     var hasCameraPermission by mutableStateOf(false)
-    var showWallSourceDialog by mutableStateOf(false)
     var isExporting by mutableStateOf(false)
     // Crash report captured on the previous run (native SIGSEGV and/or JVM), shown on launch.
     var pendingCrashReport by mutableStateOf<String?>(null)
@@ -468,8 +467,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                var isProcessing by remember { mutableStateOf(false) }
-
                 val currentTempCapture = arUiState.tempCaptureBitmap
                 val currentCaptureStep = mainUiState.captureStep
                 val isWaitingForTap = mainUiState.isWaitingForTap
@@ -571,8 +568,31 @@ class MainActivity : ComponentActivity() {
                     mainViewModel.cancelTapMode()
                     arViewModel.clearTapHighlights()
                 }
-                BackHandler(enabled = mainUiState.isTouchLocked) {
-                    mainViewModel.setTouchLocked(false)
+                // Intentionally does NOT unlock. The Up-Down-Up-Down volume sequence above exists
+                // because touch lock must survive an accidental brush of the screen — a gesture-nav
+                // edge swipe (or a hardware Back button) is exactly as easy to trigger by accident as
+                // that touch, so letting it fall through to the default "finish/pop" behavior would
+                // reopen the same failure mode from a different input path. This handler only exists
+                // to consume the event so it can't do that; deliberate unlock stays volume-key only.
+                BackHandler(enabled = mainUiState.isTouchLocked) {}
+                // Editor modes are reached via popUpTo(LIBRARY_ROUTE) { inclusive = true } (see
+                // DashboardViewModel.DESTINATION_EDITOR and the AR/Design nav calls below), so the
+                // Library is never on the back stack under an editor mode — System Back had nothing
+                // to pop to and fell through to finishing the Activity, quitting the app with no
+                // confirmation. Route back to the Library instead, matching "proj.load"'s handler.
+                BackHandler(
+                    enabled = !showLibrary && !showSettings && !mainUiState.isInPlaneRealignment &&
+                        !mainUiState.isCapturingTarget && !mainUiState.isTouchLocked
+                ) {
+                    // Pop the editor route being left, not just push Library on top of it — a plain
+                    // navigate() here left [Editor, Library] on the stack, so the NEXT Back press
+                    // popped Library and reopened the same editor instead of leaving the app: an
+                    // editor -> library -> editor loop instead of Library (the app's home) actually
+                    // being reachable as a place Back can exit from.
+                    navController.navigate(LIBRARY_ROUTE) {
+                        currentRoute?.let { popUpTo(it) { inclusive = true } }
+                        launchSingleTop = true
+                    }
                 }
 
                 // noMenu (AzNavRail 11.0) removes the side drawer entirely — all entries become rail
@@ -625,12 +645,6 @@ class MainActivity : ComponentActivity() {
                             popUpTo(EditorMode.AR.name) { inclusive = true }
                             launchSingleTop = true
                         }
-                    }
-                }
-
-                LaunchedEffect(Unit) {
-                    arViewModel.unfreezeRequested.collect {
-                        editorViewModel.toggleImageLock()
                     }
                 }
 
@@ -790,7 +804,15 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                AzHostActivityLayout(navController = navController, currentDestination = currentRoute, initiallyExpanded = false) {
+                // Captured so Settings' "Reset Tutorials" (below, but lexically INSIDE this same
+                // call's content lambda — its own onResetTutorials closure can't see a `val`
+                // assigned from this call's return value, since that assignment only completes
+                // after the whole call, including this content lambda, finishes) can also clear
+                // this controller's own persisted completion state. AzHostActivityLayout returns
+                // the controller instance directly; recomposition keeps this var current well
+                // before Settings' button is ever tapped.
+                var guidanceControllerRef: com.hereliesaz.aznavrail.tutorial.AzGuidanceController? = null
+                val guidanceController = AzHostActivityLayout(navController = navController, currentDestination = currentRoute, initiallyExpanded = false) {
                     azTheme(
                         activeColor = Cyan,
                         focusColor = Cyan,
@@ -820,7 +842,7 @@ class MainActivity : ComponentActivity() {
                     // Reactive status-driven guidance (replaces the old adaptive coach and the removed
                     // scripted-tutorial API): milestone statuses, edges that reuse the existing
                     // onboarding text, and per-mode goals that self-activate on mode entry.
-                    ConfigureGuidance(editorUiState, arUiState, context, strings)
+                    ConfigureGuidance(editorUiState, arUiState, mainUiState.isCapturingTarget, context, strings)
 
                     // Registered UNCONDITIONALLY. This used to be gated on an isRailVisible built from
                     // hideUiForCapture / isTouchLocked / isCapturingTarget / showSettings /
@@ -1131,7 +1153,8 @@ class MainActivity : ComponentActivity() {
                                         onClose = { /* no-op: ProjectLibraryScreen no longer exposes a close affordance */ },
                                         strings = strings,
                                         importErrorMessage = dashboardState.importErrorMessage,
-                                        onDismissImportError = { dashboardViewModel.dismissImportError() }
+                                        onDismissImportError = { dashboardViewModel.dismissImportError() },
+                                        onOpenSettings = { showSettings = true }
                                     )
                                 }
                                 composable(EditorMode.AR.name) {
@@ -1181,7 +1204,11 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            if (editorUiState.editorMode == EditorMode.AR
+                            // MainScreen's own camera-preview gate (hasCameraPermission &&
+                            // isCameraActive && mode != TRACE) needs the camera in Overlay too, not
+                            // just AR — Overlay with permission denied was a blank screen with no
+                            // explanation and no route to Settings, since this banner was AR-only.
+                            if ((editorUiState.editorMode == EditorMode.AR || editorUiState.editorMode == EditorMode.OVERLAY)
                                 && permissionRequestedAtLeastOnce
                                 && !arUiState.hasCameraPermission
                                 && !showLibrary && !showSettings
@@ -1196,6 +1223,29 @@ class MainActivity : ComponentActivity() {
                             LaunchedEffect(arUiState.targetPhysicalExtent) {
                                 arUiState.targetPhysicalExtent?.let { (w, h) ->
                                     editorViewModel.setAnchorExtent(w, h)
+                                }
+                            }
+
+                            // Confirming a target unmounts TargetCreationUi (and its own isLoading
+                            // spinner) immediately via resetCaptureUi(), well before the async
+                            // fingerprint-build work (awaitAnchorTransform's up-to-2s timeout, then a
+                            // full ORB/SuperPoint pass) finishes — see MainViewModel's
+                            // isConfirmingTarget doc. Without a separate indicator surviving that
+                            // unmount, the artist saw a plain AR feed with no sign anything was
+                            // happening between tapping Confirm and the eventual toast.
+                            if (mainUiState.isConfirmingTarget) {
+                                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        CircularProgressIndicator(color = Color.White)
+                                        Spacer(Modifier.height(12.dp))
+                                        Text(
+                                            text = "Saving target…",
+                                            color = Color.White,
+                                            modifier = Modifier
+                                                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
+                                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                                        )
+                                    }
                                 }
                             }
 
@@ -1245,11 +1295,16 @@ class MainActivity : ComponentActivity() {
                                     && !mainUiState.isCapturingTarget
                                     && !showLibrary && !showSettings
                             if (showProgress) {
+                                // TopEnd is RelocStatusBadge's corner (below), and both can be visible
+                                // at once (this gates on paintingProgress > 0.01, that on
+                                // isAnchorEstablished alone) — they used to render stacked at the
+                                // identical TopEnd/16dp/16dp position, showing the same number under
+                                // two different labels. BottomEnd is otherwise unused by this Box.
                                 PaintingProgressIndicator(
                                     progress = arUiState.paintingProgress,
                                     modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(top = 16.dp, end = 16.dp)
+                                        .align(Alignment.BottomEnd)
+                                        .padding(bottom = 16.dp, end = 16.dp)
                                 )
                             }
 
@@ -1268,7 +1323,12 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && !arUiState.isAnchorEstablished) {
+                            // RelocState.IDLE means "target not yet confirmed" (UiState.kt) — SEARCHING/
+                            // TRACKING both require the fingerprint to be active, i.e. an established
+                            // anchor. This badge is therefore only meaningful once anchored; gating it on
+                            // `!isAnchorEstablished` made every branch but IDLE dead (the badge always
+                            // returned immediately, per RelocStatusBadge's own state machine below).
+                            if (editorUiState.editorMode == EditorMode.AR && !showLibrary && !showSettings && arUiState.isAnchorEstablished) {
                                 RelocStatusBadge(
                                     isAnchorEstablished = arUiState.isAnchorEstablished,
                                     paintingProgress = arUiState.paintingProgress,
@@ -1493,7 +1553,6 @@ class MainActivity : ComponentActivity() {
                                     uiState = arUiState,
                                     captureStep = mainUiState.captureStep,
                                     isWaitingForTap = mainUiState.isWaitingForTap,
-                                    isLoading = isProcessing,
                                     strings = strings,
                                     onConfirmTarget = { bitmap, mask ->
                                         arViewModel.setInitialAnchorFromCapture()
@@ -1516,40 +1575,19 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onRetake = {
                                         mainViewModel.onRetakeCapture()
-                                        if (mainUiState.captureOriginatedFromTap) {
-                                            arViewModel.clearTapHighlights()
-                                        } else {
-                                            arViewModel.clearTapHighlights()
+                                        // clearCaptureForRetry (not clearTapHighlights) — it also nulls
+                                        // tempCaptureBitmap/annotatedCaptureBitmap/targetWallPlane.
+                                        // Without that, the LaunchedEffect above sees the SAME rejected
+                                        // capture still non-null and immediately re-fires straight back
+                                        // to Review with the identical bitmap: Retake was a no-op loop.
+                                        arViewModel.clearCaptureForRetry()
+                                        if (!mainUiState.captureOriginatedFromTap) {
                                             arViewModel.requestCapture()
                                         }
                                     },
                                     onCancel = {
                                         mainViewModel.onCancelCaptureClicked()
                                     },
-                                    onUnwarpConfirm = { points ->
-                                        val currentBitmap = arUiState.tempCaptureBitmap
-                                        if (currentBitmap != null && points.size == 4) {
-                                            isProcessing = true
-                                            lifecycleScope.launch(Dispatchers.Default) {
-                                                val pixelPoints = points.map {
-                                                    Offset(it.x * currentBitmap.width, it.y * currentBitmap.height)
-                                                }
-                                                val unwarped = PerspectiveProcessor.unwarpImage(currentBitmap, pixelPoints)
-
-                                                withContext(Dispatchers.Main) {
-                                                    if (unwarped != null) {
-                                                        arViewModel.setTempCapture(unwarped)
-                                                        arViewModel.setAnnotatedCapture(unwarped.isolateMarkings())
-                                                        mainViewModel.setCaptureStep(CaptureStep.REVIEW)
-                                                    } else {
-                                                        mainViewModel.setCaptureStep(CaptureStep.NONE)
-                                                    }
-                                                    isProcessing = false
-                                                }
-                                            }
-                                        }
-                                    },
-                                    onUpdateUnwarpPoints = { arViewModel.setUnwarpPoints(it) },
                                     onEraseAtPoint = { nx, ny -> arViewModel.removeMarkAt(nx, ny) }
                                 )
 
@@ -1603,36 +1641,55 @@ class MainActivity : ComponentActivity() {
                             }
 
 
-                            if (showWallSourceDialog) {
-                                WallSourceDialog(
-                                    onDismiss = { showWallSourceDialog = false },
-                                    onGallery = {
-                                        showWallSourceDialog = false
-                                        backgroundImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                                    },
-                                    onCamera = {
-                                        showWallSourceDialog = false
-                                        if (hasCameraPermission) {
-                                            val tmpFile = File(context.cacheDir, "wall_camera_${System.currentTimeMillis()}.jpg")
-                                            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tmpFile)
-                                            cameraUri = uri.toString()
-                                            takePictureLauncher.launch(uri)
-                                        } else {
-                                            permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.ACCESS_FINE_LOCATION))
-                                        }
-                                    },
-                                    strings = strings
-                                )
-                            }
-
                             if (showDesignInstructionsDialog) {
                                 androidx.compose.material3.AlertDialog(
                                     onDismissRequest = { showDesignInstructionsDialog = false },
                                     title = { Text("Design Your Mural", color = Color.White) },
-                                    text = { Text("Tap the menu icon, then tap 'Open' to choose a photo of your artwork.", color = Color.White) },
+                                    // noMenu=true (railMenuDisabled) means every rail item is always
+                                    // visible — there is no menu to open, and tapping the app icon
+                                    // instead FOLDS the rail away (AzNavRail 11.0's noMenu behaviour).
+                                    // The old copy sent the user to collapse their own navigation.
+                                    // "Open" itself lives under the "mode.design" host, which
+                                    // expandWhen auto-collapses outside Design mode — this dialog can
+                                    // fire from AR (see showDesignInstructionsDialog's callers), where
+                                    // "tap Open" alone pointed at an invisible control. Route through
+                                    // Design first.
+                                    text = { Text("Tap 'Design' on the rail, then 'Open', to choose a photo of your artwork.", color = Color.White) },
                                     containerColor = Color(0xEE1A1A1A),
                                     confirmButton = {
                                         AzButton(text = "Got it", onClick = { showDesignInstructionsDialog = false }, shape = AzButtonShape.RECTANGLE)
+                                    }
+                                )
+                            }
+
+                            // "Open" stages a replace instead of applying it immediately when a
+                            // design is already placed (EditorViewModel.onAddLayer) — surface that
+                            // as a confirmation here rather than silently losing the artist's
+                            // placement work.
+                            if (editorUiState.pendingReplaceUri != null) {
+                                androidx.compose.material3.AlertDialog(
+                                    onDismissRequest = { editorViewModel.cancelReplaceDesign() },
+                                    title = { Text("Replace design?", color = Color.White) },
+                                    text = {
+                                        Text(
+                                            "This swaps out the current design and its placement. This can be undone.",
+                                            color = Color.White
+                                        )
+                                    },
+                                    containerColor = Color(0xEE1A1A1A),
+                                    confirmButton = {
+                                        AzButton(
+                                            text = "Replace",
+                                            onClick = { editorViewModel.confirmReplaceDesign() },
+                                            shape = AzButtonShape.RECTANGLE
+                                        )
+                                    },
+                                    dismissButton = {
+                                        AzButton(
+                                            text = "Cancel",
+                                            onClick = { editorViewModel.cancelReplaceDesign() },
+                                            shape = AzButtonShape.RECTANGLE
+                                        )
                                     }
                                 )
                             }
@@ -1679,7 +1736,17 @@ class MainActivity : ComponentActivity() {
                                     onBackgroundColorChanged = { argb -> settingsViewModel.setBackgroundColor(argb) },
                                     onCheckForUpdates = { dashboardViewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
                                     onOpenUpdatePage = { dashboardViewModel.openUpdatePage(this@MainActivity) },
-                                    onResetTutorials = { settingsViewModel.resetCompletedTutorials() },
+                                    onResetTutorials = {
+                                        settingsViewModel.resetCompletedTutorials()
+                                        // The reactive per-mode guidance tours (ConfigureGuidance)
+                                        // persist their own completed/dismissed goals in
+                                        // AzGuidanceController's SharedPreferences, separate from
+                                        // the app's own DataStore that resetCompletedTutorials()
+                                        // clears above — without this, a mode tour the user already
+                                        // finished or dismissed could never be made to reappear from
+                                        // this button.
+                                        guidanceControllerRef?.resetGuidance()
+                                    },
                                     onClose = { showSettings = false },
                                     strings = strings
                                 )
@@ -1746,6 +1813,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+                guidanceControllerRef = guidanceController
             }
         }
     }
@@ -1888,6 +1956,15 @@ class MainActivity : ComponentActivity() {
                 color = navItemColor, classifiers = setOf("toggle", "effect"),
                 shape = AzButtonShape.NONE,
             ) { editorViewModel.onToggleSubjectIsolation() }
+            // Layer.isImageLocked gates whether taps/gestures reach the design image at all (see
+            // MainScreen.kt's pointerInput guards) — distinct from a mode's isTransformLocked, which
+            // only blocks pan/zoom/rotate. toggleImageLock() was implemented and tested but had no
+            // rail entry, so it could never actually be reached from the UI.
+            azRailSubItem(
+                id = "design.lock", hostId = "host.design", text = "Lock",
+                color = navItemColor, classifiers = setOf("toggle", "lock"),
+                shape = AzButtonShape.NONE,
+            ) { editorViewModel.toggleImageLock() }
 
             azDivider()
 
@@ -1927,6 +2004,13 @@ class MainActivity : ComponentActivity() {
                         if (isWaitingForTap) {
                             mainViewModel.cancelTapMode()
                         } else if (hasCameraPermission) {
+                            // Clear any previous capture (tempCaptureBitmap etc.) BEFORE re-arming.
+                            // Without this, re-arming Target after a successful capture left the old
+                            // bitmap/wall-plane in ArUiState; the review-effect saw it was still
+                            // non-null and jumped straight to Review with the stale photo — an artist
+                            // confirming it would register an old target against a freshly-established
+                            // anchor.
+                            arViewModel.clearCaptureForRetry()
                             mainViewModel.startTargetCapture()
                         } else {
                             requestPermissions()
@@ -2043,6 +2127,13 @@ class MainActivity : ComponentActivity() {
                 // asynchronous captures). This handler just tells the caller "user pressed Export".
                 onExportRequested()
             }
+            // Distinct from "proj.export" (a screenshot of the mode's content) — this hands the
+            // project's .gxr, wall fingerprint included, to another person via a share sheet. See
+            // EditorViewModel.shareProject's doc: this is the same export Co-op's bulk sync already
+            // sends, just with an actual hand-off affordance instead of a silent Downloads copy.
+            azRailSubItem(id = "proj.share", hostId = "host.project", text = "Share Wall", color = navItemColor, shape = AzButtonShape.NONE) {
+                editorViewModel.shareProject()
+            }
             azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {
                 navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
             }
@@ -2096,6 +2187,7 @@ class MainActivity : ComponentActivity() {
             if (editorUiState.design?.isInverted == true) azHighlight("design.invert", active = Cyan)
             if (editorUiState.design?.isSketch == true) azHighlight("design.outline", active = Cyan)
             if (editorUiState.design?.isSubjectIsolated == true) azHighlight("design.isolate", active = Cyan)
+            if (editorUiState.design?.isImageLocked == true) azHighlight("design.lock", active = Cyan)
 
             // State badges: surface important conditions as rail-item alerts.
             if (arUiState.guestEditWasDropped) azItemState("coop", alert = AzItemAlert.NOTICE)
@@ -2104,26 +2196,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-
-@Composable
-private fun WallSourceDialog(
-    onDismiss: () -> Unit,
-    onGallery: () -> Unit,
-    onCamera: () -> Unit,
-    strings: AppStrings
-) {
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(DesignR.string.wall_source_title)) },
-        text = { Text(stringResource(DesignR.string.wall_source_text)) },
-        confirmButton = {
-            AzButton(text = stringResource(DesignR.string.take_photo), onClick = onCamera, shape = AzButtonShape.RECTANGLE)
-        },
-        dismissButton = {
-            AzButton(text = stringResource(DesignR.string.choose_from_gallery), onClick = onGallery, shape = AzButtonShape.RECTANGLE)
-        }
-    )
-}
 
 @Composable
 private fun ArCoreUnavailableOverlay(modifier: Modifier = Modifier) {
@@ -2702,9 +2774,16 @@ private fun RelocDiagnosticsOverlay(
                 androidx.compose.ui.graphics.Color.White,
             )
         }
-        // Painting progress, labelled as such. It was labelled "Corroborated" while being fed
-        // paintingProgress — a name for the value one row up, on a number that is not it.
-        DiagnosticRow("Painted", "${(paintingProgress * 100).toInt()}%", androidx.compose.ui.graphics.Color.White)
+        // paintingProgress IS a genuine progress signal, not a confidence readout — MobileGS.cpp's
+        // own comment on its producer is explicit and deliberate: "Coverage says how much of the
+        // design is realized (progress); matchability says how much to trust this frame
+        // (confidence)" — two different, intentionally-separate channels (mCorroborationConfidence
+        // is the latter, surfaced in the Corrob/Spread/Reproj rows above). A prior pass here
+        // mislabeled this "Matched", inheriting RelocStatusBadge's own pre-existing mislabeling of
+        // the same value (a separate, not-yet-fixed issue) instead of correcting it — caught by
+        // review before merge. "Painted" wasn't wrong about WHAT this is, only imprecise about how
+        // literally to take it (it's realized-descriptor coverage, not a physical paint sensor).
+        DiagnosticRow("Progress", "${(paintingProgress * 100).toInt()}%", androidx.compose.ui.graphics.Color.White)
 
         // Drift correction. Off means the overlay rides the raw ARCore anchor and will drift as
         // tracking does; on means each accepted relocalization pulls it back. The `Fusion` row above
@@ -2907,7 +2986,12 @@ private fun PostTargetInstructionOverlay(modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                text = "Now tap the menu icon and choose 'Open' to add a photo of your artwork.",
+                // noMenu=true means every rail item is always visible; there is no menu, and
+                // tapping the app icon instead folds the rail away. "Open" itself lives under the
+                // "mode.design" host, which expandWhen auto-collapses outside Design mode — this
+                // overlay only ever shows in AR, so "tap Open" alone pointed at an invisible
+                // control. Route through Design first.
+                text = "Now tap 'Design' on the rail, then 'Open', to add a photo of your artwork.",
                 color = Color.White,
                 textAlign = TextAlign.Center,
                 fontSize = 15.sp,
@@ -3126,6 +3210,15 @@ private fun SyncingBadge(
     }
 }
 
+/**
+ * Renders [progress] as a colored bar. [progress] IS a genuine progress signal (fraction of the
+ * design's descriptors the wall has ever corroborated — see MobileGS.cpp's mPaintingProgress
+ * producer comment, which explicitly separates it from mCorroborationConfidence's instantaneous
+ * confidence). Explicitly labelled "Progress": unlabelled next to a traffic-light color scheme it
+ * still reads correctly as progress, but a bare number invites confusion with the *other*,
+ * genuinely confidence-flavored numbers elsewhere on screen (RelocStatusBadge, the diagnostic
+ * overlay's Corrob/Spread/Reproj rows).
+ */
 @Composable
 private fun PaintingProgressIndicator(
     progress: Float,
@@ -3147,6 +3240,11 @@ private fun PaintingProgressIndicator(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            Text(
+                text = "Progress",
+                color = Color.White.copy(alpha = 0.7f),
+                style = MaterialTheme.typography.labelSmall
+            )
             LinearProgressIndicator(
                 progress = { progress.coerceIn(0f, 1f) },
                 modifier = Modifier.width(90.dp),
@@ -3156,8 +3254,7 @@ private fun PaintingProgressIndicator(
             Text(
                 text = "$pct%",
                 color = Color.White,
-
-                )
+            )
         }
     }
 }

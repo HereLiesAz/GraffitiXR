@@ -5,14 +5,13 @@
 **Perzisztencia Szabály:** Az itteni változások atomiak és azonnaliak MINDEN módban.
 
 ### A. Struktúra és Adatkapcsolatok
-* **A Verem:** `List<Layer>`. A sorrend a Z-index (0 a legalsó).
-* **A Réteg:**
-    * **`Bitmap source`**: A nyers képpontadatok.
-    * **`Matrix transform`**: Tárolja a következőket: `Translation(x,y)` (Eltolás), `Scale(sx,sy)` (Méretezés), `Rotation(degrees)` (Forgatás).
-        * *Megkötés:* A transzformációk mindig a réteg középpontjához viszonyítva vannak tárolva.
-    * **`ColorAdjustment adjustments`**: `HSBC` értékek (0.0-1.0).
-    * **`BlendMode blend`**: `PorterDuff.Mode` (pl. SCREEN, MULTIPLY).
-    * **`EffectState effects`**: Logikai értékek (Booleans) az `isIsolated` (MLKit) és az `isOutlined` (OpenCV) számára.
+* **Egyetlen tervréteg, nem verem:** az `EditorUiState.design` egyetlen nullázható `Layer`, nem `List<Layer>`. Ez a app szándékos korlátozása: egy befejezett képet pozícionálsz a falhoz, több kép egyetlen kompozícióvá szerkesztése a társ tervezőalkalmazás dolga, nem ezé. (Korábban `List<Layer>` + `activeLayerId` volt; ezt eltávolították, mert minden felhasználó a gyakorlatban egyetlen elemet tárolt benne.)
+* **A Réteg (`Layer`):**
+    * **`Bitmap`**: A nyers képpontadatok (futásidejű, nem szerializált).
+    * **`offset` / `scale` / `rotationX,Y,Z`**: A transzformációs paraméterek (Compose `Offset` + skalár forgatás/méretezés mezők), nem egy `Matrix` objektum.
+    * **Szín- és fényerő-paraméterek**: `opacity`, `brightness`, `contrast`, `saturation`, `colorBalanceR/G/B` (Float értékek).
+    * **`blendMode`**: `androidx.compose.ui.graphics.BlendMode` (Compose keverési mód, pl. `Screen`, `Multiply`) — nem Android `PorterDuff.Mode`.
+    * **Effekt-jelzők**: `isInverted`, `isSketch` (körvonal-kinyerés), `isSubjectIsolated` (MLKit alany-elkülönítés) — külön logikai mezők, nincs `Mesh warpMesh` és nincs GPU-gyorsított Liquify funkció; ilyen mező vagy funkció nem létezik a kódban.
 
 ### B. Implementációs Logika
 * **AR Módban:** A `UniversalPlane` egy 3D Négyszögre (Quad) kerül renderelésre.
@@ -24,29 +23,25 @@
 ---
 
 ## 2. AR VILÁG PERZISZTENCIA (A Valóság Horgonya)
-**Definíció:** A rendszer, amely a `UniversalPlane`-t a fizikai valósághoz rögzíti.
-**Komponensek:** `MobileGS` (Motor), `SlamMap` (Térbeli Adatok), `Fingerprint` (Relokalizációs Kulcs).
+**Definíció:** A rendszer, amely a terv pozícióját a fizikai valósághoz rögzíti, még követésvesztés után is.
+**Komponensek:** `MobileGS` (natív C++17 relokalizáló motor), `Fingerprint` (a fal ujjlenyomata).
 
-### A. A Függőségi Lánc
-1.  **A Motor (`MobileGS`):**
-    * **Bemenet:** Kameraképkocka (YUV) + IMU Adatok.
-    * **Folyamat:** Ritka Pontfelhőt (Point Cloud) + Kamera Pózt generál.
-    * **Kimenet:** `ConfidenceMap` (Voxel Rács).
-2.  **A Térkép (`SlamMap`):**
-    * **Adat:** A `ConfidenceMap` bináris szerializációja.
-    * **Kapcsolat:** Ez a fizikai fal "Mentési Fájlja".
-3.  **A Kulcs (`Fingerprint`):**
-    * **Adat:** Egy sor ORB Funkció Leíró (Feature Descriptor), amelyeket a munkamenet elindításához használt specifikus célképből nyertek ki.
-    * **Funkció:** Amikor az alkalmazás újraindul, a `MobileGS` ezeket az ORB funkciókat keresi.
-    * **Logika:** `HA (JelenlegiFunkciók egyeznek a Kulccsal) -> Relokalizáció Indítása -> HorgonyPóz Visszaállítása`.
+**Fontos korrekció:** `MobileGS` **nem** térképező motor — nincs perzisztens voxel- vagy splat-réteg, nincs jelenetrekonstrukció, és nincs `draw()` metódus. A `MobileGS.cpp` saját kódkommentje is ezt mondja azokon a hívási pontokon, amelyek korábban egy ilyen réteget tápláltak (`setMappingPaused`, `getSplatCount` — mindkettő "no gaussian-splat mapper in this engine" üzenetet naplóz, és üres/inaktív értékkel tér vissza). Nincs `VoxelMap`, `ConfidenceMap` vagy `PersistentVoxelMemory` a jelenlegi kódban.
+
+### A. A Tényleges Mechanizmus
+1.  **A Fal Ujjlenyomata (Fingerprint):**
+    * **Adat:** ORB (`cv::ORB::create(1500)`) vagy SuperPoint leírók, párosítva a felhasználó által a falra rajzolt jelek háromszögelt 3D pozícióival.
+    * **Rögzítés:** A célpont megerősítésekor (`restoreWallFingerprintMetric`) egyszer jön létre.
+2.  **Relokalizáció ("Snap-Back"):**
+    * **Folyamat:** Egy háttérszál (`relocThreadFunc`) folyamatosan összeveti az élő kamerakép leíróit a tárolt ujjlenyomattal (Lowe-arány teszt), majd a 2D↔3D megfeleltetéseket `cv::solvePnPRansac`-kal oldja meg.
+    * **Eredmény:** Követésvesztés vagy zsebre tétel után ez igazítja vissza a globális horgony-transzformációt — nincs szükség térképhez, csak az egy ujjlenyomathoz.
+3.  **Opcionális, alapból KI kapcsolt kiegészítők** (csak a Beállítások > diagnosztikai overlay-ből érhetők el, nem a művész-felületről):
+    * **Teleológiai korroboráció:** a tervkompozíció leíróit veti össze az élő fallal egy bizalmi jelzés előállításához.
+    * **Önnövelés (self-grow):** a validált új jeleket hozzáadja az ujjlenyomathoz, hogy a snap-back túlélje az eredeti referencia lefestését (max. 5000 pont).
 
 ### B. Implementációs Irányelv
-* **Mentés:** Amikor a `Project.save()` meghívásra kerül, KÖTELEZŐ szerializálni mind a `SlamMap`-et (a `MobileGS.saveBytes()`-on keresztül), mind a `Fingerprint`-et (az `OpenCV.serialize()`-on keresztül).
-* **Betöltés:** Az `ArView` belépésekor:
-    1.  Töltsd be a `Fingerprint`-et a memóriába.
-    2.  Tápláld a `Fingerprint`-et a `MobileGS`-be.
-    3.  A `MobileGS` belép a `RELOCALIZATION_MODE`-ba.
-    4.  Egyezés esetén a `MobileGS` igazítja a koordinátarendszert és átvált a `TRACKING_MODE`-ba.
+* **Mentés:** A `Project.save()` a projektfájlban a `Fingerprint`-et szerializálja (`GraffitiProject.fingerprint`), nem egy voxeltérképet.
+* **Betöltés:** Az AR módba belépéskor a mentett `Fingerprint` betöltődik a `MobileGS`-be, amely megkísérli a relokalizációt a tárolt ujjlenyomat alapján.
 
 ---
 
@@ -79,25 +74,23 @@
 **Definíció:** A fő vezérlő. Kezeli az állapotátmeneteket és tájékoztatja a felhasználót a kontextusáról.
 **Vizuális Szabály:** Minden Nézet (Kamera folyamok, Makett Vászon) logikailag **HÁTTÉRKÉNT** van kezelve. A Sín ezek *fölött* helyezkedik el.
 
-### A. Sín Elem Architektúra
-Minden ikon a sínen egy adott `RailRelocItem` enum állapotnak felel meg.
+### A. Sín Elem Architektúra — javított hierarchia
+**Fontos korrekció:** a korábbi táblázat egy "RÁCS" és egy "TERVEZÉS" sín-csoportot írt le, valamint egy `SURVEY` elemet, amely `MobileGS` "szkennelés-vizualizátort" indítana — ilyen elem, csoport vagy vizualizátor **nem létezik** a kódban (`grep -rn "SURVEY"` nulla találatot ad). A tényleges sín három felső szintű harmonika-hosztból áll — **Modes** (AR, Overlay, Mockup, Trace), **Adjust** (Adjust, Balance, Invert, Outline, Isolate — egész-terv kapcsolók, nem általános rétegeszközök) és **Project** (new/save/load/export/settings) —, valamint két egyszerű felső szintű elemből: **Open** (réteg hozzáadása, mellékhatásként Design módba vált — nincs külön "Design" harmonika-hoszt) és **Help**.
 
-| Sín Csoport | Elem ID | Akció / Logika | Implementációs Link |
-| :--- | :--- | :--- | :--- |
-| **MÓDOK** | `AR` | **Nézetváltás:** `ArView`.<br>**Állapot:** `activeMode = AR`.<br>**Háttér:** Élő Kamera + SLAM. | `MainScreen.kt` -> `NavHost` |
-| | `OVERLAY` | **Nézetváltás:** `OverlayScreen`.<br>**Állapot:** `activeMode = OVERLAY`.<br>**Háttér:** Élő Kamera (Nincs SLAM). | `MainScreen.kt` |
-| | `MOCKUP` | **Nézetváltás:** `MockupScreen`.<br>**Állapot:** `activeMode = MOCKUP`.<br>**Háttér:** `MockupBackground` Bitmap. | `MainScreen.kt` |
-| | `TRACE` | **Nézetváltás:** `TraceScreen`.<br>**Állapot:** `activeMode = TRACE`.<br>**Háttér:** Fehér Világítótábla. | `MainScreen.kt` |
-| **RÁCS** | `CREATE` | **Kiváltó:** `TargetCreationOverlay`.<br>**Logika:** Lásd a 3. szakaszt. | `MainViewModel.onTargetCreate()` |
-| | `SURVEY` | **Kiváltó:** `MappingScreen`.<br>**Logika:** Engedélyezd a `MobileGS` szkennelés vizualizálót. | `MainViewModel.onSurveyor()` |
-| | `REFINE` | **Eszköz:** Maszk Ecset Váltása.<br>**Kontextus:** Csak `TargetCreation`.<br>**Logika:** `isMasking = !isMasking`. | `TargetCreationOverlay.kt` |
-| **TERVEZÉS** | `ADD` | **Szándék:** `ActivityResult(PickVisualMedia)`.<br>**Logika:** Eredmény hozzáadása a `UniversalPlane`-hez. | `MainViewModel.addLayer()` |
-| | `LAYERS` | **UI:** Újrarendezhető Lista Megjelenítése.<br>**Kapcsolat:** A `UniversalPlane.layers` közvetlen tükröződése. | `EditorUi.kt` |
-| | `WALL` | **Kiváltó:** `ActivityResult(PickVisualMedia)`.<br>**Kontextus:** CSAK Makett Mód.<br>**Logika:** Beállítja a `MockupBackground`-ot. | `MainViewModel.setMockupWall()` |
-| | `ISOLATE` | **Folyamat:** `MLKit.Segmenter`.<br>**Cél:** Aktív Réteg.<br>**Eredmény:** Alfa Maszk Alkalmazása. | `ImageUtils.removeBackground()` |
-| | `OUTLINE` | **Folyamat:** `OpenCV.Canny`.<br>**Cél:** Aktív Réteg.<br>**Eredmény:** Él-detektált Bitmap. | `ImageUtils.generateOutline()` |
-| **PROJEKT**| `SAVE` | **Folyamat:** Szerializáld a `UniversalPlane`-t + `SlamMap`-et -> Zip.<br>**IO:** Blokkoló Írás (Coroutine IO). | `ProjectManager.save()` |
-| | `LOAD` | **Folyamat:** Kicsomagolás -> Hidratáld a `UniversalPlane`-t -> Töltsd be a `SlamMap`-et a Motorba. | `ProjectManager.load()` |
+| Sín Csoport | Elem ID | Akció / Logika |
+| :--- | :--- | :--- |
+| **MODES** | `AR` | Nézetváltás AR nézetre. A cél (Target) létrehozása a Modes ▸ AR alhoszt alatti almenüből érhető el, lásd a 3. szakaszt. Almenüben: Lámpa, Zár, Magic, Co-op (Host/Join/Leave). |
+| | `OVERLAY` | Nézetváltás a rétegzés nézetre (élő kamera, nincs relokalizáció). Almenüben: Lámpa, Zár. |
+| | `MOCKUP` | Nézetváltás a makett nézetre (statikus `backgroundBitmap` háttér). Almenüben: Fal ▸ Fotó/Fájl/Törlés, Zár. |
+| | `TRACE` | Nézetváltás a világítótábla nézetre. Almenüben: Fagyasztás, Zár. |
+| **ADJUST** | `Adjust` | A tervkép fényerő/kontraszt/szaturáció panelének nyitása/zárása. |
+| | `Balance` | A színegyensúly-panel nyitása/zárása. |
+| | `Invert` | A `Layer.isInverted` kapcsoló váltása. |
+| | `Outline` | A `Layer.isSketch` (körvonal-kinyerés, OpenCV Canny) kapcsoló váltása. |
+| | `Isolate` | A `Layer.isSubjectIsolated` (MLKit alany-elkülönítés) kapcsoló váltása. |
+| **PROJECT** | `New` / `Save` / `Load` / `Export` / `Settings` | Új projekt, mentés, betöltés, exportálás, beállítások. A projektfájl a `Fingerprint`-et szerializálja, nem egy voxeltérképet (lásd 2. szakasz). |
+| *(önálló elem)* | `Open` | Kép (vagy szövegréteg) kiválasztása; mellékhatásként átvált Design módba. Nincs "Design" harmonika-hoszt. |
+| *(önálló elem)* | `Help` | Az AzNavRail beépített súgó-overlayjét nyitja meg. |
 
 ---
 

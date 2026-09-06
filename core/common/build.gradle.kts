@@ -22,10 +22,10 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            // No proguard-rules.pro exists in this module (only consumer-rules.pro, wired above via
+            // consumerProguardFiles) — a proguardFiles() reference to it was dangling and, since this
+            // library is never minified standalone, had never actually been exercised.
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
         }
     }
 

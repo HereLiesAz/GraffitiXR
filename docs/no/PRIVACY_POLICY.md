@@ -1,8 +1,8 @@
 # Personvernerklæring for GraffitiXR
 
-**Sist oppdatert:** [Gjeldende dato]
+**Sist oppdatert:** 2026-09-04
 
-HereLiesAZ bygde GraffitiXR-appen som en åpen kildekode-app. Denne TJENESTEN leveres av HereLiesAZ uten kostnad og er beregnet for bruk som den er.
+HereLiesAZ bygde GraffitiXR-appen som en kildetilgjengelig app (source-available) (se LICENSE og docs/LICENSING.md i repositoriet for vilkårene). Denne TJENESTEN leveres av HereLiesAZ uten kostnad og er beregnet for bruk som den er.
 
 Denne siden brukes til å informere besøkende om våre retningslinjer for innsamling, bruk og avsløring av personlig informasjon hvis noen bestemte seg for å bruke tjenesten vår.
 
@@ -16,9 +16,20 @@ For en bedre opplevelse, mens du bruker tjenesten vår, kan vi kreve at du gir o
 * **Lagring / Bilder:** Vi krever tilgang til enhetens lagring (lese/skrive ekstern lagring eller fotobibliotek) for å laste inn bilder for overlegg, lagre prosjektene dine og eksportere bilder.
 * **Stedsdata (valgfritt):** Hvis du gir plasseringstillatelser, kan appen samle inn GPS-data (breddegrad, lengdegrad, høyde) for å geomerke prosjektene dine. Disse dataene lagres lokalt i prosjektfilene dine.
 
-## Logg data
+## Krasjrapporter (opt-in)
 
-Vi ønsker å informere deg om at når du bruker tjenesten vår, i tilfelle feil i appen samler vi inn data og informasjon (gjennom tredjepartsprodukter) på telefonen din kalt Loggdata. Disse loggdataene kan inkludere informasjon som enhetens Internett-protokoll (“IP”)-adresse, enhetsnavn, operativsystemversjon, konfigurasjonen av appen når du bruker tjenesten vår, klokkeslett og dato for din bruk av tjenesten og annen statistikk.
+Ingenting om et krasj forlater enheten din som standard. Hvis appen krasjer eller gjenoppretter etter en intern feil, skrives en rapport til en lokal, midlertidig fil på enheten din, slik at appen kan vise deg et varsel om at «forrige økt krasjet» neste gang du åpner den — den filen forlater aldri enheten av seg selv.
+
+Å sende den rapporten til oss er avslått med mindre du selv slår det på, under **Innstillinger > Krasjrapporter**. Bare hvis — og bare hvis — du har valgt å delta, laster appen opp rapporten neste gang den starter, som en **offentlig sak (issue)** i dette prosjektets GitHub-feilsporing (github.com/HereLiesAz/GraffitiXR). Rapporten inneholder kun:
+
+*   om krasjet var fatalt (appen ble drept) eller gjenopprettet (fanget opp, og appen fortsatte å kjøre);
+*   dato og klokkeslett for krasjet;
+*   enhetens produsent og modell, samt Android-versjonen din;
+*   appens versjonsnavn;
+*   unntakets stack trace; og
+*   opptil de siste 1000 linjene av appens egen logcat-utdata (begrenset til denne appens prosess — ikke systemomfattende logger).
+
+Fordi rapporten sendes inn som en offentlig GitHub-sak, er innholdet (inkludert enhets- og logginformasjonen ovenfor) synlig for alle som kan se dette prosjektets feilsporing. Slå bare på krasjrapporter hvis du er komfortabel med det. Du kan slå av innstillingen igjen når som helst, og det vil ikke påvirke krasj som allerede har skjedd.
 
 ## Tjenesteleverandører
 
@@ -31,7 +42,9 @@ Vi kan ansette tredjepartsselskaper og enkeltpersoner på grunn av følgende år
 
 Vi bruker **Google ML Kit** for emnesegmentering (bakgrunnsfjerning). Denne behandlingen skjer lokalt på enheten din.
 
-Vi får tilgang til **GitHub API** for å se etter applikasjonsoppdateringer. Din IP-adresse kan være synlig for GitHub under disse forespørslene.
+## Oppdateringssjekker
+
+Innstillinger-skjermen har en «Se etter oppdateringer»-knapp. Ingenting sjekkes automatisk — bare når du trykker på den. Å trykke på den sender en forespørsel til **GitHub API** (api.github.com) for å slå opp prosjektets siste utgivelse. GitHub er en tredjepart utenfor vår kontroll, og IP-adressen din er synlig for GitHub i løpet av den ene forespørselen, på samme måte som den ville vært for enhver nettforespørsel du gjør til github.com. Ingen annen informasjon sendes som en del av denne forespørselen.
 
 ## Sikkerhet
 
@@ -53,8 +66,8 @@ Denne policyen trer i kraft fra 2024-01-01
 
 ## Kontakt oss
 
-Hvis du har spørsmål eller forslag om personvernreglene våre, ikke nøl med å kontakte oss på [Sett inn kontakt e-post eller GitHub Repository Link].
+Hvis du har spørsmål eller forslag om personvernreglene våre, ikke nøl med å kontakte oss på https://github.com/HereLiesAz/GraffitiXR/issues.
 
 
 ---
-*Dokumentasjonen ble oppdatert 2026-03-17 under redesign av nettstedet og integreringsfasen for sjablongmodus.*
+*Dokumentasjonen ble oppdatert 2026-09-04: rettet avsnittet om krasjrapporter, som tidligere beskrev automatisk og ikke-samtykkebasert innsamling — appen krever faktisk et eksplisitt opt-in (Innstillinger > Krasjrapporter, av som standard) før noen krasjrapport forlater enheten, og rapporten sendes inn som en offentlig GitHub-sak, ikke til «våre servere». Ga den eksisterende GitHub API-oppdateringssjekken en egen seksjon og presiserte at den er brukerinitiert (knappen «Se etter oppdateringer» i Innstillinger), ikke automatisk. Fylte inn dato- og kontaktplassholdere. Forrige oppdatering: 2026-03-17, under redesign av nettstedet og integreringsfasen for sjablongmodus.*

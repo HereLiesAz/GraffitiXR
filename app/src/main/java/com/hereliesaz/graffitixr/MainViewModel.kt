@@ -44,6 +44,13 @@ data class MainUiState(
     val isInPlaneRealignment: Boolean = false,
     // True when the current capture was initiated via the tap-to-target path (Phase 4).
     val captureOriginatedFromTap: Boolean = false,
+    // True from the moment the artist confirms a target capture until the async
+    // fingerprint-build work (awaitAnchorTransform, ORB/SuperPoint) finishes, success or failure.
+    // resetCaptureUi() unmounts TargetCreationUi (and its own isLoading spinner) immediately on
+    // confirm, well before this work is done — up to ~2s of awaitAnchorTransform's timeout alone,
+    // plus a full feature build — so without a SEPARATE flag surviving that unmount, the artist
+    // saw a plain AR feed with no indication anything was happening.
+    val isConfirmingTarget: Boolean = false,
 )
 
 @HiltViewModel
@@ -196,10 +203,25 @@ class MainViewModel @Inject constructor(
             return
         }
         resetCaptureUi()
+        _uiState.update { it.copy(isConfirmingTarget = true) }
         val safeDepth = depthBuffer
 
-        viewModelScope.launch(Dispatchers.IO) {
-            val currentProject = projectRepository.currentProject.value ?: return@launch
+        viewModelScope.launch(Dispatchers.IO) { try {
+            // Same fix as handleSingleCapture's sibling check just below: a bare `?: return@launch`
+            // here discarded the capture with no message on a device with no open project — the
+            // artist aimed, tapped, confirmed, and nothing happened.
+            val currentProject = projectRepository.currentProject.value
+            if (currentProject == null) {
+                MetricFingerprintBuilder.recordPreconditionFailure("no project open to save the target into")
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        context,
+                        "No project open — a target is saved into a project. Open or create one first.",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+                return@launch
+            }
 
             val display = (context.getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager).defaultDisplay
             val isPortrait = display.rotation == android.view.Surface.ROTATION_0 || display.rotation == android.view.Surface.ROTATION_180
@@ -260,7 +282,9 @@ class MainViewModel @Inject constructor(
             withContext(Dispatchers.Main) {
                 Toast.makeText(context, "Target Saved & Locked", Toast.LENGTH_SHORT).show()
             }
-        }
+        } finally {
+            _uiState.update { it.copy(isConfirmingTarget = false) }
+        } }
     }
 
     /**
@@ -318,11 +342,12 @@ class MainViewModel @Inject constructor(
             return
         }
         resetCaptureUi()
+        _uiState.update { it.copy(isConfirmingTarget = true) }
         val planePoint = floatArrayOf(wallPlane[0], wallPlane[1], wallPlane[2])
         val planeNormal = floatArrayOf(wallPlane[3], wallPlane[4], wallPlane[5])
         // Clear any prior marks-centering override; the builder re-publishes it on a successful build.
         slamManager.overlayMarkCenterLocal = null
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(Dispatchers.IO) { try {
             // The anchor is read HERE, not on the caller's thread, and only once one exists.
             //
             // Target creation is what ESTABLISHES the anchor: `setInitialAnchorFromCapture` raises a
@@ -431,7 +456,9 @@ class MainViewModel @Inject constructor(
             withContext(Dispatchers.Main) {
                 Toast.makeText(context, "Target Saved & Locked", Toast.LENGTH_SHORT).show()
             }
-        }
+        } finally {
+            _uiState.update { it.copy(isConfirmingTarget = false) }
+        } }
     }
 
     // Shared guidance shown when single-capture target creation lands on no tracked wall plane at all
