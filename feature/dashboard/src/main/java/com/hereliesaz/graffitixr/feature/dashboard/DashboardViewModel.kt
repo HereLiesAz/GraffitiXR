@@ -35,19 +35,43 @@ class DashboardViewModel @Inject constructor(
     // project's load can ever win and fire navigation, regardless of which finishes disk I/O first.
     private var openProjectJob: Job? = null
 
+    init {
+        viewModelScope.launch {
+            repository.currentProject.collect { project ->
+                _uiState.update { it.copy(currentProjectId = project?.id, currentProjectName = project?.name) }
+            }
+        }
+    }
+
+    fun dismissProjectError() {
+        _uiState.update { it.copy(projectErrorMessage = null) }
+    }
+
     fun loadAvailableProjects() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            val list = repository.getProjects()
-            _uiState.update { it.copy(availableProjects = list, isLoading = false) }
+            try {
+                val list = repository.getProjects()
+                _uiState.update { it.copy(availableProjects = list) }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                _uiState.update { it.copy(projectErrorMessage = "Couldn't load the project library.") }
+            } finally {
+                _uiState.update { it.copy(isLoading = false) }
+            }
         }
     }
 
     fun openProject(project: GraffitiProject) {
         openProjectJob?.cancel()
         openProjectJob = viewModelScope.launch {
-            repository.loadProject(project.id)
-                .onSuccess {
+            val result = try {
+                repository.loadProject(project.id)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                Result.failure(e)
+            }
+            result.onSuccess {
                     // Navigation is gated on this trigger (consumed once by the observer) rather than
                     // fired unconditionally by the caller, so a failed load can never carry the UI into
                     // the editor. Name is threaded through here (not read back off the id) so anything
@@ -59,6 +83,7 @@ class DashboardViewModel @Inject constructor(
                     // Previously the Result was discarded, so a missing/corrupt project failed
                     // silently. Log it and refresh the list so a deleted project stops lingering.
                     android.util.Log.e("DashboardViewModel", "Failed to open project ${project.id}", e)
+                    _uiState.update { it.copy(projectErrorMessage = "Couldn't open this project.") }
                     loadAvailableProjects()
                 }
         }
@@ -84,10 +109,14 @@ class DashboardViewModel @Inject constructor(
      */
     fun createAndOpenProject(name: String = "Untitled") {
         viewModelScope.launch {
-            val p = repository.createProject(name)
-            repository.loadProject(p.id)
-            _uiState.update { it.copy(currentProjectId = p.id, currentProjectName = p.name) }
-            loadAvailableProjects()
+            try {
+                val p = repository.createProject(name)
+                _uiState.update { it.copy(currentProjectId = p.id, currentProjectName = p.name) }
+                loadAvailableProjects()
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                _uiState.update { it.copy(projectErrorMessage = "Couldn't create the project.") }
+            }
         }
     }
 
@@ -109,6 +138,7 @@ class DashboardViewModel @Inject constructor(
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 android.util.Log.e("DashboardViewModel", "Failed to create project", e)
+                _uiState.update { it.copy(projectErrorMessage = "Couldn't create the project. Check available storage and try again.") }
             } finally {
                 _uiState.update { it.copy(isCreatingProject = false) }
             }
@@ -155,6 +185,7 @@ class DashboardViewModel @Inject constructor(
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 android.util.Log.e("DashboardViewModel", "Error deleting project: $projectId", e)
+                _uiState.update { it.copy(projectErrorMessage = "Couldn't delete this project.") }
             }
         }
     }

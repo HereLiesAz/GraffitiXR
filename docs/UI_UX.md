@@ -42,3 +42,10 @@ A projected grid line overlay that snaps to the dominant plane found in the conf
 ---
 *Documentation updated on 2026-08-07 to correct rail hierarchy, guidance, target-creation, gesture, and
 visualization claims against current source.*
+
+## Project dialogs (2026-09-06)
+
+Settings uses a modal window so its covered rail cannot open another action. Project creation
+navigates only after persistence succeeds. Save waits for the wall map and editable manifest,
+keeps its dialog open on failure, and does not export an image or archive. Export saves an image;
+Share Wall produces a portable `.gxr`. Importing an existing id creates a separate library copy.

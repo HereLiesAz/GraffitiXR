@@ -23,5 +23,6 @@ data class DashboardUiState(
     val isCreatingProject: Boolean = false,
     // Set when importProject fails (bad zip, unsupported format, etc.) so the UI can surface why the
     // spinner stopped instead of failing silently. Cleared by dismissImportError() once shown.
+    val projectErrorMessage: String? = null,
     val importErrorMessage: String? = null
 )

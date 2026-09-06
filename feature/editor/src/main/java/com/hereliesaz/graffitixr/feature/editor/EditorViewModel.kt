@@ -30,6 +30,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -96,6 +99,7 @@ class EditorViewModel @Inject constructor(
      * [pendingRailExpansion] needs no synchronization.
      */
     fun onRailHostExpansionChanged(hostId: String, expanded: Boolean) {
+        val projectId = _uiState.value.projectId ?: return
         pendingRailExpansion[hostId] = expanded
         railExpansionJob?.cancel()
         railExpansionJob = viewModelScope.launch(dispatchers.main) {
@@ -104,12 +108,33 @@ class EditorViewModel @Inject constructor(
             pendingRailExpansion.clear()
             if (toWrite.isEmpty()) return@launch
             withContext(dispatchers.io) {
-                projectRepository.updateProject { it.copy(railExpansion = it.railExpansion + toWrite) }
+                projectRepository.updateProject {
+                    if (it.id == projectId) it.copy(railExpansion = it.railExpansion + toWrite) else it
+                }
             }
         }
     }
 
     private val history = EditHistory()
+    private var projectLoadJob: Job? = null
+    private var backgroundLoadJob: Job? = null
+    private var importJob: Job? = null
+    private val editorSaveMutex = Mutex()
+
+    private fun isCurrentProject(id: String) =
+        _uiState.value.projectId == id && projectRepository.currentProject.value?.id == id
+
+    private fun cancelProjectWork() {
+        projectLoadJob?.cancel()
+        backgroundLoadJob?.cancel()
+        importJob?.cancel()
+        designEffectJob?.cancel()
+        thumbnailJob?.cancel()
+        railExpansionJob?.cancel()
+        pendingRailExpansion.clear()
+        designSourceBitmap = null
+        anchorHalfExtentMeters = null
+    }
 
     // Debounced project-preview thumbnail generation. saveProject() fires on nearly every edit,
     // so the thumbnail is regenerated at most once the edits settle, off the main thread.
@@ -180,14 +205,17 @@ class EditorViewModel @Inject constructor(
                 if (project != null) {
                     if (_uiState.value.projectId != project.id) loadProject(project)
                 } else {
+                    cancelProjectWork()
                     dispatch(EditorIntent.ClearProject)
                     history.clear()
+                    updateHistoryCounts()
                 }
             }
         }
     }
 
     private fun loadProject(project: GraffitiProject) {
+        cancelProjectWork()
         // This only runs on a genuine project switch (the caller already checked projectId
         // changed) — so anything scoped to the PREVIOUS project must be invalidated here, or it
         // leaks into the new one. Undo history is the sharpest case: left uncleared, pressing
@@ -216,7 +244,7 @@ class EditorViewModel @Inject constructor(
 
         val pendingUri = loaded?.takeIf { it.bitmap == null }?.uri
         if (pendingUri != null) {
-            viewModelScope.launch(dispatchers.io) {
+            projectLoadJob = viewModelScope.launch(dispatchers.io) {
                 // uri is always the untouched import, so this is the effect source; the saved
                 // Outline / isolation flags are then re-derived on top of it.
                 val source = ImageUtils.loadBitmapAsync(context, pendingUri)
@@ -225,8 +253,10 @@ class EditorViewModel @Inject constructor(
                 // case where the user just took an action and needs to see it didn't apply.
                 val shown = source?.let { applyDesignEffects(it, loaded).first }
                 withContext(dispatchers.main) {
-                    designSourceBitmap = source
-                    dispatch(EditorIntent.RestoreDesign(loaded.copy(bitmap = shown)))
+                    if (isCurrentProject(project.id) && _uiState.value.design?.id == loaded.id) {
+                        designSourceBitmap = source
+                        updateDesign { it.copy(bitmap = shown) }
+                    }
                 }
             }
         }
@@ -237,9 +267,11 @@ class EditorViewModel @Inject constructor(
         // flow, same native engine, undefined order, and this one skipped every one of those steps.
 
         project.backgroundImageUri?.let { uri ->
-            viewModelScope.launch(dispatchers.io) {
+            backgroundLoadJob = viewModelScope.launch(dispatchers.io) {
                 val bitmap = ImageUtils.loadBitmapAsync(context, uri)
-                withContext(dispatchers.main) { dispatch(EditorIntent.SetBackgroundBitmap(bitmap)) }
+                withContext(dispatchers.main) {
+                    if (isCurrentProject(project.id)) dispatch(EditorIntent.SetBackgroundBitmap(bitmap))
+                }
             }
         }
     }
@@ -287,7 +319,8 @@ class EditorViewModel @Inject constructor(
         command ?: return
         // The bitmap is transient and identical across a property-only change, so carry the live one
         // over rather than reloading it from disk.
-        val restored = command.oldDesign?.copy(bitmap = _uiState.value.design?.bitmap)
+        val imageChanged = command.oldDesign?.uri != _uiState.value.design?.uri
+        val restored = command.oldDesign?.copy(bitmap = if (imageChanged) null else _uiState.value.design?.bitmap)
         val effectsChanged = restored?.isSketch != _uiState.value.design?.isSketch ||
             restored?.isSubjectIsolated != _uiState.value.design?.isSubjectIsolated
         dispatch(EditorIntent.RestoreDesign(restored))
@@ -303,7 +336,25 @@ class EditorViewModel @Inject constructor(
         updateHistoryCounts()
         // The carried-over bitmap is only valid while the effect flags are unchanged; undoing an
         // effect toggle has to re-render from the source or the pixels contradict the flags.
-        if (effectsChanged) recomputeDesignEffects()
+        if (imageChanged) {
+            designEffectJob?.cancel()
+            projectLoadJob?.cancel()
+            designSourceBitmap = null
+            val projectId = _uiState.value.projectId ?: return
+            if (restored != null) {
+                projectLoadJob = viewModelScope.launch(dispatchers.io) {
+                    val source = ImageUtils.loadBitmapAsync(context, restored.uri)
+                    val shown = source?.let { applyDesignEffects(it, restored).first }
+                    withContext(dispatchers.main) {
+                        if (isCurrentProject(projectId) && _uiState.value.design?.id == restored.id) {
+                            designSourceBitmap = source
+                            updateDesign { it.copy(bitmap = shown) }
+                            _uiState.value.design?.let { opEmitter.emit(Op.DesignReplace(it)) }
+                        }
+                    }
+                }
+            }
+        } else if (effectsChanged) recomputeDesignEffects()
     }
 
     // ── The design ────────────────────────────────────────────────────────────
@@ -331,14 +382,18 @@ class EditorViewModel @Inject constructor(
     }
 
     private fun applyNewDesign(uri: Uri) {
-        pushHistory()
-        viewModelScope.launch(dispatchers.io) {
+        val projectId = _uiState.value.projectId ?: return
+        projectLoadJob?.cancel()
+        designEffectJob?.cancel()
+        importJob?.cancel()
+        importJob = viewModelScope.launch(dispatchers.io) {
+            try {
             // Cap the imported image at a screen-reasonable size. A full 12MP+ photo is ~48MB as ARGB;
             // decoding/copying/PNG-encoding it (then rendering it as a texture every frame) is what
             // made the first layer take seconds to appear and the canvas lag. 2048px is ample here.
             val bitmap = ImageUtils.loadBitmapAsync(context, uri, maxDimension = 2048)
-            val projectId = _uiState.value.projectId
-            if (bitmap != null && projectId != null) {
+            if (!isCurrentProject(projectId)) return@launch
+            if (bitmap != null) {
                 val filename = "design_${UUID.randomUUID()}.png"
                 val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(bitmap))
                 val localUri = "file://$path".toUri()
@@ -361,6 +416,8 @@ class EditorViewModel @Inject constructor(
                 )
 
                 withContext(dispatchers.main) {
+                    if (!isCurrentProject(projectId)) return@withContext
+                    pushHistory()
                     // A new import starts with no effects, so it is its own source.
                     designSourceBitmap = bitmap
                     dispatch(EditorIntent.SetDesign(design))
@@ -370,6 +427,12 @@ class EditorViewModel @Inject constructor(
             } else {
                 withContext(dispatchers.main) {
                     Toast.makeText(context, "Invalid image format or missing project", Toast.LENGTH_SHORT).show()
+                }
+            }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                withContext(dispatchers.main) {
+                    if (isCurrentProject(projectId)) _uiState.update { it.copy(effectFailureMessage = "Couldn't import that image.") }
                 }
             }
         }
@@ -412,11 +475,13 @@ class EditorViewModel @Inject constructor(
      */
     private fun recomputeDesignEffects() {
         val source = designSourceBitmap ?: return
+        val projectId = _uiState.value.projectId ?: return
+        val design = _uiState.value.design ?: return
         designEffectJob?.cancel()
         designEffectJob = viewModelScope.launch(dispatchers.default) {
-            val design = _uiState.value.design ?: return@launch
             val (rendered, failureMessage) = applyDesignEffects(source, design)
             withContext(dispatchers.main) {
+                if (!isCurrentProject(projectId) || _uiState.value.design?.id != design.id) return@withContext
                 updateDesign { it.copy(bitmap = rendered) }
                 if (failureMessage != null) {
                     _uiState.update { it.copy(effectFailureMessage = failureMessage) }
@@ -452,82 +517,104 @@ class EditorViewModel @Inject constructor(
 
     fun setBackgroundImage(uri: Uri) {
         val projectId = _uiState.value.projectId ?: return
-        viewModelScope.launch(dispatchers.io) {
-            dispatch(EditorIntent.SetLoading(true))
-            val bitmap = ImageUtils.loadBitmapAsync(context, uri)
-            if (bitmap != null) {
-                val filename = "bg_${UUID.randomUUID()}.png"
-                val path = projectRepository.saveArtifact(projectId, filename, ImageUtils.bitmapToByteArray(bitmap))
-                projectRepository.updateProject { it.copy(backgroundImageUri = "file://$path".toUri()) }
-                withContext(dispatchers.main) {
-                    dispatch(EditorIntent.SetBackgroundBitmap(bitmap))
-                    dispatch(EditorIntent.SetLoading(false))
+        backgroundLoadJob?.cancel()
+        dispatch(EditorIntent.SetLoading(true))
+        backgroundLoadJob = viewModelScope.launch(dispatchers.main) {
+            try {
+                val bitmap = withContext(dispatchers.io) { ImageUtils.loadBitmapAsync(context, uri) }
+                    ?: error("Couldn't load that image.")
+                if (!isCurrentProject(projectId)) return@launch
+                withContext(dispatchers.io) {
+                    val path = projectRepository.saveArtifact(projectId, "bg_${UUID.randomUUID()}.png", ImageUtils.bitmapToByteArray(bitmap))
+                    projectRepository.updateProject {
+                        if (it.id == projectId) it.copy(backgroundImageUri = "file://$path".toUri()) else it
+                    }
                 }
-            } else {
-                withContext(dispatchers.main) {
-                    dispatch(EditorIntent.SetLoading(false))
-                    _uiState.update { it.copy(effectFailureMessage = "Couldn't load that image.") }
-                }
+                if (isCurrentProject(projectId)) dispatch(EditorIntent.SetBackgroundBitmap(bitmap))
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (isCurrentProject(projectId)) _uiState.update { it.copy(effectFailureMessage = "Couldn't load that image.") }
+            } finally {
+                if (isCurrentProject(projectId)) dispatch(EditorIntent.SetLoading(false))
             }
         }
     }
 
-    /** Remove the Mockup wall photo: clears the persisted background URI and the live bitmap. */
     fun clearBackgroundImage() {
-        viewModelScope.launch(dispatchers.io) {
-            projectRepository.updateProject { it.copy(backgroundImageUri = null) }
-            withContext(dispatchers.main) { dispatch(EditorIntent.SetBackgroundBitmap(null)) }
+        val projectId = _uiState.value.projectId ?: return
+        backgroundLoadJob?.cancel()
+        backgroundLoadJob = viewModelScope.launch(dispatchers.main) {
+            try {
+                withContext(dispatchers.io) {
+                    projectRepository.updateProject {
+                        if (it.id == projectId) it.copy(backgroundImageUri = null) else it
+                    }
+                }
+                if (isCurrentProject(projectId)) dispatch(EditorIntent.SetBackgroundBitmap(null))
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                if (isCurrentProject(projectId)) _uiState.update { it.copy(effectFailureMessage = "Couldn't remove the wall photo.") }
+            } finally {
+                if (isCurrentProject(projectId)) dispatch(EditorIntent.SetLoading(false))
+            }
         }
     }
 
     // ── Persistence ───────────────────────────────────────────────────────────
 
     fun saveProject(name: String? = null, onComplete: (Boolean) -> Unit = {}) {
-        viewModelScope.launch(dispatchers.io) {
+        val snapshot = _uiState.value
+        val currentProject = projectRepository.currentProject.value
+        viewModelScope.launch(dispatchers.main) {
             try {
-                val currentProject = projectRepository.currentProject.value
-                val updatedDesign = _uiState.value.design?.toOverlayLayer()
-                val modeAdjustments = _uiState.value.modeAdjustments.mapKeys { it.key.name }
+                editorSaveMutex.withLock {
+                    withContext(dispatchers.io) {
+                        check(currentProject == null || currentProject.id == snapshot.projectId) { "Project is still loading" }
+                        check(projectRepository.currentProject.value?.id == currentProject?.id) { "Project changed while saving" }
+                        val updatedDesign = snapshot.design?.toOverlayLayer()
+                        val modeAdjustments = snapshot.modeAdjustments.mapKeys { it.key.name }
 
-                // Paths derive from the (immutable) project id.
-                val projectId = currentProject?.id ?: GraffitiProject(name = name ?: "New Project").id
+                        // Paths derive from the (immutable) project id.
+                        val projectId = currentProject?.id ?: GraffitiProject(name = name ?: "New Project").id
 
-                if (currentProject == null) {
-                    val manifestToSave = GraffitiProject(
-                        id = projectId,
-                        name = name ?: "New Project",
-                        design = updatedDesign,
-                        modeAdjustments = modeAdjustments,
-                    )
-                    projectRepository.createProject(manifestToSave)
-                } else {
-                    // Atomic read-modify-write: a concurrent AR wall-feature-map save merges into the SAME
-                    // currentProject, so writing a full stale copy here would drop its wall map (and vice
-                    // versa). The transform only touches the editor-owned fields.
-                    //
-                    // Guarded on id, matching scheduleThumbnailUpdate below: this launches on the IO
-                    // dispatcher, so by the time it runs the user may already have switched to a
-                    // different project, in which case `current` is that new project, not the one
-                    // `updatedDesign`/`modeAdjustments` were captured from — writing them anyway would
-                    // clobber the new project with the old one's design.
-                    projectRepository.updateProject { current ->
-                        if (current.id != projectId) current
-                        else current.copy(
-                            name = name ?: current.name,
-                            design = updatedDesign,
-                            modeAdjustments = modeAdjustments,
-                            lastModified = System.currentTimeMillis(),
-                        )
-                    }
-                    check(projectRepository.currentProject.value?.id == projectId) {
-                        "Project changed while saving"
+                        if (currentProject == null) {
+                            val manifestToSave = GraffitiProject(
+                                id = projectId,
+                                name = name ?: "New Project",
+                                design = updatedDesign,
+                                modeAdjustments = modeAdjustments,
+                            )
+                            projectRepository.createProject(manifestToSave)
+                        } else {
+                            // Atomic read-modify-write: a concurrent AR wall-feature-map save merges into the SAME
+                            // currentProject, so writing a full stale copy here would drop its wall map (and vice
+                            // versa). The transform only touches the editor-owned fields.
+                            //
+                            // Guarded on id, matching scheduleThumbnailUpdate below: this launches on the IO
+                            // dispatcher, so by the time it runs the user may already have switched to a
+                            // different project, in which case `current` is that new project, not the one
+                            // `updatedDesign`/`modeAdjustments` were captured from — writing them anyway would
+                            // clobber the new project with the old one's design.
+                            projectRepository.updateProject { current ->
+                                if (current.id != projectId) current
+                                else current.copy(
+                                    name = name ?: current.name,
+                                    design = updatedDesign,
+                                    modeAdjustments = modeAdjustments,
+                                    lastModified = System.currentTimeMillis(),
+                                )
+                            }
+                            check(projectRepository.currentProject.value?.id == projectId) {
+                                "Project changed while saving"
+                            }
+                        }
+
+                        // Explicit Save persists the editable project; image export is a separate action.
+
                     }
                 }
-
-                // Explicit Save persists the editable project; image export is a separate action.
-
                 scheduleThumbnailUpdate()
-                withContext(dispatchers.main) { onComplete(true) }
+                onComplete(true)
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 // Don't let a failed save die silently — the user believes their work is safe.

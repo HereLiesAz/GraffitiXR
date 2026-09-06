@@ -35,6 +35,7 @@ class DashboardViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         repository = mockk(relaxed = true)
+        every { repository.currentProject } returns kotlinx.coroutines.flow.MutableStateFlow<GraffitiProject?>(null)
         viewModel = DashboardViewModel(repository)
 
         // The failure paths in openProject/importProject log via android.util.Log, which isn't

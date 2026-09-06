@@ -494,6 +494,15 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                LaunchedEffect(dashboardUiState.showNewProjectDialog) {
+                    if (dashboardUiState.showNewProjectDialog) showSettings = false
+                }
+                LaunchedEffect(dashboardUiState.projectErrorMessage) {
+                    dashboardUiState.projectErrorMessage?.let {
+                        Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+                        dashboardViewModel.dismissProjectError()
+                    }
+                }
                 LaunchedEffect(dashboardNavigation) {
                     dashboardNavigation?.let { destination ->
                         when (destination) {
@@ -504,9 +513,12 @@ class MainActivity : ComponentActivity() {
                             // Fired only after openProject's load actually succeeds — see the comment
                             // at the ProjectLibraryScreen call site. A failed load never reaches here,
                             // so the editor is never entered without a real loaded project.
-                            DashboardViewModel.DESTINATION_EDITOR -> navController.navigate(EditorMode.DESIGN.name) {
-                                popUpTo(LIBRARY_ROUTE) { inclusive = true }
-                                launchSingleTop = true
+                            DashboardViewModel.DESTINATION_EDITOR -> {
+                                showSettings = false
+                                navController.navigate(EditorMode.DESIGN.name) {
+                                    popUpTo(LIBRARY_ROUTE) { inclusive = true }
+                                    launchSingleTop = true
+                                }
                             }
                         }
                         dashboardViewModel.onNavigationConsumed()
@@ -1698,7 +1710,11 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            if (showSettings) {
+                            if (showSettings && !showSaveDialog && !dashboardUiState.showNewProjectDialog) {
+                                androidx.compose.ui.window.Dialog(
+                                    onDismissRequest = { showSettings = false },
+                                    properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+                                ) {
                                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
                                 SettingsScreen(
                                     currentVersion = BuildConfig.VERSION_NAME,
@@ -1754,6 +1770,7 @@ class MainActivity : ComponentActivity() {
                                     onClose = { showSettings = false },
                                     strings = strings
                                 )
+                                }
                             }
 
                             if (hostQr != null && coopState is CoopSessionState.WaitingForGuest) {
