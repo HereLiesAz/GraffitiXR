@@ -453,8 +453,17 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
                 // A trusted look at the wall: it measures BOTH channels, and they are different
                 // quantities. Coverage says how much of the design is realized (progress);
                 // matchability says how much to trust this frame (confidence).
-                mPaintingProgress.store(coverage, std::memory_order_relaxed);
-                mCorroborationConfidence.store(matchability, std::memory_order_relaxed);
+                //
+                // Clamped and finiteness-checked: these are raw ONNX outputs with no contract
+                // enforcing [0,1] or excluding NaN/Inf (unlike the neighboring count-ratio
+                // producer of this same value elsewhere in this file, which is bounded by
+                // construction). An export that emits logits rather than a sigmoided value, or a
+                // NaN from a degenerate input, must not reach the user's progress/confidence
+                // readouts unclamped.
+                float clampedCoverage = std::isfinite(coverage) ? std::clamp(coverage, 0.0f, 1.0f) : 0.0f;
+                float clampedMatchability = std::isfinite(matchability) ? std::clamp(matchability, 0.0f, 1.0f) : 0.0f;
+                mPaintingProgress.store(clampedCoverage, std::memory_order_relaxed);
+                mCorroborationConfidence.store(clampedMatchability, std::memory_order_relaxed);
             } else {
                 // The head looked and did not recognize the wall. That is a statement about THIS
                 // FRAME, not about the mural, so only confidence decays. Decaying progress here
@@ -1350,6 +1359,18 @@ void MobileGS::restoreWallFingerprint(const cv::Mat& d, const std::vector<cv::Po
     // This path carries no partition, and the previous fingerprint's must not survive onto it: the
     // bytes would index a different point set entirely. Empty = all backbone, as before Phase 2.
     mWallRegions.clear();
+    // This path also carries no capture-view/anchor/canonical-patch co-registration -- unlike its
+    // metric sibling below, which resets mHasFingerprintView to false when passed a null
+    // viewMatrix16 for exactly this reason. Without the same reset here, restoring a
+    // descriptors-only fingerprint after a metric one left mHasFingerprintView/
+    // mFingerprintAnchorMatrix/mWallPatch behind: runRelocPass would then rectify THIS wall's
+    // live frames against the PREVIOUS wall's capture view, and getFingerprintAnchor would hand
+    // Kotlin the previous wall's anchor. Match clearWallFingerprint's reset.
+    static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    memcpy(mFingerprintAnchorMatrix, kIdentity16, 16 * sizeof(float));
+    memset(mFingerprintIntrinsics, 0, 4 * sizeof(float));
+    mHasFingerprintView = false;
+    mWallPatch.release();
 }
 void MobileGS::restoreWallFingerprintMetric(const cv::Mat& d, const std::vector<cv::Point3f>& p,
                                             const float* anchorMatrix16, const float* intrinsics4,
@@ -1558,6 +1579,13 @@ void MobileGS::alignToFingerprint(const uint8_t* data, size_t size) {
         // uses when it isn't given a capture view, so PnP falls back to the safe default path.
         memset(mFingerprintIntrinsics, 0, 4 * sizeof(float));
         mHasFingerprintView = false;
+        // mFingerprintAnchorMatrix must reset too, matching the two resets above -- it wasn't,
+        // which let a peer's install inherit THIS device's previous local fingerprint anchor.
+        // getFingerprintAnchor() would then hand Kotlin that stale anchor to compose against the
+        // peer's PnP pose, landing the overlay at an arbitrary transform. Same identity default
+        // clearWallFingerprint uses.
+        static const float kIdentity16[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+        memcpy(mFingerprintAnchorMatrix, kIdentity16, 16 * sizeof(float));
     }
     {
         // Trigger the relocalization worker to start searching. mRelocRequested/mRelocCv are paired
@@ -1627,27 +1655,26 @@ void MobileGS::scheduleRelocCheck(const cv::Mat& f) {
         runRelocPass(f, view);
         return;
     }
+    float viewSnapshot[16];
+    {
+        // Snapshot the latest VIO view under mMutex -- the same lock updateCamera writes it
+        // under -- rather than reading it here unlocked. This used to rely on gEngineMutex's
+        // incidental global exclusivity (every JNI entry point serialized against updateCamera)
+        // to avoid a torn read; now that gEngineMutex is a shared_mutex and most JNI entries
+        // (including this one's caller, nativeFeedColorFrame) only take a shared lock, that
+        // incidental protection is gone and this needs its own correct lock. Scoped so it never
+        // nests with mRelocMutex below, matching the pattern above.
+        std::lock_guard<std::mutex> lock(mMutex);
+        memcpy(viewSnapshot, mViewMatrix, 16 * sizeof(float));
+    }
     {
         std::lock_guard<std::mutex> lock(mRelocMutex);
         if (mRelocRequested) return;
         f.copyTo(mRelocColorFrame);
-        // Snapshot the latest VIO view alongside the frame so the rectifying warp matches it. A torn
-        // read vs. updateCamera is harmless here — the warp is approximate and PnP refines it.
-        memcpy(mRelocViewMatrix, mViewMatrix, 16 * sizeof(float));
+        memcpy(mRelocViewMatrix, viewSnapshot, 16 * sizeof(float));
         mRelocRequested = true;
     }
     mRelocCv.notify_one();
-}
-
-extern MobileGS* gSlamEngine;
-namespace mobilegs {
-    std::vector<uint8_t> exportFingerprint() {
-        if (gSlamEngine) return gSlamEngine->exportFingerprint();
-        return {};
-    }
-    void alignToFingerprint(const uint8_t* data, size_t size) {
-        if (gSlamEngine) gSlamEngine->alignToFingerprint(data, size);
-    }
 }
 
 bool MobileGS::loadSuperPoint(const std::vector<uchar>& onnxBytes) { return mSuperPoint.load(onnxBytes); }

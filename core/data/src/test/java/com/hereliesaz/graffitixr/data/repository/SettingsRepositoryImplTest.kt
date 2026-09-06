@@ -51,4 +51,17 @@ class SettingsRepositoryImplTest {
         repo.setRightHanded(true)
         assertTrue(repo.isRightHanded.first())
     }
+
+    @Test
+    fun `crashReportingConsent defaults to false when nothing has been written`() = runTest {
+        val repo = newRepository()
+        assertFalse(repo.crashReportingConsent.first())
+    }
+
+    @Test
+    fun `setCrashReportingConsent persists true and crashReportingConsent reads it back`() = runTest {
+        val repo = newRepository()
+        repo.setCrashReportingConsent(true)
+        assertTrue(repo.crashReportingConsent.first())
+    }
 }

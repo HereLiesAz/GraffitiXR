@@ -36,8 +36,19 @@ bool LowLightEnhancer::enhance(const cv::Mat& input, cv::Mat& output) {
         static const int INF_W = 600;
         static const int INF_H = 400;
 
+        // The model wants 3-channel (blobFromImage below assumes it, and every call site in
+        // MobileGS.cpp hands this bitmap-sourced RGBA frames straight through). A 4-channel input
+        // used to reach blobFromImage unconverted, producing a [1,4,H,W] blob against a net whose
+        // first conv expects 3 -- OpenCV throws, the catch below swallows it, and enhance() was a
+        // permanent silent no-op on every caller except the one (the live reloc path) that
+        // happened to convert to RGB first. Converting here fixes it for every caller at once
+        // instead of relying on each one to remember.
+        cv::Mat rgb;
+        if (input.channels() == 4) cv::cvtColor(input, rgb, cv::COLOR_RGBA2RGB);
+        else rgb = input;
+
         cv::Mat resized;
-        cv::resize(input, resized, cv::Size(INF_W, INF_H), 0, 0, cv::INTER_AREA);
+        cv::resize(rgb, resized, cv::Size(INF_W, INF_H), 0, 0, cv::INTER_AREA);
 
         cv::Mat f;
         resized.convertTo(f, CV_32F, 1.0 / 255.0);

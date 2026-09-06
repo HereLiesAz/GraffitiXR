@@ -19,8 +19,15 @@ class SettingsViewModel @Inject constructor(
     val language: StateFlow<AppLanguage> = settingsRepository.language
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppLanguage.SYSTEM)
 
+    val crashReportingConsent: StateFlow<Boolean> = settingsRepository.crashReportingConsent
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     fun setLanguage(language: AppLanguage) {
         viewModelScope.launch { settingsRepository.setLanguage(language) }
+    }
+
+    fun setCrashReportingConsent(on: Boolean) {
+        viewModelScope.launch { settingsRepository.setCrashReportingConsent(on) }
     }
 
     fun setBackgroundColor(argb: Int) {

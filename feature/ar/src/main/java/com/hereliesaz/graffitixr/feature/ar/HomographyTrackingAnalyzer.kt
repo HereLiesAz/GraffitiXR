@@ -13,8 +13,16 @@ import com.hereliesaz.graffitixr.feature.ar.anchor.CaptureRotation
 import com.hereliesaz.graffitixr.feature.ar.rendering.ProjectionMatrix
 import com.hereliesaz.graffitixr.nativebridge.YuvConverter
 
-/** One frame's tracked pose plus the GL projection matrix it was solved against — see [HomographyTrackingAnalyzer]. */
-data class HomographyTrackedFrame(val pose: HomographyPose, val projMatrix: FloatArray)
+/**
+ * One frame's tracked pose plus the GL projection matrix it was solved against — see
+ * [HomographyTrackingAnalyzer]. [frameAspect] (width/height of the frame the pose was solved in,
+ * AFTER rotation to display orientation) lets the renderer letterbox its viewport to match exactly
+ * what [com.hereliesaz.graffitixr.feature.ar.CameraPreview]'s `PreviewView` is showing — see
+ * [com.hereliesaz.graffitixr.feature.ar.rendering.HomographyOverlayRenderer] for why that match
+ * matters (drawing into the full GL surface while the preview beneath it is cropped/letterboxed
+ * to a different aspect stretches and mis-scales the overlay relative to what's on screen).
+ */
+data class HomographyTrackedFrame(val pose: HomographyPose, val projMatrix: FloatArray, val frameAspect: Float)
 
 /**
  * The CameraX `ImageAnalysis.Analyzer` that actually drives [BridgedHomographyTracker] from a
@@ -84,7 +92,10 @@ class HomographyTrackingAnalyzer(
                     cx = rotatedIntrinsics[2], cy = rotatedIntrinsics[3],
                     width = rotated.width, height = rotated.height,
                 )
-                onFrameTracked(HomographyTrackedFrame(pose, ProjectionMatrix.buildFrom(rotatedFrameIntrinsics)))
+                val frameAspect = rotated.width.toFloat() / rotated.height.toFloat()
+                onFrameTracked(
+                    HomographyTrackedFrame(pose, ProjectionMatrix.buildFrom(rotatedFrameIntrinsics), frameAspect),
+                )
             } else {
                 onFrameTracked(null)
             }

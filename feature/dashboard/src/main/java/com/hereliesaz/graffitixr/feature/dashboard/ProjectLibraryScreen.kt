@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -64,6 +65,11 @@ fun ProjectLibraryScreen(
     onImportProject: (Uri) -> Unit,
     onClose: () -> Unit,
     strings: AppStrings,
+    // The Library is the app's start destination and has no rail (ConfigureRailItems is gated on
+    // !showLibrary, so proj.settings is unreachable from here) — a new user needing a different
+    // language or handedness before creating a project had no way to change either. Defaults to a
+    // no-op so existing previews/tests that don't care about Settings don't need to supply it.
+    onOpenSettings: () -> Unit = {},
     // Set when a just-attempted import failed (corrupt file, wrong type, etc). Surfaced once as a
     // Toast, matching this codebase's existing pattern for reporting async failures to the user
     // (see EditorViewModel's Toast usage), then cleared via onDismissImportError so it doesn't
@@ -104,26 +110,32 @@ fun ProjectLibraryScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             // App intro header — always visible above the action buttons
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 20.dp),
-                horizontalAlignment = Alignment.Start
+                verticalAlignment = Alignment.Top,
             ) {
-                Text(
-                    text = strings.lib.title,
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Justify
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = strings.lib.description,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.White.copy(alpha = 0.7f),
-                    textAlign = TextAlign.Justify
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = strings.lib.title,
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Justify
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = strings.lib.description,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.White.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Justify
+                    )
+                }
+                // The only route to Settings before a project exists — see onOpenSettings' doc.
+                IconButton(onClick = onOpenSettings) {
+                    Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Color.White)
+                }
             }
 
             // New & Import Project Buttons

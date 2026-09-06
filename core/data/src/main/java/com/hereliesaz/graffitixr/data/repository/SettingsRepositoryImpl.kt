@@ -41,6 +41,7 @@ class SettingsRepositoryImpl @Inject constructor(
     private val SHOW_ANCHOR_BOUNDARY = booleanPreferencesKey("show_anchor_boundary")
     private val DRIFT_CORRECTION_ENABLED = booleanPreferencesKey("drift_correction_enabled")
     private val SELF_GROW_ENABLED = booleanPreferencesKey("self_grow_enabled")
+    private val CRASH_REPORTING_CONSENT = booleanPreferencesKey("crash_reporting_consent")
     private val FEATURE_MAP_ENABLED = booleanPreferencesKey("feature_map_enabled")
     private val AUTO_FOCUS_ENABLED = booleanPreferencesKey("auto_focus_enabled")
     private val FORCED_STEREO_UNSTABLE = booleanPreferencesKey("forced_stereo_unstable")
@@ -154,6 +155,16 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun setSelfGrowEnabled(on: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[SELF_GROW_ENABLED] = on
+        }
+    }
+
+    override val crashReportingConsent: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { preferences -> preferences[CRASH_REPORTING_CONSENT] ?: false }
+
+    override suspend fun setCrashReportingConsent(on: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[CRASH_REPORTING_CONSENT] = on
         }
     }
 

@@ -1,8 +1,8 @@
 # Politique de Confidentialité de GraffitiXR
 
-**Dernière Mise à Jour :** [Date Actuelle]
+**Dernière Mise à Jour :** 2026-09-04
 
-HereLiesAZ a conçu l'application GraffitiXR comme une application Open Source. Ce SERVICE est fourni par HereLiesAZ gratuitement et est destiné à être utilisé tel quel.
+HereLiesAZ a conçu l'application GraffitiXR comme une application à code source disponible (source-available) — voir le fichier LICENSE et docs/LICENSING.md du dépôt pour les conditions exactes. Ce SERVICE est fourni par HereLiesAZ gratuitement et est destiné à être utilisé tel quel.
 
 Cette page a pour but d'informer les visiteurs concernant nos politiques relatives à la collecte, l'utilisation et la divulgation des Informations Personnelles si quiconque décide d'utiliser notre Service.
 
@@ -57,4 +57,4 @@ Si vous avez des questions ou des suggestions concernant notre Politique de Conf
 
 
 ---
-*Documentation mise à jour le 2026-03-17 lors de la phase de refonte du site web et d'intégration du mode Pochoir.*
+*Documentation mise à jour le 2026-09-04 : correction de « Open Source » en « à code source disponible » (voir LICENSE / docs/LICENSING.md). Mise à jour précédente : 2026-03-17.*

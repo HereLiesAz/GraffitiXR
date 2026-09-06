@@ -87,7 +87,7 @@ class WallFeatureMapTest {
         try {
             WallFeatureMap(points3d = FloatArray(wrappedSize), descriptorsRows = hostileRows)
             fail("expected the 64-bit-widened points3d size check to reject a wrapped hostile row count")
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             // expected
         }
     }

@@ -12,13 +12,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
@@ -47,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -75,6 +78,8 @@ fun SettingsScreen(
     onLanguageChanged: (AppLanguage) -> Unit,
     isRightHanded: Boolean,
     onHandednessChanged: (Boolean) -> Unit,
+    crashReportingConsent: Boolean,
+    onCrashReportingConsentChanged: (Boolean) -> Unit,
     showDiagOverlay: Boolean,
     onDiagOverlayChanged: () -> Unit,
     showFeaturePoints: Boolean,
@@ -244,6 +249,21 @@ fun SettingsScreen(
                                 value = if (isRightHanded) strings.settings.handRight else strings.settings.handLeft,
                                 modifier = Modifier.clickable { onHandednessChanged(!isRightHanded) }
                             )
+                            // Off by default and must ask, not assume: this is the one setting in the
+                            // app that sends anything off the device. On a crash, the report (device
+                            // model + recent logcat) goes to this project's PUBLIC GitHub issue
+                            // tracker — never silently, and never anywhere else.
+                            Text(
+                                text = "On a crash, send the device model and recent logs to a public bug report? Off by default.",
+                                color = Color.Gray,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                            SettingsItem(
+                                label = "Crash reports",
+                                value = if (crashReportingConsent) strings.settings.on else strings.settings.off,
+                                modifier = Modifier.clickable { onCrashReportingConsentChanged(!crashReportingConsent) }
+                            )
                             SettingsItem(
                                 label = strings.settings.diagOverlay,
                                 value = if (showDiagOverlay) strings.settings.on else strings.settings.off,
@@ -328,7 +348,25 @@ fun SettingsScreen(
                                 value = strings.settings.resetTutorialsValue,
                                 modifier = Modifier.clickable { onResetTutorials() }
                             )
-                            SettingRow(label = strings.settings.canvasBg) {
+                            // A label-left/swatches-right Row (SettingRow's shape) can't fit five
+                            // 48dp touch targets + 4×8dp gaps (272dp) plus any label width on a
+                            // compact/split-screen card — Compose doesn't wrap a plain Row, so it
+                            // clipped or shrank targets below the accessibility fix's own minimum.
+                            // Label on its own line, swatches in a horizontally scrollable row
+                            // below: every swatch stays reachable (via scroll) at any width, and
+                            // none of the 48dp targets are ever compressed.
+                            Text(
+                                strings.settings.canvasBg,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState())
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
                                 listOf(
                                     "Black" to 0xFF000000.toInt(),
                                     "Dark"  to 0xFF1A1A2E.toInt(),
@@ -337,16 +375,31 @@ fun SettingsScreen(
                                     "Navy"  to 0xFF0D1B2A.toInt(),
                                 ).forEach { (label, argb) ->
                                     val isSelected = backgroundColor == argb
+                                    // The visible color circle stays 32dp (8dp padding inside a 48dp
+                                    // box), matching Android's 48dp minimum touch target without the
+                                    // swatch itself looking oversized. The color-only Box also gets a
+                                    // contentDescription + Button role via clickable's onClickLabel/
+                                    // role so a screen reader hears "Black, selected" instead of
+                                    // nothing at all.
                                     Box(
                                         modifier = Modifier
-                                            .size(32.dp)
+                                            .size(48.dp)
+                                            .clickable(
+                                                role = Role.Button,
+                                                onClickLabel = label,
+                                                onClick = { onBackgroundColorChanged(argb) }
+                                            )
+                                            .semantics(mergeDescendants = true) {
+                                                contentDescription = label
+                                                stateDescription = if (isSelected) "Selected" else ""
+                                            }
+                                            .padding(8.dp)
                                             .background(Color(argb.toLong() and 0xFFFFFFFFL), CircleShape)
                                             .border(
                                                 width = if (isSelected) 2.dp else 0.5.dp,
                                                 color = if (isSelected) Color.Cyan else Color.Gray,
                                                 shape = CircleShape
                                             )
-                                            .clickable { onBackgroundColorChanged(argb) }
                                     )
                                 }
                             }
@@ -436,27 +489,19 @@ fun SettingsSectionTitle(title: String) {
 @Composable
 fun SettingsItem(label: String, value: String, modifier: Modifier = Modifier) {
     Row(
+        // Each row's clickable modifier is passed in by the caller and sized only to its Text
+        // children (~24dp), well under Android's 48dp minimum touch target — every toggle in this
+        // list was harder to hit than it needed to be. heightIn enforces the minimum without
+        // affecting rows that pass a non-clickable modifier (the read-only Version row).
         modifier = modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(text = label, fontWeight = FontWeight.Medium)
         Text(text = value, color = Color.Gray)
-    }
-}
-
-@Composable
-private fun SettingRow(label: String, content: @Composable RowScope.() -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(label, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), content = content)
     }
 }
 

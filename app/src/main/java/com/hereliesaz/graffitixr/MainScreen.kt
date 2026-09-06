@@ -45,7 +45,6 @@ import com.hereliesaz.graffitixr.common.model.FeedbackEvent
 import android.widget.Toast
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.feature.ar.CameraPreview
-import com.hereliesaz.graffitixr.feature.ar.FreezePreviewScreen
 import com.hereliesaz.graffitixr.feature.ar.rendering.ArRenderer
 import com.hereliesaz.graffitixr.feature.editor.EditorViewModel
 import com.hereliesaz.graffitixr.nativebridge.SlamManager
@@ -425,16 +424,6 @@ fun MainScreen(
             }
         }
 
-        // Freeze preview — shown when user freezes layers in AR mode
-        arUiState.freezePreviewBitmap?.let { annotated ->
-            FreezePreviewScreen(
-                annotatedBitmap = annotated,
-                showDepthWarning = arUiState.freezeDepthWarning,
-                onDismiss = { arViewModel.onFreezeDismissed() },
-                onUnfreeze = { arViewModel.onUnfreezeRequested() }
-            )
-        }
-
         // Camera modes: which rotation axis the last double-tap selected. Shown for every non-Design
         // mode (AR/Overlay/Mockup/Trace) where the axis cycle applies; Design has its own indicator.
         // visible drives RotationAxisFeedback's own enter/exit + auto-dismiss (onFeedbackShown).
@@ -446,6 +435,50 @@ fun MainScreen(
                     onFeedbackShown = { editorViewModel.onFeedbackShown() },
                     modifier = Modifier.padding(top = 48.dp)
                 )
+            }
+        }
+
+        // A locked mode's transform gestures and Reset are silently ignored by the reducer (see
+        // EditorUiState.showLockedFeedback's doc) — previously the ONLY cue was a color highlight
+        // on the "Lock" rail sub-item, which can be on a collapsed accordion host. Surface it once,
+        // clearing the flag immediately so it doesn't repeat on every subsequent blocked gesture.
+        LaunchedEffect(uiState.showLockedFeedback) {
+            if (uiState.showLockedFeedback) {
+                android.widget.Toast.makeText(
+                    context,
+                    "Locked — tap Lock again to move this",
+                    android.widget.Toast.LENGTH_SHORT,
+                ).show()
+                editorViewModel.onLockedFeedbackShown()
+            }
+        }
+
+        // Isolate/Outline falling back to the unchanged input (see EditorUiState.
+        // effectFailureMessage's doc) used to leave the rail's "done" highlight lit with no other
+        // sign the effect didn't apply.
+        LaunchedEffect(uiState.effectFailureMessage) {
+            val message = uiState.effectFailureMessage
+            if (message != null) {
+                android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                editorViewModel.onEffectFailureMessageShown()
+            }
+        }
+
+        // "Share this wall" — see EditorUiState.shareProjectUri's doc. The launch itself has to
+        // happen here (an Activity Context), not in the ViewModel that prepared the file.
+        LaunchedEffect(uiState.shareProjectUri) {
+            val uri = uiState.shareProjectUri
+            if (uri != null) {
+                val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "application/zip"
+                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                    putExtra(android.content.Intent.EXTRA_SUBJECT, "GraffitiXR wall")
+                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                runCatching {
+                    context.startActivity(android.content.Intent.createChooser(send, "Share this wall"))
+                }
+                editorViewModel.onShareProjectUriConsumed()
             }
         }
 

@@ -7,7 +7,7 @@ Gyakorlatilag egyetlen képernyő létezik. A háttér-renderelési réteg az ak
 ### AR Mód (`EditorMode.AR`)
 | Réteg | Felület | Tartalom |
 |---|---|---|
-| Alsó | `GLSurfaceView` (`ArRenderer`) | ARCore élő kamerakép a `BackgroundRenderer`-en keresztül; SLAM voxel splattek a `slamManager.draw()`-on keresztül |
+| Alsó | `GLSurfaceView` (`ArRenderer`) | ARCore élő kamerakép a `BackgroundRenderer`-en keresztül; a "Lazy Grid" vetített rácsvonal-átfedés a domináns síkhoz igazítva (nincs perzisztens voxel- vagy splat-réteg, és nincs `draw()` metódus) |
 | Felső | Compose `Canvas` | 2D szerkesztőrétegek (bittérképek, transzformációk) |
 | HUD | Compose `Text` chip | Élő követési állapot (zöld=KÖVETÉS, szürke=KERESÉS) az `arUiState.isScanning` alapján |
 
@@ -27,9 +27,6 @@ Nincs kamera. A háttér egy felhasználó által kiválasztott statikus kép (`
 ### Rajzolás Mód (`EditorMode.TRACE`)
 Nincs kamera. Teljes képernyős rétegmegjelenítés lezárt érintésbemenettel. A feloldó gesztus újra engedélyezi az érintést.
 
-### Sablon Mód (`EditorMode.STENCIL`)
-Nincs kamera. Többrétegű sablongenerálási és nyomtatási folyamat. Előnézetet ad a rétegekről és exportálja a csempézett PDF-eket.
-
 ---
 
 ## 2. Szerkesztő Módok (Sín Elemek)
@@ -42,7 +39,6 @@ A "képernyők" logikai állapotok, amelyeken az `AzNavRail` segítségével leh
 | Rétegzés | Kép vetítése az élő kamera fölé (nincs SLAM) |
 | Makett | Kompozíció készítése egy statikus referenciafotón |
 | Rajzolás | Világítótábla – a kép maximális fényerőn jelenik meg a fizikai átrajzoláshoz |
-| Sablon | Többrétegű sablonok generálása és nyomtatása |
 
 ---
 
@@ -63,4 +59,4 @@ Teljes képernyős alsó lap (bottom sheet) a fő nézet felett. Felsorolja a me
 A kamera- és helymeghatározási engedélyek együtt kerülnek bekérésre a `MainActivity`-ben található `permissionLauncher` segítségével. A `hasCameraPermission` állapot szabályozza az összes kamerától függő renderelést az `ArViewport`-ban. Kamera engedély nélkül sem az AR, sem a Rétegzés mód nem mutat hátteret.
 
 ---
-*A dokumentációt 2026-03-17-én frissítették a weboldal újratervezése és a Sablon Mód integrációs szakasza során.*
+*A dokumentációt 2026-03-17-én frissítették a weboldal újratervezése és a Sablon Mód integrációs szakasza során. 2026-09-04: eltávolítva a törölt `EditorMode.STENCIL` mód leírása (a kódban nem létezik) és a téves `slamManager.draw()`/voxel splat állítás; az AR nézet leírása a jelenlegi forráskód szerint javítva.*

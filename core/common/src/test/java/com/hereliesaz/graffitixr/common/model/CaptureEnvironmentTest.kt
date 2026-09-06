@@ -186,7 +186,7 @@ class CaptureEnvironmentTest {
         try {
             json.encodeToString(env)
             org.junit.Assert.fail("expected encoding a NaN field to throw without allowSpecialFloatingPointValues")
-        } catch (e: kotlinx.serialization.SerializationException) {
+        } catch (_: kotlinx.serialization.SerializationException) {
             // expected — this is exactly the crash the production Json config must avoid.
         }
     }

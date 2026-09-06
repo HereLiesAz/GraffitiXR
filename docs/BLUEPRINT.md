@@ -11,22 +11,39 @@ We are building a tool that respects the "flow" of painting. It must be:
 
 ## Core Pillars
 
-### 1. The Persistent Voxel Memory (SLAM & Relocalization)
-* **Goal:** Create a "sticky" spatial memory that allows the app to recognize the environment instantly, even after tracking loss or screen-off events.
-* **Architecture:** We use a **Zero-Allocation Spatial Hash** for O(1) discovery speed. This ensures the map grows spatially without performance stutters.
-* **MANDATED PIVOT:** We explicitly reject soft, alpha-blended "Gaussian Splatting" due to mobile processing overhead. Instead, we use **Dense Opaque Surfels**. Points are perfectly scaled, surface-aligned, and drawn with 100% opacity using hardware Z-buffering (`glDepthMask(GL_TRUE)`). This provides a watertight surface model at a rock-solid 60fps.
-* **Efficiency:** **Stochastic Integration** processes a random 2048-pixel subset of each depth frame, reducing CPU load by 90% while maintaining high-density tracking.
-* **Metric:** A "Confidence Score" per 20mm voxel. Dual-lens hardware depth is mandatory and rewarded with a 0.9 confidence level, ensuring nearly immutable spatial memory from the first frame.
+### 1. Fingerprint Relocalization (not a persistent 3D map)
+
+An earlier design pivot considered a dense, always-on voxel/surfel map of the wall (a "Persistent
+Voxel Memory," rejecting Gaussian Splatting in favour of opaque surfels with hardware Z-buffering).
+**That was never built**, and the codebase now explicitly documents its absence — see
+[`NATIVE_ENGINE.md`](NATIVE_ENGINE.md): "It is not a mapping engine — there is no persistent-voxel or
+splat layer, no scene reconstruction, and no `draw()`." What shipped instead:
+
+* **Goal:** Recognize the wall instantly after tracking loss or a screen-off event, without a room
+  pre-scan and without the cloud.
+* **Architecture:** A C++17 engine (`MobileGS`) fingerprints the marks the artist draws on the wall —
+  ORB/SuperPoint descriptors plus a handful of triangulated 3D points — rather than densely mapping
+  the whole surface.
+* **Relocalization:** A background thread continuously matches the live camera against that
+  fingerprint and solves the pose with `solvePnPRansac`.
+* **Dual-lens hardware depth is used when available, not mandatory** — it improves the metric scale
+  prior on devices that expose stereo depth; devices without it get metric scale from the artist's
+  natural step-in/step-back baseline (two-keyframe triangulation), not a lower-confidence fallback of
+  the same mechanism.
 
 ### 2. The Rail (Navigation)
 * **Goal:** Eliminate menu diving.
 * **Tech:** `AzNavRail`.
-* **Pattern:** Contextual expansion. The "Project" button expands to show opacity/scale controls right under the thumb. No full-screen modals.
+* **Pattern:** Contextual expansion. Rail hosts expand in place to show controls right under the
+  thumb. No full-screen modals. See [`UI_UX.md`](UI_UX.md) for the current hierarchy.
 
 ### 3. The Time Capsule (Persistence)
 * **Goal:** A digital sketch should remain on the wall for weeks.
-* **Tech:** Local feature descriptors (ORB/SuperPoint) matched against the Voxel Map via PnP.
-* **UX:** When the artist returns, the app recognizes the wall texture and "snaps" the mural back into place instantly.
+* **Tech:** Local feature descriptors (ORB/SuperPoint) matched against the saved wall fingerprint via
+  PnP — not a voxel map (see Pillar 1).
+* **UX:** When the artist returns, the app recognizes the wall texture and "snaps" the mural back
+  into place. Two mechanisms that extend this — drift correction and a self-growing fingerprint —
+  ship opt-in and off by default; see [`TELEOLOGICAL_SLAM.md`](TELEOLOGICAL_SLAM.md).
 
 ## Anti-Goals (What we are NOT building)
 * **No Cloud / No Scaniverse:** We do not use commercial spatial SDKs (like Niantic Lightship/Scaniverse). We do not map the world for Big Tech.
@@ -34,4 +51,8 @@ We are building a tool that respects the "flow" of painting. It must be:
 * **No Gamification:** No points, no leaderboards, no avatars.
 
 ---
-*Documentation updated on 2026-06-22 during the SLAM right-size and documentation-accuracy pass.*
+*Documentation updated on 2026-09-04: replaced the "Persistent Voxel Memory" pillar — never built,
+and explicitly documented as absent in `NATIVE_ENGINE.md` — with the fingerprint-relocalization
+architecture that actually shipped; corrected the "dual-lens mandatory" claim; pointed Pillar 3 at
+the wall fingerprint instead of the nonexistent voxel map. Prior update: 2026-06-22, SLAM right-size
+and documentation-accuracy pass.*

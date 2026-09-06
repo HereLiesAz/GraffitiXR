@@ -6,13 +6,18 @@ import org.junit.Assert.assertNotNull
 import org.junit.Test
 
 /**
- * Guards the frozen JNI ABI between GraffitiJNI.cpp and [HomographyTrackerNative]'s four
- * `native*` methods, the same way [YuvConverterContractTest] guards `nativeYuvToRgbaBitmap`:
- * `Java_com_hereliesaz_graffitixr_nativebridge_HomographyTrackerNative_native*` is resolved by
- * the JVM at load time by exact class + method + descriptor, so a renamed method or reordered
- * parameter silently mangles the symbol and only fails at first invocation (UnsatisfiedLinkError)
- * — user-visible as the ARCore-unavailable fallback simply not tracking. This locks the
- * descriptors here instead.
+ * Pins [HomographyTrackerNative]'s four `native*` methods' Kotlin-side descriptors, the same way
+ * [YuvConverterContractTest] pins `nativeYuvToRgbaBitmap`'s.
+ *
+ * This is only HALF the boundary, and on its own does not guard against the failure its old doc
+ * comment described: JNI resolves a non-overloaded `external fun` by **short name**, not by
+ * descriptor (see [NativeMethodAritySignatureTest]'s doc for why that matters) — so this test
+ * alone would stay green through a parameter reorder on the C++ side, which is exactly the
+ * mistake that breaks silently (the wrong argument lands in the wrong register; no build failure,
+ * no link failure, no `UnsatisfiedLinkError`). [NativeMethodAritySignatureTest] is what actually
+ * cross-checks these four names' arity against `GraffitiJNI.cpp`; this test only catches the
+ * Kotlin side changing its OWN descriptor (a renamed/retyped parameter) without a matching native
+ * change — still worth pinning, just not the whole story.
  */
 class HomographyTrackerNativeContractTest {
 

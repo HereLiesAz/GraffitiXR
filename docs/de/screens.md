@@ -7,7 +7,7 @@ Es gibt praktisch nur einen Bildschirm. Die Hintergrund-Rendering-Ebene ändert 
 ### AR-Modus (`EditorMode.AR`)
 | Ebene | Oberfläche | Inhalt |
 |---|---|---|
-| Unten | `GLSurfaceView` (`ArRenderer`) | ARCore Live-Kamera-Feed über `BackgroundRenderer`; SLAM Voxel Splats über `slamManager.draw()` |
+| Unten | `GLSurfaceView` (`ArRenderer`) | ARCore Live-Kamera-Feed über `BackgroundRenderer`; das projizierte "Lazy Grid"-Rasterlinien-Overlay, ausgerichtet an der dominanten Ebene (keine persistente Voxel- oder Splat-Ebene, keine `draw()`-Methode) |
 | Oben | Compose `Canvas` | 2D-Editorebenen (Bitmaps, Transformationen) |
 | HUD | Compose `Text` chip | Live-Tracking-Status (grün=VERFOLGUNG, grau=SUCHEN) basierend auf `arUiState.isScanning` |
 
@@ -27,9 +27,6 @@ Keine Kamera. Der Hintergrund ist ein vom Benutzer ausgewähltes statisches Bild
 ### Trace-Modus (Pause) (`EditorMode.TRACE`)
 Keine Kamera. Vollbild-Ebenenanzeige mit gesperrter Touch-Eingabe. Die Entsperrungsgeste aktiviert die Touch-Eingabe wieder.
 
-### Stencil-Modus (Schablone) (`EditorMode.STENCIL`)
-Keine Kamera. Generierung mehrschichtiger Schablonen und Druck-Pipeline. Bietet eine Vorschau der Ebenen und exportiert gekachelte PDFs.
-
 ---
 
 ## 2. Editor-Modi (Leistenelemente)
@@ -42,7 +39,6 @@ Die "Bildschirme" sind logische Zustände, die über die `AzNavRail` navigiert w
 | Overlay | Projektion des Bildes über die Live-Kamera (kein SLAM) |
 | Mockup | Komposition auf einem statischen Referenzfoto |
 | Trace | Leuchtkasten — Bild mit voller Helligkeit für physisches Abpausen |
-| Stencil | Generieren und Drucken mehrschichtiger Schablonen |
 
 ---
 
@@ -63,4 +59,4 @@ Vollbild-Bottom-Sheet über dem Haupt-Viewport. Listet gespeicherte `.gxr`-Proje
 Kamera- und Standortberechtigungen werden zusammen über den `permissionLauncher` in der `MainActivity` angefordert. Der Status `hasCameraPermission` steuert das gesamte kameraabhängige Rendering im `ArViewport`. Ohne Kameraberechtigung zeigen sowohl der AR- als auch der Overlay-Modus keinen Hintergrund.
 
 ---
-*Dokumentation aktualisiert am 2026-03-17 während der Website-Neugestaltungs- und Schablonenmodus-Integrationsphase.*
+*Dokumentation aktualisiert am 2026-03-17 während der Website-Neugestaltungs- und Schablonenmodus-Integrationsphase. 2026-09-04: die Beschreibung des gelöschten `EditorMode.STENCIL`-Modus (existiert nicht im Code) und die falsche `slamManager.draw()`/Voxel-Splat-Behauptung entfernt; die Beschreibung des AR-Viewports gemäß aktuellem Quellcode korrigiert.*

@@ -45,6 +45,15 @@ bool DistortionHead::run(const cv::Mat& grayCur, const cv::Mat& grayFp, std::arr
             LOGE("DistortionHead: unexpected layout (inner dim = %d)", o.size[o.dims - 1]);
             return false;
         }
+        // Everything above validates total()/continuity/layout but never the element type. A
+        // reinterpret_cast<const float*> against a CV_16F (or any non-fp32) output reads garbage
+        // -- or, for a type narrower than 4 bytes, reads past the buffer's actual extent -- and
+        // that garbage becomes the user's painting-progress/matchability readout. Reject anything
+        // that isn't fp32 explicitly rather than trusting every exported model to match.
+        if (o.depth() != CV_32F) {
+            LOGE("DistortionHead: unexpected output type (depth=%d, expected CV_32F)", o.depth());
+            return false;
+        }
         const float* p = reinterpret_cast<const float*>(o.data);
         for (int i = 0; i < 13; ++i) out[i] = p[i];
         return true;

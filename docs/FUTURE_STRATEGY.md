@@ -119,8 +119,11 @@ The editor is not short on features. It is short on **trust and pipeline.** In o
    cockpit (mural methods, perception throttle, depth forcing) tucked behind an "advanced" fold. The depth
    of `FEATURE_REFERENCE.md` should be discoverable, not mandatory.
 4. **Ship the idea→wall pipeline as the spine:** import sketch → auto-prep/isolate → lock → paint, with
-   stencils as the killer secondary output. The tiled multi-layer PDF is a real differentiator no tracer
-   offers.
+   stencils as the killer secondary output — **if built**. As of 2026-09-04 there is no stencil/tiled-PDF
+   implementation anywhere in the codebase (`docs/STENCILS.md` describes a design that was removed for
+   having no implementing code, and `docs/index.html` still markets it — that's a bug, not a roadmap
+   item). This recommendation stands on the strength of the idea, not on anything shipped; treat it as
+   "build this" rather than "ship what exists."
 5. **Then pick A/B/C** and build only the missing platform pieces for that choice (iOS, free tier, or a
    licensing pitch deck). Do not build content, social, and iOS speculatively — that is the mainstream tax,
    and you may not be paying it.

@@ -87,7 +87,8 @@ fun EditorUi(
                     isRightHanded = uiState.isRightHanded,
                     isCapturingTarget = isCapturingTarget,
                     activeLayer = overlayLayer,
-                    showUndoRedo = true
+                    showUndoRedo = true,
+                    canvasBackground = uiState.canvasBackground,
                 ),
                 // In a Mode the adjust knobs are the off-rail tools (opacity/saturation/…); in Design
                 // they're rail-triggered via the Adjust panel. Hidden while capturing a target so they
