@@ -104,15 +104,20 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val p = repository.createProject(name)
-                _uiState.update { it.copy(currentProjectId = p.id, currentProjectName = p.name) }
+                _uiState.update { it.copy(currentProjectId = p.id, currentProjectName = p.name, showNewProjectDialog = false) }
+                _navigationTrigger.value = DESTINATION_EDITOR
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                android.util.Log.e("DashboardViewModel", "Failed to create project", e)
             } finally {
-                _uiState.update { it.copy(showNewProjectDialog = false, isCreatingProject = false) }
+                _uiState.update { it.copy(isCreatingProject = false) }
             }
             loadAvailableProjects()
         }
     }
 
     fun dismissNewProjectDialog() {
+        if (_uiState.value.isCreatingProject) return
         _uiState.update { it.copy(showNewProjectDialog = false) }
     }
 

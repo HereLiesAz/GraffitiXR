@@ -241,6 +241,18 @@ class EditorViewModelTest {
     }
 
     @Test
+    fun `explicit save completes after persistence without exporting`() = runTest {
+        addDesign()
+        var saved = false
+        viewModel.saveProject("Mural") { saved = it }
+        org.junit.Assert.assertFalse(saved)
+        testDispatcher.scheduler.advanceUntilIdle()
+        org.junit.Assert.assertTrue(saved)
+        coVerify { projectRepository.updateProject(any<(GraffitiProject) -> GraffitiProject>()) }
+        io.mockk.verify(exactly = 0) { projectManager.exportProjectToUri(any(), any(), any()) }
+    }
+
+    @Test
     fun `saveProject calls updateProject when project exists`() = runTest {
         addDesign()
 

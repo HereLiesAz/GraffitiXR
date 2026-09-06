@@ -2044,17 +2044,22 @@ class ArViewModel @Inject constructor(
      * Phase 3b: persist the in-session passive feature map into the project record (.gxr), preserving the
      * rest of the current project. No-op when building is off / the map is empty. Async + best-effort.
      */
+    suspend fun saveProjectWallMap() {
+        val projectId = loadedProjectId ?: return
+        if (projectRepository.currentProject.value?.id != projectId) return
+        val map = slamManager.getWallFeatureMap() ?: return
+        if (map.pointCount <= 0) return
+        projectRepository.updateProject {
+            if (it.id == projectId) it.copy(wallFeatureMap = map) else it
+        }
+    }
+
     private fun saveWallFeatureMap() {
-        if (projectRepository.currentProject.value == null) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val map = slamManager.getWallFeatureMap() ?: return@launch
-                if (map.pointCount <= 0) return@launch
-                // Merge through the repository's atomic transform (not a full-object write via
-                // projectManager) so a concurrent editor layer-save can't clobber the wall map and
-                // vice-versa — both funnel through updateProject(transform). (docs/AUDIT.md save-race)
-                projectRepository.updateProject { it.copy(wallFeatureMap = map) }
+                saveProjectWallMap()
             } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Timber.e(e, "Wall feature map save failed")
             }
         }

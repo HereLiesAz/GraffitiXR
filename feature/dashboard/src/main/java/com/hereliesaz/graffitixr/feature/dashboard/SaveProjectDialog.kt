@@ -26,14 +26,15 @@ fun SaveProjectDialog(
     initialName: String,
     onDismissRequest: () -> Unit,
     onSaveRequest: (String) -> Unit,
-    strings: AppStrings
+    strings: AppStrings,
+    isBusy: Boolean = false
 ) {
     // Force re-initialization if initialName changes, ensuring the field is editable
     // and correctly populated when the dialog appears.
     var name by remember(initialName) { mutableStateOf(initialName) }
 
     Dialog(
-        onDismissRequest = onDismissRequest,
+        onDismissRequest = { if (!isBusy) onDismissRequest() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Box(
@@ -42,7 +43,7 @@ fun SaveProjectDialog(
                 .clickable(
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                     indication = null
-                ) { onDismissRequest() },
+                ) { if (!isBusy) onDismissRequest() },
             contentAlignment = Alignment.Center
         ) {
             Box(
@@ -56,12 +57,13 @@ fun SaveProjectDialog(
             ) {
                 AzTextBox(
                     value = name,
+                    enabled = !isBusy,
                     onValueChange = { name = it },
                     hint = strings.editor.saveProjectHint,
                     // Bring back the Hot Pink outline (default)
                     onSubmit = { text ->
-                        if (text.isNotBlank()) {
-                            onSaveRequest(text)
+                        if (!isBusy && text.isNotBlank()) {
+                            onSaveRequest(text.trim())
                         }
                     },
                     submitButtonContent = {

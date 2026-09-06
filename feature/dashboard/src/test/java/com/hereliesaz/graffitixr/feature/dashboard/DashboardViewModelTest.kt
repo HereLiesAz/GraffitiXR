@@ -51,6 +51,33 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun `create navigates only after persistence succeeds`() = runTest {
+        coEvery { repository.createProject("Mural") } returns GraffitiProject(name = "Mural")
+        viewModel.onNewProjectTriggered()
+        viewModel.onCreateProject("Mural")
+        assertNull(viewModel.navigationTrigger.value)
+        assertTrue(viewModel.uiState.value.showNewProjectDialog)
+        advanceUntilIdle()
+        assertEquals(DashboardViewModel.DESTINATION_EDITOR, viewModel.navigationTrigger.value)
+        assertFalse(viewModel.uiState.value.showNewProjectDialog)
+    }
+
+    @Test
+    fun `failed create keeps dialog open and permits retry without navigating`() = runTest {
+        coEvery { repository.createProject("Mural") } throws java.io.IOException("Disk full")
+        viewModel.onNewProjectTriggered()
+        viewModel.onCreateProject("Mural")
+        advanceUntilIdle()
+        assertNull(viewModel.navigationTrigger.value)
+        assertTrue(viewModel.uiState.value.showNewProjectDialog)
+        assertFalse(viewModel.uiState.value.isCreatingProject)
+        coEvery { repository.createProject("Mural") } returns GraffitiProject(name = "Mural")
+        viewModel.onCreateProject("Mural")
+        advanceUntilIdle()
+        assertEquals(DashboardViewModel.DESTINATION_EDITOR, viewModel.navigationTrigger.value)
+    }
+
+    @Test
     fun `loadAvailableProjects updates state with projects`() = runTest {
         val projects = listOf(
             GraffitiProject(id = "1", name = "P1"),

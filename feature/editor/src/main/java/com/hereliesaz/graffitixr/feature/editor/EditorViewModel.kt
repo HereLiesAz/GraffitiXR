@@ -482,7 +482,7 @@ class EditorViewModel @Inject constructor(
 
     // ── Persistence ───────────────────────────────────────────────────────────
 
-    fun saveProject(name: String? = null) {
+    fun saveProject(name: String? = null, onComplete: (Boolean) -> Unit = {}) {
         viewModelScope.launch(dispatchers.io) {
             try {
                 val currentProject = projectRepository.currentProject.value
@@ -492,9 +492,8 @@ class EditorViewModel @Inject constructor(
                 // Paths derive from the (immutable) project id.
                 val projectId = currentProject?.id ?: GraffitiProject(name = name ?: "New Project").id
 
-                val manifestToSave: GraffitiProject
                 if (currentProject == null) {
-                    manifestToSave = GraffitiProject(
+                    val manifestToSave = GraffitiProject(
                         id = projectId,
                         name = name ?: "New Project",
                         design = updatedDesign,
@@ -520,19 +519,22 @@ class EditorViewModel @Inject constructor(
                             lastModified = System.currentTimeMillis(),
                         )
                     }
-                    // Export the merged result the repository just persisted (includes any AR wall map).
-                    manifestToSave = projectRepository.currentProject.value ?: return@launch
+                    check(projectRepository.currentProject.value?.id == projectId) {
+                        "Project changed while saving"
+                    }
                 }
 
-                if (name != null) exportProjectInternal(manifestToSave)
+                // Explicit Save persists the editable project; image export is a separate action.
 
                 scheduleThumbnailUpdate()
+                withContext(dispatchers.main) { onComplete(true) }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 // Don't let a failed save die silently — the user believes their work is safe.
                 android.util.Log.e("EditorViewModel", "Failed to save project", e)
                 withContext(dispatchers.main) {
                     Toast.makeText(context, "Couldn't save the project — storage may be full", Toast.LENGTH_LONG).show()
+                    onComplete(false)
                 }
             }
         }
@@ -591,49 +593,9 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    private suspend fun exportProjectInternal(project: GraffitiProject) {
-        val filename = "${project.name.replace(" ", "_")}_export.gxr"
-        try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                val contentValues = android.content.ContentValues().apply {
-                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, filename)
-                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/zip")
-                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
-                }
-                val uri = context.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
-                if (uri != null) {
-                    projectManager.exportProjectToUri(context, project.id, uri)
-                    withContext(dispatchers.main) {
-                        Toast.makeText(context, "Project saved and exported to Downloads", Toast.LENGTH_SHORT).show()
-                    }
-                } else {
-                    throw java.io.IOException("Failed to create MediaStore entry")
-                }
-            } else {
-                val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
-                val file = File(downloadsDir, filename)
-                projectManager.exportProjectToUri(context, project.id, Uri.fromFile(file))
-                withContext(dispatchers.main) {
-                    Toast.makeText(context, "Project saved and exported to ${file.absolutePath}", Toast.LENGTH_LONG).show()
-                }
-            }
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            withContext(dispatchers.main) {
-                Toast.makeText(context, "Project saved locally. Export failed: ${e.message}", Toast.LENGTH_LONG).show()
-            }
-        }
-    }
-
     /**
-     * The wall fingerprint a project's `.gxr` carries is exactly what a crew needs to hand a
-     * peer's phone the same coordinate system — [saveProject]/[exportProjectInternal] already
-     * write byte-identical output to what Co-op's own bulk sync sends
-     * ([com.hereliesaz.graffitixr.data.ProjectManager.exportProjectToUri]/`serializeCurrentProject`
-     * both call the same `zipFolder`) — but that only ever lands silently in Downloads, with no
-     * hand-off to another person. This is the same export, routed through an ACTION_SEND share
-     * sheet instead, so "give this wall to the next painter" is an actual, discoverable action
-     * rather than a step buried inside Save.
+     * Shares an editable `.gxr` archive, including the wall fingerprint, through ACTION_SEND.
+     * ProjectManager and Co-op use the same ZIP format so another painter can reopen the wall.
      *
      * Written to cacheDir (not Downloads/MediaStore) since this copy is a share intermediate, not
      * a thing the user manages — matching MainActivity's `shareDiagnosticBundle`'s existing
