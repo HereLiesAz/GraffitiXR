@@ -19,7 +19,6 @@ import com.hereliesaz.graffitixr.common.util.imageStats
 import com.hereliesaz.graffitixr.common.util.saveBitmapToGallery
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import com.hereliesaz.graffitixr.domain.repository.SettingsRepository
-import com.hereliesaz.graffitixr.nativebridge.SlamManager
 import com.hereliesaz.graffitixr.data.ProjectManager
 import com.hereliesaz.graffitixr.feature.editor.export.ExportManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -61,7 +60,6 @@ class EditorViewModel @Inject constructor(
     private val projectManager: ProjectManager,
     private val exportManager: ExportManager,
     @ApplicationContext private val context: Context,
-    internal val slamManager: SlamManager,
     private val dispatchers: DispatcherProvider,
     private val opEmitter: OpEmitter,
     private val subjectIsolator: SubjectIsolator,
@@ -222,7 +220,10 @@ class EditorViewModel @Inject constructor(
                 // uri is always the untouched import, so this is the effect source; the saved
                 // Outline / isolation flags are then re-derived on top of it.
                 val source = ImageUtils.loadBitmapAsync(context, pendingUri)
-                val shown = source?.let { applyDesignEffects(it, loaded) }
+                // Project-load restore, not a fresh user toggle -- don't surface the failure toast
+                // here even if a stage falls back; recomputeDesignEffects handles the live-toggle
+                // case where the user just took an action and needs to see it didn't apply.
+                val shown = source?.let { applyDesignEffects(it, loaded).first }
                 withContext(dispatchers.main) {
                     designSourceBitmap = source
                     dispatch(EditorIntent.RestoreDesign(loaded.copy(bitmap = shown)))
@@ -230,42 +231,16 @@ class EditorViewModel @Inject constructor(
             }
         }
 
-        viewModelScope.launch(dispatchers.io) { restoreWorld(project) }
+        // Wall-fingerprint restore is ArViewModel's job (loadFingerprintIfExists) — it owns the
+        // SlamManager singleton and does the partition/legacy-frame/design-placement handling that
+        // this class does not replicate. A second loader here used to race it: same currentProject
+        // flow, same native engine, undefined order, and this one skipped every one of those steps.
 
         project.backgroundImageUri?.let { uri ->
             viewModelScope.launch(dispatchers.io) {
                 val bitmap = ImageUtils.loadBitmapAsync(context, uri)
                 withContext(dispatchers.main) { dispatch(EditorIntent.SetBackgroundBitmap(bitmap)) }
             }
-        }
-    }
-
-    /** Restores the wall fingerprint so AR relocalizes against the saved target. */
-    private fun restoreWorld(project: GraffitiProject) {
-        val fp = project.fingerprint ?: return
-        val intr = project.fingerprintIntrinsics
-        val anchor = project.fingerprintAnchor
-        if (intr.size >= 4 && anchor.size == 16) {
-            // Metric fingerprint: replay the true capture intrinsics + anchor so reload reloc
-            // matches the live capture, not a default guess.
-            slamManager.restoreWallFingerprintMetric(
-                fp.descriptorsData, fp.descriptorsRows, fp.descriptorsCols, fp.descriptorsType,
-                fp.points3d.toFloatArray(), anchor.toFloatArray(), intr.toFloatArray(),
-                // Capture view, so reload keeps the plane-guided rectification for oblique views.
-                // Empty on projects saved before it was persisted — native then skips that pass.
-                viewMatrix = project.fingerprintViewMatrix
-                    .takeIf { it.size == 16 }?.toFloatArray() ?: FloatArray(0),
-            )
-        } else {
-            slamManager.restoreWallFingerprint(
-                fp.descriptorsData, fp.descriptorsRows, fp.descriptorsCols, fp.descriptorsType,
-                fp.points3d.toFloatArray()
-            )
-        }
-        // Restore the distortion-head canonical patch (256x256 raw gray).
-        if (fp.patchData.isNotEmpty()) {
-            val s = kotlin.math.sqrt(fp.patchData.size.toDouble()).toInt()
-            if (s * s == fp.patchData.size) slamManager.setWallPatchBytes(fp.patchData, s)
         }
     }
 
@@ -334,6 +309,28 @@ class EditorViewModel @Inject constructor(
     // ── The design ────────────────────────────────────────────────────────────
 
     override fun onAddLayer(uri: Uri) {
+        // A design already sitting on the wall is placement work an artist can lose minutes of —
+        // replacing it outright with no confirmation is how "Open" ends up eating a mural in
+        // progress. Ask first when there is something to lose; a first import has nothing to
+        // confirm away.
+        if (_uiState.value.design != null) {
+            dispatch(EditorIntent.SetPendingReplaceUri(uri))
+        } else {
+            applyNewDesign(uri)
+        }
+    }
+
+    override fun confirmReplaceDesign() {
+        val uri = _uiState.value.pendingReplaceUri ?: return
+        dispatch(EditorIntent.SetPendingReplaceUri(null))
+        applyNewDesign(uri)
+    }
+
+    override fun cancelReplaceDesign() {
+        dispatch(EditorIntent.SetPendingReplaceUri(null))
+    }
+
+    private fun applyNewDesign(uri: Uri) {
         pushHistory()
         viewModelScope.launch(dispatchers.io) {
             // Cap the imported image at a screen-reasonable size. A full 12MP+ photo is ~48MB as ARGB;
@@ -390,15 +387,23 @@ class EditorViewModel @Inject constructor(
      * Each stage falls back to its input on failure, so a segmenter that can't find a subject or an
      * OpenCV pass that throws costs the user that one effect, not their image.
      */
-    private suspend fun applyDesignEffects(source: Bitmap, design: Layer): Bitmap {
+    /** @return the resulting bitmap, plus a user-facing message if a REQUESTED stage fell back to
+     * its input rather than actually applying (null if every requested stage succeeded, or none
+     * were requested). */
+    private suspend fun applyDesignEffects(source: Bitmap, design: Layer): Pair<Bitmap, String?> {
         var out = source
+        var failure: String? = null
         if (design.isSubjectIsolated) {
-            out = subjectIsolator.isolate(out).getOrNull()?.isolatedBitmap ?: out
+            val isolated = subjectIsolator.isolate(out).getOrNull()?.isolatedBitmap
+            if (isolated != null) out = isolated
+            else failure = "Couldn't isolate a subject in this image."
         }
         if (design.isSketch) {
-            out = SketchProcessor.sketchEffect(out) ?: out
+            val sketched = SketchProcessor.sketchEffect(out)
+            if (sketched != null) out = sketched
+            else failure = "Couldn't generate an outline for this image."
         }
-        return out
+        return out to failure
     }
 
     /**
@@ -410,14 +415,21 @@ class EditorViewModel @Inject constructor(
         designEffectJob?.cancel()
         designEffectJob = viewModelScope.launch(dispatchers.default) {
             val design = _uiState.value.design ?: return@launch
-            val rendered = applyDesignEffects(source, design)
+            val (rendered, failureMessage) = applyDesignEffects(source, design)
             withContext(dispatchers.main) {
                 updateDesign { it.copy(bitmap = rendered) }
+                if (failureMessage != null) {
+                    _uiState.update { it.copy(effectFailureMessage = failureMessage) }
+                }
                 saveProject()
                 // Guests are shown pixels, not a pipeline, so ship the result rather than the flag.
                 opEmitter.emit(Op.DesignBitmapReplace(ImageUtils.bitmapToByteArray(rendered)))
             }
         }
+    }
+
+    fun onEffectFailureMessageShown() {
+        _uiState.update { it.copy(effectFailureMessage = null) }
     }
 
     /** Outline: turn the image into a sketch that is actually traceable. */
@@ -452,7 +464,10 @@ class EditorViewModel @Inject constructor(
                     dispatch(EditorIntent.SetLoading(false))
                 }
             } else {
-                withContext(dispatchers.main) { dispatch(EditorIntent.SetLoading(false)) }
+                withContext(dispatchers.main) {
+                    dispatch(EditorIntent.SetLoading(false))
+                    _uiState.update { it.copy(effectFailureMessage = "Couldn't load that image.") }
+                }
             }
         }
     }
@@ -608,6 +623,80 @@ class EditorViewModel @Inject constructor(
                 Toast.makeText(context, "Project saved locally. Export failed: ${e.message}", Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    /**
+     * The wall fingerprint a project's `.gxr` carries is exactly what a crew needs to hand a
+     * peer's phone the same coordinate system — [saveProject]/[exportProjectInternal] already
+     * write byte-identical output to what Co-op's own bulk sync sends
+     * ([com.hereliesaz.graffitixr.data.ProjectManager.exportProjectToUri]/`serializeCurrentProject`
+     * both call the same `zipFolder`) — but that only ever lands silently in Downloads, with no
+     * hand-off to another person. This is the same export, routed through an ACTION_SEND share
+     * sheet instead, so "give this wall to the next painter" is an actual, discoverable action
+     * rather than a step buried inside Save.
+     *
+     * Written to cacheDir (not Downloads/MediaStore) since this copy is a share intermediate, not
+     * a thing the user manages — matching MainActivity's `shareDiagnosticBundle`'s existing
+     * cache+FileProvider pattern elsewhere in the app. Result reaches the UI via
+     * [EditorUiState.shareProjectUri], a
+     * one-shot signal cleared by [onShareProjectUriConsumed] once MainActivity has launched the
+     * chooser, mirroring this file's other transient-signal fields (see [onLockedFeedbackShown]).
+     */
+    fun shareProject() {
+        viewModelScope.launch(dispatchers.io) {
+            val project = projectRepository.currentProject.value
+            if (project == null) {
+                withContext(dispatchers.main) {
+                    Toast.makeText(context, "Nothing to share yet — save a project first.", Toast.LENGTH_SHORT).show()
+                }
+                return@launch
+            }
+            try {
+                // exportProjectToUri reads project.json straight off disk — it isn't routed through
+                // currentProject's in-memory state. saveProject()'s own writes go through
+                // ProjectRepositoryImpl's saveMutex-guarded updateProject(transform), so a save
+                // still in flight when this runs could have this read a stale or torn file. An
+                // identity transform through that same call serializes behind any in-flight save
+                // (the mutex admits only one writer at a time) and re-persists the latest in-memory
+                // state, guaranteeing the file on disk is current before the zip below reads it.
+                projectRepository.updateProject { it }
+
+                val shareDir = File(context.cacheDir, "share").apply { mkdirs() }
+                // project.name is free-form user text (SaveProjectDialog only rejects blank), so a
+                // name like "North/Wall" must not reach the filesystem as a path — File(shareDir,
+                // "North/Wall.gxr") resolves into a nonexistent "North/" subdirectory, silently
+                // failing the export (exportProjectToUri catches and logs internally, never
+                // throwing) and leaving this code to hand the share sheet a URI for a file that was
+                // never written. Collapse anything that isn't alphanumeric/dot/dash/underscore.
+                val safeName = project.name.map { c ->
+                    if (c.isLetterOrDigit() || c == '.' || c == '-' || c == '_') c else '_'
+                }.joinToString("").ifBlank { "wall" }
+                val file = File(shareDir, "$safeName.gxr")
+                projectManager.exportProjectToUri(context, project.id, Uri.fromFile(file))
+                // exportProjectToUri never throws on failure (catch-and-log only) and never reports
+                // success either, so the only way to know the zip actually landed is to check for it
+                // — without this, a failed export still reached the share sheet with a URI for a
+                // file that doesn't exist, an attachment nothing could open.
+                if (!file.exists() || file.length() == 0L) {
+                    throw java.io.IOException("Export produced no file")
+                }
+                val contentUri = androidx.core.content.FileProvider.getUriForFile(
+                    context, "${context.packageName}.fileprovider", file
+                )
+                withContext(dispatchers.main) {
+                    _uiState.update { it.copy(shareProjectUri = contentUri) }
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                withContext(dispatchers.main) {
+                    Toast.makeText(context, "Couldn't prepare this wall to share: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    fun onShareProjectUriConsumed() {
+        _uiState.update { it.copy(shareProjectUri = null) }
     }
 
     // ── Export / interop ──────────────────────────────────────────────────────
@@ -914,6 +1003,7 @@ class EditorViewModel @Inject constructor(
     }
 
     override fun onFeedbackShown() = dispatch(EditorIntent.FeedbackShown)
+    override fun onLockedFeedbackShown() = dispatch(EditorIntent.LockedFeedbackShown)
 
     // ── Co-op ─────────────────────────────────────────────────────────────────
 

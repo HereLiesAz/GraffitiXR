@@ -85,8 +85,11 @@ the further along the painting, the tighter the teleological lock — see §6.
 **Rotation axis** (`RotationAxis`: `X` / `Y` / `Z`): double-tap in AR cycles the active axis; the
 `CycleRotationAxis` intent advances it. A `RotationAxisFeedback` overlay shows the current axis.
 
-**Tap-to-distance:** the reticle + distance chips light up when `(isDualLensActive || currentCenterDepth > 0f)`
-— i.e. on devices exposing hardware stereo depth or a valid triangulated centre depth.
+**Tap-to-distance:** the reticle + distance chips light up when `(isHardwareStereoActive || currentCenterDepth > 0f)`
+— i.e. on devices exposing hardware stereo depth or a valid triangulated centre depth. (Renamed from
+`isDualLensActive`: the old flag lit as soon as the software-stereo path's buffers allocated, advertising
+depth on devices that had none; `StereoDepthProvider`/`StereoProcessor` were removed and the flag collapsed
+into `isHardwareStereoActive`, the only one that was ever real.)
 
 ### 1.3 MOCKUP wall-capture flow (`CaptureStep`)
 
@@ -105,15 +108,16 @@ resting hand or the paper itself can't trigger it by accident. Exports a transpa
 
 ## 2. The design (`Layer`)
 
-> **TODO — likely stale beyond this note:** per §0/§1, the editor now holds exactly **one** design,
-> not an ordered list of layers with an active-layer id — the older multi-layer model was removed. The
-> `Layer` type itself (property table below) still names the design's per-image properties, so §2.1 is
-> probably still close to accurate. §2.2's "Layer list operations" table is a different matter: a scan
-> of the current reducer found no `AddLayer` / `RemoveLayer` / `ReorderLayers` / `ReplaceLayers` /
-> `SetLayers` intents — the design is instead set/replaced wholesale (`SetDesign`, `SetDesignTransform`,
-> `SetDesignProps`, `RestoreDesign`). §2.2 as written should be treated as unconfirmed/likely obsolete
-> pending a full rewrite against the current intent set — out of scope for this pass, flagged rather
-> than guessed at.
+Per §0/§1, the editor now holds exactly **one** design, not an ordered list of layers with an
+active-layer id — the older multi-layer model was removed (see the KDoc on `EditorUiState.design` in
+`core/common/.../model/EditorModels.kt`: *"Singular by design... It was a `List<Layer>` with an
+`activeLayerId`, which cost every consumer a lookup..."*). The `Layer` type keeps its name because it
+still carries exactly the per-image state the adjustment knobs drive, but there is no layer list, no
+active-layer id, and no per-layer add/remove/reorder/rename operations — those, and any compositing of
+several images into one design, are the companion design app's job now, not this app's. `EditorActions.kt`
+(the current UI-facing surface) documents this directly: *"Placement is driven entirely by gestures...
+not per-field setters: the sliders that scale/offset/per-axis-rotation setters existed for were removed,
+and the setters outlived them with no caller."*
 
 Every layer carries the full property set below; all except the runtime `bitmap` are serializable
 (wire-transferable for co-op and project save).
@@ -122,169 +126,154 @@ Every layer carries the full property set below; all except the runtime `bitmap`
 
 | Property | Default | Range / type | Effect |
 |---|---|---|---|
-| `name` | — | String | Display name in the Layers panel |
+| `id` | — | String | Stable identity (co-op ops, undo) |
+| `name` | — | String | Display name |
 | `uri` | `null` | Uri | Source image location (serialized) |
 | `bitmap` | `null` | Bitmap (`@Transient`) | Runtime pixels; never serialized |
-| `isVisible` | `true` | Bool | Show/hide without deleting |
-| `opacity` | `1.0` | `0.0–1.0` | Layer alpha |
+| `isVisible` | `true` | Bool | Show/hide |
+| `opacity` | `1.0` | `0.0–1.0` | Alpha |
 | `brightness` | `0.0` | additive | Lighten (+) / darken (−) |
 | `contrast` | `1.0` | multiplier | Contrast |
 | `saturation` | `1.0` | multiplier | Colour intensity; `0` = greyscale |
 | `colorBalanceR` | `1.0` | multiplier | Red channel gain |
 | `colorBalanceG` | `1.0` | multiplier | Green channel gain |
 | `colorBalanceB` | `1.0` | multiplier | Blue channel gain |
-| `isImageLocked` | `false` | Bool | Lock transforms on this layer |
-| `isSketch` | `false` | Bool | Treat as a hand sketch layer (affects draw handling) |
-| `textParams` | `null` | `TextLayerParams` | Present when the layer is text (see §2.4) |
+| `isImageLocked` | `false` | Bool | Lock transforms on the design |
 | `isLinked` | `false` | Bool | Link with the active layer so gestures move them together |
 | `blendMode` | `SrcOver` | `BlendMode` | Compositing mode (see §2.3) |
-| `warpMesh` | `[]` | `List<Float>` | Liquify/warp control-point mesh |
 | `offset` | `(0,0)` | Offset | Pan within the canvas |
 | `rotationX` | `0` | degrees | Tilt about width axis |
 | `rotationY` | `0` | degrees | Tilt about height axis |
 | `rotationZ` | `0` | degrees | In-plane spin |
 | `scale` | `1.0` | multiplier | Uniform scale |
 | `isInverted` | `false` | Bool | Colour invert |
-| `stencilType` | `null` | `StencilLayerType` | Set when the layer is a generated stencil (see §5) |
-| `stencilSourceId` | `null` | String | Id of the layer this stencil was built from |
+| `isSketch` | `false` | Bool | **Outline** effect — render as a traceable pencil sketch (dark lines opaque, light areas transparent); re-derived from `uri` each time, not baked in |
+| `isSubjectIsolated` | `false` | Bool | **Subject isolation** — ML Kit segmentation drops everything but the subject to transparent (see §4) |
 
-### 2.2 Layer list operations
+`warpMesh`, `stencilType`, `stencilSourceId`, and `textParams` do not exist on `Layer` — Liquify,
+stencil generation, and rasterized text layers have no implementing code (see §3.3, §5, §2.4).
 
-| Action (intent) | Behaviour |
+### 2.2 Setting/replacing the design
+
+There is no layer list to operate on, so there are no `AddLayer` / `RemoveLayer` / `ReorderLayers` /
+`ActivateLayer` intents. The design is instead set or replaced wholesale (`EditorIntent`, in
+`feature/editor/.../EditorIntent.kt`):
+
+| Intent | Behaviour |
 |---|---|
-| `ActivateLayer(id)` | Make a layer the edit target |
-| `AddLayer(layer)` | Append, activate, clear the current tool; dismisses the panel unless duplicating |
-| `RemoveLayer(id)` | Delete; if it was active, activate the first remaining layer |
-| `ReorderLayers(order)` | Reorder by explicit id list (drag in the Layers panel) |
-| `RenameLayer(id, name)` | Rename |
-| `ToggleVisibility(id)` | Show/hide |
-| `ReplaceLayers(layers, activeId)` | Wholesale replace (e.g. **flatten**) |
-| `SetLayers(layers)` | Replace list only, leaving active id/tool untouched (undo restore, reload) |
+| `SetDesign(layer, resetActivePanel)` | Replace the design with `layer` |
+| `SetPendingReplaceUri(uri)` | Stage a picker result that would replace an existing design, pending user confirmation (`confirmReplaceDesign` / `cancelReplaceDesign`); `onAddLayer(uri)` on `EditorActions` is the entry point despite the name |
+| `SetDesignTransform(scale, offset, rx, ry, rz)` | Spectator/remote-op application — no panel or gesture side effects |
+| `SetDesignProps(props)` | Property-only mutation (opacity, tone, blend mode, etc.), same no-side-effect path |
+| `RestoreDesign(design)` | Replace the design outright (undo restore); `null` clears it |
+| `LoadedProject(projectId, design)` | A project finished loading |
+| `ClearProject` | Drop the current project |
 
-Remote/spectator variants (`AppendLayer`, `RemoveLayerById`, `SetLayerTransformById`, `SetLayerProps`)
-apply changes *by id with no active-layer side effects* — used when receiving co-op ops.
+Co-op propagates design mutations as `Op`s (`core/common/.../model/Op.kt`): `DesignReplace`,
+`DesignTransform`, `ModeTransform`, `DesignProps`, `DesignBitmapReplace` (PNG-encoded, used for
+undo/redo and any pixel effect). `Op.StrokeComplete` and `Op.TextContentChange` still exist in the
+sealed class but are received as a no-op (`is Op.StrokeComplete -> Unit`) — nothing in the current UI
+emits either, since there is no brush tool and no text-layer authoring (see §3.3, §2.4).
 
 ### 2.3 Blend modes (`BlendMode`)
 
 Standard Compose/Skia blend modes are supported and serialized (`BlendModeSerializer`), default
 `SrcOver`. The set includes the normal, darken (Multiply, Darken), lighten (Screen, Lighten, Plus),
 contrast (Overlay, HardLight, SoftLight), and comparative (Difference, Exclusion) families, plus the
-Porter-Duff compositing operators. `BrushStroke.blendModeOrdinal` defaults to `3` (= `SrcOver`).
+Porter-Duff compositing operators.
 
-### 2.4 Text layers (`TextLayerParams`)
+### 2.4 Text layers — removed
 
-Text is authored as parameters and rasterized to a bitmap (`TextRasterizer`, `RenderTextLayer` intent),
-so it composites like any other layer while remaining re-editable. Font resolution uses a Google Fonts
-cache (`GoogleFontCache`). Parameters cover the string, typeface, size, colour, and alignment.
+No text-layer feature exists in the current app. There is no `TextLayerParams`, no `TextRasterizer`,
+and no `RenderTextLayer` intent; `Op.TextContentChange` exists on the wire protocol but nothing sends
+it (see §2.2). Treat "text layers" as a removed/never-shipped concept, not a current feature.
 
 ---
 
-## 3. Active-layer controls (Adjust / Transform / Color panels)
+## 3. Design controls (Adjust / Color balance panels)
 
-These act on the **active layer** (contrast with §1.1, which acts on the whole design per mode).
+These act on the design (contrast with §1.1, which acts on the whole design **per mode** via
+`ModeAdjustment`; these act on the design layer itself, in DESIGN mode).
 
-### 3.1 Visual adjustments (`ADJUST` / `ADJUSTMENTS` panel)
+### 3.1 Visual adjustments (`ADJUST` panel)
 
 | Control (intent) | Default | Range | Notes |
 |---|---|---|---|
 | `SetOpacity` | `1.0` | `0–1` | |
 | `SetBrightness` | `0.0` | additive | |
-| `SetContrast` | `1.0` | multiplier | Dedicated `CurvesAdjustment` / `CurvesDialog` for fine curves |
+| `SetContrast` | `1.0` | multiplier | |
 | `SetSaturation` | `1.0` | multiplier | |
-| `SetColorBalanceR/G/B` | `1.0` each | multiplier | Dedicated `ColorBalanceDialog` |
+| `SetColorBalanceR/G/B` | `1.0` each | multiplier | Surfaced in the `COLOR` panel (`onColorBalance{R,G,B}Changed`) |
 | `ToggleInvert` | `false` | — | |
+| `onToggleOutline` | `isSketch = false` | — | The traceable-sketch effect (§2.1) |
+| `onToggleSubjectIsolation` | `isSubjectIsolated = false` | — | Drop everything but the ML Kit-segmented subject (§4) |
 
-Colour maths run through `ColorMatrixUtils`; curve edits through `CurvesUtil`.
+Colour maths run through `ColorMatrixUtils`.
 
-### 3.2 Transform (`TRANSFORM` panel)
+There is no dedicated curves dialog (`CurvesAdjustment`/`CurvesDialog`/`CurvesUtil` do not exist) and
+no `ColorBalanceDialog` class — colour balance is three sliders in the `COLOR` panel, not a dialog.
 
-| Control | Default | Notes |
-|---|---|---|
-| `SetScale` | `1.0` | Uniform |
-| `AddOffset(delta)` | `(0,0)` | **Incremental** — delta is added to current offset |
-| `SetRotationX/Y/Z` | `0` | Per-axis |
-| `SetLayerTransform(scale, offset, rx, ry, rz)` | — | Atomic set of all five |
-| `CycleRotationAxis` | axis `Z` | Advance active 3D axis |
-| `ToggleImageLock` | `false` | Lock this layer's transforms |
+### 3.2 Transform — gesture-only
 
-### 3.3 Tools (`Tool`)
+**There is no numeric transform panel.** `SetScale`, `AddOffset`, `SetRotationX/Y/Z`, and
+`SetLayerTransform` do not exist as intents — placement is driven entirely by gestures
+(`ApplyModeTransformGesture`, `SetDesignTransform`) and by `CycleRotationAxis` for the double-tap
+rotation-axis switch (§1.2). `EditorActions.kt` states this directly: *"the sliders that
+scale/offset/per-axis-rotation setters existed for were removed, and the setters outlived them with no
+caller."* `ToggleImageLock` remains, to lock the design's transform against gestures.
 
-Selected via `SetActiveTool`; `NONE` clears. Raster tools paint onto the active layer.
+### 3.3 Tools — removed
 
-| Tool | Function |
-|---|---|
-| `NONE` | No tool active |
-| `BRUSH` | Freehand paint (size, feathering, colour, blend) |
-| `ERASER` | Erase to transparency |
-| `BLUR` | Local blur |
-| `HEAL` | Content-aware heal |
-| `BURN` | Darken locally |
-| `DODGE` | Lighten locally |
-| `LIQUIFY` | GPU push/pull warp — routes through `SlamManager.applyLiquify`; writes `warpMesh` |
-| `COLOR` | Colour sampling/fill; opens the picker |
-
-**Brush parameters** (`BrushStroke`): `brushSize` (default `50`), `brushFeathering` (default `0`),
-`colorArgb` (default opaque white), blend mode. Strokes are coarse-grained — emitted once on finger-lift
-for compact co-op transfer. Sketch layers additionally use `SetSketchThickness` (int).
-
-Colour controls: `ShowColorPicker` / `DismissColorPicker`, `SetActiveColor` (sets and closes),
-`ToggleColorPanel`.
+**There is no `Tool` enum, no `SetActiveTool` intent, and no raster paint tools in the current app.**
+`BRUSH`, `ERASER`, `BLUR`, `HEAL`, `BURN`, `DODGE`, `LIQUIFY`, and `COLOR`-as-a-tool do not exist
+anywhere in the source. `BrushStroke` and `Op.StrokeComplete` still exist as data types (co-op wire
+protocol), but nothing in the current UI creates a `BrushStroke` or dispatches `SetActiveTool` — a
+received `StrokeComplete` op is a no-op on the receiving end (see §2.2). Treat freehand painting,
+erasing, blur/heal/burn/dodge, and Liquify as removed/never-shipped, not current features. What
+remains, editing-wise, is the Outline and Subject-isolation toggles (§3.1) plus the legibility
+adjustments — see `EditorActions.kt`'s own framing: *"Scoped to this app's job: getting one image into
+place for tracing... Authoring belongs to the companion design app."*
 
 ### 3.4 Panels (`EditorPanel`)
 
-`NONE`, `LAYERS`, `ADJUSTMENTS`, `TRANSFORM`, `COLOR`, `ADJUST`. Managed by `ToggleAdjustPanel`,
+The enum still declares `NONE`, `LAYERS`, `ADJUSTMENTS`, `TRANSFORM`, `COLOR`, `ADJUST`, but only
+`ADJUST` and `COLOR` are ever set by the reducer or read by the UI — `LAYERS`, `ADJUSTMENTS`, and
+`TRANSFORM` are vestigial values with no live path to or from them. Managed by `ToggleAdjustPanel`,
 `DismissPanel`, `ToggleColorPanel`. Any transform gesture (`BeginGesture`) auto-dismisses an open panel.
 
 ---
 
-## 4. Background removal / segmentation
+## 4. Subject isolation & Outline effects
 
-`BackgroundRemover` (+ `SubjectIsolator`) produces a cutout used both for compositing and as the input
-to the stencil pipeline.
+`SubjectIsolator` (`feature/editor/.../SubjectIsolator.kt`) wraps ML Kit's `SubjectSegmentation`
+client to cut the design's subject out, making everything else transparent. There is no
+`BackgroundRemover` class, and no stencil pipeline to feed (§5) — isolation exists solely as one of
+the design's two toggleable rendering effects.
 
-| Control | Default | Notes |
-|---|---|---|
-| `BeginSegmentation` / `EndSegmentation` | — | Run / finish the isolation pass |
-| `SetSegmentationInfluence` | — | `0–1` blend between original and isolated result |
-| `SetSegmentationPreview(bitmap)` | `null` | Live preview |
-| `SetBackgroundBitmap(bitmap)` | `null` | The active backdrop (mockup wall, etc.) |
-
-The isolated bitmap fed downstream is always the downsampled version (≤2048 px), not the full-res original.
+- Toggled via `isSubjectIsolated` on `Layer` (`onToggleSubjectIsolation` / rail id `design.isolate`),
+  applied together with the Outline sketch effect (`isSketch`, `onToggleOutline` / `design.outline`) in
+  `EditorViewModel.applyDesignEffects`: isolation runs first, Outline second, each falling back to its
+  input on failure so one effect failing doesn't cost the whole image.
+- Effects are re-derived from the untouched source bitmap on every toggle (not baked in), so turning
+  one off restores the original exactly.
+- The bitmap fed to the segmenter is always downsampled to ≤2048 px on its longest side, not the
+  full-res original; confidence mask is thresholded at `0.5` with a `0.1` feather band.
+- There is no `BeginSegmentation`/`EndSegmentation`/`SetSegmentationInfluence`/`SetSegmentationPreview`
+  intent, and no per-effect influence slider — each effect is a boolean, on or off.
+- `SetBackgroundBitmap(bitmap)` is a separate, real intent: it sets the active backdrop (the MOCKUP
+  wall photo), unrelated to subject isolation.
 
 ---
 
-## 5. Stencil generation (guided wizard)
+## 5. Stencil generation — removed / no implementing code
 
-A **layer-level tool**, not a mode. Turns any image layer into physically-cuttable, multi-layer,
-tiled-PDF stencils. Topology is **OVERPAINT** — upper-layer islands are supported by surrounding sheet,
-so no bridging is required.
-
-### 5.1 Wizard steps (`StencilWizardStep`)
-
-| Step | What happens | Available actions |
-|---|---|---|
-| `PICK_SOURCE` | Choose the source image layer | Select layer |
-| `ISOLATE` | Run `SubjectIsolator`; confirm the cutout | Confirm / redo isolation |
-| `CHOOSE_LAYERS` | Pick 1, 2, or 3 stencil layers | Set count |
-| `GENERATE` | Pipeline runs (no user actions) | — (progress only) |
-| `PREVIEW` | Cycle generated layers | Next/prev; rebuild |
-| `EXPORT_PDF` | Set output size, tile to PDF, return | Set size/dimension; export |
-
-The AzNavRail shows **only** the items relevant to the active step.
-
-### 5.2 Stencil options
-
-| Option | Default | Values | Effect |
-|---|---|---|---|
-| Layer count (`StencilLayerCount`) | `TWO` | 1 / 2 / 3 | How many tonal layers to cut |
-| Layer roles (`StencilLayerType`) | — | `SILHOUETTE` (black, applied first) · `MIDTONE` (gray) · `HIGHLIGHT` (white, applied last) | Bottom-to-top paint order |
-| Tonal polarity (`TonalPolarity`) | — | `DARK` / `LIGHT` | Subject's tonal bias |
-| Output size (`outputSizeMm`) | `300` mm | float | Real-world size of the locked dimension |
-| Locked dimension (`StencilOutputDimension`) | `WIDTH` | `WIDTH` / `HEIGHT` | Which dimension the size applies to |
-| Total pages (`totalPageCount`) | derived | int | Recomputed whenever size changes |
-
-Output bitmaps are ARGB_8888, white background, black content, **with registration marks** for
-multi-sheet tiling. Export produces `exportedPdfUri` (share-ready) or `exportError`.
+**There is no stencil feature in the current app.** `StencilWizardStep`, `StencilLayerCount`,
+`StencilLayerType`, `TonalPolarity`, `StencilOutputDimension`, `outputSizeMm`, `StencilProcessor`, and
+every other symbol this section previously documented do not exist anywhere in the source
+(`find . -iname "*stencil*" -not -path "*/build/*"` returns only `docs/STENCILS.md`, which describes
+this as a design document rather than shipped code). See README.md's changelog: stencil generation was
+removed as a documented feature because it has no implementing code. `docs/STENCILS.md` should not be
+read as describing a live pipeline in this app.
 
 ---
 
@@ -298,11 +287,25 @@ This is what "pocket-ready" means in practice. Detailed math in `RELOC_MAP_DESIG
   triangulated 3D points (`WallFeatureMap` / `Fingerprint`). No cloud, no room pre-scan.
 - **Snap-back.** After tracking loss or a screen-off (pocket) event, the engine matches the live camera
   against the fingerprint and solves the pose via **PnP/RANSAC** to realign the overlay in milliseconds.
-- **Teleological self-grow.** Because the intended result is known, OpenCV watches your progress and
-  **extends the fingerprint from validated new marks** as you paint — so snap-back survives the original
-  reference marks being painted over. Painting *tightens* the lock rather than degrading it.
-- **Dual-lens awareness.** Auto-selects hardware stereo depth where a device exposes it; elsewhere falls
-  back to single-camera motion-based (VIO-baseline) depth.
+- **Teleological self-grow.** Because the intended result is known, OpenCV can watch your progress and
+  **extend the fingerprint from validated new marks** as you paint — so snap-back survives the original
+  reference marks being painted over, tightening the lock instead of degrading it.
+- **These are opt-in, unvalidated A/B switches, not always-on behaviour.** `ArViewModel.evalSetFusionEnabled`
+  (drift correction / corrected snap-back fusion) and `evalSetSelfGrowEnabled` (teleological self-grow)
+  both **default to `false`**, are persisted (`SettingsRepository.driftCorrectionEnabled` /
+  `.selfGrowEnabled`), and are surfaced as "Drift correction: ON/OFF" and "Self-grow: ON/OFF" toggles in
+  the AR diagnostics overlay — see §7.4a. A third switch, **feature map** (`featureMapEnabled`, also
+  default `false`), gates the persistent wall feature map (build + match); before it existed the
+  underlying native flags (`SlamManager.setMapRelocEnabled`/`setMapBuildEnabled`) had no caller at all,
+  so the map — and the `.gxr` project field for it — could never do anything. Turn all three on
+  deliberately if you want them; out of the box, relocalization runs on the raw ARCore anchor without
+  drift correction, and the fingerprint does not self-grow.
+- **No dual-lens depth fallback.** `useArCoreDepthApi` is hardcoded `false` in `ArViewModel` — **no**
+  device, stereo-capable or not, gets a depth estimate from the ARCore Depth API. Metric scale for
+  non-stereo devices instead comes from `MetricFingerprintBuilder`'s two-keyframe triangulation, not
+  from a per-pixel motion-based depth map. Devices that expose hardware stereo use it
+  (`isHardwareStereoActive`, tracked for the tap-to-distance gate — §1.2); devices that don't fall back
+  to that triangulated centre depth, not to a "VIO-baseline depth" image.
 - **Thread safety.** `mWallDescriptors` / `mWallKeypoints3D` are mutex-guarded against races between JNI
   updates and the background PnP thread. The JNI ABI is frozen via `Fingerprint.fromNative` and locked by
   `FingerprintJniContractTest`.
@@ -338,8 +341,21 @@ any active condition (per the toggles above) floors it to 15 fps.
 |---|---|---|---|
 | Depth capability | `depth_triangulation_capability` | device-detected | Device's depth-triangulation tier |
 | Force stereo (unstable) | `forced_stereo_unstable` | off | Force hardware stereo depth even when flagged unstable |
-| Min parallax | `parallax_min_degrees` | float | Minimum parallax angle before triangulating depth |
 | Show anchor boundary | `show_anchor_boundary` | — | Draw the anchor's boundary in AR |
+
+There is no `parallax_min_degrees` key — no code anywhere defines or reads a minimum-parallax setting.
+
+### 7.2a Relocalization experiment switches (AR diagnostics overlay)
+
+Three persisted, default-**off** switches gate the teleological-SLAM behaviour described in §6. All
+three are surfaced as toggle rows in the AR diagnostics overlay (`MainActivity.kt`), not in the main
+Settings screen:
+
+| Setting | Key | Default | Effect |
+|---|---|---|---|
+| Drift correction | `drift_correction_enabled` | off | "Fusion" — pulls the overlay back onto each accepted relocalization instead of riding the raw ARCore anchor |
+| Self-grow | `self_grow_enabled` | off | Promotes newly validated marks into the reloc fingerprint as you paint; writes the map, so is colour-coded amber rather than green |
+| Feature map | `feature_map_enabled` | off | Builds and matches against the persistent wall feature map (`WallFeatureMap`); also writes, also amber |
 
 ### 7.3 Interface / locale / canvas
 
@@ -360,23 +376,22 @@ explanation. `showPlaneGrids` and `showPoints` default **on**, matching the onbo
 promises "coloured shapes appear as the engine maps the surface" as user-facing scanning feedback —
 the accumulated point cloud is the visible result of that scan.
 
-> TODO: the previous text here described "method-appropriate defaults" applied via an
-> `ApplyMethodLayerDefaults(activeMethod)` function tied to the now-removed Mural Method setting
-> (§1.2). No such function currently exists in the reducer, so that mechanism has been removed from
-> this doc pending confirmation of whatever (if anything) replaced it. Similarly, `ToggleVoxels` /
-> `ToggleMesh` (and the underlying voxel/splat map and surface mesh they would show) were not found
-> in the current reducer — the confidence-voxel and mesh subsystems have been deleted elsewhere in
-> the codebase (see the removed "Heat Voxel Cubes" note in `UI_UX.md`), so treat "Voxels" and "Mesh"
-> rows below as likely stale until independently reconfirmed.
+The previous text here described "method-appropriate defaults" applied via an
+`ApplyMethodLayerDefaults(activeMethod)` function tied to the now-removed Mural Method setting (§1.2);
+no such function exists in the current reducer. `ToggleVoxels` and `ToggleMesh` — and the underlying
+confidence-voxel/splat-map and surface-mesh subsystems they would show — do not exist anywhere in the
+source either (see the removed "Heat Voxel Cubes" note in `UI_UX.md`); both rows are removed below.
 
 | Toggle | Intent | Shows |
 |---|---|---|
 | Diagnostics | `ToggleDiagOverlay` | Master diagnostic overlay |
 | Feature points | `ToggleFeaturePoints` | Tracked feature-point cloud |
 | Plane grids | `TogglePlaneGrids` | Detected plane grids |
-| Voxels *(TODO: confirm still live)* | `ToggleVoxels` | Confidence voxels (splat method) |
 | Points | `TogglePoints` | Raw point cloud |
-| Mesh *(TODO: confirm still live)* | `ToggleMesh` | Surface mesh (mesh method) |
+
+See §7.2a for the separate drift-correction / self-grow / feature-map experiment switches, which live
+in the same AR diagnostics overlay but are not `Toggle*` diagnostic-visibility intents — they change
+relocalization behaviour, not what's drawn.
 
 ---
 

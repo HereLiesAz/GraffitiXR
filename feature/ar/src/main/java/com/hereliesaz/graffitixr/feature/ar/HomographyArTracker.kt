@@ -8,9 +8,13 @@ import com.hereliesaz.graffitixr.nativebridge.HomographyTrackerNative
  * ARCore-unavailable fallback: a Kotlin-shaped wrapper over [HomographyTrackerNative] /
  * `HomographyTracker.h`'s planar-target tracker.
  *
- * This is Phase 1 of the fallback — the tracking math and its JNI boundary. It does not yet touch
- * CameraX, camera intrinsics, [com.hereliesaz.graffitixr.feature.ar.rendering.OverlayRenderer], or
- * any [com.hereliesaz.graffitixr.common.model.EditorMode]/`ArUiState` wiring; those are Phase 2.
+ * This is the tracking math and its JNI boundary. [HomographyFallbackOverlay] is what actually
+ * wires this to CameraX, camera intrinsics, [com.hereliesaz.graffitixr.feature.ar.rendering.OverlayRenderer],
+ * and [com.hereliesaz.graffitixr.common.model.EditorMode]/`ArUiState` — that wiring exists and is
+ * live, despite an earlier version of this comment (and `BridgedHomographyTracker`'s) describing it
+ * as a future "Phase 2." Trusting that stale claim is plausibly how the sign error in
+ * `HomographyTracker.cpp`'s CV->GL pose conversion (see BACKLOG.md's remediation-plan Phase 2)
+ * went unnoticed — a reader who believes this subsystem isn't wired up yet has no reason to test it.
  * Read `HomographyTracker.h`'s class doc before using this for anything beyond a fallback — it is
  * explicit about what's tracked exactly (on-screen size/position/skew, as long as callers pass the
  * SAME half-extents to [setReference] that the renderer draws the design quad at) versus what has

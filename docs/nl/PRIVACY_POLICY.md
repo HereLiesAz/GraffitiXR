@@ -2,7 +2,7 @@
 
 **Laatst bijgewerkt:** [Huidige datum]
 
-Hier heeft LiesAZ de GraffitiXR app gebouwd als Open Source app. Deze DIENST wordt kosteloos door HereLiesAZ geleverd en is bedoeld voor gebruik zoals deze is.
+HereLiesAZ heeft de GraffitiXR-app gebouwd als een source-available app (zie de LICENSE en docs/LICENSING.md van de repository voor de voorwaarden). Deze DIENST wordt kosteloos door HereLiesAZ geleverd en is bedoeld voor gebruik zoals deze is.
 
 Deze pagina wordt gebruikt om bezoekers te informeren over ons beleid met betrekking tot het verzamelen, gebruiken en openbaar maken van persoonlijke informatie als iemand besluit onze service te gebruiken.
 
@@ -16,9 +16,20 @@ Voor een betere ervaring tijdens het gebruik van onze Service kunnen we van u ve
 *   **Opslag / Foto's:** We hebben toegang nodig tot de opslag van uw apparaat (externe lees-/schrijfopslag of fotobibliotheek) om afbeeldingen voor overlays te laden, uw projecten op te slaan en vastgelegde afbeeldingen te exporteren.
 *   **Locatiegegevens (optioneel):** Als u locatierechten verleent, kan de app GPS-gegevens verzamelen (breedtegraad, lengtegraad, hoogte) om uw projecten te geotaggen. Deze gegevens worden lokaal opgeslagen in uw projectbestanden.
 
-## Loggegevens
+## Crashrapporten (Opt-In)
 
-We willen u informeren dat wanneer u onze Dienst gebruikt, wij in geval van een fout in de app gegevens en informatie (via producten van derden) op uw telefoon verzamelen, genaamd Loggegevens. Deze loggegevens kunnen informatie bevatten zoals het Internet Protocol (“IP”)-adres van uw apparaat, de naam van het apparaat, de versie van het besturingssysteem, de configuratie van de app bij gebruik van onze service, de tijd en datum van uw gebruik van de service en andere statistieken.
+Standaard verlaat er niets over een crash uw apparaat. Als de app crasht of herstelt van een interne fout, wordt er een rapport weggeschreven naar een lokaal, tijdelijk bestand op uw apparaat, zodat de app u bij de volgende keer opstarten een melding "vorige sessie is gecrasht" kan tonen — dat bestand verlaat op zichzelf nooit het apparaat.
+
+Het versturen van dat rapport naar ons staat uit, tenzij u dit zelf inschakelt, via **Instellingen > Crashrapporten**. Alleen als u zich hiervoor heeft aangemeld, uploadt de app het rapport bij de volgende start, als een **openbaar issue** in de GitHub-issue-tracker van dit project (github.com/HereLiesAz/GraffitiXR). Het rapport bevat alleen:
+
+*   of de crash fataal was (de app werd afgesloten) of hersteld (opgevangen en de app bleef draaien);
+*   de datum en tijd van de crash;
+*   de fabrikant en het model van uw apparaat, en uw Android-versie;
+*   de versienaam van de app;
+*   de stack trace van de uitzondering; en
+*   maximaal de laatste 1.000 regels van de eigen logcat-uitvoer van de app (beperkt tot het proces van deze app — geen systeembrede logs).
+
+Omdat het rapport wordt ingediend als een openbaar GitHub-issue, is de inhoud ervan (inclusief de bovenstaande apparaat- en loginformatie) zichtbaar voor iedereen die de issue-tracker van dit project kan bekijken. Zet crashrapporten alleen aan als u daar geen probleem mee heeft. U kunt de instelling op elk moment weer uitzetten; dit heeft geen invloed op crashes die al hebben plaatsgevonden.
 
 ## Dienstverleners
 
@@ -31,7 +42,9 @@ We kunnen om de volgende redenen externe bedrijven en personen in dienst nemen:
 
 We gebruiken **Google ML Kit** voor onderwerpsegmentatie (achtergrondverwijdering). Deze verwerking gebeurt lokaal op uw apparaat.
 
-We gebruiken de **GitHub API** om te controleren op applicatie-updates. Tijdens deze verzoeken kan uw IP-adres zichtbaar zijn voor GitHub.
+## Updatecontroles
+
+Op het instellingenscherm staat een knop "Controleren op updates". Er wordt niets automatisch gecontroleerd — alleen wanneer u erop drukt. Door erop te drukken doet de app een verzoek aan de **GitHub API** (api.github.com) om de laatste release van dit project op te zoeken. GitHub is een derde partij buiten onze controle, en uw IP-adres is voor de duur van dat ene verzoek zichtbaar voor GitHub, net zoals bij elk webverzoek dat u naar github.com doet. Er wordt geen andere informatie met dit verzoek meegestuurd.
 
 ## Beveiliging
 
@@ -57,4 +70,4 @@ Als u vragen of suggesties heeft over ons privacybeleid, aarzel dan niet om cont
 
 
 ---
-*Documentatie bijgewerkt op 17-03-2026 tijdens het herontwerp van de website en de integratiefase van de stencilmodus.*
+*Documentatie bijgewerkt op 2026-09-04: het onderdeel Loggegevens, dat crashgegevens beschreef als automatisch en zonder toestemming verzameld, is gecorrigeerd — de app vereist in werkelijkheid een expliciete opt-in (Instellingen > Crashrapporten, standaard uit) voordat er een crashrapport het apparaat verlaat, en het rapport wordt ingediend als een openbaar GitHub-issue, niet verzonden naar "onze servers". De bestaande melding over de GitHub-API-updatecontrole heeft nu een eigen sectie gekregen en is verduidelijkt als door de gebruiker geïnitieerd (de knop "Controleren op updates" in Instellingen), niet automatisch. Vorige update: 17-03-2026, tijdens het herontwerp van de website en de integratiefase van de stencilmodus.*

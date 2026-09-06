@@ -26,9 +26,14 @@ We welcome pull requests, but this is a specialized tool with strict architectur
 
 ## 🧪 Testing
 
-* **Unit Tests:** Required for all ViewModel logic (`src/test`).
-* **UI Tests:** We use simple Compose rule tests.
-* **Native Tests:** Test visually on a device with `Debug` build variant enabled to see the **Voxel Memory** visualization. Ensure that the "Lens Mode" diagnostic correctly identifies hardware stereo.
+* **Unit Tests:** Required for all ViewModel logic (`src/test`). See [`testing.md`](testing.md) for
+  the current file inventory and mock patterns.
+* **UI Tests:** There are no instrumented (`src/androidTest/`) tests in this repository yet — see
+  `testing.md` §3. Verify UI changes by running the app.
+* **Native changes:** There is no automated C++ test runner and no on-device debug visualization to
+  check against — see `testing.md` §2. Verify with the "Wall Test" (`testing.md` §4) and, for JNI
+  signature changes, `./gradlew :core:nativebridge:testDebugUnitTest` (`NativeMethodAritySignatureTest`
+  catches a drifted parameter count, not a drifted type).
 
 ---
-*Documentation updated on 2026-04-24 during Persistent Voxel Memory and Pocket-Ready recovery implementation.*
+*Documentation updated on 2026-09-04: removed the Voxel Memory visualization and "Lens Mode" hardware-stereo verification steps (neither exists — see `NATIVE_ENGINE.md`), pointed at the real test tiers in `testing.md`. Prior update: 2026-04-24, Persistent Voxel Memory and Pocket-Ready recovery implementation — the subsystem that update described was later deleted.*

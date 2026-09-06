@@ -1,4 +1,5 @@
 #include <jni.h>
+#include <shared_mutex>
 #include <android/log.h>
 #include <android/asset_manager_jni.h>
 #include <android/bitmap.h>
@@ -26,11 +27,50 @@ MobileGS* gSlamEngine = nullptr;
 // does) and its deletion in nativeDestroy. Without this, nativeDestroy's `delete gSlamEngine` races
 // every other entry point that dereferences the same raw pointer with no lock of its own --
 // SlamManager.kt's destroy() holds initLock, but feedYuvFrame/updateCamera/getRelocResult/etc do
-// not, and Kotlin has no way to serialize against destroy() from those call sites. A single mutex,
-// held for the duration of each function's gSlamEngine access (not just the null check -- releasing
-// it before the call would let destroy free the object mid-call), is the simplest correct fix.
-std::mutex gEngineMutex;
+// not, and Kotlin has no way to serialize against destroy() from those call sites.
+//
+// This only protects the *pointer's* lifetime, not MobileGS's internal state -- that's MobileGS's
+// own job (mMutex/mRelocMutex/std::atomic members; see include/MobileGS.h). So it's a
+// shared_mutex: nativeInitialize/nativeDestroy (which write the pointer itself) take an exclusive
+// std::unique_lock; every entry point that only dereferences it takes a std::shared_lock and can
+// run concurrently with other readers -- that's the actual fix for heavy OpenCV/SuperPoint work
+// (fingerprint generation, relocalization) blocking the per-frame camera/render path behind one
+// global lock. Three more entry points also need std::unique_lock despite not touching the
+// pointer: nativeLoadSuperPoint/nativeLoadDistortionHead/nativeLoadLowLightEnhancer mutate
+// mSuperPoint/mDistortionHead/mEnhancer in place via their load() calls.
+//
+// CORRECTION: an earlier version of this comment claimed gEngineMutex was "the only thing"
+// serializing those reloads against an in-flight detect()/enhance()/run() -- false, and dangerous
+// to believe. relocThreadFunc's background worker (MobileGS.cpp) calls runRelocPass/
+// tryUpdateFingerprint, which call into SuperPointDetector/DistortionHead/LowLightEnhancer,
+// WITHOUT ever taking gEngineMutex -- it's a std::thread, not a JNI entry point. What actually
+// makes a live reload safe against that thread is each of those three classes' own internal
+// std::mutex (SuperPointDetector.h/DistortionHead.h/LowLightEnhancer.h each declare `mMutex`,
+// taken in both load() and the inference call). gEngineMutex's exclusive lock on the three loader
+// entry points is still correct and still necessary -- it's what protects them against the OTHER
+// JNI-entry readers (getSuperPointFeatures, getFingerprintKeypoints, generateFingerprint, all
+// called only via JNI) -- it just isn't sufficient on its own, and the reloc-thread path was never
+// covered by it in the first place.
+//
+// tools/check_native_locking.py finds gaps like the load-vs-JNI-reader one, but it only parses
+// MobileGS.h/MobileGS.cpp member declarations -- it cannot see JNI-level globals (gLastColorFrame
+// below is exactly such a case: written by both nativeFeedYuvFrame and nativeFeedColorFrame, which
+// now both take only a shared_lock, so it needs its own mutex -- see gColorFrameMutex) or classes
+// declared elsewhere (SuperPointDetector etc., which is how it also can't see the mMutex that
+// actually protects the load-vs-reloc-thread race above). Don't treat a clean run of that script as
+// proof gEngineMutex's shared/exclusive split is sufficient by itself anywhere in this file.
+std::shared_mutex gEngineMutex;
 cv::Mat gLastColorFrame; // MANDATE: Kept in Sensor-Native (Landscape) orientation
+// gLastColorFrame is written by BOTH nativeFeedYuvFrame and nativeFeedColorFrame, which (since the
+// shared_mutex conversion above) both take only gEngineMutex's shared_lock and so can now run
+// concurrently -- e.g. the normal camera feed on the GL thread racing a glasses-session feed on
+// its own coroutine (see ArViewModel.startGlassesSession/SlamManager's forwardFrame). The old
+// exclusive std::mutex incidentally serialized these two writers; nothing does now except this
+// dedicated mutex. Lock it only around the read-modify-write of gLastColorFrame itself (assign,
+// then take a cheap header-copy snapshot), never around the heavy YUV/RGBA conversion or the
+// reloc-frame build that follows -- those must stay outside the lock or this reintroduces the
+// stall the shared_mutex conversion exists to remove.
+std::mutex gColorFrameMutex;
 JavaVM* gJvm = nullptr;
 
 // ARCore-unavailable fallback (see HomographyTracker.h). Entirely independent of gSlamEngine —
@@ -263,7 +303,7 @@ extern "C" {
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateDeviceMotion(JNIEnv* env, jobject thiz, jfloatArray angularVel, jfloatArray linearVel) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         // updateDeviceMotion memcpy's 3 floats out of each; a shorter array (or a null one) would
         // read past the end. Validate before pinning rather than trusting the Kotlin caller.
@@ -279,7 +319,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateDeviceMotion
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitialize(JNIEnv* env, jobject thiz) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::unique_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) {
         gSlamEngine = new MobileGS();
         gSlamEngine->initialize(1920, 1080);
@@ -288,37 +328,37 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeInitialize(JNIEnv*
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDestroy(JNIEnv* env, jobject thiz) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::unique_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) { delete gSlamEngine; gSlamEngine = nullptr; }
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArCoreTrackingState(JNIEnv* env, jobject thiz, jboolean isTracking) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setArCoreTrackingState(isTracking);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetViewportSize(JNIEnv* env, jobject thiz, jint width, jint height) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setViewportSize(width, height);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetRelocEnabled(JNIEnv* env, jobject thiz, jboolean enabled) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setRelocEnabled(enabled);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetSelfGrowEnabled(JNIEnv* env, jobject thiz, jboolean enabled) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setSelfGrowEnabled(enabled);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetEvalRngSeed(JNIEnv* env, jobject thiz, jlong seed) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setEvalRngSeed((long long)seed);
 }
 
@@ -326,7 +366,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetEvalRngSeed(JNI
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetEvalSyncReloc(
         JNIEnv* env, jobject thiz, jboolean enabled, jint everyN) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setEvalSyncReloc(enabled == JNI_TRUE, (int)everyN);
 }
 
@@ -336,19 +376,19 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetEvalSyncReloc(
 // a sidecar claiming otherwise would be the kind of evidence that is worse than none.
 JNIEXPORT jint JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetEvalSyncRelocEveryN(JNIEnv* env, jobject thiz) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     return gSlamEngine ? (jint)gSlamEngine->evalSyncEveryN() : 0;
 }
 
 JNIEXPORT jint JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetWallKeypointCount(JNIEnv* env, jobject thiz) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     return gSlamEngine ? gSlamEngine->getWallKeypointCount() : 0;
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallPatch(JNIEnv* env, jobject thiz, jobject bitmap) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !bitmap) return;
     cv::Mat img; bitmapToMat(env, bitmap, img);
     gSlamEngine->setWallPatch(img);
@@ -357,7 +397,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallPatch(JNIEn
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallPatchBytes(
         JNIEnv* env, jobject thiz, jbyteArray data, jint size) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !data || size <= 0) return;
     // 64-bit product, like every sibling restore path in this file (nativeRestoreWallFingerprint /
     // nativeRestoreWallFingerprintMetric / nativeRestoreWallFeatureMap): size*size in 32-bit jint can
@@ -371,7 +411,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallPatchBytes(
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMappingPaused(JNIEnv* env, jobject thiz, jboolean paused) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setMappingPaused(paused);
 }
 
@@ -380,7 +420,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(
         JNIEnv* env, jobject thiz,
         jfloatArray viewMatrix, jfloatArray projMatrix,
         jlong timestampNs) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         // Both are memcpy'd as 16 floats below (and read as 4x4 by updateCamera), so a short
         // array would read past the end. Validate both before pinning either.
@@ -406,13 +446,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateLightLevel(JNIEnv* env, jobject thiz, jfloat level) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->updateLightLevel(level);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateAnchorTransform(JNIEnv* env, jobject thiz, jfloatArray transform) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         // updateAnchorTransform memcpy's 16 floats out of this. A short or null array is dropped
         // here — the Kotlin side must not read that as "an anchor was written", which is why the
@@ -429,7 +469,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
         JNIEnv* env, jobject thiz, jobject yBuffer, jobject uBuffer, jobject vBuffer,
         jint width, jint height, jint yStride, jint uvStride, jint uvPixelStride, jlong timestampNs, jint cvRotateCode) {
 
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
 
     try {
@@ -462,47 +502,57 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     cv::Mat yuv(height + height / 2, width, CV_8UC1);
     yMat.copyTo(yuv(cv::Rect(0, 0, width, height)));
 
-    if (uvPixelStride == 1) {
-        // I420 planar (separate U and V planes) → NV21-style interleaved V,U so the reloc decode
-        // (COLOR_YUV2RGB_NV21 below) is correct. The old code copied each full height/2-row plane
-        // into a height/4-row ROI — a size mismatch that left half the chroma uninitialized and
-        // produced wrong colours. Build the VU block explicitly, bounded by the buffer capacities.
-        jlong uCap = env->GetDirectBufferCapacity(uBuffer);
-        jlong vCap = env->GetDirectBufferCapacity(vBuffer);
-        cv::Mat chroma = yuv(cv::Rect(0, height, width, height / 2));
-        for (int r = 0; r < height / 2; ++r) {
-            uint8_t* dst = chroma.ptr(r);
-            size_t rowOff = (size_t)r * uvStride;
-            for (int c = 0; c < width / 2; ++c) {
-                size_t idx = rowOff + c;
-                dst[2 * c]     = (vCap <= 0 || (jlong)idx < vCap) ? vData[idx] : 0; // V
-                dst[2 * c + 1] = (uCap <= 0 || (jlong)idx < uCap) ? uData[idx] : 0; // U
+    // frameSnapshot is a cheap header-copy (shares yuv's/converted buffer, not a deep copy) taken
+    // under gColorFrameMutex right alongside the write to gLastColorFrame, so the heavy conversion
+    // and reloc-frame work below can safely run unlocked -- see gColorFrameMutex's declaration
+    // comment for why gEngineMutex's shared_lock (taken above) no longer serializes this against a
+    // concurrent nativeFeedColorFrame call.
+    cv::Mat frameSnapshot;
+    {
+        std::lock_guard<std::mutex> colorLock(gColorFrameMutex);
+        if (uvPixelStride == 1) {
+            // I420 planar (separate U and V planes) → NV21-style interleaved V,U so the reloc decode
+            // (COLOR_YUV2RGB_NV21 below) is correct. The old code copied each full height/2-row plane
+            // into a height/4-row ROI — a size mismatch that left half the chroma uninitialized and
+            // produced wrong colours. Build the VU block explicitly, bounded by the buffer capacities.
+            jlong uCap = env->GetDirectBufferCapacity(uBuffer);
+            jlong vCap = env->GetDirectBufferCapacity(vBuffer);
+            cv::Mat chroma = yuv(cv::Rect(0, height, width, height / 2));
+            for (int r = 0; r < height / 2; ++r) {
+                uint8_t* dst = chroma.ptr(r);
+                size_t rowOff = (size_t)r * uvStride;
+                for (int c = 0; c < width / 2; ++c) {
+                    size_t idx = rowOff + c;
+                    dst[2 * c]     = (vCap <= 0 || (jlong)idx < vCap) ? vData[idx] : 0; // V
+                    dst[2 * c + 1] = (uCap <= 0 || (jlong)idx < uCap) ? uData[idx] : 0; // U
+                }
             }
+            // No conversion on GL thread; pass raw YUV to map thread. Plain assignment, not clone():
+            // `yuv` is a local whose buffer nothing else writes, so cv::Mat's refcount hands ownership
+            // over for free. The clone() this replaces copied the whole frame a second time, on the GL
+            // thread, every call.
+            gLastColorFrame = yuv;
+        } else if (uvPixelStride == 2) {
+            // Semi-planar (NV12/NV21): the interleaved chroma can be memcpy'd straight into the YUV
+            // block's rows. The previous version built a separate zero-filled full-chroma Mat and then
+            // copyTo'd it across — an extra allocation, an extra zero-fill and an extra copy per frame.
+            jlong vCap = env->GetDirectBufferCapacity(vBuffer);
+            cv::Mat chroma = yuv(cv::Rect(0, height, width, height / 2));
+            size_t limit = (vCap > 0) ? (size_t)vCap : (size_t)((height / 2 - 1) * uvStride + width);
+            for (int r = 0; r < height / 2; ++r) {
+                uint8_t* dst = chroma.ptr(r);
+                size_t rowStart = (size_t)r * uvStride;
+                size_t rowLen = std::min((size_t)width, (size_t)(limit > rowStart ? limit - rowStart : 0));
+                if (rowLen > 0) std::memcpy(dst, vData + rowStart, rowLen);
+                // Rows the source can't fill must still be cleared: a fresh cv::Mat is uninitialised,
+                // whereas the scratch Mat this replaces was zero-filled.
+                if (rowLen < (size_t)width) std::memset(dst + rowLen, 0, (size_t)width - rowLen);
+            }
+            gLastColorFrame = yuv;
+        } else {
+            cv::cvtColor(yMat, gLastColorFrame, cv::COLOR_GRAY2RGB);
         }
-        // No conversion on GL thread; pass raw YUV to map thread. Plain assignment, not clone():
-        // `yuv` is a local whose buffer nothing else writes, so cv::Mat's refcount hands ownership
-        // over for free. The clone() this replaces copied the whole frame a second time, on the GL
-        // thread, every call.
-        gLastColorFrame = yuv;
-    } else if (uvPixelStride == 2) {
-        // Semi-planar (NV12/NV21): the interleaved chroma can be memcpy'd straight into the YUV
-        // block's rows. The previous version built a separate zero-filled full-chroma Mat and then
-        // copyTo'd it across — an extra allocation, an extra zero-fill and an extra copy per frame.
-        jlong vCap = env->GetDirectBufferCapacity(vBuffer);
-        cv::Mat chroma = yuv(cv::Rect(0, height, width, height / 2));
-        size_t limit = (vCap > 0) ? (size_t)vCap : (size_t)((height / 2 - 1) * uvStride + width);
-        for (int r = 0; r < height / 2; ++r) {
-            uint8_t* dst = chroma.ptr(r);
-            size_t rowStart = (size_t)r * uvStride;
-            size_t rowLen = std::min((size_t)width, (size_t)(limit > rowStart ? limit - rowStart : 0));
-            if (rowLen > 0) std::memcpy(dst, vData + rowStart, rowLen);
-            // Rows the source can't fill must still be cleared: a fresh cv::Mat is uninitialised,
-            // whereas the scratch Mat this replaces was zero-filled.
-            if (rowLen < (size_t)width) std::memset(dst + rowLen, 0, (size_t)width - rowLen);
-        }
-        gLastColorFrame = yuv;
-    } else {
-        cv::cvtColor(yMat, gLastColorFrame, cv::COLOR_GRAY2RGB);
+        frameSnapshot = gLastColorFrame;
     }
 
     // Relocalization MATCHING still uses the Display-Aligned frame for best user feedback.
@@ -514,17 +564,17 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     // work used to be done unconditionally, so during the entire scanning phase (no fingerprint
     // exists yet, by definition) every single conversion was built and immediately thrown away,
     // several times a second, stalling the render loop for nothing.
-    if (gLastColorFrame.empty() || !gSlamEngine->relocWantsFrame()) return;
+    if (frameSnapshot.empty() || !gSlamEngine->relocWantsFrame()) return;
 
-    if (gLastColorFrame.rows == height + height/2) {
+    if (frameSnapshot.rows == height + height/2) {
         cv::Mat relocFrame;
-        cv::cvtColor(gLastColorFrame, relocFrame, cv::COLOR_YUV2RGB_NV21);
+        cv::cvtColor(frameSnapshot, relocFrame, cv::COLOR_YUV2RGB_NV21);
         if (cvRotateCode >= 0) {
             cv::rotate(relocFrame, relocFrame, cvRotateCode);
         }
         gSlamEngine->scheduleRelocCheck(relocFrame);
     } else {
-        cv::Mat relocFrame = gLastColorFrame.clone();
+        cv::Mat relocFrame = frameSnapshot.clone();
         if (cvRotateCode >= 0) {
             cv::rotate(relocFrame, relocFrame, cvRotateCode);
         }
@@ -621,15 +671,36 @@ JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
         JNIEnv* env, jobject thiz, jobject colorBuffer, jint width, jint height, jlong timestampNs, jint cvRotateCode) {
 
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     uint8_t* buffer = static_cast<uint8_t*>(env->GetDirectBufferAddress(colorBuffer));
-    if (!buffer || !gSlamEngine) return;
+    if (!buffer || !gSlamEngine || width <= 0 || height <= 0) return;
+
+    // Same guard as nativeFeedYuvFrame's Y-plane check: wrapping the caller's buffer in a cv::Mat
+    // with no bounds check lets a short/truncated colorBuffer (wrong stride assumption on the
+    // caller's side, e.g. a glasses-forwarded frame) read past its end. Skip the check only when
+    // the capacity query itself is unavailable, matching that call site's style.
+    jlong colorCap = env->GetDirectBufferCapacity(colorBuffer);
+    size_t colorNeeded = (size_t)height * (size_t)width * 4;
+    if (colorCap > 0 && (size_t)colorCap < colorNeeded) {
+        LOGE("nativeFeedColorFrame: buffer too small (cap=%lld, need=%zu)", (long long)colorCap, colorNeeded);
+        return;
+    }
 
     try {
         cv::Mat frame(height, width, CV_8UC4, buffer);
-        cv::cvtColor(frame, gLastColorFrame, cv::COLOR_RGBA2RGB);
-
-        cv::Mat relocFrame = gLastColorFrame.clone();
+        cv::Mat relocFrame;
+        {
+            // See gColorFrameMutex's declaration comment: this and nativeFeedYuvFrame both only
+            // hold gEngineMutex's shared_lock now, so they need their own mutex around the
+            // read-modify-write of gLastColorFrame. The clone() (the actual per-frame cost) stays
+            // inside the lock here -- unlike nativeFeedYuvFrame's snapshot-then-unlock, this
+            // conversion is cheap enough (a single RGBA->RGB cvtColor + clone, not a multi-branch
+            // YUV assembly) that splitting it wouldn't measurably reduce contention, and keeping
+            // it simple avoids a second place to get the snapshot pattern wrong.
+            std::lock_guard<std::mutex> colorLock(gColorFrameMutex);
+            cv::cvtColor(frame, gLastColorFrame, cv::COLOR_RGBA2RGB);
+            relocFrame = gLastColorFrame.clone();
+        }
         if (cvRotateCode >= 0) {
             cv::rotate(relocFrame, relocFrame, cvRotateCode);
         }
@@ -647,7 +718,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
 JNIEXPORT jboolean JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadSuperPoint(
         JNIEnv* env, jobject thiz, jobject assetManager) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::unique_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return JNI_FALSE;
     AAssetManager* mgr = AAssetManager_fromJava(env, assetManager);
     AAsset* asset = AAssetManager_open(mgr, "superpoint.onnx", AASSET_MODE_BUFFER);
@@ -663,7 +734,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadSuperPoint(
 JNIEXPORT jboolean JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadDistortionHead(
         JNIEnv* env, jobject thiz, jobject assetManager) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::unique_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return JNI_FALSE;
     AAssetManager* mgr = AAssetManager_fromJava(env, assetManager);
     AAsset* asset = AAssetManager_open(mgr, "distortion_head.onnx", AASSET_MODE_BUFFER);
@@ -682,7 +753,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadDistortionHead
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeLoadLowLightEnhancer(
         JNIEnv* env, jobject thiz, jobject assetManager) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::unique_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
     AAssetManager* mgr = AAssetManager_fromJava(env, assetManager);
     AAsset* asset = AAssetManager_open(mgr, "zerodce.onnx", AASSET_MODE_BUFFER);
@@ -705,7 +776,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
     // since JNI can't catch C++ exceptions), and a descriptor blob at least rows*cols*elemSize.
     // The size product is computed in 64-bit so a hostile rows*cols can't overflow past the check.
     // Mirrors the guarded nativeRestoreWallFeatureMap path; the metric sibling below does the same.
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !descArray || !ptsArray) return;
     if (rows < 0 || cols < 0) return;
     int depth = CV_MAT_DEPTH(type);
@@ -741,7 +812,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
     // wraps the descriptor blob (valid OpenCV type + 64-bit overflow-safe size check), and only pass
     // anchor/intrinsics when correctly sized (native copies a fixed 16 / 4 floats and tolerates null),
     // else leave the native defaults.
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !descArray || !ptsArray) return;
     if (rows < 0 || cols < 0) return;
     int depth = CV_MAT_DEPTH(type);
@@ -805,7 +876,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFeature
     // 64-bit (a jsize/jint product here would let a hostile rows*cols overflow past the check and
     // wrap a tiny buffer in a huge cv::Mat -> OOB read), and parallel arrays of matching length.
     // Mirrors nativeRestoreWallFingerprint / nativeRestoreWallFingerprintMetric above.
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !descArray || !ptsArray) return;
     if (rows < 0 || cols < 0) return;
     int depth = CV_MAT_DEPTH(type);
@@ -864,37 +935,37 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFeature
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearWallFeatureMap(JNIEnv*, jobject) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->clearWallFeatureMap();
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearWallFingerprint(JNIEnv*, jobject) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->clearWallFingerprint();
 }
 
 JNIEXPORT jint JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetMapPointCount(JNIEnv*, jobject) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     return gSlamEngine ? gSlamEngine->getMapPointCount() : 0;
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMapRelocEnabled(JNIEnv*, jobject, jboolean enabled) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setMapRelocEnabled(enabled == JNI_TRUE);
 }
 
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMapBuildEnabled(JNIEnv*, jobject, jboolean enabled) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setMapBuildEnabled(enabled == JNI_TRUE);
 }
 
 JNIEXPORT jbyteArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportWallFeatureMap(JNIEnv* env, jobject) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
     std::vector<uint8_t> blob = gSlamEngine->exportWallFeatureMap();
     if (blob.empty()) return nullptr;
@@ -997,7 +1068,7 @@ JNIEXPORT jobject JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetWallFingerprint(
         JNIEnv* env, jobject thiz, jobject bitmap, jobject mask, jobject depthBuffer, jint depthW, jint depthH, jint depthStride, jfloatArray intrArray, jfloatArray viewMatArray) {
 
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
     // generateFingerprint dereferences intr[0..3] and viewMat[0..15] unconditionally (unlike the
     // optional-pointer restore paths above), so a null or short array here is an OOB read past
@@ -1038,7 +1109,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArtworkFingerpr
     // intr[0..3] / viewMat[0..15] unconditionally. Validate before touching either array.
     if (!intrArray || env->GetArrayLength(intrArray) < 4) return;
     if (!viewMatArray || env->GetArrayLength(viewMatArray) < 16) return;
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         cv::Mat composite;
         bitmapToMat(env, bitmap, composite);
@@ -1060,7 +1131,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArtworkFingerpr
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
         JNIEnv* env, jobject thiz, jobject bitmap) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
     cv::Mat frame;
     bitmapToMat(env, bitmap, frame);
@@ -1101,7 +1172,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAnnotateKeypoints(
 JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDetectSuperPoint(
         JNIEnv* env, jobject thiz, jobject bitmap) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
     cv::Mat image; bitmapToMat(env, bitmap, image);
     if (image.empty()) return nullptr;
@@ -1137,7 +1208,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeDetectSuperPoint(
 JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintKeypoints(
         JNIEnv* env, jobject thiz, jobject bitmap, jobject mask) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
     cv::Mat image; bitmapToMat(env, bitmap, image);
     if (image.empty()) return nullptr;
@@ -1166,7 +1237,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintKeyp
 JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetKeypoints(
         JNIEnv* env, jobject thiz, jobject bitmap) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
     cv::Mat frame;
     bitmapToMat(env, bitmap, frame);
@@ -1205,20 +1276,24 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetKeypoints(
 
 extern "C" JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetAnchorTransform(JNIEnv* env, jobject) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    // Every Kotlin call site (ArRenderer.kt, ArViewModel.kt) treats a null return as "no engine /
+    // allocation pressure" and falls back accordingly -- returning a non-null all-zero array here
+    // instead silently collapsed the caller's model matrix / fed a garbage pose into
+    // MetricFingerprintBuilder. Match nativeGetFingerprintAnchor's sibling behavior: only allocate
+    // and populate the array once there's an engine to read from.
+    if (!gSlamEngine) return nullptr;
     jfloatArray result = env->NewFloatArray(16);
     if (!result) return nullptr;
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
-    if (gSlamEngine) {
-        float mat[16];
-        gSlamEngine->getAnchorTransform(mat);
-        env->SetFloatArrayRegion(result, 0, 16, mat);
-    }
+    float mat[16];
+    gSlamEngine->getAnchorTransform(mat);
+    env->SetFloatArrayRegion(result, 0, 16, mat);
     return result;
 }
 
 extern "C" JNIEXPORT jfloat JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPaintingProgress(JNIEnv* env, jobject) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) return gSlamEngine->getPaintingProgress();
     return 0.0f;
 }
@@ -1228,7 +1303,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPaintingProgres
 // there is certainly no measurement, so the fallback is the sentinel and not a confident zero.
 extern "C" JNIEXPORT jfloat JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCorroborationConfidence(JNIEnv* env, jobject) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) return gSlamEngine->getCorroborationConfidence();
     return -1.0f;
 }
@@ -1259,7 +1334,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostic
     // [12] and [13] default to the "not run" ordinals (kCorrobNotRun = 6, kGrowNotRun = 0) rather
     // than -1: they are enums, and with no engine nothing ran, which is exactly what those say.
     jint vals[14] = {kRelocUnknownOrdinal, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 6, 0};
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         vals[0] = gSlamEngine->lastRelocReject();
         vals[1] = gSlamEngine->lastRelocMatches();
@@ -1293,7 +1368,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocDiagnostic
 extern "C" JNIEXPORT jfloatArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCorroborationDiagnostics(JNIEnv* env, jobject) {
     jfloat vals[3] = {-1.0f, -1.0f, -1.0f};
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         vals[0] = gSlamEngine->corrobSearchRadiusPx();
         vals[1] = gSlamEngine->lastRelocReprojPx();
@@ -1312,7 +1387,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetCorroborationDi
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetDesignPlacement(
         JNIEnv* env, jobject, jfloatArray fpFromDesign16, jfloat halfW, jfloat halfH) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
     if (!fpFromDesign16 || env->GetArrayLength(fpFromDesign16) != 16) {
         gSlamEngine->setDesignPlacement(nullptr, 0.0f, 0.0f);
@@ -1325,7 +1400,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetDesignPlacement
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetStageTimings(JNIEnv* env, jobject, jfloatArray out) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
     // SetFloatArrayRegion bounds-checks and throws on a short array, so this is not a memory-safety
     // hole either way -- but every other array-taking function in this file validates length before
@@ -1342,13 +1417,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetStageTimings(JN
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetStageEnabled(JNIEnv* env, jobject, jint stage, jboolean enabled) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) gSlamEngine->setStageEnabled((int) stage, enabled == JNI_TRUE);
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocResult(JNIEnv* env, jobject, jfloatArray out) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
     // See nativeGetStageTimings above for why this is validated even though SetFloatArrayRegion
     // itself would already reject a short array.
@@ -1363,7 +1438,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocResult(JNI
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintAnchor(JNIEnv* env, jobject, jfloatArray out) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
     // See nativeGetStageTimings above for why this is validated even though SetFloatArrayRegion
     // itself would already reject a short array.
@@ -1379,7 +1454,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintAnch
 JNIEXPORT jbyteArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportFingerprint(
         JNIEnv* env, jobject thiz) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return nullptr;
     std::vector<uint8_t> fingerprint = gSlamEngine->exportFingerprint();
     if (fingerprint.empty()) return nullptr;
@@ -1393,7 +1468,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportFingerprint(
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAlignToFingerprint(
         JNIEnv* env, jobject thiz, jbyteArray data) {
-    std::lock_guard<std::mutex> engineLock(gEngineMutex);
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine || !data) return;
     jsize size = env->GetArrayLength(data);
     jbyte* buffer = env->GetByteArrayElements(data, nullptr);

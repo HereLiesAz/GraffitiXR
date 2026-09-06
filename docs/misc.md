@@ -5,7 +5,8 @@
 Internal codename: "TagTrace".
 
 ## Easter Eggs
-* If you tap the version number in Settings 7 times, it toggles "Dev Mode" which visualizes the raw voxel grid colors instead of the confidence heat map.
+* No tap-the-version-number "Dev Mode" exists in the current code (grepped for it — nothing).
+  There is no voxel grid or confidence heat map to visualize either way; see `NATIVE_ENGINE.md`.
 
 ## Performance Targets
 * **FPS:** 60fps on Pixel 6 and newer.
@@ -13,4 +14,6 @@ Internal codename: "TagTrace".
 * **Battery:** < 20% drain per hour of continuous scanning.
 
 ---
-*Documentation updated on 2026-03-17 during website redesign and Stencil generation integration phase.*
+*Documentation updated on 2026-09-04: removed the "Dev Mode" Easter egg claim — no such feature
+exists in the current code, and there is no voxel grid or confidence heat map to toggle between.
+Prior update: 2026-03-17, website redesign and Stencil generation integration phase.*

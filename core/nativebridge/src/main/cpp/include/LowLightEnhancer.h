@@ -12,7 +12,9 @@ public:
     bool load(const std::vector<uchar>& onnxBytes);
     bool isLoaded() const { return mLoaded; }
 
-    // input/output: CV_8UC3 RGB. Returns false if model not loaded or inference fails.
+    // input: CV_8UC3 RGB or CV_8UC4 RGBA (converted internally). output: always CV_8UC3 RGB,
+    // resized back to input's original size. Returns false if model not loaded or inference
+    // fails.
     bool enhance(const cv::Mat& input, cv::Mat& output);
 
 private:
