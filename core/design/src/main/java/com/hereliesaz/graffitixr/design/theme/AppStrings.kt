@@ -133,7 +133,8 @@ fun rememberAppStrings(): AppStrings {
             targetInclude = stringResource(R.string.target_include),
             targetEraseMarks = stringResource(R.string.target_erase_marks),
             targetShowFeatures = stringResource(R.string.target_show_features),
-            syncing = stringResource(R.string.syncing)
+            syncing = stringResource(R.string.syncing),
+            reacquiringTarget = stringResource(R.string.reacquiring_target)
         ),
         help = AppStrings.Help(
             modeHost = R.string.help_mode_host,
@@ -304,7 +305,8 @@ data class AppStrings(
         val targetInclude: String,
         val targetEraseMarks: String,
         val targetShowFeatures: String,
-        val syncing: String
+        val syncing: String,
+        val reacquiringTarget: String
     )
     /**
      * Rail-item help text. Fields here must correspond to an actually-registered rail item — a

@@ -51,7 +51,7 @@ class BridgedHomographyTrackerTest {
         every { tracker.track(any(), any(), any(), any(), any()) } returns lockedPose andThen null
         // Bridge reports a 90-degree pan since that lock, well inside the bridge window.
         every { bridge.msSinceReference() } returns 100L
-        every { bridge.cameraRotationDelta(any()) } returns ninetyAboutY
+        every { bridge.cameraRotationDelta() } returns ninetyAboutY
 
         val bridgedTracker = BridgedHomographyTracker(
             context = mockk<Context>(relaxed = true),

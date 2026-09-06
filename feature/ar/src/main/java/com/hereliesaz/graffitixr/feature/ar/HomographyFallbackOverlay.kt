@@ -163,6 +163,7 @@ fun HomographyFallbackOverlay(
         return
     }
     val reference = referenceBitmap!!
+    val strings = rememberAppStrings()
     val objectHalfW = 1f
     val objectHalfH = reference.height.toFloat() / reference.width.toFloat()
 
@@ -257,7 +258,7 @@ fun HomographyFallbackOverlay(
     if (isTrackingLost) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Text(
-                text = "Reacquiring target…",
+                text = strings.ar.reacquiringTarget,
                 color = Color.White,
                 modifier = Modifier
                     .padding(top = 32.dp)

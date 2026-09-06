@@ -60,15 +60,22 @@ class BridgedHomographyTracker(
     /**
      * Track one live camera frame, bridging through a brief vision failure with gyro rotation.
      *
-     * @param rotationDeg the sensor-to-display quarter-turn — see [GyroOrientationBridge.cameraRotationDelta].
+     * @param rotationDeg the sensor-to-display quarter-turn in effect for THIS frame — captured
+     *   alongside the gyro reference candidate and only committed if this frame's tracking locks,
+     *   so a later [GyroOrientationBridge.cameraRotationDelta] uses the rotation at reference time.
      * @return a fresh vision-tracked pose, a gyro-bridged hold of the last one, or null once both
      *   vision has failed AND the bridge window has elapsed (or gyro isn't available at all).
      */
     fun trackFrame(frameBitmap: Bitmap, fx: Float, fy: Float, cx: Float, cy: Float, rotationDeg: Int): HomographyPose? {
+        // Snapshot a candidate reference BEFORE the synchronous vision solve below, not after —
+        // so its timestamp sits at this frame's capture time and any rotation that happens while
+        // track() is running isn't silently dropped from the first bridged pose that follows a
+        // fresh lock. Only committed if this frame's tracking actually succeeds.
+        val pendingReference = bridge.captureReferenceCandidate(rotationDeg)
         val visionPose = tracker.track(frameBitmap, fx, fy, cx, cy)
         if (visionPose != null) {
             lastGoodPose = visionPose
-            bridge.markReference()
+            pendingReference?.let(bridge::commitReference)
             return visionPose
         }
 
@@ -84,7 +91,7 @@ class BridgedHomographyTracker(
         // phone hasn't actually moved (see GyroOrientationBridge's class doc). `t' = ΔR · t` is
         // the correct way to carry the (unmoved) camera centre through a known rotation; it is
         // still not a translation ESTIMATE — no accelerometer, no new displacement assumed.
-        val deltaCamera = bridge.cameraRotationDelta(rotationDeg)
+        val deltaCamera = bridge.cameraRotationDelta()
             ?: return null // no sensor sample yet — nothing to bridge with.
         val heldRotation = rowMajorRotationOf(held.viewMatrix)
         val heldTranslation = translationOf(held.viewMatrix)
