@@ -35,6 +35,7 @@ class DashboardViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         repository = mockk(relaxed = true)
+        every { repository.currentProject } returns kotlinx.coroutines.flow.MutableStateFlow<GraffitiProject?>(null)
         viewModel = DashboardViewModel(repository)
 
         // The failure paths in openProject/importProject log via android.util.Log, which isn't
@@ -48,6 +49,33 @@ class DashboardViewModelTest {
     fun tearDown() {
         Dispatchers.resetMain()
         unmockkStatic(android.util.Log::class)
+    }
+
+    @Test
+    fun `create navigates only after persistence succeeds`() = runTest {
+        coEvery { repository.createProject("Mural") } returns GraffitiProject(name = "Mural")
+        viewModel.onNewProjectTriggered()
+        viewModel.onCreateProject("Mural")
+        assertNull(viewModel.navigationTrigger.value)
+        assertTrue(viewModel.uiState.value.showNewProjectDialog)
+        advanceUntilIdle()
+        assertEquals(DashboardViewModel.DESTINATION_EDITOR, viewModel.navigationTrigger.value)
+        assertFalse(viewModel.uiState.value.showNewProjectDialog)
+    }
+
+    @Test
+    fun `failed create keeps dialog open and permits retry without navigating`() = runTest {
+        coEvery { repository.createProject("Mural") } throws java.io.IOException("Disk full")
+        viewModel.onNewProjectTriggered()
+        viewModel.onCreateProject("Mural")
+        advanceUntilIdle()
+        assertNull(viewModel.navigationTrigger.value)
+        assertTrue(viewModel.uiState.value.showNewProjectDialog)
+        assertFalse(viewModel.uiState.value.isCreatingProject)
+        coEvery { repository.createProject("Mural") } returns GraffitiProject(name = "Mural")
+        viewModel.onCreateProject("Mural")
+        advanceUntilIdle()
+        assertEquals(DashboardViewModel.DESTINATION_EDITOR, viewModel.navigationTrigger.value)
     }
 
     @Test

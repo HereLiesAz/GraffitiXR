@@ -124,10 +124,15 @@ internal object EditorReducer {
         EditorIntent.BeginGesture -> state.copy(gestureInProgress = true, activePanel = EditorPanel.NONE)
         is EditorIntent.RestoreDesign -> state.copy(design = intent.design, transformStash = null)
         is EditorIntent.LoadedProject ->
-            state.copy(projectId = intent.projectId, design = intent.design, transformStash = null)
+            state.copy(projectId = intent.projectId, design = intent.design, transformStash = null,
+                backgroundBitmap = null, pendingReplaceUri = null, isLoading = false, activePanel = EditorPanel.NONE)
         EditorIntent.ClearProject -> state.copy(
             projectId = null,
             design = null,
+            modeAdjustments = emptyMap(),
+            pendingReplaceUri = null,
+            isLoading = false,
+            activePanel = EditorPanel.NONE,
             backgroundBitmap = null,
             transformStash = null,
         )

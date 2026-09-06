@@ -6,6 +6,7 @@ import com.hereliesaz.graffitixr.data.ProjectManager
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -17,6 +18,43 @@ import java.util.concurrent.CyclicBarrier
 class ProjectRepositoryImplTest {
 
     private val testDispatcher = StandardTestDispatcher()
+
+    @Test
+    fun `failed persistence leaves the previously saved state intact`() = runTest {
+        val manager = mockk<ProjectManager>(relaxed = true)
+        val context = mockk<Context>(relaxed = true)
+        val repo = ProjectRepositoryImpl(context, manager)
+        repo.createProject(GraffitiProject(id = "saved", name = "Original"))
+        coEvery { manager.saveProject(context, any(), any(), any()) } throws java.io.IOException("Full")
+        try {
+            repo.updateProject { it.copy(name = "Unsaved") }
+            org.junit.Assert.fail("Expected save failure")
+        } catch (_: java.io.IOException) { }
+        assertEquals("Original", repo.currentProject.value?.name)
+    }
+
+    @Test
+    fun `deletion waits for an active save and does not resurrect the project`() = runTest {
+        val manager = mockk<ProjectManager>(relaxed = true)
+        val context = mockk<Context>(relaxed = true)
+        val repo = ProjectRepositoryImpl(context, manager)
+        repo.createProject(GraffitiProject(id = "saved"))
+        val started = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val finish = kotlinx.coroutines.CompletableDeferred<Unit>()
+        coEvery { manager.saveProject(context, any(), any(), any()) } coAnswers {
+            started.complete(Unit)
+            finish.await()
+        }
+        val save = async { repo.updateProject { it.copy(name = "Updated") } }
+        started.await()
+        val delete = async { repo.deleteProject("saved") }
+        testScheduler.runCurrent()
+        coVerify(exactly = 0) { manager.deleteProject(context, "saved") }
+        finish.complete(Unit)
+        save.await()
+        delete.await()
+        assertEquals(null, repo.currentProject.value)
+    }
 
     @Test
     fun `createProject by name adds to state and calls manager`() = runTest(testDispatcher) {

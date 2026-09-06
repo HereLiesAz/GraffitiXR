@@ -68,6 +68,28 @@ class ProjectManagerTest {
     }
 
     @Test
+    fun `importing the same id preserves the existing project`() = runTest {
+        manager.saveProject(mockContext, GraffitiProject(id = "same", name = "Current work"))
+        val imported = importZip(zipOf("project.json" to projectJson("same")))
+        assertTrue(imported != null && imported.id != "same")
+        assertEquals("Current work", manager.loadProjectMetadata(mockContext, "same")?.name)
+        assertTrue(File(tempFilesDir, "projects/${imported!!.id}/project.json").exists())
+    }
+
+    @Test
+    fun `import rewrites sender image paths to local project assets`() = runTest {
+        every { Uri.parse(any()) } answers {
+            val raw = firstArg<String>()
+            mockk<Uri> { every { path } returns raw.removePrefix("file://"); every { toString() } returns raw }
+        }
+        every { uriProvider.getUriForFile(any()) } answers { Uri.parse("file://${firstArg<File>().absolutePath}") }
+        val manifest = """{"id":"portable","name":"Wall","design":{"uri":"file:///sender/files/projects/portable/design.png"}}""".toByteArray()
+        val imported = importZip(zipOf("project.json" to manifest, "design.png" to byteArrayOf(1, 2)))
+        assertEquals(File(tempFilesDir, "projects/portable/design.png").absolutePath, imported?.design?.uri?.path)
+        assertEquals(imported?.design?.uri.toString(), manager.loadProjectMetadata(mockContext, "portable")?.design?.uri.toString())
+    }
+
+    @Test
     fun `getProjectList returns empty list when directory is missing or empty`() = runTest {
         val list = manager.getProjectList(mockContext)
         assertTrue(list.isEmpty())

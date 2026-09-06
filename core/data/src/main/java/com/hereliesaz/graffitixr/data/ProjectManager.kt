@@ -163,15 +163,12 @@ class ProjectManager @Inject constructor(
      * project.json that would fail to parse and silently drop the project on next load.
      */
     private fun atomicWriteText(target: File, text: String) {
-        val tmp = File(target.parentFile, "${target.name}.tmp")
-        tmp.writeText(text)
-        if (!tmp.renameTo(target)) {
-            // Some filesystems won't rename onto an existing file; replace explicitly.
-            target.delete()
-            if (!tmp.renameTo(target)) {
-                target.writeText(text)
-                tmp.delete()
-            }
+        val tmp = File.createTempFile("${target.name}.", ".tmp", target.parentFile)
+        try {
+            tmp.writeText(text)
+            check(tmp.renameTo(target)) { "Could not replace ${target.name}" }
+        } finally {
+            tmp.delete()
         }
     }
 
@@ -418,37 +415,58 @@ class ProjectManager @Inject constructor(
                         Log.e("ProjectManager", "Import rejected: unsafe project id")
                         return@use null
                     }
-                    val destDir = File(context.filesDir, "projects/${project.id}").also { it.mkdirs() }
-
-                    for ((name, tmpFile) in extractedFiles) {
-                        // Zip-Slip guard: entry names are attacker-controlled and may contain
-                        // ".." components that escape destDir.
-                        val dest = resolveInside(destDir, name)
-                        if (dest == null) {
-                            Log.w("ProjectManager", "Skipping zip entry escaping project dir: $name")
-                            tmpFile.delete()
-                            continue
-                        }
-                        dest.parentFile?.mkdirs()
-                        // renameTo can silently fail across filesystems (cache vs files dir) or when
-                        // the destination exists — fall back to an explicit copy so an imported
-                        // project is never left with missing files.
-                        if (dest.exists()) dest.delete()
-                        if (!tmpFile.renameTo(dest)) {
+                    // An import is a new library entry when this id already exists. Never
+                    // overwrite a working mural with an older shared/archive copy.
+                    val importedId = if (File(context.filesDir, "projects/${project.id}").exists())
+                        java.util.UUID.randomUUID().toString() else project.id
+                    val destDir = File(context.filesDir, "projects/$importedId")
+                    check(destDir.mkdirs()) { "Could not create import directory" }
+                    try {
+                        for ((name, tmpFile) in extractedFiles) {
+                            val dest = resolveInside(destDir, name) ?: continue
+                            dest.parentFile?.mkdirs()
                             tmpFile.copyTo(dest, overwrite = true)
-                            tmpFile.delete()
                         }
+                        val imported = relocateProjectFiles(project, destDir).copy(id = importedId)
+                        atomicWriteText(File(destDir, "project.json"), json.encodeToString(imported))
+                        imported
+                    } catch (e: Exception) {
+                        destDir.deleteRecursively()
+                        throw e
                     }
-
-                    project
                 }
             }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Log.e("ProjectManager", "Import failed", e)
             null
         } finally {
             // Temp files are only renamed away on the success path; clear any stragglers.
             extractedFiles.values.forEach { if (it.exists()) it.delete() }
+        }
+    }
+
+    private fun relocateProjectFiles(project: GraffitiProject, root: File): GraffitiProject {
+        fun localPath(path: String): File {
+            val marker = "/projects/${project.id}/"
+            val relative = if (marker in path) path.substringAfter(marker) else path.substringAfterLast('/')
+            return resolveInside(root, relative)?.takeIf { it.isFile }
+                ?: error("Archive is missing project asset: $relative")
+        }
+        fun localUri(uri: Uri?): Uri? = uri?.let {
+            uriProvider.getUriForFile(localPath(it.path ?: it.toString()))
+        }
+        return migrateInMemory(project).let { migrated ->
+            migrated.copy(
+                design = migrated.design?.let { it.copy(uri = localUri(it.uri)!!) },
+                backgroundImageUri = localUri(migrated.backgroundImageUri),
+                overlayImageUri = localUri(migrated.overlayImageUri),
+                originalOverlayImageUri = localUri(migrated.originalOverlayImageUri),
+                thumbnailUri = localUri(migrated.thumbnailUri),
+                targetImageUris = migrated.targetImageUris.map { localUri(it)!! },
+                evolutionImageUris = migrated.evolutionImageUris.map { localUri(it)!! },
+                targetFingerprintPath = migrated.targetFingerprintPath?.let { localPath(it).absolutePath },
+            )
         }
     }
 
@@ -587,7 +605,7 @@ class ProjectManager @Inject constructor(
                 }
 
                 withContext(Dispatchers.Main) {
-                    projectRepositoryProvider.get().createProject(project)
+                    projectRepositoryProvider.get().createProject(relocateProjectFiles(project, destDir))
                 }
             }
         } catch (e: Exception) {

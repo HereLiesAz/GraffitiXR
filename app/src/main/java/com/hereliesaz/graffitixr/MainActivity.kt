@@ -197,6 +197,7 @@ class MainActivity : ComponentActivity() {
     private val mainViewModel: MainViewModel by viewModels()
 
     var showSaveDialog by mutableStateOf(false)
+    private var isSavingProject by mutableStateOf(false)
     var showSettings by mutableStateOf(false)
     var hasCameraPermission by mutableStateOf(false)
     var isExporting by mutableStateOf(false)
@@ -493,6 +494,15 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                LaunchedEffect(dashboardUiState.showNewProjectDialog) {
+                    if (dashboardUiState.showNewProjectDialog) showSettings = false
+                }
+                LaunchedEffect(dashboardUiState.projectErrorMessage) {
+                    dashboardUiState.projectErrorMessage?.let {
+                        Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+                        dashboardViewModel.dismissProjectError()
+                    }
+                }
                 LaunchedEffect(dashboardNavigation) {
                     dashboardNavigation?.let { destination ->
                         when (destination) {
@@ -503,9 +513,12 @@ class MainActivity : ComponentActivity() {
                             // Fired only after openProject's load actually succeeds — see the comment
                             // at the ProjectLibraryScreen call site. A failed load never reaches here,
                             // so the editor is never entered without a real loaded project.
-                            DashboardViewModel.DESTINATION_EDITOR -> navController.navigate(EditorMode.DESIGN.name) {
-                                popUpTo(LIBRARY_ROUTE) { inclusive = true }
-                                launchSingleTop = true
+                            DashboardViewModel.DESTINATION_EDITOR -> {
+                                showSettings = false
+                                navController.navigate(EditorMode.DESIGN.name) {
+                                    popUpTo(LIBRARY_ROUTE) { inclusive = true }
+                                    launchSingleTop = true
+                                }
                             }
                         }
                         dashboardViewModel.onNavigationConsumed()
@@ -1603,15 +1616,28 @@ class MainActivity : ComponentActivity() {
                                     // re-saves under the same real name instead of clobbering it with
                                     // the UUID.
                                     initialName = dashboardUiState.currentProjectName ?: stringResource(DesignR.string.new_project_name),
-                                    onDismissRequest = { showSaveDialog = false },
+                                    onDismissRequest = { if (!isSavingProject) showSaveDialog = false },
+                                    isBusy = isSavingProject,
                                     onSaveRequest = { name ->
-                                        lifecycleScope.launch {
-                                            // saveMapBlocking() does native SLAM/feature-map writes; keep it off the
-                                            // main thread (it was ANR-ing on large maps). UI-state updates stay on main.
-                                            withContext(Dispatchers.IO) { arViewModel.saveMapBlocking() }
-                                            editorViewModel.saveProject(name)
-                                            dashboardViewModel.onProjectRenamed(name)
-                                            showSaveDialog = false
+                                        if (!isSavingProject) {
+                                            isSavingProject = true
+                                            lifecycleScope.launch {
+                                                try {
+                                                    withContext(Dispatchers.IO) { arViewModel.saveProjectWallMap() }
+                                                    editorViewModel.saveProject(name) { saved ->
+                                                        isSavingProject = false
+                                                        if (saved) {
+                                                            dashboardViewModel.onProjectRenamed(name)
+                                                            showSaveDialog = false
+                                                        }
+                                                    }
+                                                } catch (e: Exception) {
+                                                    isSavingProject = false
+                                                    if (e is kotlinx.coroutines.CancellationException) throw e
+                                                    android.util.Log.e("MainActivity", "Failed to save wall map", e)
+                                                    Toast.makeText(this@MainActivity, "Couldn't save the project", Toast.LENGTH_LONG).show()
+                                                }
+                                            }
                                         }
                                     },
                                     strings = strings
@@ -1622,19 +1648,9 @@ class MainActivity : ComponentActivity() {
                                 SaveProjectDialog(
                                     initialName = stringResource(DesignR.string.new_project_name),
                                     onDismissRequest = { dashboardViewModel.dismissNewProjectDialog() },
+                                    isBusy = dashboardUiState.isCreatingProject,
                                     onSaveRequest = { name ->
-                                        // The dialog stays visible across the async create (it only
-                                        // dismisses once onCreateProject's coroutine finishes), so a
-                                        // second tap here while the first create is still in flight
-                                        // would otherwise spawn a duplicate project. onCreateProject
-                                        // itself now guards on DashboardUiState.isCreatingProject and
-                                        // no-ops on a re-entrant call, so this can be tapped repeatedly
-                                        // without side effects beyond the first.
                                         dashboardViewModel.onCreateProject(name)
-                                        navController.navigate(EditorMode.DESIGN.name) {
-                                            popUpTo(LIBRARY_ROUTE) { inclusive = true }
-                                            launchSingleTop = true
-                                        }
                                     },
                                     strings = strings
                                 )
@@ -1694,7 +1710,11 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
 
-                            if (showSettings) {
+                            if (showSettings && !showSaveDialog && !dashboardUiState.showNewProjectDialog) {
+                                androidx.compose.ui.window.Dialog(
+                                    onDismissRequest = { showSettings = false },
+                                    properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+                                ) {
                                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
                                 SettingsScreen(
                                     currentVersion = BuildConfig.VERSION_NAME,
@@ -1750,6 +1770,7 @@ class MainActivity : ComponentActivity() {
                                     onClose = { showSettings = false },
                                     strings = strings
                                 )
+                                }
                             }
 
                             if (hostQr != null && coopState is CoopSessionState.WaitingForGuest) {
@@ -2119,6 +2140,7 @@ class MainActivity : ComponentActivity() {
                 dashboardViewModel.onNewProjectTriggered()
             }
             azRailSubItem(id = "proj.save", hostId = "host.project", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE) {
+                showSettings = false
                 showSaveDialog = true
             }
             azRailSubItem(id = "proj.export", hostId = "host.project", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE) {

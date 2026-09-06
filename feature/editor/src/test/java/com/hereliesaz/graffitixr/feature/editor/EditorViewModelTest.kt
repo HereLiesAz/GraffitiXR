@@ -1,6 +1,8 @@
 package com.hereliesaz.graffitixr.feature.editor
 
 import android.content.ContentResolver
+import com.hereliesaz.graffitixr.common.model.OverlayLayer
+import com.hereliesaz.graffitixr.common.util.ImageUtils
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -147,6 +149,62 @@ class EditorViewModelTest {
     }
 
     @Test
+    fun `switching projects cancels an old image decode`() = runTest {
+        val oldUri = Uri.parse("file://old.png")
+        val gate = kotlinx.coroutines.CompletableDeferred<Bitmap?>()
+        coEvery { ImageUtils.loadBitmapAsync(context, oldUri, any()) } coAnswers { gate.await() }
+        currentProjectFlow.value = GraffitiProject(id = "old", design = OverlayLayer(uri = oldUri))
+        testDispatcher.scheduler.runCurrent()
+        currentProjectFlow.value = GraffitiProject(id = "new")
+        testDispatcher.scheduler.runCurrent()
+        gate.complete(mockk(relaxed = true))
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals("new", viewModel.uiState.value.projectId)
+        assertNull(viewModel.uiState.value.design)
+    }
+
+    @Test
+    fun `switching to a project without a wall clears the old background`() = runTest {
+        viewModel.setBackgroundImage(Uri.parse("content://wall"))
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertNotNull(viewModel.uiState.value.backgroundBitmap)
+        currentProjectFlow.value = GraffitiProject(id = "empty")
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.backgroundBitmap)
+    }
+
+    @Test
+    fun `clearing wall cancels an unfinished wall import`() = runTest {
+        val gate = kotlinx.coroutines.CompletableDeferred<Bitmap?>()
+        coEvery { ImageUtils.loadBitmapAsync(any(), any(), any()) } coAnswers { gate.await() }
+        viewModel.setBackgroundImage(Uri.parse("content://wall"))
+        testDispatcher.scheduler.runCurrent()
+        viewModel.clearBackgroundImage()
+        gate.complete(mockk(relaxed = true))
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.backgroundBitmap)
+        org.junit.Assert.assertFalse(viewModel.uiState.value.isLoading)
+    }
+
+    @Test
+    fun `undo replacement decodes the original image`() = runTest {
+        coEvery { projectRepository.saveArtifact(any(), any(), any()) } answers {
+            "/path/" + secondArg<String>()
+        }
+        addDesign()
+        val original = viewModel.uiState.value.design!!
+        val originalBitmap = mockk<Bitmap>(relaxed = true)
+        coEvery { ImageUtils.loadBitmapAsync(context, original.uri, any()) } returns originalBitmap
+        viewModel.onAddLayer(Uri.parse("content://replacement"))
+        viewModel.confirmReplaceDesign()
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.onUndoClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(original.uri, viewModel.uiState.value.design?.uri)
+        org.junit.Assert.assertSame(originalBitmap, viewModel.uiState.value.design?.bitmap)
+    }
+
+    @Test
     fun `initial state is correct`() {
         val state = viewModel.uiState.value
         assertEquals(EditorMode.AR, state.editorMode)
@@ -238,6 +296,18 @@ class EditorViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         coVerify { projectRepository.createProject(any<GraffitiProject>()) }
+    }
+
+    @Test
+    fun `explicit save completes after persistence without exporting`() = runTest {
+        addDesign()
+        var saved = false
+        viewModel.saveProject("Mural") { saved = it }
+        org.junit.Assert.assertFalse(saved)
+        testDispatcher.scheduler.advanceUntilIdle()
+        org.junit.Assert.assertTrue(saved)
+        coVerify { projectRepository.updateProject(any<(GraffitiProject) -> GraffitiProject>()) }
+        io.mockk.verify(exactly = 0) { projectManager.exportProjectToUri(any(), any(), any()) }
     }
 
     @Test
