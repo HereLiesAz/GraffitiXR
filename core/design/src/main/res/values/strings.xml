@@ -470,6 +470,7 @@
     <string name="scan_hint_build_map">Walk left and right to build map</string>
     <string name="scan_hint_closer">Move closer to the wall</string>
     <string name="scan_hint_higher_lower">Scan higher and lower</string>
+    <string name="reacquiring_target">Reacquiring target…</string>
 
     <!-- Content Descriptions -->
     <string name="desc_bg_mockup">Background Mockup</string>
