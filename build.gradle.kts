@@ -11,7 +11,7 @@ buildscript {
         "org.bitbucket.b_c:jose4j:0.9.6",
         "org.apache.commons:commons-lang3:3.20.0",
         "org.apache.httpcomponents:httpclient:4.5.14",
-        "com.google.guava:guava:33.6.0-jre",
+        "com.google.guava:guava:33.7.1-jre",
         // play-services-base 18.10.1 (see libs.versions.toml) itself depends on
         // play-services-basement 18.11.0 (confirmed against its published POM) -- forcing
         // basement below that strips classes base's own obfuscated internals reference
