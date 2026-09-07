@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - '.github/workflows/fix-mainactivity-context.yml'
+  workflow_dispatch:
 
 permissions:
   contents: write
