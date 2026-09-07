@@ -1,0 +1,49 @@
+name: Apply MainActivity context fix
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-mainactivity-context.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Apply compile fix
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt')
+          s = p.read_text()
+          old = '''                LaunchedEffect(dashboardUiState.projectErrorMessage) {
+                    dashboardUiState.projectErrorMessage?.let {
+                        Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+                        dashboardViewModel.dismissProjectError()
+                    }
+                }'''
+          new = '''                LaunchedEffect(dashboardUiState.projectErrorMessage) {
+                    dashboardUiState.projectErrorMessage?.let {
+                        Toast.makeText(shareToastContext, it, Toast.LENGTH_LONG).show()
+                        dashboardViewModel.dismissProjectError()
+                    }
+                }'''
+          if old not in s:
+              raise SystemExit('Expected MainActivity block not found; refusing broad replacement')
+          p.write_text(s.replace(old, new, 1))
+          PY
+      - name: Remove one-shot workflow and commit
+        shell: bash
+        run: |
+          rm .github/workflows/fix-mainactivity-context.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt .github/workflows/fix-mainactivity-context.yml
+          git commit -m 'fix: use scoped context for project error toast'
+          git push
