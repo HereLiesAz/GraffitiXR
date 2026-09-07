@@ -499,7 +499,7 @@ class MainActivity : ComponentActivity() {
                 }
                 LaunchedEffect(dashboardUiState.projectErrorMessage) {
                     dashboardUiState.projectErrorMessage?.let {
-                        Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+                        Toast.makeText(shareToastContext, it, Toast.LENGTH_LONG).show()
                         dashboardViewModel.dismissProjectError()
                     }
                 }
