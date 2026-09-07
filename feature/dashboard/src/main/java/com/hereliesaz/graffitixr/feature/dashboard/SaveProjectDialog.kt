@@ -1,11 +1,13 @@
 package com.hereliesaz.graffitixr.feature.dashboard
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,45 +31,57 @@ fun SaveProjectDialog(
     strings: AppStrings,
     isBusy: Boolean = false
 ) {
-    // Force re-initialization if initialName changes, ensuring the field is editable
-    // and correctly populated when the dialog appears.
     var name by remember(initialName) { mutableStateOf(initialName) }
 
     Dialog(
         onDismissRequest = { if (!isBusy) onDismissRequest() },
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = !isBusy,
+            dismissOnClickOutside = !isBusy,
+        )
     ) {
+        // A real modal scrim. The old implementation used a full-screen clickable Box as a
+        // home-grown outside-click detector. During the create -> navigate transition that left
+        // AzNavRail/Settings visually and interactively entangled with the project dialog. Android's
+        // Dialog window already owns outside/back dismissal, so there is no reason for a second
+        // pointer surface here.
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .clickable(
-                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                    indication = null
-                ) { if (!isBusy) onDismissRequest() },
+                .background(Color.Black.copy(alpha = 0.72f)),
             contentAlignment = Alignment.Center
         ) {
             Box(
                 modifier = Modifier
                     .wrapContentSize()
                     .padding(24.dp)
-                    .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        indication = null
-                    ) { } // prevent dismissing when clicking content
+                    .background(Color(0xFF101010), RoundedCornerShape(8.dp))
+                    .padding(16.dp)
             ) {
                 AzTextBox(
                     value = name,
                     enabled = !isBusy,
                     onValueChange = { name = it },
                     hint = strings.editor.saveProjectHint,
-                    // Bring back the Hot Pink outline (default)
                     onSubmit = { text ->
                         if (!isBusy && text.isNotBlank()) {
                             onSaveRequest(text.trim())
                         }
                     },
                     submitButtonContent = {
-                        Text(strings.common.save, color = Color.White)
+                        if (isBusy) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.padding(end = 8.dp),
+                                    strokeWidth = 2.dp,
+                                    color = Color.White,
+                                )
+                                Text("SAVING", color = Color.White)
+                            }
+                        } else {
+                            Text(strings.common.save, color = Color.White)
+                        }
                     }
                 )
             }
