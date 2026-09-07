@@ -23,20 +23,11 @@ jobs:
           from pathlib import Path
           p = Path('app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt')
           s = p.read_text()
-          old = '''                LaunchedEffect(dashboardUiState.projectErrorMessage) {
-                    dashboardUiState.projectErrorMessage?.let {
-                        Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-                        dashboardViewModel.dismissProjectError()
-                    }
-                }'''
-          new = '''                LaunchedEffect(dashboardUiState.projectErrorMessage) {
-                    dashboardUiState.projectErrorMessage?.let {
-                        Toast.makeText(shareToastContext, it, Toast.LENGTH_LONG).show()
-                        dashboardViewModel.dismissProjectError()
-                    }
-                }'''
-          if old not in s:
-              raise SystemExit('Expected MainActivity block not found; refusing broad replacement')
+          old = 'Toast.makeText(context, it, Toast.LENGTH_LONG).show()'
+          new = 'Toast.makeText(shareToastContext, it, Toast.LENGTH_LONG).show()'
+          count = s.count(old)
+          if count != 1:
+              raise SystemExit(f'Expected exactly one project-error toast context call, found {count}')
           p.write_text(s.replace(old, new, 1))
           PY
       - name: Remove one-shot workflow and commit
