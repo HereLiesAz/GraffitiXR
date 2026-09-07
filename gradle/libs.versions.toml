@@ -3,7 +3,7 @@
 activityCompose = "1.13.0"
 agp = "9.4.0"
 appcompat = "1.8.0"
-arcore = "1.54.0"
+arcore = "1.56.0"
 azNavRail = "11.45"
 camerax = "1.6.1"
 coil = "2.7.0"
