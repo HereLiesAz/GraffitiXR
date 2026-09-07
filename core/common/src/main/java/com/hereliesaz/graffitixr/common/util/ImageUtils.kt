@@ -39,10 +39,11 @@ object ImageUtils {
      * falls back to MediaStore on older versions.
      *
      * @param context Application context.
-     * @param uri The URI of the image to load.
-     * @return The loaded [Bitmap], or null if loading failed.
+     * @param uri The URI of the image to load. Null means there is no image to load.
+     * @return The loaded [Bitmap], or null if no URI was supplied or loading failed.
      */
-    suspend fun loadBitmapAsync(context: Context, uri: Uri, maxDimension: Int? = null): Bitmap? {
+    suspend fun loadBitmapAsync(context: Context, uri: Uri?, maxDimension: Int? = null): Bitmap? {
+        if (uri == null) return null
         return withContext(Dispatchers.IO) {
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
