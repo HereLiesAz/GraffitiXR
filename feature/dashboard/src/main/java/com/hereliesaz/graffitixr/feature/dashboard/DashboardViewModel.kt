@@ -26,6 +26,9 @@ class DashboardViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
+    private val _navigationTrigger = MutableStateFlow<String?>(null)
+    val navigationTrigger: StateFlow<String?> = _navigationTrigger.asStateFlow()
+
     private var openProjectJob: Job? = null
 
     init {
@@ -67,6 +70,7 @@ class DashboardViewModel @Inject constructor(
             result.onSuccess {
                 _uiState.update { it.copy(currentProjectId = project.id, currentProjectName = project.name) }
                 onOpened()
+                _navigationTrigger.value = DESTINATION_EDITOR
             }.onFailure { e ->
                 android.util.Log.e("DashboardViewModel", "Failed to open project ${project.id}", e)
                 _uiState.update { it.copy(projectErrorMessage = "Couldn't open this project.") }
@@ -104,6 +108,7 @@ class DashboardViewModel @Inject constructor(
                 val p = repository.createProject(name)
                 _uiState.update { it.copy(currentProjectId = p.id, currentProjectName = p.name, showNewProjectDialog = false) }
                 onCreated()
+                _navigationTrigger.value = DESTINATION_EDITOR
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 android.util.Log.e("DashboardViewModel", "Failed to create project", e)
@@ -157,6 +162,10 @@ class DashboardViewModel @Inject constructor(
                 _uiState.update { it.copy(projectErrorMessage = "Couldn't delete this project.") }
             }
         }
+    }
+
+    fun onNavigationConsumed() {
+        _navigationTrigger.value = null
     }
 
     fun checkForUpdates(currentVersion: String) {
@@ -233,6 +242,7 @@ class DashboardViewModel @Inject constructor(
     internal data class GitHubRelease(val tagName: String, val htmlUrl: String)
 
     companion object {
+        const val DESTINATION_EDITOR = "editor"
         internal const val IMPORT_FAILURE_MESSAGE =
             "Couldn't import project — the file may be corrupt or in an unsupported format."
     }
