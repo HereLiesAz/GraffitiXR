@@ -1,0 +1,46 @@
+name: Remove Sept 4 Share Wall path
+on:
+  push:
+    paths:
+      - '.github/workflows/remove-sept4-share-path.yml'
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Remove post-Sept-4 share chooser path and Share Wall rail action
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          main = Path('app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt')
+          s = main.read_text()
+          pattern = re.compile(r'''\n\s*// Distinct from "proj\.export".*?\n\s*azRailSubItem\(id = "proj\.share".*?\n\s*editorViewModel\.shareProject\(\)\n\s*\}\n''', re.S)
+          s2, n = pattern.subn('\n', s, count=1)
+          if n != 1:
+              raise SystemExit(f'Expected one proj.share block, found {n}')
+          main.write_text(s2)
+
+          screen = Path('app/src/main/java/com/hereliesaz/graffitixr/MainScreen.kt')
+          s = screen.read_text()
+          pattern = re.compile(r'''\n\s*// "Share this wall".*?\n\s*LaunchedEffect\(uiState\.shareProjectUri\) \{.*?\n\s*\}\n\n''', re.S)
+          s2, n = pattern.subn('\n', s, count=1)
+          if n != 1:
+              raise SystemExit(f'Expected one shareProjectUri chooser effect, found {n}')
+          screen.write_text(s2)
+          PY
+          git diff --check
+          ! grep -q 'id = "proj.share"' app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt
+          ! grep -q 'createChooser(send, "Share this wall")' app/src/main/java/com/hereliesaz/graffitixr/MainScreen.kt
+      - name: Commit repair
+        run: |
+          git config user.name "Az"
+          git config user.email "103241502+HereLiesAz@users.noreply.github.com"
+          git add app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt app/src/main/java/com/hereliesaz/graffitixr/MainScreen.kt
+          git commit -m "Restore pre-Sept-4 project action wiring"
+          git push
