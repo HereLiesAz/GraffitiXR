@@ -1,0 +1,70 @@
+name: Apply AzNavRail MainActivity routing
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-aznavrail-mainactivity-routing.yml'
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch actual current MainActivity callbacks
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt')
+          s=p.read_text()
+
+          s=s.replace('                val dashboardUiState by dashboardViewModel.uiState.collectAsState()\n                val dashboardNavigation by dashboardViewModel.navigationTrigger.collectAsState()\n                val language by settingsViewModel.language.collectAsState()',
+                      '                val dashboardUiState by dashboardViewModel.uiState.collectAsState()\n                val language by settingsViewModel.language.collectAsState()',1)
+
+          start=s.find('                LaunchedEffect(dashboardNavigation) {')
+          marker='\n\n                LaunchedEffect(navController) {'
+          end=s.find(marker,start)
+          if start < 0 or end < 0: raise SystemExit('dashboard navigation bridge not found')
+          s=s[:start]+s[end+2:]
+
+          old='''                                            dashboardViewModel.openProject(project)
+          '''
+          new='''                                            dashboardViewModel.openProject(project) {
+                                                showSettings = false
+                                                navController.navigate(EditorMode.DESIGN.name) {
+                                                    popUpTo(LIBRARY_ROUTE) { inclusive = true }
+                                                    launchSingleTop = true
+                                                }
+                                            }
+          '''
+          if old not in s: raise SystemExit('actual onLoadProject call not found')
+          s=s.replace(old,new,1)
+
+          old='''                                    onSaveRequest = { name ->
+                                        dashboardViewModel.onCreateProject(name)
+                                    },'''
+          new='''                                    onSaveRequest = { name ->
+                                        dashboardViewModel.onCreateProject(name) {
+                                            showSettings = false
+                                            navController.navigate(EditorMode.DESIGN.name) {
+                                                popUpTo(LIBRARY_ROUTE) { inclusive = true }
+                                                launchSingleTop = true
+                                            }
+                                        }
+                                    },'''
+          if old not in s: raise SystemExit('actual new project callback not found')
+          s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+          git diff --check
+          ! grep -q 'dashboardNavigation' app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt
+          grep -q 'dashboardViewModel.openProject(project) {' app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt
+          grep -q 'dashboardViewModel.onCreateProject(name) {' app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt
+      - name: Commit
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt
+          git commit -m 'Route project create and open through AzNavRail host controller'
+          git push origin HEAD:main
