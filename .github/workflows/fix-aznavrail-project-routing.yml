@@ -1,0 +1,85 @@
+name: Fix AzNavRail project routing
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-aznavrail-project-routing.yml'
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Route project completion through the host NavController
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt')
+          s = p.read_text()
+
+          old = '''                val dashboardUiState by dashboardViewModel.uiState.collectAsState()\n                val dashboardNavigation by dashboardViewModel.navigationTrigger.collectAsState()\n                val language by settingsViewModel.language.collectAsState()'''
+          new = '''                val dashboardUiState by dashboardViewModel.uiState.collectAsState()\n                val language by settingsViewModel.language.collectAsState()'''
+          if old not in s:
+              raise SystemExit('dashboardNavigation state block not found')
+          s = s.replace(old, new, 1)
+
+          start = s.find('                LaunchedEffect(dashboardNavigation) {')
+          end_marker = '\n\n                LaunchedEffect(navController) {'
+          end = s.find(end_marker, start)
+          if start < 0 or end < 0:
+              raise SystemExit('legacy dashboard navigation effect not found')
+          s = s[:start] + s[end+2:]
+
+          p.write_text(s)
+          PY
+
+          # DashboardViewModel should report successful project selection/creation through callbacks;
+          # the Activity owns navigation because AzHostActivityLayout/AzNavHost own this controller.
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('feature/dashboard/src/main/java/com/hereliesaz/graffitixr/feature/dashboard/DashboardViewModel.kt')
+          s = p.read_text()
+          s = s.replace('''    private val _navigationTrigger = MutableStateFlow<String?>(null)\n    val navigationTrigger: StateFlow<String?> = _navigationTrigger.asStateFlow()\n\n''', '')
+          s = s.replace('fun openProject(project: GraffitiProject) {', 'fun openProject(project: GraffitiProject, onOpened: () -> Unit = {}) {', 1)
+          s = s.replace('''                    _uiState.update { it.copy(currentProjectId = project.id, currentProjectName = project.name) }\n                    _navigationTrigger.value = DESTINATION_EDITOR''', '''                    _uiState.update { it.copy(currentProjectId = project.id, currentProjectName = project.name) }\n                    onOpened()''', 1)
+          s = s.replace('fun onCreateProject(name: String) {', 'fun onCreateProject(name: String, onCreated: () -> Unit = {}) {', 1)
+          s = s.replace('''                _uiState.update { it.copy(currentProjectId = p.id, currentProjectName = p.name, showNewProjectDialog = false) }\n                _navigationTrigger.value = DESTINATION_EDITOR''', '''                _uiState.update { it.copy(currentProjectId = p.id, currentProjectName = p.name, showNewProjectDialog = false) }\n                onCreated()''', 1)
+          s = s.replace('''    fun onNavigationConsumed() { _navigationTrigger.value = null }\n\n''', '')
+          s = s.replace('''        /** [navigationTrigger] value that means "a project just finished loading, enter the editor". */\n        const val DESTINATION_EDITOR = "editor"\n''', '')
+          p.write_text(s)
+          PY
+
+          # Wire the two library-screen success callbacks to the SAME controller owned by AzHostActivityLayout.
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt')
+          s = p.read_text()
+
+          old = 'onOpenProject = { project -> dashboardViewModel.openProject(project) },'
+          new = '''onOpenProject = { project ->\n                                        dashboardViewModel.openProject(project) {\n                                            showSettings = false\n                                            navController.navigate(EditorMode.DESIGN.name) {\n                                                popUpTo(LIBRARY_ROUTE) { inclusive = true }\n                                                launchSingleTop = true\n                                            }\n                                        }\n                                    },'''
+          if old not in s:
+              raise SystemExit('ProjectLibraryScreen open callback not found')
+          s = s.replace(old, new, 1)
+
+          old = 'onSaveRequest = { name -> dashboardViewModel.onCreateProject(name) },'
+          new = '''onSaveRequest = { name ->\n                            dashboardViewModel.onCreateProject(name) {\n                                showSettings = false\n                                navController.navigate(EditorMode.DESIGN.name) {\n                                    popUpTo(LIBRARY_ROUTE) { inclusive = true }\n                                    launchSingleTop = true\n                                }\n                            }\n                        },'''
+          if old not in s:
+              raise SystemExit('new-project save callback not found')
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+
+          git diff --check
+          ! grep -q 'dashboardNavigation' app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt
+          ! grep -q '_navigationTrigger' feature/dashboard/src/main/java/com/hereliesaz/graffitixr/feature/dashboard/DashboardViewModel.kt
+          grep -q 'onCreateProject(name)' app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt
+      - name: Commit routing repair
+        run: |
+          git config user.name "Az"
+          git config user.email "103241502+HereLiesAz@users.noreply.github.com"
+          git add app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt feature/dashboard/src/main/java/com/hereliesaz/graffitixr/feature/dashboard/DashboardViewModel.kt
+          git commit -m "Route project lifecycle through AzNavRail host controller"
+          git push
