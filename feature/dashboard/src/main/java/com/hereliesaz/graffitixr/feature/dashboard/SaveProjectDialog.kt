@@ -29,6 +29,7 @@ fun SaveProjectDialog(
     strings: AppStrings,
     isBusy: Boolean = false
 ) {
+    // Project Save is persistence only. Sharing/exporting is never initiated by this dialog.
     // Force re-initialization if initialName changes, ensuring the field is editable
     // and correctly populated when the dialog appears.
     var name by remember(initialName) { mutableStateOf(initialName) }
