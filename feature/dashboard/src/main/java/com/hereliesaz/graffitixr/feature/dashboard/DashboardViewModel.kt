@@ -106,7 +106,7 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val p = repository.createProject(name)
-                _uiState.update { it.copy(currentProjectId = p.id, currentProjectName = p.name, showNewProjectDialog = false) }
+                _uiState.update { it.copy(currentProjectId = p.id, currentProjectName = p.name) }
                 onCreated()
                 _navigationTrigger.value = DESTINATION_EDITOR
             } catch (e: Exception) {
@@ -114,7 +114,7 @@ class DashboardViewModel @Inject constructor(
                 android.util.Log.e("DashboardViewModel", "Failed to create project", e)
                 _uiState.update { it.copy(projectErrorMessage = "Couldn't create the project. Check available storage and try again.") }
             } finally {
-                _uiState.update { it.copy(isCreatingProject = false) }
+                _uiState.update { it.copy(isCreatingProject = false, showNewProjectDialog = false) }
             }
             loadAvailableProjects()
         }
