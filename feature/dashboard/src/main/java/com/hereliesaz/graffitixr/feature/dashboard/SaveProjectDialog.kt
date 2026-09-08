@@ -16,6 +16,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.hereliesaz.graffitixr.design.theme.AppStrings
+import kotlinx.coroutines.delay
 
 @Composable
 fun SaveProjectDialog(
@@ -38,25 +40,38 @@ fun SaveProjectDialog(
     isBusy: Boolean = false
 ) {
     var name by remember(initialName) { mutableStateOf(initialName) }
+    var pendingSubmit by remember { mutableStateOf<String?>(null) }
+    val locallySubmitting = pendingSubmit != null
+    val busy = isBusy || locallySubmitting
 
     fun submit() {
         val trimmed = name.trim()
-        if (!isBusy && trimmed.isNotEmpty()) onSaveRequest(trimmed)
+        if (!busy && trimmed.isNotEmpty()) pendingSubmit = trimmed
+    }
+
+    // Do not dismiss the Dialog in the same input dispatch that clicked SAVE. AzNavRail lives in
+    // the activity window underneath this Dialog and handles its own pointer stream. If project
+    // creation completes quickly enough to remove the Dialog while that SAVE gesture is still being
+    // dispatched, the tail of the gesture can reach the rail: on real devices this has fired
+    // Project -> Share Wall and Project -> Export, opening the .gxr share sheet and also producing
+    // the "Image saved to gallery" toast. Keep the modal window alive beyond the gesture before
+    // handing creation/save to the caller. The local busy flag also makes a second tap impossible
+    // during that guard interval.
+    LaunchedEffect(pendingSubmit) {
+        val submittedName = pendingSubmit ?: return@LaunchedEffect
+        delay(250)
+        onSaveRequest(submittedName)
+        pendingSubmit = null
     }
 
     Dialog(
-        onDismissRequest = { if (!isBusy) onDismissRequest() },
+        onDismissRequest = { if (!busy) onDismissRequest() },
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
-            dismissOnBackPress = !isBusy,
-            dismissOnClickOutside = !isBusy,
+            dismissOnBackPress = !busy,
+            dismissOnClickOutside = !busy,
         )
     ) {
-        // Keep the entire dialog in Compose's modal window. Do not use AzTextBox here: its
-        // rail-oriented submit handling allowed the same pointer gesture to survive the dialog's
-        // create/dismiss transition and reach controls in the activity underneath. In practice a
-        // tap on SAVE could create the project and then activate Export, producing the misleading
-        // "Image saved to gallery" toast and leaving the user looking at Settings.
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -74,7 +89,7 @@ fun SaveProjectDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    enabled = !isBusy,
+                    enabled = !busy,
                     singleLine = true,
                     label = { Text(strings.editor.saveProjectHint) },
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
@@ -90,10 +105,10 @@ fun SaveProjectDialog(
                 ) {
                     Button(
                         onClick = { submit() },
-                        enabled = !isBusy && name.isNotBlank(),
+                        enabled = !busy && name.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        if (isBusy) {
+                        if (busy) {
                             CircularProgressIndicator(
                                 modifier = Modifier.padding(end = 8.dp),
                                 strokeWidth = 2.dp,
