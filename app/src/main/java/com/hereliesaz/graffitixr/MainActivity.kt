@@ -2149,13 +2149,6 @@ class MainActivity : ComponentActivity() {
                 // asynchronous captures). This handler just tells the caller "user pressed Export".
                 onExportRequested()
             }
-            // Distinct from "proj.export" (a screenshot of the mode's content) — this hands the
-            // project's .gxr, wall fingerprint included, to another person via a share sheet. See
-            // EditorViewModel.shareProject's doc: this is the same export Co-op's bulk sync already
-            // sends, just with an actual hand-off affordance instead of a silent Downloads copy.
-            azRailSubItem(id = "proj.share", hostId = "host.project", text = "Share Wall", color = navItemColor, shape = AzButtonShape.NONE) {
-                editorViewModel.shareProject()
-            }
             azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {
                 navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
             }
