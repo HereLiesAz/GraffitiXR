@@ -1,0 +1,141 @@
+name: Restore intertwined project save flow
+
+on:
+  push:
+    paths:
+      - '.github/workflows/restore-intertwined-save.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore historical save semantics
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          # 1. Restore the pre-Sept-4 AzNavRail save dialog exactly.
+          dialog = Path('feature/dashboard/src/main/java/com/hereliesaz/graffitixr/feature/dashboard/SaveProjectDialog.kt')
+          dialog.write_text('''package com.hereliesaz.graffitixr.feature.dashboard
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.hereliesaz.aznavrail.AzTextBox
+import com.hereliesaz.graffitixr.design.theme.AppStrings
+
+@Composable
+fun SaveProjectDialog(
+    initialName: String,
+    onDismissRequest: () -> Unit,
+    onSaveRequest: (String) -> Unit,
+    strings: AppStrings
+) {
+    var name by remember(initialName) { mutableStateOf(initialName) }
+
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null
+                ) { onDismissRequest() },
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .wrapContentSize()
+                    .padding(24.dp)
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null
+                    ) { }
+            ) {
+                AzTextBox(
+                    value = name,
+                    onValueChange = { name = it },
+                    hint = strings.editor.saveProjectHint,
+                    onSubmit = { text ->
+                        if (text.isNotBlank()) onSaveRequest(text)
+                    },
+                    submitButtonContent = {
+                        Text(strings.common.save, color = Color.White)
+                    }
+                )
+            }
+        }
+    }
+}
+''')
+
+          # 2. Its historical signature had no isBusy parameter.
+          main = Path('app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt')
+          text = main.read_text()
+          text = text.replace('''                                    isBusy = isSavingProject,\n''', '')
+          text = text.replace('''                                    isBusy = dashboardUiState.isCreatingProject,\n''', '')
+          main.write_text(text)
+
+          # 3. Restore the historical rule: an explicit named Save persists AND exports the .gxr.
+          # Keep the modern atomic/mutex persistence around it; only put the removed export back.
+          editor = Path('feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/EditorViewModel.kt')
+          text = editor.read_text()
+          marker = '''                        // Explicit Save persists the editable project; image export is a separate action.\n'''
+          replacement = '''                        // Historical intertwined Save behavior: autosaves (name == null) only persist,\n                        // while an explicit named Save also writes the editable .gxr to Downloads.\n                        if (name != null) {\n                            val savedProject = projectRepository.currentProject.value\n                                ?: error("Project disappeared after save")\n                            exportProjectInternal(savedProject)\n                        }\n'''
+          if text.count(marker) != 1:
+              raise SystemExit(f'Expected one explicit-save marker, found {text.count(marker)}')
+          text = text.replace(marker, replacement, 1)
+
+          insertion_marker = '''    /**\n     * Regenerates the project's preview thumbnail off the main thread, debounced so the rapid\n'''
+          export_fn = '''    private suspend fun exportProjectInternal(project: GraffitiProject) {\n        val filename = "${project.name.replace(" ", "_")}_export.gxr"\n        try {\n            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {\n                val contentValues = android.content.ContentValues().apply {\n                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, filename)\n                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/zip")\n                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)\n                }\n                val uri = context.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)\n                    ?: throw java.io.IOException("Failed to create MediaStore entry")\n                projectManager.exportProjectToUri(context, project.id, uri)\n                withContext(dispatchers.main) {\n                    Toast.makeText(context, "Project saved and exported to Downloads", Toast.LENGTH_SHORT).show()\n                }\n            } else {\n                val downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)\n                val file = File(downloadsDir, filename)\n                projectManager.exportProjectToUri(context, project.id, Uri.fromFile(file))\n                withContext(dispatchers.main) {\n                    Toast.makeText(context, "Project saved and exported to ${file.absolutePath}", Toast.LENGTH_LONG).show()\n                }\n            }\n        } catch (e: Exception) {\n            if (e is kotlinx.coroutines.CancellationException) throw e\n            withContext(dispatchers.main) {\n                Toast.makeText(context, "Project saved locally. Export failed: ${e.message}", Toast.LENGTH_LONG).show()\n            }\n        }\n    }\n\n'''
+          if 'private suspend fun exportProjectInternal(' not in text:
+              if text.count(insertion_marker) != 1:
+                  raise SystemExit(f'Expected one thumbnail marker, found {text.count(insertion_marker)}')
+              text = text.replace(insertion_marker, export_fn + insertion_marker, 1)
+          editor.write_text(text)
+          PY
+
+      - name: Verify restored semantics
+        run: |
+          grep -q 'com.hereliesaz.aznavrail.AzTextBox' feature/dashboard/src/main/java/com/hereliesaz/graffitixr/feature/dashboard/SaveProjectDialog.kt
+          grep -q 'if (name != null)' feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/EditorViewModel.kt
+          grep -q 'exportProjectInternal(savedProject)' feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/EditorViewModel.kt
+          grep -q 'Project saved and exported to Downloads' feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/EditorViewModel.kt
+          ! grep -q 'isBusy = isSavingProject' app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt
+          git diff --check
+
+      - name: Commit restored code
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt \
+                  feature/dashboard/src/main/java/com/hereliesaz/graffitixr/feature/dashboard/SaveProjectDialog.kt \
+                  feature/editor/src/main/java/com/hereliesaz/graffitixr/feature/editor/EditorViewModel.kt
+          git commit -m 'Restore intertwined AzNavRail project save behavior'
+          git push
