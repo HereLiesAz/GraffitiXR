@@ -37,7 +37,7 @@ class DefaultUriProvider @Inject constructor() : UriProvider {
 
 @Singleton
 class ProjectManager @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+    @param:ApplicationContext private val appContext: Context,
     private val uriProvider: UriProvider,
     private val projectRepositoryProvider: Provider<ProjectRepository>
 ) {
@@ -166,9 +166,12 @@ class ProjectManager @Inject constructor(
         val tmp = File.createTempFile("${target.name}.", ".tmp", target.parentFile)
         try {
             tmp.writeText(text)
-            check(tmp.renameTo(target)) { "Could not replace ${target.name}" }
+            // Some filesystems won't rename onto an existing file; fall back to a direct write.
+            if (!tmp.renameTo(target)) {
+                target.writeText(text)
+            }
         } finally {
-            tmp.delete()
+            if (tmp.exists()) tmp.delete()
         }
     }
 
@@ -237,6 +240,7 @@ class ProjectManager @Inject constructor(
             val project = json.decodeFromString<GraffitiProject>(jsonString)
             migrateInMemory(project)
         } catch (e: Exception) {
+            e.printStackTrace(System.err)
             Log.e("ProjectManager", "Failed to load project metadata", e)
             null
         }
@@ -385,7 +389,7 @@ class ProjectManager @Inject constructor(
                         val relativeName = if (name.contains('/')) name.substringAfter('/') else name
 
                         if (!entry.isDirectory && relativeName.isNotEmpty()) {
-                            val streamed = streamEntryBounded(zis, totalBytes, context.cacheDir)
+                            val streamed = streamEntryBounded(zis, totalBytes, appContext.cacheDir)
                             if (streamed == null) {
                                 Log.e("ProjectManager", "Import aborted: archive exceeds $MAX_IMPORT_BYTES bytes")
                                 return@use null
@@ -420,7 +424,8 @@ class ProjectManager @Inject constructor(
                     val importedId = if (File(context.filesDir, "projects/${project.id}").exists())
                         java.util.UUID.randomUUID().toString() else project.id
                     val destDir = File(context.filesDir, "projects/$importedId")
-                    check(destDir.mkdirs()) { "Could not create import directory" }
+                    destDir.mkdirs()
+                    check(destDir.isDirectory) { "Could not create import directory" }
                     try {
                         for ((name, tmpFile) in extractedFiles) {
                             val dest = resolveInside(destDir, name) ?: continue
@@ -438,6 +443,7 @@ class ProjectManager @Inject constructor(
             }
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
+            e.printStackTrace(System.err)
             Log.e("ProjectManager", "Import failed", e)
             null
         } finally {
@@ -531,7 +537,7 @@ class ProjectManager @Inject constructor(
      */
     fun serializeCurrentProject(): ByteArray {
         val project = projectRepositoryProvider.get().currentProject.value ?: return ByteArray(0)
-        val sourceFolder = File(context.filesDir, "projects/${project.id}")
+        val sourceFolder = File(appContext.filesDir, "projects/${project.id}")
         if (!sourceFolder.exists()) return ByteArray(0)
 
         return ByteArrayOutputStream().use { baos ->
@@ -563,7 +569,7 @@ class ProjectManager @Inject constructor(
                 while (entry != null) {
                     val name = entry.name
                     if (!entry.isDirectory && name.isNotEmpty()) {
-                        val streamed = streamEntryBounded(zis, totalBytes, context.cacheDir)
+                        val streamed = streamEntryBounded(zis, totalBytes, appContext.cacheDir)
                         if (streamed == null) {
                             Log.e("ProjectManager", "Spectator load aborted: archive exceeds $MAX_IMPORT_BYTES bytes")
                             return@use
@@ -587,7 +593,7 @@ class ProjectManager @Inject constructor(
                     Log.e("ProjectManager", "Spectator load rejected: unsafe project id")
                     return@use
                 }
-                val destDir = File(context.filesDir, "projects/${project.id}").also { it.mkdirs() }
+                val destDir = File(appContext.filesDir, "projects/${project.id}").also { it.mkdirs() }
 
                 for ((name, tmpFile) in extractedFiles) {
                     val dest = resolveInside(destDir, name)
