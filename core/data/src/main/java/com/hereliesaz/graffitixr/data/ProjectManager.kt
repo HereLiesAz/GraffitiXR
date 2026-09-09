@@ -240,6 +240,7 @@ class ProjectManager @Inject constructor(
             val project = json.decodeFromString<GraffitiProject>(jsonString)
             migrateInMemory(project)
         } catch (e: Exception) {
+            e.printStackTrace(System.err)
             Log.e("ProjectManager", "Failed to load project metadata", e)
             null
         }
@@ -442,6 +443,7 @@ class ProjectManager @Inject constructor(
             }
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
+            e.printStackTrace(System.err)
             Log.e("ProjectManager", "Import failed", e)
             null
         } finally {
