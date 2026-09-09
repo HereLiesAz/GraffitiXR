@@ -16,6 +16,8 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -54,28 +56,35 @@ class DashboardViewModelTest {
     @Test
     fun `create navigates only after persistence succeeds`() = runTest {
         coEvery { repository.createProject("Mural") } returns GraffitiProject(name = "Mural")
+        val events = mutableListOf<String>()
+        val job = launch { viewModel.navigationEvents.toList(events) }
         viewModel.onNewProjectTriggered()
         viewModel.onCreateProject("Mural")
-        assertNull(viewModel.navigationTrigger.value)
-        assertTrue(viewModel.uiState.value.showNewProjectDialog)
-        advanceUntilIdle()
-        assertEquals(DashboardViewModel.DESTINATION_EDITOR, viewModel.navigationTrigger.value)
+        // Dialog dismissed synchronously before async work; nav not fired yet
         assertFalse(viewModel.uiState.value.showNewProjectDialog)
+        advanceUntilIdle()
+        assertEquals(listOf(DashboardViewModel.DESTINATION_EDITOR), events)
+        assertFalse(viewModel.uiState.value.showNewProjectDialog)
+        job.cancel()
     }
 
     @Test
     fun `failed create keeps dialog open and permits retry without navigating`() = runTest {
         coEvery { repository.createProject("Mural") } throws java.io.IOException("Disk full")
+        val events = mutableListOf<String>()
+        val job = launch { viewModel.navigationEvents.toList(events) }
         viewModel.onNewProjectTriggered()
         viewModel.onCreateProject("Mural")
         advanceUntilIdle()
-        assertNull(viewModel.navigationTrigger.value)
+        assertTrue(events.isEmpty())
+        // Dialog re-shown on failure so the user can retry without re-typing the name
         assertTrue(viewModel.uiState.value.showNewProjectDialog)
         assertFalse(viewModel.uiState.value.isCreatingProject)
         coEvery { repository.createProject("Mural") } returns GraffitiProject(name = "Mural")
         viewModel.onCreateProject("Mural")
         advanceUntilIdle()
-        assertEquals(DashboardViewModel.DESTINATION_EDITOR, viewModel.navigationTrigger.value)
+        assertEquals(listOf(DashboardViewModel.DESTINATION_EDITOR), events)
+        job.cancel()
     }
 
     @Test
@@ -110,13 +119,16 @@ class DashboardViewModelTest {
         // real name. openProject must now carry the actual GraffitiProject.name into uiState.
         val project = GraffitiProject(id = "1", name = "My Mural")
         coEvery { repository.loadProject("1") } returns Result.success(Unit)
+        val events = mutableListOf<String>()
+        val job = launch { viewModel.navigationEvents.toList(events) }
 
         viewModel.openProject(project)
         testDispatcher.scheduler.advanceUntilIdle()
 
         assertEquals("1", viewModel.uiState.value.currentProjectId)
         assertEquals("My Mural", viewModel.uiState.value.currentProjectName)
-        assertEquals(DashboardViewModel.DESTINATION_EDITOR, viewModel.navigationTrigger.value)
+        assertEquals(listOf(DashboardViewModel.DESTINATION_EDITOR), events)
+        job.cancel()
     }
 
     @Test
@@ -126,13 +138,16 @@ class DashboardViewModelTest {
         val project = GraffitiProject(id = "missing", name = "Ghost")
         coEvery { repository.loadProject("missing") } returns Result.failure(Exception("not found"))
         coEvery { repository.getProjects() } returns emptyList()
+        val events = mutableListOf<String>()
+        val job = launch { viewModel.navigationEvents.toList(events) }
 
         viewModel.openProject(project)
         testDispatcher.scheduler.advanceUntilIdle()
 
-        assertNull(viewModel.navigationTrigger.value)
+        assertTrue(events.isEmpty())
         assertNull(viewModel.uiState.value.currentProjectId)
         assertNull(viewModel.uiState.value.currentProjectName)
+        job.cancel()
     }
 
     @Test
@@ -172,6 +187,8 @@ class DashboardViewModelTest {
     fun `onCreateProject creates the project and dismisses the dialog`() = runTest {
         val newProject = GraffitiProject(id = "new", name = "Test Project")
         coEvery { repository.createProject(any<String>()) } returns newProject
+        val events = mutableListOf<String>()
+        val job = launch { viewModel.navigationEvents.toList(events) }
 
         viewModel.onCreateProject(name = "Test Project")
         testDispatcher.scheduler.advanceUntilIdle()
@@ -181,6 +198,8 @@ class DashboardViewModelTest {
         assertEquals(false, viewModel.uiState.value.isCreatingProject)
         assertEquals("new", viewModel.uiState.value.currentProjectId)
         assertEquals("Test Project", viewModel.uiState.value.currentProjectName)
+        assertEquals(listOf(DashboardViewModel.DESTINATION_EDITOR), events)
+        job.cancel()
     }
 
     @Test
