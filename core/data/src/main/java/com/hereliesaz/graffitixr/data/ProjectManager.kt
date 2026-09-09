@@ -166,9 +166,12 @@ class ProjectManager @Inject constructor(
         val tmp = File.createTempFile("${target.name}.", ".tmp", target.parentFile)
         try {
             tmp.writeText(text)
-            check(tmp.renameTo(target)) { "Could not replace ${target.name}" }
+            // Some filesystems won't rename onto an existing file; fall back to a direct write.
+            if (!tmp.renameTo(target)) {
+                target.writeText(text)
+            }
         } finally {
-            tmp.delete()
+            if (tmp.exists()) tmp.delete()
         }
     }
 
@@ -420,7 +423,8 @@ class ProjectManager @Inject constructor(
                     val importedId = if (File(context.filesDir, "projects/${project.id}").exists())
                         java.util.UUID.randomUUID().toString() else project.id
                     val destDir = File(context.filesDir, "projects/$importedId")
-                    check(destDir.mkdirs()) { "Could not create import directory" }
+                    destDir.mkdirs()
+                    check(destDir.isDirectory) { "Could not create import directory" }
                     try {
                         for ((name, tmpFile) in extractedFiles) {
                             val dest = resolveInside(destDir, name) ?: continue
