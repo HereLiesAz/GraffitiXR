@@ -37,7 +37,7 @@ class DefaultUriProvider @Inject constructor() : UriProvider {
 
 @Singleton
 class ProjectManager @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+    @param:ApplicationContext private val appContext: Context,
     private val uriProvider: UriProvider,
     private val projectRepositoryProvider: Provider<ProjectRepository>
 ) {
@@ -389,7 +389,7 @@ class ProjectManager @Inject constructor(
                         val relativeName = if (name.contains('/')) name.substringAfter('/') else name
 
                         if (!entry.isDirectory && relativeName.isNotEmpty()) {
-                            val streamed = streamEntryBounded(zis, totalBytes, context.cacheDir)
+                            val streamed = streamEntryBounded(zis, totalBytes, appContext.cacheDir)
                             if (streamed == null) {
                                 Log.e("ProjectManager", "Import aborted: archive exceeds $MAX_IMPORT_BYTES bytes")
                                 return@use null
@@ -537,7 +537,7 @@ class ProjectManager @Inject constructor(
      */
     fun serializeCurrentProject(): ByteArray {
         val project = projectRepositoryProvider.get().currentProject.value ?: return ByteArray(0)
-        val sourceFolder = File(context.filesDir, "projects/${project.id}")
+        val sourceFolder = File(appContext.filesDir, "projects/${project.id}")
         if (!sourceFolder.exists()) return ByteArray(0)
 
         return ByteArrayOutputStream().use { baos ->
@@ -569,7 +569,7 @@ class ProjectManager @Inject constructor(
                 while (entry != null) {
                     val name = entry.name
                     if (!entry.isDirectory && name.isNotEmpty()) {
-                        val streamed = streamEntryBounded(zis, totalBytes, context.cacheDir)
+                        val streamed = streamEntryBounded(zis, totalBytes, appContext.cacheDir)
                         if (streamed == null) {
                             Log.e("ProjectManager", "Spectator load aborted: archive exceeds $MAX_IMPORT_BYTES bytes")
                             return@use
@@ -593,7 +593,7 @@ class ProjectManager @Inject constructor(
                     Log.e("ProjectManager", "Spectator load rejected: unsafe project id")
                     return@use
                 }
-                val destDir = File(context.filesDir, "projects/${project.id}").also { it.mkdirs() }
+                val destDir = File(appContext.filesDir, "projects/${project.id}").also { it.mkdirs() }
 
                 for ((name, tmpFile) in extractedFiles) {
                     val dest = resolveInside(destDir, name)
