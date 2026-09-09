@@ -426,7 +426,6 @@ class MainActivity : ComponentActivity() {
                 var showJoinScanner by remember { mutableStateOf(false) }
                 val hostQr by arViewModel.hostQrPayload.collectAsState()
                 val dashboardUiState by dashboardViewModel.uiState.collectAsState()
-                val dashboardNavigation by dashboardViewModel.navigationTrigger.collectAsState()
                 val language by settingsViewModel.language.collectAsState()
 
                 LaunchedEffect(language) {
@@ -503,8 +502,8 @@ class MainActivity : ComponentActivity() {
                         dashboardViewModel.dismissProjectError()
                     }
                 }
-                LaunchedEffect(dashboardNavigation) {
-                    dashboardNavigation?.let { destination ->
+                LaunchedEffect(Unit) {
+                    dashboardViewModel.navigationEvents.collect { destination ->
                         when (destination) {
                             "project_library" -> navController.navigate(LIBRARY_ROUTE) {
                                 launchSingleTop = true
@@ -521,7 +520,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
-                        dashboardViewModel.onNavigationConsumed()
                     }
                 }
 

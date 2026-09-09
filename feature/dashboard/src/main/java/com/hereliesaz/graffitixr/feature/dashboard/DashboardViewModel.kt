@@ -11,6 +11,7 @@ import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -26,8 +27,8 @@ class DashboardViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
-    private val _navigationTrigger = MutableStateFlow<String?>(null)
-    val navigationTrigger: StateFlow<String?> = _navigationTrigger.asStateFlow()
+    private val _navigationEvents = Channel<String>(Channel.BUFFERED)
+    val navigationEvents: Flow<String> = _navigationEvents.receiveAsFlow()
 
     private var openProjectJob: Job? = null
 
@@ -70,7 +71,7 @@ class DashboardViewModel @Inject constructor(
             result.onSuccess {
                 _uiState.update { it.copy(currentProjectId = project.id, currentProjectName = project.name) }
                 onOpened()
-                _navigationTrigger.value = DESTINATION_EDITOR
+                _navigationEvents.trySend(DESTINATION_EDITOR)
             }.onFailure { e ->
                 android.util.Log.e("DashboardViewModel", "Failed to open project ${project.id}", e)
                 _uiState.update { it.copy(projectErrorMessage = "Couldn't open this project.") }
@@ -102,19 +103,26 @@ class DashboardViewModel @Inject constructor(
 
     fun onCreateProject(name: String, onCreated: () -> Unit = {}) {
         if (_uiState.value.isCreatingProject) return
-        _uiState.update { it.copy(isCreatingProject = true) }
+        // Dismiss dialog immediately so the user sees progress, not a frozen dialog.
+        // On failure we re-show it so they can retry without re-typing the name.
+        _uiState.update { it.copy(isCreatingProject = true, showNewProjectDialog = false) }
         viewModelScope.launch {
             try {
                 val p = repository.createProject(name)
                 _uiState.update { it.copy(currentProjectId = p.id, currentProjectName = p.name) }
                 onCreated()
-                _navigationTrigger.value = DESTINATION_EDITOR
+                _navigationEvents.trySend(DESTINATION_EDITOR)
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 android.util.Log.e("DashboardViewModel", "Failed to create project", e)
-                _uiState.update { it.copy(projectErrorMessage = "Couldn't create the project. Check available storage and try again.") }
+                _uiState.update {
+                    it.copy(
+                        projectErrorMessage = "Couldn't create the project. Check available storage and try again.",
+                        showNewProjectDialog = true
+                    )
+                }
             } finally {
-                _uiState.update { it.copy(isCreatingProject = false, showNewProjectDialog = false) }
+                _uiState.update { it.copy(isCreatingProject = false) }
             }
             loadAvailableProjects()
         }
@@ -162,10 +170,6 @@ class DashboardViewModel @Inject constructor(
                 _uiState.update { it.copy(projectErrorMessage = "Couldn't delete this project.") }
             }
         }
-    }
-
-    fun onNavigationConsumed() {
-        _navigationTrigger.value = null
     }
 
     fun checkForUpdates(currentVersion: String) {
