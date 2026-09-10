@@ -792,7 +792,7 @@ class EditorViewModel @Inject constructor(
                     dispatch(EditorIntent.SetLoading(false))
                     Toast.makeText(
                         context,
-                        if (success) "Image saved to gallery" else "Failed to save image",
+                        if (success) "Image exported to gallery" else "Export failed — check storage permissions",
                         Toast.LENGTH_LONG
                     ).show()
                 }
