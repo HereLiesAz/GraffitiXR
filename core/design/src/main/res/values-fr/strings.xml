@@ -160,11 +160,6 @@
     <string name="nav_load_info">Ouvrir la bibliothèque de projets pour charger un projet précédemment sauvegardé.</string>
     <string name="nav_export">Exporter</string>
     <string name="nav_export_info">Exporter une image aplatie de tous les calques visibles vers votre galerie de photos.</string>
-
-    <!-- Label for the Share action. -->
-    <string name="nav_share">Share</string>
-    <!-- Description of the Share action. -->
-    <string name="nav_share_info">Share this project as a .gxr file so others can open it in GraffitiXR.</string>
     <string name="nav_help">Aide</string>
     <string name="nav_help_info">Appuyez sur n\'importe quel bouton pendant que l\'Aide est active pour voir ce qu\'il fait.</string>
     <string name="nav_light">Lumière</string>

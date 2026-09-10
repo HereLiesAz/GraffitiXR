@@ -135,11 +135,6 @@
 
     <string name="nav_export_info">Exporteer een platte samengevoegde afbeelding van alle zichtbare lagen naar uw fotogalerij.</string>
 
-    <!-- Label for the Share action. -->
-    <string name="nav_share">Share</string>
-    <!-- Description of the Share action. -->
-    <string name="nav_share_info">Share this project as a .gxr file so others can open it in GraffitiXR.</string>
-
 
     <string name="nav_help">Hulp</string>
 

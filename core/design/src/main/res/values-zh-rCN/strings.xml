@@ -135,11 +135,6 @@
 
     <string name="nav_export_info">将所有可见图层合并后导出为一张平面图像到您的照片库。</string>
 
-    <!-- Label for the Share action. -->
-    <string name="nav_share">Share</string>
-    <!-- Description of the Share action. -->
-    <string name="nav_share_info">Share this project as a .gxr file so others can open it in GraffitiXR.</string>
-
 
     <string name="nav_help">帮助</string>
 

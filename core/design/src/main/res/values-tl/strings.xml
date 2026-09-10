@@ -50,11 +50,6 @@
     <string name="nav_load_info">Buksan ang library ng proyekto upang mag-load ng isang naunang na-save na proyekto.</string>
     <string name="nav_export">I-export</string>
     <string name="nav_export_info">Mag-export ng flat merged na imahe ng lahat ng nakikitang layer sa iyong photo gallery.</string>
-
-    <!-- Label for the Share action. -->
-    <string name="nav_share">Share</string>
-    <!-- Description of the Share action. -->
-    <string name="nav_share_info">Share this project as a .gxr file so others can open it in GraffitiXR.</string>
     <string name="nav_help">Tulong</string>
     <string name="nav_help_info">I-tap ang anumang button habang aktibo ang Help para makita kung ano ang ginagawa nito.</string>
     <string name="nav_light">Liwanag</string>

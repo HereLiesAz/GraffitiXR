@@ -155,11 +155,6 @@
     <!-- Description of the Export action, explaining it merges layers into one image. -->
     <string name="nav_export_info">Export a flat merged image of all visible layers to your photo gallery.</string>
 
-    <!-- Label for the Share action. -->
-    <string name="nav_share">Share</string>
-    <!-- Description of the Share action. -->
-    <string name="nav_share_info">Share this project as a .gxr file so others can open it in GraffitiXR.</string>
-
     <!-- Label for the interactive help system. -->
     <string name="nav_help">Help</string>
     <!-- Description of how to use the interactive help system. -->
