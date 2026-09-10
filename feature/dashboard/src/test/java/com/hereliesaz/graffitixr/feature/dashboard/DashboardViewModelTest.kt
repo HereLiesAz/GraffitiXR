@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -69,7 +70,7 @@ class DashboardViewModelTest {
     }
 
     @Test
-    fun `failed create keeps dialog open and permits retry without navigating`() = runTest {
+    fun `failed create shows error and lets user retry without navigating`() = runTest {
         coEvery { repository.createProject("Mural") } throws java.io.IOException("Disk full")
         val events = mutableListOf<String>()
         val job = launch { viewModel.navigationEvents.toList(events) }
@@ -77,9 +78,10 @@ class DashboardViewModelTest {
         viewModel.onCreateProject("Mural")
         advanceUntilIdle()
         assertTrue(events.isEmpty())
-        // Dialog re-shown on failure so the user can retry without re-typing the name
-        assertTrue(viewModel.uiState.value.showNewProjectDialog)
+        // Dialog stays closed on failure; error message is shown instead to avoid retry loops
+        assertFalse(viewModel.uiState.value.showNewProjectDialog)
         assertFalse(viewModel.uiState.value.isCreatingProject)
+        assertNotNull(viewModel.uiState.value.projectErrorMessage)
         coEvery { repository.createProject("Mural") } returns GraffitiProject(name = "Mural")
         viewModel.onCreateProject("Mural")
         advanceUntilIdle()
