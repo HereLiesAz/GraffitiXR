@@ -606,24 +606,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // noMenu (AzNavRail 11.0) removes the side drawer entirely — all entries become rail
-                // items — and makes the app-icon tap FOLD THE RAIL UP INTO THE ICON (the scope tracks
-                // this as `isFoldedUp`).
-                //
-                // The menu is disabled in EVERY mode, not just Design. Nothing is lost by doing so:
-                // this app declares no drawer-only entries at all (no azMenuItem / azMenuToggle /
-                // azMenuCycler / azMenu*Host anywhere — every entry is an azRailItem, azRailHostItem
-                // or azRailSubItem), so the side drawer only ever duplicated the rail. Disabling it
-                // everywhere also means the app-icon fold and AzNavRail's isExpanded=false
-                // initialisation — which keeps its outer fillMaxSize Box from attaching
-                // tapOutsideToCollapse over the screen — apply in AR, Overlay, Mockup and Trace too,
-                // not only Design.
-                //
-                // Folding is the ONLY thing that hides rail items. App state must never withhold
-                // them: the icon stays on screen either way, so an empty rail turns a tap on it into
-                // a dead input with no way back. See the unconditional ConfigureRailItems below.
-                val railMenuDisabled = true
-
                 var permissionRequestedAtLeastOnce by remember { mutableStateOf(hasCameraPermission) }
 
                 LaunchedEffect(Unit) {
@@ -838,7 +820,6 @@ class MainActivity : ComponentActivity() {
                         // not the phone — the phone sits in the off-hand, so the rail must dock on
                         // the side opposite the dominant hand for that hand's thumb to reach it.
                         dockingSide = if (editorUiState.isRightHanded) AzDockingSide.LEFT else AzDockingSide.RIGHT,
-                        noMenu = railMenuDisabled
                     )
                     azAdvanced(
                         helpEnabled = true,
@@ -1659,11 +1640,7 @@ class MainActivity : ComponentActivity() {
                                 androidx.compose.material3.AlertDialog(
                                     onDismissRequest = { showDesignInstructionsDialog = false },
                                     title = { Text("Design Your Mural", color = Color.White) },
-                                    // noMenu=true (railMenuDisabled) means every rail item is always
-                                    // visible — there is no menu to open, and tapping the app icon
-                                    // instead FOLDS the rail away (AzNavRail 11.0's noMenu behaviour).
-                                    // The old copy sent the user to collapse their own navigation.
-                                    // "Open" itself lives under the "mode.design" host, which
+                                    // "Open" lives under the "mode.design" host, which
                                     // expandWhen auto-collapses outside Design mode — this dialog can
                                     // fire from AR (see showDesignInstructionsDialog's callers), where
                                     // "tap Open" alone pointed at an invisible control. Route through
@@ -2999,11 +2976,9 @@ private fun PostTargetInstructionOverlay(modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                // noMenu=true means every rail item is always visible; there is no menu, and
-                // tapping the app icon instead folds the rail away. "Open" itself lives under the
-                // "mode.design" host, which expandWhen auto-collapses outside Design mode — this
-                // overlay only ever shows in AR, so "tap Open" alone pointed at an invisible
-                // control. Route through Design first.
+                // "Open" lives under the "mode.design" host, which expandWhen auto-collapses
+                // outside Design mode — this overlay only ever shows in AR, so "tap Open" alone
+                // points at an invisible control. Route through Design first.
                 text = "Now tap 'Design' on the rail, then 'Open', to add a photo of your artwork.",
                 color = Color.White,
                 textAlign = TextAlign.Center,
