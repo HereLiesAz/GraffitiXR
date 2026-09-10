@@ -115,10 +115,12 @@ class DashboardViewModel @Inject constructor(
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 android.util.Log.e("DashboardViewModel", "Failed to create project", e)
+                // Do NOT re-show the dialog on failure: if creation keeps failing (IO error,
+                // serialization issue) showing it again creates an infinite retry loop. The
+                // error message below is surfaced by the UI; the user can tap NEW to try again.
                 _uiState.update {
                     it.copy(
-                        projectErrorMessage = "Couldn't create the project. Check available storage and try again.",
-                        showNewProjectDialog = true
+                        projectErrorMessage = "Couldn't create \"$name\": ${e.javaClass.simpleName}: ${e.message}"
                     )
                 }
             } finally {
