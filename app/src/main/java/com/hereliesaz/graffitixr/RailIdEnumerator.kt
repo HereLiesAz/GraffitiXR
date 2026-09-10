@@ -69,7 +69,7 @@ internal fun enumerateRailItemIdRegistrations(mode: EditorMode): List<String> {
 
     // Project menu
     ids += listOf(
-        "host.project", "proj.new", "proj.save", "proj.export", "proj.load", "proj.settings",
+        "host.project", "proj.new", "proj.save", "proj.export", "proj.share", "proj.load", "proj.settings",
     )
 
     // Global tools
@@ -121,6 +121,7 @@ internal val RAIL_ITEM_HOST_ID: Map<String, String> = mapOf(
     "proj.new" to "host.project",
     "proj.save" to "host.project",
     "proj.export" to "host.project",
+    "proj.share" to "host.project",
     "proj.load" to "host.project",
     "proj.settings" to "host.project",
 )

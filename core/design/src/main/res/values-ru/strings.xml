@@ -135,6 +135,11 @@
 
     <string name="nav_export_info">Экспортируйте плоское объединенное изображение всех видимых слоев в свою фотогалерею.</string>
 
+    <!-- Label for the Share action. -->
+    <string name="nav_share">Share</string>
+    <!-- Description of the Share action. -->
+    <string name="nav_share_info">Share this project as a .gxr file so others can open it in GraffitiXR.</string>
+
 
     <string name="nav_help">Помощь</string>
 

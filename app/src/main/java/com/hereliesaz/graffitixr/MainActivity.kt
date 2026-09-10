@@ -2147,6 +2147,9 @@ class MainActivity : ComponentActivity() {
                 // asynchronous captures). This handler just tells the caller "user pressed Export".
                 onExportRequested()
             }
+            azRailSubItem(id = "proj.share", hostId = "host.project", text = navStrings.share, color = navItemColor, shape = AzButtonShape.NONE) {
+                editorViewModel.shareProject()
+            }
             azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {
                 navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
             }

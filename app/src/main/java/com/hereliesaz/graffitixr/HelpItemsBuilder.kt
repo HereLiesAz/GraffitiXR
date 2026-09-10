@@ -68,6 +68,7 @@ internal fun buildHelpItems(strings: AppStrings): Map<String, Any> = mapOf(
     "proj.new" to strings.help.newProject,
     "proj.save" to strings.help.saveProject,
     "proj.export" to strings.help.exportImage,
+    "proj.share" to strings.nav.shareInfo,
     "proj.load" to strings.help.loadProject,
     "proj.settings" to strings.help.appSettings,
 
