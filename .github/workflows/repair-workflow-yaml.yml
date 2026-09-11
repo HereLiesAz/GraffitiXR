@@ -1,0 +1,48 @@
+name: Repair workflow YAML
+
+on:
+  push:
+    branches:
+      - fix/build-conflicts-20260911
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/build-conflicts-20260911
+          fetch-depth: 0
+
+      - name: Repair duplicate env mappings
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          files = [
+              '.github/workflows/android-ci.yml',
+              '.github/workflows/android-release-apk.yml',
+              '.github/workflows/android-release-aab.yml',
+          ]
+          broken = '''      - name: Setup Gradle\n        env:\n          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true\n        uses: gradle/actions/setup-gradle@v4\n        env:\n          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true\n'''
+          fixed = '''      - name: Setup Gradle\n        uses: gradle/actions/setup-gradle@v4\n        env:\n          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true\n          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true\n'''
+          for name in files:
+              p = Path(name)
+              s = p.read_text()
+              if broken not in s:
+                  raise RuntimeError(f'Expected malformed Setup Gradle block not found in {name}')
+              p.write_text(s.replace(broken, fixed, 1))
+          PY
+
+      - name: Commit repairs
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/workflows/android-ci.yml .github/workflows/android-release-apk.yml .github/workflows/android-release-aab.yml
+          git diff --cached --check
+          git commit -m "fix: repair duplicate env keys in Android workflows"
+          git push origin HEAD:fix/build-conflicts-20260911
