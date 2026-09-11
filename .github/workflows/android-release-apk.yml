@@ -76,10 +76,9 @@ jobs:
           distribution: 'temurin'
 
       - name: Setup Gradle
-        env:
-          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
         uses: gradle/actions/setup-gradle@v4
         env:
+          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
           FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
           cache-read-only: false

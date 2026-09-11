@@ -68,36 +68,12 @@ class ProjectManagerTest {
 
     @Test
     fun `import rewrites sender image paths to local project assets`() = runTest {
-<<<<<<< Updated upstream
-        // Pre-create all mock Uris on the test thread before any answers{} block runs on IO,
-        // to avoid MockK thread-local recording state corruption when mocks are created inside answers{}.
-        val localDesignFile = File(tempFilesDir, "projects/portable/design.png")
-        val localDesignUri = mockk<Uri>(relaxed = true).also { m ->
-            every { m.path } returns localDesignFile.absolutePath
-            every { m.toString() } returns "file://${localDesignFile.absolutePath}"
-        }
-        // Uri.parse must return a sensible mock for any string (relaxed), but for the specific
-        // local path that uriProvider will produce, return the pre-created mock above.
-        every { Uri.parse(any()) } answers {
-            val raw = firstArg<String>()
-            if (raw == "file://${localDesignFile.absolutePath}") localDesignUri
-            else mockk<Uri>(relaxed = true).also { m ->
-                every { m.path } returns raw.removePrefix("file://")
-                every { m.toString() } returns raw
-            }
-        }
-        every { uriProvider.getUriForFile(localDesignFile) } returns localDesignUri
-        val manifest = """{"id":"portable","name":"Wall","design":{"uri":"file:///sender/files/projects/portable/design.png"}}""".toByteArray()
-        val imported = importZip(zipOf("project.json" to manifest, "design.png" to byteArrayOf(1, 2)))
-        assertEquals(localDesignFile.absolutePath, imported?.design?.uri?.path)
-=======
         val manifest = """{"id":"portable","name":"Wall","design":{"uri":"file:///sender/files/projects/portable/design.png"}}""".toByteArray()
         val imported = importZip(zipOf("project.json" to manifest, "design.png" to byteArrayOf(1, 2)))
         assertEquals(
             File(tempFilesDir, "projects/portable/design.png").canonicalFile,
             imported?.design?.uri?.path?.let { File(it).canonicalFile },
         )
->>>>>>> Stashed changes
         assertEquals(imported?.design?.uri.toString(), manager.loadProjectMetadata(mockContext, "portable")?.design?.uri.toString())
     }
 
@@ -267,21 +243,6 @@ class ProjectManagerTest {
 
     // --- Target image pruning (unbounded growth) ---
 
-<<<<<<< Updated upstream
-    /** A [UriProvider] whose returned [Uri] mocks expose a real, deletable file path. */
-    private fun realFileUriProvider(): UriProvider = object : UriProvider {
-        override fun getUriForFile(file: File): Uri {
-            val u = mockk<Uri>(relaxed = true)
-            every { u.path } returns file.absolutePath
-            // toString() is used by UriSerializer.serialize; must round-trip via Uri.parse back to a
-            // mock whose .path is the file's absolute path so pruneTargetImages can delete it.
-            every { u.toString() } returns "file://${file.absolutePath}"
-            return u
-        }
-    }
-
-=======
->>>>>>> Stashed changes
     @Test
     fun `saveProject prunes target images beyond the cap and deletes their files`() = runTest {
         val projectRepositoryProvider = mockk<javax.inject.Provider<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>>(relaxed = true)
