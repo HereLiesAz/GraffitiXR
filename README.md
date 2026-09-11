@@ -55,6 +55,3 @@ Strictly decoupled multi-module Clean Architecture:
 - [Data Formats](docs/data_formats.md)
 - [Contributing](docs/contributing.md)
 - [Release & Google Play Delivery](docs/RELEASE.md)
-
----
-*Documentation updated on 2026-09-04 (second pass, same day): corrected the "multi-layer graphical creation" / "Design: Multi-layer image composition" claims — the multi-layer stack was removed; there is exactly one design image, and compositing several into one is the companion design app's job now, not this app's. Earlier same-day pass: corrected feature claims against the current codebase — see the audit this pass was based on for details. Removed AI Glasses Support (Meta Ray-Ban provider deleted; the Xreal provider can never activate), stencil generation, and GPU-accelerated Liquify, none of which have implementing code; marked snap-back/self-grow as the opt-in, unvalidated toggles they currently are; corrected Co-op Mode and Dual-Lens Aware to their real (narrower) behavior; fixed the crash-report claim to describe the new opt-in consent flow. Prior update: 2026-07-12, for AzNavRail 11.0 and the PolyForm/MIT licensing layout.*
