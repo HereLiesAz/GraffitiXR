@@ -1870,34 +1870,40 @@ class MainActivity : ComponentActivity() {
             permissionLauncher.launch(perms.toTypedArray())
         }
 
-        if (!showLibrary) {
-            val isDesignMode = editorUiState.editorMode == EditorMode.DESIGN
-            // railExpansion (param) is the per-host expansion restored from the project so the rail reopens
-            // as the user left it. Seeded into initiallyExpanded below; captured by onExpandedChange (manual
-            // toggles only). host.modes' expandWhen reads railExpansion["host.project"] so opening Project
-            // collapses Modes and closing it re-expands them.
+        val isDesignMode = editorUiState.editorMode == EditorMode.DESIGN
+        // railExpansion (param) is the per-host expansion restored from the project so the rail reopens
+        // as the user left it. Seeded into initiallyExpanded below; captured by onExpandedChange (manual
+        // toggles only). host.modes' expandWhen reads railExpansion["host.project"] so opening Project
+        // collapses Modes and closing it re-expands them.
+        //
+        // Items are always registered with AzNavRail (so navhost destinations are never absent),
+        // but disabled on the library screen so they're non-interactive there. The former
+        // if (!showLibrary) gate that removed all items was the root cause of the save-dialog race:
+        // no items registered = no navhost destinations = navigation to editor silently fails.
 
-            // 1. DESIGN (TOP) — the layer workspace itself, promoted to the top slot Open used to
-            // occupy. Tapping it routes straight into DESIGN mode (opacity/brightness/contrast/
-            // saturation edit the layer itself, per EditorViewModel.dispatchModeAdjustIfInMode);
-            // expanding it reveals Open (the action that used to sit here on its own) and the
-            // per-design Adjust folder as sub-items, so "start a design" and "adjust it" live under
-            // one folder instead of two unrelated top-level entries.
-            //
-            // expandWhen forces this open whenever the user is actually IN Design mode (matching
-            // host.modes' expandWhen pattern below) — landing here via "New Project" / "Load" /
-            // the AR-stall fallback all navigate directly, never through a rail tap, so without this
-            // the host stayed collapsed and both Open and the guidance callout that points at it
-            // ("Tap 'Open' to add your first layer") were unreachable/invisible on a first run.
-            azRailHostItem(
+        // 1. DESIGN (TOP) — the layer workspace itself, promoted to the top slot Open used to
+        // occupy. Tapping it routes straight into DESIGN mode (opacity/brightness/contrast/
+        // saturation edit the layer itself, per EditorViewModel.dispatchModeAdjustIfInMode);
+        // expanding it reveals Open (the action that used to sit here on its own) and the
+        // per-design Adjust folder as sub-items, so "start a design" and "adjust it" live under
+        // one folder instead of two unrelated top-level entries.
+        //
+        // expandWhen forces this open whenever the user is actually IN Design mode (matching
+        // host.modes' expandWhen pattern below) — landing here via "New Project" / "Load" /
+        // the AR-stall fallback all navigate directly, never through a rail tap, so without this
+        // the host stayed collapsed and both Open and the guidance callout that points at it
+        // ("Tap 'Open' to add your first layer") were unreachable/invisible on a first run.
+        azRailHostItem(
                 id = "mode.design",
                 text = navStrings.design,
                 route = EditorMode.DESIGN.name,
                 color = navItemColor,
+                disabled = showLibrary,
                 initiallyExpanded = railExpansion["mode.design"] ?: false,
                 expandWhen = { isDesignMode },
                 onExpandedChange = { editorViewModel.onRailHostExpansionChanged("mode.design", it) },
             )
+        if (!showLibrary) {
             // Open — opens an image picker so the chosen image lands as a new layer, staying in the
             // current mode (the layer is shared across every mode). Only ensures a project exists
             // first, since onAddLayer silently no-ops without one.
