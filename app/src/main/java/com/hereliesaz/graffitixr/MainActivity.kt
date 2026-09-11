@@ -69,6 +69,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -502,7 +503,11 @@ class MainActivity : ComponentActivity() {
                         dashboardViewModel.dismissProjectError()
                     }
                 }
-                LaunchedEffect(Unit) {
+                LaunchedEffect(navController) {
+                    // NavController exists one composition before AzNavHost installs its graph.
+                    // Waiting for the first back-stack entry prevents cold-start events from
+                    // navigating during that gap ("Navigation graph has not been set").
+                    navController.currentBackStackEntryFlow.first()
                     dashboardViewModel.navigationEvents.collect { destination ->
                         when (destination) {
                             "project_library" -> navController.navigate(LIBRARY_ROUTE) {
@@ -2136,7 +2141,10 @@ class MainActivity : ComponentActivity() {
                 onExportRequested()
             }
             azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary) {
-                navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
+                lifecycleScope.launch {
+                    navController.currentBackStackEntryFlow.first()
+                    navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
+                }
             }
             azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary) {
                 showSettings = true
