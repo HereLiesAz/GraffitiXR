@@ -81,7 +81,7 @@ jobs:
       max-parallel: 3
     steps:
       - name: 'Invoke Jules on issue #${{ matrix.issue.number }}'
-        uses: 'google-labs-code/jules-invoke@v1'
+        uses: 'google-labs-code/jules-invoke@v1.0.0'
         with:
           prompt: |-
             Triage this unlabeled GitHub issue and apply appropriate labels.

@@ -49,7 +49,7 @@ jobs:
 
       - name: 'Invoke Jules for issue triage'
         if: '${{ steps.get_labels.outputs.available_labels != '''' }}'
-        uses: 'google-labs-code/jules-invoke@v1'
+        uses: 'google-labs-code/jules-invoke@v1.0.0'
         with:
           prompt: |-
             Triage the following GitHub issue and apply the most appropriate labels from the available set.

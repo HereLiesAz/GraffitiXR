@@ -26,7 +26,7 @@ jobs:
       pull-requests: 'write'
     steps:
       - name: 'Invoke Jules for PR review'
-        uses: 'google-labs-code/jules-invoke@v1'
+        uses: 'google-labs-code/jules-invoke@v1.0.0'
         with:
           prompt: |-
             Please review pull request #${{ github.event.pull_request.number || github.event.issue.number }} in ${{ github.repository }}.
