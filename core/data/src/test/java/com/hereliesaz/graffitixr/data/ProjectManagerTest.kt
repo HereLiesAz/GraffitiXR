@@ -9,8 +9,6 @@ import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.common.model.LocationFix
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -25,8 +23,14 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.File
 
+/** Exercises project files with real Android URI parsing, including serialized URI round trips. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class ProjectManagerTest {
 
     private lateinit var mockContext: Context
@@ -39,23 +43,11 @@ class ProjectManagerTest {
         tempFilesDir = File(System.getProperty("java.io.tmpdir"), "graffitixr_test_files")
         tempFilesDir.mkdirs()
 
-        mockContext = mockk(relaxed = true)
+        mockContext = mockk()
         every { mockContext.filesDir } returns tempFilesDir
         every { mockContext.cacheDir } returns File(tempFilesDir, "cache").also { it.mkdirs() }
 
-        mockkStatic(Uri::class)
-        every { Uri.parse(any()) } returns mockk(relaxed = true)
-        every { Uri.fromFile(any()) } returns mockk(relaxed = true)
-
-        // The hardened import/spectator paths log skipped hostile entries; android.util.Log is
-        // not available in plain JVM tests.
-        mockkStatic(android.util.Log::class)
-        every { android.util.Log.e(any(), any()) } returns 0
-        every { android.util.Log.e(any(), any(), any()) } returns 0
-        every { android.util.Log.w(any(), any<String>()) } returns 0
-        every { android.util.Log.i(any(), any()) } returns 0
-
-        uriProvider = mockk(relaxed = true)
+        uriProvider = DefaultUriProvider()
         val projectRepositoryProvider = mockk<javax.inject.Provider<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>>(relaxed = true)
         manager = ProjectManager(mockContext, uriProvider, projectRepositoryProvider)
     }
@@ -63,8 +55,6 @@ class ProjectManagerTest {
     @After
     fun teardown() {
         tempFilesDir.deleteRecursively()
-        unmockkStatic(Uri::class)
-        unmockkStatic(android.util.Log::class)
     }
 
     @Test
@@ -78,6 +68,7 @@ class ProjectManagerTest {
 
     @Test
     fun `import rewrites sender image paths to local project assets`() = runTest {
+<<<<<<< Updated upstream
         // Pre-create all mock Uris on the test thread before any answers{} block runs on IO,
         // to avoid MockK thread-local recording state corruption when mocks are created inside answers{}.
         val localDesignFile = File(tempFilesDir, "projects/portable/design.png")
@@ -99,6 +90,14 @@ class ProjectManagerTest {
         val manifest = """{"id":"portable","name":"Wall","design":{"uri":"file:///sender/files/projects/portable/design.png"}}""".toByteArray()
         val imported = importZip(zipOf("project.json" to manifest, "design.png" to byteArrayOf(1, 2)))
         assertEquals(localDesignFile.absolutePath, imported?.design?.uri?.path)
+=======
+        val manifest = """{"id":"portable","name":"Wall","design":{"uri":"file:///sender/files/projects/portable/design.png"}}""".toByteArray()
+        val imported = importZip(zipOf("project.json" to manifest, "design.png" to byteArrayOf(1, 2)))
+        assertEquals(
+            File(tempFilesDir, "projects/portable/design.png").canonicalFile,
+            imported?.design?.uri?.path?.let { File(it).canonicalFile },
+        )
+>>>>>>> Stashed changes
         assertEquals(imported?.design?.uri.toString(), manager.loadProjectMetadata(mockContext, "portable")?.design?.uri.toString())
     }
 
@@ -133,8 +132,8 @@ class ProjectManagerTest {
 
     @Test
     fun `importProjectFromUri fails gracefully on bad URI`() = runTest {
-        val mockUri = mockk<Uri>(relaxed = true)
-        val mockResolver = mockk<android.content.ContentResolver>(relaxed = true)
+        val mockUri = Uri.parse("content://test/project.gxr")
+        val mockResolver = mockk<android.content.ContentResolver>()
 
         every { mockContext.contentResolver } returns mockResolver
         every { mockResolver.openInputStream(any()) } returns null
@@ -160,8 +159,8 @@ class ProjectManagerTest {
     private fun projectJson(id: String) = """{"id":"$id","name":"evil"}""".toByteArray()
 
     private suspend fun importZip(zipBytes: ByteArray): GraffitiProject? {
-        val mockUri = mockk<Uri>(relaxed = true)
-        val mockResolver = mockk<android.content.ContentResolver>(relaxed = true)
+        val mockUri = Uri.parse("content://test/project.gxr")
+        val mockResolver = mockk<android.content.ContentResolver>()
         every { mockContext.contentResolver } returns mockResolver
         every { mockResolver.openInputStream(any()) } returns zipBytes.inputStream()
         return manager.importProjectFromUri(mockContext, mockUri)
@@ -268,6 +267,7 @@ class ProjectManagerTest {
 
     // --- Target image pruning (unbounded growth) ---
 
+<<<<<<< Updated upstream
     /** A [UriProvider] whose returned [Uri] mocks expose a real, deletable file path. */
     private fun realFileUriProvider(): UriProvider = object : UriProvider {
         override fun getUriForFile(file: File): Uri {
@@ -280,22 +280,12 @@ class ProjectManagerTest {
         }
     }
 
+=======
+>>>>>>> Stashed changes
     @Test
     fun `saveProject prunes target images beyond the cap and deletes their files`() = runTest {
-        // The default `Uri.parse` stub from setup() returns the SAME opaque mock for every string,
-        // which would make a round-tripped URI's `.path` meaningless. Override it here so decoding
-        // the "file://..." strings this test's UriProvider writes reconstructs a working `.path`,
-        // mirroring what real android.net.Uri.parse/.fromFile actually do.
-        every { Uri.parse(any()) } answers {
-            val s = firstArg<String>()
-            mockk<Uri>(relaxed = true).also { m ->
-                every { m.path } returns s.removePrefix("file://")
-                every { m.toString() } returns s
-            }
-        }
-
         val projectRepositoryProvider = mockk<javax.inject.Provider<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>>(relaxed = true)
-        val pruningManager = ProjectManager(mockContext, realFileUriProvider(), projectRepositoryProvider)
+        val pruningManager = ProjectManager(mockContext, uriProvider, projectRepositoryProvider)
         val bitmap = mockk<Bitmap>(relaxed = true)
 
         var project = GraffitiProject(id = "many_targets", name = "Many targets")
@@ -315,7 +305,7 @@ class ProjectManagerTest {
     @Test
     fun `appendTargetImage prunes beyond the cap without touching project json`() = runTest {
         val projectRepositoryProvider = mockk<javax.inject.Provider<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>>(relaxed = true)
-        val pruningManager = ProjectManager(mockContext, realFileUriProvider(), projectRepositoryProvider)
+        val pruningManager = ProjectManager(mockContext, uriProvider, projectRepositoryProvider)
         val bitmap = mockk<Bitmap>(relaxed = true)
 
         var uris = emptyList<Uri>()

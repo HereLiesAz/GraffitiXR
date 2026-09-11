@@ -70,7 +70,11 @@ class DashboardViewModelTest {
     }
 
     @Test
+<<<<<<< Updated upstream
     fun `failed create shows error and lets user retry without navigating`() = runTest {
+=======
+    fun `failed create keeps dialog closed and permits explicit retry without navigating`() = runTest {
+>>>>>>> Stashed changes
         coEvery { repository.createProject("Mural") } throws java.io.IOException("Disk full")
         val events = mutableListOf<String>()
         val job = launch { viewModel.navigationEvents.toList(events) }
@@ -78,14 +82,24 @@ class DashboardViewModelTest {
         viewModel.onCreateProject("Mural")
         advanceUntilIdle()
         assertTrue(events.isEmpty())
+<<<<<<< Updated upstream
         // Dialog stays closed on failure; error message is shown instead to avoid retry loops
         assertFalse(viewModel.uiState.value.showNewProjectDialog)
+=======
+        assertFalse(viewModel.uiState.value.showNewProjectDialog)
+        assertEquals("Couldn't create \"Mural\": IOException: Disk full", viewModel.uiState.value.projectErrorMessage)
+>>>>>>> Stashed changes
         assertFalse(viewModel.uiState.value.isCreatingProject)
         assertNotNull(viewModel.uiState.value.projectErrorMessage)
         coEvery { repository.createProject("Mural") } returns GraffitiProject(name = "Mural")
+        viewModel.dismissProjectError()
+        viewModel.onNewProjectTriggered()
+        assertTrue(viewModel.uiState.value.showNewProjectDialog)
         viewModel.onCreateProject("Mural")
         advanceUntilIdle()
         assertEquals(listOf(DashboardViewModel.DESTINATION_EDITOR), events)
+        assertFalse(viewModel.uiState.value.showNewProjectDialog)
+        assertNull(viewModel.uiState.value.projectErrorMessage)
         job.cancel()
     }
 
@@ -206,8 +220,8 @@ class DashboardViewModelTest {
 
     @Test
     fun `onCreateProject ignores a re-entrant call while a create is already in flight`() = runTest {
-        // The new-project dialog stays visible across the async createProject call, so a second tap
-        // before the first finishes used to spawn a duplicate project. isCreatingProject flips
+        // A second call before the async createProject finishes must not spawn a duplicate project.
+        // isCreatingProject flips
         // synchronously before the coroutine is dispatched, so a second call issued immediately after
         // (as a double tap would) must be a no-op.
         val newProject = GraffitiProject(id = "new", name = "Test Project")
