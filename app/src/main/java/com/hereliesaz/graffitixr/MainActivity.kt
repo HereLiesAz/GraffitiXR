@@ -1876,10 +1876,10 @@ class MainActivity : ComponentActivity() {
         // toggles only). host.modes' expandWhen reads railExpansion["host.project"] so opening Project
         // collapses Modes and closing it re-expands them.
         //
-        // Items are always registered with AzNavRail (so navhost destinations are never absent),
-        // but disabled on the library screen so they're non-interactive there. The former
-        // if (!showLibrary) gate that removed all items was the root cause of the save-dialog race:
-        // no items registered = no navhost destinations = navigation to editor silently fails.
+        // Items are always registered with AzNavRail, but disabled on the library screen so they're
+        // non-interactive there. The former if (!showLibrary) gate that removed items from the rail
+        // prevented proj.save (and all other editor items) from being tappable, making the save dialog
+        // unreachable even when a project was open.
 
         // 1. DESIGN (TOP) — the layer workspace itself, promoted to the top slot Open used to
         // occupy. Tapping it routes straight into DESIGN mode (opacity/brightness/contrast/
@@ -1903,8 +1903,7 @@ class MainActivity : ComponentActivity() {
                 expandWhen = { isDesignMode },
                 onExpandedChange = { editorViewModel.onRailHostExpansionChanged("mode.design", it) },
             )
-        if (!showLibrary) {
-            // Open — opens an image picker so the chosen image lands as a new layer, staying in the
+        // Open — opens an image picker so the chosen image lands as a new layer, staying in the
             // current mode (the layer is shared across every mode). Only ensures a project exists
             // first, since onAddLayer silently no-ops without one.
             azRailSubItem(
@@ -1914,6 +1913,7 @@ class MainActivity : ComponentActivity() {
                 color = navItemColor,
                 classifiers = setOf("toggle"),
                 shape = AzButtonShape.NONE,
+                disabled = showLibrary,
                 onClick = {
                     if (editorUiState.projectId == null) dashboardViewModel.createAndOpenProject()
                     overlayPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -1930,33 +1930,34 @@ class MainActivity : ComponentActivity() {
                 text = navStrings.adjust,
                 color = navItemColor,
                 shape = AzButtonShape.NONE,
+                disabled = showLibrary,
                 initiallyExpanded = railExpansion["host.design"] ?: false,
                 onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.design", it) },
             )
             azRailSubItem(
                 id = "design.adjust", hostId = "host.design", text = navStrings.adjust,
                 color = navItemColor, classifiers = setOf("toggle", "panel"),
-                shape = AzButtonShape.NONE,
+                shape = AzButtonShape.NONE, disabled = showLibrary,
             ) { editorViewModel.onAdjustClicked() }
             azRailSubItem(
                 id = "design.balance", hostId = "host.design", text = navStrings.balance,
                 color = navItemColor, classifiers = setOf("toggle", "panel"),
-                shape = AzButtonShape.NONE,
+                shape = AzButtonShape.NONE, disabled = showLibrary,
             ) { editorViewModel.onBalanceClicked() }
             azRailSubItem(
                 id = "design.invert", hostId = "host.design", text = navStrings.invert,
                 color = navItemColor, classifiers = setOf("toggle", "effect"),
-                shape = AzButtonShape.NONE,
+                shape = AzButtonShape.NONE, disabled = showLibrary,
             ) { editorViewModel.onToggleInvert() }
             azRailSubItem(
                 id = "design.outline", hostId = "host.design", text = navStrings.outline,
                 color = navItemColor, classifiers = setOf("toggle", "effect"),
-                shape = AzButtonShape.NONE,
+                shape = AzButtonShape.NONE, disabled = showLibrary,
             ) { editorViewModel.onToggleOutline() }
             azRailSubItem(
                 id = "design.isolate", hostId = "host.design", text = navStrings.isolate,
                 color = navItemColor, classifiers = setOf("toggle", "effect"),
-                shape = AzButtonShape.NONE,
+                shape = AzButtonShape.NONE, disabled = showLibrary,
             ) { editorViewModel.onToggleSubjectIsolation() }
             // Layer.isImageLocked gates whether taps/gestures reach the design image at all (see
             // MainScreen.kt's pointerInput guards) — distinct from a mode's isTransformLocked, which
@@ -1965,7 +1966,7 @@ class MainActivity : ComponentActivity() {
             azRailSubItem(
                 id = "design.lock", hostId = "host.design", text = "Lock",
                 color = navItemColor, classifiers = setOf("toggle", "lock"),
-                shape = AzButtonShape.NONE,
+                shape = AzButtonShape.NONE, disabled = showLibrary,
             ) { editorViewModel.toggleImageLock() }
 
             azDivider()
@@ -1981,6 +1982,7 @@ class MainActivity : ComponentActivity() {
                 id = "host.modes",
                 text = navStrings.modes,
                 color = navItemColor,
+                disabled = showLibrary,
                 initiallyExpanded = railExpansion["host.modes"] ?: true,
                 expandWhen = { railExpansion["host.project"] != true },
                 onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.modes", it) },
@@ -1989,7 +1991,7 @@ class MainActivity : ComponentActivity() {
             val showArModeEntry = !arUiState.isArCoreAvailabilityResolved || arUiState.isArCoreAvailable
             if (showArModeEntry) {
                 // AR is a sub-host: it navigates to AR mode and contains its tools.
-                azRailSubHostItem(id = "mode.ar", hostId = "host.modes", text = navStrings.arMode, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE)
+                azRailSubHostItem(id = "mode.ar", hostId = "host.modes", text = navStrings.arMode, route = EditorMode.AR.name, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary)
                 // Target capture — only meaningful while in AR mode.
                 if (editorUiState.editorMode == EditorMode.AR) {
                     // Target button is a toggle: selected (cyan) means screen taps create the target;
@@ -2001,7 +2003,8 @@ class MainActivity : ComponentActivity() {
                         text = navStrings.grid,
                         color = navItemColor,
                         classifiers = setOf("toggle"),
-                        shape = AzButtonShape.NONE
+                        shape = AzButtonShape.NONE,
+                        disabled = showLibrary,
                     ) {
                         if (isWaitingForTap) {
                             mainViewModel.cancelTapMode()
@@ -2019,54 +2022,55 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     // Flashlight — illuminate the wall in low light while tracking.
-                    azRailSubItem(id = "mode.ar.light", hostId = "mode.ar", text = navStrings.light, color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE) {
+                    azRailSubItem(id = "mode.ar.light", hostId = "mode.ar", text = navStrings.light, color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE, disabled = showLibrary) {
                         arViewModel.toggleFlashlight()
                     }
-                    azRailSubItem(id = "mode.ar.lock", hostId = "mode.ar", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE) {
+                    azRailSubItem(id = "mode.ar.lock", hostId = "mode.ar", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE, disabled = showLibrary) {
                         editorViewModel.onToggleModeTransformLocked(EditorMode.AR)
                     }
                     // Magic — fit the design to the established anchor's extent (falling back to a
                     // legibility auto-tune when there is no anchor yet). onMagicClicked was
                     // implemented and unreachable: the "Magic Wand" the adjustments panel's doc
                     // still described had been removed from that panel's action row.
-                    azRailSubItem(id = "mode.ar.magic", hostId = "mode.ar", text = navStrings.magic, color = navItemColor, shape = AzButtonShape.NONE) {
+                    azRailSubItem(id = "mode.ar.magic", hostId = "mode.ar", text = navStrings.magic, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary) {
                         editorViewModel.onMagicClicked()
                     }
                     // Co-op ▸ { Host, Join, Leave } — share this AR coordinate system with a nearby peer.
-                    azRailSubHostItem(id = "coop", hostId = "mode.ar", text = navStrings.coop, color = navItemColor, shape = AzButtonShape.NONE)
+                    azRailSubHostItem(id = "coop", hostId = "mode.ar", text = navStrings.coop, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary)
                     azRailSubItem(
                         id = "coop.host", hostId = "coop", text = navStrings.hostCoop,
                         color = navItemColor,
                         classifiers = setOf("toggle"),
                         shape = AzButtonShape.NONE,
-                        disabled = !(arUiState.isAnchorEstablished && arUiState.splatCount > 0) &&
-                            arUiState.coopRole != CoopRole.HOST
+                        disabled = showLibrary || (!(arUiState.isAnchorEstablished && arUiState.splatCount > 0) &&
+                            arUiState.coopRole != CoopRole.HOST)
                     ) {
                         if (arUiState.coopRole != CoopRole.HOST) arViewModel.startHosting()
                     }
                     azRailSubItem(
                         id = "coop.join", hostId = "coop", text = navStrings.joinCoop,
-                        color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE
+                        color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE,
+                        disabled = showLibrary,
                     ) {
                         if (arUiState.coopRole != CoopRole.GUEST) {
                             if (hasCameraPermission) onShowJoinScanner() else requestPermissions()
                         }
                     }
                     if (arUiState.coopRole != CoopRole.NONE) {
-                        azRailSubItem(id = "coop.leave", hostId = "coop", text = navStrings.leaveCoop, color = HotPink, shape = AzButtonShape.NONE) {
+                        azRailSubItem(id = "coop.leave", hostId = "coop", text = navStrings.leaveCoop, color = HotPink, shape = AzButtonShape.NONE, disabled = showLibrary) {
                             arViewModel.leaveSession()
                         }
                     }
                 }
             }
 
-            azRailSubHostItem(id = "mode.overlay", hostId = "host.modes", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE)
+            azRailSubHostItem(id = "mode.overlay", hostId = "host.modes", text = navStrings.overlay, route = EditorMode.OVERLAY.name, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary)
             // Flashlight — illuminate the wall in low light while overlaying.
             if (editorUiState.editorMode == EditorMode.OVERLAY) {
-                azRailSubItem(id = "mode.overlay.light", hostId = "mode.overlay", text = navStrings.light, color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE) {
+                azRailSubItem(id = "mode.overlay.light", hostId = "mode.overlay", text = navStrings.light, color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE, disabled = showLibrary) {
                     arViewModel.toggleFlashlight()
                 }
-                azRailSubItem(id = "mode.overlay.lock", hostId = "mode.overlay", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE) {
+                azRailSubItem(id = "mode.overlay.lock", hostId = "mode.overlay", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE, disabled = showLibrary) {
                     editorViewModel.onToggleModeTransformLocked(EditorMode.OVERLAY)
                 }
             }
@@ -2077,33 +2081,33 @@ class MainActivity : ComponentActivity() {
             // was carrying a Wall ▸ Photo/File/Clear folder and a Mockup Lock that could not act on
             // anything they were looking at. Tapping Mockup routes into the mode, so the tools are one
             // tap away rather than gone.
-            azRailSubHostItem(id = "mode.mockup", hostId = "host.modes", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE)
+            azRailSubHostItem(id = "mode.mockup", hostId = "host.modes", text = navStrings.mockup, route = EditorMode.MOCKUP.name, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary)
             if (editorUiState.editorMode == EditorMode.MOCKUP) {
-                azRailSubHostItem(id = "mockup.wall", hostId = "mode.mockup", text = navStrings.wall, color = navItemColor, shape = AzButtonShape.NONE)
-                azRailSubItem(id = "wall.photo", hostId = "mockup.wall", text = navStrings.photo, color = navItemColor, shape = AzButtonShape.NONE) {
+                azRailSubHostItem(id = "mockup.wall", hostId = "mode.mockup", text = navStrings.wall, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary)
+                azRailSubItem(id = "wall.photo", hostId = "mockup.wall", text = navStrings.photo, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary) {
                     onWallPhoto()
                 }
-                azRailSubItem(id = "wall.file", hostId = "mockup.wall", text = navStrings.file, color = navItemColor, shape = AzButtonShape.NONE) {
+                azRailSubItem(id = "wall.file", hostId = "mockup.wall", text = navStrings.file, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary) {
                     backgroundPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
                 // Clear — only offered once a wall photo is set, so there is something to remove.
                 if (editorUiState.backgroundBitmap != null) {
-                    azRailSubItem(id = "wall.clear", hostId = "mockup.wall", text = navStrings.wallClear, color = navItemColor, shape = AzButtonShape.NONE) {
+                    azRailSubItem(id = "wall.clear", hostId = "mockup.wall", text = navStrings.wallClear, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary) {
                         editorViewModel.clearBackgroundImage()
                     }
                 }
-                azRailSubItem(id = "mode.mockup.lock", hostId = "mode.mockup", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE) {
+                azRailSubItem(id = "mode.mockup.lock", hostId = "mode.mockup", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE, disabled = showLibrary) {
                     editorViewModel.onToggleModeTransformLocked(EditorMode.MOCKUP)
                 }
             }
 
             // Trace ▸ { Freeze, Lock } — same mode gating as the others.
-            azRailSubHostItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE)
+            azRailSubHostItem(id = "mode.trace", hostId = "host.modes", text = navStrings.trace, route = EditorMode.TRACE.name, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary)
             if (editorUiState.editorMode == EditorMode.TRACE) {
-                azRailSubItem(id = "mode.trace.freeze", hostId = "mode.trace", text = "Freeze", color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE) {
+                azRailSubItem(id = "mode.trace.freeze", hostId = "mode.trace", text = "Freeze", color = navItemColor, classifiers = setOf("toggle"), shape = AzButtonShape.NONE, disabled = showLibrary) {
                     mainViewModel.setTouchLocked(!isTouchLocked)
                 }
-                azRailSubItem(id = "mode.trace.lock", hostId = "mode.trace", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE) {
+                azRailSubItem(id = "mode.trace.lock", hostId = "mode.trace", text = "Lock", color = navItemColor, classifiers = setOf("toggle", "lock"), shape = AzButtonShape.NONE, disabled = showLibrary) {
                     editorViewModel.onToggleModeTransformLocked(EditorMode.TRACE)
                 }
             }
@@ -2114,26 +2118,27 @@ class MainActivity : ComponentActivity() {
                 id = "host.project",
                 text = navStrings.project,
                 color = navItemColor,
+                disabled = showLibrary,
                 initiallyExpanded = railExpansion["host.project"] ?: false,
                 onExpandedChange = { editorViewModel.onRailHostExpansionChanged("host.project", it) },
             )
-            azRailSubItem(id = "proj.new", hostId = "host.project", text = navStrings.new, color = navItemColor, shape = AzButtonShape.NONE) {
+            azRailSubItem(id = "proj.new", hostId = "host.project", text = navStrings.new, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary) {
                 dashboardViewModel.onNewProjectTriggered()
             }
-            azRailSubItem(id = "proj.save", hostId = "host.project", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE) {
+            azRailSubItem(id = "proj.save", hostId = "host.project", text = navStrings.save, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary) {
                 showSettings = false
                 showSaveDialog = true
             }
-            azRailSubItem(id = "proj.export", hostId = "host.project", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE) {
+            azRailSubItem(id = "proj.export", hostId = "host.project", text = navStrings.export, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary) {
                 // Export is mode-dispatched by the caller so it has access to the CameraX
                 // controller (Overlay stills) and a coroutine scope (AR/Overlay both suspend on
                 // asynchronous captures). This handler just tells the caller "user pressed Export".
                 onExportRequested()
             }
-            azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE) {
+            azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary) {
                 navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true }
             }
-            azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE) {
+            azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary) {
                 showSettings = true
             }
 
@@ -2188,7 +2193,6 @@ class MainActivity : ComponentActivity() {
             // State badges: surface important conditions as rail-item alerts.
             if (arUiState.guestEditWasDropped) azItemState("coop", alert = AzItemAlert.NOTICE)
             if (arUiState.trackingFailed) azItemState("mode.ar", alert = AzItemAlert.WARNING)
-        }
     }
 }
 
