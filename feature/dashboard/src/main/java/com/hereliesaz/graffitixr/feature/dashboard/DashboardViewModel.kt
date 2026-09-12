@@ -104,7 +104,7 @@ class DashboardViewModel @Inject constructor(
     fun onCreateProject(name: String, onCreated: () -> Unit = {}) {
         if (_uiState.value.isCreatingProject) return
         // Dismiss dialog immediately so the user sees progress, not a frozen dialog.
-        // On failure we re-show it so they can retry without re-typing the name.
+        // On failure it stays closed; the error is shown and NEW allows an explicit retry.
         _uiState.update { it.copy(isCreatingProject = true, showNewProjectDialog = false) }
         viewModelScope.launch {
             try {

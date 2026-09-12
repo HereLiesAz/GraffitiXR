@@ -69,6 +69,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -502,7 +503,11 @@ class MainActivity : ComponentActivity() {
                         dashboardViewModel.dismissProjectError()
                     }
                 }
-                LaunchedEffect(Unit) {
+                LaunchedEffect(navController) {
+                    // NavController exists one composition before AzNavHost installs its graph.
+                    // Waiting for the first back-stack entry prevents cold-start events from
+                    // navigating during that gap ("Navigation graph has not been set").
+                    navController.currentBackStackEntryFlow.first()
                     dashboardViewModel.navigationEvents.collect { destination ->
                         when (destination) {
                             "project_library" -> navController.navigate(LIBRARY_ROUTE) {
@@ -980,7 +985,7 @@ class MainActivity : ComponentActivity() {
                         // early-return on EVERY modal, not just one — collapsing the repeated
                         // boolean chains here prevents a future overlay from forgetting one.
                         val anyModalActive = showLibrary || showSettings || isExporting ||
-                            mainUiState.isCapturingTarget || showSaveDialog ||
+                            mainUiState.isCapturingTarget || showSaveDialog || pendingCrashReport != null ||
                             dashboardUiState.showNewProjectDialog
 
                         val completedTutorials by mainViewModel.completedTutorials.collectAsState()
