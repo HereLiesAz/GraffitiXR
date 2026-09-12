@@ -1,0 +1,148 @@
+name: Apply AzNavRail callback hotfix
+
+on:
+  push:
+    branches: [ hotfix/aznavrail-trailing-lambda ]
+    paths:
+      - .github/workflows/apply-aznavrail-callback-hotfix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Rewrite accidental hiddenMenu trailing lambdas as onClick callbacks
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt')
+          text = path.read_text(encoding='utf-8')
+          target = 'azRailSubItem'
+
+          def skip_quoted(s, i):
+              if s.startswith('"""', i):
+                  j = s.find('"""', i + 3)
+                  return len(s) if j < 0 else j + 3
+              quote = s[i]
+              i += 1
+              while i < len(s):
+                  if s[i] == '\\':
+                      i += 2
+                      continue
+                  if s[i] == quote:
+                      return i + 1
+                  i += 1
+              return i
+
+          def find_matching(s, start, opener, closer):
+              depth = 0
+              i = start
+              while i < len(s):
+                  if s.startswith('//', i):
+                      j = s.find('\n', i + 2)
+                      i = len(s) if j < 0 else j + 1
+                      continue
+                  if s.startswith('/*', i):
+                      j = s.find('*/', i + 2)
+                      i = len(s) if j < 0 else j + 2
+                      continue
+                  if s[i] in ('"', "'"):
+                      i = skip_quoted(s, i)
+                      continue
+                  if s[i] == opener:
+                      depth += 1
+                  elif s[i] == closer:
+                      depth -= 1
+                      if depth == 0:
+                          return i
+                  i += 1
+              raise RuntimeError(f'unmatched {opener} at {start}')
+
+          spans = []
+          i = 0
+          while True:
+              pos = text.find(target, i)
+              if pos < 0:
+                  break
+              j = pos + len(target)
+              while j < len(text) and text[j].isspace():
+                  j += 1
+              if j >= len(text) or text[j] != '(':
+                  i = j
+                  continue
+              close = find_matching(text, j, '(', ')')
+              args = text[j + 1:close]
+              k = close + 1
+              while k < len(text) and text[k].isspace():
+                  k += 1
+              if k < len(text) and text[k] == '{' and 'onClick =' not in args and 'hiddenMenu =' not in args:
+                  end = find_matching(text, k, '{', '}')
+                  spans.append((pos, j, close, k, end))
+                  i = end + 1
+              else:
+                  i = close + 1
+
+          if not spans:
+              raise SystemExit('No accidental azRailSubItem trailing lambdas found; refusing no-op hotfix')
+
+          for pos, open_idx, close_idx, brace_idx, end_idx in reversed(spans):
+              args = text[open_idx + 1:close_idx]
+              comma = '' if args.rstrip().endswith(',') else ','
+              replacement = text[pos:close_idx] + comma + ' onClick = ' + text[brace_idx:end_idx + 1] + ')'
+              text = text[:pos] + replacement + text[end_idx + 1:]
+
+          modal_old = '''mainUiState.isCapturingTarget || showSaveDialog ||\n                            dashboardUiState.showNewProjectDialog'''
+          modal_new = '''mainUiState.isCapturingTarget || showSaveDialog || pendingCrashReport != null ||\n                            dashboardUiState.showNewProjectDialog'''
+          if modal_old not in text:
+              raise SystemExit('Crash-modal interaction guard anchor not found')
+          text = text.replace(modal_old, modal_new, 1)
+
+          path.write_text(text, encoding='utf-8')
+          print(f'Rewrote {len(spans)} azRailSubItem trailing lambdas to explicit onClick callbacks')
+          PY
+
+      - name: Verify dangerous pattern is gone
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt').read_text()
+          # The project actions that caused the launch loop must now be explicit callbacks.
+          for item in ('proj.new', 'proj.save', 'proj.export', 'proj.load', 'proj.settings'):
+              p = text.find(f'id = "{item}"')
+              if p < 0:
+                  raise SystemExit(f'missing {item}')
+              snippet = text[p:p+1800]
+              if 'onClick = {' not in snippet:
+                  raise SystemExit(f'{item} is not using explicit onClick')
+          if 'pendingCrashReport != null' not in text:
+              raise SystemExit('crash modal was not added to interaction gating')
+          PY
+
+      - name: Compile app
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:compileDebugKotlin
+
+      - name: Commit verified hotfix
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm .github/workflows/apply-aznavrail-callback-hotfix.yml
+          git add -A
+          git commit -m "fix: stop rail callbacks executing during composition [skip ci]"
+          git push origin HEAD:hotfix/aznavrail-trailing-lambda
