@@ -20,7 +20,8 @@ import org.junit.Test
  * Cross-frame world-coordinate delta is therefore not physical drift.
  *
  * The implementation now measures only same-frame relative disagreement between the primary anchor
- * and independent support-anchor votes. A global world-frame correction cancels out.
+ * and independent support-anchor votes. A global world-frame correction cancels out. Without a
+ * tracking support vote the metric is unmeasured (-1), never a fabricated zero.
  */
 class AnchorOrchestratorDriftTest {
 
@@ -48,13 +49,13 @@ class AnchorOrchestratorDriftTest {
         assertEquals(-1f, AnchorOrchestrator().primaryAnchorDriftMeters(), 0f)
     }
 
-    @Test fun `single tracking anchor reports no observed disagreement`() {
+    @Test fun `single tracking anchor is unmeasured without an independent support vote`() {
         val o = AnchorOrchestrator()
         o.setInitialAnchor(anchorAt(1f, 2f, 3f))
-        assertEquals(0f, o.primaryAnchorDriftMeters(), 1e-5f)
+        assertEquals(-1f, o.primaryAnchorDriftMeters(), 0f)
     }
 
-    @Test fun `cross-frame world-coordinate movement alone is not reported as physical drift`() {
+    @Test fun `cross-frame world-coordinate movement alone remains unmeasured without support`() {
         val primary = mockk<Anchor>(relaxed = true)
         every { primary.trackingState } returns TrackingState.TRACKING
         every { primary.pose } returns pose(0f, 0f, 0f)
@@ -63,9 +64,9 @@ class AnchorOrchestratorDriftTest {
         o.setInitialAnchor(primary)
 
         // ARCore is allowed to rewrite this world-space number after Session.update(). With no
-        // independent same-frame reference, calling this 5 m of "drift" would be fiction.
+        // independent same-frame reference, calling this 5 m of "drift" OR 0 m would both be fiction.
         every { primary.pose } returns pose(3f, 4f, 0f)
-        assertEquals(0f, o.primaryAnchorDriftMeters(), 1e-4f)
+        assertEquals(-1f, o.primaryAnchorDriftMeters(), 0f)
     }
 
     @Test fun `support created after world-frame rewrite uses current primary pose not establishment pose`() {
@@ -120,6 +121,20 @@ class AnchorOrchestratorDriftTest {
         // If only that support's current pose later diverges to x=4, its artwork vote becomes x=3.
         every { support.pose } returns pose(4f, 0f, 0f)
         assertEquals(3f, o.primaryAnchorDriftMeters(), 1e-4f)
+    }
+
+    @Test fun `paused support makes disagreement unmeasured rather than zero`() {
+        val primary = anchorAt(0f, 0f, 0f)
+        val support = mockk<Anchor>(relaxed = true)
+        every { support.trackingState } returns TrackingState.TRACKING
+        every { support.pose } returns pose(1f, 0f, 0f)
+
+        val o = AnchorOrchestrator()
+        o.setInitialAnchor(primary)
+        addSupport(o, pose(1f, 0f, 0f), support)
+
+        every { support.trackingState } returns TrackingState.PAUSED
+        assertEquals(-1f, o.primaryAnchorDriftMeters(), 0f)
     }
 
     @Test fun `re-establishing detaches the superseded anchor on the serialized path`() {
