@@ -5,6 +5,7 @@ import com.google.ar.core.Pose
 import com.google.ar.core.TrackingState
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -64,11 +65,27 @@ class AnchorOrchestratorDriftTest {
         assertEquals(0f, o.primaryAnchorDriftMeters(), 1e-4f)
     }
 
-    @Test fun `clear drops the baseline back to not-measured`() {
+    @Test fun `re-establishing detaches the superseded anchor on the serialized path`() {
+        val oldAnchor = anchorAt(0f, 0f, 0f)
+        val newAnchor = anchorAt(1f, 1f, 1f)
         val o = AnchorOrchestrator()
-        o.setInitialAnchor(anchorAt(1f, 1f, 1f))
+
+        o.setInitialAnchor(oldAnchor)
+        o.setInitialAnchor(newAnchor)
+
+        verify(exactly = 1) { oldAnchor.detach() }
+        verify(exactly = 0) { newAnchor.detach() }
+    }
+
+    @Test fun `clear drops the baseline without touching ARCore native anchor state`() {
+        val anchor = anchorAt(1f, 1f, 1f)
+        val o = AnchorOrchestrator()
+        o.setInitialAnchor(anchor)
+
         o.clear()
+
         assertEquals(-1f, o.primaryAnchorDriftMeters(), 0f)
+        verify(exactly = 0) { anchor.detach() }
     }
 
     /** A dropped-tracking anchor cannot report a live drift; -1 is honest, not a stale number. */
