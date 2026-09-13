@@ -32,6 +32,14 @@ on:
         type: boolean
         default: true
 
+# Serialize all Play-publish runs on main so two back-to-back merges can't both read the same
+# versionBuild and try to upload the same versionCode. cancel-in-progress: false queues the
+# second run rather than killing it mid-upload (a canceled mid-upload leaves a used code with
+# no corresponding commit, making the NEXT run collide too).
+concurrency:
+  group: play-publish
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
