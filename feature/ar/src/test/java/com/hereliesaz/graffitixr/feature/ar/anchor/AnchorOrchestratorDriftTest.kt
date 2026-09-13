@@ -24,9 +24,12 @@ import org.junit.Test
  */
 class AnchorOrchestratorDriftTest {
 
+    private fun pose(x: Float, y: Float, z: Float) =
+        Pose(floatArrayOf(x, y, z), floatArrayOf(0f, 0f, 0f, 1f))
+
     private fun anchorAt(x: Float, y: Float, z: Float, state: TrackingState = TrackingState.TRACKING): Anchor {
         val a = mockk<Anchor>(relaxed = true)
-        every { a.pose } returns Pose(floatArrayOf(x, y, z), floatArrayOf(0f, 0f, 0f, 1f))
+        every { a.pose } returns pose(x, y, z)
         every { a.trackingState } returns state
         return a
     }
@@ -54,49 +57,68 @@ class AnchorOrchestratorDriftTest {
     @Test fun `cross-frame world-coordinate movement alone is not reported as physical drift`() {
         val primary = mockk<Anchor>(relaxed = true)
         every { primary.trackingState } returns TrackingState.TRACKING
-        every { primary.pose } returns Pose(floatArrayOf(0f, 0f, 0f), floatArrayOf(0f, 0f, 0f, 1f))
+        every { primary.pose } returns pose(0f, 0f, 0f)
 
         val o = AnchorOrchestrator()
         o.setInitialAnchor(primary)
 
         // ARCore is allowed to rewrite this world-space number after Session.update(). With no
         // independent same-frame reference, calling this 5 m of "drift" would be fiction.
-        every { primary.pose } returns Pose(floatArrayOf(3f, 4f, 0f), floatArrayOf(0f, 0f, 0f, 1f))
+        every { primary.pose } returns pose(3f, 4f, 0f)
         assertEquals(0f, o.primaryAnchorDriftMeters(), 1e-4f)
     }
 
-    @Test fun `rigid world-frame correction applied to primary and support cancels out`() {
+    @Test fun `support created after world-frame rewrite uses current primary pose not establishment pose`() {
         val primary = mockk<Anchor>(relaxed = true)
         every { primary.trackingState } returns TrackingState.TRACKING
-        every { primary.pose } returns Pose(floatArrayOf(0f, 0f, 0f), floatArrayOf(0f, 0f, 0f, 1f))
+        every { primary.pose } returns pose(0f, 0f, 0f)
 
-        val support = anchorAt(11f, 0f, 0f)
         val o = AnchorOrchestrator()
         o.setInitialAnchor(primary)
-        addSupport(
-            o,
-            Pose(floatArrayOf(1f, 0f, 0f), floatArrayOf(0f, 0f, 0f, 1f)),
-            support,
-        )
 
-        // A +10 m rewrite of the current ARCore world frame moves both numerical poses. The support's
-        // stored -1 m artwork offset makes both anchors vote for x=10 in THIS frame.
-        every { primary.pose } returns Pose(floatArrayOf(10f, 0f, 0f), floatArrayOf(0f, 0f, 0f, 1f))
+        // Between target establishment and support creation ARCore rewrites the world basis +10 m.
+        // The physical primary/support relationship is still one metre. The old implementation kept
+        // the establishment-time primary world pose (0), so it solved support⁻¹ × oldPrimary as -11
+        // instead of the correct same-frame -1 and immediately manufactured ten metres of conflict.
+        every { primary.pose } returns pose(10f, 0f, 0f)
+        val support = anchorAt(11f, 0f, 0f)
+        addSupport(o, pose(11f, 0f, 0f), support)
+
+        assertEquals(0f, o.primaryAnchorDriftMeters(), 1e-4f)
+    }
+
+    @Test fun `later rigid world-frame correction applied to primary and support cancels out`() {
+        val primary = mockk<Anchor>(relaxed = true)
+        val support = mockk<Anchor>(relaxed = true)
+        every { primary.trackingState } returns TrackingState.TRACKING
+        every { support.trackingState } returns TrackingState.TRACKING
+        every { primary.pose } returns pose(10f, 0f, 0f)
+        every { support.pose } returns pose(11f, 0f, 0f)
+
+        val o = AnchorOrchestrator()
+        o.setInitialAnchor(primary)
+        addSupport(o, pose(11f, 0f, 0f), support)
+
+        // Both current world coordinates move +5 m later. Because the stored offset is relative, both
+        // anchors still vote for the same physical artwork location in the new current frame.
+        every { primary.pose } returns pose(15f, 0f, 0f)
+        every { support.pose } returns pose(16f, 0f, 0f)
         assertEquals(0f, o.primaryAnchorDriftMeters(), 1e-4f)
     }
 
     @Test fun `primary disagreement with support consensus is reported in current-frame metres`() {
         val primary = anchorAt(0f, 0f, 0f)
-        val support = anchorAt(4f, 0f, 0f)
+        val support = mockk<Anchor>(relaxed = true)
+        every { support.trackingState } returns TrackingState.TRACKING
+        every { support.pose } returns pose(1f, 0f, 0f)
+
         val o = AnchorOrchestrator()
         o.setInitialAnchor(primary)
-        addSupport(
-            o,
-            Pose(floatArrayOf(1f, 0f, 0f), floatArrayOf(0f, 0f, 0f, 1f)),
-            support,
-        )
+        addSupport(o, pose(1f, 0f, 0f), support)
 
-        // Support offset is -1 m, so its artwork vote is x=3 while primary votes x=0.
+        // Support was created 1 m away, so its offset is -1 and both initially vote for x=0.
+        // If only that support's current pose later diverges to x=4, its artwork vote becomes x=3.
+        every { support.pose } returns pose(4f, 0f, 0f)
         assertEquals(3f, o.primaryAnchorDriftMeters(), 1e-4f)
     }
 
@@ -125,7 +147,7 @@ class AnchorOrchestratorDriftTest {
 
     @Test fun `a paused primary reports not-measured rather than stale disagreement`() {
         val a = mockk<Anchor>(relaxed = true)
-        every { a.pose } returns Pose(floatArrayOf(0f, 0f, 0f), floatArrayOf(0f, 0f, 0f, 1f))
+        every { a.pose } returns pose(0f, 0f, 0f)
         every { a.trackingState } returns TrackingState.TRACKING
         val o = AnchorOrchestrator()
         o.setInitialAnchor(a)
