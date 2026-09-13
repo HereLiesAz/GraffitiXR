@@ -15,11 +15,11 @@ import timber.log.Timber
  * does the math outside it, so contention is limited to the brief snapshot/store.
  *
  * That monitor protects only this class's Kotlin state. It does NOT make ARCore [Anchor]/[Session]
- * calls thread-safe. [primaryAnchorDriftMeters] (`anchor.pose`), [getActiveAnchorCount]
- * (`anchor.trackingState`), [setInitialAnchor] (`anchor.pose` plus detaching any previous anchors),
- * and [addSupportAnchor] (`session.createAnchor`) all touch ARCore native state and therefore must run
- * on the GL/session-serialized path. Off-GL callers of the diagnostic methods must use ArRenderer's
- * locked wrappers.
+ * calls thread-safe. [primaryAnchorDriftMeters] (`anchor.pose`/`anchor.trackingState`),
+ * [getActiveAnchorCount] (`anchor.trackingState`), [setInitialAnchor] (`anchor.pose` plus detaching
+ * any previous anchors), and [addSupportAnchor] (`session.createAnchor`) all touch ARCore native
+ * state and therefore must run on the GL/session-serialized path. Off-GL callers of the diagnostic
+ * methods must use ArRenderer's locked wrappers.
  *
  * [clear] is intentionally different: it only drops this orchestrator's references/state and never
  * calls `Anchor.detach()`. That makes teardown safe even when ArRenderer's bounded `sessionLock`
@@ -43,8 +43,8 @@ class AnchorOrchestrator {
      * it is excluded, in metres.
      *
      * Half a metre is chosen to sit above honest disagreement and below the failure. Anchors on one
-     * wall agree to within a few centimetres; ARCore drift between two anchors in the same room is
-     * tens of centimetres at worst. The run this was written for went metres, and kept going.
+     * wall agree to within a few centimetres; relative anchor disagreement in the same room is tens
+     * of centimetres at worst. The run this was written for went metres, and kept going.
      *
      * A prior, not a measurement — no experiment has swept it. Erring large is the safe direction:
      * too tight discards genuine anchors and reduces the consensus to one vote, which is the state
@@ -55,23 +55,38 @@ class AnchorOrchestrator {
     // The master artwork pose in world space, set when the first anchor is established.
     private var masterArtworkPose: Pose? = null
 
-    // The primary anchor's translation at the instant it was established. Compared against its
-    // live translation so a report can state, in metres, exactly how far the anchor itself has
-    // moved — not the consensus average, not the rendered overlay, the raw ARCore Anchor. This is
-    // the number that tells the next reader whether a "runs away" report is this mechanism again or
-    // something new, instead of re-deriving it from a distance HUD and a stopwatch.
-    private var establishedTranslation: FloatArray? = null
-
     /**
-     * How far the primary anchor's own pose has moved since [setInitialAnchor], in metres, or -1 if
-     * there is no established anchor or it has stopped tracking.
+     * Historical name kept for the renderer/diagnostic API, but the quantity is deliberately NOT
+     * "how far Anchor.pose moved since establishment" anymore.
+     *
+     * ARCore's world coordinate space is frame-local: both camera and anchor numerical coordinates
+     * may change significantly after Session.update() while the physical anchor remains perfectly
+     * fixed. Comparing an anchor's world-space translation to a value saved from an earlier frame
+     * therefore measured coordinate-frame correction and mislabeled it as physical drift.
+     *
+     * The useful invariant is relative disagreement INSIDE THE SAME current frame. This returns the
+     * translation distance between the primary anchor's artwork suggestion and the medoid suggestion
+     * of all currently-tracking support anchors. A rigid world-frame correction applied to everything
+     * cancels out. With no support anchors there is no independent vote, so 0 means "no observed
+     * disagreement", not proof of zero physical error. Returns -1 only when no primary anchor exists
+     * or the primary is not tracking.
      */
     fun primaryAnchorDriftMeters(): Float = synchronized(this) {
-        val e0 = establishedTranslation ?: return -1f
         val primary = consensusAnchors.firstOrNull() ?: return -1f
         if (primary.anchor.trackingState != TrackingState.TRACKING) return -1f
-        val t = primary.anchor.pose.translation
-        val dx = t[0] - e0[0]; val dy = t[1] - e0[1]; val dz = t[2] - e0[2]
+
+        val supports = consensusAnchors.drop(1)
+            .filter { it.anchor.trackingState == TrackingState.TRACKING }
+        if (supports.isEmpty()) return 0f
+
+        val primarySuggestion = primary.anchor.pose.compose(primary.artworkOffset)
+        val supportSuggestions = supports.map { it.anchor.pose.compose(it.artworkOffset) }
+        val supportMedoid = medoidPosition(
+            supportSuggestions.map { floatArrayOf(it.tx(), it.ty(), it.tz()) }
+        )
+        val dx = primarySuggestion.tx() - supportMedoid[0]
+        val dy = primarySuggestion.ty() - supportMedoid[1]
+        val dz = primarySuggestion.tz() - supportMedoid[2]
         return kotlin.math.sqrt(dx * dx + dy * dy + dz * dz)
     }
 
@@ -103,7 +118,6 @@ class AnchorOrchestrator {
             detachAnchorsLocked()
             clearStateLocked()
             masterArtworkPose = anchor.pose
-            establishedTranslation = anchor.pose.translation
             consensusAnchors.add(ConsensusAnchor(anchor, Pose.IDENTITY))
         }
         Timber.d("Initial consensus anchor established at ${anchor.pose}")
@@ -162,15 +176,10 @@ class AnchorOrchestrator {
         // Throw out the anchors that disagree with the rest before averaging.
         //
         // Without this, one support anchor is enough to take the artwork with it. ARCore anchors
-        // drift and occasionally jump — in a dim room with weak tracking, routinely — and a weighted
-        // MEAN has no defence against that: a single outlier moves the result in proportion to how
-        // wrong it is. Worse, `weight = 1/(1+dist)` is computed from the offset captured when the
-        // anchor was created, so an anchor that has since flown across the room keeps whatever
-        // authority it had when it was still trustworthy.
-        //
-        // A device run watched the artwork recede 4.6 → 4.8 → 5.6 → 7.2 → 26.3 ft over four seconds
-        // while relocalization held a 97% inlier ratio at 2px reprojection and fusion was off — so
-        // nothing downstream of this function was involved. The overlay "very literally ran away".
+        // can disagree as their local estimates update, and a weighted MEAN has no defence against
+        // an outlier: a single bad vote moves the result in proportion to how wrong it is. Worse,
+        // `weight = 1/(1+dist)` is computed from the offset captured when the anchor was created, so
+        // an anchor that has since diverged keeps whatever authority it had when it was trustworthy.
         //
         // Use the MEDOID: the actual anchor suggestion with the smallest total distance to all other
         // suggestions. Unlike an independent per-axis median, this centre is guaranteed to be a pose
@@ -270,7 +279,6 @@ class AnchorOrchestrator {
     private fun clearStateLocked() {
         consensusAnchors.clear()
         masterArtworkPose = null
-        establishedTranslation = null
         hasLastGood = false
     }
 
