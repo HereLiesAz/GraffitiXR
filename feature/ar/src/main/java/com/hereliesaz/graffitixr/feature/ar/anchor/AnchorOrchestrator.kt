@@ -64,9 +64,9 @@ class AnchorOrchestrator {
      * The useful invariant is relative disagreement INSIDE THE SAME current frame. This returns the
      * translation distance between the primary anchor's artwork suggestion and the medoid suggestion
      * of all currently-tracking support anchors. A rigid world-frame correction applied to everything
-     * cancels out. With no support anchors there is no independent vote, so 0 means "no observed
-     * disagreement", not proof of zero physical error. Returns -1 only when no primary anchor exists
-     * or the primary is not tracking.
+     * cancels out. With no tracking support anchors there is no independent vote, so this returns -1
+     * rather than fabricating a measured zero. It also returns -1 when no primary anchor exists or
+     * the primary is not tracking.
      */
     fun primaryAnchorDriftMeters(): Float = synchronized(this) {
         val primary = consensusAnchors.firstOrNull() ?: return -1f
@@ -74,7 +74,7 @@ class AnchorOrchestrator {
 
         val supports = consensusAnchors.drop(1)
             .filter { it.anchor.trackingState == TrackingState.TRACKING }
-        if (supports.isEmpty()) return 0f
+        if (supports.isEmpty()) return -1f
 
         val primarySuggestion = primary.anchor.pose.compose(primary.artworkOffset)
         val supportSuggestions = supports.map { it.anchor.pose.compose(it.artworkOffset) }
