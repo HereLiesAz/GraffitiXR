@@ -10,25 +10,21 @@ import timber.log.Timber
  * Orchestrates a "Democratic Consensus" of AR anchors to maintain a stable
  * model matrix for artwork layers, even as the primary target moves off-screen.
  *
- * Thread-safety: [getConsensusMatrix]/[getActiveAnchorCount] run on the GL render thread while
- * [clear]/[setInitialAnchor]/[addSupportAnchor] are driven from the ViewModel/main thread, so every
- * access to the shared mutable state (`consensusAnchors`, `masterArtworkPose`, `lastGoodMatrix`,
+ * Shared Kotlin state (`consensusAnchors`, `masterArtworkPose`, `lastGoodMatrix`,
  * `hasLastGood`) is guarded by `synchronized(this)`. The per-frame path snapshots under the lock and
- * does the (lock-free) math outside it, so contention is limited to the brief snapshot/store.
+ * does the math outside it, so contention is limited to the brief snapshot/store.
  *
- * That `synchronized(this)` covers ONLY this class's own Kotlin fields — it says nothing about the
- * ARCore [Anchor] objects those fields hold references to. [primaryAnchorDriftMeters] (`anchor.pose`),
- * [getActiveAnchorCount] (`anchor.trackingState`), and [clear] (`anchor.detach()`) all make real
- * ARCore native calls through those references, and ARCore's [Session]/[Anchor] API is not itself
- * thread-safe: calling any of them concurrently with the GL thread's own ARCore calls (which run under
- * `ArRenderer.sessionLock`, covering the whole `onDrawFrame` body) can race ARCore internally. Callers
- * on any thread OTHER than the GL thread — e.g. `ArViewModel.buildDiagnosticReport()`
- * (`primaryAnchorDriftMeters`) or `ArRenderer.destroy()` (`clear`) — MUST go through
- * `ArRenderer`'s own serialized wrappers (`primaryAnchorDriftMeters()`/`activeAnchorCount()`, both
- * via `withLockedSession`; the `clear()` call in `destroy()`, under the same bounded lock it uses to
- * null `session`) rather than calling these methods on this class directly. [setInitialAnchor]/
- * [addSupportAnchor] also create/hold anchors but are not currently reached from off the GL thread;
- * if that changes, they need the same treatment.
+ * That monitor protects only this class's Kotlin state. It does NOT make ARCore [Anchor]/[Session]
+ * calls thread-safe. [primaryAnchorDriftMeters] (`anchor.pose`), [getActiveAnchorCount]
+ * (`anchor.trackingState`), [setInitialAnchor] (`anchor.pose` plus detaching any previous anchors),
+ * and [addSupportAnchor] (`session.createAnchor`) all touch ARCore native state and therefore must run
+ * on the GL/session-serialized path. Off-GL callers of the diagnostic methods must use ArRenderer's
+ * locked wrappers.
+ *
+ * [clear] is intentionally different: it only drops this orchestrator's references/state and never
+ * calls `Anchor.detach()`. That makes teardown safe even when ArRenderer's bounded `sessionLock`
+ * acquisition fails. Old anchors are explicitly detached when a new initial anchor is established on
+ * the GL thread; on final renderer/session teardown ARCore owns the remaining native lifetime.
  */
 class AnchorOrchestrator {
 
@@ -43,8 +39,8 @@ class AnchorOrchestrator {
     private val MAX_CONSENSUS_ANCHORS = 8
 
     /**
-     * How far a support anchor's suggested artwork position may sit from the median before it is
-     * excluded from the consensus, in metres.
+     * How far a support anchor's suggested artwork position may sit from the consensus medoid before
+     * it is excluded, in metres.
      *
      * Half a metre is chosen to sit above honest disagreement and below the failure. Anchors on one
      * wall agree to within a few centimetres; ARCore drift between two anchors in the same room is
@@ -86,31 +82,26 @@ class AnchorOrchestrator {
     private var hasLastGood = false
 
     /**
-     * Resets the orchestrator, typically on session clear or project load.
+     * Resets only this orchestrator's Kotlin state. No ARCore native calls occur here, by design.
+     *
+     * This method can therefore be used during best-effort teardown even if ArRenderer failed to
+     * acquire its session lock. When replacing an anchor inside a live session, [setInitialAnchor]
+     * detaches the previous anchors first on the serialized GL path.
      */
     fun clear() {
         synchronized(this) {
-            // Teardown path (ArRenderer.destroy()) races ArViewModel.performFullCleanupLocked's
-            // session.close() on a separate coroutine with no ordering between them, so a detach here
-            // can land on an anchor whose session is already gone. The sibling cloud-anchor detach in
-            // ArRenderer.kt guards the exact same call the same way, for the exact same reason.
-            consensusAnchors.forEach {
-                try { it.anchor.detach() } catch (_: Exception) { /* session already gone */ }
-            }
-            consensusAnchors.clear()
-            masterArtworkPose = null
-            establishedTranslation = null
-            hasLastGood = false
+            clearStateLocked()
         }
     }
 
     /**
      * Establishes the initial artwork pose based on the primary target anchor.
+     * Must be called from the GL/session-serialized path because it touches ARCore Anchor state.
      */
     fun setInitialAnchor(anchor: Anchor) {
         synchronized(this) {
-            // clear() re-enters this monitor (reentrant), keeping the reset+seed atomic.
-            clear()
+            detachAnchorsLocked()
+            clearStateLocked()
             masterArtworkPose = anchor.pose
             establishedTranslation = anchor.pose.translation
             consensusAnchors.add(ConsensusAnchor(anchor, Pose.IDENTITY))
@@ -120,6 +111,7 @@ class AnchorOrchestrator {
 
     /**
      * Promotes a world-space point to a support anchor.
+     * Must be called from the GL/session-serialized path.
      */
     fun addSupportAnchor(session: Session, worldPose: Pose) {
         synchronized(this) {
@@ -142,8 +134,9 @@ class AnchorOrchestrator {
      * suggests[i] = anchor_i.pose * offset_i
      */
     fun getConsensusMatrix(outMatrix: FloatArray) {
-        // Snapshot the tracking set (and the anchor poses we need) under the lock, then do the math
-        // lock-free. Filtering a plain MutableList concurrently with clear() would otherwise CME.
+        // Snapshot the tracking set under the lock, then do the math lock-free. clear() only drops
+        // Kotlin references and never detaches anchors, so a concurrent teardown cannot invalidate
+        // the ARCore objects in this snapshot while the GL thread is reading their poses.
         val tracking = synchronized(this) {
             consensusAnchors.filter { it.anchor.trackingState == TrackingState.TRACKING }
         }
@@ -179,25 +172,24 @@ class AnchorOrchestrator {
         // while relocalization held a 97% inlier ratio at 2px reprojection and fusion was off — so
         // nothing downstream of this function was involved. The overlay "very literally ran away".
         //
-        // The median is the right centre here precisely because it cannot be dragged: half the votes
-        // would have to be wrong before it moves. Anchors further than [OUTLIER_RADIUS_M] from it
-        // are excluded from the average entirely — they are not consensus, they are the thing
-        // consensus exists to survive.
-        val medianPos = floatArrayOf(
-            medianOf(suggestions.map { it.tx() }),
-            medianOf(suggestions.map { it.ty() }),
-            medianOf(suggestions.map { it.tz() }),
+        // Use the MEDOID: the actual anchor suggestion with the smallest total distance to all other
+        // suggestions. Unlike an independent per-axis median, this centre is guaranteed to be a pose
+        // somebody really voted for. The old coordinate-wise median could synthesize a phantom point
+        // assembled from X/Y/Z coordinates belonging to different anchors, then reject real anchors
+        // relative to a position no anchor ever occupied.
+        val medoidPos = medoidPosition(
+            suggestions.map { floatArrayOf(it.tx(), it.ty(), it.tz()) }
         )
         val kept = tracking.filterIndexed { i, _ ->
             val s = suggestions[i]
-            val dx = s.tx() - medianPos[0]
-            val dy = s.ty() - medianPos[1]
-            val dz = s.tz() - medianPos[2]
+            val dx = s.tx() - medoidPos[0]
+            val dy = s.ty() - medoidPos[1]
+            val dz = s.tz() - medoidPos[2]
             dx * dx + dy * dy + dz * dz <= OUTLIER_RADIUS_M * OUTLIER_RADIUS_M
         }.ifEmpty {
-            // Cannot happen with a real median — the median element is always within 0 of itself —
-            // but an empty list here would divide by a zero weight sum and write NaNs into the
-            // artwork matrix, which is a far worse failure than keeping everything.
+            // Defensive only: the medoid itself is always distance 0 from the medoid, so at least one
+            // vote must survive any non-negative radius. Keeping everything is safer than emitting
+            // NaNs if that invariant is ever broken by malformed input.
             tracking
         }
 
@@ -264,23 +256,57 @@ class AnchorOrchestrator {
         }
     }
 
-    private fun identity() = floatArrayOf(1f,0f,0f,0f, 0f,1f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
-
-    /**
-     * Median of a non-empty list, by the lower element on an even count.
-     *
-     * Deliberately not the mean of the two middles: this is used per-axis on a set of 3D positions,
-     * and mixing an interpolated value into one axis while the others take real samples produces a
-     * centre that no anchor ever voted for. Picking an actual sample keeps the reference point on
-     * the manifold of things the anchors actually said.
-     */
-    private fun medianOf(values: List<Float>): Float {
-        if (values.isEmpty()) return 0f
-        val sorted = values.sorted()
-        return sorted[(sorted.size - 1) / 2]
+    private fun detachAnchorsLocked() {
+        consensusAnchors.forEach {
+            try {
+                it.anchor.detach()
+            } catch (_: Exception) {
+                // A replacement can race broader session teardown. The important property is that
+                // this native call only happens from the serialized GL path, never from clear().
+            }
+        }
     }
+
+    private fun clearStateLocked() {
+        consensusAnchors.clear()
+        masterArtworkPose = null
+        establishedTranslation = null
+        hasLastGood = false
+    }
+
+    private fun identity() = floatArrayOf(1f,0f,0f,0f, 0f,1f,0f,0f, 0f,0f,1f,0f, 0f,0f,0f,1f)
 
     fun getActiveAnchorCount(): Int = synchronized(this) {
         consensusAnchors.count { it.anchor.trackingState == TrackingState.TRACKING }
     }
+}
+
+/**
+ * Returns the actual input point whose total Euclidean distance to every other input point is
+ * smallest. Ties are deterministic: the earliest vote wins.
+ */
+internal fun medoidPosition(points: List<FloatArray>): FloatArray {
+    require(points.isNotEmpty()) { "medoid requires at least one point" }
+
+    var bestIndex = 0
+    var bestScore = Double.POSITIVE_INFINITY
+    for (i in points.indices) {
+        val p = points[i]
+        require(p.size >= 3) { "medoid points must have at least 3 coordinates" }
+        var score = 0.0
+        for (j in points.indices) {
+            if (i == j) continue
+            val q = points[j]
+            require(q.size >= 3) { "medoid points must have at least 3 coordinates" }
+            val dx = (p[0] - q[0]).toDouble()
+            val dy = (p[1] - q[1]).toDouble()
+            val dz = (p[2] - q[2]).toDouble()
+            score += kotlin.math.sqrt(dx * dx + dy * dy + dz * dz)
+        }
+        if (score < bestScore) {
+            bestScore = score
+            bestIndex = i
+        }
+    }
+    return points[bestIndex].copyOf()
 }
