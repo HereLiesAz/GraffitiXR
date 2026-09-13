@@ -10,16 +10,16 @@ import timber.log.Timber
  * Orchestrates a "Democratic Consensus" of AR anchors to maintain a stable
  * model matrix for artwork layers, even as the primary target moves off-screen.
  *
- * Shared Kotlin state (`consensusAnchors`, `masterArtworkPose`, `lastGoodMatrix`,
- * `hasLastGood`) is guarded by `synchronized(this)`. The per-frame path snapshots under the lock and
- * does the math outside it, so contention is limited to the brief snapshot/store.
+ * Shared Kotlin state (`consensusAnchors`, `lastGoodMatrix`, `hasLastGood`) is guarded by
+ * `synchronized(this)`. The per-frame path snapshots under the lock and does the math outside it, so
+ * contention is limited to the brief snapshot/store.
  *
  * That monitor protects only this class's Kotlin state. It does NOT make ARCore [Anchor]/[Session]
  * calls thread-safe. [primaryAnchorDriftMeters] (`anchor.pose`/`anchor.trackingState`),
  * [getActiveAnchorCount] (`anchor.trackingState`), [setInitialAnchor] (`anchor.pose` plus detaching
- * any previous anchors), and [addSupportAnchor] (`session.createAnchor`) all touch ARCore native
- * state and therefore must run on the GL/session-serialized path. Off-GL callers of the diagnostic
- * methods must use ArRenderer's locked wrappers.
+ * any previous anchors), and [addSupportAnchor] (`session.createAnchor` plus current anchor poses)
+ * all touch ARCore native state and therefore must run on the GL/session-serialized path. Off-GL
+ * callers of the diagnostic methods must use ArRenderer's locked wrappers.
  *
  * [clear] is intentionally different: it only drops this orchestrator's references/state and never
  * calls `Anchor.detach()`. That makes teardown safe even when ArRenderer's bounded `sessionLock`
@@ -31,7 +31,7 @@ class AnchorOrchestrator {
     private data class ConsensusAnchor(
         val anchor: Anchor,
         // The Pose of the artwork relative to this anchor.
-        // calculated as: anchor.inverse() * artworkPose
+        // calculated as: anchor.inverse() * artworkPose, with BOTH poses sampled in one ARCore frame.
         val artworkOffset: Pose
     )
 
@@ -51,9 +51,6 @@ class AnchorOrchestrator {
      * this class exists to improve on.
      */
     private val OUTLIER_RADIUS_M = 0.5f
-
-    // The master artwork pose in world space, set when the first anchor is established.
-    private var masterArtworkPose: Pose? = null
 
     /**
      * Historical name kept for the renderer/diagnostic API, but the quantity is deliberately NOT
@@ -91,8 +88,9 @@ class AnchorOrchestrator {
     }
 
     // The last successfully-computed consensus matrix. Held during a (usually brief) tracking loss so
-    // the overlay stays put on the wall instead of teleporting to the world origin — this is exactly
-    // the "stays stuck even in your pocket" behaviour the app is built around.
+    // the overlay stays put instead of teleporting to the world origin. This is only a visual hold;
+    // the matrix is never used to establish new support-anchor geometry, because an earlier ARCore
+    // world frame must not be mixed with current-frame poses.
     private val lastGoodMatrix = FloatArray(16)
     private var hasLastGood = false
 
@@ -117,7 +115,9 @@ class AnchorOrchestrator {
         synchronized(this) {
             detachAnchorsLocked()
             clearStateLocked()
-            masterArtworkPose = anchor.pose
+            // The primary defines the artwork base frame, so its relative offset is identity. Do not
+            // cache anchor.pose as a "master world pose": ARCore world coordinates are not stable
+            // across frames, and doing so makes every later support anchor compare different frames.
             consensusAnchors.add(ConsensusAnchor(anchor, Pose.IDENTITY))
         }
         Timber.d("Initial consensus anchor established at ${anchor.pose}")
@@ -126,15 +126,24 @@ class AnchorOrchestrator {
     /**
      * Promotes a world-space point to a support anchor.
      * Must be called from the GL/session-serialized path.
+     *
+     * The offset is solved from poses sampled NOW, in the same ARCore frame: support⁻¹ × primary.
+     * The old implementation composed the current support pose against a primary world pose cached
+     * when the target was first established. ARCore explicitly does not guarantee numerical world
+     * coordinates across frames, so that offset silently baked world-frame correction into consensus.
      */
     fun addSupportAnchor(session: Session, worldPose: Pose) {
         synchronized(this) {
             if (consensusAnchors.size >= MAX_CONSENSUS_ANCHORS) return
-            val master = masterArtworkPose ?: return
+            val primary = consensusAnchors.firstOrNull() ?: return
+            if (primary.anchor.trackingState != TrackingState.TRACKING) return
 
             val anchor = session.createAnchor(worldPose)
-            // offset = anchor.inverse() * master
-            val offset = worldPose.inverse().compose(master)
+            val primaryPoseNow = primary.anchor.pose
+            val supportPoseNow = anchor.pose
+            // Both operands are from the current frame; their relative transform is meaningful even
+            // if ARCore has globally rewritten the world basis since target establishment.
+            val offset = supportPoseNow.inverse().compose(primaryPoseNow)
 
             consensusAnchors.add(ConsensusAnchor(anchor, offset))
             Timber.d("Support anchor added. Total consensus anchors: ${consensusAnchors.size}")
@@ -156,9 +165,9 @@ class AnchorOrchestrator {
         }
 
         if (tracking.isEmpty()) {
-            // No anchor is tracking this frame. HOLD the last good world matrix rather than writing
-            // identity, which would snap the artwork overlay to the world origin on every dropped
-            // frame. Only fall back to identity before any consensus has ever been computed.
+            // No anchor is tracking this frame. HOLD the last good matrix rather than writing identity.
+            // This is presentation only; no new anchor-relative geometry is derived from this stale
+            // world-frame value. Once ARCore resumes tracking, current anchor poses replace it.
             synchronized(this) {
                 if (hasLastGood) System.arraycopy(lastGoodMatrix, 0, outMatrix, 0, 16)
                 // Hand-written instead of Matrix.setIdentityM: the unit tests run with
@@ -278,7 +287,6 @@ class AnchorOrchestrator {
 
     private fun clearStateLocked() {
         consensusAnchors.clear()
-        masterArtworkPose = null
         hasLastGood = false
     }
 
