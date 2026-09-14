@@ -7,25 +7,31 @@ import com.hereliesaz.graffitixr.common.model.FusionState
  * Fuses the ARCore-consensus backbone with mark-PnP relocalization into a single rendered anchor
  * model matrix (ARCore world frame).
  *
- * The PnP fix is modelled as a **persistent world-frame drift correction** `D = corrected ∘
- * backbone⁻¹`, held between snaps and re-applied to the live backbone every frame
- * (`fused = D ∘ backbone`). So the overlay stays locked to the PnP-corrected world location even as
- * ARCore's frame drifts and even on frames where no new snap arrives — the previous design reset to
- * the raw backbone each non-snap frame, which washed out every correction.
+ * The PnP fix is stored as a **persistent anchor-local correction**
+ * `L = backbone⁻¹ ∘ corrected`, then re-applied to the live backbone every frame as
+ * `fused = backbone ∘ L`.
+ *
+ * This side matters. ARCore may rewrite the numerical world coordinate frame between updates while
+ * keeping the physical scene fixed. Under a world-frame rebase `G`, both current poses become
+ * `backbone' = G ∘ backbone` and `corrected' = G ∘ corrected`; the local correction is unchanged:
+ * `backbone'⁻¹ ∘ corrected' = backbone⁻¹ ∘ corrected`. A world-space left correction
+ * `D = corrected ∘ backbone⁻¹` would instead need to be conjugated by every unknown rebase
+ * (`D' = G ∘ D ∘ G⁻¹`). Persisting the old `D` and applying `D ∘ backbone'` therefore fought
+ * ARCore's own coordinate correction.
  *
  * Correction strength is driven by the **PnP inlier ratio** (not splat confidence, which is ~0 when
  * the depth API is off and would otherwise zero the correction). A confident relock that is *cold*
  * — the first lock, or one that diverges far from where we're currently drawing (the pocket case) —
- * **hard-snaps** (D replaced outright) for instant relocalization; otherwise D is smoothed toward
+ * **hard-snaps** (L replaced outright) for instant relocalization; otherwise L is smoothed toward
  * the new fix.
  *
- * Stateful only across frames (last seq + current correction); the geometry is pure.
+ * Stateful only across frames (last seq + current local correction); the geometry is pure.
  */
 class PoseFusion {
     private var lastSeq = 0f
-    // Persistent world-frame drift correction D such that fused = D ∘ backbone. Held between snaps and
-    // re-applied every frame so the overlay stays locked to the PnP-corrected world location even on
-    // frames with no new snap. Null until the first trusted relocalization.
+    // Persistent ANCHOR-LOCAL correction L such that fused = backbone ∘ L. Unlike a world-frame
+    // left correction, L survives ARCore rebasing because the same current backbone carries it into
+    // whatever world basis ARCore publishes this frame. Null until the first trusted relocalization.
     private var correction: FloatArray? = null
     // True until the first HARD relock after a (re)start or tracking loss, so a cold relock — out of a
     // pocket, screen back on — snaps instantly instead of easing in.
@@ -35,16 +41,14 @@ class PoseFusion {
     fun markRelocalizing() { coldStart = true }
 
     /**
-     * Clears the persistent drift correction back to its initial (no-correction) state and re-arms
+     * Clears the persistent local correction back to its initial (no-correction) state and re-arms
      * the cold-start snap, as if this PoseFusion had just been constructed.
      *
      * Call this when a NEW anchor/fingerprint is established inside an already-running session (the
      * artist re-captures a target). [markRelocalizing] alone does not clear `correction` — by design,
-     * a plain tracking loss keeps the standing correction so a returning lock resumes where it left
-     * off. A re-capture is a different event: the anchor itself changed, so a correction computed
-     * against the OLD anchor's drift is not stale, it is now WRONG for the new one, and applying it
-     * produces a visible offset that would otherwise only ease out over many relock cycles instead of
-     * clearing immediately.
+     * a plain tracking loss keeps the standing anchor-local correction so a returning lock resumes
+     * where it left off. A re-capture is different: the anchor-local frame itself changed, so a
+     * correction expressed in the OLD anchor frame is now meaningless and must be cleared.
      */
     fun reset() {
         correction = null
@@ -136,8 +140,9 @@ class PoseFusion {
          * `Fingerprint`, and partitions the footprint with — so this needs no new geometry, only a
          * quantity the project already computes for another reason.
          *
-         * **`D` goes on ONE side, not both.** Converting a *transform* between conventions is
-         * normally the conjugation `D · m · D`, and that is what I wrote first. It is wrong here
+         * **`D` here is the fixed CV↔GL axis-conversion matrix, not PoseFusion's persistent
+         * correction.** `D` goes on ONE side, not both. Converting a transform between conventions
+         * is normally the conjugation `D · m · D`, and that is what I wrote first. It is wrong here
          * because `captureAnchorCam` carries its own `D` (it is a CV view times a model matrix), so
          * the trailing factor applies it twice — landing 4.29 from the anchor where the original
          * defect was 2.92, i.e. *worse than doing nothing*. `PAPER.md` §8.3's warning about getting
@@ -217,13 +222,14 @@ class PoseFusion {
 
         if (isNew && inlierRatio >= MIN_INLIER_RATIO) {
             val corrected = composeCorrected(vCurrent, reloc.copyOf(16), captureAnchorCam)
-            // World-frame drift correction such that D ∘ backbone == corrected at snap time.
-            val newD = PoseMath.multiply(corrected, PoseMath.rigidInverse(backbone))
+            // Anchor-local correction such that backbone ∘ L == corrected at snap time. This relative
+            // transform is frame-invariant under ARCore's global world-coordinate rewrites.
+            val newLocal = PoseMath.multiply(PoseMath.rigidInverse(backbone), corrected)
 
             // Cold = first lock after (re)start/tracking-loss, no prior correction, or a fix that
-            // diverges far from where we currently draw (the pocket case). A confident cold fix snaps
-            // hard for instant relock; everything else eases in by inlier-ratio-scaled alpha.
-            val applied = correction?.let { PoseMath.multiply(it, backbone) }
+            // diverges far from where we're currently drawing (the pocket case). Compare in the
+            // CURRENT world frame by carrying the stored local correction through the live backbone.
+            val applied = correction?.let { PoseMath.multiply(backbone, it) }
             val cold = coldStart || applied == null || diverged(applied, corrected)
             val highConf = inlierRatio >= COLD_SNAP_INLIER_RATIO && inliers >= COLD_SNAP_MIN_INLIERS
 
@@ -231,23 +237,23 @@ class PoseFusion {
                 coldStart = false
                 lastState = FusionState.COLD_SNAP
                 lastAlpha = -1f          // a snap has no blend rate; -1 says so rather than 1.0
-                newD // instant relock
+                newLocal // instant relock, stored relative to the backbone
             } else {
                 val effConf = (CONF_FLOOR + (1f - CONF_FLOOR) * confGlobal.coerceIn(0f, 1f))
                 val alpha = (BASE_ALPHA * inlierRatio * effConf).coerceIn(0f, 1f)
                 lastState = FusionState.BLENDING
                 lastAlpha = alpha
-                blend(correction ?: identity(), newD, alpha)
+                blend(correction ?: identity(), newLocal, alpha)
             }
             snapsAccepted++
         } else if (correction != null) {
-            // A correction stands but nothing new arrived. The healthy steady state — and also what
-            // a stale correction looks like, which is why snapsAccepted is published beside it.
+            // A local correction stands but nothing new arrived. It remains valid under a global
+            // ARCore world rebase because the live backbone carries it into the current frame.
             lastState = FusionState.HOLDING
         }
         lastSeq = seq
-        // fused = D ∘ backbone, re-applied every frame (identity drift until the first trusted snap).
-        return PoseMath.multiply(correction ?: identity(), backbone)
+        // fused = backbone ∘ L, re-applied every frame (identity until the first trusted snap).
+        return PoseMath.multiply(backbone, correction ?: identity())
     }
 
     private var lastState = FusionState.WAITING_FOR_LOCK
@@ -260,8 +266,9 @@ class PoseFusion {
      * A snapshot of the last decision, for the diagnostic overlay and the eval CSV.
      *
      * The magnitudes are computed here rather than stored, because the correction is a matrix and
-     * "how far is it pulling the overlay" is the question a reader actually has. Millimetres and
-     * degrees, both -1 when no correction stands.
+     * "how far is it pulling the overlay" is the question a reader actually has. The correction is
+     * anchor-local, so these magnitudes are invariant under ARCore world-frame rebasing. Millimetres
+     * and degrees are both -1 when no correction stands.
      *
      * Note this reports what fusion did when it RAN. The states that mean it did not run at all —
      * disabled, no anchor, no capture pose — are the caller's to report, because only the caller
