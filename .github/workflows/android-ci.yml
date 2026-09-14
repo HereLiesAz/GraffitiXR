@@ -39,8 +39,6 @@ jobs:
     timeout-minutes: 40
     steps:
       - name: Checkout
-        env:
-          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
         uses: actions/checkout@v7
 
       - name: Inject Google Services
@@ -96,8 +94,6 @@ jobs:
 
     steps:
       - name: Checkout
-        env:
-          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
