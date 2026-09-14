@@ -41,7 +41,7 @@ jobs:
       - name: Checkout
         env:
           ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Inject Google Services
         env:
@@ -98,7 +98,7 @@ jobs:
       - name: Checkout
         env:
           ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
