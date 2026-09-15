@@ -3,14 +3,13 @@ name: Temporary AR session ownership patch
 on:
   push:
     branches:
-      - fix/ar-session-ownership-wiring
+      - 'fix/ar-session-ownership-wiring'
 
 permissions:
   contents: write
 
 jobs:
   patch:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Check out patch branch
