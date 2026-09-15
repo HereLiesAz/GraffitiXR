@@ -2716,8 +2716,8 @@ class ArRenderer(
      * Returns true when [sessionLock] was acquired within [timeoutMs] — i.e. the GL thread is
      * provably outside [onDrawFrame] and (with the session nulled) cannot touch ARCore again.
      * Returns false when the GL thread stayed wedged inside the frame (e.g. blocked in
-     * session.update() on a camera that never feeds); the @Volatile session is still nulled so
-     * If the lock cannot be acquired within [timeoutMs], returns false without changing [session].
+     * session.update() on a camera that never feeds); in that case [session] is left untouched and
+     * ownership stays with the renderer.
      * A timeout means ownership was not transferred; callers must not touch the ARCore Session until
      * a later successful handoff. Safe from any thread; never blocks longer than [timeoutMs].
      * Does NOT set [isDestroying]: callers that are tearing down
