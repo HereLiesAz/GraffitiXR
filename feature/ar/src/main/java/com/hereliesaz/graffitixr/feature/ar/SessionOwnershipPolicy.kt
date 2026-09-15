@@ -1,7 +1,7 @@
 package com.hereliesaz.graffitixr.feature.ar
 
 /**
- * What a caller may do after asking the renderer to hand off its ARCore [Session].
+ * What a caller may do after asking the renderer to hand off its ARCore `Session`.
  *
  * A timeout is not partial ownership. The GL thread may still be inside a native ARCore call with a
  * local reference to that same session, so lifecycle code must either defer final cleanup until the
