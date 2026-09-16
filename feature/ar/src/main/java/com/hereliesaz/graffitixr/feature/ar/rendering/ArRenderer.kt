@@ -2716,10 +2716,11 @@ class ArRenderer(
      * Returns true when [sessionLock] was acquired within [timeoutMs] — i.e. the GL thread is
      * provably outside [onDrawFrame] and (with the session nulled) cannot touch ARCore again.
      * Returns false when the GL thread stayed wedged inside the frame (e.g. blocked in
-     * session.update() on a camera that never feeds); the @Volatile session is still nulled so
-     * no NEW frame starts, but the wedged frame holds its own stale reference — the caller must
-     * rely on Session.close() to absorb the in-flight update(). Safe from any thread; never
-     * blocks longer than [timeoutMs]. Does NOT set [isDestroying]: callers that are tearing down
+     * session.update() on a camera that never feeds); in that case [session] is left untouched and
+     * ownership stays with the renderer.
+     * A timeout means ownership was not transferred; callers must not touch the ARCore Session until
+     * a later successful handoff. Safe from any thread; never blocks longer than [timeoutMs].
+     * Does NOT set [isDestroying]: callers that are tearing down
      * set it themselves, while live-reconfigure callers re-attach via [attachSession] afterwards.
      */
     fun detachSessionBounded(timeoutMs: Long): Boolean {
@@ -2728,12 +2729,13 @@ class ArRenderer(
         } catch (_: InterruptedException) {
             false
         }
+        if (!locked) return false
         try {
             session = null
         } finally {
-            if (locked) sessionLock.unlock()
+            sessionLock.unlock()
         }
-        return locked
+        return true
     }
 
     /**

@@ -1960,19 +1960,30 @@ class ArViewModel @Inject constructor(
             // session under its OWN ReentrantLock, so closing under sessionMutex alone raced the
             // GL frame body (hitTest/acquireCameraImage/setCameraTextureName on a session being
             // closed) — Session is not thread-safe, and that race segfaulted ARCore internally on
-            // its MTC_vio thread. detachSessionBounded confirms the GL thread is out of the frame
-            // (or times out if it's wedged inside update(), in which case close() absorbs the
-            // in-flight call). Saves still work: they read the renderer's sub-renderers, not the
-            // ARCore session.
-            renderer?.isDestroying = true
-            val glThreadOut = renderer?.detachSessionBounded(1500L) ?: true
-            if (!glThreadOut) {
-                appendDiag("cleanup: GL thread wedged in-frame after 1500ms — closing session anyway")
-            }
+            // its MTC_vio thread. detachSessionBounded is a real ownership handoff: success means
+            // the GL thread is out of the frame; timeout means it still owns the Session and native
+            // teardown must be deferred. Saves still work: they read the renderer's sub-renderers,
+            // not the ARCore session.
+            val r = renderer
+            val s = session
+            val wasResumed = isSessionResumed
+            r?.isDestroying = true
+            val handoffSucceeded = r?.detachSessionBounded(1500L) ?: true
+
             saveMapBlocking()
-            session?.let {
-                if (isSessionResumed) it.pause()
-                it.close()
+            when (decideSessionOwnership(handoffSucceeded, SessionOwnershipAction.CLEANUP)) {
+                SessionOwnershipDecision.PROCEED -> {
+                    s?.let { closeDetachedArSession(it, wasResumed) }
+                }
+                SessionOwnershipDecision.DEFER_CLEANUP -> {
+                    appendDiag("cleanup: GL thread still owns ARCore after 1500ms — deferring native close")
+                    if (r != null && s != null) {
+                        deferArSessionCloseUntilRendererHandoff(r, s, wasResumed)
+                    }
+                }
+                SessionOwnershipDecision.ABORT_RECONFIGURE -> {
+                    appendDiag("cleanup: ownership policy aborted native teardown")
+                }
             }
             session = null
             renderer = null
@@ -2864,9 +2875,18 @@ class ArViewModel @Inject constructor(
                 if (s == null || isDestroying) return@withLock
                 val wasResumed = isSessionResumed
                 // Get the GL thread out of the frame body before touching the session config.
-                val glThreadOut = renderer?.detachSessionBounded(1500L) ?: true
-                if (!glThreadOut) {
-                    appendDiag("stereo recovery: GL thread wedged in-frame after 1500ms — reconfiguring anyway")
+                val handoffSucceeded = renderer?.detachSessionBounded(1500L) ?: true
+                if (
+                    decideSessionOwnership(handoffSucceeded, SessionOwnershipAction.RECONFIGURE) ==
+                    SessionOwnershipDecision.ABORT_RECONFIGURE
+                ) {
+                    appendDiag("stereo recovery: GL thread still owns ARCore after 1500ms — aborting live reconfigure")
+                    _feedback.tryEmit(
+                        com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                            "AR camera recovery timed out safely — exit and re-enter AR"
+                        )
+                    )
+                    return@withLock
                 }
                 if (wasResumed) pauseArSessionInternal()
                 try {
