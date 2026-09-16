@@ -1,0 +1,39 @@
+name: Temporary AR rotation timeout patch
+
+on:
+  push:
+    branches:
+      - 'fix/ar-rotation-timeout-discard'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/ar-rotation-timeout-discard
+          fetch-depth: 0
+
+      - name: Apply exact renderer patch
+        run: python3 .github/scripts/tmp_patch_rotation_timeout.py
+
+      - name: Verify patch scope
+        shell: bash
+        run: |
+          git diff --check
+          test "$(git diff --name-only)" = 'feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/rendering/ArRenderer.kt'
+
+      - name: Run AR unit tests
+        run: ./gradlew :feature:ar:testDebugUnitTest --no-daemon
+
+      - name: Commit renderer fix
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/rendering/ArRenderer.kt
+          git commit -m 'fix(ar): discard invalid rotation correction on timeout'
+          git push origin HEAD:fix/ar-rotation-timeout-discard
