@@ -596,8 +596,9 @@ class ArRenderer(
     private var overlayRotationCorrectionPending: Boolean = false
     // How many consecutive frames [overlayRotationCorrectionPending] has been retried because the
     // candidate correction failed validation. Reset whenever a NEW establishment arms the pending
-    // flag, and again once a candidate is accepted. Capped by MAX_OVERLAY_CORRECTION_RETRY_FRAMES so
-    // an anchor that never starts tracking doesn't leave the flag pending for the rest of the session.
+    // flag, and again once the candidate is either applied or discarded. Capped by
+    // MAX_OVERLAY_CORRECTION_RETRY_FRAMES so an anchor that never starts tracking doesn't leave the
+    // flag pending for the rest of the session.
     private var overlayRotationCorrectionRetryFrames: Int = 0
     // The disambiguating "up" reference (see the candidate-build block below) resolved from the LIVE
     // camera matrix on the FIRST attempt for the current pending correction, then reused unchanged for
@@ -1738,26 +1739,38 @@ class ArRenderer(
                 // later. sessionLock is reentrant and already held on this thread for the whole frame,
                 // so this re-enters for free rather than blocking.
                 val anchorTracking = normalIsDegenerate || activeAnchorCount() > 0
-                val giveUp = overlayRotationCorrectionRetryFrames >= MAX_OVERLAY_CORRECTION_RETRY_FRAMES
                 val valid = anchorTracking && reproducesNormal
 
-                if (valid || giveUp) {
-                    if (giveUp && !valid) {
+                when (
+                    decideOverlayRotationCorrection(
+                        valid = valid,
+                        retryFrames = overlayRotationCorrectionRetryFrames,
+                        maxRetryFrames = MAX_OVERLAY_CORRECTION_RETRY_FRAMES,
+                    )
+                ) {
+                    OverlayRotationCorrectionDecision.APPLY -> {
+                        System.arraycopy(overlayRotationCorrectionCandidate, 0, overlayRotationCorrection, 0, 16)
+                        overlayRotationCorrectionPending = false
+                        overlayRotationCorrectionRetryFrames = 0
+                    }
+                    OverlayRotationCorrectionDecision.RETRY -> {
+                        // Leave [overlayRotationCorrectionPending] set: retry against next frame's
+                        // anchorMatrix, which is more likely to be the real anchor's own tracked pose.
+                        // overlayRotationCorrection is untouched — it stays whatever it was (identity, on
+                        // the very first attempt), which draws as "use the raw anchor frame" while retrying.
+                        overlayRotationCorrectionRetryFrames++
+                    }
+                    OverlayRotationCorrectionDecision.DISCARD -> {
                         Timber.w(
-                            "ARDIAG overlayRotationCorrection: accepting an unvalidated capture after " +
+                            "ARDIAG overlayRotationCorrection: discarding invalid capture after " +
                                 "$overlayRotationCorrectionRetryFrames retries " +
                                 "(anchorTracking=$anchorTracking reproducesNormal=$reproducesNormal)"
                         )
+                        // A timeout is not validation. Keep the existing live correction unchanged and
+                        // stop retrying until the next anchor establishment explicitly arms a new capture.
+                        overlayRotationCorrectionPending = false
+                        overlayRotationCorrectionRetryFrames = 0
                     }
-                    System.arraycopy(overlayRotationCorrectionCandidate, 0, overlayRotationCorrection, 0, 16)
-                    overlayRotationCorrectionPending = false
-                    overlayRotationCorrectionRetryFrames = 0
-                } else {
-                    // Leave [overlayRotationCorrectionPending] set: retry against next frame's
-                    // anchorMatrix, which is more likely to be the real anchor's own tracked pose.
-                    // overlayRotationCorrection is untouched — it stays whatever it was (identity, on
-                    // the very first attempt), which draws as "use the raw anchor frame" while retrying.
-                    overlayRotationCorrectionRetryFrames++
                 }
             }
 
@@ -2883,11 +2896,11 @@ class ArRenderer(
         const val PLANE_PICK_DOT_TIE = 0.05f
 
         // Bound on how many frames [overlayRotationCorrectionPending] is retried while its candidate
-        // fails validation (anchor not yet TRACKING, or a degenerate up-vector fallback), before it is
-        // accepted anyway with a warning logged. At a typical 30-60fps this is well under a second —
-        // long enough for a freshly-created anchor to reach TRACKING, short enough that a persistently
-        // non-tracking anchor doesn't leave the artwork's orientation undecided for the rest of the
-        // session.
+        // fails validation (anchor not yet TRACKING, or a degenerate up-vector fallback), before the
+        // invalid candidate is discarded and the existing live correction is kept. At a typical
+        // 30-60fps this is well under a second — long enough for a freshly-created anchor to reach
+        // TRACKING, short enough that a persistently non-tracking anchor doesn't leave the artwork's
+        // orientation undecided for the rest of the session.
         const val MAX_OVERLAY_CORRECTION_RETRY_FRAMES = 15
 
         const val PERCEPTION_FULL_FPS = 60
