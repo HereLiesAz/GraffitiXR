@@ -1,11 +1,11 @@
 package com.hereliesaz.graffitixr.feature.editor
 
 import android.graphics.Bitmap
-import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmentation
 import com.google.mlkit.vision.segmentation.subject.SubjectSegmenterOptions
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -35,8 +35,14 @@ class SubjectIsolator @Inject constructor() {
         runCatching {
             val scaled = downsample(bitmap, 2048)
             val image = InputImage.fromBitmap(scaled, 0)
-            val segResult = Tasks.await(segmenter.process(image))
+            val segResult = segmenter.process(image).await()
             val subjects = segResult.subjects
+            if (subjects.isEmpty()) {
+                // No subject found: proceeding would leave mergedConf all-zero, and
+                // applyConfidenceThreshold would then make the WHOLE image transparent —
+                // silently destroying the design rather than reporting the failure.
+                throw IllegalStateException("No subject found to isolate")
+            }
             val w = scaled.width; val h = scaled.height
             val mergedConf = FloatArray(w * h)
             for (subject in subjects) {
@@ -62,7 +68,7 @@ class SubjectIsolator @Inject constructor() {
                 }
             }
             val isolated = applyConfidenceThreshold(scaled, mergedConf, threshold = 0.5f)
-            IsolationResult(isolatedBitmap = isolated, rawConfidence = mergedConf, width = w, height = h)
+            IsolationResult(isolatedBitmap = isolated)
         }
     }
 
@@ -101,7 +107,4 @@ class SubjectIsolator @Inject constructor() {
 
 data class IsolationResult(
     val isolatedBitmap: Bitmap,
-    val rawConfidence: FloatArray,
-    val width: Int,
-    val height: Int
 )

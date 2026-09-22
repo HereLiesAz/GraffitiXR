@@ -1161,8 +1161,8 @@ class MainActivity : ComponentActivity() {
                                             dashboardViewModel.onNewProjectTriggered()
                                         },
                                         onImportProject = { uri -> dashboardViewModel.importProject(uri) },
-                                        onClose = { /* no-op: ProjectLibraryScreen no longer exposes a close affordance */ },
                                         strings = strings,
+                                        isLoading = dashboardState.isLoading,
                                         importErrorMessage = dashboardState.importErrorMessage,
                                         onDismissImportError = { dashboardViewModel.dismissImportError() },
                                         onOpenSettings = { showSettings = true }
@@ -1718,6 +1718,7 @@ class MainActivity : ComponentActivity() {
                                 SettingsScreen(
                                     currentVersion = BuildConfig.VERSION_NAME,
                                     updateStatus = dashboardUiState.updateStatusMessage,
+                                    updateUrl = dashboardUiState.updateUrl,
                                     isCheckingForUpdate = dashboardUiState.isCheckingForUpdate,
                                     currentLanguage = language,
                                     onLanguageChanged = { settingsViewModel.setLanguage(it) },
