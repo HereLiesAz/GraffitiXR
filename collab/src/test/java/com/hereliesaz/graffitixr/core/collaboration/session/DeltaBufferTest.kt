@@ -2,6 +2,7 @@
 package com.hereliesaz.graffitixr.core.collaboration.session
 
 import com.hereliesaz.graffitixr.common.model.Layer
+import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.common.model.Op
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -147,6 +148,23 @@ class DeltaBufferTest {
         buf.append(3, replacement, 10)
 
         assertEquals(listOf<Pair<Long, Op>>(3L to replacement), buf.opsAfter(0))
+    }
+
+    @Test
+    fun `replacing the design does not supersede an independent ModeTransform`() {
+        // ModeTransform lives on ModeAdjustment, not on the design layer DesignReplace swaps out
+        // (see Op.ModeTransform's kdoc) — it is the on-wall placement for one editor mode, and a
+        // design replacement carries no opinion about it.
+        val buf = DeltaBuffer()
+        val placement = Op.ModeTransform(mode = "AR", adjustment = ModeAdjustment(offsetX = 5f))
+        buf.append(1, placement, 10)
+        val replacement = Op.DesignReplace(Layer(id = "d", name = "design"))
+        buf.append(2, replacement, 10)
+
+        assertEquals(
+            listOf<Pair<Long, Op>>(1L to placement, 2L to replacement),
+            buf.opsAfter(0),
+        )
     }
 
     @Test

@@ -4,6 +4,7 @@ package com.hereliesaz.graffitixr.core.collaboration.session
 import android.util.Log
 import com.hereliesaz.graffitixr.common.model.CoopSessionState
 import com.hereliesaz.graffitixr.common.model.Op
+import com.hereliesaz.graffitixr.core.collaboration.ProjectSnapshot
 import com.hereliesaz.graffitixr.core.collaboration.wire.BulkAckPayload
 import com.hereliesaz.graffitixr.core.collaboration.wire.BulkBeginPayload
 import com.hereliesaz.graffitixr.core.collaboration.wire.ByePayload
@@ -18,6 +19,7 @@ import com.hereliesaz.graffitixr.core.collaboration.wire.Limits
 import com.hereliesaz.graffitixr.core.collaboration.wire.OpCodec
 import com.hereliesaz.graffitixr.core.collaboration.wire.PingPayload
 import com.hereliesaz.graffitixr.core.collaboration.wire.SessionCrypto
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -44,18 +46,24 @@ internal class HostSession(
     private val token: String,
     private val protocolVersion: Int,
     private val localDeviceName: String,
-    private val fingerprintBytes: ByteArray,
-    private val projectBytes: ByteArray,
     private val projectId: String,
-    private val layerCount: Int,
+    // Called fresh every time a bulk snapshot is actually sent (see [sendBulk]), not just once at
+    // construction: a precomputed ByteArray captured here would go stale the moment a guest joins
+    // (or reconnects into a DeltaBuffer gap) more than a few edits into the session, silently
+    // handing them an out-of-date project.
+    private val snapshotProvider: () -> ProjectSnapshot,
 ) : Session() {
 
     init {
         // The guest rejects bulk transfers above this cap with a bare require() that surfaces as
         // an unexplained NetworkLost on its side; failing fast here turns an oversized project
-        // into an immediate, attributable hosting error instead.
-        require(projectBytes.size <= Limits.MAX_BULK_BYTES && fingerprintBytes.size <= Limits.MAX_BULK_BYTES) {
-            "project too large to host: ${projectBytes.size}B project / ${fingerprintBytes.size}B fingerprint " +
+        // into an immediate, attributable hosting error instead. This only validates size against
+        // whatever the project looks like right now — [sendBulk] validates again every time it
+        // actually sends one, since the project this check saw at construction is not necessarily
+        // the one sent later.
+        val probe = snapshotProvider()
+        require(probe.projectBytes.size <= Limits.MAX_BULK_BYTES && probe.fingerprintBytes.size <= Limits.MAX_BULK_BYTES) {
+            "project too large to host: ${probe.projectBytes.size}B project / ${probe.fingerprintBytes.size}B fingerprint " +
                 "(cap ${Limits.MAX_BULK_BYTES}B)"
         }
     }
@@ -65,10 +73,11 @@ internal class HostSession(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     // Unbounded channel, but NOT unbounded memory: every element is appended to deltaBuffer
-    // first (real encoded size), whose 5 MB / 1000-op cap ends the session on overflow. The
-    // previous design (bounded 128 + DROP_OLDEST, seq assigned at send time) silently discarded
-    // ops that overflowed during a reconnect window before they ever reached the DeltaBuffer,
-    // so the guest's canvas diverged with no signal.
+    // first (real encoded size), whose 48 MB / 2000-op cap (see DeltaBuffer.kt) evicts oldest
+    // entries and records a gap on overflow rather than ending the session. The previous design
+    // (bounded 128 + DROP_OLDEST, seq assigned at send time) silently discarded ops that
+    // overflowed during a reconnect window before they ever reached the DeltaBuffer, so the
+    // guest's canvas diverged with no signal.
     private val outQueue: Channel<EncodedDelta> = Channel(capacity = Channel.UNLIMITED)
     private val deltaBuffer = DeltaBuffer()
     private val seqCounter = AtomicLong(0L)
@@ -112,22 +121,46 @@ internal class HostSession(
      *
      * `java.net.Socket` exposes no write-side timeout (`soTimeout` only bounds reads), so the
      * actual write runs on a plain IO thread and this coroutine only waits up to
-     * [WRITE_TIMEOUT_MS] for it. If it doesn't finish in time, the coroutine gives up, but the
-     * underlying thread is still parked inside the blocking write call — closing [output] (which,
-     * per `Socket.getOutputStream`'s contract, closes the socket) unblocks that thread with an
-     * IOException, then this function throws so the caller treats it exactly like any other
-     * failed write: a dropped connection, not a wedged one.
+     * [WRITE_TIMEOUT_MS] for it.
+     *
+     * A bare `withTimeoutOrNull(...) { withContext(Dispatchers.IO) { blockingWrite() } }` does
+     * NOT actually bound wall-clock time: `withContext` only returns once its block completes, so
+     * `withTimeoutOrNull` cancelling the *coroutine* around it has nothing to act on while that
+     * coroutine is suspended waiting on `withContext` — the underlying thread stays parked inside
+     * the blocking call regardless, for as long as the guest simply never reads (backgrounded app,
+     * throttled network, or a hostile peer). [runInterruptible] does not rescue this either: unlike
+     * NIO channels, plain `java.net.Socket` streams do not respond to `Thread.interrupt()` while
+     * blocked in a native write — the thread still does not unblock.
+     *
+     * The one thing that reliably unblocks a stuck `java.net.Socket` write is closing the stream
+     * out from under it (`Socket.getOutputStream`'s documented contract: closing the stream closes
+     * the socket), which turns the blocked write into an `IOException` on that thread. So instead
+     * of trying to cancel the write, a watchdog coroutine races it: if the write hasn't finished by
+     * [WRITE_TIMEOUT_MS], the watchdog force-closes [output], the write call unblocks with an
+     * exception, and this function reports that as a timeout either way (even in the unlikely case
+     * the failure the write actually saw had some other proximate cause) — the caller treats it
+     * exactly like any other failed write: a dropped connection, not a wedged one.
      */
     private suspend fun writeFrameTimed(output: OutputStream, type: FrameType, payload: ByteArray) {
-        val completed = withTimeoutOrNull(WRITE_TIMEOUT_MS) {
+        val timedOut = java.util.concurrent.atomic.AtomicBoolean(false)
+        val watchdog = scope.launch {
+            delay(WRITE_TIMEOUT_MS)
+            timedOut.set(true)
+            try { output.close() } catch (_: Exception) {}
+        }
+        try {
             withContext(Dispatchers.IO) {
                 Frame.write(output, type, payload)
                 output.flush()
             }
-        }
-        if (completed == null) {
-            try { output.close() } catch (_: Exception) {}
-            throw java.io.IOException("write timed out after ${WRITE_TIMEOUT_MS}ms")
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            if (timedOut.get()) {
+                throw java.io.IOException("write timed out after ${WRITE_TIMEOUT_MS}ms", e)
+            }
+            throw e
+        } finally {
+            watchdog.cancel()
         }
     }
 
@@ -353,22 +386,69 @@ internal class HostSession(
 
     private fun randomNonce(): ByteArray = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
 
+    /**
+     * Send a full project snapshot: to a fresh guest, or to a reconnecting one whose replay
+     * request landed in a [DeltaBuffer] gap. Always re-reads the project via [snapshotProvider]
+     * rather than any value captured earlier, so the guest gets the project as it stands right
+     * now rather than a copy frozen at some earlier point (construction, or an earlier bulk send).
+     */
     private suspend fun sendBulk(output: OutputStream, crypto: SessionCrypto) {
+        // Read the seq counter BEFORE calling snapshotProvider(): every op site updates project
+        // state before calling enqueueOp (which is what assigns/advances this counter), so any op
+        // whose seq is <= this value is guaranteed to already be reflected in the snapshot the
+        // provider is about to read. That ordering is what makes dropStaleQueueEntries below safe.
+        val seqCutoff = seqCounter.get()
+        val snapshot = snapshotProvider()
+        require(
+            snapshot.projectBytes.size <= Limits.MAX_BULK_BYTES &&
+                snapshot.fingerprintBytes.size <= Limits.MAX_BULK_BYTES,
+        ) {
+            "project too large to host: ${snapshot.projectBytes.size}B project / " +
+                "${snapshot.fingerprintBytes.size}B fingerprint (cap ${Limits.MAX_BULK_BYTES}B)"
+        }
+        // The snapshot just captured already contains every op enqueued up to seqCutoff (see
+        // above), so any of those ops still sitting in outQueue — left over from a previous
+        // guest's session that disconnected before they were sent, or from this same reconnect's
+        // gap — must not also go out as live DELTA frames once outboundLoop starts: the guest is
+        // about to start from this snapshot with a lastAppliedSeq below every one of those seqs,
+        // so its `seq > lastAppliedSeq` filter would let every one of them through a second time,
+        // re-applying (or double-appending, for e.g. StrokeComplete) state the snapshot already
+        // has. Only ops enqueued strictly after this point are genuinely new and must ship live.
+        dropStaleQueueEntries(seqCutoff)
         writeSecure(
             output, crypto, FrameType.BULK_BEGIN,
             OpCodec.encode(
                 BulkBeginPayload(
                     projectId = projectId,
-                    layerCount = layerCount,
-                    fingerprintBytes = fingerprintBytes.size,
-                    projectBytes = projectBytes.size,
+                    layerCount = snapshot.layerCount,
+                    fingerprintBytes = snapshot.fingerprintBytes.size,
+                    projectBytes = snapshot.projectBytes.size,
                 )
             ),
         )
         // Chunk payload into 64KB frames.
-        chunkAndWrite(output, crypto, FrameType.BULK_FINGERPRINT, fingerprintBytes)
-        chunkAndWrite(output, crypto, FrameType.BULK_PROJECT, projectBytes)
+        chunkAndWrite(output, crypto, FrameType.BULK_FINGERPRINT, snapshot.fingerprintBytes)
+        chunkAndWrite(output, crypto, FrameType.BULK_PROJECT, snapshot.projectBytes)
         writeSecure(output, crypto, FrameType.BULK_END, ByteArray(0))
+    }
+
+    /**
+     * Discard queued deltas with seq <= [seqCutoff]: they are already represented in the bulk
+     * snapshot [sendBulk] is about to (or just did) send, so shipping them again afterward would
+     * double-apply them on the guest. Runs under [enqueueLock] so a concurrent [enqueueOp] can't
+     * slip an old-seq entry back in between the drain and the (rare) re-send of anything newer
+     * found while draining — [Channel] has no peek, so anything past the cutoff pulled off while
+     * scanning has to be put back rather than left undrained.
+     */
+    private fun dropStaleQueueEntries(seqCutoff: Long) {
+        synchronized(enqueueLock) {
+            val keep = mutableListOf<EncodedDelta>()
+            while (true) {
+                val delta = outQueue.tryReceive().getOrNull() ?: break
+                if (delta.seq > seqCutoff) keep.add(delta)
+            }
+            keep.forEach { outQueue.trySend(it) }
+        }
     }
 
     private suspend fun chunkAndWrite(output: OutputStream, crypto: SessionCrypto, type: FrameType, bytes: ByteArray) {
@@ -387,7 +467,14 @@ internal class HostSession(
         for (delta in outQueue) {
             try {
                 writeSecure(output, crypto, FrameType.DELTA, delta.bytes)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                // A reconnect handoff cancels liveJob (see enterReconnecting/handleConnection),
+                // which surfaces here as a CancellationException from inside writeSecure/delay.
+                // That is routine teardown of THIS loop, not a broken connection — swallowing it
+                // like any other Exception would additionally call enterReconnecting() a second
+                // time for the connection that is already being replaced, right as the freshly
+                // reconnected guest's new loops are starting, which can kick it right back out.
+                if (e is CancellationException) throw e
                 // Connection broken; enter reconnecting. The op stays in deltaBuffer and is
                 // replayed to the reconnecting guest from there.
                 enterReconnecting()
@@ -400,7 +487,11 @@ internal class HostSession(
         while (scope.isActive) {
             val frame = try {
                 readSecure(input, crypto) ?: run { enterReconnecting(); return }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                // See outboundLoop's matching comment: a reconnect handoff cancels this loop via
+                // liveJob, and that must propagate as cancellation, not be misread as the read
+                // itself failing and trigger a second, spurious enterReconnecting().
+                if (e is CancellationException) throw e
                 enterReconnecting(); return
             }
             when (frame.type) {
@@ -412,12 +503,20 @@ internal class HostSession(
                     val ping = OpCodec.decode<PingPayload>(frame.payload)
                     try {
                         writeSecure(output, crypto, FrameType.PONG, OpCodec.encode(ping))
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
                         enterReconnecting(); return
                     }
                 }
                 FrameType.BULK_ACK -> { /* bulk done; ignore */ }
-                FrameType.BYE -> { close(CoopSessionState.EndReason.HostClosed); return }
+                FrameType.BYE -> {
+                    // The guest is closing voluntarily; report the reason it actually sent
+                    // (typically UserLeft) rather than the host's own HostClosed, which this
+                    // guest-initiated BYE never is.
+                    val bye = OpCodec.decode<ByePayload>(frame.payload)
+                    close(bye.reason)
+                    return
+                }
                 else -> {
                     // Unexpected frame in this direction; ignore but log.
                 }
@@ -430,7 +529,9 @@ internal class HostSession(
             delay(5_000)
             try {
                 writeSecure(output, crypto, FrameType.PING, OpCodec.encode(PingPayload(System.currentTimeMillis())))
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                // See outboundLoop's matching comment.
+                if (e is CancellationException) throw e
                 enterReconnecting(); return
             }
         }

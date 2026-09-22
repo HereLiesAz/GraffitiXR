@@ -267,9 +267,12 @@ class ArViewModel @Inject constructor(
                     )
                     return@launch
                 }
-                val fingerprint = slamManager.exportFingerprint() ?: ByteArray(0)
-                val projectBytes = projectManager.serializeCurrentProject()
-                if (projectBytes.isEmpty()) {
+                // A one-off probe purely to give an immediate, attributable error if the project
+                // can't be packaged at all — the actual bytes sent to a guest are re-read fresh by
+                // the snapshotProvider below every time a bulk resync goes out (initial join, or a
+                // reconnect that lands in a replay gap), not this one-time snapshot, so a guest
+                // joining or rejoining well into the session gets the project as it stands then.
+                if (projectManager.serializeCurrentProject().isEmpty()) {
                     // A project is open but its folder didn't serialize (never saved to disk, or the
                     // directory is missing). Same silent-empty-session outcome, different cause.
                     _feedback.tryEmit(
@@ -281,11 +284,14 @@ class ArViewModel @Inject constructor(
                 }
                 val qrString = collaborationManager.startHosting(
                     projectId = projectManager.currentProjectId(),
-                    layerCount = projectRepository.currentProject.value?.layers?.size ?: 0,
-                    fingerprintBytes = fingerprint,
-                    projectBytes = projectBytes,
                     localDeviceName = android.os.Build.MODEL,
-                )
+                ) {
+                    com.hereliesaz.graffitixr.core.collaboration.ProjectSnapshot(
+                        fingerprintBytes = slamManager.exportFingerprint() ?: ByteArray(0),
+                        projectBytes = projectManager.serializeCurrentProject(),
+                        layerCount = projectRepository.currentProject.value?.layers?.size ?: 0,
+                    )
+                }
                 _uiState.update {
                     it.copy(
                         coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.HOST,
