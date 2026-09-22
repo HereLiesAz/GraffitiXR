@@ -78,7 +78,7 @@ As of AzNavRail 10.18 the onboarding tutorial is a **reactive, status-driven gui
 * `azGoal(id, target, label, autoStartWhen = "az.screen.<MODE>")` — per-mode goals that self-activate on mode entry and complete (persisted by the library under `az_navrail_completed_goals`) once their milestone is reached.
 * `azSuppressGuide(700) { gestureInProgress }` keeps callouts hidden during gestures.
 
-The instruction overlay is mounted automatically by `AzHostActivityLayout`. The Help rail item (`item.help`) reads the host's controller via `LocalAzGuidanceController.current` to enable / replay the tour. See `docs/AZNAVRAIL_COMPLETE_GUIDE.md` §9 for the full API.
+The instruction overlay is mounted automatically by `AzHostActivityLayout`. The Help rail item (`item.help`) reads the host's controller via `LocalAzGuidanceController.current` to enable / replay the tour. *(An earlier version of this document pointed to `docs/AZNAVRAIL_COMPLETE_GUIDE.md` §9 for the full API — that file does not exist anywhere in this repository; the AzNavRail library's own upstream documentation is the authoritative source for its full API surface.)*
 
 ---
 *Documentation updated on 2026-06-28 for AzNavRail 10.18 and the reactive guidance framework.*

@@ -1,21 +1,13 @@
 # Politica di Sicurezza
 
+Prendiamo la sicurezza molto sul serio. Essendo un'applicazione offline, la superficie di attacco è limitata, ma manteniamo standard rigorosi per la protezione dei dati locali.
+
 ## Versioni Supportate
 
-Usa questa sezione per informare le persone su quali versioni del tuo progetto
-sono attualmente supportate con aggiornamenti di sicurezza.
-
-| Versione | Supportata         |
-| -------- | ------------------ |
-| 5.1.x    | :white_check_mark: |
-| 5.0.x    | :x:                |
-| 4.0.x    | :white_check_mark: |
-| < 4.0    | :x:                |
+Attualmente, solo il branch `main` e l'ultima versione pubblicata (release) ricevono aggiornamenti di sicurezza.
 
 ## Segnalare una Vulnerabilità
 
-Usa questa sezione per dire alle persone come segnalare una vulnerabilità.
-
-Dì loro dove andare, con quale frequenza possono aspettarsi un aggiornamento su una
-vulnerabilità segnalata, cosa aspettarsi se la vulnerabilità viene accettata o
-rifiutata, ecc.
+Se scopri una vulnerabilità di sicurezza in GraffitiXR, per favore **non aprire una issue pubblica**.
+Invia invece una segnalazione privata di vulnerabilità (Security Advisory) tramite GitHub, oppure contattaci direttamente.
+Faremo del nostro meglio per esaminare rapidamente il problema e fornire una correzione nel prossimo aggiornamento.

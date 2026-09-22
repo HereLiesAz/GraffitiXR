@@ -19,6 +19,34 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * A point-in-time snapshot of the project state a bulk resync sends to a guest. Callers (e.g.
+ * [CollaborationManager.startHosting]'s caller) supply a factory rather than precomputed bytes, so
+ * every bulk send — the initial one, and any later fallback when a reconnect lands in a
+ * [com.hereliesaz.graffitixr.core.collaboration.session.DeltaBuffer] gap — reflects the project as
+ * it stands at send time, not as it stood when hosting started minutes or hours earlier.
+ */
+data class ProjectSnapshot(
+    val fingerprintBytes: ByteArray,
+    val projectBytes: ByteArray,
+    val layerCount: Int,
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is ProjectSnapshot) return false
+        return fingerprintBytes.contentEquals(other.fingerprintBytes) &&
+            projectBytes.contentEquals(other.projectBytes) &&
+            layerCount == other.layerCount
+    }
+
+    override fun hashCode(): Int {
+        var result = fingerprintBytes.contentHashCode()
+        result = 31 * result + projectBytes.contentHashCode()
+        result = 31 * result + layerCount
+        return result
+    }
+}
+
 /** Public API. Editor + AR features depend on this surface only. */
 @Singleton
 class CollaborationManager @Inject constructor() {
@@ -35,14 +63,19 @@ class CollaborationManager @Inject constructor() {
     // previous collector (otherwise one leaks per host/join cycle and stale ones race _state).
     @Volatile private var observeJob: Job? = null
 
-    /** Begin hosting. Returns the QR payload to display. */
+    /**
+     * Begin hosting. Returns the QR payload to display.
+     *
+     * [snapshotProvider] is called once at construction (to validate the project isn't too large
+     * to host at all) and again every time a bulk resync is actually sent — the initial one and
+     * any later reconnect-gap fallback — so a guest joining or rejoining well into a session
+     * always gets the project as it stands *then*, not a copy frozen at the moment hosting began.
+     */
     suspend fun startHosting(
         projectId: String,
-        layerCount: Int,
-        fingerprintBytes: ByteArray,
-        projectBytes: ByteArray,
         localDeviceName: String,
         protocolVersion: Int = ProtocolVersion.CURRENT,
+        snapshotProvider: () -> ProjectSnapshot,
     ): String {
         check(hostSession == null && guestSession == null) { "already in a session" }
         val token = QrPayload.newToken()
@@ -50,14 +83,23 @@ class CollaborationManager @Inject constructor() {
             token = token,
             protocolVersion = protocolVersion,
             localDeviceName = localDeviceName,
-            fingerprintBytes = fingerprintBytes,
-            projectBytes = projectBytes,
             projectId = projectId,
-            layerCount = layerCount,
+            snapshotProvider = snapshotProvider,
         )
         hostSession = session
         observe(session.state)
-        val port = session.startListening()
+        // If startListening() throws (e.g. the port failed to bind), hostSession must not stay
+        // set: check() above would then refuse every future startHosting/joinFromQr forever, with
+        // no way for the user to retry after a transient failure.
+        val port = try {
+            session.startListening()
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            observeJob?.cancel()
+            observeJob = null
+            hostSession = null
+            throw e
+        }
         val payload = QrPayload(
             host = LocalIp.discover() ?: "127.0.0.1",
             port = port,
@@ -146,7 +188,19 @@ class CollaborationManager @Inject constructor() {
     private fun observe(stateFlow: StateFlow<CoopSessionState>) {
         observeJob?.cancel()
         observeJob = scope.launch {
-            stateFlow.collect { _state.value = it }
+            stateFlow.collect {
+                _state.value = it
+                // A session can end on its own — the host's guest never reconnects, a version
+                // mismatch, a bad token, the peer's own BYE — without leaveSession() ever being
+                // called. Without this, hostSession/guestSession stay non-null forever after such
+                // an end, and the check() guards in startHosting/joinFromQr then refuse every
+                // future attempt with "already in a session", even though nothing is listening or
+                // connected anymore and the user has no ended session they know to "leave".
+                if (it is CoopSessionState.Ended) {
+                    hostSession = null
+                    guestSession = null
+                }
+            }
         }
     }
 }

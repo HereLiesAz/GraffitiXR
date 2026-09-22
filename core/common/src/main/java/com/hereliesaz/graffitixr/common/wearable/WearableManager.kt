@@ -31,6 +31,10 @@ class WearableManager @Inject constructor(
 
     fun activate(provider: SmartGlassProvider) {
         connectionJob?.cancel()
+        val previousProvider = activeProvider
+        if (previousProvider != null && previousProvider !== provider) {
+            previousProvider.disconnect()
+        }
         activeProvider = provider
         provider.connect()
         connectionJob = scope.launch {

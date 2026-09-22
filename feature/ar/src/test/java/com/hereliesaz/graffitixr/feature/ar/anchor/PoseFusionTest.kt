@@ -248,6 +248,51 @@ class PoseFusionTest {
         )
     }
 
+    /**
+     * The specific case the diagnostic overlay used to get wrong: a relock is accepted (so a
+     * standing correction exists), and a LATER relock attempt reaches fusion but is refused by
+     * `MIN_INLIER_RATIO`. Before `FusionState.RELOCK_REFUSED` existed, this reported the same
+     * `HOLDING` as "no relock arrived this frame at all" — indistinguishable from the healthy
+     * steady state while fusion was actually throwing away every correction.
+     */
+    @Test fun `a refusal after a prior snap is reported distinctly from holding`() {
+        val f = PoseFusion()
+        // First: a confident cold relock is accepted and snaps, establishing a standing correction.
+        f.currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(10f,0f,0f), inliers = 90f, matches = 100f, seq = 1f), captureAtOrigin(),
+            confGlobal = 1f)
+        assertEquals(
+            com.hereliesaz.graffitixr.common.model.FusionState.COLD_SNAP, f.diagnostics().state,
+        )
+
+        // Then: a NEW relock arrives (different seq) and is refused for a low inlier ratio, while
+        // the correction from the snap above still stands.
+        f.currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(10f,0f,0f), inliers = 10f, matches = 100f, seq = 2f), captureAtOrigin(),
+            confGlobal = 1f)
+        val refusedAfterSnap = f.diagnostics()
+        assertEquals(
+            "an attempted-and-refused relock with a standing correction must not read as HOLDING " +
+                "(\"nothing arrived\") — it is an active refusal",
+            com.hereliesaz.graffitixr.common.model.FusionState.RELOCK_REFUSED, refusedAfterSnap.state,
+        )
+        assertEquals("the refusal must still be counted", 1, refusedAfterSnap.snapsRejected)
+        assertEquals("the prior snap must still be counted", 1, refusedAfterSnap.snapsAccepted)
+        assertEquals(
+            "the standing correction from the prior snap is unaffected by the refusal",
+            10_000f, refusedAfterSnap.correctionMm, 1f,
+        )
+
+        // And: with no new relock at all (a zero seq, as onTick sends when nothing was sampled),
+        // the state reverts to plain HOLDING — proving the two are genuinely distinguished by the
+        // branch logic, not just by which test calls into it.
+        f.currentAnchor(trans(0f,0f,1f), identity(), FloatArray(19), captureAtOrigin(), confGlobal = 1f)
+        assertEquals(
+            "with nothing new arriving at all, the state is HOLDING, not RELOCK_REFUSED",
+            com.hereliesaz.graffitixr.common.model.FusionState.HOLDING, f.diagnostics().state,
+        )
+    }
+
     /** A small, non-diverging relock blends, and the rate it blended at must be reported. */
     @Test fun `fusion reports the blend rate it actually used`() {
         val f = PoseFusion()

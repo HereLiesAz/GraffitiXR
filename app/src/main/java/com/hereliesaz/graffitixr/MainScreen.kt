@@ -66,7 +66,6 @@ fun MainScreen(
     slamManager: SlamManager,
     hasCameraPermission: Boolean,
     cameraController: androidx.camera.view.LifecycleCameraController,
-    onRendererCreated: (ArRenderer) -> Unit,
     isExporting: Boolean = false,
     // First-run DETECT stage: enables the renderer's tap-free auto-anchor so the fingerprint builder
     // has a pose to work against while it looks for the marks the user drew. The scribble itself is
@@ -337,7 +336,6 @@ fun MainScreen(
                             renderer.hideVisualization = isExporting
                             rendererRef.value = renderer
                             arViewModel.attachSessionToRenderer(renderer)
-                            onRendererCreated(renderer)
                             val view = GLSurfaceView(ctx).apply {
                                 setEGLContextClientVersion(3)
                                 setZOrderMediaOverlay(true)
@@ -420,7 +418,6 @@ fun MainScreen(
                 // drawn full-screen by the shared background rendering below, so it fills the
                 // screen behind the rail as a background component.
                 EditorMode.DESIGN -> {}
-                else -> {}
             }
         }
 

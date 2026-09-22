@@ -1,18 +1,13 @@
 # Säkerhetspolicy
 
+Vi tar säkerhet på allvar. Eftersom detta är en offline-applikation är attackytan begränsad, men vi upprätthåller strikta standarder för skydd av lokal data.
+
 ## Versioner som stöds
 
-Använd det här avsnittet för att berätta för andra om vilka versioner av ditt projekt som
-stöds för närvarande med säkerhetsuppdateringar.
-| Version | Stöds |
-| ------- | ------------------ |
-| 5.1.x | :white_check_mark: |
-| 5.0.x | :x: |
-| 4.0.x | :white_check_mark: |
-| < 4,0 | :x: |
+För närvarande är det endast `main`-grenen och den senaste publicerade versionen som får säkerhetsuppdateringar.
+
 ## Rapportera en sårbarhet
 
-Använd det här avsnittet för att berätta för andra hur man rapporterar en sårbarhet.
-Berätta för dem vart de ska gå, hur ofta de kan förvänta sig att få en uppdatering om en
-rapporterad sårbarhet, vad man kan förvänta sig om sårbarheten accepteras eller
-tackat nej osv.
+Om du upptäcker en säkerhetssårbarhet i GraffitiXR, vänligen **öppna inte ett offentligt ärende (issue)**.
+Skicka istället en privat sårbarhetsrapport (Security Advisory) via GitHub, eller kontakta oss direkt.
+Vi kommer att göra vårt bästa för att snabbt undersöka problemet och tillhandahålla en korrigering i nästa uppdatering.

@@ -27,7 +27,7 @@ We welcome pull requests, but this is a specialized tool with strict architectur
 ## 🧪 Testing
 
 * **Unit Tests:** Required for all ViewModel logic (`src/test`). See [`testing.md`](testing.md) for
-  the current file inventory and mock patterns.
+  the current test organization, how to list the current files, and mock patterns.
 * **UI Tests:** There are no instrumented (`src/androidTest/`) tests in this repository yet — see
   `testing.md` §3. Verify UI changes by running the app.
 * **Native changes:** There is no automated C++ test runner and no on-device debug visualization to

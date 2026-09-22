@@ -40,13 +40,19 @@ NDK_VERSION="25.2.9519653"
 CMAKE_VERSION="3.22.1"
 
 echo "Checking for NDK..."
-# Simple check if any NDK exists, if so, warn but don't force fail unless empty
-if ls "$ANDROID_HOME/ndk" >/dev/null 2>&1; then
+# `ls` on an existing-but-empty directory still exits 0, so check for actual contents rather
+# than mere existence of the directory.
+if [ -n "$(ls -A "$ANDROID_HOME/ndk" 2>/dev/null)" ]; then
     echo "NDK detected. Skipping forced install to prevent version conflicts."
     echo "Ensure your local.properties or build.gradle points to a valid NDK."
 else
-    echo "Installing NDK (version $NDK_VERSION) and CMake (version $CMAKE_VERSION)..."
-    yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --install "ndk;$NDK_VERSION" "cmake;$CMAKE_VERSION"
+    echo "Installing NDK (version $NDK_VERSION)..."
+    yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --install "ndk;$NDK_VERSION"
 fi
+
+# CMake is an independent concern from the NDK: install it regardless of whether an NDK was
+# already present, since CMakeLists.txt requires it either way.
+echo "Installing CMake (version $CMAKE_VERSION)..."
+yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --install "cmake;$CMAKE_VERSION"
 
 exit 0

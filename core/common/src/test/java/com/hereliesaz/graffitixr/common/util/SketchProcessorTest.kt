@@ -14,8 +14,8 @@ class SketchProcessorTest {
         val paramNames = sketchEffect!!.parameters.map { it.type.simpleName }
         // Should have 3 parameters: Bitmap, Int (thickness), Int (penColor)
         assertTrue(
-            "sketchEffect should accept penColor parameter (3 params), got: $paramNames",
-            sketchEffect.parameterCount >= 3
+            "sketchEffect should accept exactly 3 parameters (Bitmap, thickness, penColor), got: $paramNames",
+            sketchEffect.parameterCount == 3
         )
     }
 }

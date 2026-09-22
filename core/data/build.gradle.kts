@@ -11,16 +11,11 @@ android {
     compileSdk = 37
     defaultConfig {
         minSdk = 26
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    buildFeatures {
-        buildConfig = true
     }
 
     // Robolectric (SettingsRepositoryImplTest) needs Android resources on the unit-test
@@ -47,7 +42,6 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:domain"))
 
-    implementation(libs.gson)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.compose.ui.geometry)
     // ProjectManager persists layer BlendMode (androidx.compose.ui.graphics.BlendMode). This was
@@ -62,8 +56,6 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.kotlinx.coroutines.test)
-    // Ed25519 signing in AzpInstallerTest, to build signed `.azp` fixtures the installer verifies.
-    testImplementation("org.bouncycastle:bcprov-jdk18on:1.86")
     // SettingsRepositoryImplTest needs a real android.content.Context to exercise the actual
     // DataStore-backed persistence rather than mocking SettingsRepository itself (which proves
     // nothing about the implementation). Same pattern as :collab's QrPayloadTest.

@@ -7,7 +7,7 @@ Gyakorlatilag egyetlen képernyő létezik. A háttér-renderelési réteg az ak
 ### AR Mód (`EditorMode.AR`)
 | Réteg | Felület | Tartalom |
 |---|---|---|
-| Alsó | `GLSurfaceView` (`ArRenderer`) | ARCore élő kamerakép a `BackgroundRenderer`-en keresztül; a "Lazy Grid" vetített rácsvonal-átfedés a domináns síkhoz igazítva (nincs perzisztens voxel- vagy splat-réteg, és nincs `draw()` metódus) |
+| Alsó | `GLSurfaceView` (`ArRenderer`) | ARCore élő kamerakép a `BackgroundRenderer`-en keresztül, az AR-átfedéssel kompozitálva. Nincs perzisztens 3D térkép, nincs voxel-/splat-renderelés, és (a confidence-map eltávolítása óta) "Lazy Grid" átfedés sincs többé — lásd [`NATIVE_ENGINE.md`](../NATIVE_ENGINE.md). |
 | Felső | Compose `Canvas` | 2D szerkesztőrétegek (bittérképek, transzformációk) |
 | HUD | Compose `Text` chip | Élő követési állapot (zöld=KÖVETÉS, szürke=KERESÉS) az `arUiState.isScanning` alapján |
 
@@ -59,4 +59,4 @@ Teljes képernyős alsó lap (bottom sheet) a fő nézet felett. Felsorolja a me
 A kamera- és helymeghatározási engedélyek együtt kerülnek bekérésre a `MainActivity`-ben található `permissionLauncher` segítségével. A `hasCameraPermission` állapot szabályozza az összes kamerától függő renderelést az `ArViewport`-ban. Kamera engedély nélkül sem az AR, sem a Rétegzés mód nem mutat hátteret.
 
 ---
-*A dokumentációt 2026-03-17-én frissítették a weboldal újratervezése és a Sablon Mód integrációs szakasza során. 2026-09-04: eltávolítva a törölt `EditorMode.STENCIL` mód leírása (a kódban nem létezik) és a téves `slamManager.draw()`/voxel splat állítás; az AR nézet leírása a jelenlegi forráskód szerint javítva.*
+*A dokumentációt 2026-03-17-én frissítették a weboldal újratervezése és a Sablon Mód integrációs szakasza során. 2026-09-04: eltávolítva a törölt `EditorMode.STENCIL` mód leírása (a kódban nem létezik) és a téves `slamManager.draw()`/voxel splat állítás; az AR nézet leírása a jelenlegi forráskód szerint javítva. 2026-09-22: eltávolítva a "Lazy Grid" átfedés elavult említése — a confidence-map-pel együtt törölve lett, és már nem létezik a kódban.*

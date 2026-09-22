@@ -88,11 +88,11 @@ import com.hereliesaz.graffitixr.common.model.ScanPhase
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorPanel
 import com.hereliesaz.graffitixr.common.model.EditorUiState
+import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.onboarding.ArUnavailableOverlay
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.hereliesaz.graffitixr.common.security.SecurityProviderState
-import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
 import androidx.compose.ui.res.stringResource
@@ -102,6 +102,7 @@ import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
 import com.hereliesaz.graffitixr.design.theme.HotPink
 import com.hereliesaz.graffitixr.design.theme.NeonGreen
 import com.hereliesaz.graffitixr.design.theme.NavStrings
+import com.hereliesaz.graffitixr.design.theme.contrastColorFor
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.common.model.CoopSessionState
 import com.hereliesaz.graffitixr.common.model.CoopRole
@@ -295,7 +296,7 @@ class MainActivity : ComponentActivity() {
     // [VOLUME_UNLOCK_WINDOW_MS] of the first press. Intercepted here (not a Compose key modifier)
     // because volume keys reach dispatchKeyEvent before anything else gets a look, locked or not.
     private var volumeUnlockStage = 0
-    private var volumeUnlockLastPressAt = 0L
+    private var volumeUnlockFirstPressAt = 0L
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val isVolumeKey = event.keyCode == KeyEvent.KEYCODE_VOLUME_UP ||
@@ -303,13 +304,21 @@ class MainActivity : ComponentActivity() {
         if (isVolumeKey && mainViewModel.uiState.value.isTouchLocked) {
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
                 val now = System.currentTimeMillis()
-                if (now - volumeUnlockLastPressAt > VOLUME_UNLOCK_WINDOW_MS) volumeUnlockStage = 0
-                volumeUnlockLastPressAt = now
+                // Whole-attempt deadline: the sequence resets if it isn't completed within
+                // VOLUME_UNLOCK_WINDOW_MS of its FIRST press, not merely a per-press gap — a
+                // per-press-only reset would let a slow, deliberate press-by-press sequence run
+                // indefinitely, defeating the point of a timed gesture for a security-relevant
+                // touch-lock bypass.
+                if (volumeUnlockStage != 0 && now - volumeUnlockFirstPressAt > VOLUME_UNLOCK_WINDOW_MS) {
+                    volumeUnlockStage = 0
+                }
+                if (volumeUnlockStage == 0) volumeUnlockFirstPressAt = now
 
                 val expected = VOLUME_UNLOCK_SEQUENCE[volumeUnlockStage]
                 volumeUnlockStage = if (event.keyCode == expected) {
                     volumeUnlockStage + 1
                 } else if (event.keyCode == VOLUME_UNLOCK_SEQUENCE[0]) {
+                    volumeUnlockFirstPressAt = now
                     1 // wrong beat, but this press could still be starting a fresh attempt
                 } else {
                     0
@@ -786,10 +795,7 @@ class MainActivity : ComponentActivity() {
                 val context = LocalContext.current
                 val canvasBg = editorUiState.canvasBackground
 
-                val navItemColor = remember(canvasBg) {
-                    val luminance = 0.299f * canvasBg.red + 0.587f * canvasBg.green + 0.114f * canvasBg.blue
-                    if (luminance > 0.5f) Color.Black else Color.White
-                }
+                val navItemColor = remember(canvasBg) { contrastColorFor(canvasBg) }
 
                 val allHelpItems = remember(strings) { buildHelpItems(strings) }
 
@@ -907,6 +913,15 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                     val requested = arViewModel.requestExport { bmp ->
+                                        // The timeout job may have already fired and completed
+                                        // (isExporting=false, "timed out" toast shown) before this
+                                        // late readback lands — cancel() on a job that already ran
+                                        // to completion is a no-op, so check isCompleted explicitly
+                                        // and drop the stale callback rather than exporting twice /
+                                        // reporting success after a failure the user already saw.
+                                        if (timeoutJob.isCompleted) {
+                                            return@requestExport
+                                        }
                                         timeoutJob.cancel()
                                         isExporting = false
                                         editorViewModel.exportImage(backgroundBitmap = bmp, skipLayerComposite = true)
@@ -962,7 +977,6 @@ class MainActivity : ComponentActivity() {
                             slamManager = slamManager,
                             hasCameraPermission = hasCameraPermission,
                             cameraController = cameraController,
-                            onRendererCreated = { _ -> },
                             // Was omitted, so MainScreen always saw the parameter default (false) and
                             // the flag was inert everywhere it is read. Wiring it makes the rail and
                             // the loading/segmentation overlays actually step aside for an export, as
@@ -1147,8 +1161,8 @@ class MainActivity : ComponentActivity() {
                                             dashboardViewModel.onNewProjectTriggered()
                                         },
                                         onImportProject = { uri -> dashboardViewModel.importProject(uri) },
-                                        onClose = { /* no-op: ProjectLibraryScreen no longer exposes a close affordance */ },
                                         strings = strings,
+                                        isLoading = dashboardState.isLoading,
                                         importErrorMessage = dashboardState.importErrorMessage,
                                         onDismissImportError = { dashboardViewModel.dismissImportError() },
                                         onOpenSettings = { showSettings = true }
@@ -1456,7 +1470,12 @@ class MainActivity : ComponentActivity() {
                             OffscreenIndicators(
                                 uiState = editorUiState,
                                 arUiState = arUiState,
-                                screenSize = fullSize
+                                screenSize = fullSize,
+                                modeAdj = if (editorUiState.editorMode != EditorMode.DESIGN) {
+                                    editorUiState.modeAdjustments[editorUiState.editorMode] ?: ModeAdjustment()
+                                } else {
+                                    ModeAdjustment()
+                                }
                             )
 
                             // Tap-to-distance (Sub-project C): live center reticle + a distance chip
@@ -1699,6 +1718,7 @@ class MainActivity : ComponentActivity() {
                                 SettingsScreen(
                                     currentVersion = BuildConfig.VERSION_NAME,
                                     updateStatus = dashboardUiState.updateStatusMessage,
+                                    updateUrl = dashboardUiState.updateUrl,
                                     isCheckingForUpdate = dashboardUiState.isCheckingForUpdate,
                                     currentLanguage = language,
                                     onLanguageChanged = { settingsViewModel.setLanguage(it) },
@@ -1836,10 +1856,6 @@ class MainActivity : ComponentActivity() {
         hasCameraPermission = ContextCompat.checkSelfPermission(
             this, Manifest.permission.CAMERA
         ) == PackageManager.PERMISSION_GRANTED
-    }
-
-    override fun onPause() {
-        super.onPause()
     }
 
     override fun onDestroy() {
@@ -2620,7 +2636,7 @@ private fun RelocDiagnosticsOverlay(
         // Pose fusion: what is actually happening to the overlay, and when nothing is, WHY.
         //
         // Every row above reports a measurement. This one reports a decision, and it is the row to
-        // read first when the complaint is "the overlay drifts" — because six quite different causes
+        // read first when the complaint is "the overlay drifts" — because seven quite different causes
         // produce that same symptom and nothing else on this overlay separates them. A healthy Reloc
         // row above a DISABLED or NO CAPTURE POSE here means the relocalizer is working perfectly and
         // its results are being discarded.
@@ -2645,12 +2661,16 @@ private fun RelocDiagnosticsOverlay(
                 com.hereliesaz.graffitixr.common.model.FusionState.BLENDING ->
                     "blending a=" + String.format(java.util.Locale.US, "%.2f", fusion.lastAlpha)
                 com.hereliesaz.graffitixr.common.model.FusionState.HOLDING -> "holding"
+                // A relock reached fusion this tick and was refused (low inlier ratio) while a
+                // standing correction already existed — distinct from HOLDING ("nothing arrived").
+                com.hereliesaz.graffitixr.common.model.FusionState.RELOCK_REFUSED -> "refusing relock"
             },
             when (fusionState) {
-                // Red for the two that mean corrections are being computed and thrown away, or
+                // Red for the states that mean corrections are being computed and thrown away, or
                 // cannot be computed at all. Amber for the transient waits. White for working.
                 com.hereliesaz.graffitixr.common.model.FusionState.NO_CAPTURE_POSE,
                 com.hereliesaz.graffitixr.common.model.FusionState.NO_FINGERPRINT,
+                com.hereliesaz.graffitixr.common.model.FusionState.RELOCK_REFUSED,
                 com.hereliesaz.graffitixr.common.model.FusionState.DISABLED ->
                     androidx.compose.ui.graphics.Color.Red
                 com.hereliesaz.graffitixr.common.model.FusionState.NO_ANCHOR,

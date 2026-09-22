@@ -207,6 +207,12 @@ data class EditorUiState(
     val hideUiForCapture: Boolean = false,
     val isRightHanded: Boolean = true,
     val gestureInProgress: Boolean = false,
+    // A tone/opacity adjustment-slider drag is in progress. Deliberately separate from
+    // [gestureInProgress] (transform gestures only): the two used to share one flag, which made
+    // dragging a tone slider pop the "Axis: Z (…)" rotation-axis feedback chip — a control it has
+    // nothing to do with. Also read by ArRenderer/guidance suppression via [gestureInProgress]
+    // only, so an adjustment drag no longer pauses AR tracking either, which it never needed to.
+    val adjustmentInProgress: Boolean = false,
     val showRotationAxisFeedback: Boolean = false,
     // Transient, self-clearing (mirrors showRotationAxisFeedback's pattern) — set true when a
     // transform gesture or Reset is silently ignored because the current mode's transform is

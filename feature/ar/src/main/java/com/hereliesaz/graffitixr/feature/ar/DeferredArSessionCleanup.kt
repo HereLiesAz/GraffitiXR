@@ -29,9 +29,14 @@ internal fun closeDetachedArSession(session: Session, wasResumed: Boolean) {
  *
  * This deliberately uses an independent daemon thread rather than viewModelScope: ViewModel cleanup
  * can cancel that scope while a native frame is still wedged. The thread retries the bounded renderer
- * handoff until the session lock is genuinely acquired. If the native call never returns, the daemon
- * remains parked and the stuck session is abandoned rather than invoking undefined concurrent native
- * teardown.
+ * handoff in an unbounded `while (!isInterrupted)` loop — NOT a one-shot "park and abandon": every
+ * iteration calls [ArRenderer.detachSessionBounded] again, which blocks for up to [handoffTimeoutMs]
+ * on `tryLock` and then either succeeds (closing the session and returning) or fails and loops
+ * straight back around. If the GL thread is permanently wedged (e.g. blocked forever inside
+ * `session.update()`), this thread retries forever rather than being "parked" — it is live,
+ * non-daemon-blocking work that keeps re-attempting the handoff indefinitely; only an interrupt
+ * (currently never sent to this thread by any caller) stops it. `isDaemon = true` at least keeps a
+ * permanently wedged instance of this loop from blocking JVM/process shutdown on its own.
  */
 internal fun deferArSessionCloseUntilRendererHandoff(
     renderer: ArRenderer,

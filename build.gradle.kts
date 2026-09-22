@@ -1,5 +1,4 @@
 // FILE: build.gradle.kts
-import org.gradle.api.plugins.quality.CheckstyleExtension
 buildscript {
     val commonForcedDependencies = listOf(
         "commons-beanutils:commons-beanutils:1.11.0",
@@ -23,15 +22,21 @@ buildscript {
         "com.google.android.gms:play-services-basement:18.11.0",
         // Bouncy Castle: 1.79 (transitive, via the build + app classpaths) is vulnerable to
         // a covert timing channel (HIGH), LDAP injection, and a risky-crypto-algo issue in
-        // bcpkix — all first patched in 1.84. The bcprov/bcpkix/bcutil versions must match.
+        // bcpkix — all first patched in 1.84. Forced here to 1.86 (a later release that still
+        // carries those fixes); the bcprov/bcpkix/bcutil versions must match.
         "org.bouncycastle:bcprov-jdk18on:1.86",
         "org.bouncycastle:bcpkix-jdk18on:1.86",
         "org.bouncycastle:bcutil-jdk18on:1.86",
-        // Kotlin 2.4.0 emits class metadata version 2.4.0, but Hilt/Dagger 2.59.2 bundles a
-        // kotlin-metadata-jvm that only reads up to 2.3.0 — its KSP processor fails the build with
-        // "Provided Metadata instance has version 2.4.0, while maximum supported version is 2.3.0".
-        // Force the matching 2.4.0 reader onto every classpath (incl. the KSP processor) so Hilt
-        // can parse 2.4.0 metadata. Keep this version in lockstep with `kotlin` in libs.versions.toml.
+        // Kotlin (currently 2.4.20, see `kotlin` in libs.versions.toml) emits class metadata at
+        // its own version, but Hilt/Dagger (currently 2.60.1) bundles a kotlin-metadata-jvm that
+        // may only read up to an older metadata version — its KSP processor fails the build with
+        // "Provided Metadata instance has version X, while maximum supported version is Y" when
+        // the two are out of sync. Force the matching kotlin-metadata-jvm reader onto every
+        // classpath (incl. the KSP processor) so Hilt can parse the current Kotlin's metadata.
+        // Keep this version in lockstep with `kotlin` in libs.versions.toml. NOTE: this comment's
+        // version numbers have been corrected to match current pins (Hilt 2.60.1 / Kotlin 2.4.20)
+        // but whether the underlying incompatibility still reproduces at these versions has not
+        // been re-verified — treat as a candidate to re-test before removing.
         "org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.20"
     )
 
@@ -59,9 +64,6 @@ buildscript {
     repositories {
         google()
         mavenCentral()
-    }
-    dependencies {
-        // No direct dependencies here usually if using plugins block, but we need to configure resolutionStrategy
     }
     configurations.all {
         resolutionStrategy {
