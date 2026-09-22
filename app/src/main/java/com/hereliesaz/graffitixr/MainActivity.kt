@@ -93,7 +93,6 @@ import com.hereliesaz.graffitixr.onboarding.ArUnavailableOverlay
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.security.SecurityProviderManager
 import com.hereliesaz.graffitixr.common.security.SecurityProviderState
-import com.hereliesaz.graffitixr.common.util.isolateMarkings
 import com.hereliesaz.graffitixr.design.components.TouchLockOverlay
 import com.hereliesaz.graffitixr.design.components.UnlockInstructionsPopup
 import androidx.compose.ui.res.stringResource

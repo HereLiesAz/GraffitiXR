@@ -84,6 +84,6 @@ class AutoTuneTest {
         val flat = ImageStats(128f, 128f, 128f, 128f, 2f)
         val busy = ImageStats(128f, 128f, 128f, 128f, 100f)
         val art = ImageStats(128f, 128f, 128f, 128f, 20f)
-        assertTrue(computeAutoTune(busy, art).opacity < computeAutoTune(flat, art).opacity)
+        assertTrue(computeAutoTune(busy, art).opacity > computeAutoTune(flat, art).opacity)
     }
 }

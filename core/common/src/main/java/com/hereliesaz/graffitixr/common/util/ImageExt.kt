@@ -26,6 +26,10 @@ private const val NOISE_AREA_DIVISOR = 10000
 private const val ERASE_TOUCH_RADIUS_FRACTION = 0.05f
 private const val ERASE_TOUCH_RADIUS_MIN_PX = 16
 
+// 255 * width * height must stay under Int.MAX_VALUE (2_147_483_647) for isolateMarkings'
+// IntArray-based integral image to not overflow: 2_147_483_647 / 255 ≈ 8_421_504.
+private const val MAX_ISOLATE_MARKINGS_PIXELS = 8_000_000L
+
 /**
  * Deconstructs the visual reality of a poorly lit wall, stripping away the
  * chaotic noise of the background to isolate only the high-contrast markings.
@@ -40,6 +44,14 @@ private const val ERASE_TOUCH_RADIUS_MIN_PX = 16
 fun Bitmap.isolateMarkings(tapPos: Pair<Float, Float>? = null): Bitmap {
     val w = this.width
     val h = this.height
+    // The integral-image accumulator below is an IntArray: its running sum can reach
+    // 255 * width * height, which overflows Int (and silently corrupts the threshold, with no
+    // exception) above ~8.4 MP. Every current caller feeds this an ARCore capture (<= ~2 MP), so
+    // this is a latent guard, not a live fix — but it's cheap and turns silent corruption into a
+    // clear failure if a larger source is ever wired in.
+    require(w.toLong() * h.toLong() <= MAX_ISOLATE_MARKINGS_PIXELS) {
+        "isolateMarkings: image too large (${w}x$h) — integral-image accumulator would overflow Int"
+    }
     val n = w * h
     val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
     val pixels = IntArray(n)
