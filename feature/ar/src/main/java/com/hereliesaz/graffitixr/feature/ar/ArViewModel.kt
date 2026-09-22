@@ -2875,7 +2875,7 @@ class ArViewModel @Inject constructor(
      * The forced hardware-stereo path is broken on this device — switch the LIVE session to the
      * mono camera config (detach renderer → pause → set mono → resume → re-attach) so the broken
      * motion-stereo disparity stops thrashing the tracker, and persist the flag so future sessions
-     * skip stereo entirely. Recoverable: the user re-selecting Mural clears the flag (see
+     * skip stereo entirely. Recoverable: the user re-enabling the ambient scan clears the flag (see
      * setAmbientScanEnabled). Runs on Dispatchers.Default — pause()/resume() block on the camera — and
      * detaches the renderer first because reconfiguring a Session the GL thread is concurrently
      * driving under a different lock is the not-thread-safe race that crashes ARCore natively.

@@ -139,7 +139,7 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, importErrorMessage = null) }
             try {
-                val result = repository.importProject(uri)
+                val result = repository.importProject(uri.toString())
                 if (result.isSuccess) {
                     loadAvailableProjects()
                 } else {

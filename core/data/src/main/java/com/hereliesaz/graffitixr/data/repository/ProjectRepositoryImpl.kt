@@ -130,8 +130,8 @@ class ProjectRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun importProject(uri: android.net.Uri): Result<GraffitiProject> = saveMutex.withLock {
-        val project = projectManager.importProjectFromUri(context, uri)
+    override suspend fun importProject(uri: String): Result<GraffitiProject> = saveMutex.withLock {
+        val project = projectManager.importProjectFromUri(context, android.net.Uri.parse(uri))
             ?: return@withLock Result.failure(Exception("Failed to import project from $uri"))
         _currentProject.value = project
         refreshProjects()
