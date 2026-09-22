@@ -12,7 +12,7 @@ package com.hereliesaz.graffitixr.common.model
  * outside, which is exactly the class of thing this exists to end.
  *
  * The artist-visible symptom for most of [FusionState] is identical: the overlay sits on the ARCore
- * backbone and drifts. This says which of six quite different causes produced it.
+ * backbone and drifts. This says which of seven quite different causes produced it.
  */
 data class FusionDiagnostics(
     val state: FusionState = FusionState.NOT_SAMPLED,
@@ -112,4 +112,26 @@ enum class FusionState {
      * never had a fingerprint to begin with.
      */
     NO_FINGERPRINT,
+
+    /**
+     * A relocalization reached fusion this tick and was REFUSED by `PoseFusion.MIN_INLIER_RATIO`,
+     * while a standing correction from an earlier accepted relock already existed.
+     *
+     * **Out of gate order, like [NO_FINGERPRINT], and for the same reason.** Conceptually this
+     * belongs right after [HOLDING] — both describe "a correction stands, nothing new was
+     * accepted" — but `EvalSampleLog` persists this enum's **ordinal**, so it is appended instead of
+     * inserted.
+     *
+     * Before this state existed, `PoseFusion` reported [HOLDING] for both "no relock arrived this
+     * frame" and "a relock arrived and was thrown away", because the branch that sets it was keyed
+     * only on whether a correction already existed, not on whether an attempt happened. That made
+     * the overlay claim a healthy steady state while relocalization was actively failing every
+     * frame. [FusionDiagnostics.snapsRejected] already counted the refusal; this is what makes the
+     * *current* tick say so too, rather than only the session-lifetime tally.
+     *
+     * The FIRST-EVER refusal, before any relock has ever been accepted, is still [WAITING_FOR_LOCK]
+     * — there is no standing correction yet for it to be confused with, and "still waiting for the
+     * first lock" is the accurate read of that case.
+     */
+    RELOCK_REFUSED,
 }

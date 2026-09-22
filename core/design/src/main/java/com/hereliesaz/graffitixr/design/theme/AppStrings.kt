@@ -194,7 +194,13 @@ data class AppStrings(
         val reset: String,
         val generating: String
     )
-    data class Library(
+    /**
+     * Not a `data class`: [deleteProjectDesc] is a capturing lambda that is never referentially
+     * (or structurally) equal across instances built from the same strings, which would defeat
+     * `equals()`-based memoization (e.g. `remember(strings) {...}`) despite representing identical
+     * content. [equals]/[hashCode] are hand-written to compare only the plain string fields.
+     */
+    class Library(
         val title: String,
         val description: String,
         val newProject: String,
@@ -203,7 +209,30 @@ data class AppStrings(
         val noProjectsHint: String,
         val projectThumbnail: String,
         val deleteProjectDesc: (String) -> String
-    )
+    ) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is Library) return false
+            return title == other.title &&
+                description == other.description &&
+                newProject == other.newProject &&
+                importProject == other.importProject &&
+                noProjects == other.noProjects &&
+                noProjectsHint == other.noProjectsHint &&
+                projectThumbnail == other.projectThumbnail
+        }
+
+        override fun hashCode(): Int {
+            var result = title.hashCode()
+            result = 31 * result + description.hashCode()
+            result = 31 * result + newProject.hashCode()
+            result = 31 * result + importProject.hashCode()
+            result = 31 * result + noProjects.hashCode()
+            result = 31 * result + noProjectsHint.hashCode()
+            result = 31 * result + projectThumbnail.hashCode()
+            return result
+        }
+    }
     data class Settings(
         val title: String,
         val preferences: String,
@@ -273,7 +302,14 @@ data class AppStrings(
         val posterPhysicalSize: String,
         val posterGeneratePdf: String
     )
-    data class Ar(
+    /**
+     * Not a `data class`: [matchedPercent] and [scanHintAmbient] are capturing lambdas that are
+     * never referentially (or structurally) equal across instances built from the same strings,
+     * which would defeat `equals()`-based memoization (e.g. `remember(strings) {...}`) despite
+     * representing identical content. [equals]/[hashCode] are hand-written to compare only the
+     * plain string fields.
+     */
+    class Ar(
         val depthUnsupported: String,
         val arcoreRequiredTitle: String,
         val arcoreRequiredText: String,
@@ -307,13 +343,88 @@ data class AppStrings(
         val targetShowFeatures: String,
         val syncing: String,
         val reacquiringTarget: String
-    )
+    ) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is Ar) return false
+            return depthUnsupported == other.depthUnsupported &&
+                arcoreRequiredTitle == other.arcoreRequiredTitle &&
+                arcoreRequiredText == other.arcoreRequiredText &&
+                installArcore == other.installArcore &&
+                cameraPermissionRequired == other.cameraPermissionRequired &&
+                openSettings == other.openSettings &&
+                targetCreationTitle == other.targetCreationTitle &&
+                targetCreationText == other.targetCreationText &&
+                targetReviewTitle == other.targetReviewTitle &&
+                diagCopied == other.diagCopied &&
+                diagTitle == other.diagTitle &&
+                diagWaiting == other.diagWaiting &&
+                planeConfirmQuestion == other.planeConfirmQuestion &&
+                looksCorrect == other.looksCorrect &&
+                redetect == other.redetect &&
+                planeRealignmentTitle == other.planeRealignmentTitle &&
+                planeRealignmentText == other.planeRealignmentText &&
+                useThisWall == other.useThisWall &&
+                scanning == other.scanning &&
+                anchorLocked == other.anchorLocked &&
+                scanHintRecover == other.scanHintRecover &&
+                scanHintTooDark == other.scanHintTooDark &&
+                scanHintBuildMap == other.scanHintBuildMap &&
+                scanHintCloser == other.scanHintCloser &&
+                scanHintHigherLower == other.scanHintHigherLower &&
+                targetExclude == other.targetExclude &&
+                targetInclude == other.targetInclude &&
+                targetEraseMarks == other.targetEraseMarks &&
+                targetShowFeatures == other.targetShowFeatures &&
+                syncing == other.syncing &&
+                reacquiringTarget == other.reacquiringTarget
+        }
+
+        override fun hashCode(): Int {
+            var result = depthUnsupported.hashCode()
+            result = 31 * result + arcoreRequiredTitle.hashCode()
+            result = 31 * result + arcoreRequiredText.hashCode()
+            result = 31 * result + installArcore.hashCode()
+            result = 31 * result + cameraPermissionRequired.hashCode()
+            result = 31 * result + openSettings.hashCode()
+            result = 31 * result + targetCreationTitle.hashCode()
+            result = 31 * result + targetCreationText.hashCode()
+            result = 31 * result + targetReviewTitle.hashCode()
+            result = 31 * result + diagCopied.hashCode()
+            result = 31 * result + diagTitle.hashCode()
+            result = 31 * result + diagWaiting.hashCode()
+            result = 31 * result + planeConfirmQuestion.hashCode()
+            result = 31 * result + looksCorrect.hashCode()
+            result = 31 * result + redetect.hashCode()
+            result = 31 * result + planeRealignmentTitle.hashCode()
+            result = 31 * result + planeRealignmentText.hashCode()
+            result = 31 * result + useThisWall.hashCode()
+            result = 31 * result + scanning.hashCode()
+            result = 31 * result + anchorLocked.hashCode()
+            result = 31 * result + scanHintRecover.hashCode()
+            result = 31 * result + scanHintTooDark.hashCode()
+            result = 31 * result + scanHintBuildMap.hashCode()
+            result = 31 * result + scanHintCloser.hashCode()
+            result = 31 * result + scanHintHigherLower.hashCode()
+            result = 31 * result + targetExclude.hashCode()
+            result = 31 * result + targetInclude.hashCode()
+            result = 31 * result + targetEraseMarks.hashCode()
+            result = 31 * result + targetShowFeatures.hashCode()
+            result = 31 * result + syncing.hashCode()
+            result = 31 * result + reacquiringTarget.hashCode()
+            return result
+        }
+    }
     /**
-     * Rail-item help text. Fields here must correspond to an actually-registered rail item — a
-     * detekt-adjacent test (`RailIntegrityCheck`) cross-checks this against `ConfigureRailItems`,
-     * and a mismatch is exactly how this class accumulated 28 fields (targetHost through
-     * cloudOffset, an old per-layer authoring toolset) with zero callers before this cleanup: the
-     * tools they described belong to the companion design app, not this one.
+     * Rail-item help text. Fields here are meant to correspond to an actually-registered rail
+     * item, but nothing currently checks that automatically: the app module's `RailIntegrityCheck`
+     * (a debug-only runtime object, not a test) and its companion `HelpItemsBuilderTest` both
+     * operate on hardcoded string-literal keys in `HelpItemsBuilder`'s helpList map, cross-checked
+     * against the rail's registered ids — neither ever inspects these `Help` fields themselves. A
+     * field that stops being referenced from `HelpItemsBuilder` will silently sit here unused; this
+     * is exactly how this class previously accumulated 28 dead fields (targetHost through
+     * cloudOffset, an old per-layer authoring toolset) before a manual cleanup: the tools they
+     * described belong to the companion design app, not this one.
      */
     data class Help(
         val modeHost: Int,

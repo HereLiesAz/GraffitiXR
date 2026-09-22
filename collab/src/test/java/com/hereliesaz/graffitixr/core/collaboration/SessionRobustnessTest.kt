@@ -34,10 +34,8 @@ class SessionRobustnessTest {
         token = "tok",
         protocolVersion = 1,
         localDeviceName = "host",
-        fingerprintBytes = fingerprint,
-        projectBytes = project,
         projectId = "p1",
-        layerCount = 0,
+        snapshotProvider = { ProjectSnapshot(fingerprintBytes = fingerprint, projectBytes = project, layerCount = 0) },
     )
 
     @Test

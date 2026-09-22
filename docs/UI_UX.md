@@ -4,11 +4,11 @@ GraffitiXR is designed for one-handed use while holding a spray can or a ladder.
 
 ## 1. The Rail (AzNavRail)
 
-* **Position:** Vertical strip on the right side (configurable for left-handed use in Settings).
+* **Position:** Vertical strip **left-docked by default** (`isRightHanded = true` maps to a left-side dock; toggle handedness in Settings to move it to the right).
 * **Philosophy:** "Thumb Range Only." If you have to reach for the top of the screen, the UI failed.
 * **Hierarchy:** three top-level accordion hosts — **Modes** (AR, Overlay, Mockup, Trace), **Adjust** (a small set of whole-design toggles — Adjust, Balance, Invert, Outline, Isolate — not general layer tools), and **Project** (new, save, load, export, settings) — plus two plain top-level items: **Open** (add a layer, switching into Design mode as a side effect; there is no separate "Design" accordion host) and **Help**.
     * **Context Actions:** per-mode options appear as expanding sub-items / nested rails from the active Modes host.
-* **Reactive guide:** an in-app onboarding guide (AzNavRail 10.18's status-driven guidance) can point a callout at the next thing to do based on your current mode and state, and suppresses itself during gestures. As of this writing it does **not** auto-start on mode entry, and the **Help** rail item no longer replays it — Help instead opens AzNavRail's built-in help overlay. TODO: confirm whether/how the reactive guide is currently surfaced to users at all, since its trigger path is presently dormant in code.
+* **Reactive guide:** an in-app onboarding guide (AzNavRail 10.18's status-driven guidance) can point a callout at the next thing to do based on your current mode and state, and suppresses itself during gestures. Per-mode goals are registered with `autoStartWhen = "az.screen.<MODE>"` in `GuidanceDefinitions.kt`, so the guide **does auto-start on mode entry** (see [`docs/DSL.md`](DSL.md)). The **Help** rail item no longer replays it — Help instead opens AzNavRail's built-in help overlay.
 
 ## 2. The Viewport & Gestures
 
@@ -34,14 +34,20 @@ confidence-tinted voxels). That subsystem has been deleted — the code's own co
 confidence computation now says "voxel/splat map deleted," and it returns a hardcoded `0.0` always.
 There is currently no voxel/confidence-tinted visualization in the app.
 
-### The Lazy Grid
-A projected grid line overlay that snaps to the dominant plane found in the confidence map.
-* **Purpose:** Helps the artist judge perspective distortion visually.
-* **Behavior:** It is "Lazy"—it smooths out jitter. If tracking glitches, the grid floats gently rather than snapping violently.
+### The Lazy Grid (removed)
+This section previously described a projected grid-line overlay that snapped to the dominant plane
+found in the confidence map. It was deleted along with the confidence map it depended on (see
+`docs/AUDIT.md`); there is currently no grid overlay in the app.
 
 ---
 *Documentation updated on 2026-08-07 to correct rail hierarchy, guidance, target-creation, gesture, and
 visualization claims against current source.*
+
+*Documentation updated on 2026-09-22: corrected the rail's default docking side (left, not right —
+`isRightHanded = true` maps to `AzDockingSide.LEFT`); corrected the reactive-guide TODO, which claimed
+the auto-start trigger was dormant — `GuidanceDefinitions.kt` registers `autoStartWhen` per mode and it
+does auto-start on mode entry; and marked "The Lazy Grid" as a removed feature, consistent with
+`docs/en/screens.md`.*
 
 ## Project dialogs (2026-09-06)
 

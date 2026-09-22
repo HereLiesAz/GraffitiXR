@@ -52,10 +52,9 @@ interface SettingsRepository {
      * Whether relocalization corrections are fused onto the overlay ("drift correction").
      *
      * Persisted, and that is the whole point. It was session-scoped, which cost a real field run:
-     * the artist enabled it, the session ended, and the next run silently reverted to off. The
-     * relocalizer locked on 31% of ticks at a 94% inlier ratio and every one of those corrections
-     * was computed and discarded, so the overlay drifted exactly as if nothing worked — and the
-     * report's own `Fusion: DISABLED ×777 (100%)` was the only place that said why.
+     * the artist enabled it, the session ended, and the next run silently reverted to off. Every
+     * relocalization correction computed while it was off is discarded, so the overlay drifts
+     * exactly as if nothing worked, with nothing in the UI to say why.
      *
      * Off by default still: it is unvalidated on a device. But a switch the artist has to remember
      * to find and re-flip on every launch is not a switch they have.
@@ -118,18 +117,23 @@ interface SettingsRepository {
 
     /**
      * Set once a device proves it can't run forced hardware-stereo (ARCore motion-stereo disparity
-     * fails / VIO never tracks): future sessions skip the stereo config and stay on Canvas, so the
-     * broken path can't thrash the device. Cleared when the user explicitly re-selects Mural.
+     * fails / VIO never tracks): future sessions skip the stereo config and stay mono, so the
+     * broken path can't thrash the device. Cleared when the user re-enables the ambient scan
+     * (see [setAmbientScanEnabled]).
      */
     val forcedStereoUnstable: Flow<Boolean>
 
     suspend fun setForcedStereoUnstable(unstable: Boolean)
 
     /**
-     * Cached result of the one-time hardware-stereo capability probe:
-     * -1 = not yet probed, 0 = device can't run forced stereo (use mono), 1 = stereo tracks (use it).
-     * Probing runs a short throwaway stereo session on a worker thread the first time AR is entered,
-     * so we only adopt the dual-lens path on a device whose motion-stereo actually tracks.
+     * Cached result of the one-time dual-lens depth-triangulation capability probe:
+     * -1 = not yet probed, 0 = device can't run forced stereo (use mono), 1 = the dual lenses proved
+     * they can triangulate real depth (use stereo). A stereo config that merely exists and tracks is
+     * not enough to score 1 — the probe requires an actual populated depth map.
+     * Probing runs a short throwaway stereo session in the isolated `:probe` process
+     * (`StereoProbeService`, out-of-process so a crash there can't take down the main process), the
+     * first time AR is entered, so we only adopt the dual-lens path on a device that actually
+     * produces usable depth.
      */
     val stereoCapability: Flow<Int>
 
@@ -165,7 +169,10 @@ interface SettingsRepository {
     val adaptiveRateEnabled: Flow<Boolean>
     suspend fun setAdaptiveRateEnabled(on: Boolean)
 
-    /** Set of tutorial keys the user has completed. Keys: "tut_ar", "tut_overlay", "tut_mockup", "tut_trace", "tut_design", "tut_project". */
+    /**
+     * Set of completed-tutorial/explainer keys. Caller-defined: any string identifying a
+     * completed tutorial or one-time explainer (e.g. "first_run_ar_doodle", "ar_unavailable_explainer").
+     */
     val completedTutorials: Flow<Set<String>>
 
     suspend fun markTutorialComplete(key: String)

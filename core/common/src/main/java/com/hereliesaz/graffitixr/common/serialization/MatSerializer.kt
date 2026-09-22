@@ -14,6 +14,12 @@ import com.hereliesaz.graffitixr.common.util.NativeLibLoader
 
 object MatSerializer : KSerializer<Mat> {
 
+    // NOTE: same latent issue as SketchProcessor had (see its util/SketchProcessor.kt comment) —
+    // a load failure here throws from a static initializer, so the JVM wraps it in
+    // ExceptionInInitializerError (an Error, not an Exception), which callers' `catch (e:
+    // Exception)` cannot catch. Left as `init {}` for now rather than moved to lazy-on-first-use
+    // in [serialize]/[deserialize], since that would need an integration test covering
+    // native-load failure to verify against; flagging here instead of guessing.
     init {
         NativeLibLoader.loadAll()
     }

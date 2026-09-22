@@ -174,8 +174,8 @@ style:
   active: true
   MagicNumber:
     # The tuning constants (thresholds, timeouts, kernel sizes) are documented in
-    # docs/PARAMETERS.md and at their use sites; hoisting each to a named constant would move the
-    # explanation away from the code it explains.
+    # docs/research/PARAMETERS.md and at their use sites; hoisting each to a named constant would
+    # move the explanation away from the code it explains.
     active: false
   MaxLineLength:
     # Wide enough for the fully-qualified Compose/ARCore types and the long explanatory comments
