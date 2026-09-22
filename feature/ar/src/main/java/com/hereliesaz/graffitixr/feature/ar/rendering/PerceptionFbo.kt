@@ -7,6 +7,7 @@ import com.hereliesaz.graffitixr.design.rendering.ShaderUtil
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
+import timber.log.Timber
 
 /**
  * Offscreen colour+depth framebuffer that caches the world-locked perception layers (voxel splats,
@@ -30,6 +31,11 @@ class PerceptionFbo : GlReleasable {
     private var depthRbo = 0
     private var width = 0
     private var height = 0
+    // Separate from `fbo != 0`: a non-zero id only means glGenFramebuffers succeeded, not that the
+    // attachments it was given form a complete, renderable framebuffer. Set by [resize] from
+    // glCheckFramebufferStatus and consulted by [isSized] so a caller gating on it (ArRenderer's
+    // perception-draw branch) can actually fall back when the FBO is attachment-incomplete.
+    private var complete = false
 
     private var program = 0
     private var aPos = 0
@@ -79,6 +85,23 @@ class PerceptionFbo : GlReleasable {
             GLES20.glAttachShader(it, v)
             GLES20.glAttachShader(it, f)
             GLES20.glLinkProgram(it)
+        }
+        // Shader objects are only needed until the program is linked; the compiled code they hold
+        // lives in the program afterwards, and leaving them around leaks a GL object per (re)create.
+        GLES20.glDeleteShader(v)
+        GLES20.glDeleteShader(f)
+
+        val linkStatus = IntArray(1)
+        GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linkStatus, 0)
+        if (linkStatus[0] != GLES20.GL_TRUE) {
+            // Documented fallback (ArRenderer: "if the FBO is unavailable, perception falls back to
+            // drawing every frame") only works if `ready` actually reflects whether the composite
+            // program is usable. Leaving it false here is what lets that fallback trigger.
+            Timber.e("$TAG: program link failed: ${GLES20.glGetProgramInfoLog(program)}")
+            GLES20.glDeleteProgram(program)
+            program = 0
+            ready = false
+            return
         }
         aPos = GLES20.glGetAttribLocation(program, "a_Pos")
         aUv = GLES20.glGetAttribLocation(program, "a_Uv")
@@ -135,11 +158,20 @@ class PerceptionFbo : GlReleasable {
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, fbo)
         GLES20.glFramebufferTexture2D(GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0, GLES20.GL_TEXTURE_2D, colorTex, 0)
         GLES20.glFramebufferRenderbuffer(GLES20.GL_FRAMEBUFFER, GLES20.GL_DEPTH_ATTACHMENT, GLES20.GL_RENDERBUFFER, depthRbo)
+        val status = GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER)
+        complete = status == GLES20.GL_FRAMEBUFFER_COMPLETE
+        if (!complete) {
+            // Documented fallback ("if the FBO is unavailable, perception falls back to drawing every
+            // frame") depends on this being caught here rather than surfacing later as blank/garbage
+            // perception output. Leave the (unusable) attachments allocated rather than partially
+            // tearing them down mid-bind; the next resize() call retries via releaseFboOnly().
+            Timber.e("$TAG: framebuffer incomplete, status=0x${status.toString(16)}")
+        }
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
     }
 
-    /** True when a valid attachment exists at the current size. */
-    fun isSized(): Boolean = fbo != 0 && width > 0 && height > 0
+    /** True when a valid, attachment-complete FBO exists at the current size. */
+    fun isSized(): Boolean = fbo != 0 && width > 0 && height > 0 && complete
 
     /** Bind the FBO and clear it transparent so only perception pixels carry alpha. */
     fun bindForRender() {
@@ -196,6 +228,7 @@ class PerceptionFbo : GlReleasable {
         if (colorTex != 0) { GLES20.glDeleteTextures(1, intArrayOf(colorTex), 0); colorTex = 0 }
         if (depthRbo != 0) { GLES20.glDeleteRenderbuffers(1, intArrayOf(depthRbo), 0); depthRbo = 0 }
         width = 0; height = 0
+        complete = false
     }
 
     override fun release() {

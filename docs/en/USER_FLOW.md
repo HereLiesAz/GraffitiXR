@@ -36,9 +36,9 @@ relocalization thread).
 
 **Correction:** `MobileGS` is **not** a mapping engine — there is no persistent voxel or splat layer,
 no scene reconstruction, and no `draw()` method. The engine's own code comments say so at the call
-sites that used to feed such a layer (`setMappingPaused`, `getSplatCount` — both log "no
-gaussian-splat mapper in this engine" and return inert values). There is no `VoxelMap`,
-`ConfidenceMap`, or `PersistentVoxelMemory` in the current code.
+site that used to feed such a layer (`setMappingPaused`, which logs "no gaussian-splat mapper in this
+engine" and is a no-op). There is no `VoxelMap`, `ConfidenceMap`, `PersistentVoxelMemory`, or
+`getSplatCount` in the current code — `getSplatCount` was removed entirely, not just stubbed.
 
 ### A. The Dependency Chain
 1.  **Baseline fingerprint:** when the artist registers the wall, the engine stores ORB/SuperPoint
@@ -49,7 +49,7 @@ gaussian-splat mapper in this engine" and return inert values). There is no `Vox
 3.  **Snap-back:** on a high-confidence match, the corrected pose can realign the overlay to the wall
     after tracking loss or a screen-off event. This drift-correction consumer, and the related
     self-growing-fingerprint mechanism, ship opt-in and off by default — see
-    [`TELEOLOGICAL_SLAM.md`](TELEOLOGICAL_SLAM.md).
+    [`TELEOLOGICAL_SLAM.md`](../TELEOLOGICAL_SLAM.md).
 
 ---
 

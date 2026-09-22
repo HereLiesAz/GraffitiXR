@@ -100,12 +100,6 @@ android {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
 
-        externalNativeBuild {
-            cmake {
-                cppFlags += "-std=c++17"
-            }
-        }
-
         // Crash auto-reporting: CrashUploadWorker files a GitHub issue containing the crash log, using
         // this token. It is read at BUILD time from the GH_TOKEN env var (the same one
         // settings.gradle.kts uses for the GitHub Packages maven repo), with a gradle-property

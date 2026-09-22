@@ -145,7 +145,11 @@ data class ArUiState(
 
     // Phase 5 — When true, OverlayRenderer draws an orange line-loop around the anchor quad boundary.
     val showAnchorBoundary: Boolean = false,
-    /** ARCore camera target frame rate: 60 (default) or 30. Applies on next AR entry. */
+    /**
+     * ARCore camera target frame rate. One of [com.hereliesaz.graffitixr.common.model.CameraTargetFps]'s
+     * four values: 60 (default), 30, `DEVICE_DEFAULT` (0, no filtering), or `DEVICE_MAX` (-1, the
+     * device's highest-fps config). Applies on next AR entry.
+     */
     val cameraTargetFps: Int = 60,
     /**
      * Perception-throttle triggers. When enabled and active, each drops the world-locked perception

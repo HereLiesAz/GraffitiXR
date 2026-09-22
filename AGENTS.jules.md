@@ -46,7 +46,7 @@ Operating instructions for this repository. Read before planning.
 ## Drift Detection
 
 - When restating an architectural decision, state its original reason. If the reason has drifted from the original, stop and flag it in the PR.
-- Before opening a PR, quote each invariant from `ARCHITECTURE.md` and name the `file:line` that enforces it. If none can be named, say the invariant is unenforced.
+- Before opening a PR, quote each invariant from `docs/ARCHITECTURE.md` and name the `file:line` that enforces it. If none can be named, say the invariant is unenforced.
 - The changed-file list comes from `git status`, never from recollection.
 - If the plan and the diff have diverged, say so explicitly rather than reconciling them silently.
 
@@ -71,4 +71,4 @@ Operating instructions for this repository. Read before planning.
 
 ## Companion File
 
-`ARCHITECTURE.md` holds module boundaries, invariants, current version, and decisions with their reasons. Read it before proposing structural changes. Never recall it — open it.
+`docs/ARCHITECTURE.md` holds module boundaries, invariants, current version, and decisions with their reasons. Read it before proposing structural changes. Never recall it — open it.

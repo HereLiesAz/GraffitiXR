@@ -53,6 +53,7 @@ internal object EditorReducer {
             state.copy(activePanel = if (state.activePanel == EditorPanel.ADJUST) EditorPanel.NONE else EditorPanel.ADJUST)
         EditorIntent.DismissPanel -> state.copy(activePanel = EditorPanel.NONE)
         is EditorIntent.SetGestureInProgress -> state.copy(gestureInProgress = intent.inProgress)
+        is EditorIntent.SetAdjustmentInProgress -> state.copy(adjustmentInProgress = intent.inProgress)
         is EditorIntent.SetEditorMode -> reduceEditorMode(state, intent.mode)
 
         is EditorIntent.SetModeAdjustment ->
@@ -226,8 +227,15 @@ internal object EditorReducer {
     }
 
     /**
-     * Mode is a view, not a container: the design (the document) persists and stays editable, but
-     * transient mode-specific overlay state must not bleed into the next mode.
+     * Mode is a view, not a container: the design (the document) persists and stays editable.
+     *
+     * This does not clear any transient overlay flags (rotation-axis feedback, locked feedback,
+     * gesture/adjustment-in-progress, the active panel, …) on a mode switch — none of those are
+     * actually mode-scoped state today: each is either shared across every mode by design (see
+     * GestureFeedback's doc on [EditorUiState.showRotationAxisFeedback]) or is already false by the
+     * time a mode switch can happen (a gesture/adjustment must end before the UI that triggers a
+     * mode switch is reachable). If a genuinely mode-scoped transient flag is added later, add its
+     * reset here.
      */
     private fun reduceEditorMode(state: EditorUiState, mode: EditorMode): EditorUiState {
         if (state.editorMode == mode) return state

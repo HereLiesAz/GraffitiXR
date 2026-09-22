@@ -400,7 +400,7 @@ not accuracy parameters.
 | `GOOD_ERR_MM` | `EvalDecision.kt` | `10` mm | measured-ish — "≤1 cm is effective at mural scale", a judgement about the application |
 | Jitter window | `DriftCostProbe.kt` | `30` samples | guessed (~0.5 s at 60 Hz) |
 | Repetitions per condition | `EVALUATION.md` §3.3 | `3` | derived — median of three rejects a thermally-throttled run |
-| RNG seed | *proposed*, eval-only | fixed constant | derived — determinism requirement |
+| RNG seed | *implemented* (`MobileGS::setEvalRngSeed`), eval-only | fixed constant | derived — determinism requirement |
 
 ---
 

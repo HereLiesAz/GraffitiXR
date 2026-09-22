@@ -47,7 +47,7 @@ import androidx.core.net.toUri
  * Mockup) or by projection (AR). Authoring the image belongs to the companion design app, so the
  * painting, stencil and text-authoring pipelines that used to live here have been removed; images
  * arrive already finished, via the picker or an inbound ACTION_SEND share, and leave via
- * [exportImage] / [exportForShare].
+ * [exportImage].
  *
  * What remains is placement (transform, lock) and legibility — opacity, brightness, contrast,
  * saturation, colour balance, invert, plus the two effects that change what the image IS rather
@@ -105,12 +105,30 @@ class EditorViewModel @Inject constructor(
         railExpansionJob = viewModelScope.launch(dispatchers.main) {
             kotlinx.coroutines.delay(500)
             val toWrite = pendingRailExpansion.toMap()
-            pendingRailExpansion.clear()
             if (toWrite.isEmpty()) return@launch
-            withContext(dispatchers.io) {
-                projectRepository.updateProject {
-                    if (it.id == projectId) it.copy(railExpansion = it.railExpansion + toWrite) else it
+            // pendingRailExpansion is only cleared AFTER the write succeeds (see below) — not here,
+            // before it. Cleared here, a cancellation landing mid-write (a new tap arriving inside
+            // this delay/write window, or a project switch) would have already wiped the record of
+            // what still needed writing, with nothing left to retry it from. Left populated, the next
+            // debounced write (whether triggered by this same batch resuming or a subsequent tap)
+            // still has these entries to merge in and persist.
+            try {
+                withContext(dispatchers.io) {
+                    projectRepository.updateProject {
+                        if (it.id == projectId) it.copy(railExpansion = it.railExpansion + toWrite) else it
+                    }
                 }
+                // Only drop the entries we just wrote, and only if nothing newer queued behind them
+                // while the write was in flight (a tap during the IO call keeps its own re-queued
+                // entry).
+                toWrite.forEach { (key, value) ->
+                    if (pendingRailExpansion[key] == value) pendingRailExpansion.remove(key)
+                }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                // Left in pendingRailExpansion (not cleared above) — the next debounced write
+                // retries it. This is a UI preference, not project data, so no user-facing failure.
+                android.util.Log.e("EditorViewModel", "Failed to persist rail expansion state", e)
             }
         }
     }
@@ -230,8 +248,12 @@ class EditorViewModel @Inject constructor(
 
         val current = _uiState.value.design
         val loaded = project.design?.toLayer()?.let { design ->
-            // Carry the live bitmap over when the image is unchanged, so reopening the same project
-            // does not re-decode it off disk.
+            // This is only reached on a genuine project SWITCH (the caller already filters out
+            // reopening the same project id), so `current` here belongs to the project being left,
+            // not the one being loaded — this does not skip re-decoding on reopen. The branch only
+            // helps in the (rare, and today likely never true, since saved artifacts get a
+            // per-project UUID filename) case where the outgoing and incoming projects' designs
+            // happen to reference the exact same image uri.
             if (current != null && current.uri == design.uri) design.copy(bitmap = current.bitmap) else design
         }
 
@@ -350,6 +372,13 @@ class EditorViewModel @Inject constructor(
                             designSourceBitmap = source
                             updateDesign { it.copy(bitmap = shown) }
                             _uiState.value.design?.let { opEmitter.emit(Op.DesignReplace(it)) }
+                            // Layer.bitmap is @Transient and never serializes, so DesignReplace alone
+                            // leaves a guest with metadata pointing at a URI on the HOST's local
+                            // filesystem and no pixels. Ship the actual bytes too, the same way
+                            // recomputeDesignEffects does for effect toggles.
+                            if (shown != null) {
+                                opEmitter.emit(Op.DesignBitmapReplace(ImageUtils.bitmapToByteArray(shown)))
+                            }
                         }
                     }
                 }
@@ -422,6 +451,11 @@ class EditorViewModel @Inject constructor(
                     designSourceBitmap = bitmap
                     dispatch(EditorIntent.SetDesign(design))
                     opEmitter.emit(Op.DesignReplace(design))
+                    // Layer.bitmap is @Transient and never serializes, so DesignReplace alone leaves
+                    // a guest with metadata pointing at a URI on the HOST's local filesystem and no
+                    // pixels — nothing renders until some later, unrelated op happens to also carry
+                    // bytes. Ship the pixels too, the same way recomputeDesignEffects does.
+                    opEmitter.emit(Op.DesignBitmapReplace(ImageUtils.bitmapToByteArray(bitmap)))
                     saveProject()
                 }
             } else {
@@ -500,6 +534,14 @@ class EditorViewModel @Inject constructor(
     /** Outline: turn the image into a sketch that is actually traceable. */
     override fun onToggleOutline() {
         if (_uiState.value.design == null) return
+        // recomputeDesignEffects bails out with no-op when designSourceBitmap is null (e.g. a co-op
+        // guest that only received design metadata, or a project load whose bitmap decode failed).
+        // Checked here, BEFORE pushHistory()/flipping the flag, so that case doesn't consume an undo
+        // slot and light up the rail as "on" for an effect that never actually rendered.
+        if (designSourceBitmap == null) {
+            _uiState.update { it.copy(effectFailureMessage = "Couldn't generate an outline for this image.") }
+            return
+        }
         pushHistory()
         updateDesign { it.copy(isSketch = !it.isSketch) }
         recomputeDesignEffects()
@@ -508,6 +550,10 @@ class EditorViewModel @Inject constructor(
     /** Subject isolation: drop everything the segmenter does not read as the subject. */
     override fun onToggleSubjectIsolation() {
         if (_uiState.value.design == null) return
+        if (designSourceBitmap == null) {
+            _uiState.update { it.copy(effectFailureMessage = "Couldn't isolate a subject in this image.") }
+            return
+        }
         pushHistory()
         updateDesign { it.copy(isSubjectIsolated = !it.isSubjectIsolated) }
         recomputeDesignEffects()
@@ -521,8 +567,13 @@ class EditorViewModel @Inject constructor(
         dispatch(EditorIntent.SetLoading(true))
         backgroundLoadJob = viewModelScope.launch(dispatchers.main) {
             try {
-                val bitmap = withContext(dispatchers.io) { ImageUtils.loadBitmapAsync(context, uri) }
-                    ?: error("Couldn't load that image.")
+                // Same cap as the design-import path (applyNewDesign) and for the same reason: a
+                // full 12MP+ wall photo is ~48MB as ARGB, and decoding/PNG-encoding it at full
+                // resolution (then rendering it as a texture every frame) is needless — 2048px is
+                // ample for a background photo too.
+                val bitmap = withContext(dispatchers.io) {
+                    ImageUtils.loadBitmapAsync(context, uri, maxDimension = 2048)
+                } ?: error("Couldn't load that image.")
                 if (!isCurrentProject(projectId)) return@launch
                 withContext(dispatchers.io) {
                     val path = projectRepository.saveArtifact(projectId, "bg_${UUID.randomUUID()}.png", ImageUtils.bitmapToByteArray(bitmap))
@@ -554,8 +605,6 @@ class EditorViewModel @Inject constructor(
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 if (isCurrentProject(projectId)) _uiState.update { it.copy(effectFailureMessage = "Couldn't remove the wall photo.") }
-            } finally {
-                if (isCurrentProject(projectId)) dispatch(EditorIntent.SetLoading(false))
             }
         }
     }
@@ -619,8 +668,16 @@ class EditorViewModel @Inject constructor(
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 // Don't let a failed save die silently — the user believes their work is safe.
                 android.util.Log.e("EditorViewModel", "Failed to save project", e)
+                // The three check() calls above throw IllegalStateException for an in-flight
+                // project-switch/lifecycle race, not a storage problem — reporting those as
+                // "storage may be full" is misleading. Keep that message for genuine IO failures.
+                val message = if (e is IllegalStateException) {
+                    "Couldn't save — try again"
+                } else {
+                    "Couldn't save the project — storage may be full"
+                }
                 withContext(dispatchers.main) {
-                    Toast.makeText(context, "Couldn't save the project — storage may be full", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                     onComplete(false)
                 }
             }
@@ -806,30 +863,6 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Composites the design to a PNG in `cacheDir/shared` and returns a FileProvider
-     * `content://` Uri suitable for `ACTION_SEND` — the two-app hand-off back to the design app.
-     * Returns null if there's nothing to share. The host fires the share intent; the Uri authority
-     * is `${applicationId}.fileprovider`, declared in the manifest.
-     */
-    suspend fun exportForShare(): Uri? = withContext(dispatchers.default) {
-        val design = _uiState.value.design ?: return@withContext null
-        val metrics = context.resources.displayMetrics
-        val composite = exportManager.composite(
-            design,
-            metrics.widthPixels.takeIf { it > 0 } ?: 1080,
-            metrics.heightPixels.takeIf { it > 0 } ?: 1920,
-            backgroundColor = android.graphics.Color.TRANSPARENT,
-        )
-        val dir = File(context.cacheDir, "shared").apply { mkdirs() }
-        val file = File(dir, "graffitixr_share.png")
-        java.io.FileOutputStream(file).use { out ->
-            composite.compress(Bitmap.CompressFormat.PNG, 100, out)
-        }
-        composite.recycle()
-        androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-    }
-
     // ── Settings / perception layers ──────────────────────────────────────────
 
     /**
@@ -842,32 +875,30 @@ class EditorViewModel @Inject constructor(
     fun toggleHandedness() {
         dispatch(EditorIntent.ToggleHandedness)
         val isRightHanded = _uiState.value.isRightHanded
-        viewModelScope.launch(dispatchers.io) {
-            settingsRepository.setRightHanded(isRightHanded)
-        }
+        launchIoCatching { settingsRepository.setRightHanded(isRightHanded) }
     }
     fun toggleDiagOverlay() {
         dispatch(EditorIntent.ToggleDiagOverlay)
         val on = _uiState.value.showDiagOverlay
-        viewModelScope.launch(dispatchers.io) { settingsRepository.setShowDiagOverlay(on) }
+        launchIoCatching { settingsRepository.setShowDiagOverlay(on) }
     }
 
     fun toggleFeaturePoints() {
         dispatch(EditorIntent.ToggleFeaturePoints)
         val on = _uiState.value.showFeaturePoints
-        viewModelScope.launch(dispatchers.io) { settingsRepository.setShowFeaturePoints(on) }
+        launchIoCatching { settingsRepository.setShowFeaturePoints(on) }
     }
 
     fun togglePlaneGrids() {
         dispatch(EditorIntent.TogglePlaneGrids)
         val on = _uiState.value.showPlaneGrids
-        viewModelScope.launch(dispatchers.io) { settingsRepository.setShowPlaneGrids(on) }
+        launchIoCatching { settingsRepository.setShowPlaneGrids(on) }
     }
 
     fun togglePoints() {
         dispatch(EditorIntent.TogglePoints)
         val on = _uiState.value.showPoints
-        viewModelScope.launch(dispatchers.io) { settingsRepository.setShowPoints(on) }
+        launchIoCatching { settingsRepository.setShowPoints(on) }
     }
 
     // ── Placement ─────────────────────────────────────────────────────────────
@@ -987,11 +1018,11 @@ class EditorViewModel @Inject constructor(
 
     override fun onAdjustmentStart() {
         pushHistory()
-        dispatch(EditorIntent.SetGestureInProgress(true))
+        dispatch(EditorIntent.SetAdjustmentInProgress(true))
     }
 
     override fun onAdjustmentEnd() {
-        dispatch(EditorIntent.SetGestureInProgress(false))
+        dispatch(EditorIntent.SetAdjustmentInProgress(false))
         saveProject()
         emitActiveLayerProps()
     }
@@ -1156,6 +1187,23 @@ class EditorViewModel @Inject constructor(
      */
     private fun dispatch(intent: EditorIntent) {
         _uiState.update { EditorReducer.reduce(it, intent) }
+    }
+
+    /**
+     * Fire-and-forget IO, guarded against an uncaught exception crashing the app. Used by the
+     * simple settings-persistence calls (toggleHandedness and friends) which have no result the
+     * caller waits on and nowhere else to route a failure — unlike saveProject/setBackgroundImage
+     * etc., which surface failure to the user because their result matters to what's on screen.
+     */
+    private fun launchIoCatching(block: suspend () -> Unit) {
+        viewModelScope.launch(dispatchers.io) {
+            try {
+                block()
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                android.util.Log.e("EditorViewModel", "Unhandled failure in background IO", e)
+            }
+        }
     }
 
 }

@@ -6,7 +6,6 @@
 
 # Root
 BACKLOG.md
-CLAUDE.md
 
 # Internal / process
 docs/AGENTS.md
@@ -22,7 +21,6 @@ docs/misc.md
 # Developer / engineering reference
 docs/API_REFERENCE.md
 docs/ARCHITECTURE.md
-docs/AZNAVRAIL_COMPLETE_GUIDE.md
 docs/BLUEPRINT.md
 docs/DSL.md
 docs/NATIVE_ENGINE.md

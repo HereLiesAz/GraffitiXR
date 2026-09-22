@@ -17,6 +17,12 @@ import org.opencv.imgproc.Imgproc
 
 object PerspectiveProcessor {
 
+    // NOTE: same latent issue as SketchProcessor had (see its comment) — a load failure here
+    // throws from a static initializer, so the JVM wraps it in ExceptionInInitializerError
+    // (an Error, not an Exception), which callers' `catch (e: Exception)` cannot catch. Left as
+    // `init {}` for now rather than moved to lazy-on-first-use in every function below, since
+    // that would touch two call sites ([unwarpImage], [removeBackground]) without an integration
+    // test covering native-load failure to verify against; flagging here instead of guessing.
     init {
         NativeLibLoader.loadAll()
     }

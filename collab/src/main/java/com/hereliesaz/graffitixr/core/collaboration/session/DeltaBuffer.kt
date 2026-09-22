@@ -35,11 +35,12 @@ import com.hereliesaz.graffitixr.common.model.Op
  */
 internal class DeltaBuffer(
     /**
-     * Total retained bytes before eviction starts. Sized for whole-canvas PNGs rather than for
-     * small ops: at 5 MB a single [Op.DesignBitmapReplace] could exceed the entire budget on its own,
-     * which is what made one warp fatal.
+     * Total retained bytes before eviction starts (48 MB). Sized for whole-canvas PNGs rather
+     * than for small ops: at a much smaller cap a single [Op.DesignBitmapReplace] could exceed
+     * the entire budget on its own, which is what made one warp fatal.
      */
     private val maxBytes: Long = 48L * 1024 * 1024,
+    /** Op-count cap before eviction starts (2000 ops), alongside [maxBytes]. */
     private val maxOps: Int = 2000,
 ) {
     private data class Entry(val seq: Long, val op: Op, val sizeBytes: Int)
@@ -80,11 +81,15 @@ internal class DeltaBuffer(
     /**
      * Drop buffered entries that [incoming] makes redundant.
      *
-     * There is one design, so every op is scoped to it and the question is only which ops SUBSUME
-     * which. Three do:
+     * There is one design, so every op scoped to it (pixels, transform, tone, strokes, text) is
+     * subsumed by a wholesale replacement of that design. [Op.ModeTransform] is the one exception:
+     * it lives on [ModeAdjustment], not on the design layer (see its kdoc), so it is independent
+     * per-mode placement state that a [Op.DesignReplace] does not carry and must not clear. Four
+     * ops SUBSUME earlier entries:
      *
      *  * [Op.DesignReplace] replaces the whole design object — pixels, transform and tone — so
-     *    nothing buffered before it can still matter.
+     *    nothing design-scoped buffered before it can still matter. It does NOT subsume
+     *    [Op.ModeTransform] for the reason above.
      *  * [Op.DesignBitmapReplace] defines the pixels outright, so it subsumes earlier pixel ops
      *    (another bitmap replace, or a completed stroke) but NOT transform or tone, which are
      *    separate state a replacement does not carry.
@@ -98,7 +103,7 @@ internal class DeltaBuffer(
      */
     private fun supersede(incoming: Op) {
         val subsumes: (Op) -> Boolean = when (incoming) {
-            is Op.DesignReplace -> { _ -> true }
+            is Op.DesignReplace -> { op -> op !is Op.ModeTransform }
             is Op.DesignBitmapReplace -> { op -> op is Op.DesignBitmapReplace || op is Op.StrokeComplete }
             is Op.DesignTransform -> { op -> op is Op.DesignTransform }
             is Op.DesignProps -> { op -> op is Op.DesignProps }

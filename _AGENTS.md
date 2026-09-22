@@ -80,7 +80,7 @@ Every agent starts with fresh context and no memory of prior runs.
 
 Fresh context is the fix for drift. An agent has no sunk investment in the code it audits.
 
-- Before any push, delegate the invariant check: hand the agent `ARCHITECTURE.md` and the changed files, ask which invariants are enforced and at what `file:line`. Findings come back as `file:line` or they don't count.
+- Before any push, delegate the invariant check: hand the agent `docs/ARCHITECTURE.md` and the changed files, ask which invariants are enforced and at what `file:line`. Findings come back as `file:line` or they don't count.
 - Before writing a new function, class, or file, delegate the duplication search.
 - Treat agent findings as claims, not conclusions. Open the file.
 
@@ -108,7 +108,7 @@ Fresh context is the fix for drift. An agent has no sunk investment in the code 
 
 ## Companion File
 
-`ARCHITECTURE.md` lives in-repo and holds what shouldn't live in a prompt:
+`docs/ARCHITECTURE.md` holds what shouldn't live in a prompt:
 
 - Module boundaries
 - Invariants (5–10 lines)

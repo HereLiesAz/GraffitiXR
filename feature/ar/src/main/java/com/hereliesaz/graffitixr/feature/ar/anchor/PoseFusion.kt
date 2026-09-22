@@ -246,9 +246,18 @@ class PoseFusion {
                 blend(correction ?: identity(), newLocal, alpha)
             }
             snapsAccepted++
+        } else if (isNew && correction != null) {
+            // A relock reached fusion THIS tick and was refused by MIN_INLIER_RATIO (above), but a
+            // standing correction from an earlier accepted relock already exists. Distinct from the
+            // branch below: "an attempt arrived and was thrown away" is a different fault from
+            // "nothing arrived", and the two look identical on every other channel — the overlay
+            // just sits there either way. Conflating them as HOLDING is what let fusion silently
+            // refuse every correction while the diagnostic overlay reported the healthy steady state.
+            lastState = FusionState.RELOCK_REFUSED
         } else if (correction != null) {
-            // A local correction stands but nothing new arrived. It remains valid under a global
-            // ARCore world rebase because the live backbone carries it into the current frame.
+            // A local correction stands but nothing new arrived this tick at all. It remains valid
+            // under a global ARCore world rebase because the live backbone carries it into the
+            // current frame.
             lastState = FusionState.HOLDING
         }
         lastSeq = seq

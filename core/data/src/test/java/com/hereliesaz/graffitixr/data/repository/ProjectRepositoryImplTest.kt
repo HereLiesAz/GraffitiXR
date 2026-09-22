@@ -126,8 +126,10 @@ class ProjectRepositoryImplTest {
     /**
      * The property "atomic" is supposed to guarantee: two writers transforming NON-overlapping
      * fields concurrently must both land in the final state — neither read-modify-write may clobber
-     * the other (this is what `updateProject(transform)`'s `_currentProject.updateAndGet { }` CAS
-     * loop plus `saveMutex` exist for — see the comments on `ProjectRepositoryImpl.updateProject`).
+     * the other. `updateProject(transform)` gets this not from a CAS loop but from `saveMutex`: the
+     * whole read-current / apply-transform / persist / publish sequence runs serialized under the
+     * mutex, so a second writer's transform always sees the first writer's already-published result
+     * (see the comments on `ProjectRepositoryImpl.updateProject`).
      *
      * Uses real OS threads (not the deterministic test dispatcher) released simultaneously by a
      * [CyclicBarrier], so a naive non-atomic "read current, compute copy, write current" would

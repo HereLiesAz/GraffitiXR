@@ -19,16 +19,22 @@ import org.opencv.imgproc.Imgproc
  */
 object SketchProcessor {
 
-    init {
-        NativeLibLoader.loadAll()
-    }
+    // Deliberately NOT loaded from an `init {}` block: a failure thrown there is a static
+    // initializer failure, which the JVM wraps in `ExceptionInInitializerError` — an `Error`, not
+    // an `Exception`, so `catch (e: Exception)` callers (including this object's own try/catch
+    // below) can never catch it and it crashes the app uncaught. Loading lazily on first use here
+    // instead means a load failure surfaces as the plain `RuntimeException` NativeLibLoader itself
+    // throws, which the catch block below DOES catch, matching this effect's documented
+    // "costs the user that one effect, not their image" behaviour. NativeLibLoader.loadAll() is
+    // idempotent (guarded by its own AtomicBoolean/@Synchronized), so calling it on every
+    // invocation is cheap once loaded.
 
     /**
      * Applies a pencil-sketch (dodge-blend) effect to [bitmap].
      *
      * @param bitmap    Source image (any config; read via OpenCV).
      * @param thickness Controls the Gaussian blur radius. Larger values produce softer/thicker lines.
-     *                  Must be >= 1. The actual kernel size will be `(thickness * 2 + 1)` squared.
+     *                  Must be >= 1. The actual kernel size will be `(thickness * 8 + 1)` squared.
      * @param penColor  ARGB color for the sketch lines. Alpha of each output pixel is derived from
      *                  sketch darkness: dark pixels → opaque [penColor], light pixels → transparent.
      *                  Defaults to white for backward compatibility.
@@ -38,6 +44,8 @@ object SketchProcessor {
     fun sketchEffect(bitmap: Bitmap, thickness: Int = 5, penColor: Int = android.graphics.Color.WHITE): Bitmap? {
         val mats = mutableListOf<Mat>()
         return try {
+            NativeLibLoader.loadAll()
+
             val clampedThickness = thickness.coerceAtLeast(1)
 
             // Step 1: Load bitmap into an OpenCV Mat and convert RGBA → grayscale

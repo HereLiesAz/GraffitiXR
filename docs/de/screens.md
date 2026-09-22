@@ -7,7 +7,7 @@ Es gibt praktisch nur einen Bildschirm. Die Hintergrund-Rendering-Ebene ändert 
 ### AR-Modus (`EditorMode.AR`)
 | Ebene | Oberfläche | Inhalt |
 |---|---|---|
-| Unten | `GLSurfaceView` (`ArRenderer`) | ARCore Live-Kamera-Feed über `BackgroundRenderer`; das projizierte "Lazy Grid"-Rasterlinien-Overlay, ausgerichtet an der dominanten Ebene (keine persistente Voxel- oder Splat-Ebene, keine `draw()`-Methode) |
+| Unten | `GLSurfaceView` (`ArRenderer`) | ARCore Live-Kamera-Feed über `BackgroundRenderer`, kombiniert mit dem AR-Overlay. Es gibt keine persistente 3D-Karte, kein Voxel-/Splat-Rendering und (seit der Entfernung der Confidence-Map) auch kein "Lazy Grid"-Overlay mehr — siehe [`NATIVE_ENGINE.md`](../NATIVE_ENGINE.md). |
 | Oben | Compose `Canvas` | 2D-Editorebenen (Bitmaps, Transformationen) |
 | HUD | Compose `Text` chip | Live-Tracking-Status (grün=VERFOLGUNG, grau=SUCHEN) basierend auf `arUiState.isScanning` |
 
@@ -59,4 +59,4 @@ Vollbild-Bottom-Sheet über dem Haupt-Viewport. Listet gespeicherte `.gxr`-Proje
 Kamera- und Standortberechtigungen werden zusammen über den `permissionLauncher` in der `MainActivity` angefordert. Der Status `hasCameraPermission` steuert das gesamte kameraabhängige Rendering im `ArViewport`. Ohne Kameraberechtigung zeigen sowohl der AR- als auch der Overlay-Modus keinen Hintergrund.
 
 ---
-*Dokumentation aktualisiert am 2026-03-17 während der Website-Neugestaltungs- und Schablonenmodus-Integrationsphase. 2026-09-04: die Beschreibung des gelöschten `EditorMode.STENCIL`-Modus (existiert nicht im Code) und die falsche `slamManager.draw()`/Voxel-Splat-Behauptung entfernt; die Beschreibung des AR-Viewports gemäß aktuellem Quellcode korrigiert.*
+*Dokumentation aktualisiert am 2026-03-17 während der Website-Neugestaltungs- und Schablonenmodus-Integrationsphase. 2026-09-04: die Beschreibung des gelöschten `EditorMode.STENCIL`-Modus (existiert nicht im Code) und die falsche `slamManager.draw()`/Voxel-Splat-Behauptung entfernt; die Beschreibung des AR-Viewports gemäß aktuellem Quellcode korrigiert. 2026-09-22: die veraltete Erwähnung des "Lazy Grid"-Overlays entfernt — es wurde zusammen mit der Confidence-Map gelöscht und existiert nicht mehr im Code.*

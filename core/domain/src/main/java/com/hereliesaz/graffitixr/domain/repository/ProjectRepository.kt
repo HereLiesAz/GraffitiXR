@@ -23,14 +23,16 @@ interface ProjectRepository {
     val projects: Flow<List<GraffitiProject>>
 
     /**
-     * Creates a new project with the given name.
+     * Creates a new project with the given name, and sets it as the current/active project
+     * (updates [currentProject]).
      * @param name The name of the new project.
      * @return The created [GraffitiProject] instance.
      */
     suspend fun createProject(name: String): GraffitiProject
 
     /**
-     * Saves a new project instance to the repository.
+     * Saves a new project instance to the repository, and sets it as the current/active project
+     * (updates [currentProject]).
      * @param project The project to save.
      */
     suspend fun createProject(project: GraffitiProject)
@@ -64,6 +66,9 @@ interface ProjectRepository {
     /**
      * Atomically updates the current project using a transformation function.
      * Useful for modifying immutable data classes safely.
+     *
+     * If there is no current project, this is a silent no-op: [transform] is not invoked and no
+     * error or signal is raised.
      * @param transform A function that takes the current project and returns the new state.
      */
     suspend fun updateProject(transform: (GraffitiProject) -> GraffitiProject)
@@ -84,17 +89,18 @@ interface ProjectRepository {
     suspend fun saveArtifact(projectId: String, filename: String, data: ByteArray): String
 
     /**
-     * Updates the target fingerprint path for a project (used by Teleological SLAM).
+     * Updates the target fingerprint path for a project.
      * @param projectId The project ID.
      * @param path The file path to the ORB descriptor file.
      */
     suspend fun updateTargetFingerprint(projectId: String, path: String)
 
     /**
-     * Imports a project from a .gxr zip file URI.
+     * Imports a project from a .gxr zip file.
      * Extracts and persists the project, then sets it as the current project.
-     * @param uri The URI of the .gxr file to import.
+     * @param uri The string form of the URI of the .gxr file to import (e.g. `uri.toString()` of an
+     * `android.net.Uri`).
      * @return [Result.success] with the imported project, or [Result.failure] on error.
      */
-    suspend fun importProject(uri: android.net.Uri): Result<GraffitiProject>
+    suspend fun importProject(uri: String): Result<GraffitiProject>
 }
