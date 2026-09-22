@@ -241,7 +241,11 @@ class ArViewModel @Inject constructor(
     @Volatile private var reportedGuestEditDrop = false
 
     fun startHosting() {
-        viewModelScope.launch {
+        // serializeCurrentProject() zips the whole project directory and can run to several MB for
+        // a project with many target images — run this whole flow off Main so neither that call nor
+        // HostSession's own synchronous size-probe (see the snapshotProvider lambda below) can block
+        // the UI thread.
+        viewModelScope.launch(dispatchers.io) {
             try {
                 // Both preconditions are checked here rather than only in the rail's enablement
                 // colour, so tapping Host always yields either a session or an explanation of what
@@ -286,9 +290,15 @@ class ArViewModel @Inject constructor(
                     projectId = projectManager.currentProjectId(),
                     localDeviceName = android.os.Build.MODEL,
                 ) {
+                    // snapshotProvider's type (CollaborationManager) is a plain () -> ProjectSnapshot,
+                    // not suspend — it's invoked both synchronously from HostSession's init{} and
+                    // later from its own IO-dispatched coroutine, neither of which can be changed to
+                    // call a suspend function without a deeper restructuring of the collab module.
+                    // This whole startHosting() flow already runs on dispatchers.io (see the launch
+                    // above), so bridging with runBlocking here blocks an IO-pool thread, never Main.
                     com.hereliesaz.graffitixr.core.collaboration.ProjectSnapshot(
                         fingerprintBytes = slamManager.exportFingerprint() ?: ByteArray(0),
-                        projectBytes = projectManager.serializeCurrentProject(),
+                        projectBytes = kotlinx.coroutines.runBlocking { projectManager.serializeCurrentProject() },
                         layerCount = projectRepository.currentProject.value?.layers?.size ?: 0,
                     )
                 }
