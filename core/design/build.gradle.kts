@@ -37,11 +37,4 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.az.nav.rail)
-
-    // MISSING DEPENDENCY RESTORED:
-    // Required for legacy vector drawables using ?attr/colorControlNormal
-    implementation(libs.androidx.appcompat)
-    
-    // ADDED: Required for shared 3D rendering (ProjectedImageRenderer)
-    implementation(libs.arcore.client)
 }

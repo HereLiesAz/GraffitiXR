@@ -1,6 +1,8 @@
 package com.hereliesaz.graffitixr.design.theme
 
 import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
@@ -76,8 +78,15 @@ fun GraffitiXRTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as Activity).window
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            // view.context may be a ContextThemeWrapper (or another wrapper) rather than the
+            // Activity itself; unwrap it instead of casting directly to avoid a
+            // ClassCastException, and no-op if no Activity is found in the chain.
+            val activity = view.context.findActivity()
+            if (activity != null) {
+                val window = activity.window
+                WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars =
+                    !darkTheme
+            }
         }
     }
 
@@ -91,4 +100,11 @@ fun GraffitiXRTheme(
             content = content
         )
     }
+}
+
+/** Walks up the [ContextWrapper] chain to find the hosting [Activity], or null if there isn't one. */
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

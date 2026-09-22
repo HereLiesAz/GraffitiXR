@@ -102,6 +102,7 @@ import com.hereliesaz.graffitixr.design.theme.GraffitiXRTheme
 import com.hereliesaz.graffitixr.design.theme.HotPink
 import com.hereliesaz.graffitixr.design.theme.NeonGreen
 import com.hereliesaz.graffitixr.design.theme.NavStrings
+import com.hereliesaz.graffitixr.design.theme.contrastColorFor
 import com.hereliesaz.graffitixr.feature.ar.ArViewModel
 import com.hereliesaz.graffitixr.common.model.CoopSessionState
 import com.hereliesaz.graffitixr.common.model.CoopRole
@@ -794,10 +795,7 @@ class MainActivity : ComponentActivity() {
                 val context = LocalContext.current
                 val canvasBg = editorUiState.canvasBackground
 
-                val navItemColor = remember(canvasBg) {
-                    val luminance = 0.299f * canvasBg.red + 0.587f * canvasBg.green + 0.114f * canvasBg.blue
-                    if (luminance > 0.5f) Color.Black else Color.White
-                }
+                val navItemColor = remember(canvasBg) { contrastColorFor(canvasBg) }
 
                 val allHelpItems = remember(strings) { buildHelpItems(strings) }
 
