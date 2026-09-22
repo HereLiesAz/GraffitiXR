@@ -17,7 +17,9 @@
 #include <condition_variable>
 #include <GLES3/gl3.h>
 
-#include "NativeUtil.h"
+// glm::mat4 is used directly below (growMapFromReloc); NativeUtil.h previously pulled this in as a
+// side effect of its (now-removed, dead-code) camToWorld/compileShader helpers.
+#include <glm/glm.hpp>
 
 class MobileGS {
 public:
@@ -414,7 +416,7 @@ public:
     // Detect the same features generateFingerprint would (SuperPoint/ORB-1000, masked) and return their
     // 2D positions in image pixels — for a truthful "what anchors the fingerprint" curation overlay.
     void getFingerprintKeypoints(const cv::Mat& image, const cv::Mat& mask, std::vector<cv::Point2f>& out);
-    // Teleological self-grow (default ON): promotes validated new marks into the live reloc
+    // Teleological self-grow (default OFF): promotes validated new marks into the live reloc
     // fingerprint so snap-back survives the original reference being painted over. Mutates the
     // authoritative set but is hard-guarded (fresh+confident relock, gatekeeper-validated, plane-fit,
     // re-projection dedup, per-relock + total caps, RANSAC backstop). Toggleable via the UI.
@@ -481,8 +483,6 @@ public:
      * mean a different five frames per run, which is the non-determinism this exists to remove.
      */
     void setEvalSyncReloc(bool enabled, int everyN);
-    /** True when inline relocalization is active — for the run-identity sidecar's sync/async field. */
-    bool isEvalSyncReloc() const { return mEvalSyncReloc.load(std::memory_order_relaxed); }
     /** The cadence in force, or 0 when sync mode is off. Reported alongside the flag. */
     int evalSyncEveryN() const {
         return mEvalSyncReloc.load(std::memory_order_relaxed)

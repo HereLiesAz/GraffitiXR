@@ -350,9 +350,11 @@ class ArRenderer(
     /**
      * Inliers required before a relocalization is trusted as eval ground truth.
      *
-     * Matches PoseFusion's own bar for a usable fix rather than inventing a second one: a pose good
-     * enough to move the overlay is good enough to measure against, and two different thresholds
-     * would make the CSV disagree with what the app actually did.
+     * A standalone threshold for gating the eval CSV's truth-pose column — NOT a reuse of a
+     * `PoseFusion` constant. `PoseFusion.MIN_INLIER_RATIO` (0.5) is a ratio, not a count, and
+     * `PoseFusion.COLD_SNAP_MIN_INLIERS` (20) is the bar for a hard snap, a stricter and differently
+     * motivated gate. This value has not been shown to match either, so treat it as its own number
+     * until it is deliberately reconciled with one of them.
      */
     private val MIN_TRUTH_INLIERS = 6
 
@@ -1617,8 +1619,13 @@ class ArRenderer(
                     // It now carries the measured corroboration (fraction of the registered artwork's
                     // features the real wall currently answers for). PoseFusion floors it at
                     // CONF_FLOOR, so an unpainted wall still corrects at half strength on the inlier
-                    // ratio alone — the previous behaviour is the floor, not the ceiling — and a
-                    // well-advanced mural earns up to 2x that.
+                    // ratio alone — the previous behaviour is the floor, not the ceiling. See
+                    // PoseFusion.CONF_FLOOR's own doc for why "a well-painted wall pulls 2x a bare
+                    // one" is NOT the right way to describe the ceiling: `confGlobal` is a
+                    // frame-to-frame confidence, not the whole-mural progress ratio the 2x figure was
+                    // true of before Phase 5b, and its practical maximum is below 1 for reasons that
+                    // doc lays out — so the real gain a well-painted wall earns is less than 2x and
+                    // has not been measured.
                     //
                     // Corroboration CONFIDENCE, not painting PROGRESS. Progress answers "how much of
                     // the mural exists" on a timescale of hours; this answers "how much do I trust
@@ -1768,6 +1775,19 @@ class ArRenderer(
                         )
                         // A timeout is not validation. Keep the existing live correction unchanged and
                         // stop retrying until the next anchor establishment explicitly arms a new capture.
+                        //
+                        // NOTE (audit): this retry budget is effectively ONE-SHOT per anchor
+                        // establishment. Nothing re-arms `overlayRotationCorrectionPending` after a
+                        // DISCARD here except a fresh establishment pass (see wherever
+                        // `pendingAnchorEstablishment` is set), so a discard early in a session leaves
+                        // `overlayRotationCorrection` at whatever it last held (identity, on the very
+                        // first attempt) for the rest of that anchor's lifetime — it is not retried
+                        // later even if the conditions that caused the DISCARD (anchor not yet
+                        // tracking, normal not reproducible) clear up on their own. A fix would need to
+                        // identify a safe point in the anchor lifecycle to re-arm
+                        // `overlayRotationCorrectionPending` without a fresh establishment pass; that
+                        // is anchor-lifecycle state-machine surgery this pass is not confident enough
+                        // to make unverified.
                         overlayRotationCorrectionPending = false
                         overlayRotationCorrectionRetryFrames = 0
                     }
@@ -2740,6 +2760,12 @@ class ArRenderer(
         val locked = try {
             sessionLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)
         } catch (_: InterruptedException) {
+            // Catching InterruptedException clears the thread's interrupt flag (JVM semantics) — if
+            // that flag is not restored here, [deferArSessionCloseUntilRendererHandoff]'s own
+            // `while (!Thread.currentThread().isInterrupted)` retry loop can never observe the
+            // interrupt that was meant to stop it, and spins forever regardless of who calls
+            // Thread.interrupt() on it.
+            Thread.currentThread().interrupt()
             false
         }
         if (!locked) return false

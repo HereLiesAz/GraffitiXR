@@ -2635,7 +2635,7 @@ private fun RelocDiagnosticsOverlay(
         // Pose fusion: what is actually happening to the overlay, and when nothing is, WHY.
         //
         // Every row above reports a measurement. This one reports a decision, and it is the row to
-        // read first when the complaint is "the overlay drifts" — because six quite different causes
+        // read first when the complaint is "the overlay drifts" — because seven quite different causes
         // produce that same symptom and nothing else on this overlay separates them. A healthy Reloc
         // row above a DISABLED or NO CAPTURE POSE here means the relocalizer is working perfectly and
         // its results are being discarded.
@@ -2660,12 +2660,16 @@ private fun RelocDiagnosticsOverlay(
                 com.hereliesaz.graffitixr.common.model.FusionState.BLENDING ->
                     "blending a=" + String.format(java.util.Locale.US, "%.2f", fusion.lastAlpha)
                 com.hereliesaz.graffitixr.common.model.FusionState.HOLDING -> "holding"
+                // A relock reached fusion this tick and was refused (low inlier ratio) while a
+                // standing correction already existed — distinct from HOLDING ("nothing arrived").
+                com.hereliesaz.graffitixr.common.model.FusionState.RELOCK_REFUSED -> "refusing relock"
             },
             when (fusionState) {
-                // Red for the two that mean corrections are being computed and thrown away, or
+                // Red for the states that mean corrections are being computed and thrown away, or
                 // cannot be computed at all. Amber for the transient waits. White for working.
                 com.hereliesaz.graffitixr.common.model.FusionState.NO_CAPTURE_POSE,
                 com.hereliesaz.graffitixr.common.model.FusionState.NO_FINGERPRINT,
+                com.hereliesaz.graffitixr.common.model.FusionState.RELOCK_REFUSED,
                 com.hereliesaz.graffitixr.common.model.FusionState.DISABLED ->
                     androidx.compose.ui.graphics.Color.Red
                 com.hereliesaz.graffitixr.common.model.FusionState.NO_ANCHOR,
