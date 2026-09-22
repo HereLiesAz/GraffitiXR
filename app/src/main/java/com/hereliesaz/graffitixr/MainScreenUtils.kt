@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.scale
 import com.hereliesaz.graffitixr.common.model.ArUiState
 import com.hereliesaz.graffitixr.common.model.EditorMode
 import com.hereliesaz.graffitixr.common.model.EditorUiState
+import com.hereliesaz.graffitixr.common.model.ModeAdjustment
 import com.hereliesaz.graffitixr.design.theme.HotPink
 import com.hereliesaz.graffitixr.design.theme.Cyan
 import kotlin.math.atan2
@@ -45,19 +46,24 @@ fun OffscreenIndicators(
     uiState: EditorUiState,
     arUiState: ArUiState,
     screenSize: IntSize,
+    modeAdj: ModeAdjustment = ModeAdjustment(),
     modifier: Modifier = Modifier
 ) {
     if (screenSize.width <= 0 || screenSize.height <= 0) return
 
-    // 1. Indicator for Active Layer (HotPink)
+    // 1. Indicator for Active Layer (HotPink). Excluded from AR mode, matching MainScreen.kt's
+    // 2D layer draw (`uiState.editorMode != EditorMode.AR`) — the active-layer graphicsLayer isn't
+    // even composed in AR mode, so this indicator shouldn't point at it either.
     val activeLayer = uiState.design
-    if (activeLayer != null) {
+    if (activeLayer != null && uiState.editorMode != EditorMode.AR) {
         val centerX = screenSize.width / 2f
         val centerY = screenSize.height / 2f
-        
-        val layerCenterX = centerX + activeLayer.offset.x
-        val layerCenterY = centerY + activeLayer.offset.y
-        
+
+        // Mirrors MainScreen.kt's composition: the outer graphicsLayer applies modeAdj's
+        // offset/scale, then the inner Image applies the layer's own offset.
+        val layerCenterX = centerX + modeAdj.offsetX + modeAdj.scale * activeLayer.offset.x
+        val layerCenterY = centerY + modeAdj.offsetY + modeAdj.scale * activeLayer.offset.y
+
         if (layerCenterX < 0 || layerCenterX > screenSize.width || layerCenterY < 0 || layerCenterY > screenSize.height) {
             DirectionalIndicator(
                 angle = screenSpaceArrowAngleDeg(layerCenterX - centerX, layerCenterY - centerY),
@@ -78,7 +84,11 @@ fun OffscreenIndicators(
             // If lz < 0, it's in front.
             // We want the indicator if it's offscreen.
             
-            val isOffscreen = lz > 0 || Math.abs(lx) > 0.8f || Math.abs(ly) > 0.8f
+            // 0.45 approximates tan(half-FOV) for a typical phone camera's horizontal field of
+            // view (~63° full FOV); there's no per-device FOV plumbed in here, so this is a
+            // deliberately rough stand-in rather than 0.8f (~53° off-axis), which was far wider
+            // than any real phone's half-FOV and so rarely fired for targets genuinely offscreen.
+            val isOffscreen = lz > 0 || Math.abs(lx) > 0.45f || Math.abs(ly) > 0.45f
             
             if (isOffscreen) {
                 // relDir is in view space: +x = camera-right, +y = up, +z = behind the camera.

@@ -44,6 +44,7 @@ internal val DECORATED_IDS = setOf(
     "mode.mockup.lock",
     "mode.trace.freeze", "mode.trace.lock",
     "design.adjust", "design.balance", "design.invert", "design.outline", "design.isolate",
+    "design.lock",
 )
 
 /**
