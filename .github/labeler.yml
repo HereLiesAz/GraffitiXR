@@ -23,8 +23,7 @@ core:
 native:
   - changed-files:
       - any-glob-to-any-file:
-          - 'app/src/main/cpp/**'
-          - 'core/native/**'
+          - 'core/nativebridge/src/main/cpp/**'
 
 # Label 'build' for gradle files
 build:
@@ -32,4 +31,11 @@ build:
       - any-glob-to-any-file:
           - '**/*.gradle.kts'
           - '**/*.gradle'
-          - 'buildSrc/**'
+
+# Label 'collab' for the collaboration module (Gradle path :android_collaboration_module,
+# directory collab/ -- the mismatch between the two is a known inconsistency, tracked
+# separately; this rule just makes sure PRs touching the module still get labeled).
+collab:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'collab/**'

@@ -1,6 +1,13 @@
 # Politique de Sécurité
 
-Nous prenons la sécurité au sérieux. Si vous découvrez une vulnérabilité de sécurité, veuillez nous en informer.
+Nous prenons la sécurité au sérieux. Étant une application hors ligne, la surface d'attaque est limitée, mais nous maintenons des standards rigoureux pour la protection des données locales.
 
-## Signaler une Vulnérabilité
-Veuillez signaler toute vulnérabilité en ouvrant un ticket (issue) dans le dépôt GitHub (https://github.com/HereLiesAZ/GraffitiXR). Ne partagez pas de détails sensibles publiquement jusqu'à ce que le problème soit résolu.
+## Versions Prises en Charge
+
+Actuellement, seule la branche `main` et la dernière version publiée (release) reçoivent des mises à jour de sécurité.
+
+## Signalement d'une Vulnérabilité
+
+Si vous découvrez une vulnérabilité de sécurité dans GraffitiXR, merci de **ne pas ouvrir de ticket (issue) public**.
+Envoyez plutôt un signalement privé de vulnérabilité (Security Advisory) via GitHub, ou contactez-nous directement.
+Nous ferons de notre mieux pour examiner rapidement le problème et fournir un correctif dans la prochaine mise à jour.

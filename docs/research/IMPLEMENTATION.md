@@ -6,10 +6,11 @@ and *how you know it worked*. It assumes the paper's vocabulary — the **footpr
 operator** Φ, the **backbone set** `F_out`, the **corroboration set** `F_in`.
 
 Everything cited as "already fixed" landed in PRs #1785–#1788 and is on `main`.
-Since then Phase 1, Phase 5a and three of Phase 6a's four todos have landed;
-Phase 0 itself is still unbuilt and still gates Phases 2, 3, 4 and 5b. See
-[`README.md`](README.md) "Status" for the current picture — this line said
-"nothing below Phase 0 is built" long after that stopped being true.
+Since then Phase 1, Phase 5a and all four of Phase 6a's todos (including 6a.4,
+the eval-only fixed RNG seed and synchronous-reloc mode — see its `[x]` below)
+have landed; Phase 0 itself is still unbuilt and still gates Phases 2, 3, 4 and
+5b. See [`README.md`](README.md) "Status" for the current picture — this line
+said "nothing below Phase 0 is built" long after that stopped being true.
 
 ---
 

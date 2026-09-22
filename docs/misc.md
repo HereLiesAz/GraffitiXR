@@ -9,6 +9,10 @@ Internal codename: "TagTrace".
   There is no voxel grid or confidence heat map to visualize either way; see `NATIVE_ENGINE.md`.
 
 ## Performance Targets
+*These are unverified aspirational targets, not measured results — there is currently no device-testing
+or performance-measurement harness in this repository (see `docs/testing.md` and `docs/AUDIT.md`).
+Nothing here has been benchmarked against real hardware.*
+
 * **FPS:** 60fps on Pixel 6 and newer.
 * **RAM:** < 500MB native heap usage.
 * **Battery:** < 20% drain per hour of continuous scanning.

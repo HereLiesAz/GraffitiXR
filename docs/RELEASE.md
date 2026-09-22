@@ -15,8 +15,13 @@ export KEYSTORE_PASSWORD=... KEY_ALIAS=... KEY_PASSWORD=...
 # → app/build/outputs/bundle/release/app-release.aab
 ```
 
-Publishing is automated by the **Build & Publish AAB (Play)**
-(`.github/workflows/release-aab.yml`) workflow — run it from the Actions tab.
+> **Note (2026-09-22):** `.github/workflows/release-aab.yml` does **not currently exist** in this
+> repository. The only workflows present are `.github/workflows/android-ci.yml` and
+> `.github/workflows/merged-build.yml`, and both build a **debug APK** (`./gradlew assembleDebug`)
+> and publish it as a GitHub Release tagged `latest-debug-v<major>.<minor>` — neither builds a
+> signed release AAB or uploads anything to Google Play. The rest of this section (and §2 below)
+> describes a Play-publishing workflow that does not exist yet; treat it as a design/target, not
+> current behavior, until someone adds that workflow. See `.github/workflows/` for what actually runs.
 
 ---
 
@@ -52,7 +57,14 @@ build (see the file's own comments for the minor‑bump‑resets‑patch rule).
 
 ## 2. Publishing via the workflow
 
-Workflow: **`.github/workflows/release-aab.yml`** — `workflow_dispatch` only.
+> **This workflow does not exist yet.** There is no `release-aab.yml` (or any AAB/Play-publishing
+> workflow) in `.github/workflows/` as of 2026-09-22 — the description below is aspirational/planned,
+> not a description of current CI behavior. The real workflows (`android-ci.yml`,
+> `merged-build.yml`) build a debug APK on every push and publish it to a GitHub Release; they use
+> JDK **21** (Temurin) and the `KEYSTORE_RAW` base64 secret (decoded to `app/keystore.jks`), not JDK 17
+> or the `KEYSTORE_PRIVATE`/`KEYSTORE_CHAIN` secrets described further below.
+
+Planned workflow: **`.github/workflows/release-aab.yml`** — `workflow_dispatch` only.
 
 Inputs:
 
@@ -67,10 +79,11 @@ What it does:
 1. Checks out with `fetch-depth: 0` and write access, so a publish run can
    commit the incremented `versionBuild` in `version.properties` back to `main`.
 2. Injects `google-services.json` and decodes the base64 `KEYSTORE_RAW` secret
-   to `app/keystore.jks` (same steps as `release-apk.yml`). OpenCV needs no
+   to `app/keystore.jks` (same steps as `android-ci.yml`/`merged-build.yml` use today). OpenCV needs no
    fetch step — it's a Maven Central dependency (`org.opencv:opencv`, Java +
    native via Prefab).
-3. Sets up JDK 17 (Temurin) + Gradle.
+3. Sets up JDK 21 (Temurin) + Gradle (matching what `android-ci.yml`/`merged-build.yml` actually use
+   today — an earlier version of this document said JDK 17).
 4. Reads `applicationId` from `app/build.gradle.kts` (not hardcoded), for the
    later Play-upload step.
 5. Runs `bundleRelease` — no `-PversionBuild` override; `versionCode` comes
@@ -100,9 +113,11 @@ An AAB does **not** need separate per‑device artifacts. From a single
 `bundleRelease`, Play generates and serves optimized APKs split by:
 
 - **ABI** — this is the big win here. The native payload
-  (`:core:nativebridge`, OpenCV, and the LiteRT **NPU runtime** libraries for
-  Qualcomm/MediaTek/Google Tensor) is large; with per‑ABI splits a device only
-  downloads its own architecture's `.so` files.
+  (`:core:nativebridge` and OpenCV) is large; with per‑ABI splits a device only
+  downloads its own architecture's `.so` files. *(An earlier version of this document also cited
+  LiteRT NPU runtime libraries under `core/nativebridge/libs/litert_npu_runtime_libraries/*` as part
+  of this payload; no such directory exists in the current source — verify with `find` before relying
+  on that claim.)*
 - **Screen density** — only the matching drawable densities.
 - **Language** — only the device's locale resources.
 
@@ -116,8 +131,10 @@ The project is already cleanly multi‑module (`:feature:ar`, `:feature:editor`,
 `:feature:dashboard`, `:android_collaboration_module`, `:core:*`), but these are
 `com.android.library` modules **statically linked** into `:app`. They are
 **compile‑time dependencies**: `app/.../MainScreen.kt` imports and uses their
-types directly (`ArViewModel`, `CameraPreview`, `FreezePreviewScreen`,
-`ArRenderer`, `EditorViewModel`, `DrawingCanvas`, …).
+types directly (`ArViewModel`, `CameraPreview`, `ArRenderer`, `EditorViewModel`, …). *(An earlier
+version of this document also named `FreezePreviewScreen` and `DrawingCanvas` here; both have since
+been deleted from the codebase — grep confirms neither exists anymore. The size-analysis argument
+below should be re-verified against current `MainScreen.kt` dependencies before being relied on.)*
 
 Converting these to **on‑demand** `com.android.dynamic-feature` modules was
 evaluated and intentionally **not** done in this change, because:
@@ -134,16 +151,21 @@ evaluated and intentionally **not** done in this change, because:
 - **The size win is already captured** by the automatic per‑ABI split above —
   the dominant size driver is the native/NPU payload, not optional UI code.
 
-The `com.android.dynamic-feature` plugin alias is added to the version catalog
-(`libs.plugins.android.dynamic.feature`) so the infrastructure is ready.
+> **Correction (2026-09-22):** an earlier version of this document claimed the
+> `com.android.dynamic-feature` plugin alias (`libs.plugins.android.dynamic.feature`) was already
+> added to the version catalog. It is not — `gradle/libs.versions.toml` has no such entry. That
+> infrastructure has not actually been set up; treat everything below as a proposal, not a
+> already-started migration.
 
 **Recommended future candidates** (each as a separately reviewed, build‑verified
 PR), in priority order:
 
-1. **LiteRT NPU runtimes** (`core/nativebridge/libs/litert_npu_runtime_libraries/*`)
-   as **conditional / install‑time** dynamic features targeted by device — these
-   are large, vendor‑specific, and only one vendor's runtime is ever used on a
-   given device.
+1. **LiteRT NPU runtimes** — *(this candidate cited a
+   `core/nativebridge/libs/litert_npu_runtime_libraries/*` directory that does not exist in the
+   current source. If NPU-vendor-specific native runtime libraries are added to the project in the
+   future, splitting them as conditional / install-time dynamic features per device would still be
+   worth evaluating — these tend to be large and vendor-specific, with only one vendor's runtime ever
+   used on a given device — but as of this writing there is no such directory to split.)*
 2. **Co‑op / collaboration** (`:android_collaboration_module`) as an **on‑demand**
    feature — genuinely optional (peer‑to‑peer multiplayer painting), but first
    needs decoupling from `:feature:ar`/`:app`.
@@ -170,15 +192,17 @@ included here.
 
 ## 4. Required repository secrets
 
-### Signing (already used by `release-apk.yml`)
+### Signing (already used by `android-ci.yml` / `merged-build.yml`)
+
+There is no `release-apk.yml` in this repository — the actual signing secrets, as read by
+`android-ci.yml` and `merged-build.yml` today, are:
 
 | Secret | Purpose |
 |--------|---------|
-| `KEYSTORE_PRIVATE` | PEM private key — assembled into `app/keystore.jks` in CI |
-| `KEYSTORE_CHAIN`   | PEM certificate chain |
-| `KEYSTORE_PASSWORD`| Keystore (store) password |
-| `KEY_ALIAS`        | Key alias |
-| `KEY_PASSWORD`     | Key password |
+| `KEYSTORE_RAW`      | Base64-encoded `.jks` keystore file — decoded to `app/keystore.jks` in CI |
+| `KEYSTORE_PASSWORD` | Keystore (store) password |
+| `KEY_ALIAS`         | Key alias |
+| `KEY_PASSWORD`      | Key password |
 
 ### Google Play publishing (new)
 
@@ -189,7 +213,7 @@ included here.
 ### Build config (already used)
 
 `GOOGLE_SERVICES_API_KEY`, `PROJECT_ID`, `CLIENT_ID`, `ARCORE_API_KEY`,
-and `GH_TOKEN` (for the GitHub Packages Maven repo). See `release-apk.yml`.
+and `GH_TOKEN` (for the GitHub Packages Maven repo). See `android-ci.yml` / `merged-build.yml`.
 
 ---
 
@@ -227,9 +251,11 @@ GraffitiXR:
 - **Core product is offline / local.** The README states zero cloud dependencies
   and local‑only processing — reflect that (no/minimal data collection) in the
   form.
-- **Third‑party SDKs that may collect data:** the **Meta Wearables (mwdat)**
-  integration and Google Play Services / ARCore are present. Review their data
-  practices and disclose anything they collect on your behalf.
+- **Third‑party SDKs that may collect data:** Google Play Services / ARCore is present. Review its
+  data practices and disclose anything it collects on your behalf. *(An earlier version of this
+  document also named a "Meta Wearables (mwdat)" integration here — grepping
+  `gradle/libs.versions.toml` and `app/build.gradle.kts` finds no such dependency in the project, so
+  that instruction has been removed.)*
 - **Permissions to justify:** `CAMERA` (core), plus optional `BLUETOOTH*`,
   `ACCESS_*_LOCATION`, Wi‑Fi, and `INTERNET` — all already marked as optional
   hardware features in the manifest so they don't filter the listing.

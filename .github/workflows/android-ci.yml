@@ -1,6 +1,12 @@
 name: Android CI
 
-# Runs unit tests on every push/PR, then builds and releases a debug APK on push.
+# GraffitiXR's canonical CI/release pipeline: runs unit tests on every push/PR, then builds and
+# publishes the `latest-debug-vX.Y` debug-APK release on push.
+# This is the ONLY workflow that tags/publishes that release — .github/workflows/merged-build.yml
+# builds and tests the same code but deliberately does not touch the shared release tag, so the
+# two workflows never race each other over it (see git history for the incident that caused this
+# split).
+#
 # Auto-detects app name from settings.gradle.kts / settings.gradle.
 # Reads version from version.properties (Major.Minor.Patch.Build).
 #
@@ -10,14 +16,6 @@ name: Android CI
 #   KEY_ALIAS                — key alias inside the keystore
 #   KEY_PASSWORD             — key password
 #   GH_TOKEN                 — GitHub token with write access (defaults to GITHUB_TOKEN)
-#
-# Optional secrets (Google Services injection — skipped if template absent):
-#   GOOGLE_SERVICES_API_KEY  — Firebase/Google API key
-#   PROJECT_ID               — Firebase project ID
-#   CLIENT_ID                — OAuth client ID
-#
-# Optional secrets (add any extra project-specific API keys here):
-#   CUSTOM_API_KEY           — placeholder; rename and replicate as needed
 
 on:
   push:
@@ -41,19 +39,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Inject Google Services
-        env:
-          GOOGLE_SERVICES_API_KEY: ${{ secrets.GOOGLE_SERVICES_API_KEY }}
-          PROJECT_ID: ${{ secrets.PROJECT_ID }}
-          CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          CUSTOM_API_KEY: ${{ secrets.CUSTOM_API_KEY }}
-        run: |
-          if [ -f "app/google-services.json.template" ]; then
-            sed -e 's/{{\([^}]*\)}}/${\1}/g' app/google-services.json.template | envsubst > app/google-services.json
-          fi
-          # Add any extra local.properties keys below:
-          # echo "CUSTOM_API_KEY=$CUSTOM_API_KEY" >> local.properties
-
       - name: Set up JDK 21
         uses: actions/setup-java@v6
         with:
@@ -70,6 +55,17 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew test --continue --build-cache --no-daemon --stacktrace
+
+      - name: Run detekt
+        # config/detekt/detekt.yml (maxIssues: 0) existed but was never wired into CI, so it was
+        # never actually enforced. continue-on-error is deliberate here: the detekt Gradle plugin
+        # version hasn't been verified clean against this project's Kotlin/AGP versions in CI, so
+        # this reports findings without hard-failing the build until that's confirmed. Tighten to
+        # a hard failure (drop continue-on-error) once a clean run is verified.
+        continue-on-error: true
+        run: |
+          chmod +x gradlew
+          ./gradlew detekt --continue --build-cache --no-daemon --stacktrace
 
       - name: Upload test reports
         if: always()
@@ -93,21 +89,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Inject Google Services
-        env:
-          GOOGLE_SERVICES_API_KEY: ${{ secrets.GOOGLE_SERVICES_API_KEY }}
-          PROJECT_ID: ${{ secrets.PROJECT_ID }}
-          CLIENT_ID: ${{ secrets.CLIENT_ID }}
-          CUSTOM_API_KEY: ${{ secrets.CUSTOM_API_KEY }}
-        run: |
-          if [ -f "app/google-services.json.template" ]; then
-            echo "Template found. Injecting secrets..."
-            sed -e 's/{{\([^}]*\)}}/${\1}/g' app/google-services.json.template | envsubst > app/google-services.json
-          else
-            echo "Warning: google-services.json.template not found. Skipping injection."
-          fi
-          # echo "CUSTOM_API_KEY=$CUSTOM_API_KEY" >> local.properties
 
       - name: Decode signing keystore
         env:
@@ -169,7 +150,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `Build Failure on ${context.eventName === 'pull_request' ? 'PR #' + context.issue.number : context.ref}`,
-              body: `/jules debug this build error\n\n**Log:**\n\`\`\`\n${logTail}\n\`\`\``,
+              body: `**Log:**\n\`\`\`\n${logTail}\n\`\`\``,
               labels: ['jules', 'bug']
             });
 

@@ -44,13 +44,17 @@ captures/
 project_backup_*
 google-services.json
 
-# Transient dependencies (stored in root libs/)
-*/libs/opencv/
-*/libs/glm/
-*/libs/litert/
-*/libs/mlkit-subject-segmentation/
-*/libs/*.aar
-*/libs/litert_npu_runtime_libraries/
+# Transient dependencies (vendored under core/nativebridge/libs/).
+# NOTE: `*/libs/…` requires at least one path segment before `libs/`, so it never matched
+# `core/nativebridge/libs/glm/` (two segments) or a hypothetical root `libs/` (zero segments).
+# core/nativebridge/libs/glm/ is committed on purpose (it's the copy the CMake build actually
+# uses — see core/nativebridge/src/main/cpp/CMakeLists.txt) so it is intentionally NOT listed
+# here; these patterns are for genuinely transient/locally-fetched deps only.
+core/nativebridge/libs/opencv/
+core/nativebridge/libs/litert/
+core/nativebridge/libs/mlkit-subject-segmentation/
+core/nativebridge/libs/*.aar
+core/nativebridge/libs/litert_npu_runtime_libraries/
 
 # Legacy/Other
 /app/src/main/cpp/include/glm/*

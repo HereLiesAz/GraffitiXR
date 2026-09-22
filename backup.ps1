@@ -7,9 +7,7 @@
     to understand the project's entire structural reality.
 #>
 
-$ScriptName = "backup_precision.ps1"
 $Timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
-$PSScriptRoot = Get-Location
 $BackupFile = Join-Path -Path $PSScriptRoot -ChildPath "project_source_only_${Timestamp}.txt"
 
 # The Absolute Whitelist: If it isn't one of these, the machine doesn't need to read it.
@@ -26,10 +24,10 @@ $HardExcludedDirs = @(".git", ".gradle", ".idea", "build", ".cxx", "node_modules
 
 $CustomExcludedPaths = @()
 
-# --- .aiexclude Assimilation ---
-if (Test-Path "$PSScriptRoot\.aiexclude") {
-    Write-Host "Parsing .aiexclude..." -ForegroundColor Magenta
-    $aiExcludeContent = Get-Content "$PSScriptRoot\.aiexclude"
+# --- .azignore Assimilation ---
+if (Test-Path "$PSScriptRoot\.azignore") {
+    Write-Host "Parsing .azignore..." -ForegroundColor Magenta
+    $aiExcludeContent = Get-Content "$PSScriptRoot\.azignore"
     foreach ($line in $aiExcludeContent) {
         if ([string]::IsNullOrWhiteSpace($line) -or $line.StartsWith("#")) { continue }
         $cleanLine = $line.Trim().Replace('/', [System.IO.Path]::DirectorySeparatorChar).Replace('\', [System.IO.Path]::DirectorySeparatorChar)
@@ -48,7 +46,7 @@ function Test-IsExcluded {
         if ($HardExcludedDirs -contains $part) { return $true }
     }
 
-    # 2. .aiexclude Checks
+    # 2. .azignore Checks
     foreach ($customPath in $CustomExcludedPaths) {
         if ($normalizedPath -like "*$customPath*") { return $true }
     }
