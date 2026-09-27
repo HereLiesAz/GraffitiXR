@@ -249,10 +249,17 @@ class CorroborationTranslitTest {
             source("core/nativebridge/src/main/cpp/include/MobileGS.h").readText()
                 .contains("mSelfGrowEnabled{false}"),
         )
+        // The eval overlay's toggle is `ArViewModel.evalSelfGrowEnabled`, backed by
+        // `_evalSelfGrowEnabled`, NOT a `mutableStateOf` in MainActivity.kt — that substring exists
+        // in the app module for several unrelated toggles and pins nothing about this one. Read the
+        // ViewModel's own initializer instead, the same source-text pin this file uses everywhere
+        // else, so a change to the default trips this test rather than a search that happens to
+        // match something.
         assertTrue(
-            "the overlay toggle must start false",
-            source("app/src/main/java/com/hereliesaz/graffitixr/MainActivity.kt").readText()
-                .contains("mutableStateOf(false) }"),
+            "the overlay toggle's backing field must start false",
+            source("feature/ar/src/main/java/com/hereliesaz/graffitixr/feature/ar/ArViewModel.kt")
+                .readText()
+                .contains("private val _evalSelfGrowEnabled = MutableStateFlow(false)"),
         )
     }
 

@@ -30,8 +30,8 @@ per-file SPDX header  →  module `LICENSE`  →  this `LICENSING.md`  →  root
 
 The engine is **not** contained in one module; the protective boundary must cover the whole set:
 
-- `core/nativebridge/**` — the native C++ engine (`MobileGS`, `SuperPointDetector`, `StereoProcessor`,
-  `ImageWarper`, `DistortionHead`, `GraffitiJNI`, …), the JNI bridge, and the Kotlin engine side
+- `core/nativebridge/**` — the native C++ engine (`MobileGS`, `SuperPointDetector`,
+  `DistortionHead`, `GraffitiJNI`, …), the JNI bridge, and the Kotlin engine side
   (`SlamManager`, depth providers). Carries its own `core/nativebridge/LICENSE`.
 - `feature/ar/anchor/**` — `MetricFingerprintBuilder`, `MetricMarks`, `PlaneMarks`, `PoseFusion`
   (fingerprint construction + pose solving — core teleological logic).
@@ -82,7 +82,8 @@ outcome); they still never touch the engine.
   land in; to keep dual-licensing/acquisition open, require a CLA or don't accept outside contributions to
   parts you might commercialize.
 - **Third-party compliance is separate.** Bundled deps keep their upstream licenses; note a **GPL-2.0**
-  component (`ittnotify`) inside the vendored OpenCV — a compliance item to check regardless of this plan.
+  component (`ittnotify`) inside OpenCV, which is a Maven Central dependency (`org.opencv:opencv`), not a
+  vendored/committed module — a compliance item to check regardless of this plan.
 
 ## Status
 

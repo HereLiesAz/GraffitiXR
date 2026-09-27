@@ -17,9 +17,9 @@ Para lang sa mga kamiseta at salaming de kolor, isinama ko ang hindi AR, ang pag
 At pagkatapos, mayroong isang disenteng suite ng mga nauugnay na tool sa disenyo, para sa paghahanda ng isang solong larawan bago mo ito idikit sa dingding. Maaari akong magpatuloy, ngunit pakiramdam ko ay mayroon na ako.
 
 ## Mga Pangunahing Tampok
-*   **Offline-Una:** Walang cloud dependencies para sa anumang ginagawa ng app — lokal ang tracking, rendering, at gawaing pang-disenyo. Ang tanging bagay na umaalis sa device ay ang crash report, at opt-in iyon at naka-off bilang default (Settings > Crash reports); tingnan ang [`docs/tl/PRIVACY_POLICY.md`](docs/tl/PRIVACY_POLICY.md).
+*   **Offline-Una:** Walang cloud dependencies para sa anumang ginagawa ng app — lokal ang tracking, rendering, at gawaing pang-disenyo. Ang tanging bagay na umaalis sa device ay ang crash report, at opt-in iyon at naka-off bilang default (Settings > Crash reports); tingnan ang [`docs/tl/PRIVACY_POLICY.md`](PRIVACY_POLICY.md).
 *   **Fingerprint Relocalization:** isang C++17 native OpenCV pipeline (ORB/SuperPoint descriptors + PnP/RANSAC) na kumukuha ng fingerprint mula sa mga markang iginuhit mo sa dingding at ibinabalik ang overlay pagkatapos mawala ang tracking — lubos na offline, walang paunang pag-scan ng kwarto.
-*   **Pocket-Ready (eksperimental, naka-off bilang default):** may drift correction at self-extending fingerprint (para makaligtas ang snap-back kahit mapinturahan na ang orihinal na reference) na maaaring i-on sa Settings > diagnostic overlay, ngunit hindi pa ito na-validate sa tunay na hardware — tingnan ang [Teleological SLAM](docs/TELEOLOGICAL_SLAM.md).
+*   **Pocket-Ready (eksperimental, naka-off bilang default):** may drift correction at self-extending fingerprint (para makaligtas ang snap-back kahit mapinturahan na ang orihinal na reference) na maaaring i-on sa Settings > diagnostic overlay, ngunit hindi pa ito na-validate sa tunay na hardware — tingnan ang [Teleological SLAM](../TELEOLOGICAL_SLAM.md).
 *   **May Kamalayan sa Dual-Lens:** awtomatikong pumipili ng hardware stereo depth sa mga device na may ganitong feature; sa ibang device, gumagamit ng monocular pose ng ARCore nang walang hiwalay na depth estimate.
 *   **Co-op Mode:** naka-encrypt, QR-paired na session sharing para makapanood ang isang kasamahan ng live canvas ng host sa AR. Sa kasalukuyan ay host → guest lamang — hindi pa nag-sync pabalik ang mga edit ng guest.
 *   **AzNavRail UI:** thumb-driven, isang-kamay na navigation na dinisenyo para sa mga artist na hawak ang spray can.
@@ -43,18 +43,18 @@ Mahigpit na na-decoupled na multi-module Clean Architecture:
 *   `:core:design` — Ibinahaging Compose design system (mga reusable control at overlay).
 
 ## Lisensya
-Ang GraffitiXR ay **source-available, hindi open source.** Ang app, ang mga `core:*` module, at ang AR / SLAM / teleological engine ay lisensyado sa ilalim ng **PolyForm Noncommercial 1.0.0** ([`/LICENSE`](LICENSE)); ang deklaradong extension API surface at mga asset importer ay **MIT** ([`docs/licenses/MIT.txt`](docs/licenses/MIT.txt)). Ang **naka-compile na app ay libreng gamitin ng sinuman, kasama na ang mga bayad na komisyon** — ang noncommercial na termino ay sumasakop sa muling paggamit ng *source*, hindi sa mga muralist na gumagawa ng bayad na trabaho. Tingnan ang [`docs/LICENSING.md`](docs/LICENSING.md) para sa awtoritatibong, path-by-path na layout at precedence. Ang mga bundled third party (OpenCV, ML Kit, ...) ay pinananatili ang sarili nilang upstream na lisensya.
+Ang GraffitiXR ay **source-available, hindi open source.** Ang app, ang mga `core:*` module, at ang AR / SLAM / teleological engine ay lisensyado sa ilalim ng **PolyForm Noncommercial 1.0.0** ([`/LICENSE`](../../LICENSE)); ang deklaradong extension API surface at mga asset importer ay **MIT** ([`docs/licenses/MIT.txt`](../licenses/MIT.txt)). Ang **naka-compile na app ay libreng gamitin ng sinuman, kasama na ang mga bayad na komisyon** — ang noncommercial na termino ay sumasakop sa muling paggamit ng *source*, hindi sa mga muralist na gumagawa ng bayad na trabaho. Tingnan ang [`docs/LICENSING.md`](../LICENSING.md) para sa awtoritatibong, path-by-path na layout at precedence. Ang mga bundled third party (OpenCV, ML Kit, ...) ay pinananatili ang sarili nilang upstream na lisensya.
 
 ## Dokumentasyon
-- [Pangkalahatang-ideya ng Arkitektura](docs/ARCHITECTURE.md)
-- [Mga Detalye ng Native Engine](docs/NATIVE_ENGINE.md)
-- [SLAM Setup & Relocalization](docs/SLAM_SETUP.md)
-- [Teleological SLAM](docs/TELEOLOGICAL_SLAM.md)
-- [Performance Guide](docs/performance.md)
-- [Diskarte sa Pagsubok](docs/testing.md)
-- [Data Formats](docs/data_formats.md)
-- [Contributing](docs/contributing.md)
-- [Release & Google Play Delivery](docs/RELEASE.md)
+- [Pangkalahatang-ideya ng Arkitektura](../ARCHITECTURE.md)
+- [Mga Detalye ng Native Engine](../NATIVE_ENGINE.md)
+- [SLAM Setup & Relocalization](../SLAM_SETUP.md)
+- [Teleological SLAM](../TELEOLOGICAL_SLAM.md)
+- [Performance Guide](../performance.md)
+- [Diskarte sa Pagsubok](../testing.md)
+- [Data Formats](../data_formats.md)
+- [Contributing](../contributing.md)
+- [Release & Google Play Delivery](../RELEASE.md)
 - [Reference ng Screen at Mode](../en/screens.md)
 
 ---

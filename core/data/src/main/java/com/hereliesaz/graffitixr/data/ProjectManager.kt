@@ -63,12 +63,15 @@ class ProjectManager @Inject constructor(
         private const val MAX_IMPORT_BYTES = 512L * 1024 * 1024
 
         /**
-         * Cap on how many captured target images a single project keeps. Nothing previously pruned
-         * this list, so repeated re-captures on a long-lived project (a normal workflow — the artist
-         * re-aims until a fingerprint takes) grew it, and its on-disk PNGs, without bound short of
-         * deleting the whole project. No existing precedent in this codebase for the right number, so
-         * 30 is chosen as generous headroom for a real capture session (an artist rarely retries more
-         * than a handful of times) while still bounding worst-case storage to a few dozen PNGs.
+         * Cap on how many captured target images a single project keeps, enforced by
+         * [pruneTargetImages]. Nothing previously pruned this list, so repeated re-captures could grow
+         * it, and its on-disk PNGs, without bound short of deleting the whole project. No existing
+         * precedent in this codebase for the right number, so 30 is chosen as generous headroom for a
+         * real capture session while still bounding worst-case storage to a few dozen PNGs.
+         *
+         * Note: the live capture flow appends via [appendTargetImage], which does its own pruning and
+         * never routes through [saveProject]'s `targetImages` parameter — this cap/path is exercised by
+         * tests and direct API use, not production captures.
          */
         private const val MAX_TARGET_IMAGES = 30
     }
@@ -94,7 +97,12 @@ class ProjectManager @Inject constructor(
         // AR, etc.) and change only when the user creates a NEW target — which is the one path that
         // passes a non-null fingerprint. So when the incoming project carries no fingerprint, carry
         // over whatever is already persisted instead of nulling it. This makes it impossible for any
-        // other writer (or a stale-snapshot race) to wipe the saved target.
+        // other writer (or a stale-snapshot race) to wipe the saved target — the view matrix and
+        // capture rotation are captured alongside the fingerprint itself, so they follow the same
+        // unconditional preserve-from-existing as the fingerprint/intrinsics/anchor; the wall feature
+        // map and cloud anchor id can each legitimately be set on a routine (non-fingerprint) save
+        // (e.g. the passive wall-map save), so those instead only fall back to the on-disk value when
+        // the incoming project doesn't set one, same as the legacy target-fingerprint references.
         val incoming = if (projectData.fingerprint == null) {
             val existing = try {
                 val f = File(root, "project.json")
@@ -109,10 +117,14 @@ class ProjectManager @Inject constructor(
                     fingerprint = existing.fingerprint,
                     fingerprintIntrinsics = existing.fingerprintIntrinsics,
                     fingerprintAnchor = existing.fingerprintAnchor,
+                    fingerprintViewMatrix = existing.fingerprintViewMatrix,
+                    fingerprintCaptureRotationDeg = existing.fingerprintCaptureRotationDeg,
                     // Preserve the legacy target-fingerprint references too, so no save without them
                     // can wipe an existing target.
                     targetFingerprint = projectData.targetFingerprint ?: existing.targetFingerprint,
                     targetFingerprintPath = projectData.targetFingerprintPath ?: existing.targetFingerprintPath,
+                    wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
+                    cloudAnchorId = projectData.cloudAnchorId ?: existing.cloudAnchorId,
                 )
             } else projectData
         } else projectData
@@ -120,7 +132,7 @@ class ProjectManager @Inject constructor(
         val thumbnailUri = if (thumbnail != null) {
             val file = File(root, "thumbnail.png")
             FileOutputStream(file).use { out ->
-                thumbnail.compress(Bitmap.CompressFormat.PNG, 80, out)
+                thumbnail.compress(Bitmap.CompressFormat.PNG, 100, out)
             }
             uriProvider.getUriForFile(file)
         } else {
@@ -161,15 +173,23 @@ class ProjectManager @Inject constructor(
      * Writes [text] to [target] atomically: stream into a sibling temp file then rename
      * over the target, so a crash/kill/IO-error mid-write can never leave a truncated
      * project.json that would fail to parse and silently drop the project on next load.
+     * Throws rather than silently falling back to a non-atomic direct write if the rename
+     * can't be made to succeed.
      */
     private fun atomicWriteText(target: File, text: String) {
         val tmp = File.createTempFile("${target.name}.", ".tmp", target.parentFile)
         try {
             tmp.writeText(text)
-            // Some filesystems won't rename onto an existing file; fall back to a direct write.
-            if (!tmp.renameTo(target)) {
-                target.writeText(text)
+            // Some filesystems won't rename onto an existing file on the first try; retry a
+            // couple times before giving up, rather than falling back to a direct write onto
+            // target, which a crash mid-write could leave truncated.
+            var renamed = tmp.renameTo(target)
+            var attempt = 0
+            while (!renamed && attempt < 2) {
+                attempt++
+                renamed = tmp.renameTo(target)
             }
+            check(renamed) { "Could not atomically replace ${target.name}" }
         } finally {
             if (tmp.exists()) tmp.delete()
         }
@@ -240,7 +260,6 @@ class ProjectManager @Inject constructor(
             val project = json.decodeFromString<GraffitiProject>(jsonString)
             migrateInMemory(project)
         } catch (e: Exception) {
-            e.printStackTrace(System.err)
             Log.e("ProjectManager", "Failed to load project metadata", e)
             null
         }
@@ -376,9 +395,11 @@ class ProjectManager @Inject constructor(
     }
 
     suspend fun importProjectFromUri(context: Context, uri: Uri): GraffitiProject? = withContext(Dispatchers.IO) {
+        // All callers pass the application context here (same object as the injected [appContext]),
+        // so the body uses [appContext] throughout rather than mixing it with this parameter.
         val extractedFiles = mutableMapOf<String, File>()
         return@withContext try {
-            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+            appContext.contentResolver.openInputStream(uri)?.use { inputStream ->
                 ZipInputStream(inputStream).use { zis ->
                     var projectData: GraffitiProject? = null
                     var totalBytes = 0L
@@ -421,9 +442,9 @@ class ProjectManager @Inject constructor(
                     }
                     // An import is a new library entry when this id already exists. Never
                     // overwrite a working mural with an older shared/archive copy.
-                    val importedId = if (File(context.filesDir, "projects/${project.id}").exists())
+                    val importedId = if (File(appContext.filesDir, "projects/${project.id}").exists())
                         java.util.UUID.randomUUID().toString() else project.id
-                    val destDir = File(context.filesDir, "projects/$importedId")
+                    val destDir = File(appContext.filesDir, "projects/$importedId")
                     destDir.mkdirs()
                     check(destDir.isDirectory) { "Could not create import directory" }
                     try {
@@ -443,11 +464,11 @@ class ProjectManager @Inject constructor(
             }
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            e.printStackTrace(System.err)
             Log.e("ProjectManager", "Import failed", e)
             null
         } finally {
-            // Temp files are only renamed away on the success path; clear any stragglers.
+            // Extracted temp files are copied (not renamed) into the destination directory on the
+            // success path and left in place; clear them here on every path (success and failure).
             extractedFiles.values.forEach { if (it.exists()) it.delete() }
         }
     }
@@ -534,13 +555,17 @@ class ProjectManager @Inject constructor(
 
     /**
      * Serialises the current project to bytes for bulk-transfer to a guest device.
+     *
+     * Zips the whole project directory into a heap `ByteArray` — potentially several MB for a
+     * project with many target images — so this always runs off the caller's thread, matching
+     * every other IO function in this class.
      */
-    fun serializeCurrentProject(): ByteArray {
-        val project = projectRepositoryProvider.get().currentProject.value ?: return ByteArray(0)
+    suspend fun serializeCurrentProject(): ByteArray = withContext(Dispatchers.IO) {
+        val project = projectRepositoryProvider.get().currentProject.value ?: return@withContext ByteArray(0)
         val sourceFolder = File(appContext.filesDir, "projects/${project.id}")
-        if (!sourceFolder.exists()) return ByteArray(0)
+        if (!sourceFolder.exists()) return@withContext ByteArray(0)
 
-        return ByteArrayOutputStream().use { baos ->
+        ByteArrayOutputStream().use { baos ->
             ZipOutputStream(baos).use { zos ->
                 zipFolder(sourceFolder, "", zos)
             }
@@ -615,6 +640,7 @@ class ProjectManager @Inject constructor(
                 }
             }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             Log.e("ProjectManager", "loadAsSpectator failed", e)
         } finally {
             // Temp files are only renamed away on the success path; clear any stragglers.

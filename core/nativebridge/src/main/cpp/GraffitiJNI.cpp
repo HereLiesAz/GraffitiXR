@@ -53,24 +53,18 @@ MobileGS* gSlamEngine = nullptr;
 // covered by it in the first place.
 //
 // tools/check_native_locking.py finds gaps like the load-vs-JNI-reader one, but it only parses
-// MobileGS.h/MobileGS.cpp member declarations -- it cannot see JNI-level globals (gLastColorFrame
-// below is exactly such a case: written by both nativeFeedYuvFrame and nativeFeedColorFrame, which
-// now both take only a shared_lock, so it needs its own mutex -- see gColorFrameMutex) or classes
-// declared elsewhere (SuperPointDetector etc., which is how it also can't see the mMutex that
-// actually protects the load-vs-reloc-thread race above). Don't treat a clean run of that script as
-// proof gEngineMutex's shared/exclusive split is sufficient by itself anywhere in this file.
+// MobileGS.h/MobileGS.cpp member declarations -- it cannot see JNI-level globals in this file, or
+// classes declared elsewhere (SuperPointDetector etc., which is how it also can't see the mMutex
+// that actually protects the load-vs-reloc-thread race above). Don't treat a clean run of that
+// script as proof gEngineMutex's shared/exclusive split is sufficient by itself anywhere in this
+// file. (A JNI-level global once lived here, gLastColorFrame + gColorFrameMutex, written by both
+// nativeFeedYuvFrame and nativeFeedColorFrame -- exactly the kind of thing that script cannot see.
+// It was removed because grep confirmed neither write was ever read back by anything outside that
+// same function's own critical section: each entry point only ever read its own write, so sharing
+// it through a process-lifetime global bought nothing but a pinned multi-MB buffer and a mutex
+// guarding a variable that was never actually shared. Both call sites now use a genuinely local
+// cv::Mat instead -- see nativeFeedYuvFrame's frameSnapshot and nativeFeedColorFrame's colorFrame.)
 std::shared_mutex gEngineMutex;
-cv::Mat gLastColorFrame; // MANDATE: Kept in Sensor-Native (Landscape) orientation
-// gLastColorFrame is written by BOTH nativeFeedYuvFrame and nativeFeedColorFrame, which (since the
-// shared_mutex conversion above) both take only gEngineMutex's shared_lock and so can now run
-// concurrently -- e.g. the normal camera feed on the GL thread racing a glasses-session feed on
-// its own coroutine (see ArViewModel.startGlassesSession/SlamManager's forwardFrame). The old
-// exclusive std::mutex incidentally serialized these two writers; nothing does now except this
-// dedicated mutex. Lock it only around the read-modify-write of gLastColorFrame itself (assign,
-// then take a cheap header-copy snapshot), never around the heavy YUV/RGBA conversion or the
-// reloc-frame build that follows -- those must stay outside the lock or this reintroduces the
-// stall the shared_mutex conversion exists to remove.
-std::mutex gColorFrameMutex;
 JavaVM* gJvm = nullptr;
 
 // ARCore-unavailable fallback (see HomographyTracker.h). Entirely independent of gSlamEngine —
@@ -420,6 +414,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(
         JNIEnv* env, jobject thiz,
         jfloatArray viewMatrix, jfloatArray projMatrix,
         jlong timestampNs) {
+    (void)timestampNs; // not currently consumed by updateCamera; kept for JNI signature stability.
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (gSlamEngine) {
         // Both are memcpy'd as 16 floats below (and read as 4x4 by updateCamera), so a short
@@ -468,6 +463,7 @@ JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
         JNIEnv* env, jobject thiz, jobject yBuffer, jobject uBuffer, jobject vBuffer,
         jint width, jint height, jint yStride, jint uvStride, jint uvPixelStride, jlong timestampNs, jint cvRotateCode) {
+    (void)timestampNs; // not currently consumed here; kept for JNI signature stability.
 
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     if (!gSlamEngine) return;
@@ -502,14 +498,14 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
     cv::Mat yuv(height + height / 2, width, CV_8UC1);
     yMat.copyTo(yuv(cv::Rect(0, 0, width, height)));
 
-    // frameSnapshot is a cheap header-copy (shares yuv's/converted buffer, not a deep copy) taken
-    // under gColorFrameMutex right alongside the write to gLastColorFrame, so the heavy conversion
-    // and reloc-frame work below can safely run unlocked -- see gColorFrameMutex's declaration
-    // comment for why gEngineMutex's shared_lock (taken above) no longer serializes this against a
-    // concurrent nativeFeedColorFrame call.
+    // frameSnapshot used to be a header-copy of the process-global gLastColorFrame, taken under
+    // gColorFrameMutex. That global had no reader anywhere except this function and
+    // nativeFeedColorFrame's own equivalent local (each only ever reads back its own write, in the
+    // same critical section) -- so it was pinning a multi-MB buffer alive for the process lifetime,
+    // and the mutex existed only to guard a "shared" variable that was never actually shared.
+    // frameSnapshot is now a genuinely local cv::Mat; no lock is needed.
     cv::Mat frameSnapshot;
     {
-        std::lock_guard<std::mutex> colorLock(gColorFrameMutex);
         if (uvPixelStride == 1) {
             // I420 planar (separate U and V planes) → NV21-style interleaved V,U so the reloc decode
             // (COLOR_YUV2RGB_NV21 below) is correct. The old code copied each full height/2-row plane
@@ -531,7 +527,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
             // `yuv` is a local whose buffer nothing else writes, so cv::Mat's refcount hands ownership
             // over for free. The clone() this replaces copied the whole frame a second time, on the GL
             // thread, every call.
-            gLastColorFrame = yuv;
+            frameSnapshot = yuv;
         } else if (uvPixelStride == 2) {
             // Semi-planar (NV12/NV21): the interleaved chroma can be memcpy'd straight into the YUV
             // block's rows. The previous version built a separate zero-filled full-chroma Mat and then
@@ -548,11 +544,10 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
                 // whereas the scratch Mat this replaces was zero-filled.
                 if (rowLen < (size_t)width) std::memset(dst + rowLen, 0, (size_t)width - rowLen);
             }
-            gLastColorFrame = yuv;
+            frameSnapshot = yuv;
         } else {
-            cv::cvtColor(yMat, gLastColorFrame, cv::COLOR_GRAY2RGB);
+            cv::cvtColor(yMat, frameSnapshot, cv::COLOR_GRAY2RGB);
         }
-        frameSnapshot = gLastColorFrame;
     }
 
     // Relocalization MATCHING still uses the Display-Aligned frame for best user feedback.
@@ -590,8 +585,8 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedYuvFrame(
 
 // YuvConverter.nativeYuvToRgbaBitmap — decode a camera-frame YUV_420_888 into a caller-owned
 // ARGB_8888 Bitmap. Reuses the same plane-parsing structure as nativeFeedYuvFrame above (I420 vs
-// NV21/NV12 branch keyed on uvPixelStride) but writes into the bitmap instead of into
-// gLastColorFrame. Replaces the fake "zero-copy" ImageProcessingUtils path (JPEG round-trip).
+// NV21/NV12 branch keyed on uvPixelStride) but writes into the bitmap instead of into a local
+// frame Mat. Replaces the fake "zero-copy" ImageProcessingUtils path (JPEG round-trip).
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_YuvConverter_nativeYuvToRgbaBitmap(
         JNIEnv* env, jobject thiz,
@@ -647,7 +642,12 @@ Java_com_hereliesaz_graffitixr_nativebridge_YuvConverter_nativeYuvToRgbaBitmap(
         for (int r = 0; r < height / 2; ++r) {
             size_t rowStart = r * uvRowStride;
             size_t rowLen = std::min((size_t)width, (size_t)(limit > rowStart ? limit - rowStart : 0));
-            if (rowLen > 0) std::memcpy(nv21.ptr(height + r), vData + rowStart, rowLen);
+            uint8_t* dst = nv21.ptr(height + r);
+            if (rowLen > 0) std::memcpy(dst, vData + rowStart, rowLen);
+            // Rows the source can't fill must still be cleared: nv21 is a freshly allocated,
+            // uninitialised cv::Mat (unlike nativeFeedYuvFrame's yuv Mat, which gets this same
+            // treatment at its sibling call site) -- see the matching memset there.
+            if (rowLen < (size_t)width) std::memset(dst + rowLen, 0, (size_t)width - rowLen);
         }
     } else {
         // Unusual pixelStride (not 1 or 2). No sane camera exposes this; fill grayscale so the
@@ -670,6 +670,7 @@ Java_com_hereliesaz_graffitixr_nativebridge_YuvConverter_nativeYuvToRgbaBitmap(
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
         JNIEnv* env, jobject thiz, jobject colorBuffer, jint width, jint height, jlong timestampNs, jint cvRotateCode) {
+    (void)timestampNs; // not currently consumed here; kept for JNI signature stability.
 
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
     uint8_t* buffer = static_cast<uint8_t*>(env->GetDirectBufferAddress(colorBuffer));
@@ -688,19 +689,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeFeedColorFrame(
 
     try {
         cv::Mat frame(height, width, CV_8UC4, buffer);
-        cv::Mat relocFrame;
-        {
-            // See gColorFrameMutex's declaration comment: this and nativeFeedYuvFrame both only
-            // hold gEngineMutex's shared_lock now, so they need their own mutex around the
-            // read-modify-write of gLastColorFrame. The clone() (the actual per-frame cost) stays
-            // inside the lock here -- unlike nativeFeedYuvFrame's snapshot-then-unlock, this
-            // conversion is cheap enough (a single RGBA->RGB cvtColor + clone, not a multi-branch
-            // YUV assembly) that splitting it wouldn't measurably reduce contention, and keeping
-            // it simple avoids a second place to get the snapshot pattern wrong.
-            std::lock_guard<std::mutex> colorLock(gColorFrameMutex);
-            cv::cvtColor(frame, gLastColorFrame, cv::COLOR_RGBA2RGB);
-            relocFrame = gLastColorFrame.clone();
-        }
+        // colorFrame used to be the process-global gLastColorFrame, written here under
+        // gColorFrameMutex. See nativeFeedYuvFrame's frameSnapshot comment above: nothing outside
+        // this function's own critical section ever read that global, so it is now a genuinely
+        // local variable and needs no lock.
+        cv::Mat colorFrame;
+        cv::cvtColor(frame, colorFrame, cv::COLOR_RGBA2RGB);
+        cv::Mat relocFrame = colorFrame.clone();
         if (cvRotateCode >= 0) {
             cv::rotate(relocFrame, relocFrame, cvRotateCode);
         }
@@ -1401,7 +1396,18 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetDesignPlacement
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetStageTimings(JNIEnv* env, jobject, jfloatArray out) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
-    if (!gSlamEngine) return;
+    // Caller-allocated `out` (SlamManager.kt's getStageTimings) starts as all-zeros, which the
+    // Kotlin side already treats -1.0f (not 0.0f) as "not measured" for these same slots when the
+    // engine IS present (see getStageTimings' doc comment). Returning here with `out` untouched
+    // would leave it at 0.0f -- read as a real zero-ms measurement rather than "no engine yet" --
+    // so write the same -1.0f sentinel before bailing.
+    if (!gSlamEngine) {
+        if (out && env->GetArrayLength(out) >= 5) {
+            float sentinel[5] = {-1.0f, -1.0f, -1.0f, -1.0f, -1.0f};
+            env->SetFloatArrayRegion(out, 0, 5, sentinel);
+        }
+        return;
+    }
     // SetFloatArrayRegion bounds-checks and throws on a short array, so this is not a memory-safety
     // hole either way -- but every other array-taking function in this file validates length before
     // writing, and a short `out` here should behave the same way (a clear log line) rather than an
@@ -1424,7 +1430,18 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetStageEnabled(JN
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocResult(JNIEnv* env, jobject, jfloatArray out) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
-    if (!gSlamEngine) return;
+    // See nativeGetStageTimings above: leaving `out` untouched here would read as a real all-zero
+    // pnpMat/inlierCount/matchCount/seq rather than "no engine yet", so write an unambiguous -1.0f
+    // sentinel into every slot instead (an all-(-1) 4x4 matrix cannot be a valid rotation, so this
+    // cannot be confused with a real pose).
+    if (!gSlamEngine) {
+        if (out && env->GetArrayLength(out) >= 19) {
+            float sentinel[19];
+            std::fill(sentinel, sentinel + 19, -1.0f);
+            env->SetFloatArrayRegion(out, 0, 19, sentinel);
+        }
+        return;
+    }
     // See nativeGetStageTimings above for why this is validated even though SetFloatArrayRegion
     // itself would already reject a short array.
     if (!out || env->GetArrayLength(out) < 19) {
@@ -1439,7 +1456,17 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocResult(JNI
 extern "C" JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFingerprintAnchor(JNIEnv* env, jobject, jfloatArray out) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
-    if (!gSlamEngine) return;
+    // See nativeGetStageTimings above: leaving `out` untouched here would read as a real all-zero
+    // anchor matrix rather than "no engine yet". Write an unambiguous -1.0f sentinel instead (an
+    // all-(-1) 4x4 matrix cannot be a valid transform, so this cannot be confused with a real one).
+    if (!gSlamEngine) {
+        if (out && env->GetArrayLength(out) >= 16) {
+            float sentinel[16];
+            std::fill(sentinel, sentinel + 16, -1.0f);
+            env->SetFloatArrayRegion(out, 0, 16, sentinel);
+        }
+        return;
+    }
     // See nativeGetStageTimings above for why this is validated even though SetFloatArrayRegion
     // itself would already reject a short array.
     if (!out || env->GetArrayLength(out) < 16) {

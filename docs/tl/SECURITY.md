@@ -1,21 +1,13 @@
 # Patakaran sa Seguridad
 
+Seryoso naming pinapahalagahan ang seguridad. Dahil ito ay isang offline na application, limitado ang attack surface, ngunit nagpapanatili kami ng mahigpit na pamantayan para sa proteksyon ng lokal na data.
+
 ## Mga Sinusuportahang Bersyon
 
-Gamitin ang seksyong ito upang sabihin sa mga tao ang tungkol sa kung aling mga bersyon ng iyong proyekto
-kasalukuyang sinusuportahan ng mga update sa seguridad.
-
-|Bersyon |Sinusuportahan |
-|------- |------------------- |
-|5.1.x |:white_check_mark: |
-|5.0.x |:x: |
-|4.0.x |:white_check_mark: |
-|< 4.0 |:x: |
+Sa kasalukuyan, ang `main` branch lamang at ang pinakabagong inilabas na bersyon (release) ang tumatanggap ng mga update sa seguridad.
 
 ## Pag-uulat ng Kahinaan
 
-Gamitin ang seksyong ito upang sabihin sa mga tao kung paano mag-ulat ng kahinaan.
-
-Sabihin sa kanila kung saan pupunta, kung gaano kadalas sila makakaasa na makakuha ng update sa a
-iniulat na kahinaan, ano ang aasahan kung tatanggapin ang kahinaan o
-tinanggihan, atbp.
+Kung matuklasan mo ang isang kahinaan sa seguridad sa GraffitiXR, mangyaring **huwag magbukas ng pampublikong issue**.
+Sa halip, magpadala ng pribadong ulat ng kahinaan (Security Advisory) sa pamamagitan ng GitHub, o direktang makipag-ugnayan sa amin.
+Gagawin namin ang lahat upang mabilis na siyasatin ang isyu at magbigay ng ayos sa susunod na update.

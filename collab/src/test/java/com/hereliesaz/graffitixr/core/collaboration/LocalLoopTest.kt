@@ -27,10 +27,10 @@ class LocalLoopTest {
             token = "tok",
             protocolVersion = 1,
             localDeviceName = "host",
-            fingerprintBytes = fingerprint,
-            projectBytes = projectBytes,
             projectId = "p1",
-            layerCount = 0,
+            snapshotProvider = {
+                ProjectSnapshot(fingerprintBytes = fingerprint, projectBytes = projectBytes, layerCount = 0)
+            },
         )
         val port = host.startListening()
 

@@ -208,8 +208,13 @@ fun HomographyFallbackOverlay(
 
     // cameraController.cameraInfo is null until CameraPreview has actually bound the controller to
     // a lifecycle; the analyzer needs a real Camera2 id (for CameraIntrinsicsEstimator) that only
-    // exists once that binding has happened, so this polls the same composition's recomposition
-    // rather than assuming bind-order against CameraPreview.
+    // exists once that binding has happened. cameraInfo is a plain CameraX getter, not
+    // Compose-observable state, so it creates no recomposition dependency of its own: this
+    // produceState block runs once, on first composition, with whatever cameraInfo returns at that
+    // instant, and re-runs only if THIS composable itself recomposes for some other reason and the
+    // key's object identity happens to have changed by then — it does not poll or react to a later
+    // CameraPreview bind on its own. If a bind can genuinely race this composition, that race is not
+    // closed here.
     val cameraId by produceState<String?>(initialValue = null, cameraController.cameraInfo) {
         value = cameraController.cameraInfo?.let { Camera2CameraInfo.from(it).cameraId }
     }

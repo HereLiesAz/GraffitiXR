@@ -241,7 +241,11 @@ class ArViewModel @Inject constructor(
     @Volatile private var reportedGuestEditDrop = false
 
     fun startHosting() {
-        viewModelScope.launch {
+        // serializeCurrentProject() zips the whole project directory and can run to several MB for
+        // a project with many target images — run this whole flow off Main so neither that call nor
+        // HostSession's own synchronous size-probe (see the snapshotProvider lambda below) can block
+        // the UI thread.
+        viewModelScope.launch(dispatchers.io) {
             try {
                 // Both preconditions are checked here rather than only in the rail's enablement
                 // colour, so tapping Host always yields either a session or an explanation of what
@@ -267,9 +271,12 @@ class ArViewModel @Inject constructor(
                     )
                     return@launch
                 }
-                val fingerprint = slamManager.exportFingerprint() ?: ByteArray(0)
-                val projectBytes = projectManager.serializeCurrentProject()
-                if (projectBytes.isEmpty()) {
+                // A one-off probe purely to give an immediate, attributable error if the project
+                // can't be packaged at all — the actual bytes sent to a guest are re-read fresh by
+                // the snapshotProvider below every time a bulk resync goes out (initial join, or a
+                // reconnect that lands in a replay gap), not this one-time snapshot, so a guest
+                // joining or rejoining well into the session gets the project as it stands then.
+                if (projectManager.serializeCurrentProject().isEmpty()) {
                     // A project is open but its folder didn't serialize (never saved to disk, or the
                     // directory is missing). Same silent-empty-session outcome, different cause.
                     _feedback.tryEmit(
@@ -281,11 +288,20 @@ class ArViewModel @Inject constructor(
                 }
                 val qrString = collaborationManager.startHosting(
                     projectId = projectManager.currentProjectId(),
-                    layerCount = projectRepository.currentProject.value?.layers?.size ?: 0,
-                    fingerprintBytes = fingerprint,
-                    projectBytes = projectBytes,
                     localDeviceName = android.os.Build.MODEL,
-                )
+                ) {
+                    // snapshotProvider's type (CollaborationManager) is a plain () -> ProjectSnapshot,
+                    // not suspend — it's invoked both synchronously from HostSession's init{} and
+                    // later from its own IO-dispatched coroutine, neither of which can be changed to
+                    // call a suspend function without a deeper restructuring of the collab module.
+                    // This whole startHosting() flow already runs on dispatchers.io (see the launch
+                    // above), so bridging with runBlocking here blocks an IO-pool thread, never Main.
+                    com.hereliesaz.graffitixr.core.collaboration.ProjectSnapshot(
+                        fingerprintBytes = slamManager.exportFingerprint() ?: ByteArray(0),
+                        projectBytes = kotlinx.coroutines.runBlocking { projectManager.serializeCurrentProject() },
+                        layerCount = projectRepository.currentProject.value?.layers?.size ?: 0,
+                    )
+                }
                 _uiState.update {
                     it.copy(
                         coopRole = com.hereliesaz.graffitixr.common.model.CoopRole.HOST,
@@ -2859,7 +2875,7 @@ class ArViewModel @Inject constructor(
      * The forced hardware-stereo path is broken on this device — switch the LIVE session to the
      * mono camera config (detach renderer → pause → set mono → resume → re-attach) so the broken
      * motion-stereo disparity stops thrashing the tracker, and persist the flag so future sessions
-     * skip stereo entirely. Recoverable: the user re-selecting Mural clears the flag (see
+     * skip stereo entirely. Recoverable: the user re-enabling the ambient scan clears the flag (see
      * setAmbientScanEnabled). Runs on Dispatchers.Default — pause()/resume() block on the camera — and
      * detaches the renderer first because reconfiguring a Session the GL thread is concurrently
      * driving under a different lock is the not-thread-safe race that crashes ARCore natively.

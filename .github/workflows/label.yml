@@ -10,4 +10,10 @@ permissions:
 
 jobs:
   label:
+    # KNOWN RISK (flagged by infra audit, not resolved here): this is a pull_request_target
+    # workflow with pull-requests: write, calling an external reusable workflow pinned to the
+    # moving branch ref `@main` rather than a commit SHA. That's a supply-chain risk for a
+    # privileged trigger type -- whoever can push to HereLiesAz/workflows' main branch can change
+    # what this runs with write access to this repo's PRs. Pin this to a commit SHA
+    # (`@<40-char-sha>`) once someone can look one up from HereLiesAz/workflows; do not guess one.
     uses: HereLiesAz/workflows/.github/workflows/pr-labeler.yml@main

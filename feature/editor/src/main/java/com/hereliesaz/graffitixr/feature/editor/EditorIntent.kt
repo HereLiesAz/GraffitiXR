@@ -59,6 +59,9 @@ internal sealed interface EditorIntent {
     data class ApplyModeTransformGesture(val mode: EditorMode, val pan: Offset, val zoom: Float, val rotation: Float) : EditorIntent
     data class ToggleModeTransformLocked(val mode: EditorMode) : EditorIntent
     data class SetGestureInProgress(val inProgress: Boolean) : EditorIntent
+    /** An adjustment-slider (opacity/brightness/contrast/saturation) drag started or ended — kept
+     * separate from [SetGestureInProgress], which is for transform gestures only. */
+    data class SetAdjustmentInProgress(val inProgress: Boolean) : EditorIntent
 
     // ── Effect-result / transient flags (dispatched by the VM around async work) ───
     data class SetLoading(val loading: Boolean) : EditorIntent
@@ -71,12 +74,8 @@ internal sealed interface EditorIntent {
     data object ToggleFeaturePoints : EditorIntent
     data object TogglePlaneGrids : EditorIntent
     data object TogglePoints : EditorIntent
-    /**
-     * Sets the method-specific perception layers to their defaults for [activeMethod]: the layer
-     * matching the active mural method on, the other two off. Always-applicable layers (feature
-     * points, plane grids) are untouched. Dispatched on AR entry and on method change; the user
-     * may then turn any layer back on manually until the method changes again.
-     */
+    /** Dismisses the rotation-axis feedback chip (see [EditorUiState.showRotationAxisFeedback]),
+     * clearing it back to hidden once the UI has shown it. */
     data object FeedbackShown : EditorIntent
     data object LockedFeedbackShown : EditorIntent
 

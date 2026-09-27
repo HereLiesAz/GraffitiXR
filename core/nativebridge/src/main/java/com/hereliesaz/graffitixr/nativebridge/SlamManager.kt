@@ -175,10 +175,11 @@ class SlamManager @Inject constructor(
         }
         if (sessionEpoch != epochAtEntry) return null
         val m = nativeGetAnchorTransform()
-        // Native hands back a freshly ZEROED array when the engine is gone, which passes a bare
-        // size check and yields a singular matrix — strictly worse than the identity this exists to
-        // avoid. A real anchor pose has a unit-length first rotation column; all three writers
-        // produce orthonormal matrices, so this rejects only genuinely broken input.
+        // Native returns null (not a zeroed array) when the engine is gone -- see
+        // nativeGetAnchorTransform's own comment in GraffitiJNI.cpp. The size check below is a
+        // defensive belt-and-suspenders guard, not the primary "no engine" signal. A real anchor
+        // pose has a unit-length first rotation column; all three writers produce orthonormal
+        // matrices, so the orthonormality check below rejects only genuinely broken input.
         if (m == null || m.size != 16) return null
         val c0 = kotlin.math.sqrt(m[0] * m[0] + m[1] * m[1] + m[2] * m[2])
         return if (kotlin.math.abs(c0 - 1f) < 1e-3f) m else null
@@ -468,7 +469,7 @@ class SlamManager @Inject constructor(
     fun setViewportSize(width: Int, height: Int) = nativeSetViewportSize(width, height)
 
     fun setRelocEnabled(enabled: Boolean) = nativeSetRelocEnabled(enabled)
-    /** Teleological self-grow (default ON): promote validated new marks into the live fingerprint. */
+    /** Teleological self-grow (default OFF): promote validated new marks into the live fingerprint. */
     fun setSelfGrowEnabled(enabled: Boolean) = nativeSetSelfGrowEnabled(enabled)
 
     /**

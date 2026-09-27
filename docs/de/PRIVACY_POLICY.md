@@ -16,9 +16,20 @@ Für ein besseres Erlebnis können wir bei der Nutzung unseres Dienstes verlange
 *   **Speicher / Fotos:** Wir benötigen Zugriff auf den Speicher Ihres Geräts (Lese-/Schreibzugriff auf externen Speicher oder Fotobibliothek), um Bilder für Overlays zu laden, Ihre Projekte zu speichern und aufgenommene Bilder zu exportieren.
 *   **Standortdaten (Optional):** Wenn Sie Standortberechtigungen erteilen, kann die App GPS-Daten (Breitengrad, Längengrad, Höhe) erfassen, um Ihre Projekte mit Geotags zu versehen. Diese Daten werden lokal in Ihren Projektdateien gespeichert.
 
-## Protokolldaten (Log Data)
+## Absturzberichte (Opt-In)
 
-Wir möchten Sie darüber informieren, dass wir bei jeder Nutzung unseres Dienstes im Falle eines Fehlers in der App Daten und Informationen (durch Produkte von Drittanbietern) auf Ihrem Telefon erfassen, die als Protokolldaten bezeichnet werden. Diese Protokolldaten können Informationen wie die Internetprotokolladresse ("IP-Adresse") Ihres Geräts, den Gerätenamen, die Version des Betriebssystems, die Konfiguration der App bei der Nutzung unseres Dienstes, die Uhrzeit und das Datum Ihrer Nutzung des Dienstes sowie andere Statistiken enthalten.
+Standardmäßig verlässt nichts über einen Absturz Ihr Gerät. Wenn die App abstürzt oder sich von einem internen Fehler erholt, wird ein Bericht in eine lokale, temporäre Datei auf Ihrem Gerät geschrieben, damit die App Ihnen beim nächsten Öffnen einen Hinweis „letzte Sitzung abgestürzt" anzeigen kann — diese Datei verlässt das Gerät von sich aus nie.
+
+Das Senden dieses Berichts an uns ist deaktiviert, sofern Sie es nicht selbst unter **Einstellungen > Absturzberichte** aktivieren. Nur wenn Sie sich dafür entschieden haben, lädt die App den Bericht beim nächsten Start als **öffentliches Issue** im GitHub-Issue-Tracker dieses Projekts (github.com/HereLiesAZ/GraffitiXR) hoch. Der Bericht enthält ausschließlich:
+
+*   ob der Absturz fatal war (die App wurde beendet) oder abgefangen wurde (die App lief weiter);
+*   Datum und Uhrzeit des Absturzes;
+*   Hersteller und Modell Ihres Geräts sowie Ihre Android-Version;
+*   den Versionsnamen der App;
+*   den Stacktrace der Ausnahme; und
+*   bis zu die letzten 1.000 Zeilen der Logcat-Ausgabe der App selbst (beschränkt auf den Prozess dieser App — keine systemweiten Logs).
+
+Da der Bericht als öffentliches GitHub-Issue eingereicht wird, ist sein Inhalt (einschließlich der oben genannten Geräte- und Log-Informationen) für jeden sichtbar, der den Issue-Tracker dieses Projekts einsehen kann. Aktivieren Sie Absturzberichte nur, wenn Sie damit einverstanden sind. Sie können die Einstellung jederzeit wieder deaktivieren; dies wirkt sich nicht auf bereits aufgetretene Abstürze aus.
 
 ## Dienstleister
 
@@ -31,7 +42,9 @@ Wir können Drittunternehmen und -personen aus folgenden Gründen beschäftigen:
 
 Wir verwenden **Google ML Kit** für die Motivsegmentierung (Hintergrundentfernung). Diese Verarbeitung erfolgt lokal auf Ihrem Gerät.
 
-Wir greifen auf die **GitHub-API** zu, um nach Anwendungsupdates zu suchen. Ihre IP-Adresse kann bei diesen Anfragen für GitHub sichtbar sein.
+## Update-Prüfungen
+
+Der Einstellungsbildschirm enthält eine Schaltfläche „Nach Updates suchen". Es wird nichts automatisch geprüft — nur wenn Sie darauf tippen. Ein Tippen darauf löst eine Anfrage an die **GitHub-API** (api.github.com) aus, um die neueste Version dieses Projekts nachzuschlagen. GitHub ist ein Drittanbieter außerhalb unserer Kontrolle, und Ihre IP-Adresse ist für die Dauer dieser einen Anfrage für GitHub sichtbar — genau wie bei jeder Webanfrage, die Sie an github.com richten. Es werden im Rahmen dieser Anfrage keine weiteren Informationen gesendet.
 
 ## Sicherheit
 
@@ -57,3 +70,5 @@ Wenn Sie Fragen oder Anregungen zu unserer Datenschutzerklärung haben, zögern 
 
 ---
 *Dokumentation aktualisiert am 2026-09-04: "Open-Source" auf "Source-Available" korrigiert (siehe LICENSE / docs/LICENSING.md) und den Platzhalter für die Kontakt-E-Mail durch den echten Issue-Link des Repositorys ersetzt. Vorheriges Update: 2026-03-17.*
+
+*Dokumentation aktualisiert am 2026-09-22: den Abschnitt „Protokolldaten" korrigiert, der Absturzdaten als automatisch und ohne Zustimmung erfasst beschrieb — tatsächlich erfordert die App eine ausdrückliche Zustimmung (Einstellungen > Absturzberichte, standardmäßig deaktiviert), bevor ein Absturzbericht das Gerät verlässt, und der Bericht wird als öffentliches GitHub-Issue eingereicht, nicht an „unsere Server" gesendet. Der bestehenden GitHub-API-Update-Prüfung wurde ein eigener Abschnitt gegeben, der klarstellt, dass sie benutzerausgelöst ist (Schaltfläche „Nach Updates suchen" in den Einstellungen), nicht automatisch.*

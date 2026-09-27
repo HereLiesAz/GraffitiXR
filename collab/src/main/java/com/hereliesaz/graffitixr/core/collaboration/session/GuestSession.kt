@@ -29,7 +29,15 @@ internal class GuestSession(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     @Volatile private var sessionId: String? = null
     @Volatile private var lastAppliedSeq: Long = 0L
-    private var socket: Socket? = null
+    // Read from severGuest()-style test helpers and closed from close()/attemptReconnect() on
+    // whichever coroutine is running, while connectLoop() (a different IO thread each attempt)
+    // assigns it. Without @Volatile a writer's assignment is not guaranteed visible to a reader
+    // on another thread, unlike its neighbours sessionId/lastAppliedSeq above.
+    @Volatile private var socket: Socket? = null
+    // The crypto for the current live connection, so close() can seal a BYE on it. Cleared on
+    // every reconnect attempt (mirrors HostSession.activeCrypto) so close() never seals a BYE
+    // with keys bound to an already-dead connection.
+    @Volatile private var activeCrypto: SessionCrypto? = null
 
     private fun randomNonce(): ByteArray = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
     // Guards the check-then-set phase transition in attemptReconnect(): the inbound loop and a
@@ -134,8 +142,22 @@ internal class GuestSession(
                     }
                     sessionId = helloOk.sessionId
                     val crypto = SessionCrypto.forGuest(token, helloOk.sessionId, guestNonce, helloOk.hostNonce)
-                    if (!isReconnect) {
-                        receiveBulk(input, output, crypto)
+                    activeCrypto = crypto
+                    // The first post-handshake frame tells us which path the host took. A fresh
+                    // join (isReconnect == false) always gets a full bulk snapshot. A reconnect
+                    // gets EITHER a replay (plain DELTA/PING frames, handled below exactly like any
+                    // other live frame) OR — when the host's DeltaBuffer can no longer answer the
+                    // replay (a gap) — the same bulk snapshot a fresh join gets. Previously only the
+                    // !isReconnect branch ever called receiveBulk(), so a reconnecting guest that hit
+                    // a gap received BULK_* frames it had no handler for: they fell into livePhase's
+                    // `else -> {}` and were silently discarded, leaving the guest desynced forever.
+                    val first = readSecure(input, crypto) ?: error("peer closed before first live frame")
+                    if (first.type == FrameType.BULK_BEGIN) {
+                        receiveBulk(first, input, output, crypto)
+                    } else {
+                        // Only a reconnect may skip the bulk snapshot; a fresh join must always
+                        // start with one.
+                        require(isReconnect) { "expected BULK_BEGIN for a fresh join, got ${first.type}" }
                     }
                     // The host's own name, now that HELLO_OK carries it. Falls back to "host" for
                     // a peer that predates the field — the same string this used to hard-code.
@@ -143,7 +165,7 @@ internal class GuestSession(
                         peerName = helloOk.hostName.ifBlank { "host" },
                     )
                     phase = Phase.Live
-                    livePhase(input, output, crypto)
+                    livePhase(input, output, crypto, firstFrame = if (first.type == FrameType.BULK_BEGIN) null else first)
                     true
                 }
                 FrameType.HELLO_REJECTED -> {
@@ -171,8 +193,12 @@ internal class GuestSession(
         }
     }
 
-    private suspend fun receiveBulk(input: InputStream, output: OutputStream, crypto: SessionCrypto) {
-        val begin = readSecure(input, crypto) ?: error("EOF in bulk")
+    private suspend fun receiveBulk(
+        begin: Frame.FrameRead,
+        input: InputStream,
+        output: OutputStream,
+        crypto: SessionCrypto,
+    ) {
         require(begin.type == FrameType.BULK_BEGIN)
         val beginPayload = OpCodec.decode<BulkBeginPayload>(begin.payload)
 
@@ -210,16 +236,26 @@ internal class GuestSession(
         return buffer
     }
 
-    private suspend fun livePhase(input: InputStream, output: OutputStream, crypto: SessionCrypto) {
+    private suspend fun livePhase(
+        input: InputStream,
+        output: OutputStream,
+        crypto: SessionCrypto,
+        // A frame already read by connectLoop while it was deciding whether the host sent a bulk
+        // snapshot or a replay (see the BULK_BEGIN check there). When present, it is handled as
+        // this loop's first iteration instead of being re-read (and lost) from the socket.
+        firstFrame: Frame.FrameRead? = null,
+    ) {
         scope.launch {
+            var pending = firstFrame
             while (scope.isActive) {
-                val frame = try {
+                val frame = pending ?: try {
                     readSecure(input, crypto) ?: run {
                         attemptReconnect(); return@launch
                     }
                 } catch (_: Exception) {
                     attemptReconnect(); return@launch
                 }
+                pending = null
                 when (frame.type) {
                     FrameType.DELTA -> {
                         val delta = OpCodec.decode<DeltaPayload>(frame.payload)
@@ -268,6 +304,7 @@ internal class GuestSession(
         _state.value = CoopSessionState.Reconnecting
         try { socket?.close() } catch (_: Exception) {}
         socket = null
+        activeCrypto = null
         val deadline = System.currentTimeMillis() + reconnectWindowMs
         while (System.currentTimeMillis() < deadline && phase != Phase.Ended) {
             delay(reconnectIntervalMs)
@@ -285,6 +322,42 @@ internal class GuestSession(
     override suspend fun close(reason: CoopSessionState.EndReason) {
         phase = Phase.Ended
         _state.value = CoopSessionState.Ended(reason)
+        // Best-effort BYE so the host learns this is a voluntary departure instead of reading it
+        // as silence: without this, the host's read loop only notices up to READ_TIMEOUT_MS later
+        // and reports Reconnecting/NetworkLost for a guest that in fact left cleanly. Skipped when
+        // no live crypto exists yet (still mid-handshake): the host only accepts ENC frames once
+        // its own handshake reply has gone out, so an earlier plaintext BYE would just be rejected.
+        val sock = socket
+        val crypto = activeCrypto
+        if (sock != null && crypto != null && !sock.isClosed) {
+            // A write that blocks (peer stopped reading) must not delay teardown. Socket exposes
+            // no write-side timeout and, unlike NIO channels, a plain java.net.Socket stream does
+            // not respond to coroutine cancellation / Thread.interrupt() while blocked in a
+            // native write — only closing the stream unblocks it (Socket.getOutputStream's
+            // documented contract; see HostSession.writeFrameTimed for the long version of why a
+            // withTimeoutOrNull{withContext(IO){...}} alone would not bound this). A daemon timer
+            // — not a coroutine on `scope`, which this function cancels right below and so cannot
+            // be relied on to still be running when a stuck write would need it — force-closes
+            // the socket if the write hasn't finished within BYE_TIMEOUT_MS; the resulting
+            // IOException is swallowed since the socket is being closed either way.
+            val watchdog = java.util.Timer(true).apply {
+                schedule(
+                    object : java.util.TimerTask() {
+                        override fun run() { try { sock.close() } catch (_: Exception) {} }
+                    },
+                    BYE_TIMEOUT_MS,
+                )
+            }
+            try {
+                withContext(Dispatchers.IO) {
+                    val output = sock.getOutputStream()
+                    Frame.write(output, FrameType.ENC, crypto.seal(FrameType.BYE, OpCodec.encode(ByePayload(reason))))
+                    output.flush()
+                }
+            } catch (_: Exception) { /* best-effort */ } finally {
+                watchdog.cancel()
+            }
+        }
         try { socket?.close() } catch (_: Exception) {}
         scope.cancel()
     }
@@ -293,5 +366,10 @@ internal class GuestSession(
         // The host sends PING every 5s (plus deltas), so 15s of read silence means a dead or
         // half-open host. Mirrors HostSession.READ_TIMEOUT_MS.
         const val READ_TIMEOUT_MS = 15_000
+
+        // Bound on the best-effort BYE write in close(). Short and separate from READ_TIMEOUT_MS:
+        // this is teardown, not live traffic, and nothing should wait long on it before the
+        // socket closes regardless.
+        const val BYE_TIMEOUT_MS = 1_000L
     }
 }

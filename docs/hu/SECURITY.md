@@ -1,18 +1,13 @@
 # Biztonsági Irányelvek
 
+A biztonságot komolyan vesszük. Mivel ez egy offline alkalmazás, a támadási felület korlátozott, de szigorú szabványokat tartunk be a helyi adatok védelme érdekében.
+
 ## Támogatott verziók
 
-Ez a szakasz tájékoztat arról, hogy a projekt mely verziói kapnak jelenleg biztonsági frissítéseket.
-
-| Verzió  | Támogatott          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+Jelenleg csak a `main` ág és a legutóbbi megjelent kiadás kap biztonsági frissítéseket.
 
 ## Sebezhetőség bejelentése
 
-Használd ezt a szakaszt arra, hogy elmondd, hogyan lehet bejelenteni egy sebezhetőséget.
-
-Mondd el nekik, hová forduljanak, milyen gyakran számíthatnak frissítésre a bejelentett sebezhetőséggel kapcsolatban, mire számítsanak, ha a sebezhetőséget elfogadják vagy elutasítják, stb.
+Ha biztonsági sebezhetőséget fedez fel a GraffitiXR-ben, kérjük, **ne nyisson nyilvános issue-t**.
+Ehelyett küldjön privát sebezhetőség-jelentést (Security Advisory) a GitHubon keresztül, vagy vegye fel velünk közvetlenül a kapcsolatot.
+Mindent megteszünk, hogy gyorsan kivizsgáljuk a problémát, és a következő frissítéssel javítást biztosítsunk.

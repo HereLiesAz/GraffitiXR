@@ -6,7 +6,7 @@ SuperPoint is the self-supervised feature detector from Magic Leap:
   https://github.com/magicleap/SuperPointPretrainedNetwork
 
 Outputs:
-  app/src/main/assets/superpoint.onnx
+  core/nativebridge/src/main/assets/superpoint.onnx
 
   Tensor outputs from the exported model:
     semi  [1, 65,  H/8, W/8]  — keypoint probability heatmap (raw logits)
@@ -119,7 +119,7 @@ def main():
     parser.add_argument("--width",  type=int, default=640,
                         help="Export dummy input width  (multiple of 8, default: 640)")
     parser.add_argument("--output", type=str,
-                        default="app/src/main/assets/superpoint.onnx",
+                        default="core/nativebridge/src/main/assets/superpoint.onnx",
                         help="Output ONNX path")
     args = parser.parse_args()
 
@@ -157,7 +157,7 @@ def main():
     print(f"[✓] Exported → {out_path}  ({size_kb} KB)")
     print()
     print("Next steps:")
-    print("  1. Place the .onnx file in app/src/main/assets/ (already done above).")
+    print("  1. Place the .onnx file in core/nativebridge/src/main/assets/ (already done above).")
     print("  2. Rebuild the app:  ./gradlew assembleDebug")
     print("  3. At startup, Logcat will show:  SuperPoint: ready")
 

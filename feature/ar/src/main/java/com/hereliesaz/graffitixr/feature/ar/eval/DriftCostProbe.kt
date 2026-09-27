@@ -207,8 +207,12 @@ class DriftCostProbe(
 
     private fun sampleBatteryMa(): Float {
         // CURRENT_NOW is µA on most devices; convert to mA. Sign convention is device-dependent.
+        // Int.MIN_VALUE is the framework's "property not supported on this device" sentinel — the
+        // same convention this file uses for tempC: -1f means "not sampled", since a legitimate
+        // reading (0 mA, no net current draw) is a real value a consumer must not confuse with
+        // absence. batteryMa never legitimately goes negative, so -1f is unambiguous here too.
         val micro = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
-        return if (micro == Int.MIN_VALUE) 0f else micro / 1000f
+        return if (micro == Int.MIN_VALUE) -1f else micro / 1000f
     }
 
     fun recoveryMs(): Long? = lossMs?.let { EvalMetrics.recoveryMs(it, relockMs) }

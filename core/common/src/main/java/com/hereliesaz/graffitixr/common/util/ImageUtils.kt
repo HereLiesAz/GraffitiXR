@@ -72,7 +72,7 @@ object ImageUtils {
                     }
                     var sample = 1
                     val longest = maxOf(bounds.outWidth, bounds.outHeight)
-                    while (longest > 0 && longest / sample > maxDimension) sample *= 2
+                    while (longest > 0 && longest / sample > maxDimension && sample < (1 shl 30)) sample *= 2
                     val opts = BitmapFactory.Options().apply { inSampleSize = sample }
                     context.contentResolver.openInputStream(uri)?.use {
                         BitmapFactory.decodeStream(it, null, opts)
@@ -208,28 +208,5 @@ object ImageUtils {
         val stream = ByteArrayOutputStream()
         bitmap.compress(format, quality, stream)
         return stream.toByteArray()
-    }
-
-    // ==================== UI Utilities ====================
-
-    /**
-     * Cycles through available BlendModes for the UI.
-     *
-     * @param current The current blend mode name.
-     * @return The next blend mode in the cycle.
-     */
-    fun getNextBlendMode(current: String): String {
-        val modes = listOf(
-            "SrcOver", "Multiply", "Screen", "Overlay",
-            "Darken", "Lighten", "ColorDodge", "ColorBurn",
-            "HardLight", "SoftLight", "Difference", "Exclusion",
-            "Hue", "Saturation", "Color", "Luminosity"
-        )
-        val index = modes.indexOf(current)
-        return if (index == -1 || index == modes.lastIndex) {
-            modes[0]
-        } else {
-            modes[index + 1]
-        }
     }
 }

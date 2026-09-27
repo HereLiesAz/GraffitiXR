@@ -1,21 +1,13 @@
 # Sicherheitsrichtlinie
 
+Wir nehmen Sicherheit ernst. Da es sich um eine Offline-Anwendung handelt, ist die Angriffsfläche begrenzt, aber wir halten strenge Standards für den Schutz lokaler Daten ein.
+
 ## Unterstützte Versionen
 
-Verwenden Sie diesen Abschnitt, um die Leute darüber zu informieren, welche Versionen Ihres Projekts
-derzeit mit Sicherheitsupdates unterstützt werden.
-
-| Version | Unterstützt        |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+Derzeit erhalten nur der `main`-Branch und die jeweils neueste veröffentlichte Version Sicherheitsupdates.
 
 ## Melden einer Schwachstelle
 
-Verwenden Sie diesen Abschnitt, um den Leuten mitzuteilen, wie sie eine Schwachstelle melden können.
-
-Teilen Sie ihnen mit, wohin sie sich wenden sollen, wie oft sie ein Update zu einer
-gemeldeten Schwachstelle erwarten können, was sie erwarten können, wenn die Schwachstelle akzeptiert oder
-abgelehnt wird, usw.
+Wenn Sie eine Sicherheitslücke in GraffitiXR entdecken, öffnen Sie bitte **kein öffentliches Issue**.
+Reichen Sie stattdessen einen privaten Bericht über eine Sicherheitslücke (Security Advisory) über GitHub ein, oder kontaktieren Sie uns direkt.
+Wir werden unser Bestes tun, um das Problem schnell zu untersuchen und mit dem nächsten Update einen Patch bereitzustellen.

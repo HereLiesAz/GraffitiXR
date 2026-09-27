@@ -1,22 +1,13 @@
-
 # Beveiligingsbeleid
+
+Wij nemen beveiliging serieus. Omdat dit een offline applicatie is, is het aanvalsoppervlak beperkt, maar we hanteren strenge normen voor de bescherming van lokale gegevens.
 
 ## Ondersteunde versies
 
-Gebruik dit gedeelte om mensen te vertellen welke versies van uw project er zijn
-wordt momenteel ondersteund met beveiligingsupdates.
-
-| Versie | Ondersteund |
-| ------- | ------------------ |
-| 5.1.x | :white_check_mark: |
-| 5.0.x | :x: |
-| 4.0.x | :white_check_mark: |
-| < 4,0 | :x: |
+Momenteel ontvangen alleen de `main`-branch en de meest recente uitgebrachte versie beveiligingsupdates.
 
 ## Een kwetsbaarheid melden
 
-Gebruik dit gedeelte om mensen te vertellen hoe ze een kwetsbaarheid kunnen melden.
-
-Vertel ze waar ze heen moeten, hoe vaak ze een update kunnen verwachten over een
-gemelde kwetsbaarheid, wat u kunt verwachten als de kwetsbaarheid wordt geaccepteerd of
-geweigerd, enz.
+Als u een beveiligingskwetsbaarheid in GraffitiXR ontdekt, **open dan geen openbare issue**.
+Dien in plaats daarvan een privérapport over de kwetsbaarheid (Security Advisory) in via GitHub, of neem rechtstreeks contact met ons op.
+We zullen ons best doen om het probleem snel te onderzoeken en met de volgende update een oplossing te bieden.

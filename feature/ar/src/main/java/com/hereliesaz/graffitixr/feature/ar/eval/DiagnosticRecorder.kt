@@ -173,7 +173,10 @@ class DiagnosticRecorder(
             if (ring.none { it.reloc.reject == RelocReject.OK }) add("relocalization never locked")
             if (ring.none { it.fusion.state == FusionState.COLD_SNAP ||
                     it.fusion.state == FusionState.BLENDING ||
-                    it.fusion.state == FusionState.HOLDING }) {
+                    it.fusion.state == FusionState.HOLDING ||
+                    // A standing correction exists here too (RELOCK_REFUSED requires one) — only
+                    // NEW relocks are being refused, not the fact that fusion ever corrected at all.
+                    it.fusion.state == FusionState.RELOCK_REFUSED }) {
                 // Distinguished from a fusion that was ON and never managed to correct anything.
                 //
                 // `ArRenderer.fusionEnabled` ships FALSE and its only writer sits behind the

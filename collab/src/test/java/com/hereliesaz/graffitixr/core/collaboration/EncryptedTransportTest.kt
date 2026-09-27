@@ -25,10 +25,14 @@ class EncryptedTransportTest {
         token = token,
         protocolVersion = 2,
         localDeviceName = "host",
-        fingerprintBytes = ByteArray(64) { it.toByte() },
-        projectBytes = project,
         projectId = "p1",
-        layerCount = 0,
+        snapshotProvider = {
+            ProjectSnapshot(
+                fingerprintBytes = ByteArray(64) { it.toByte() },
+                projectBytes = project,
+                layerCount = 0,
+            )
+        },
     )
 
     private fun newGuest(

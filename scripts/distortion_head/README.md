@@ -65,8 +65,11 @@ The exported graph is self-contained (frozen SuperPoint + head): native code fee
 images and reads `distortion[13]`. The exporter also attempts an OpenCV-DNN reload as a
 compatibility check.
 
-## Next (device wiring — not in this scaffold)
+## Device wiring (live)
 
-See §5–6 of the spec: add the canonical patch to `Fingerprint`, run the head in
-`relocThreadFunc` between SuperPoint and PnP, use the warp to *guide* matching / seed IPPE
-(never to write the pose directly), and route `coverage → mPaintingProgress`.
+The device wiring described in §5–6 of the spec is complete, not a TODO: `core/nativebridge/
+src/main/cpp/MobileGS.cpp` loads `distortion_head.onnx` and calls it from `relocThreadFunc`
+alongside SuperPoint. `matchability`/`coverage` (`dist[11]`/`dist[12]`) feed the relock
+confidence and the *coverage → `mPaintingProgress`* routing, exactly as specced — the warp
+guides matching/seeds IPPE rather than writing the pose directly. See `MobileGS.cpp` around
+`runRelocPass`/the distortion-head block for the current call sites.

@@ -28,7 +28,13 @@ suspend fun PointerInputScope.detectSmartOverlayGestures(
         var started = false
         val touchSlop = viewConfiguration.touchSlop
 
-        awaitFirstDown(requireUnconsumed = false)
+        val down = awaitFirstDown(requireUnconsumed = false)
+
+        // Ignore gestures that start outside the caller-provided valid bounds (e.g. outside the
+        // overlay's current placement area). Don't consume the down event, so it remains free to
+        // be handled elsewhere in the pointer input chain; simply skip our own gesture tracking
+        // for this cycle.
+        if (!getValidBounds().contains(down.position)) return@awaitEachGesture
 
         do {
             val event = awaitPointerEvent()

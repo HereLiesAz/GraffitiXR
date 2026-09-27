@@ -82,8 +82,10 @@ fun Knob(
     val updatedValue by rememberUpdatedState(value)
     val updatedOnValueChange by rememberUpdatedState(onValueChange)
     // The pointerInput blocks are keyed on Unit (created once), so wrap the rest of the captured
-    // state in rememberUpdatedState too — otherwise a recomposition with a different range/default
-    // would keep using the values from first composition (wrong sensitivity / reset target).
+    // state in rememberUpdatedState too. All current call sites pass compile-time-constant ranges
+    // and defaults, so this is precautionary rather than a fix for an observed bug: it's here so a
+    // future caller that recomposes with a different range/default doesn't silently get stale
+    // values from first composition (wrong sensitivity / reset target).
     val updatedOnStart by rememberUpdatedState(onValueChangeStart)
     val updatedOnFinished by rememberUpdatedState(onValueChangeFinished)
     val updatedDefault by rememberUpdatedState(defaultValue)

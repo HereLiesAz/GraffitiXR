@@ -64,7 +64,7 @@ internal fun enumerateRailItemIdRegistrations(mode: EditorMode): List<String> {
     // panels and invert)
     ids += listOf(
         "mode.design", "host.design", "design.adjust", "design.balance", "design.invert",
-        "design.outline", "design.isolate",
+        "design.outline", "design.isolate", "design.lock",
     )
 
     // Project menu
@@ -97,6 +97,7 @@ internal val RAIL_ITEM_HOST_ID: Map<String, String> = mapOf(
     "design.invert" to "host.design",
     "design.outline" to "host.design",
     "design.isolate" to "host.design",
+    "design.lock" to "host.design",
     "mode.ar" to "host.modes",
     "target.create" to "mode.ar",
     "mode.ar.light" to "mode.ar",

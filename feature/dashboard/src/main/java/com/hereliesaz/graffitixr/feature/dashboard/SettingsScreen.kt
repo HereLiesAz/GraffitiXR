@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,8 +22,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,7 +33,6 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -73,6 +69,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 fun SettingsScreen(
     currentVersion: String,
     updateStatus: String?,
+    updateUrl: String?,
     isCheckingForUpdate: Boolean,
     currentLanguage: AppLanguage,
     onLanguageChanged: (AppLanguage) -> Unit,
@@ -152,10 +149,15 @@ fun SettingsScreen(
     }
 
     val openAppSettings: () -> Unit = {
-        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-        val uri = Uri.fromParts("package", context.packageName, null)
-        intent.data = uri
-        context.startActivity(intent)
+        try {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+            val uri = Uri.fromParts("package", context.packageName, null)
+            intent.data = uri
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            android.util.Log.e("SettingsScreen", "Failed to open app settings", e)
+        }
     }
 
     var showLanguageDialog by remember { mutableStateOf(false) }
@@ -249,10 +251,13 @@ fun SettingsScreen(
                                 value = if (isRightHanded) strings.settings.handRight else strings.settings.handLeft,
                                 modifier = Modifier.clickable { onHandednessChanged(!isRightHanded) }
                             )
-                            // Off by default and must ask, not assume: this is the one setting in the
-                            // app that sends anything off the device. On a crash, the report (device
+                            // Off by default and must ask, not assume. On a crash, the report (device
                             // model + recent logcat) goes to this project's PUBLIC GitHub issue
-                            // tracker — never silently, and never anywhere else.
+                            // tracker — never silently, and never anywhere else. This is the only
+                            // *consent-gated* network call the app makes; separately, and without a
+                            // toggle, opening Settings also fires an unconditional update check
+                            // against api.github.com (see the LaunchedEffect above) — that one isn't
+                            // covered by this setting.
                             Text(
                                 text = "On a crash, send the device model and recent logs to a public bug report? Off by default.",
                                 color = Color.Gray,
@@ -422,7 +427,7 @@ fun SettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                val isUpdateAvailable = updateStatus?.startsWith("New version") == true
+                                val isUpdateAvailable = updateUrl != null
                                 Column(
                                     modifier = Modifier
                                         .weight(1f)

@@ -16,9 +16,20 @@ Pour une meilleure expérience lors de l'utilisation de notre Service, nous pouv
 *   **Stockage / Photos :** Nous avons besoin d'accéder au stockage de votre appareil (Lecture/Écriture sur le Stockage Externe ou la Photothèque) pour charger des images pour les superpositions, sauvegarder vos projets et exporter les images capturées.
 *   **Données de Localisation (Optionnel) :** Si vous accordez les autorisations de localisation, l'application peut collecter des données GPS (latitude, longitude, altitude) pour géolocaliser vos projets. Ces données sont enregistrées localement dans vos fichiers de projet.
 
-## Données de Journal
+## Rapports de Plantage (Opt-In)
 
-Nous tenons à vous informer que chaque fois que vous utilisez notre Service, en cas d'erreur dans l'application, nous collectons des données et des informations (via des produits tiers) sur votre téléphone, appelées Données de Journal. Ces Données de Journal peuvent inclure des informations telles que l'adresse IP (Internet Protocol) de votre appareil, le nom de l'appareil, la version du système d'exploitation, la configuration de l'application lors de l'utilisation de notre Service, l'heure et la date de votre utilisation du Service, et d'autres statistiques.
+Par défaut, rien concernant un plantage ne quitte votre appareil. Si l'application plante ou se remet d'une erreur interne, un rapport est écrit dans un fichier local et temporaire sur votre appareil, afin que l'application puisse vous afficher un avis « la dernière session a planté » la prochaine fois que vous l'ouvrez — ce fichier ne quitte jamais l'appareil de lui-même.
+
+L'envoi de ce rapport est désactivé à moins que vous ne l'activiez vous-même, dans **Paramètres > Rapports de plantage**. Si — et seulement si — vous avez activé cette option, l'application télécharge le rapport au prochain démarrage, en tant qu'**issue publique** sur le suivi des issues GitHub de ce projet (github.com/HereLiesAZ/GraffitiXR). Le rapport contient uniquement :
+
+*   si le plantage était fatal (l'application a été arrêtée) ou récupéré (intercepté, l'application a continué à fonctionner) ;
+*   la date et l'heure du plantage ;
+*   le fabricant et le modèle de votre appareil, ainsi que votre version d'Android ;
+*   le nom de version de l'application ;
+*   la pile d'appels (stack trace) de l'exception ; et
+*   jusqu'aux 1 000 dernières lignes de la sortie logcat propre à l'application (limitée au processus de cette application — pas les journaux système entiers).
+
+Comme le rapport est déposé en tant qu'issue publique GitHub, son contenu (y compris les informations sur l'appareil et les journaux ci-dessus) est visible par quiconque peut consulter le suivi des issues de ce projet. N'activez les rapports de plantage que si vous êtes à l'aise avec cela. Vous pouvez désactiver ce paramètre à tout moment, sans que cela n'affecte les plantages déjà survenus.
 
 ## Fournisseurs de Services
 
@@ -31,7 +42,9 @@ Nous pouvons employer des sociétés tierces et des personnes pour les raisons s
 
 Nous utilisons **Google ML Kit** pour la segmentation des sujets (suppression de l'arrière-plan). Ce traitement s'effectue localement sur votre appareil.
 
-Nous accédons à l'**API GitHub** pour vérifier les mises à jour de l'application. Votre adresse IP peut être visible par GitHub lors de ces requêtes.
+## Vérifications de Mise à Jour
+
+L'écran Paramètres comporte un bouton « Vérifier les mises à jour ». Rien n'est vérifié automatiquement — uniquement lorsque vous appuyez dessus. Appuyer dessus effectue une requête vers l'**API GitHub** (api.github.com) pour consulter la dernière version de ce projet. GitHub est un tiers hors de notre contrôle, et votre adresse IP est visible par GitHub pendant la durée de cette unique requête, tout comme elle le serait pour n'importe quelle requête web que vous adressez à github.com. Aucune autre information n'est envoyée dans le cadre de cette requête.
 
 ## Sécurité
 
@@ -58,3 +71,5 @@ Si vous avez des questions ou des suggestions concernant notre Politique de Conf
 
 ---
 *Documentation mise à jour le 2026-09-04 : correction de « Open Source » en « à code source disponible » (voir LICENSE / docs/LICENSING.md). Mise à jour précédente : 2026-03-17.*
+
+*Documentation mise à jour le 2026-09-22 : correction de la section « Données de Journal », qui décrivait les données de plantage comme collectées automatiquement et sans consentement — en réalité, l'application nécessite une activation explicite (Paramètres > Rapports de plantage, désactivée par défaut) avant qu'un rapport de plantage ne quitte l'appareil, et le rapport est déposé en tant qu'issue publique GitHub, et non envoyé à « nos serveurs ». Une section dédiée a été ajoutée pour la vérification des mises à jour via l'API GitHub, précisant qu'elle est déclenchée par l'utilisateur (bouton « Vérifier les mises à jour » dans les Paramètres), et non automatique.*

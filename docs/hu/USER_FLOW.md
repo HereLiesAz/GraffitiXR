@@ -26,7 +26,7 @@
 **Definíció:** A rendszer, amely a terv pozícióját a fizikai valósághoz rögzíti, még követésvesztés után is.
 **Komponensek:** `MobileGS` (natív C++17 relokalizáló motor), `Fingerprint` (a fal ujjlenyomata).
 
-**Fontos korrekció:** `MobileGS` **nem** térképező motor — nincs perzisztens voxel- vagy splat-réteg, nincs jelenetrekonstrukció, és nincs `draw()` metódus. A `MobileGS.cpp` saját kódkommentje is ezt mondja azokon a hívási pontokon, amelyek korábban egy ilyen réteget tápláltak (`setMappingPaused`, `getSplatCount` — mindkettő "no gaussian-splat mapper in this engine" üzenetet naplóz, és üres/inaktív értékkel tér vissza). Nincs `VoxelMap`, `ConfidenceMap` vagy `PersistentVoxelMemory` a jelenlegi kódban.
+**Fontos korrekció:** `MobileGS` **nem** térképező motor — nincs perzisztens voxel- vagy splat-réteg, nincs jelenetrekonstrukció, és nincs `draw()` metódus. A `MobileGS.cpp` saját kódkommentje is ezt mondja azon a hívási ponton, amely korábban egy ilyen réteget táplált (`setMappingPaused`, amely "no gaussian-splat mapper in this engine" üzenetet naplóz, és no-op). Nincs `VoxelMap`, `ConfidenceMap`, `PersistentVoxelMemory` vagy `getSplatCount` a jelenlegi kódban — a `getSplatCount`-ot teljesen eltávolították, nem csak csonkolták.
 
 ### A. A Tényleges Mechanizmus
 1.  **A Fal Ujjlenyomata (Fingerprint):**

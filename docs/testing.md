@@ -11,17 +11,28 @@ Unit tests live in `src/test/` inside each module. Run all at once or per-module
 ./gradlew :core:data:testDebugUnitTest
 ~~~
 
-### Existing test files
+### Test organization
 
-| File | Module | Covers |
-|---|---|---|
-| `DualAnalyzerTest` | `:feature:ar` | Relocalization callback, light throttle, luminosity path |
-| `ArViewModelTest` | `:feature:ar` | Session management, flashlight, GPS, keyframe capture, fingerprint restore on project load |
-| `EditorViewModelTest` | `:feature:editor` | Design placement/legibility, undo/redo, replace-confirmation flow |
-| `ProjectManagerTest` | `:core:data` | `getProjectList`, `deleteProject`, `getMapPath`, `importProjectFromUri` failure paths |
-| `NativeMethodAritySignatureTest` | `:core:nativebridge` | Regex-scrapes `GraffitiJNI.cpp` to catch a Kotlin `external fun` whose parameter count drifts from its native counterpart (does not check types) |
-| `SlamManagerAnchorEstablishmentTest` | `:core:nativebridge` | Pins named historical regressions in anchor-establishment sequencing |
-| `FingerprintJniContractTest` | `:core:common` | Guards the frozen `Fingerprint.fromNative` JNI constructor contract |
+Tests live under each module's own `src/test/` directory, mirroring the module boundaries described in
+[`docs/ARCHITECTURE.md`](ARCHITECTURE.md) — e.g. `:feature:ar` view-model and analyzer tests,
+`:feature:editor` design-placement tests, `:core:data` persistence tests, `:core:nativebridge` JNI
+signature/contract tests, `:core:common` model/serialization tests. As of this writing there are over
+100 `*Test.kt` files across the repository — too many to hand-enumerate here without the list going
+stale the next time a test is added or renamed. For the current, authoritative inventory, run:
+
+~~~bash
+find . -path "*/src/test/*" -name "*Test.kt"
+~~~
+
+A few tests are worth calling out individually because they guard specific, easy-to-regress contracts
+rather than ordinary feature behavior:
+
+* `NativeMethodAritySignatureTest` (`:core:nativebridge`) — regex-scrapes `GraffitiJNI.cpp` to catch a
+  Kotlin `external fun` whose parameter count drifts from its native counterpart (does not check types).
+* `SlamManagerAnchorEstablishmentTest` (`:core:nativebridge`) — pins named historical regressions in
+  anchor-establishment sequencing.
+* `FingerprintJniContractTest` (`:core:common`) — guards the frozen `Fingerprint.fromNative` JNI
+  constructor contract.
 
 *Note: The relocalization and confidence/progress logic itself — `MobileGS::runRelocPass`
 (background PnP snap-back), the distortion-head crop, `MobileGS::tryUpdateFingerprint`'s fallback —

@@ -79,7 +79,7 @@ class DashboardViewModelTest {
         advanceUntilIdle()
         assertTrue(events.isEmpty())
         assertFalse(viewModel.uiState.value.showNewProjectDialog)
-        assertEquals("Couldn't create \"Mural\": IOException: Disk full", viewModel.uiState.value.projectErrorMessage)
+        assertEquals("Couldn't create \"Mural\" — try again.", viewModel.uiState.value.projectErrorMessage)
         assertFalse(viewModel.uiState.value.isCreatingProject)
         assertNotNull(viewModel.uiState.value.projectErrorMessage)
         coEvery { repository.createProject("Mural") } returns GraffitiProject(name = "Mural")

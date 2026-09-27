@@ -220,6 +220,17 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
     mCorrobMatched.store(-1, std::memory_order_relaxed);
     mCorrobLoneSkips.store(-1, std::memory_order_relaxed);
     mCorrobSearchRadiusPx.store(-1.0f, std::memory_order_relaxed);
+    // Same rule again for the five diagnostics below (detected/obliquity/rectified-corr/matches/
+    // inliers): they used to only be reset further down, past these early-outs, so a rejected
+    // attempt (e.g. kRelocNoFingerprint) would publish a previous successful attempt's stale
+    // numbers next to its own fresh reject code. Reset to each field's declared "not measured"
+    // default (see mLastRelocMatches/mLastRelocInliers/mLastRelocDetected/mLastRelocObliquityDeg/
+    // mLastRelocRectifiedCorr initializers in MobileGS.h) before any early-out can return.
+    mLastRelocDetected.store(0, std::memory_order_relaxed);
+    mLastRelocObliquityDeg.store(-1, std::memory_order_relaxed);
+    mLastRelocRectifiedCorr.store(0, std::memory_order_relaxed);
+    mLastRelocMatches.store(0, std::memory_order_relaxed);
+    mLastRelocInliers.store(0, std::memory_order_relaxed);
 
     if (!mRelocEnabled) {
         mLastRelocReject.store(kRelocDisabled, std::memory_order_relaxed);
@@ -359,7 +370,9 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
     // Published so the diagnostics can show whether this pass is actually running. It was dead in
     // practice for a long time (nothing set mHasFingerprintView on the live capture path), so
     // "did rectification fire, and did it help" is worth being able to read off the device rather
-    // than infer. -1 = the pass was not eligible at all this attempt.
+    // than infer. -1 = the pass was not eligible at all this attempt. (Already reset to this same
+    // "not eligible" state above, before the early-outs; re-stated here right before the eligibility
+    // check purely for local readability -- this attempt is known reachable at this point.)
     mLastRelocObliquityDeg.store(-1, std::memory_order_relaxed);
     mLastRelocRectifiedCorr.store(0, std::memory_order_relaxed);
     if (hasFpView && mIsArCoreTracking.load(std::memory_order_relaxed) && wallKps3d.size() >= 12) {
@@ -1930,7 +1943,11 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
     std::vector<cv::Point3f>   pts3d;
     std::vector<int>           validIdx;
 
-    int tooClose = 0, tooFar = 0, missing = 0;
+    // No far-plane rejection here: any depthMm >= 100 is accepted regardless of how large it is.
+    // Not implemented -- a "too far" bucket isn't measured by this loop, so it's deliberately left
+    // out of the counts/log below rather than declared and always logged as 0 (which would read as
+    // a measured zero rather than "not checked").
+    int tooClose = 0, missing = 0;
 
     for (int i = 0; i < (int)kps.size(); ++i) {
         const auto& kp = kps[i];
@@ -1956,8 +1973,8 @@ MobileGS::FingerprintData MobileGS::generateFingerprint(
     LOGI("generateFingerprint: %zu/%zu keypoints have valid depth (scaleX=%.4f, scaleY=%.4f, depthW=%d, depthH=%d)",
          validKps.size(), kps.size(), scaleX, scaleY, depthW, depthH);
     if (validKps.empty()) {
-        LOGE("generateFingerprint: no valid depth. Counts: tooClose=%d, tooFar=%d, missing=%d. Total kps=%zu",
-             tooClose, tooFar, missing, kps.size());
+        LOGE("generateFingerprint: no valid depth. Counts: tooClose=%d, missing=%d (no far-plane check). Total kps=%zu",
+             tooClose, missing, kps.size());
         return {};
     }
 

@@ -51,10 +51,10 @@ set*). `PARAMETERS.md` is a lookup table, not prose.
 The defects `IMPLEMENTATION.md` lists as "already fixed" were repaired in PRs
 #1785–#1788 and are on `main`. Since then **Phase 1** (the footprint operator Φ,
 `anchor/Footprint.kt`) and **Phase 5a** (splitting painting progress from
-corroboration confidence) have landed, and **Phase 6a is three of its four todos
-in** — 6a.4 (the eval-only fixed RNG seed and synchronous-reloc mode) is still
-open, so replay A/Bs continue to carry un-quantified RANSAC variance. Phases 2,
-3, 4 and 5b are still proposed.
+corroboration confidence) have landed, and **Phase 6a is complete** — all four
+todos, including 6a.4 (the eval-only fixed RNG seed and synchronous-reloc mode),
+have landed, so replay A/Bs no longer carry un-quantified RANSAC variance.
+Phases 2, 3, 4 and 5b are still proposed.
 
 **Phase 0 is next in the landing order and blocks all four.** It is gated on
 experiment **E0b**, which has not been run — it needs a physical ARCore device.

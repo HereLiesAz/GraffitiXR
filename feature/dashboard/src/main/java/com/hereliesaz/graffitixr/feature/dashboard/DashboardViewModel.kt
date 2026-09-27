@@ -59,7 +59,7 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    fun openProject(project: GraffitiProject, onOpened: () -> Unit = {}) {
+    fun openProject(project: GraffitiProject) {
         openProjectJob?.cancel()
         openProjectJob = viewModelScope.launch {
             val result = try {
@@ -70,7 +70,6 @@ class DashboardViewModel @Inject constructor(
             }
             result.onSuccess {
                 _uiState.update { it.copy(currentProjectId = project.id, currentProjectName = project.name) }
-                onOpened()
                 _navigationEvents.trySend(DESTINATION_EDITOR)
             }.onFailure { e ->
                 android.util.Log.e("DashboardViewModel", "Failed to open project ${project.id}", e)
@@ -89,19 +88,24 @@ class DashboardViewModel @Inject constructor(
     }
 
     fun createAndOpenProject(name: String = "Untitled") {
+        if (_uiState.value.isCreatingProject) return
+        _uiState.update { it.copy(isCreatingProject = true) }
         viewModelScope.launch {
             try {
                 val p = repository.createProject(name)
                 _uiState.update { it.copy(currentProjectId = p.id, currentProjectName = p.name) }
+                _navigationEvents.trySend(DESTINATION_EDITOR)
                 loadAvailableProjects()
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 _uiState.update { it.copy(projectErrorMessage = "Couldn't create the project.") }
+            } finally {
+                _uiState.update { it.copy(isCreatingProject = false) }
             }
         }
     }
 
-    fun onCreateProject(name: String, onCreated: () -> Unit = {}) {
+    fun onCreateProject(name: String) {
         if (_uiState.value.isCreatingProject) return
         // Dismiss dialog immediately so the user sees progress, not a frozen dialog.
         // On failure it stays closed; the error is shown and NEW allows an explicit retry.
@@ -110,7 +114,6 @@ class DashboardViewModel @Inject constructor(
             try {
                 val p = repository.createProject(name)
                 _uiState.update { it.copy(currentProjectId = p.id, currentProjectName = p.name) }
-                onCreated()
                 _navigationEvents.trySend(DESTINATION_EDITOR)
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
@@ -120,7 +123,7 @@ class DashboardViewModel @Inject constructor(
                 // error message below is surfaced by the UI; the user can tap NEW to try again.
                 _uiState.update {
                     it.copy(
-                        projectErrorMessage = "Couldn't create \"$name\": ${e.javaClass.simpleName}: ${e.message}"
+                        projectErrorMessage = "Couldn't create \"$name\" — try again."
                     )
                 }
             } finally {
@@ -139,7 +142,7 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, importErrorMessage = null) }
             try {
-                val result = repository.importProject(uri)
+                val result = repository.importProject(uri.toString())
                 if (result.isSuccess) {
                     loadAvailableProjects()
                 } else {
@@ -175,6 +178,7 @@ class DashboardViewModel @Inject constructor(
     }
 
     fun checkForUpdates(currentVersion: String) {
+        if (_uiState.value.isCheckingForUpdate) return
         viewModelScope.launch {
             _uiState.update { it.copy(isCheckingForUpdate = true, updateStatusMessage = "Checking for updates...") }
             try {
@@ -204,6 +208,7 @@ class DashboardViewModel @Inject constructor(
             _uiState.update { it.copy(updateStatusMessage = "Opening browser...") }
         } catch (e: Exception) {
             android.util.Log.e("DashboardViewModel", "Failed to open update URL", e)
+            _uiState.update { it.copy(updateStatusMessage = "Couldn't open the browser.") }
         }
     }
 

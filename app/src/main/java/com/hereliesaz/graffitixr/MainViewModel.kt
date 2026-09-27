@@ -130,14 +130,7 @@ class MainViewModel @Inject constructor(
     }
 
     fun cancelTapMode() {
-        _uiState.update {
-            it.copy(
-                isCapturingTarget = false,
-                captureStep = CaptureStep.NONE,
-                isWaitingForTap = false,
-                captureOriginatedFromTap = false
-            )
-        }
+        resetCaptureUi()
     }
 
     fun setCaptureStep(step: CaptureStep) {
@@ -318,10 +311,11 @@ class MainViewModel @Inject constructor(
     }
 
     /**
-     * Depth-off, SINGLE-capture target creation. The tap must land on a green (parallel, in-range)
-     * ARCore wall plane — ARCore has already solved that plane's metric pose, so we back-project the
-     * captured features onto it ([MetricFingerprintBuilder.buildSingle]) instead of triangulating a
-     * second view. No green plane → refuse and guide the artist to face a wall.
+     * Depth-off, SINGLE-capture target creation. The tap must land on a tracked ARCore wall plane
+     * (the plane no longer has to be green — see the hit-test in ArRenderer); ARCore has already
+     * solved that plane's metric pose, so we back-project the captured features onto it
+     * ([MetricFingerprintBuilder.buildSingle]) instead of triangulating a second view. No tracked
+     * plane under the tap → refuse and guide the artist to face a wall.
      */
     private fun handleSingleCapture(
         bitmap: Bitmap, intr: FloatArray, view: FloatArray, wallPlane: FloatArray?, rotationDeg: Int,
@@ -471,23 +465,17 @@ class MainViewModel @Inject constructor(
         "No wall detected there yet. Sweep the phone across the surface until it's outlined, then tap."
 
     /**
-     * The single-capture tap wasn't on a green (parallel, in-range) wall plane. Guide the artist;
-     * the capture frame is discarded separately (ArViewModel.clearCaptureForRetry) so they stay in
-     * tap mode and can simply re-aim and tap again.
+     * The single-capture tap wasn't on any tracked wall plane (the plane no longer has to be
+     * green — see the hit-test in ArRenderer). Guide the artist; the capture frame is discarded
+     * separately (ArViewModel.clearCaptureForRetry) so they stay in tap mode and can simply
+     * re-aim and tap again.
      */
     fun notifyTargetNotOnWall() {
         Toast.makeText(context, notOnGreenWallMessage, Toast.LENGTH_LONG).show()
     }
 
     fun onCancelCaptureClicked() {
-        _uiState.update {
-            it.copy(
-                isCapturingTarget = false,
-                captureStep = CaptureStep.NONE,
-                isWaitingForTap = false,
-                captureOriginatedFromTap = false
-            )
-        }
+        resetCaptureUi()
     }
 
     private companion object {

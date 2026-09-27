@@ -44,6 +44,7 @@ internal val DECORATED_IDS = setOf(
     "mode.mockup.lock",
     "mode.trace.freeze", "mode.trace.lock",
     "design.adjust", "design.balance", "design.invert", "design.outline", "design.isolate",
+    "design.lock",
 )
 
 /**
@@ -85,7 +86,9 @@ internal fun AzNavHostScope.ConfigureGuidance(
 
     // Stay quiet during an active gesture; re-show after a short settle. Mirrors the old coach, which
     // hid mid-gesture and waited ~700 ms before surfacing the next step.
-    azSuppressGuide(settleMs = 700L) { editorUiState.gestureInProgress }
+    azSuppressGuide(settleMs = 700L) {
+        editorUiState.gestureInProgress || editorUiState.adjustmentInProgress
+    }
     // AR's own TargetCreationUi (TargetInstructionCard) is a full-screen capture modal with its
     // own instructions; this reactive guidance overlay is rendered automatically by
     // AzHostActivityLayout and isn't covered by MainActivity's anyModalActive gate (that only

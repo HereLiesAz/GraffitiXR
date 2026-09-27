@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -63,8 +64,8 @@ fun ProjectLibraryScreen(
     onDeleteProject: (String) -> Unit,
     onNewProject: () -> Unit,
     onImportProject: (Uri) -> Unit,
-    onClose: () -> Unit,
     strings: AppStrings,
+    isLoading: Boolean = false,
     // The Library is the app's start destination and has no rail (ConfigureRailItems is gated on
     // !showLibrary, so proj.settings is unreachable from here) — a new user needing a different
     // language or handedness before creating a project had no way to change either. Defaults to a
@@ -97,6 +98,12 @@ fun ProjectLibraryScreen(
     // onDeleteProject call happens solely from the confirm button of the
     // AlertDialog rendered below.
     var pendingDeleteProject by remember { mutableStateOf<GraffitiProject?>(null) }
+
+    // Hoisted once per composition instead of allocated per-item-per-recomposition inside the
+    // LazyColumn below. NOTE: this uses the system locale (Locale.getDefault()), not the app's own
+    // in-app language setting (AppLanguage isn't plumbed into this composable's scope) — a future
+    // pass should thread the current AppLanguage's Locale through here instead.
+    val lastModifiedFormat = remember { SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault()) }
 
     Box(
         modifier = Modifier
@@ -247,8 +254,7 @@ fun ProjectLibraryScreen(
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
-                                                .format(Date(project.lastModified)),
+                                            text = lastModifiedFormat.format(Date(project.lastModified)),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = Color.White.copy(alpha = 0.85f)
                                         )
@@ -300,6 +306,15 @@ fun ProjectLibraryScreen(
                         Text(strings.common.cancel)
                     }
                 }
+            )
+        }
+
+        // Surfaces isLoading (set while loading the library or importing a project) so a large
+        // .gxr import doesn't leave the user staring at an unresponsive screen with no feedback.
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center),
+                color = Color.White
             )
         }
     }

@@ -343,7 +343,7 @@
     <string name="status_scan_surfaces">Сканируйте поверхности вокруг вас.</string>
     <string name="status_tap_surface">Коснитесь поверхности, чтобы разместить якорь.</string>
     <string name="status_looking_grid">Ищем свою сетку...</string>
-    <string name="status_ready">Готовый. </string>
+    <string name="status_ready">Готово. (%1$d точ.)</string>
     <string name="unlock_hint">Громкость: Вверх, Вниз, Вверх, Вниз — быстро — для разблокировки</string>
 
 

@@ -93,7 +93,7 @@ fun AdjustmentsPanel(
 
     if (!isVisible) return
 
-    val bottomPadding = if (isLandscape) 16.dp else (screenHeight * 0.0f)
+    val bottomPadding = if (isLandscape) 16.dp else 0.dp
 
     // Resolve active layer properties
     val activeLayer = state.activeLayer

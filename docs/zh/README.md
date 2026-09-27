@@ -17,9 +17,9 @@ GraffitiXR 是一款为街头艺术家设计的 Android 应用程序。有很多
 然后，还有一套不错的设计工具，用于在将单张图像贴到墙上之前对其进行准备。我可以继续说下去，但我觉得我已经说得够多了。
 
 ## 主要特点
-*   **离线优先：** 应用所做的一切都没有云端依赖——追踪、渲染和设计工作都在本地完成。唯一会离开设备的东西是崩溃报告，而且它是选择性开启的，默认关闭（设置 > 崩溃报告）；详见 [`docs/zh/PRIVACY_POLICY.md`](docs/zh/PRIVACY_POLICY.md)。
+*   **离线优先：** 应用所做的一切都没有云端依赖——追踪、渲染和设计工作都在本地完成。唯一会离开设备的东西是崩溃报告，而且它是选择性开启的，默认关闭（设置 > 崩溃报告）；详见 [`docs/zh/PRIVACY_POLICY.md`](PRIVACY_POLICY.md)。
 *   **指纹重定位（Fingerprint Relocalization）：** 一个 C++17 原生 OpenCV 管道（ORB/SuperPoint 描述符 + PnP/RANSAC），对你在墙上绘制的标记进行指纹识别，并在跟踪丢失后使覆盖层瞬间归位——完全离线，无需预先扫描房间。
-*   **口袋就绪（实验性，默认关闭）：** 存在漂移校正和自我扩展指纹功能（使瞬间归位能在原始参照被涂盖后依然生效），可在设置 > 诊断叠加层中开启，但两者都尚未在真实硬件上得到验证——参见[目的论 SLAM](docs/TELEOLOGICAL_SLAM.md)。
+*   **口袋就绪（实验性，默认关闭）：** 存在漂移校正和自我扩展指纹功能（使瞬间归位能在原始参照被涂盖后依然生效），可在设置 > 诊断叠加层中开启，但两者都尚未在真实硬件上得到验证——参见[目的论 SLAM](../TELEOLOGICAL_SLAM.md)。
 *   **双镜头感知：** 在支持硬件立体深度的设备上自动选用它；其他设备则通过 ARCore 的单目姿态进行追踪，没有独立的深度估计。
 *   **协作模式（Co-op Mode）：** 加密的、通过二维码配对的会话共享，让协作者可以在 AR 中观看主持人的实时画布。目前仅支持主持人 → 访客的单向模式——访客自己的编辑还不会同步回去。
 *   **AzNavRail 界面：** 拇指驱动的单手导航，专为手持喷漆罐的艺术家设计。
@@ -43,18 +43,18 @@ GraffitiXR 是一款为街头艺术家设计的 Android 应用程序。有很多
 *   `:core:design` — 共享的 Compose 设计系统（可复用控件与叠加层）。
 
 ## 许可
-GraffitiXR 是**源代码可用（source-available），并非开源**。该应用、`core:*` 模块，以及 AR / SLAM / 目的论引擎均采用 **PolyForm Noncommercial 1.0.0** 许可（[`/LICENSE`](LICENSE)）；声明的扩展 API 层和资源导入器采用 **MIT** 许可（[`docs/licenses/MIT.txt`](docs/licenses/MIT.txt)）。**编译后的应用可供任何人免费使用，包括接受付费委托的壁画创作**——非商业条款约束的是*源代码*的再利用，而非从事付费工作的壁画师。有关权威的、按路径划分的布局和优先级说明，请参阅 [`docs/LICENSING.md`](docs/LICENSING.md)。捆绑的第三方库（OpenCV、ML Kit 等）保留各自的上游许可证。
+GraffitiXR 是**源代码可用（source-available），并非开源**。该应用、`core:*` 模块，以及 AR / SLAM / 目的论引擎均采用 **PolyForm Noncommercial 1.0.0** 许可（[`/LICENSE`](../../LICENSE)）；声明的扩展 API 层和资源导入器采用 **MIT** 许可（[`docs/licenses/MIT.txt`](../licenses/MIT.txt)）。**编译后的应用可供任何人免费使用，包括接受付费委托的壁画创作**——非商业条款约束的是*源代码*的再利用，而非从事付费工作的壁画师。有关权威的、按路径划分的布局和优先级说明，请参阅 [`docs/LICENSING.md`](../LICENSING.md)。捆绑的第三方库（OpenCV、ML Kit 等）保留各自的上游许可证。
 
 ## 文档
-- [架构概览](docs/ARCHITECTURE.md)
-- [原生引擎详情](docs/NATIVE_ENGINE.md)
-- [SLAM 设置与调整](docs/SLAM_SETUP.md)
-- [目的论 SLAM](docs/TELEOLOGICAL_SLAM.md)
-- [性能指南](docs/performance.md)
-- [测试策略](docs/testing.md)
-- [数据格式](docs/data_formats.md)
-- [贡献指南](docs/contributing.md)
-- [发布与 Google Play 分发](docs/RELEASE.md)
+- [架构概览](../ARCHITECTURE.md)
+- [原生引擎详情](../NATIVE_ENGINE.md)
+- [SLAM 设置与调整](../SLAM_SETUP.md)
+- [目的论 SLAM](../TELEOLOGICAL_SLAM.md)
+- [性能指南](../performance.md)
+- [测试策略](../testing.md)
+- [数据格式](../data_formats.md)
+- [贡献指南](../contributing.md)
+- [发布与 Google Play 分发](../RELEASE.md)
 - [屏幕与模式参考](../en/screens.md)
 
 ---

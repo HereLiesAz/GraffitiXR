@@ -93,6 +93,12 @@ class GyroOrientationBridge(context: Context) : SensorEventListener {
         if (!registered) return
         sensorManager?.unregisterListener(this)
         registered = false
+        // Clear the last sample along with the listener, the same "no data" sentinel (null)
+        // clearReference() already uses. Otherwise a subsequent start() leaves latestQuaternion
+        // holding the stale pre-pause sample, and a caller that reads it (captureReferenceCandidate,
+        // cameraRotationDelta) immediately after start() would bridge from up to ~20ms-old data
+        // (SENSOR_DELAY_GAME) instead of correctly reporting "no sample yet".
+        latestQuaternion = null
     }
 
     override fun onSensorChanged(event: SensorEvent) {
