@@ -1207,6 +1207,21 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetCaptureImage(
     }
 }
 
+JNIEXPORT jfloatArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAutoFitDesign(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return nullptr;
+    float out[5];
+    bool ok = false;
+    try { ok = gSlamEngine->autoFitDesign(out); }
+    catch (const std::exception& e) { LOGE("nativeAutoFitDesign: exception: %s", e.what()); }
+    catch (...) { LOGE("nativeAutoFitDesign: unknown exception"); }
+    if (!ok) return nullptr;
+    jfloatArray arr = env->NewFloatArray(5);
+    if (arr) env->SetFloatArrayRegion(arr, 0, 5, out);
+    return arr;
+}
+
 JNIEXPORT jbyteArray JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportPaintGrid(JNIEnv* env, jobject thiz) {
     std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);

@@ -1028,6 +1028,31 @@ class EditorViewModel @Inject constructor(
     override fun onCycleRotationAxis() = dispatch(EditorIntent.CycleRotationAxis)
 
     /**
+     * Applies an AR auto-fit (the design matched to paint already on the wall) to the AR mode
+     * adjustment, as one undoable step. [dx]/[dy] metres, [dThetaRad] CCW and [scaleRatio] are the
+     * design's move in its CURRENT local frame. The renderer composes T(pan) · Rz(-rotation) · S(scale),
+     * so the offset is rotated into the pan frame and the rotation sign flipped to match.
+     */
+    fun applyArFit(dx: Float, dy: Float, dThetaRad: Float, scaleRatio: Float) {
+        if (!scaleRatio.isFinite() || scaleRatio <= 0f || !dx.isFinite() || !dy.isFinite() || !dThetaRad.isFinite()) return
+        val cur = _uiState.value.modeAdjustments[EditorMode.AR] ?: ModeAdjustment()
+        if (cur.isTransformLocked) return
+        // Snapshot AR explicitly: the fit may land while another mode is on screen.
+        history.pushProperty(currentDesignSnapshot(), EditorMode.AR, cur)
+        updateHistoryCounts()
+        val rendererRad = Math.toRadians(-cur.rotation.toDouble())
+        val c = kotlin.math.cos(rendererRad).toFloat(); val sn = kotlin.math.sin(rendererRad).toFloat()
+        val next = cur.copy(
+            offsetX = cur.offsetX + c * dx - sn * dy,
+            offsetY = cur.offsetY + sn * dx + c * dy,
+            rotation = cur.rotation - Math.toDegrees(dThetaRad.toDouble()).toFloat(),
+            scale = (cur.scale * scaleRatio).coerceIn(0.1f, 10f),
+        )
+        dispatch(EditorIntent.SetModeAdjustment(EditorMode.AR, next))
+        saveProject()
+    }
+
+    /**
      * Cycles the design's blend mode (README: Mockup visualizes blend modes on the wall photo).
      * A design property, like invert: it follows the design into every mode's canvas and export.
      */

@@ -2289,6 +2289,7 @@ class ArViewModel @Inject constructor(
         // anchor, and a late frame re-arming it is the sixth-audit defect in one line.
         if (isDestroying) return
         latestDesignFootprint = design
+        tryAutoFit()
         val live = liveFingerprint ?: return
         val fp = live.fingerprint
         // IMPLEMENTATION.md 4.5 — push the placement on EVERY footprint change, not only when a
@@ -3005,7 +3006,36 @@ class ArViewModel @Inject constructor(
 
     private val artworkRegInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
 
-    fun updatePaintingGuide(bitmap: Bitmap) {
+    /**
+     * Auto-fit result for the editor to apply to the AR mode adjustment: the design's move in its own
+     * current local frame — [dx, dy] metres, [dThetaRad] CCW, [scale] ratio. See SlamManager.autoFitDesign.
+     */
+    data class DesignFit(val dx: Float, val dy: Float, val dThetaRad: Float, val scale: Float)
+
+    private val _designFits = kotlinx.coroutines.flow.MutableSharedFlow<DesignFit>(extraBufferCapacity = 1)
+    val designFits: kotlinx.coroutines.flow.SharedFlow<DesignFit> = _designFits
+
+    // A project restarted in the app but not on the wall: after a NEW target capture or a NEW design,
+    // try once to fit the design to the paint already there. Armed by those two events only, so a
+    // design the artist has placed by hand is never moved out from under them.
+    @Volatile private var autoFitArmed = false
+    @Volatile private var lastGuideKey: String? = null
+
+    private fun tryAutoFit() {
+        if (!autoFitArmed) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val r = slamManager.autoFitDesign() ?: return@launch   // stays armed: retried on the next placement change
+            autoFitArmed = false
+            _designFits.tryEmit(DesignFit(r[0], r[1], r[2], r[3]))
+            Timber.i("Auto-fit applied: ${r[4].toInt()} inliers")
+        }
+    }
+
+    fun updatePaintingGuide(bitmap: Bitmap, designKey: String? = null) {
+        if (designKey != null && designKey != lastGuideKey) {
+            lastGuideKey = designKey
+            autoFitArmed = true
+        }
         // The design composite (design layers only — NO wall texture) is the teleological "base
         // understanding": the registered overlay the clean wall frame is validated against. Re-register
         // it as the artwork base whenever the design changes so painting-progress (and the staged
@@ -3021,6 +3051,7 @@ class ArViewModel @Inject constructor(
             } finally {
                 artworkRegInFlight.set(false)
             }
+            tryAutoFit()
         }
     }
 
@@ -3044,6 +3075,7 @@ class ArViewModel @Inject constructor(
         environment: com.hereliesaz.graffitixr.common.model.CaptureEnvironment =
             com.hereliesaz.graffitixr.common.model.CaptureEnvironment(),
     ) {
+        autoFitArmed = true // a fresh photo of the wall may show paint the new design should fit
         // Doodle demo: a headless capture (no tap, no review) — build the fingerprint from the
         // drawing and return before the normal capture/review flow runs. Clear the capture-request
         // flag ourselves (the normal paths below do this) so the renderer isn't re-armed every frame.

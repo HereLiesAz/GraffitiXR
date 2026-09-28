@@ -1523,6 +1523,7 @@ void MobileGS::clearWallFingerprint() {
     mCaptureRgb.release();
     ++mArtworkGeneration;
     mArtworkImageW = 0;
+    mArtworkGray.release();
     mArtworkImageH = 0;
     // The design's placement belongs to the project that placed it. Left behind, the corroboration
     // match would predict the next project's design features at the previous design's location on
@@ -1876,6 +1877,7 @@ void MobileGS::setArtworkFingerprint(const cv::Mat& composite, const uint8_t* de
         mArtworkKeypoints3D = std::move(pts3d);
         mArtworkKeypoints2D = std::move(keepPts2d);
         mArtworkImageW = gray.cols;
+        mArtworkGray = gray.clone();
         mArtworkImageH = gray.rows;
         // A new design means nothing corroborated so far corroborates THIS one.
         mArtworkCorroborated.assign((size_t)mArtworkDescriptors.rows, 0);
@@ -2260,6 +2262,87 @@ void MobileGS::buildPaintGridLocked(const cv::Mat& composite, const std::vector<
         }
     }
     mGrid = std::move(g);
+}
+
+bool MobileGS::autoFitDesign(float* out5) {
+    cv::Mat photoRgb, designGray; float K[4]; float fpFromDesign[16]; float halfW, halfH;
+    std::vector<cv::Point3f> wall;
+    {
+        std::lock_guard<std::mutex> lock(mMutex);
+        if (mCaptureRgb.empty() || mArtworkGray.empty() || !mHasDesignPlacement ||
+            !(mDesignHalfW > 0) || !(mDesignHalfH > 0) || !(mCaptureIntr[0] > 0) || mWallKeypoints3D.size() < 12)
+            return false;
+        photoRgb = mCaptureRgb.clone(); designGray = mArtworkGray.clone();
+        memcpy(K, mCaptureIntr, sizeof(K)); memcpy(fpFromDesign, mDesignFpFromDesign, sizeof(fpFromDesign));
+        halfW = mDesignHalfW; halfH = mDesignHalfH; wall = mWallKeypoints3D;
+    }
+    // Wall plane in the fingerprint (= capture camera) frame, fit to the marks.
+    cv::Mat data((int)wall.size(), 3, CV_32F);
+    for (int i = 0; i < (int)wall.size(); ++i) {
+        data.at<float>(i, 0) = wall[i].x; data.at<float>(i, 1) = wall[i].y; data.at<float>(i, 2) = wall[i].z;
+    }
+    cv::PCA pca(data, cv::Mat(), cv::PCA::DATA_AS_ROW);
+    cv::Vec3d nrm(pca.eigenvectors.at<float>(2, 0), pca.eigenvectors.at<float>(2, 1), pca.eigenvectors.at<float>(2, 2));
+    const cv::Vec3d cen(pca.mean.at<float>(0, 0), pca.mean.at<float>(0, 1), pca.mean.at<float>(0, 2));
+    if (cv::norm(nrm) < 1e-6) return false;
+    nrm /= cv::norm(nrm);
+    const double pd = nrm.dot(cen);
+    const glm::mat4 designFromFp = glm::inverse(glm::make_mat4(fpFromDesign));
+
+    cv::Mat photoGray; cv::cvtColor(photoRgb, photoGray, cv::COLOR_RGB2GRAY);
+    normalizeForFeatures(photoGray);
+    auto detect = [&](const cv::Mat& g, std::vector<cv::KeyPoint>& k, cv::Mat& d) {
+        if (!(mSuperPoint.isLoaded() && mSuperPoint.detect(g, k, d)) || k.empty())
+            cv::ORB::create(2000)->detectAndCompute(g, cv::noArray(), k, d);
+    };
+    std::vector<cv::KeyPoint> pk; cv::Mat pd_; detect(photoGray, pk, pd_);
+    if (pk.size() < 20) return false;
+
+    const float W = (float)designGray.cols, Hh = (float)designGray.rows;
+    int bestInl = 0; cv::Mat bestM;
+    for (int polarity = 0; polarity < 2; ++polarity) {
+        cv::Mat g = polarity ? (255 - designGray) : designGray;
+        std::vector<cv::KeyPoint> dk; cv::Mat dd; detect(g, dk, dd);
+        if (dk.size() < 20 || dd.type() != pd_.type() || dd.cols != pd_.cols) continue;
+        cv::Ptr<cv::DescriptorMatcher> m = dd.type() == CV_32F
+            ? cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE)
+            : cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
+        std::vector<std::vector<cv::DMatch>> km; m->knnMatch(dd, pd_, km, 2);
+        std::vector<cv::Point2f> src, dst;
+        for (auto& mm : km) {
+            if (mm.size() < 2 || !(mm[0].distance < 0.8f * mm[1].distance)) continue;
+            // Design pixel -> design-local metres at the CURRENT extents.
+            const cv::Point2f dp = dk[mm[0].queryIdx].pt;
+            const cv::Point2f lp(halfW * (2.0f * dp.x / W - 1.0f), halfH * (1.0f - 2.0f * dp.y / Hh));
+            // Photo pixel -> ray from the capture camera -> wall plane -> current design-local frame.
+            const cv::Point2f pp = pk[mm[0].trainIdx].pt;
+            const cv::Vec3d dir((pp.x - K[2]) / K[0], (pp.y - K[3]) / K[1], 1.0);
+            const double den = nrm.dot(dir);
+            if (std::abs(den) < 1e-6) continue;
+            const double lam = pd / den;
+            if (!(lam > 0)) continue;
+            const glm::vec4 X = designFromFp * glm::vec4((float)(lam * dir[0]), (float)(lam * dir[1]), (float)(lam * dir[2]), 1.0f);
+            src.push_back(lp); dst.emplace_back(X.x, X.y);
+        }
+        if (src.size() < 12) continue;
+        std::vector<uchar> inl;
+        cv::Mat M = cv::estimateAffinePartial2D(src, dst, inl, cv::RANSAC, 0.03, 2000, 0.995);
+        const int n = M.empty() ? 0 : cv::countNonZero(inl);
+        // Confidence: enough agreeing matches, and a fair share of those that survived the ratio test.
+        if (n >= 15 && n * 4 >= (int)src.size() && n > bestInl) { bestInl = n; bestM = M; }
+    }
+    if (bestM.empty()) return false;
+    const double a = bestM.at<double>(0, 0), b = bestM.at<double>(1, 0);
+    const double k = std::sqrt(a * a + b * b);
+    if (!(k > 0.05 && k < 20.0)) return false;
+    out5[0] = (float)bestM.at<double>(0, 2);
+    out5[1] = (float)bestM.at<double>(1, 2);
+    out5[2] = (float)std::atan2(b, a);
+    out5[3] = (float)k;
+    out5[4] = (float)bestInl;
+    LOGI("autoFitDesign: %d inliers, t=(%.3f,%.3f) m, rot=%.1f deg, scale x%.3f",
+         bestInl, out5[0], out5[1], out5[2] * 57.2958f, out5[3]);
+    return true;
 }
 
 void MobileGS::setCaptureImage(const cv::Mat& img, const float* intr4) {

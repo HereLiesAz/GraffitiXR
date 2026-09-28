@@ -452,6 +452,13 @@ class SlamManager @Inject constructor(
      */
     fun setCaptureImage(bitmap: Bitmap, intrinsics: FloatArray) = nativeSetCaptureImage(bitmap, intrinsics)
 
+    /**
+     * Fit the registered design to paint already on the wall, from the capture photo. Returns
+     * [dx, dy (m), dTheta (rad, CCW), scale ratio, inliers] in the current design's local frame, or
+     * null when there is no confident fit. Blocking (feature detection); call off the main thread.
+     */
+    fun autoFitDesign(): FloatArray? = nativeAutoFitDesign()
+
     /** Opaque per-project progress state (painted cells + learned paint colours), or null. */
     fun exportPaintGrid(): ByteArray? = nativeExportPaintGrid()
 
@@ -854,6 +861,7 @@ class SlamManager @Inject constructor(
     private external fun nativeGetPaintMarkCount(): Int
     private external fun nativeSetCaptureImage(bitmap: Bitmap, intrinsics: FloatArray)
     private external fun nativeExportPaintGrid(): ByteArray?
+    private external fun nativeAutoFitDesign(): FloatArray?
     private external fun nativeRestorePaintGrid(state: ByteArray)
     private external fun nativeGetFeatureProgress(): Float
     private external fun nativeRestoreWallFeatureMap(

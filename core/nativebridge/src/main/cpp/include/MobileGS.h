@@ -676,7 +676,16 @@ private:
     cv::Mat mCaptureRgb;                           // capture photo (fingerprint frame = its camera)
     float mCaptureIntr[4] = {0,0,0,0};
     std::vector<uint8_t> mPendingGridRestore;      // applied when a grid of matching shape is built
+    cv::Mat mArtworkGray;                          // normalised design composite, for autoFitDesign
 public:
+    /**
+     * Fit the registered design to paint already on the wall (a project restarted in the app but not
+     * on the wall). Matches the design against the capture photo (in both polarities, since paint
+     * rarely keeps the design's colours), back-projects the photo side onto the wall plane, and solves
+     * a RANSAC similarity in the CURRENT design's local frame. out5 = {dx, dy (m), dTheta (rad, CCW
+     * in the design plane), scale ratio, inliers}. Returns false when there is no confident fit.
+     */
+    bool autoFitDesign(float* out5);
     void setCaptureImage(const cv::Mat& rgb, const float* intr4);
     std::vector<uint8_t> exportPaintGrid() const;
     void restorePaintGrid(const std::vector<uint8_t>& blob);
