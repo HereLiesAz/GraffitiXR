@@ -226,6 +226,12 @@ object MetricFingerprintBuilder {
         anchorModel: FloatArray,
         rotationDeg: Int,
         minPoints: Int = 20,
+        /**
+         * The artist's selected marks region, same orientation as [bitmap] (scaled if its size
+         * differs). A feature is kept only where the mask's alpha is non-zero — the same rule native
+         * `getFingerprintKeypoints` / `generateFingerprint` apply to an ARGB mask. Null keeps all.
+         */
+        mask: Bitmap? = null,
     ): Fingerprint? {
         lastDetected = 0; lastPlaced = 0; lastRequired = minPoints
         // Convention B: the bitmap and intrinsics arrived in display orientation, so the view goes
@@ -240,8 +246,13 @@ object MetricFingerprintBuilder {
                 val pixels = ArrayList<PlaneMarks.Pixel>(pos.size / 2)
                 var i = 0
                 while (i + 1 < pos.size) { pixels.add(PlaneMarks.Pixel(pos[i], pos[i + 1])); i += 2 }
-                val fp = ingestSingle(slam, descs, pixels, cvView, intr,
-                    planePointWorld, planeNormalWorld, anchorModel, minPoints, glView, rotationDeg)
+                val (mPixels, mDescs) = applyMask(mask, bitmap, pixels, descs)
+                val fp = try {
+                    ingestSingle(slam, mDescs, mPixels, cvView, intr,
+                        planePointWorld, planeNormalWorld, anchorModel, minPoints, glView, rotationDeg)
+                } finally {
+                    if (mDescs !== descs) mDescs.release()
+                }
                 if (fp != null) return fp
             } finally {
                 descs.release()
@@ -264,11 +275,37 @@ object MetricFingerprintBuilder {
                 return null
             }
             val pixels = kp.toArray().map { PlaneMarks.Pixel(it.pt.x.toFloat(), it.pt.y.toFloat()) }
-            return ingestSingle(slam, d, pixels, cvView, intr,
-                planePointWorld, planeNormalWorld, anchorModel, minPoints, glView, rotationDeg)
+            val (mPixels, mDescs) = applyMask(mask, bitmap, pixels, d)
+            try {
+                return ingestSingle(slam, mDescs, mPixels, cvView, intr,
+                    planePointWorld, planeNormalWorld, anchorModel, minPoints, glView, rotationDeg)
+            } finally {
+                if (mDescs !== d) mDescs.release()
+            }
         } finally {
             gray.release(); norm.release(); kp.release(); d.release()
         }
+    }
+
+    /**
+     * Keep only the features inside [mask] (alpha > 0). Returns the inputs unchanged when there is no
+     * mask or every feature is inside it; otherwise a new descriptor Mat the caller must release.
+     */
+    private fun applyMask(
+        mask: Bitmap?, bitmap: Bitmap, pixels: List<PlaneMarks.Pixel>, descs: Mat,
+    ): Pair<List<PlaneMarks.Pixel>, Mat> {
+        if (mask == null || pixels.isEmpty() || bitmap.width <= 0 || bitmap.height <= 0) return pixels to descs
+        val sx = mask.width.toFloat() / bitmap.width
+        val sy = mask.height.toFloat() / bitmap.height
+        val keep = pixels.indices.filter { i ->
+            val mx = (pixels[i].u * sx).toInt().coerceIn(0, mask.width - 1)
+            val my = (pixels[i].v * sy).toInt().coerceIn(0, mask.height - 1)
+            android.graphics.Color.alpha(mask.getPixel(mx, my)) > 0
+        }
+        if (keep.size == pixels.size) return pixels to descs
+        val out = Mat(keep.size, descs.cols(), descs.type())
+        for ((dst, src) in keep.withIndex()) descs.row(src).copyTo(out.row(dst))
+        return keep.map { pixels[it] } to out
     }
 
     /** Back-project the detected pixels onto the plane, keep the descriptors that hit, ingest. */
