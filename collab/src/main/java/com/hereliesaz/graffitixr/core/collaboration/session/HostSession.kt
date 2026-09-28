@@ -300,6 +300,18 @@ internal class HostSession(
             )
             socket.close(); return
         }
+        // Replay guard. The proof binds only the guest's nonce, so a HELLO sniffed on the LAN
+        // verifies again when resent — and would take the single guest slot, locking the real guest
+        // out until the read timeout. Guests draw a fresh nonce per connection, so a repeat is a
+        // replay. Recorded only after the proof checks out, so unauthenticated traffic can't fill it.
+        if (!rememberGuestNonce(hello.guestNonce)) {
+            writeFrameTimed(
+                output,
+                FrameType.HELLO_REJECTED,
+                OpCodec.encode(HelloRejectedPayload(HelloRejectedPayload.RejectReason.BadToken)),
+            )
+            socket.close(); return
+        }
         if (hello.clientVersion != protocolVersion) {
             writeFrameTimed(
                 output,
@@ -387,6 +399,17 @@ internal class HostSession(
                 launch { heartbeatLoop(output, crypto) }
             }
         }
+    }
+
+    /** Guest nonces already accepted this session (bounded, oldest evicted). */
+    private val seenGuestNonces = object : LinkedHashMap<String, Unit>(64, 0.75f, false) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Unit>?) = size > 1024
+    }
+
+    /** False if [nonce] was already used in this session, i.e. the HELLO is a replay. */
+    private fun rememberGuestNonce(nonce: ByteArray): Boolean = synchronized(seenGuestNonces) {
+        val key = java.util.Base64.getEncoder().encodeToString(nonce)
+        if (seenGuestNonces.containsKey(key)) false else { seenGuestNonces[key] = Unit; true }
     }
 
     private fun randomNonce(): ByteArray = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
