@@ -1429,6 +1429,7 @@ class MainActivity : ComponentActivity() {
                                     // created when the fingerprint was right there.
                                     fingerprintPoints = arUiState.wallFingerprintPoints,
                                     paintingProgress = arUiState.paintingProgress,
+                                    featureProgress = arUiState.featureProgress,
                                     captureCount = diagnosticCaptures,
                                     onShareReport = { shareDiagnosticBundle() },
                                     fusionEnabled = evalFusionOn,
@@ -2531,6 +2532,7 @@ private fun RelocDiagnosticsOverlay(
     fusion: com.hereliesaz.graffitixr.common.model.FusionDiagnostics,
     fingerprintPoints: Int,
     paintingProgress: Float,
+    featureProgress: Float = -1f,
     onShareReport: () -> Unit,
     captureCount: Int,
     // The two experiment switches, moved here from the debug-only eval panel.
@@ -2784,6 +2786,13 @@ private fun RelocDiagnosticsOverlay(
         // (since fixed: the badge's string now reads "painted") — caught by review before merge. "Painted" wasn't wrong about WHAT this is, only imprecise about how
         // literally to take it (it's realized-descriptor coverage, not a physical paint sensor).
         DiagnosticRow("Progress", "${(paintingProgress * 100).toInt()}%", androidx.compose.ui.graphics.Color.White)
+        // Area progress above; the feature count (distinctive design features confirmed) is the
+        // detail channel that feeds it.
+        DiagnosticRow(
+            "Detail",
+            if (featureProgress < 0f) "—" else "${(featureProgress * 100).toInt()}%",
+            androidx.compose.ui.graphics.Color.White,
+        )
 
         // Drift correction. Off means the overlay rides the raw ARCore anchor and will drift as
         // tracking does; on means each accepted relocalization pulls it back. The `Fusion` row above
