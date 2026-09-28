@@ -136,9 +136,6 @@
 
     <string name="nav_export">导出</string>
 
-
-    <string name="nav_share_wall">分享墙面</string>
-
     <string name="nav_export_info">将所有可见图层合并后导出为一张平面图像到您的照片库。</string>
 
 

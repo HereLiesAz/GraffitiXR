@@ -133,7 +133,6 @@
 
     <!-- Action label to export the final image. -->
     <string name="nav_export">Eksport</string>
-    <string name="nav_share_wall">Del vegg</string>
     <!-- Description of the Export action, explaining it merges layers into one image. -->
     <string name="nav_export_info">Eksporter et flatt sammenslått bilde av alle synlige lag til fotogalleriet ditt.</string>
 

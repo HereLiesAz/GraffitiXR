@@ -133,7 +133,6 @@
 
     <!-- Action label to export the final image. -->
     <string name="nav_export">Exportar</string>
-    <string name="nav_share_wall">Partilhar parede</string>
     <!-- Description of the Export action, explaining it merges layers into one image. -->
     <string name="nav_export_info">Exporte uma imagem mesclada e plana de todas as camadas visíveis para sua galeria de fotos.</string>
 

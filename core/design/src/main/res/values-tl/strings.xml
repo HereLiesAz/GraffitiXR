@@ -50,7 +50,6 @@
     <string name="nav_load">Magkarga</string>
     <string name="nav_load_info">Buksan ang library ng proyekto upang mag-load ng isang naunang na-save na proyekto.</string>
     <string name="nav_export">I-export</string>
-    <string name="nav_share_wall">Ibahagi ang pader</string>
     <string name="nav_export_info">Mag-export ng flat merged na imahe ng lahat ng nakikitang layer sa iyong photo gallery.</string>
     <string name="nav_help">Tulong</string>
     <string name="nav_help_info">I-tap ang anumang button habang aktibo ang Help para makita kung ano ang ginagawa nito.</string>

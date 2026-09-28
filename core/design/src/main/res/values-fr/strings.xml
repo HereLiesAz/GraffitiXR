@@ -160,7 +160,6 @@
     <string name="nav_load">Charger</string>
     <string name="nav_load_info">Ouvrir la bibliothèque de projets pour charger un projet précédemment sauvegardé.</string>
     <string name="nav_export">Exporter</string>
-    <string name="nav_share_wall">Partager le mur</string>
     <string name="nav_export_info">Exporter une image aplatie de tous les calques visibles vers votre galerie de photos.</string>
     <string name="nav_help">Aide</string>
     <string name="nav_help_info">Appuyez sur n\'importe quel bouton pendant que l\'Aide est active pour voir ce qu\'il fait.</string>

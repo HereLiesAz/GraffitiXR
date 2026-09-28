@@ -153,7 +153,6 @@
 
     <!-- Action label to export the final image. -->
     <string name="nav_export">Export</string>
-    <string name="nav_share_wall">Share wall</string>
     <!-- Description of the Export action, explaining it merges layers into one image. -->
     <string name="nav_export_info">Export a flat merged image of all visible layers to your photo gallery.</string>
 

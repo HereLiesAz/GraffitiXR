@@ -428,18 +428,6 @@ class MainActivity : ComponentActivity() {
 
 
                 val editorUiState by editorViewModel.uiState.collectAsState()
-                // Share Wall: EditorViewModel.shareProject() writes the .gxr and publishes a content URI;
-                // hand it to the system share sheet once, then clear it.
-                LaunchedEffect(editorUiState.shareProjectUri) {
-                    val uri = editorUiState.shareProjectUri ?: return@LaunchedEffect
-                    val send = Intent(Intent.ACTION_SEND).apply {
-                        type = "application/octet-stream"
-                        putExtra(Intent.EXTRA_STREAM, uri)
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                    startActivity(Intent.createChooser(send, null))
-                    editorViewModel.onShareProjectUriConsumed()
-                }
                 val railExpansion by editorViewModel.railExpansion.collectAsState()
                 val mainUiState by mainViewModel.uiState.collectAsState()
                 val arUiState by arViewModel.uiState.collectAsState()
@@ -2149,7 +2137,6 @@ class MainActivity : ComponentActivity() {
                 // asynchronous captures). This handler just tells the caller "user pressed Export".
                 onExportRequested()
             })
-            azRailSubItem(id = "proj.share", hostId = "host.project", text = navStrings.shareWall, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { editorViewModel.shareProject() })
             azRailSubItem(id = "proj.load", hostId = "host.project", text = navStrings.load, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { navController.navigate(LIBRARY_ROUTE) { launchSingleTop = true } })
             azRailSubItem(id = "proj.settings", hostId = "host.project", text = navStrings.settings, color = navItemColor, shape = AzButtonShape.NONE, disabled = showLibrary, onClick = { showSettings = true })
 

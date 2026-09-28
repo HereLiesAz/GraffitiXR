@@ -61,7 +61,6 @@ fun rememberNavStrings(): NavStrings {
         loadInfo = stringResource(R.string.nav_load_info),
         export = stringResource(R.string.nav_export),
         exportInfo = stringResource(R.string.nav_export_info),
-        shareWall = stringResource(R.string.nav_share_wall),
         help = stringResource(R.string.nav_help),
         helpInfo = stringResource(R.string.nav_help_info),
         light = stringResource(R.string.nav_light),
@@ -144,8 +143,6 @@ data class NavStrings(
     val loadInfo: String,
     val export: String,
     val exportInfo: String,
-    /** Shares the project as a .gxr (design + wall fingerprint) so another device can relocalize. */
-    val shareWall: String,
     val help: String,
     val helpInfo: String,
     val light: String,

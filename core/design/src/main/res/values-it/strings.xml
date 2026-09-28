@@ -133,7 +133,6 @@
 
     <!-- Action label to export the final image. -->
     <string name="nav_export">Esporta</string>
-    <string name="nav_share_wall">Condividi muro</string>
     <!-- Description of the Export action, explaining it merges layers into one image. -->
     <string name="nav_export_info">Esporta un\'immagine piatta unita di tutti i livelli visibili nella tua galleria fotografica.</string>
 
