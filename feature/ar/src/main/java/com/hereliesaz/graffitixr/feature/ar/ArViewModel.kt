@@ -339,7 +339,16 @@ class ArViewModel @Inject constructor(
                     localDeviceName = android.os.Build.MODEL,
                     onBulkReceived = { fingerprint, project ->
                         slamManager.alignToPeer(fingerprint)
-                        projectManager.loadAsSpectator(project)
+                        // A failed load used to be logged and nothing else: the guest showed
+                        // Connected with no project. Say so and end the session instead.
+                        if (!projectManager.loadAsSpectator(project)) {
+                            _feedback.tryEmit(
+                                com.hereliesaz.graffitixr.common.model.FeedbackEvent.Error(
+                                    "Couldn't load the host's project — the session was ended.", null
+                                )
+                            )
+                            leaveSession()
+                        }
                     },
                     onOp = { op -> dispatchSpectatorOp(op) },
                 )

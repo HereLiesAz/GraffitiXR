@@ -196,7 +196,25 @@ class ProjectManagerTest {
                 ),
             )
             assertFalse(evilTarget.exists())
-            assertTrue(File(tempFilesDir, "projects/spec_safe/layer.png").exists())
+            assertTrue(File(tempFilesDir, "projects/coop_spec_safe/layer.png").exists())
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `loadAsSpectator never overwrites a local project with the host's id`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        try {
+            val local = File(tempFilesDir, "projects/shared_wall").also { it.mkdirs() }
+            File(local, "layer.png").writeBytes(byteArrayOf(1))
+            val ok = manager.loadAsSpectator(
+                zipOf("project.json" to projectJson("shared_wall"), "layer.png" to byteArrayOf(9)),
+            )
+            assertTrue(ok)
+            assertTrue(File(local, "layer.png").readBytes().contentEquals(byteArrayOf(1)))
+            assertTrue(File(tempFilesDir, "projects/coop_shared_wall/layer.png").exists())
         } finally {
             Dispatchers.resetMain()
         }

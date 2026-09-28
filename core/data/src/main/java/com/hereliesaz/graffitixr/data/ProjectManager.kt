@@ -55,6 +55,7 @@ class ProjectManager @Inject constructor(
     }
 
     companion object {
+        private const val SPECTATOR_PREFIX = "coop_"
         /**
          * Cap on total decompressed bytes accepted from an imported/peer-received `.gxr` archive.
          * Both sources are untrusted (a shared file, or the co-op wire), so a zip bomb must not
@@ -594,8 +595,18 @@ class ProjectManager @Inject constructor(
      * cumulative decompressed size is capped at [MAX_IMPORT_BYTES], and temp files are always cleaned
      * up (duplicate-collision path and the exception path both included).
      */
-    suspend fun loadAsSpectator(bytes: ByteArray) = withContext(Dispatchers.IO) {
-        if (bytes.isEmpty()) return@withContext
+    /**
+     * Installs the host's project archive as this guest's current project. Returns true only when
+     * the project was created; false (never a throw) on any rejection or failure, so the caller can
+     * tell the guest instead of showing a connected session with nothing loaded.
+     *
+     * The copy lives under [spectatorId], never the host's id: a guest who imported the host's .gxr
+     * and edited it locally holds a project with that same id, and joining the session must not
+     * overwrite their work. Repeated bulks (reconnects) replace the spectator copy, as they should.
+     */
+    suspend fun loadAsSpectator(bytes: ByteArray): Boolean = withContext(Dispatchers.IO) {
+        if (bytes.isEmpty()) return@withContext false
+        var loaded = false
 
         val extractedFiles = mutableMapOf<String, File>()
         try {
@@ -631,7 +642,8 @@ class ProjectManager @Inject constructor(
                     Log.e("ProjectManager", "Spectator load rejected: unsafe project id")
                     return@use
                 }
-                val destDir = File(appContext.filesDir, "projects/${project.id}").also { it.mkdirs() }
+                val localId = spectatorId(project.id)
+                val destDir = File(appContext.filesDir, "projects/$localId").also { it.mkdirs() }
 
                 for ((name, tmpFile) in extractedFiles) {
                     val dest = resolveInside(destDir, name)
@@ -648,9 +660,12 @@ class ProjectManager @Inject constructor(
                     }
                 }
 
+                // Relocate against the HOST's id (the archive's paths carry it), then re-key.
+                val relocated = relocateProjectFiles(project, destDir).copy(id = localId)
                 withContext(Dispatchers.Main) {
-                    projectRepositoryProvider.get().createProject(relocateProjectFiles(project, destDir))
+                    projectRepositoryProvider.get().createProject(relocated)
                 }
+                loaded = true
             }
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
@@ -659,7 +674,12 @@ class ProjectManager @Inject constructor(
             // Temp files are only renamed away on the success path; clear any stragglers.
             extractedFiles.values.forEach { if (it.exists()) it.delete() }
         }
+        loaded
     }
+
+    /** Local id for a spectated host project; distinct from the host id so it never collides. */
+    internal fun spectatorId(hostId: String): String =
+        if (hostId.startsWith(SPECTATOR_PREFIX)) hostId else SPECTATOR_PREFIX + hostId
 
     // --- End co-op implementation ---
 
