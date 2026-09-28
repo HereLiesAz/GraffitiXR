@@ -164,6 +164,15 @@ class PoseFusion {
         )
 
         /** Smoothed interpolation between two rigid poses (translation lerp + quaternion nlerp). */
+        /**
+         * The view matrix of the frame a reloc result was solved on (`reloc[19..34]`), or null for a
+         * legacy 19-float result or the no-engine sentinel. A rigid view's last element is exactly 1.
+         * Composing with this rather than the render frame's view keeps hand motion during the
+         * reloc latency (hundreds of ms) out of the correction.
+         */
+        fun solveViewOf(reloc: FloatArray): FloatArray? =
+            if (reloc.size >= 35 && reloc[34] == 1f) reloc.copyOfRange(19, 35) else null
+
         fun blend(current: FloatArray, target: FloatArray, alpha: Float): FloatArray {
             val t = PoseMath.lerp(PoseMath.translationOf(current), PoseMath.translationOf(target), alpha)
             val q = PoseMath.nlerpQuat(PoseMath.matrixToQuaternion(current), PoseMath.matrixToQuaternion(target), alpha)
@@ -221,7 +230,7 @@ class PoseFusion {
         if (isNew && inlierRatio < MIN_INLIER_RATIO) snapsRejected++
 
         if (isNew && inlierRatio >= MIN_INLIER_RATIO) {
-            val corrected = composeCorrected(vCurrent, reloc.copyOf(16), captureAnchorCam)
+            val corrected = composeCorrected(solveViewOf(reloc) ?: vCurrent, reloc.copyOf(16), captureAnchorCam)
             // Anchor-local correction such that backbone ∘ L == corrected at snap time. This relative
             // transform is frame-invariant under ARCore's global world-coordinate rewrites.
             val newLocal = PoseMath.multiply(PoseMath.rigidInverse(backbone), corrected)

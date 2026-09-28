@@ -1448,9 +1448,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocResult(JNI
         LOGE("nativeGetRelocResult: out array too short (need 19)");
         return;
     }
-    float buf[19];
-    gSlamEngine->getRelocResult(buf);
-    env->SetFloatArrayRegion(out, 0, 19, buf);
+    // 35 slots also carry the solve-frame view matrix at [19..34]; 19 keeps the legacy layout.
+    const jsize n = env->GetArrayLength(out) >= 35 ? 35 : 19;
+    float buf[35];
+    gSlamEngine->getRelocResult(buf, n == 35);
+    env->SetFloatArrayRegion(out, 0, n, buf);
 }
 
 extern "C" JNIEXPORT void JNICALL

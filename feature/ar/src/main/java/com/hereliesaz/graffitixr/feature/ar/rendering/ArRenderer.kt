@@ -585,8 +585,7 @@ class ArRenderer(
     // demo. So the mural never came back to the wall. When a saved capture pose exists and no anchor
     // does, two consecutive high-confidence reloc solves that agree (PoseFusion.diverged == false) are
     // taken as the wall's pose and handed to the normal establishment path via [pendingRelocAnchor].
-    // Requiring agreement filters the worst of the reloc latency (the solve is composed with this
-    // frame's view, not the solve frame's), which a single solve under hand motion would bake in.
+    // Requiring agreement guards against a single bad solve.
     private var relocAnchorCandidate: FloatArray? = null
     private var relocAnchorLastSeq = 0f
     @Volatile private var pendingRelocAnchor: FloatArray? = null
@@ -1332,8 +1331,8 @@ class ArRenderer(
                         if (ratio >= com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion.COLD_SNAP_INLIER_RATIO &&
                             inliers >= com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion.COLD_SNAP_MIN_INLIERS
                         ) {
-                            val v = FloatArray(16)
-                            frame.camera.getViewMatrix(v, 0)
+                            val v = com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion.solveViewOf(r)
+                                ?: FloatArray(16).also { frame.camera.getViewMatrix(it, 0) }
                             val pose = com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion
                                 .composeCorrected(v, r.copyOf(16), cac)
                             val prev = relocAnchorCandidate

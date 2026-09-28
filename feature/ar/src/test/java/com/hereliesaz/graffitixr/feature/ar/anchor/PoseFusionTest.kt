@@ -504,4 +504,26 @@ class PoseFusionTest {
             reloc(trans(10.05f,0f,0f), inliers = 90f, matches = 100f, seq = 2f), captureAtOrigin(), confGlobal = 1f)
         assertTrue("expected smoothed move, got ${out[12]}", out[12] > 10f && out[12] < 10.05f)
     }
+
+    /**
+     * Reloc runs hundreds of ms behind the render thread. A 35-float result carries the view of the
+     * frame the PnP was solved on; the correction must be composed with THAT view, so a camera that
+     * moved since the solve (vCurrent != solve view) does not shift the snapped anchor.
+     */
+    @Test fun `composes with the solve-frame view, not the current view`() {
+        val withView = FloatArray(35).also {
+            System.arraycopy(trans(10f,0f,0f), 0, it, 0, 16)
+            it[16] = 90f; it[17] = 100f; it[18] = 1f
+            System.arraycopy(identity(), 0, it, 19, 16)
+        }
+        val moved = PoseFusion().currentAnchor(trans(0f,0f,0f), trans(5f,0f,0f), withView, captureAtOrigin(), confGlobal = 1f)
+        val still = PoseFusion().currentAnchor(trans(0f,0f,0f), identity(),
+            reloc(trans(10f,0f,0f), inliers = 90f, matches = 100f, seq = 1f), captureAtOrigin(), confGlobal = 1f)
+        for (k in 12..14) assertEquals("translation $k", still[k], moved[k], 1e-4f)
+    }
+
+    @Test fun `solveViewOf rejects legacy and sentinel payloads`() {
+        assertEquals(null, PoseFusion.solveViewOf(FloatArray(19)))
+        assertEquals(null, PoseFusion.solveViewOf(FloatArray(35) { -1f }))
+    }
 }

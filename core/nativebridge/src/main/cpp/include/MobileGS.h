@@ -410,7 +410,9 @@ public:
      */
     bool relocWantsFrame();
     void getAnchorTransform(float* outMat16) const;
-    void getRelocResult(float* out19) const;       // [0..15]=pnpMat,16=inliers,17=matches,18=seq
+    // [0..15]=pnpMat,16=inliers,17=matches,18=seq; with withSolveView, [19..34]=the GL view matrix
+    // of the frame the PnP was solved on (published atomically with pnpMat under mMutex).
+    void getRelocResult(float* out, bool withSolveView) const;
     void getFingerprintAnchor(float* out16) const;
     void setArtworkFingerprint(const cv::Mat& composite, const uint8_t* depthData, int depthW, int depthH, int depthStride, const float* intrinsics4, const float* viewMat16);
     // Detect the same features generateFingerprint would (SuperPoint/ORB-1000, masked) and return their
@@ -649,6 +651,10 @@ private:
 
     // --- Pose fusion (Sub-project B): reloc result published for Kotlin to compose correctly ---
     float mPnpCamFromFpWorld[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    // View matrix of the frame mPnpCamFromFpWorld was solved on. Reloc runs hundreds of ms behind
+    // the render thread; composing the PnP with a later frame's view bakes camera motion into the
+    // correction, so consumers compose with this instead.
+    float mPnpSolveView[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
     std::atomic<int> mPnpInlierCount{0};
     std::atomic<int> mPnpMatchCount{0};
     std::atomic<long> mPnpResultSeq{0};

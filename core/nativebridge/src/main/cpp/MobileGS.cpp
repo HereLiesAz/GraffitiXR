@@ -608,8 +608,10 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
 
                 // PnP gives T_camera_from_fingerprintWorld (a view matrix). DO NOT write it to
                 // mAnchorMatrix (a world-space MODEL matrix) — that caused overlay teleport.
-                // Publish the raw result; Kotlin composes inverse(V_current)*pnp*fpAnchor with the
-                // FRESH view matrix (see PoseFusion).
+                // Publish the raw result together with the view of the frame it was solved on;
+                // Kotlin composes inverse(V_solve)*pnp*captureAnchorCam (see PoseFusion). Composing
+                // with the render frame's fresh view instead baked hand motion during the reloc
+                // latency into the correction.
                 glm::mat4 pnpMat = glm::mat4(1.0f);
                 for(int i=0; i<3; ++i) {
                     for(int j=0; j<3; ++j) pnpMat[j][i] = (float)R.at<double>(i,j);
@@ -618,6 +620,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
                 {
                     std::lock_guard<std::mutex> lock(mMutex);
                     memcpy(mPnpCamFromFpWorld, glm::value_ptr(pnpMat), 16 * sizeof(float));
+                    memcpy(mPnpSolveView, relocView, 16 * sizeof(float));
                 }
                 mPnpInlierCount.store((int)inliers.size(), std::memory_order_relaxed);
                 mPnpMatchCount.store((int)imgPts.size(), std::memory_order_relaxed);
@@ -2045,12 +2048,13 @@ void MobileGS::setStageEnabled(int stage, bool enabled) {
          stage, enabled ? 1 : 0);
 }
 
-void MobileGS::getRelocResult(float* out19) const {
+void MobileGS::getRelocResult(float* out, bool withSolveView) const {
     std::lock_guard<std::mutex> lock(mMutex);
-    memcpy(out19, mPnpCamFromFpWorld, 16 * sizeof(float));
-    out19[16] = (float) mPnpInlierCount.load(std::memory_order_relaxed);
-    out19[17] = (float) mPnpMatchCount.load(std::memory_order_relaxed);
-    out19[18] = (float) mPnpResultSeq.load(std::memory_order_relaxed);
+    memcpy(out, mPnpCamFromFpWorld, 16 * sizeof(float));
+    out[16] = (float) mPnpInlierCount.load(std::memory_order_relaxed);
+    out[17] = (float) mPnpMatchCount.load(std::memory_order_relaxed);
+    out[18] = (float) mPnpResultSeq.load(std::memory_order_relaxed);
+    if (withSolveView) memcpy(out + 19, mPnpSolveView, 16 * sizeof(float));
 }
 void MobileGS::getFingerprintAnchor(float* out16) const {
     std::lock_guard<std::mutex> lock(mMutex);
