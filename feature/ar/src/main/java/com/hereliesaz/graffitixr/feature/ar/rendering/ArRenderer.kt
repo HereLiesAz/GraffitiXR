@@ -579,6 +579,17 @@ class ArRenderer(
     @Volatile var isCapturingTarget: Boolean = false
     @Volatile var isInPlaneRealignment: Boolean = false
     @Volatile var pendingAnchorEstablishment: Boolean = false
+    // Return-visit anchoring. A reopened project (or a co-op guest) restores its fingerprint and the
+    // native reloc thread solves PnP against it, but nothing used to turn that solve into an anchor:
+    // the only anchor sources were a fresh capture (which overwrites the saved target) and the doodle
+    // demo. So the mural never came back to the wall. When a saved capture pose exists and no anchor
+    // does, two consecutive high-confidence reloc solves that agree (PoseFusion.diverged == false) are
+    // taken as the wall's pose and handed to the normal establishment path via [pendingRelocAnchor].
+    // Requiring agreement filters the worst of the reloc latency (the solve is composed with this
+    // frame's view, not the solve frame's), which a single solve under hand motion would bake in.
+    private var relocAnchorCandidate: FloatArray? = null
+    private var relocAnchorLastSeq = 0f
+    @Volatile private var pendingRelocAnchor: FloatArray? = null
     // World-space surface normal captured at anchor establishment, always oriented to point toward the
     // camera/user. The artwork is ALWAYS laid flat against the selected surface and facing the user by
     // rebuilding the overlay base frame each draw so its local +Z = this normal (see overlayDraw),
@@ -1307,8 +1318,47 @@ class ArRenderer(
                 doodleAutoAnchorRequested = true
                 pendingAnchorEstablishment = true
             }
+            if (!anchorEstablished && !pendingAnchorEstablishment && !isCapturingTarget &&
+                frame.camera.trackingState == TrackingState.TRACKING
+            ) {
+                val cac = slamManager.captureAnchorCam
+                if (cac != null) {
+                    val r = slamManager.getRelocResult()
+                    val seq = r[18]
+                    if (seq > 0f && seq != relocAnchorLastSeq) {
+                        relocAnchorLastSeq = seq
+                        val inliers = r[16]
+                        val ratio = if (r[17] > 0f) inliers / r[17] else 0f
+                        if (ratio >= com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion.COLD_SNAP_INLIER_RATIO &&
+                            inliers >= com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion.COLD_SNAP_MIN_INLIERS
+                        ) {
+                            val v = FloatArray(16)
+                            frame.camera.getViewMatrix(v, 0)
+                            val pose = com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion
+                                .composeCorrected(v, r.copyOf(16), cac)
+                            val prev = relocAnchorCandidate
+                            if (prev != null &&
+                                !com.hereliesaz.graffitixr.feature.ar.anchor.PoseFusion.diverged(prev, pose)
+                            ) {
+                                relocAnchorCandidate = null
+                                pendingRelocAnchor = pose
+                                pendingAnchorEstablishment = true
+                                Timber.i("ARDIAG return-visit anchor from reloc seq=$seq inliers=$inliers ratio=$ratio")
+                            } else {
+                                relocAnchorCandidate = pose
+                            }
+                        } else {
+                            relocAnchorCandidate = null
+                        }
+                    }
+                }
+            }
             if (pendingAnchorEstablishment) {
                 pendingAnchorEstablishment = false
+                // Non-null only for a return-visit anchor (see [relocAnchorCandidate]); consumed here so
+                // a later capture-confirm establishment falls through to the hit-test path.
+                val relocPose = pendingRelocAnchor
+                pendingRelocAnchor = null
                 try {
                     val camera = frame.camera
                     val viewMat = FloatArray(16)
@@ -1352,7 +1402,31 @@ class ArRenderer(
                     // below from the chosen surface; left as the anchor→camera direction by default.
                     var nrmX = 0f; var nrmY = 0f; var nrmZ = 0f
                     var haveNormal = false
-                    if (chosen != null) {
+                    if (relocPose != null) {
+                        // The saved wall's pose in this session's world. Its rotation is the day-one
+                        // anchor's: a plane hit's local +Y is the wall normal; a fallback anchor has
+                        // identity rotation and faced the camera. Take +Y when it plausibly faces the
+                        // camera (|cos| > 0.5), else the anchor→camera direction, matching both origins.
+                        anchorModelMatrix = relocPose.copyOf()
+                        val q = com.hereliesaz.graffitixr.feature.ar.anchor.PoseMath.matrixToQuaternion(relocPose)
+                        anchor = activeSession.createAnchor(
+                            com.google.ar.core.Pose(
+                                floatArrayOf(relocPose[12], relocPose[13], relocPose[14]),
+                                floatArrayOf(q[0], q[1], q[2], q[3]),
+                            )
+                        )
+                        val tcx = camPosX - relocPose[12]; val tcy = camPosY - relocPose[13]; val tcz = camPosZ - relocPose[14]
+                        val tcl = Math.sqrt((tcx * tcx + tcy * tcy + tcz * tcz).toDouble()).toFloat()
+                        val yx = relocPose[4]; val yy = relocPose[5]; val yz = relocPose[6]
+                        val yl = Math.sqrt((yx * yx + yy * yy + yz * yz).toDouble()).toFloat()
+                        val cos = if (tcl > 1e-4f && yl > 1e-4f) (yx * tcx + yy * tcy + yz * tcz) / (tcl * yl) else 0f
+                        if (kotlin.math.abs(cos) > 0.5f) {
+                            nrmX = yx; nrmY = yy; nrmZ = yz
+                        } else {
+                            nrmX = tcx; nrmY = tcy; nrmZ = tcz
+                        }
+                        haveNormal = true
+                    } else if (chosen != null) {
                         val pose = chosen.hitPose
                         val dx = pose.tx() - camPosX
                         val dy = pose.ty() - camPosY
