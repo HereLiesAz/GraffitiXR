@@ -69,7 +69,12 @@ internal class HostSession(
     }
 
     /** An op with its sequence number and wire encoding, fixed at enqueue time. */
-    private class EncodedDelta(val seq: Long, val bytes: ByteArray)
+    private class EncodedDelta(
+        val seq: Long,
+        val bytes: ByteArray,
+        /** Monotonic enqueue time; see [BULK_PERSIST_GRACE_MS]. */
+        val enqueuedAtMs: Long = System.nanoTime() / 1_000_000L,
+    )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     // Unbounded channel, but NOT unbounded memory: every element is appended to deltaBuffer
@@ -396,7 +401,8 @@ internal class HostSession(
         // Read the seq counter BEFORE calling snapshotProvider(): every op site updates project
         // state before calling enqueueOp (which is what assigns/advances this counter), so any op
         // whose seq is <= this value is guaranteed to already be reflected in the snapshot the
-        // provider is about to read. That ordering is what makes dropStaleQueueEntries below safe.
+        // provider is about to read — in MEMORY. The snapshot reads disk, which lags; see the grace
+        // window in dropStaleQueueEntries.
         val seqCutoff = seqCounter.get()
         val snapshot = snapshotProvider()
         require(
@@ -442,10 +448,16 @@ internal class HostSession(
      */
     private fun dropStaleQueueEntries(seqCutoff: Long) {
         synchronized(enqueueLock) {
+            val now = System.nanoTime() / 1_000_000L
             val keep = mutableListOf<EncodedDelta>()
             while (true) {
                 val delta = outQueue.tryReceive().getOrNull() ?: break
-                if (delta.seq > seqCutoff) keep.add(delta)
+                // Also keep recent ones: the snapshot is read from DISK, but op sites update memory,
+            // emit, and persist later on a coroutine, so an op enqueued moments before the bulk
+            // may be in neither the snapshot nor (if dropped) the live stream. Every live op is
+            // absolute state, so re-applying one the snapshot already has converges; StrokeComplete,
+            // the one append-style op, is ignored by the receiver today.
+            if (delta.seq > seqCutoff || now - delta.enqueuedAtMs <= BULK_PERSIST_GRACE_MS) keep.add(delta)
             }
             keep.forEach { outQueue.trySend(it) }
         }
@@ -584,6 +596,11 @@ internal class HostSession(
     }
 
     private companion object {
+        /**
+         * How long a queued op survives a bulk send even when its seq is covered by the snapshot:
+         * long enough for the editor's deferred save to reach disk, which is what the snapshot reads.
+         */
+        private const val BULK_PERSIST_GRACE_MS = 5_000L
         private const val TAG = "HostSession"
 
         // Guests ack every 1s and answer 5s PINGs, so 15s of read silence means a dead or
