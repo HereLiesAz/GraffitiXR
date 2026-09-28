@@ -1763,7 +1763,7 @@ class MainActivity : ComponentActivity() {
                                     onImperialUnitsChanged = { arViewModel.setImperialUnits(it) },
                                     backgroundColor = editorUiState.canvasBackground.toArgb(),
                                     onBackgroundColorChanged = { argb -> settingsViewModel.setBackgroundColor(argb) },
-                                    onCheckForUpdates = { dashboardViewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
+                                    onCheckForUpdates = { dashboardViewModel.openUpdatePage(this@MainActivity) },
                                     onOpenUpdatePage = { dashboardViewModel.openUpdatePage(this@MainActivity) },
                                     onResetTutorials = {
                                         settingsViewModel.resetCompletedTutorials()

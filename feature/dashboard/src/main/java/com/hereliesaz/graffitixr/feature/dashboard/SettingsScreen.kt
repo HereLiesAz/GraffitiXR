@@ -113,11 +113,6 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
 
-    // Auto-check for updates on load
-    LaunchedEffect(Unit) {
-        onCheckForUpdates()
-    }
-
     // Permissions State — recomputed on ON_RESUME so returning from App Settings (where the user may
     // have just granted a permission via [openAppSettings]) reflects the new grant, instead of the
     // stale value a keyless remember{} would freeze at first composition.
