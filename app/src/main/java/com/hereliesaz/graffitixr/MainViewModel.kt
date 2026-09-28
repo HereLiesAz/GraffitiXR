@@ -189,10 +189,14 @@ class MainViewModel @Inject constructor(
         val safeIntr = intrinsics
         val safeView = viewMatrix
 
-        if (depthBuffer == null) {
-            // No depth source: build the wall fingerprint from a SINGLE capture by back-projecting
-            // features onto the ARCore wall plane (whose metric pose ARCore already solved).
-            handleSingleCapture(bitmap, safeIntr, safeView, wallPlane, rotationDeg, captureEnvironment)
+        if (depthBuffer == null || wallPlane != null) {
+            // Build the wall fingerprint from a SINGLE capture by back-projecting features onto the
+            // ARCore wall plane (whose metric pose ARCore already solved), inside the artist's
+            // selection. Preferred even when depth exists: it is the only path that records the full
+            // co-registration (intrinsics, anchor, display-oriented view, captureAnchorCam), without
+            // which a project can neither be drift-corrected nor re-anchored on a return visit. The
+            // depth path below is the fallback for a capture with depth but no wall plane.
+            handleSingleCapture(bitmap, safeIntr, safeView, wallPlane, rotationDeg, captureEnvironment, selectionMask)
             return
         }
         resetCaptureUi()
@@ -254,6 +258,9 @@ class MainViewModel @Inject constructor(
             // fingerprint so the head survives reload. Inert unless its model is bundled.
             val patch = grayPatchBytes(sensorBmp)
             slamManager.setWallPatchBytes(patch, PATCH_SIZE)
+            // This path produces no capture pose. A stale one from an earlier capture this session
+            // would pair these points with the old anchor in PoseFusion.
+            slamManager.captureAnchorCam = null
 
             // Target capture is a writer of the SAME project.json as the editor's design-layer save and
             // AR's wall-feature-map save. A raw whole-object saveProject here (as this used to be) would
@@ -265,6 +272,13 @@ class MainViewModel @Inject constructor(
             projectRepository.updateProject { current ->
                 current.copy(
                     fingerprint = fp.copy(patchData = patch),
+                    // This path records no co-registration. Clear any left by an earlier single
+                    // capture: reload would otherwise pair these new points with the old capture's
+                    // anchor, intrinsics and view, and relocalize against geometry that doesn't match.
+                    fingerprintIntrinsics = emptyList(),
+                    fingerprintAnchor = emptyList(),
+                    fingerprintViewMatrix = emptyList(),
+                    fingerprintCaptureRotationDeg = -1,
                     targetImageUris = updatedTargetUris,
                 )
             }
@@ -320,6 +334,7 @@ class MainViewModel @Inject constructor(
     private fun handleSingleCapture(
         bitmap: Bitmap, intr: FloatArray, view: FloatArray, wallPlane: FloatArray?, rotationDeg: Int,
         captureEnvironment: com.hereliesaz.graffitixr.common.model.CaptureEnvironment?,
+        selectionMask: Bitmap? = null,
     ) {
         if (wallPlane == null || wallPlane.size < 6) {
             resetCaptureUi()
@@ -389,6 +404,7 @@ class MainViewModel @Inject constructor(
             val fp = MetricFingerprintBuilder.buildSingle(
                 slamManager, bitmap, view, intr, planePoint, planeNormal, anchor,
                 rotationDeg = rotationDeg,
+                mask = selectionMask,
             )
             if (fp == null) {
                 // Say WHICH way it fell short. "Not enough texture" was the same message whether the

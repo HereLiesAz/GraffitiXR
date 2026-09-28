@@ -479,6 +479,11 @@ class ArRenderer(
     // Cleared when the anchor is reset; set after the first successful bitmap upload
     // so subsequent re-composites don't snap the user's scale back to the initial fit.
     @Volatile private var quadInitialFitApplied = false
+    // Metric design size across sessions (GraffitiProject.arDesignHalfWidthM). The provider returns
+    // the saved half-width or <= 0 when none; the callback reports a fresh screen fit so it can be
+    // saved. Both set by ArViewModel on attach.
+    @Volatile var savedDesignHalfWidthProvider: () -> Float = { -1f }
+    @Volatile var onDesignHalfWidthFitted: (Float) -> Unit = {}
     @Volatile private var lastBitmapW: Int = 0
     @Volatile private var lastBitmapH: Int = 0
 
@@ -2429,14 +2434,22 @@ class ArRenderer(
 
                 val bmpAspect = lastBitmapW.toFloat() / lastBitmapH.toFloat()
                 val halfWFromH = halfScreenH * bmpAspect
-                val halfW: Float
-                val halfH: Float
+                var halfW: Float
+                var halfH: Float
                 if (halfWFromH <= halfScreenW) {
                     halfW = halfWFromH
                     halfH = halfScreenH
                 } else {
                     halfW = halfScreenW
                     halfH = halfScreenW / bmpAspect
+                }
+                val savedHalfW = savedDesignHalfWidthProvider()
+                if (savedHalfW > 0f && savedHalfW.isFinite()) {
+                    // Placed before: keep its real-world size, not the fit to today's distance.
+                    halfW = savedHalfW
+                    halfH = savedHalfW / bmpAspect
+                } else {
+                    onDesignHalfWidthFitted(halfW)
                 }
 
                 overlayRenderer.setExtent(halfW, halfH)

@@ -2650,6 +2650,22 @@ class ArViewModel @Inject constructor(
         // touches a SensorManager or a location client it does not own.
         renderer?.attitudeSampler = { attitudeProvider?.snapshot() }
         renderer?.locationSampler = { locationFix() }
+        renderer?.savedDesignHalfWidthProvider = {
+            projectRepository.currentProject.value?.arDesignHalfWidthM ?: -1f
+        }
+        renderer?.onDesignHalfWidthFitted = { halfW ->
+            val projectId = projectRepository.currentProject.value?.id
+            if (projectId != null) viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    projectRepository.updateProject {
+                        if (it.id == projectId && it.arDesignHalfWidthM <= 0f) it.copy(arDesignHalfWidthM = halfW) else it
+                    }
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    Timber.e(e, "Design size save failed")
+                }
+            }
+        }
         // Re-apply the experiment switches to the FRESH renderer.
         //
         // `ArRenderer` is reconstructed whenever the AR view is (leaving and re-entering AR, and
