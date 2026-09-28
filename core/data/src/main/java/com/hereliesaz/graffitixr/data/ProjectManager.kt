@@ -343,19 +343,29 @@ class ProjectManager @Inject constructor(
                 saturation == 1f && colorBalanceR == 1f && colorBalanceG == 1f && colorBalanceB == 1f
     }
 
-    fun exportProjectToUri(context: Context, projectId: String, uri: Uri) {
+    /**
+     * Zips the project folder into [uri]. Returns true only when the whole archive was written: a
+     * failure mid-write still closes the zip (leaving a readable but incomplete archive), so callers
+     * must not share [uri]'s contents unless this returns true.
+     */
+    fun exportProjectToUri(context: Context, projectId: String, uri: Uri): Boolean {
         val sourceFolder = File(context.filesDir, "projects/$projectId")
-        if (!sourceFolder.exists()) return
+        if (!sourceFolder.exists()) return false
 
-        try {
-            context.contentResolver.openOutputStream(uri)?.use { os ->
-                ZipOutputStream(os).use { zos ->
+        return try {
+            val os = context.contentResolver.openOutputStream(uri) ?: return false
+            os.use {
+                ZipOutputStream(it).use { zos ->
                     // Use empty string for parent to zip contents directly into the root.
                     zipFolder(sourceFolder, "", zos)
                 }
             }
+            true
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e("ProjectManager", "Export failed", e)
+            false
         }
     }
 

@@ -790,13 +790,12 @@ class EditorViewModel @Inject constructor(
                     if (c.isLetterOrDigit() || c == '.' || c == '-' || c == '_') c else '_'
                 }.joinToString("").ifBlank { "wall" }
                 val file = File(shareDir, "$safeName.gxr")
-                projectManager.exportProjectToUri(context, project.id, Uri.fromFile(file))
-                // exportProjectToUri never throws on failure (catch-and-log only) and never reports
-                // success either, so the only way to know the zip actually landed is to check for it
-                // — without this, a failed export still reached the share sheet with a URI for a
-                // file that doesn't exist, an attachment nothing could open.
-                if (!file.exists() || file.length() == 0L) {
-                    throw java.io.IOException("Export produced no file")
+                // Delete first: a previous export with the same name must never be shared as if it
+                // were this one, and a failed write must never be shared as a complete archive.
+                file.delete()
+                if (!projectManager.exportProjectToUri(context, project.id, Uri.fromFile(file))) {
+                    file.delete()
+                    throw java.io.IOException("Export failed")
                 }
                 val contentUri = androidx.core.content.FileProvider.getUriForFile(
                     context, "${context.packageName}.fileprovider", file
