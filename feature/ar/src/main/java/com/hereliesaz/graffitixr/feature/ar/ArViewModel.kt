@@ -1065,6 +1065,8 @@ class ArViewModel @Inject constructor(
     // slamManager.getSplatCount(), which has been a hardcoded 0 since the voxel/splat map was
     // deleted — so the delta was permanently 0 and the autosave never fired once.
     private val lastSavedMapPointCount = AtomicInteger(0)
+    private val lastSavedPaintCount = AtomicInteger(0)
+    @Volatile private var lastSavedProgress = 0f
     private var autoSaveJob: kotlinx.coroutines.Job? = null
     private var loadedProjectId: String? = null
 
@@ -2083,11 +2085,23 @@ class ArViewModel @Inject constructor(
     suspend fun saveProjectWallMap() {
         val projectId = loadedProjectId ?: return
         if (projectRepository.currentProject.value?.id != projectId) return
-        val map = slamManager.getWallFeatureMap() ?: return
-        if (map.pointCount <= 0) return
+        val map = slamManager.getWallFeatureMap()?.takeIf { it.pointCount > 0 }
+        // The teleological reference set: painted design features. Persisted so a return visit
+        // relocalizes on the paint, not only on marks that may since have been painted over.
+        val paint = slamManager.getPaintMarks()
+        val grid = slamManager.exportPaintGrid()?.let { java.util.Base64.getEncoder().encodeToString(it) }
+        if (map == null && paint == null && grid == null) return
         projectRepository.updateProject {
-            if (it.id == projectId) it.copy(wallFeatureMap = map) else it
+            if (it.id == projectId) {
+                it.copy(
+                    wallFeatureMap = map ?: it.wallFeatureMap,
+                    paintMarks = paint ?: it.paintMarks,
+                    paintGrid = grid ?: it.paintGrid,
+                )
+            } else it
         }
+        paint?.let { lastSavedPaintCount.set(it.pointCount) }
+        lastSavedProgress = slamManager.getPaintingProgress()
     }
 
     private fun saveWallFeatureMap() {
@@ -2275,6 +2289,7 @@ class ArViewModel @Inject constructor(
         // anchor, and a late frame re-arming it is the sixth-audit defect in one line.
         if (isDestroying) return
         latestDesignFootprint = design
+        tryAutoFit()
         val live = liveFingerprint ?: return
         val fp = live.fingerprint
         // IMPLEMENTATION.md 4.5 — push the placement on EVERY footprint change, not only when a
@@ -2599,6 +2614,34 @@ class ArViewModel @Inject constructor(
                 // No map on this project: clear any map left in native from a previously loaded project.
                 slamManager.clearWallFeatureMap()
             }
+            // Painted-design reference marks live in the fingerprint frame, so they are restored
+            // only beside the fingerprint they were placed in — and cleared otherwise, so another
+            // project's paint never leaks into this one's relocalization.
+            val paint = project.paintMarks
+            if (fp != null && !legacyFrame && paint != null && paint.pointCount > 0) {
+                slamManager.restorePaintMarks(paint)
+                lastSavedPaintCount.set(paint.pointCount)
+            } else {
+                slamManager.clearPaintMarks()
+                lastSavedPaintCount.set(0)
+            }
+            // Area progress: its saved state, and the capture photo that supplies bare-wall colours.
+            // Same condition as the paint marks — both are only meaningful in this fingerprint frame.
+            if (fp != null && !legacyFrame) {
+                project.paintGrid?.let { encoded ->
+                    runCatching { java.util.Base64.getDecoder().decode(encoded) }.getOrNull()
+                        ?.let { slamManager.restorePaintGrid(it) }
+                }
+                val photo = project.targetImageUris.lastOrNull()
+                val intr = project.fingerprintIntrinsics
+                if (photo != null && intr.size == 4) {
+                    val bmp = runCatching {
+                        com.hereliesaz.graffitixr.common.util.ImageUtils.loadBitmapAsync(appContext, photo)
+                    }.getOrNull()
+                    if (bmp != null) slamManager.setCaptureImage(bmp, intr.toFloatArray())
+                }
+            }
+            lastSavedProgress = 0f
         }
     }
 
@@ -2625,7 +2668,12 @@ class ArViewModel @Inject constructor(
                 // only by the explicit saves on AR exit and app background. A crash or a kill in
                 // between lost everything scanned since.
                 val current = renderer?.mappedPointCount ?: 0
-                if (current > 0 && current - lastSavedMapPointCount.get() >= AUTOSAVE_POINT_DELTA) {
+                val paint = slamManager.getPaintMarkCount()
+                val progress = slamManager.getPaintingProgress()
+                if ((current > 0 && current - lastSavedMapPointCount.get() >= AUTOSAVE_POINT_DELTA) ||
+                    paint - lastSavedPaintCount.get() >= AUTOSAVE_PAINT_DELTA ||
+                    progress - lastSavedProgress >= AUTOSAVE_PROGRESS_DELTA
+                ) {
                     saveMapNow()
                 }
             }
@@ -2958,7 +3006,36 @@ class ArViewModel @Inject constructor(
 
     private val artworkRegInFlight = java.util.concurrent.atomic.AtomicBoolean(false)
 
-    fun updatePaintingGuide(bitmap: Bitmap) {
+    /**
+     * Auto-fit result for the editor to apply to the AR mode adjustment: the design's move in its own
+     * current local frame — [dx, dy] metres, [dThetaRad] CCW, [scale] ratio. See SlamManager.autoFitDesign.
+     */
+    data class DesignFit(val dx: Float, val dy: Float, val dThetaRad: Float, val scale: Float)
+
+    private val _designFits = kotlinx.coroutines.flow.MutableSharedFlow<DesignFit>(extraBufferCapacity = 1)
+    val designFits: kotlinx.coroutines.flow.SharedFlow<DesignFit> = _designFits
+
+    // A project restarted in the app but not on the wall: after a NEW target capture or a NEW design,
+    // try once to fit the design to the paint already there. Armed by those two events only, so a
+    // design the artist has placed by hand is never moved out from under them.
+    @Volatile private var autoFitArmed = false
+    @Volatile private var lastGuideKey: String? = null
+
+    private fun tryAutoFit() {
+        if (!autoFitArmed) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val r = slamManager.autoFitDesign() ?: return@launch   // stays armed: retried on the next placement change
+            autoFitArmed = false
+            _designFits.tryEmit(DesignFit(r[0], r[1], r[2], r[3]))
+            Timber.i("Auto-fit applied: ${r[4].toInt()} inliers")
+        }
+    }
+
+    fun updatePaintingGuide(bitmap: Bitmap, designKey: String? = null) {
+        if (designKey != null && designKey != lastGuideKey) {
+            lastGuideKey = designKey
+            autoFitArmed = true
+        }
         // The design composite (design layers only — NO wall texture) is the teleological "base
         // understanding": the registered overlay the clean wall frame is validated against. Re-register
         // it as the artwork base whenever the design changes so painting-progress (and the staged
@@ -2974,6 +3051,7 @@ class ArViewModel @Inject constructor(
             } finally {
                 artworkRegInFlight.set(false)
             }
+            tryAutoFit()
         }
     }
 
@@ -2997,6 +3075,7 @@ class ArViewModel @Inject constructor(
         environment: com.hereliesaz.graffitixr.common.model.CaptureEnvironment =
             com.hereliesaz.graffitixr.common.model.CaptureEnvironment(),
     ) {
+        autoFitArmed = true // a fresh photo of the wall may show paint the new design should fit
         // Doodle demo: a headless capture (no tap, no review) — build the fingerprint from the
         // drawing and return before the normal capture/review flow runs. Clear the capture-request
         // flag ourselves (the normal paths below do this) so the renderer isn't re-armed every frame.
@@ -3310,6 +3389,12 @@ class ArViewModel @Inject constructor(
          * roughly a few seconds of active scanning, so at most that much work is at risk.
          */
         const val AUTOSAVE_POINT_DELTA = 500
+
+        /** New painted-design reference marks since the last save that trigger an autosave. */
+        const val AUTOSAVE_PAINT_DELTA = 20
+
+        /** Area-progress gain since the last save that triggers an autosave. */
+        const val AUTOSAVE_PROGRESS_DELTA = 0.02f
 
         /**
          * Fixed RANSAC seed for eval runs (`IMPLEMENTATION.md` 6a.4, `EVALUATION.md` §3.1).

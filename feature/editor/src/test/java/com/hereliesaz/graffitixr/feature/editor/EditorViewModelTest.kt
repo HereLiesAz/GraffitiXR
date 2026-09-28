@@ -408,6 +408,24 @@ class EditorViewModelTest {
     }
 
     @Test
+    fun `applyArFit moves the AR adjustment and undo restores it`() = runTest {
+        viewModel.setEditorMode(EditorMode.AR)
+        addDesign()
+        viewModel.applyArFit(dx = 0.1f, dy = -0.2f, dThetaRad = (Math.PI / 2).toFloat(), scaleRatio = 2f)
+        testDispatcher.scheduler.advanceUntilIdle()
+        val a = viewModel.uiState.value.modeAdjustments[EditorMode.AR]!!
+        assertEquals(0.1f, a.offsetX, 1e-4f)
+        assertEquals(-0.2f, a.offsetY, 1e-4f)
+        assertEquals(-90f, a.rotation, 1e-3f)
+        assertEquals(2f, a.scale, 1e-4f)
+        viewModel.onUndoClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        val b = viewModel.uiState.value.modeAdjustments[EditorMode.AR] ?: com.hereliesaz.graffitixr.common.model.ModeAdjustment()
+        assertEquals(0f, b.offsetX, 1e-4f)
+        assertEquals(1f, b.scale, 1e-4f)
+    }
+
+    @Test
     fun `undo and redo on empty stacks do not crash`() {
         // Fresh ViewModel has empty undo and redo stacks; neither call should throw.
         viewModel.onUndoClicked()

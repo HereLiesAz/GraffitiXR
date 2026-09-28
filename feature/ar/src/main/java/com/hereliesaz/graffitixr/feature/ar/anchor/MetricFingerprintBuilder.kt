@@ -93,6 +93,7 @@ object MetricFingerprintBuilder {
             }
             keptDesc.release()
 
+            slam.clearPaintMarks() // new capture = new fingerprint frame
             slam.restoreWallFingerprintMetric(
                 bytes, rows, cols, type, tri.pointsCam0, anchorModel, intr0,
             )
@@ -381,6 +382,7 @@ object MetricFingerprintBuilder {
         // Native pairs the two in computeRectifyHomography (viewFp / mWallKeypoints3D) against a
         // display-oriented viewCur, so handing it the raw sensor-frame view leaves the rectifying
         // homography rotated by R_z. Note the GL sign is NEGATED — see glViewDisplayOriented.
+        slam.clearPaintMarks() // new capture = new fingerprint frame
         slam.restoreWallFingerprintMetric(
             bytes, rows, cols, type, res.pointsCam, anchorModel, intr,
             viewMatrix = glView?.let { MetricMarks.glViewDisplayOriented(it, rotationDeg) }

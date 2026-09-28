@@ -414,6 +414,60 @@ class SlamManager @Inject constructor(
             map.points3d, map.confidence, map.obsCount, map.anchor, map.intrinsics,
         )
     }
+    /**
+     * Teleological reference set: design features the wall has confirmed as painted, in the
+     * fingerprint frame. Matched by relocalization alongside the original marks, so tracking holds
+     * as they get painted over. Returned as a [WallFeatureMap] (points + descriptors only) for
+     * project persistence, or null when empty. Blob: [rows, cols, type][rows*3 floats][descriptors].
+     */
+    fun getPaintMarks(): WallFeatureMap? {
+        val blob = nativeExportPaintMarks() ?: return null
+        if (blob.size < 12) return null
+        val bb = ByteBuffer.wrap(blob).order(ByteOrder.nativeOrder())
+        val rows = bb.int; val cols = bb.int; val type = bb.int
+        if (rows <= 0 || cols <= 0 || blob.size < 12 + rows * 12) return null
+        return try {
+            val points = FloatArray(rows * 3) { bb.float }
+            val desc = ByteArray(blob.size - bb.position()).also { bb.get(it) }
+            WallFeatureMap(points3d = points, descriptorsData = desc, descriptorsRows = rows,
+                descriptorsCols = cols, descriptorsType = type)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** Restore a persisted [getPaintMarks] set. Must follow the fingerprint restore it belongs to. */
+    fun restorePaintMarks(map: WallFeatureMap) = nativeRestorePaintMarks(
+        map.descriptorsData, map.descriptorsRows, map.descriptorsCols, map.descriptorsType, map.points3d,
+    )
+
+    /** Drop the paint set — required whenever the fingerprint FRAME changes (a new capture). */
+    fun clearPaintMarks() = nativeClearPaintMarks()
+
+    fun getPaintMarkCount(): Int = nativeGetPaintMarkCount()
+
+    /**
+     * Area progress. The capture photo (display-oriented, with the intrinsics it was taken with)
+     * supplies each design cell's bare-wall colour; see MobileGS::PaintGrid.
+     */
+    fun setCaptureImage(bitmap: Bitmap, intrinsics: FloatArray) = nativeSetCaptureImage(bitmap, intrinsics)
+
+    /**
+     * Fit the registered design to paint already on the wall, from the capture photo. Returns
+     * [dx, dy (m), dTheta (rad, CCW), scale ratio, inliers] in the current design's local frame, or
+     * null when there is no confident fit. Blocking (feature detection); call off the main thread.
+     */
+    fun autoFitDesign(): FloatArray? = nativeAutoFitDesign()
+
+    /** Opaque per-project progress state (painted cells + learned paint colours), or null. */
+    fun exportPaintGrid(): ByteArray? = nativeExportPaintGrid()
+
+    /** Restore [exportPaintGrid] output; applied once the same design's grid exists. */
+    fun restorePaintGrid(state: ByteArray) = nativeRestorePaintGrid(state)
+
+    /** Fraction of design features confirmed on the wall (the detail channel), or -1. */
+    fun getFeatureProgress(): Float = nativeGetFeatureProgress()
+
     /** Drop the in-native wall feature map. */
     fun clearWallFeatureMap() = nativeClearWallFeatureMap()
     /** Live wall-feature-map point count — diagnostic. */
@@ -799,6 +853,17 @@ class SlamManager @Inject constructor(
         points3d: FloatArray, anchorMatrix: FloatArray, intrinsics: FloatArray,
         viewMatrix: FloatArray, regions: ByteArray
     )
+    private external fun nativeExportPaintMarks(): ByteArray?
+    private external fun nativeRestorePaintMarks(
+        descriptorsData: ByteArray, rows: Int, cols: Int, type: Int, points3d: FloatArray
+    )
+    private external fun nativeClearPaintMarks()
+    private external fun nativeGetPaintMarkCount(): Int
+    private external fun nativeSetCaptureImage(bitmap: Bitmap, intrinsics: FloatArray)
+    private external fun nativeExportPaintGrid(): ByteArray?
+    private external fun nativeAutoFitDesign(): FloatArray?
+    private external fun nativeRestorePaintGrid(state: ByteArray)
+    private external fun nativeGetFeatureProgress(): Float
     private external fun nativeRestoreWallFeatureMap(
         descriptorsData: ByteArray, rows: Int, cols: Int, type: Int,
         points3d: FloatArray, confidence: FloatArray, obsCount: IntArray,

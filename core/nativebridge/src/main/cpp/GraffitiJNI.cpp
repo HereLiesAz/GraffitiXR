@@ -867,6 +867,62 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFingerp
 // Persistent wall feature map (Phase 2a: store only). Mirrors the metric-fingerprint restore but
 // adds parallel per-point confidence (jfloatArray) + obs (jintArray); anchor/intrinsics are
 // passed through only when correctly sized (16 / 4), else left at their native defaults.
+// Painted-design reference set (MobileGS::kMaxPaintMarks). Blob layout: see exportPaintMarks.
+JNIEXPORT jbyteArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportPaintMarks(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return nullptr;
+    std::vector<uint8_t> blob = gSlamEngine->exportPaintMarks();
+    if (blob.empty()) return nullptr;
+    jbyteArray out = env->NewByteArray((jsize)blob.size());
+    if (!out) return nullptr;
+    env->SetByteArrayRegion(out, 0, (jsize)blob.size(), reinterpret_cast<const jbyte*>(blob.data()));
+    return out;
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestorePaintMarks(
+        JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type,
+        jfloatArray ptsArray) {
+    // Same defensive validation as nativeRestoreWallFeatureMap: a malformed project must never
+    // reach a cv::Mat constructor that throws or reads out of bounds.
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine || !descArray || !ptsArray) return;
+    if (rows < 0 || cols < 0) return;
+    int depth = CV_MAT_DEPTH(type);
+    int channels = CV_MAT_CN(type);
+    if (depth < 0 || depth > CV_64F || channels < 1 || channels > 4) return;
+    if ((jlong)rows * (jlong)cols * (jlong)CV_ELEM_SIZE(type) > (jlong)env->GetArrayLength(descArray)) return;
+    if ((jlong)env->GetArrayLength(ptsArray) != (jlong)rows * 3LL) return;
+    jbyte* descData = env->GetByteArrayElements(descArray, nullptr);
+    jfloat* ptsData = env->GetFloatArrayElements(ptsArray, nullptr);
+    try {
+        cv::Mat descriptors(rows, cols, type, descData);
+        std::vector<cv::Point3f> pts;
+        pts.reserve((size_t)rows);
+        for (int i = 0; i < rows; ++i) pts.emplace_back(ptsData[3*i], ptsData[3*i+1], ptsData[3*i+2]);
+        gSlamEngine->restorePaintMarks(descriptors, pts); // clones
+    } catch (const std::exception& e) {
+        LOGE("nativeRestorePaintMarks: exception: %s", e.what());
+    } catch (...) {
+        LOGE("nativeRestorePaintMarks: unknown exception");
+    }
+    env->ReleaseByteArrayElements(descArray, descData, JNI_ABORT);
+    env->ReleaseFloatArrayElements(ptsArray, ptsData, JNI_ABORT);
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeClearPaintMarks(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (gSlamEngine) gSlamEngine->clearPaintMarks();
+}
+
+JNIEXPORT jint JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetPaintMarkCount(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    return gSlamEngine ? gSlamEngine->getPaintMarkCount() : 0;
+}
+
 JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestoreWallFeatureMap(
         JNIEnv* env, jobject thiz, jbyteArray descArray, jint rows, jint cols, jint type,
@@ -1128,6 +1184,71 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetArtworkFingerpr
         env->ReleaseFloatArrayElements(intrArray, intr, JNI_ABORT);
         env->ReleaseFloatArrayElements(viewMatArray, view, JNI_ABORT);
     }
+}
+
+// Area progress: the capture photo supplies bare-wall colours (MobileGS::PaintGrid).
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetCaptureImage(
+        JNIEnv* env, jobject thiz, jobject bitmap, jfloatArray intrArray) {
+    if (!bitmap || !intrArray || env->GetArrayLength(intrArray) < 4) return;
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return;
+    cv::Mat img;
+    bitmapToMat(env, bitmap, img);
+    if (img.empty()) return;
+    float intr[4];
+    env->GetFloatArrayRegion(intrArray, 0, 4, intr);
+    try {
+        gSlamEngine->setCaptureImage(img, intr);
+    } catch (const std::exception& e) {
+        LOGE("nativeSetCaptureImage: exception: %s", e.what());
+    } catch (...) {
+        LOGE("nativeSetCaptureImage: unknown exception");
+    }
+}
+
+JNIEXPORT jfloatArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeAutoFitDesign(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return nullptr;
+    float out[5];
+    bool ok = false;
+    try { ok = gSlamEngine->autoFitDesign(out); }
+    catch (const std::exception& e) { LOGE("nativeAutoFitDesign: exception: %s", e.what()); }
+    catch (...) { LOGE("nativeAutoFitDesign: unknown exception"); }
+    if (!ok) return nullptr;
+    jfloatArray arr = env->NewFloatArray(5);
+    if (arr) env->SetFloatArrayRegion(arr, 0, 5, out);
+    return arr;
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeExportPaintGrid(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine) return nullptr;
+    std::vector<uint8_t> blob = gSlamEngine->exportPaintGrid();
+    if (blob.empty()) return nullptr;
+    jbyteArray out = env->NewByteArray((jsize)blob.size());
+    if (!out) return nullptr;
+    env->SetByteArrayRegion(out, 0, (jsize)blob.size(), reinterpret_cast<const jbyte*>(blob.data()));
+    return out;
+}
+
+JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeRestorePaintGrid(JNIEnv* env, jobject thiz, jbyteArray data) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    if (!gSlamEngine || !data) return;
+    const jsize len = env->GetArrayLength(data);
+    if (len < 12 || len > (1 << 20)) return;
+    std::vector<uint8_t> blob((size_t)len);
+    env->GetByteArrayRegion(data, 0, len, reinterpret_cast<jbyte*>(blob.data()));
+    gSlamEngine->restorePaintGrid(blob);
+}
+
+JNIEXPORT jfloat JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetFeatureProgress(JNIEnv* env, jobject thiz) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    return gSlamEngine ? gSlamEngine->getFeatureProgress() : -1.0f;
 }
 
 JNIEXPORT void JNICALL

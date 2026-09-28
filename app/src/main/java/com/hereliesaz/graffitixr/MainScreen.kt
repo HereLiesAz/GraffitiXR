@@ -281,6 +281,12 @@ fun MainScreen(
                     // now legitimately differ. Only on a layer change, which is rare — the recompose
                     // storm this file worries about elsewhere is driven by the tone key, and that no
                     // longer reaches here.
+                    // Auto-fit (see ArViewModel.designFits): applied as an ordinary, undoable AR edit.
+                    LaunchedEffect(Unit) {
+                        arViewModel.designFits.collect { fit ->
+                            editorViewModel.applyArFit(fit.dx, fit.dy, fit.dThetaRad, fit.scale)
+                        }
+                    }
                     LaunchedEffect(visibleDesign, arUiState.isAnchorEstablished) {
                         if (!arUiState.isAnchorEstablished || visibleDesign == null) {
                             return@LaunchedEffect
@@ -288,7 +294,7 @@ fun MainScreen(
                         val guide = withContext(Dispatchers.Default) {
                             compositeDesignForAr(visibleDesign)
                         }
-                        arViewModel.updatePaintingGuide(guide)
+                        arViewModel.updatePaintingGuide(guide, visibleDesign.uri?.toString())
                     }
 
                     AndroidView(

@@ -125,6 +125,8 @@ class ProjectManager @Inject constructor(
                     targetFingerprint = projectData.targetFingerprint ?: existing.targetFingerprint,
                     targetFingerprintPath = projectData.targetFingerprintPath ?: existing.targetFingerprintPath,
                     wallFeatureMap = projectData.wallFeatureMap ?: existing.wallFeatureMap,
+                    paintMarks = projectData.paintMarks ?: existing.paintMarks,
+                    paintGrid = projectData.paintGrid ?: existing.paintGrid,
                     cloudAnchorId = projectData.cloudAnchorId ?: existing.cloudAnchorId,
                     // Written once by the AR placement; a stale snapshot must not reset it.
                     arDesignHalfWidthM = if (projectData.arDesignHalfWidthM > 0f) projectData.arDesignHalfWidthM

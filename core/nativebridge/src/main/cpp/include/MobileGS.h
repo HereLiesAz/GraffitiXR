@@ -215,6 +215,11 @@ public:
 
     /** Hard ceiling on stored wall marks — a memory guard on the self-grow append. */
     static constexpr size_t kMaxWallMarks = 5000;
+    // Teleological reference set: design features the wall has confirmed (painted), placed in the
+    // fingerprint frame through the design's placement. Matched by the reloc PnP alongside the
+    // backbone, so the more of the mural exists, the more the wall has to lock onto — and snap-back
+    // survives the original marks being painted over. Capped like the wall set.
+    static constexpr size_t kMaxPaintMarks = 5000;
 
     /**
      * Why the SPATIALLY-CONSTRAINED corroboration match did or did not run this attempt.
@@ -413,6 +418,12 @@ public:
     // [0..15]=pnpMat,16=inliers,17=matches,18=seq; with withSolveView, [19..34]=the GL view matrix
     // of the frame the PnP was solved on (published atomically with pnpMat under mMutex).
     void getRelocResult(float* out, bool withSolveView) const;
+    // Painted-design reference set (see kMaxPaintMarks). Blob: int32 rows, cols, type, then rows*3
+    // floats (points), then the descriptor bytes. Empty vector when there are none.
+    std::vector<uint8_t> exportPaintMarks() const;
+    void restorePaintMarks(const cv::Mat& descs, const std::vector<cv::Point3f>& pts);
+    void clearPaintMarks();
+    int getPaintMarkCount() const;
     void getFingerprintAnchor(float* out16) const;
     void setArtworkFingerprint(const cv::Mat& composite, const uint8_t* depthData, int depthW, int depthH, int depthStride, const float* intrinsics4, const float* viewMat16);
     // Detect the same features generateFingerprint would (SuperPoint/ORB-1000, masked) and return their
@@ -555,6 +566,10 @@ private:
     void tryUpdateFingerprint(const cv::Mat& grayClean,
                               const std::vector<cv::KeyPoint>* preKps = nullptr,
                               const cv::Mat* preDescs = nullptr);
+    // Area progress (see PaintGrid). Runs after tryUpdateFingerprint on a frame whose reloc succeeded.
+    void updatePaintGrid(const cv::Mat& colorFrame);
+    // Builds the grid from the registered design composite; caller holds mMutex.
+    void buildPaintGridLocked(const cv::Mat& composite, const std::vector<cv::Point2f>& featurePts);
     // Plane-guided rectification: homography (current-image <-> fingerprint-image) from the wall plane
     // and the VIO baseline between the current and fingerprint-capture views, plus the viewing
     // obliquity in degrees. False if no fingerprint view is stored or the geometry is degenerate.
@@ -614,6 +629,14 @@ private:
     // of hours, roughly monotonic. Never decayed." Cleared whenever a new artwork is registered,
     // because every prior reading was against a different target.
     std::vector<uint8_t> mArtworkCorroborated;
+    // See kMaxPaintMarks. Rows of mPaintDescriptors are 1:1 with mPaintPoints3D (fingerprint frame).
+    // Independent of the artwork registration: once confirmed, paint stays a reference even if the
+    // design composite is re-registered. Cleared only when the fingerprint FRAME changes (a new
+    // capture, clearWallFingerprint, a peer alignment) — never by a partition re-restore.
+    cv::Mat mPaintDescriptors;
+    std::vector<cv::Point3f> mPaintPoints3D;
+    // Per artwork row, for the current generation: already promoted into the paint set.
+    std::vector<uint8_t> mArtworkPromoted;
     // Bumped whenever the artwork is replaced or cleared. tryUpdateFingerprint snapshots the
     // descriptors under the lock, spends milliseconds matching outside it, and then merges its
     // result back in; without this it would merge into whatever artwork is registered by then. The
@@ -621,6 +644,53 @@ private:
     // length check and corrupt the accumulator with another target's hits.
     long mArtworkGeneration = 0;
     std::atomic<float> mPaintingProgress{0.0f};
+    // Feature-count progress (fraction of design features ever confirmed), kept as its own channel
+    // now that mPaintingProgress is the area measure whenever a PaintGrid exists. -1 = not measured.
+    std::atomic<float> mFeatureProgress{-1.0f};
+
+    /**
+     * Area progress: the design split into a grid; each cell is painted when either
+     *  - enough of its SuperPoint features are confirmed on the wall, or
+     *  - its COLOUR RELATIONSHIPS say so. Design cells are clustered by colour; a cell is paint-
+     *    candidate when it no longer looks like its bare-wall peers (cells that looked alike in the
+     *    capture photo, or at first AR sighting when the photo doesn't cover it), and it looks like
+     *    the paint already confirmed for its design cluster — or, before any is, like another
+     *    changed cell of the same cluster. Hue never has to agree with the design: purple in the
+     *    picture painted yellow is fine, as long as the design's same-colour areas share a paint.
+     * Lighting shifts move a whole wall together, which a relational test ignores.
+     */
+    struct PaintGrid {
+        int cols = 0, rows = 0, k = 0;
+        std::vector<float> weight;                 // opaque fraction of the cell (0 = not design)
+        std::vector<int> cluster;                  // design colour cluster, -1 when weight == 0
+        std::vector<std::vector<int>> features;    // artwork descriptor rows inside the cell
+        std::vector<cv::Vec3f> base;               // bare-wall colour (lighting-normalised Lab)
+        std::vector<uint8_t> hasBase;              // 1 = capture photo, 2 = first AR sighting
+        std::vector<int> baseGroup;                // cluster of bare-wall colours, -1 = none yet
+        std::vector<uint8_t> painted, pending;
+        std::vector<cv::Vec3f> paintSum;           // per design cluster: learned paint colour
+        std::vector<int> paintN;
+        bool baseGroupsBuilt = false;
+    };
+    PaintGrid mGrid;
+    cv::Mat mCaptureRgb;                           // capture photo (fingerprint frame = its camera)
+    float mCaptureIntr[4] = {0,0,0,0};
+    std::vector<uint8_t> mPendingGridRestore;      // applied when a grid of matching shape is built
+    cv::Mat mArtworkGray;                          // normalised design composite, for autoFitDesign
+public:
+    /**
+     * Fit the registered design to paint already on the wall (a project restarted in the app but not
+     * on the wall). Matches the design against the capture photo (in both polarities, since paint
+     * rarely keeps the design's colours), back-projects the photo side onto the wall plane, and solves
+     * a RANSAC similarity in the CURRENT design's local frame. out5 = {dx, dy (m), dTheta (rad, CCW
+     * in the design plane), scale ratio, inliers}. Returns false when there is no confident fit.
+     */
+    bool autoFitDesign(float* out5);
+    void setCaptureImage(const cv::Mat& rgb, const float* intr4);
+    std::vector<uint8_t> exportPaintGrid() const;
+    void restorePaintGrid(const std::vector<uint8_t>& blob);
+    float getFeatureProgress() const { return mFeatureProgress.load(std::memory_order_relaxed); }
+private:
     // -1 = never measured, which is NOT the same as 0.0 = measured and found nothing. Zero is a
     // legitimate reading here, so it cannot double as the "no data yet" sentinel.
     std::atomic<float> mCorroborationConfidence{kCorroborationUnmeasured};
