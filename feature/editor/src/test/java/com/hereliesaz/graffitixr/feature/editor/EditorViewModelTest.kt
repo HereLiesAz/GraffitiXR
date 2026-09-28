@@ -376,8 +376,9 @@ class EditorViewModelTest {
         fun traceScale() = viewModel.uiState.value.modeAdjustments[EditorMode.TRACE]?.scale ?: 1f
         val before = traceScale()
 
+        // Outside DESIGN a pinch goes to the mode's adjustment via onModeTransformGesture.
         viewModel.onGestureStart()
-        viewModel.onTransformGesture(Offset.Zero, 2.0f, 0f)
+        viewModel.onModeTransformGesture(EditorMode.TRACE, Offset.Zero, 2.0f, 0f)
         viewModel.onGestureEnd()
         testDispatcher.scheduler.advanceUntilIdle()
         val after = traceScale()
