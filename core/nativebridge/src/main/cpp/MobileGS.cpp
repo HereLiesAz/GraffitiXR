@@ -300,6 +300,12 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
     }
     mLastRelocDetected.store((int)baseKps.size(), std::memory_order_relaxed);
 
+    // One correspondence per fingerprint point across ALL passes (plain, 0.5x, 2x, rectified). The
+    // passes see the same marks, so without this a single wall point matched at three scales counted
+    // as three inliers, and PoseFusion's COLD_SNAP_MIN_INLIERS / ratio gates passed on a fraction of
+    // the independent evidence they assume. First pass wins (the plain pass runs first).
+    std::vector<uint8_t> corrSeen(wallKps3d.size(), 0);
+
     auto buildCorr = [&](const cv::Mat& g, const cv::Mat& Hback,
                          std::vector<cv::Point2f>& outImg, std::vector<cv::Point3f>& outObj,
                          std::vector<uint8_t>& outFromBackbone,
@@ -333,6 +339,8 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
                 // accuracy degrade with task progress. BAND straddles the edge and is trusted by
                 // neither side. Corroboration against F_in happens later, once a pose exists.
                 if (usePartition && wallRegions[match[0].trainIdx] != kRegionOutside) continue;
+                if (corrSeen[match[0].trainIdx]) continue;
+                corrSeen[match[0].trainIdx] = 1;
                 cv::Point2f p = kps[match[0].queryIdx].pt;
                 if (!Hback.empty()) {
                     std::vector<cv::Point2f> in{p}, outp;
