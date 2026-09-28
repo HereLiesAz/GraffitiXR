@@ -2773,14 +2773,12 @@ private fun RelocDiagnosticsOverlay(
                 androidx.compose.ui.graphics.Color.White,
             )
         }
-        // paintingProgress IS a genuine progress signal, not a confidence readout — MobileGS.cpp's
-        // own comment on its producer is explicit and deliberate: "Coverage says how much of the
-        // design is realized (progress); matchability says how much to trust this frame
-        // (confidence)" — two different, intentionally-separate channels (mCorroborationConfidence
-        // is the latter, surfaced in the Corrob/Spread/Reproj rows above). A prior pass here
-        // mislabeled this "Matched", inheriting RelocStatusBadge's own pre-existing mislabeling of
-        // the same value (a separate, not-yet-fixed issue) instead of correcting it — caught by
-        // review before merge. "Painted" wasn't wrong about WHAT this is, only imprecise about how
+        // paintingProgress IS a genuine progress signal, not a confidence readout: the cumulative
+        // fraction of the design's features the wall has corroborated (MobileGS
+        // tryUpdateFingerprint). Confidence is the separate mCorroborationConfidence channel,
+        // surfaced in the Corrob/Spread/Reproj rows above. A prior pass here
+        // mislabeled this "Matched", inheriting RelocStatusBadge's then-mislabeling of the same value
+        // (since fixed: the badge's string now reads "painted") — caught by review before merge. "Painted" wasn't wrong about WHAT this is, only imprecise about how
         // literally to take it (it's realized-descriptor coverage, not a physical paint sensor).
         DiagnosticRow("Progress", "${(paintingProgress * 100).toInt()}%", androidx.compose.ui.graphics.Color.White)
 

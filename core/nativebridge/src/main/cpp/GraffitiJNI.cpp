@@ -410,6 +410,13 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetMappingPaused(J
 }
 
 JNIEXPORT void JNICALL
+Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeSetLiveIntrinsics(JNIEnv* env, jobject thiz, jfloat fx, jfloat fy, jfloat cx, jfloat cy) {
+    std::shared_lock<std::shared_mutex> engineLock(gEngineMutex);
+    const float intr[4] = {fx, fy, cx, cy};
+    if (gSlamEngine) gSlamEngine->setLiveIntrinsics(intr);
+}
+
+JNIEXPORT void JNICALL
 Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeUpdateCamera(
         JNIEnv* env, jobject thiz,
         jfloatArray viewMatrix, jfloatArray projMatrix,
@@ -1448,9 +1455,11 @@ Java_com_hereliesaz_graffitixr_nativebridge_SlamManager_nativeGetRelocResult(JNI
         LOGE("nativeGetRelocResult: out array too short (need 19)");
         return;
     }
-    float buf[19];
-    gSlamEngine->getRelocResult(buf);
-    env->SetFloatArrayRegion(out, 0, 19, buf);
+    // 35 slots also carry the solve-frame view matrix at [19..34]; 19 keeps the legacy layout.
+    const jsize n = env->GetArrayLength(out) >= 35 ? 35 : 19;
+    float buf[35];
+    gSlamEngine->getRelocResult(buf, n == 35);
+    env->SetFloatArrayRegion(out, 0, n, buf);
 }
 
 extern "C" JNIEXPORT void JNICALL

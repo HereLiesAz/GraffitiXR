@@ -100,6 +100,11 @@ void MobileGS::initialize(int /*width*/, int /*height*/) {
     }
 }
 
+void MobileGS::setLiveIntrinsics(const float* intr4) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    memcpy(mLiveIntrinsics, intr4, 4 * sizeof(float));
+}
+
 void MobileGS::updateCamera(float* viewMat, float* projMat) {
     std::lock_guard<std::mutex> lock(mMutex);
     memcpy(mViewMatrix, viewMat, 16 * sizeof(float));
@@ -172,6 +177,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
     std::vector<uint8_t> wallRegions;
     cv::Mat wallPatch;
     float fpIntrinsics[4];
+    float liveIntrinsics[4] = {0,0,0,0};
     bool hasFpView = false;
     // Phase 2b snapshot: the persistent feature map + the last reloc pose, used (when the flag is on)
     // as the frustum-gate prior. The map is co-registered to the fingerprint anchor, so its points
@@ -188,6 +194,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
         wallPatch = mWallPatch.clone();
         memcpy(fpIntrinsics, mFingerprintIntrinsics, 4 * sizeof(float));
         hasFpView = mHasFingerprintView;
+        memcpy(liveIntrinsics, mLiveIntrinsics, 4 * sizeof(float));
         mapDescs = mMapDescriptors.clone();
         mapKps3d = mMapPoints3D;
         memcpy(mapPriorPose, mPnpCamFromFpWorld, 16 * sizeof(float));
@@ -293,6 +300,12 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
     }
     mLastRelocDetected.store((int)baseKps.size(), std::memory_order_relaxed);
 
+    // One correspondence per fingerprint point across ALL passes (plain, 0.5x, 2x, rectified). The
+    // passes see the same marks, so without this a single wall point matched at three scales counted
+    // as three inliers, and PoseFusion's COLD_SNAP_MIN_INLIERS / ratio gates passed on a fraction of
+    // the independent evidence they assume. First pass wins (the plain pass runs first).
+    std::vector<uint8_t> corrSeen(wallKps3d.size(), 0);
+
     auto buildCorr = [&](const cv::Mat& g, const cv::Mat& Hback,
                          std::vector<cv::Point2f>& outImg, std::vector<cv::Point3f>& outObj,
                          std::vector<uint8_t>& outFromBackbone,
@@ -326,6 +339,8 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
                 // accuracy degrade with task progress. BAND straddles the edge and is trusted by
                 // neither side. Corroboration against F_in happens later, once a pose exists.
                 if (usePartition && wallRegions[match[0].trainIdx] != kRegionOutside) continue;
+                if (corrSeen[match[0].trainIdx]) continue;
+                corrSeen[match[0].trainIdx] = 1;
                 cv::Point2f p = kps[match[0].queryIdx].pt;
                 if (!Hback.empty()) {
                     std::vector<cv::Point2f> in{p}, outp;
@@ -463,9 +478,8 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
         if (mDistortionHead.run(crop, wallPatch, dist)) {
             const float matchability = dist[11], coverage = dist[12];
             if (matchability > 0.5f) {
-                // A trusted look at the wall: it measures BOTH channels, and they are different
-                // quantities. Coverage says how much of the design is realized (progress);
-                // matchability says how much to trust this frame (confidence).
+                // A trusted look at the wall. Matchability says how much to trust this frame
+                // (confidence) and is published. Coverage is not progress (see below).
                 //
                 // Clamped and finiteness-checked: these are raw ONNX outputs with no contract
                 // enforcing [0,1] or excluding NaN/Inf (unlike the neighboring count-ratio
@@ -475,7 +489,12 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
                 // readouts unclamped.
                 float clampedCoverage = std::isfinite(coverage) ? std::clamp(coverage, 0.0f, 1.0f) : 0.0f;
                 float clampedMatchability = std::isfinite(matchability) ? std::clamp(matchability, 0.0f, 1.0f) : 0.0f;
-                mPaintingProgress.store(clampedCoverage, std::memory_order_relaxed);
+                // Coverage is NOT published as progress. By the head's own training label
+                // (docs/DISTORTION_HEAD.md) it is the visible fraction of the capture patch — the
+                // original marks — which FALLS as they are painted over: an unpainted wall read
+                // ~100% and progress ran backwards. Progress comes from the corroboration ratio in
+                // tryUpdateFingerprint regardless of whether the head is loaded.
+                (void)clampedCoverage;
                 mCorroborationConfidence.store(clampedMatchability, std::memory_order_relaxed);
             } else {
                 // The head looked and did not recognize the wall. That is a statement about THIS
@@ -526,8 +545,13 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
         // Camera matrix: reuse the intrinsics the fingerprint's 3D points were built with (keeps
         // the 2D<->3D correspondence consistent) when available, else a coarse default. The old
         // hardcoded init supplied only 6 of the 9 entries, leaving the bottom row uninitialised.
+        // The live frame's intrinsics win: the 3D points are metric and camera-independent, so the
+        // camera matrix must describe THIS frame, whose orientation may differ from the capture's.
         double fx = 1000.0, fy = 1000.0, cx = 960.0, cy = 540.0;
-        if (fpIntrinsics[0] > 0.0f && fpIntrinsics[1] > 0.0f) {
+        if (liveIntrinsics[0] > 0.0f && liveIntrinsics[1] > 0.0f) {
+            fx = liveIntrinsics[0]; fy = liveIntrinsics[1];
+            cx = liveIntrinsics[2]; cy = liveIntrinsics[3];
+        } else if (fpIntrinsics[0] > 0.0f && fpIntrinsics[1] > 0.0f) {
             fx = fpIntrinsics[0]; fy = fpIntrinsics[1];
             cx = fpIntrinsics[2]; cy = fpIntrinsics[3];
         }
@@ -608,8 +632,10 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
 
                 // PnP gives T_camera_from_fingerprintWorld (a view matrix). DO NOT write it to
                 // mAnchorMatrix (a world-space MODEL matrix) — that caused overlay teleport.
-                // Publish the raw result; Kotlin composes inverse(V_current)*pnp*fpAnchor with the
-                // FRESH view matrix (see PoseFusion).
+                // Publish the raw result together with the view of the frame it was solved on;
+                // Kotlin composes inverse(V_solve)*pnp*captureAnchorCam (see PoseFusion). Composing
+                // with the render frame's fresh view instead baked hand motion during the reloc
+                // latency into the correction.
                 glm::mat4 pnpMat = glm::mat4(1.0f);
                 for(int i=0; i<3; ++i) {
                     for(int j=0; j<3; ++j) pnpMat[j][i] = (float)R.at<double>(i,j);
@@ -618,6 +644,7 @@ void MobileGS::runRelocPass(const cv::Mat& frame, const float* relocView) {
                 {
                     std::lock_guard<std::mutex> lock(mMutex);
                     memcpy(mPnpCamFromFpWorld, glm::value_ptr(pnpMat), 16 * sizeof(float));
+                    memcpy(mPnpSolveView, relocView, 16 * sizeof(float));
                 }
                 mPnpInlierCount.store((int)inliers.size(), std::memory_order_relaxed);
                 mPnpMatchCount.store((int)imgPts.size(), std::memory_order_relaxed);
@@ -1119,7 +1146,9 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
     // stable across frames while a lock is not, so keying on the lock would flip progress between
     // two different measurements every time the artist looked away and back — two definitions
     // alternating in one readout is worse than either alone.
-    if (!mDistortionHead.isLoaded()) {
+    // Progress is published whether or not the distortion head is loaded (see runRelocPass for why the
+    // head's coverage is not progress). Only the confidence channel below defers to the head.
+    {
         if (havePlacement) {
             // Phase 4 is active for this project. A tick with no lock publishes nothing and leaves
             // the last value standing, because the alternative is replacing a cumulative reading
@@ -1134,7 +1163,8 @@ void MobileGS::tryUpdateFingerprint(const cv::Mat& grayClean,
             mPaintingProgress.store((float)matched / (float)artDescs.rows,
                                     std::memory_order_relaxed);
         }
-
+    }
+    if (!mDistortionHead.isLoaded()) {
         if (gated) {
             // 4.8: zero predicted-visible is "the artist is not looking at the design", NOT "the
             // wall does not corroborate it". Publishing 0.0 would be a measurement never taken.
@@ -2045,12 +2075,13 @@ void MobileGS::setStageEnabled(int stage, bool enabled) {
          stage, enabled ? 1 : 0);
 }
 
-void MobileGS::getRelocResult(float* out19) const {
+void MobileGS::getRelocResult(float* out, bool withSolveView) const {
     std::lock_guard<std::mutex> lock(mMutex);
-    memcpy(out19, mPnpCamFromFpWorld, 16 * sizeof(float));
-    out19[16] = (float) mPnpInlierCount.load(std::memory_order_relaxed);
-    out19[17] = (float) mPnpMatchCount.load(std::memory_order_relaxed);
-    out19[18] = (float) mPnpResultSeq.load(std::memory_order_relaxed);
+    memcpy(out, mPnpCamFromFpWorld, 16 * sizeof(float));
+    out[16] = (float) mPnpInlierCount.load(std::memory_order_relaxed);
+    out[17] = (float) mPnpMatchCount.load(std::memory_order_relaxed);
+    out[18] = (float) mPnpResultSeq.load(std::memory_order_relaxed);
+    if (withSolveView) memcpy(out + 19, mPnpSolveView, 16 * sizeof(float));
 }
 void MobileGS::getFingerprintAnchor(float* out16) const {
     std::lock_guard<std::mutex> lock(mMutex);

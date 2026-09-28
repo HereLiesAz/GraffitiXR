@@ -216,7 +216,7 @@
     <string name="plane_realignment_text">L\'ancre est placée à partir de là où vous étiez lors de la capture. ARCore choisit la surface verticale suivie la plus directement devant cette position d\'origine.\n\n1. Retournez approximativement là où vous étiez lors de la capture\n2. Faites un panoramique lent de la caméra sur le mur de votre fresque pour qu\'ARCore puisse l\'enregistrer comme une surface plane\n3. Restez stable face à l\'œuvre, puis appuyez ci-dessous\n\nLa bordure orange sautera vers la surface nouvellement détectée.</string>
     <string name="use_this_wall">Utiliser ce mur</string>
     <string name="scanning_dots">Analyse en cours\u2026</string>
-    <string name="matched_percent">%1$d%% correspondant</string>
+    <string name="matched_percent">%1$d%% peint</string>
     <string name="anchor_locked">Ancre verrouillée</string>
     <string name="choose_font">Choisir Police</string>
     <string name="help_mode_host">Commutateur de mode : Basculer entre les modes de l\'application. Instructions : Appuyez pour développer, puis sélectionnez AR, Superposition, Maquette ou Table lumineuse.</string>

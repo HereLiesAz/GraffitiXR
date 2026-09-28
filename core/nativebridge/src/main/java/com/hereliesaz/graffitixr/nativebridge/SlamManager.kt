@@ -564,6 +564,9 @@ class SlamManager @Inject constructor(
      */
     fun setMappingPaused(paused: Boolean) = nativeSetMappingPaused(paused)
 
+    /** Display-oriented intrinsics of the frames fed via [feedYuvFrame]; the reloc PnP uses these. */
+    fun setLiveIntrinsics(fx: Float, fy: Float, cx: Float, cy: Float) = nativeSetLiveIntrinsics(fx, fy, cx, cy)
+
     fun updateCamera(
         viewMatrix: FloatArray,
         projectionMatrix: FloatArray,
@@ -624,7 +627,8 @@ class SlamManager @Inject constructor(
     fun setStageEnabled(stage: Int, enabled: Boolean) = nativeSetStageEnabled(stage, enabled)
 
     /** Pose fusion (B): [0..15]=pnpMat, [16]=inlierCount, [17]=matchCount, [18]=seq. */
-    fun getRelocResult(): FloatArray { val o = FloatArray(19); nativeGetRelocResult(o); return o }
+    /** [0..15] PnP camera_from_fp, 16 inliers, 17 matches, 18 seq, [19..34] view matrix of the solve frame. */
+    fun getRelocResult(): FloatArray { val o = FloatArray(35); nativeGetRelocResult(o); return o }
 
     /** Pose fusion (B): the anchor model matrix captured in the fingerprint world frame. */
     fun getFingerprintAnchor(): FloatArray { val o = FloatArray(16); nativeGetFingerprintAnchor(o); return o }
@@ -821,6 +825,7 @@ class SlamManager @Inject constructor(
     private external fun nativeSetWallPatch(bitmap: Bitmap)
     private external fun nativeSetWallPatchBytes(data: ByteArray, size: Int)
     private external fun nativeSetMappingPaused(paused: Boolean)
+    private external fun nativeSetLiveIntrinsics(fx: Float, fy: Float, cx: Float, cy: Float)
     private external fun nativeFeedYuvFrame(
         yBuffer: ByteBuffer,
         uBuffer: ByteBuffer,

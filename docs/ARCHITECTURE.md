@@ -103,6 +103,13 @@ global drift and "snap" the overlay back into place — see
 runs unconditionally, but its downstream drift-correction consumer is a diagnostic-only, off-by-
 default toggle today.
 
+**Return-visit anchoring.** When a project with a saved capture pose (`captureAnchorCam`) is
+reopened and no anchor exists yet, the renderer turns two consecutive agreeing high-confidence
+reloc solves (`PoseFusion.COLD_SNAP_*` gates, `PoseFusion.diverged` agreement) into the primary
+ARCore anchor (`ArRenderer.pendingRelocAnchor`). This runs regardless of the drift-correction
+toggle and without re-capturing, so the saved target is preserved. Pre-Phase-2 fingerprints
+(no capture pose) cannot use it. Not yet validated on device.
+
 ---
 *Documentation updated on 2026-09-04: removed the fictional Persistent Voxel Memory /
 `slamManager.draw()` architecture (deleted from the codebase; never actually built per
