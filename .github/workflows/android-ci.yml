@@ -1,7 +1,8 @@
 name: Android CI
 
 # GraffitiXR's canonical CI/release pipeline: runs unit tests on every push/PR, then builds and
-# publishes the `latest-debug-vX.Y` debug-APK release on push.
+# publishes the `latest-debug-vX.Y` debug-APK release on push to main only — a feature-branch push
+# must never replace the public build.
 # This is the ONLY workflow that tags/publishes that release — .github/workflows/merged-build.yml
 # builds and tests the same code but deliberately does not touch the shared release tag, so the
 # two workflows never race each other over it (see git history for the incident that caused this
@@ -155,7 +156,7 @@ jobs:
             });
 
       - name: Prepare Release Variables
-        if: success() && github.event_name == 'push'
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         id: release_vars
         run: |
           MAJOR=$(grep '^versionMajor=' version.properties | cut -d'=' -f2 | tr -d '\r ')
@@ -186,7 +187,7 @@ jobs:
           cd build_tools_package && zip -r ../build-tools.zip . && cd ..
 
       - name: Publish Release
-        if: success() && github.event_name == 'push'
+        if: success() && github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
