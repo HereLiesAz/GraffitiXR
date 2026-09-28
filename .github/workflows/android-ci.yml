@@ -41,6 +41,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Derive CI versionCode
+        # Above every versionCode published from version.properties (14730 at the switch), and
+        # monotonic per workflow. Read by app/build.gradle.kts; version.properties is not rewritten.
+        run: echo "CI_VERSION_CODE=$((20000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+
       - name: Set up JDK 21
         uses: actions/setup-java@v6
         with:
@@ -57,6 +62,11 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew test --continue --build-cache --no-daemon --stacktrace
+
+      - name: Native lock discipline
+        # tools/check_native_locking.py: every plain MobileGS member access must sit under a
+        # MobileGS-owned lock (gEngineMutex is a shared_mutex and no longer serialises them).
+        run: python3 tools/check_native_locking.py
 
       - name: Run detekt
         # config/detekt/detekt.yml (maxIssues: 0) existed but was never wired into CI, so it was
@@ -87,6 +97,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Derive CI versionCode
+        # Above every versionCode published from version.properties (14730 at the switch), and
+        # monotonic per workflow. Read by app/build.gradle.kts; version.properties is not rewritten.
+        run: echo "CI_VERSION_CODE=$((20000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+
       - name: Set up JDK 21
         uses: actions/setup-java@v6
         with:
@@ -116,6 +131,11 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Derive CI versionCode
+        # Above every versionCode published from version.properties (14730 at the switch), and
+        # monotonic per workflow. Read by app/build.gradle.kts; version.properties is not rewritten.
+        run: echo "CI_VERSION_CODE=$((20000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
 
       - name: Decode signing keystore
         env:
@@ -190,7 +210,7 @@ jobs:
           MAJOR=$(grep '^versionMajor=' version.properties | cut -d'=' -f2 | tr -d '\r ')
           MINOR=$(grep '^versionMinor=' version.properties | cut -d'=' -f2 | tr -d '\r ')
           PATCH=$(grep '^versionPatch=' version.properties | cut -d'=' -f2 | tr -d '\r ')
-          BUILD_NUMBER=$(grep '^versionBuild=' version.properties | cut -d'=' -f2 | tr -d '\r ')
+          BUILD_NUMBER="${CI_VERSION_CODE}"
           VERSION_NAME="$MAJOR.$MINOR.$PATCH.$BUILD_NUMBER"
           TAG_NAME="latest-debug-v${MAJOR}.${MINOR}"
           if [ -f "settings.gradle.kts" ]; then

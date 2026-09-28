@@ -63,7 +63,13 @@ val isMinorBumped = verMinor != lastMinor
 var currentVersionCode = versionProps.getProperty("versionBuild", "1").toInt()
 var currentPatch = if (isMinorBumped) 0 else versionProps.getProperty("versionPatch", "0").toInt()
 
-if (isBuilding) {
+// CI supplies its own versionCode (derived from the run number) and never rewrites the tracked
+// version.properties: the same commit then builds the same code however many compiles ran first,
+// and two branches' CI builds can't publish identical codes. Local builds keep auto-incrementing.
+val ciVersionCode = System.getenv("CI_VERSION_CODE")?.toIntOrNull()?.takeIf { it > 0 }
+if (ciVersionCode != null) {
+    currentVersionCode = ciVersionCode
+} else if (isBuilding) {
     currentVersionCode++ // build never resets
     // A minor bump makes this build the new minor's .0; otherwise advance the patch.
     if (!isMinorBumped) currentPatch++
