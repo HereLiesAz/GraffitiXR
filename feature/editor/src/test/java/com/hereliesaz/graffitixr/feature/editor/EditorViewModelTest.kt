@@ -370,6 +370,44 @@ class EditorViewModelTest {
     }
 
     @Test
+    fun `redo after a mode switch restores the undone mode's adjustment`() = runTest {
+        viewModel.setEditorMode(EditorMode.TRACE)
+        addDesign()
+        fun traceScale() = viewModel.uiState.value.modeAdjustments[EditorMode.TRACE]?.scale ?: 1f
+        val before = traceScale()
+
+        // Outside DESIGN a pinch goes to the mode's adjustment via onModeTransformGesture.
+        viewModel.onGestureStart()
+        viewModel.onModeTransformGesture(EditorMode.TRACE, Offset.Zero, 2.0f, 0f)
+        viewModel.onGestureEnd()
+        testDispatcher.scheduler.advanceUntilIdle()
+        val after = traceScale()
+        assertEquals(before * 2.0f, after, 0.01f)
+
+        viewModel.onUndoClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(before, traceScale(), 0.01f)
+
+        // The redo entry must describe TRACE, not the mode active when it was taken.
+        viewModel.setEditorMode(EditorMode.MOCKUP)
+        viewModel.onRedoClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(after, traceScale(), 0.01f)
+    }
+
+    @Test
+    fun `cycling blend mode steps through the list and undo restores it`() = runTest {
+        addDesign()
+        assertEquals(androidx.compose.ui.graphics.BlendMode.SrcOver, viewModel.uiState.value.design!!.blendMode)
+        viewModel.onCycleBlendMode()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(androidx.compose.ui.graphics.BlendMode.Multiply, viewModel.uiState.value.design!!.blendMode)
+        viewModel.onUndoClicked()
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(androidx.compose.ui.graphics.BlendMode.SrcOver, viewModel.uiState.value.design!!.blendMode)
+    }
+
+    @Test
     fun `undo and redo on empty stacks do not crash`() {
         // Fresh ViewModel has empty undo and redo stacks; neither call should throw.
         viewModel.onUndoClicked()

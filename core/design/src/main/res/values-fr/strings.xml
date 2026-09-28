@@ -139,6 +139,7 @@
     <string name="nav_isolate">Isoler</string>
     <string name="nav_isolate_info">Supprimer automatiquement l\'arrière-plan de ce calque, ne laissant que le sujet sur un arrière-plan transparent.</string>
     <string name="nav_invert">Inverser</string>
+    <string name="nav_blend">Fusion</string>
     <string name="nav_invert_info">Créer un négatif du calque actuel. Les noirs deviennent blancs et les couleurs sont inversées — utile pour l\'analyse de pochoir et de superposition.</string>
     <string name="nav_outline">Contour</string>
     <string name="nav_outline_info">Convertir ce calque en dessin au trait noir sur fond transparent — idéal pour créer des modèles de pochoir.</string>

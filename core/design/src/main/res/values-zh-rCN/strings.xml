@@ -83,6 +83,9 @@
 
     <string name="nav_invert">反色</string>
 
+
+    <string name="nav_blend">混合</string>
+
     <string name="nav_invert_info">创建当前图层的负片。黑色变为白色，颜色反转为其补色 — 适用于模板和覆盖层分析。</string>
 
 

@@ -102,6 +102,7 @@
 
     <!-- Label for the color inversion tool. -->
     <string name="nav_invert">Invert</string>
+    <string name="nav_blend">Blend</string>
     <!-- Description of the Invert tool, explaining its use for stencil and overlay analysis. -->
     <string name="nav_invert_info">Create a negative of the current layer. Blacks become whites, and colors are flipped to their opposites — useful for stencil and overlay analysis.</string>
 

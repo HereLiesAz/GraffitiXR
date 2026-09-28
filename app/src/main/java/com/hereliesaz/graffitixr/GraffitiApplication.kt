@@ -68,13 +68,13 @@ class GraffitiApplication : Application() {
         // + deletes them for that dialog (same startup transaction) — otherwise the async upload
         // races that delete and finds nothing. Then upload off the main thread and delete each file
         // on success. Covers both the JVM crash dump and the native (SIGSEGV/SIGABRT) backtrace. The
-        // benign isolated ":probe" native crash is intentionally NOT reported. Empty GH_TOKEN
+        // benign isolated ":probe" native crash is intentionally NOT reported. Empty CRASH_REPORT_TOKEN
         // (local/dev builds) -> uploadCaptured no-ops. CoroutineExceptionHandler is
         // belt-and-suspenders: the crash-reporting path must never itself crash the app on launch.
         val crashUploadErrorHandler = CoroutineExceptionHandler { _, e ->
             Log.e("GraffitiApplication", "Crash upload failed at startup; ignored", e)
         }
-        val crashToken = BuildConfig.GH_TOKEN
+        val crashToken = BuildConfig.CRASH_REPORT_TOKEN
         if (crashToken.isNotBlank()) {
             val capturedCrashes = listOf(
                 "last_crash.txt" to "Auto-Report: App Crash",

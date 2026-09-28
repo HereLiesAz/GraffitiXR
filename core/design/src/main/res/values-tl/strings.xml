@@ -29,6 +29,7 @@
     <string name="nav_isolate">Ihiwalay</string>
     <string name="nav_isolate_info">Awtomatikong alisin ang background mula sa layer na ito, iiwan lamang ang paksa sa isang transparent na background.</string>
     <string name="nav_invert">Baliktarin</string>
+    <string name="nav_blend">Paghalo</string>
     <string name="nav_invert_info">Lumikha ng negatibo ng kasalukuyang layer. Ang mga itim ay nagiging puti, at ang mga kulay ay binabaligtad sa kanilang mga kabaligtaran — kapaki-pakinabang para sa pagsusuri ng stencil at overlay.</string>
     <string name="nav_outline">Balangkas</string>
     <string name="nav_outline_info">I-convert ang layer na ito sa black line art sa isang transparent na background — perpekto para sa paggawa ng mga template ng stencil.</string>

@@ -213,7 +213,9 @@ There is no `release-apk.yml` in this repository — the actual signing secrets,
 ### Build config (already used)
 
 `GOOGLE_SERVICES_API_KEY`, `PROJECT_ID`, `CLIENT_ID`, `ARCORE_API_KEY`,
-and `GH_TOKEN` (for the GitHub Packages Maven repo). See `android-ci.yml` / `merged-build.yml`.
+and `CRASH_REPORT_TOKEN` — a fine-grained token with **Issues: write on this repo only**, compiled
+into the APK for opt-in crash reports (so it is extractable; never use a broader token). See
+`android-ci.yml` / `merged-build.yml`.
 
 ---
 

@@ -69,7 +69,12 @@ internal class HostSession(
     }
 
     /** An op with its sequence number and wire encoding, fixed at enqueue time. */
-    private class EncodedDelta(val seq: Long, val bytes: ByteArray)
+    private class EncodedDelta(
+        val seq: Long,
+        val bytes: ByteArray,
+        /** Monotonic enqueue time; see [BULK_PERSIST_GRACE_MS]. */
+        val enqueuedAtMs: Long = System.nanoTime() / 1_000_000L,
+    )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     // Unbounded channel, but NOT unbounded memory: every element is appended to deltaBuffer
@@ -295,6 +300,18 @@ internal class HostSession(
             )
             socket.close(); return
         }
+        // Replay guard. The proof binds only the guest's nonce, so a HELLO sniffed on the LAN
+        // verifies again when resent — and would take the single guest slot, locking the real guest
+        // out until the read timeout. Guests draw a fresh nonce per connection, so a repeat is a
+        // replay. Recorded only after the proof checks out, so unauthenticated traffic can't fill it.
+        if (!rememberGuestNonce(hello.guestNonce)) {
+            writeFrameTimed(
+                output,
+                FrameType.HELLO_REJECTED,
+                OpCodec.encode(HelloRejectedPayload(HelloRejectedPayload.RejectReason.BadToken)),
+            )
+            socket.close(); return
+        }
         if (hello.clientVersion != protocolVersion) {
             writeFrameTimed(
                 output,
@@ -384,6 +401,17 @@ internal class HostSession(
         }
     }
 
+    /** Guest nonces already accepted this session (bounded, oldest evicted). */
+    private val seenGuestNonces = object : LinkedHashMap<String, Unit>(64, 0.75f, false) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Unit>?) = size > 1024
+    }
+
+    /** False if [nonce] was already used in this session, i.e. the HELLO is a replay. */
+    private fun rememberGuestNonce(nonce: ByteArray): Boolean = synchronized(seenGuestNonces) {
+        val key = java.util.Base64.getEncoder().encodeToString(nonce)
+        if (seenGuestNonces.containsKey(key)) false else { seenGuestNonces[key] = Unit; true }
+    }
+
     private fun randomNonce(): ByteArray = ByteArray(16).also { java.security.SecureRandom().nextBytes(it) }
 
     /**
@@ -396,7 +424,8 @@ internal class HostSession(
         // Read the seq counter BEFORE calling snapshotProvider(): every op site updates project
         // state before calling enqueueOp (which is what assigns/advances this counter), so any op
         // whose seq is <= this value is guaranteed to already be reflected in the snapshot the
-        // provider is about to read. That ordering is what makes dropStaleQueueEntries below safe.
+        // provider is about to read — in MEMORY. The snapshot reads disk, which lags; see the grace
+        // window in dropStaleQueueEntries.
         val seqCutoff = seqCounter.get()
         val snapshot = snapshotProvider()
         require(
@@ -442,10 +471,16 @@ internal class HostSession(
      */
     private fun dropStaleQueueEntries(seqCutoff: Long) {
         synchronized(enqueueLock) {
+            val now = System.nanoTime() / 1_000_000L
             val keep = mutableListOf<EncodedDelta>()
             while (true) {
                 val delta = outQueue.tryReceive().getOrNull() ?: break
-                if (delta.seq > seqCutoff) keep.add(delta)
+                // Also keep recent ones: the snapshot is read from DISK, but op sites update memory,
+            // emit, and persist later on a coroutine, so an op enqueued moments before the bulk
+            // may be in neither the snapshot nor (if dropped) the live stream. Every live op is
+            // absolute state, so re-applying one the snapshot already has converges; StrokeComplete,
+            // the one append-style op, is ignored by the receiver today.
+            if (delta.seq > seqCutoff || now - delta.enqueuedAtMs <= BULK_PERSIST_GRACE_MS) keep.add(delta)
             }
             keep.forEach { outQueue.trySend(it) }
         }
@@ -584,6 +619,11 @@ internal class HostSession(
     }
 
     private companion object {
+        /**
+         * How long a queued op survives a bulk send even when its seq is covered by the snapshot:
+         * long enough for the editor's deferred save to reach disk, which is what the snapshot reads.
+         */
+        private const val BULK_PERSIST_GRACE_MS = 5_000L
         private const val TAG = "HostSession"
 
         // Guests ack every 1s and answer 5s PINGs, so 15s of read silence means a dead or

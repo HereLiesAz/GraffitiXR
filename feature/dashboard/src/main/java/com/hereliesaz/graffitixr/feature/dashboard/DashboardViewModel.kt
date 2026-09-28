@@ -9,14 +9,10 @@ import androidx.lifecycle.viewModelScope
 import com.hereliesaz.graffitixr.common.model.GraffitiProject
 import com.hereliesaz.graffitixr.domain.repository.ProjectRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
 import javax.inject.Inject
 
 @HiltViewModel
@@ -177,29 +173,11 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
-    fun checkForUpdates(currentVersion: String) {
-        if (_uiState.value.isCheckingForUpdate) return
-        viewModelScope.launch {
-            _uiState.update { it.copy(isCheckingForUpdate = true, updateStatusMessage = "Checking for updates...") }
-            try {
-                val latestRelease = fetchLatestRelease()
-                if (latestRelease == null) {
-                    _uiState.update { it.copy(isCheckingForUpdate = false, updateStatusMessage = "Could not connect to update server.") }
-                    return@launch
-                }
-                val latestTag = latestRelease.tagName.removePrefix("v")
-                if (isNewerVersion(latestTag, currentVersion)) {
-                    _uiState.update { it.copy(isCheckingForUpdate = false, updateStatusMessage = "New version $latestTag available", updateUrl = latestRelease.htmlUrl) }
-                } else {
-                    _uiState.update { it.copy(isCheckingForUpdate = false, updateStatusMessage = "You are on the latest experimental build.") }
-                }
-            } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
-                _uiState.update { it.copy(isCheckingForUpdate = false, updateStatusMessage = "Update check failed.") }
-            }
-        }
-    }
-
+    /**
+     * Opens the releases page in the browser. The app itself never contacts a server to check for
+     * updates: README's promise is that the only thing that ever leaves the device is an opt-in crash
+     * report, and an automatic GitHub API call on opening Settings broke it.
+     */
     fun openUpdatePage(context: Context) {
         val url = _uiState.value.updateUrl ?: "https://github.com/hereliesaz/GraffitiXR/releases"
         try {
@@ -209,23 +187,6 @@ class DashboardViewModel @Inject constructor(
         } catch (e: Exception) {
             android.util.Log.e("DashboardViewModel", "Failed to open update URL", e)
             _uiState.update { it.copy(updateStatusMessage = "Couldn't open the browser.") }
-        }
-    }
-
-    private suspend fun fetchLatestRelease(): GitHubRelease? = withContext(Dispatchers.IO) {
-        var connection: HttpURLConnection? = null
-        try {
-            val url = URL("https://api.github.com/repos/hereliesaz/GraffitiXR/releases/latest")
-            connection = url.openConnection() as HttpURLConnection
-            connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
-            connection.connectTimeout = 10_000
-            connection.readTimeout = 10_000
-            if (connection.responseCode != 200) return@withContext null
-            parseRelease(connection.inputStream.bufferedReader().readText())
-        } catch (_: Exception) {
-            null
-        } finally {
-            connection?.disconnect()
         }
     }
 

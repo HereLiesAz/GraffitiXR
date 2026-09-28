@@ -49,6 +49,10 @@ class ProjectManagerTest {
 
         uriProvider = DefaultUriProvider()
         val projectRepositoryProvider = mockk<javax.inject.Provider<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>>(relaxed = true)
+        // A relaxed Provider<T> returns an erased Object from get(), which fails the cast at the call
+        // site; stub it so paths that reach the repository (spectator load) actually complete.
+        every { projectRepositoryProvider.get() } returns
+            mockk<com.hereliesaz.graffitixr.domain.repository.ProjectRepository>(relaxed = true)
         manager = ProjectManager(mockContext, uriProvider, projectRepositoryProvider)
     }
 
@@ -196,7 +200,31 @@ class ProjectManagerTest {
                 ),
             )
             assertFalse(evilTarget.exists())
-            assertTrue(File(tempFilesDir, "projects/spec_safe/layer.png").exists())
+            assertTrue(File(tempFilesDir, "projects/coop_spec_safe/layer.png").exists())
+        } finally {
+            Dispatchers.resetMain()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `loadAsSpectator never overwrites a local project with the host's id`() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        try {
+            val local = File(tempFilesDir, "projects/shared_wall").also { it.mkdirs() }
+            File(local, "layer.png").writeBytes(byteArrayOf(1))
+            val ok = manager.loadAsSpectator(
+                zipOf("project.json" to projectJson("shared_wall"), "layer.png" to byteArrayOf(9)),
+            )
+            assertTrue("spectator load should succeed", ok)
+            assertTrue(
+                "local project was overwritten",
+                File(local, "layer.png").readBytes().contentEquals(byteArrayOf(1)),
+            )
+            assertTrue(
+                "spectator copy missing",
+                File(tempFilesDir, "projects/coop_shared_wall/layer.png").exists(),
+            )
         } finally {
             Dispatchers.resetMain()
         }

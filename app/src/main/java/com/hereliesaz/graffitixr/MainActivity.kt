@@ -556,20 +556,17 @@ class MainActivity : ComponentActivity() {
                     // timeout would otherwise sleep the screen and pause ARCore mid-mural, repeatedly.
                     // No brightness override here (unlike touch-locked TRACE below): AR just needs to
                     // stay awake, not stay bright.
-                    val keepAwake = mainUiState.isTouchLocked || editorUiState.editorMode == EditorMode.AR
-                    if (mainUiState.isTouchLocked) {
-                        // Keep the screen on in every mode while locked, but force MAX brightness only
-                        // where it's functionally needed — the TRACE lightbox. Other modes keep system
-                        // brightness (AR touch-lock at max brightness was pure waste). Even in TRACE,
-                        // cap brightness once battery is low.
-                        params.screenBrightness = when {
-                            editorUiState.editorMode != EditorMode.TRACE ->
-                                WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-                            arUiState.batteryTier >= 2 -> 0.85f
-                            else -> 1.0f
-                        }
-                    } else {
-                        params.screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                    // TRACE is a lightbox (README): screen on and brightness up for the whole mode, not
+                    // only while touch-locked — tracing unlocked used to time out at system brightness.
+                    val isTrace = editorUiState.editorMode == EditorMode.TRACE
+                    val keepAwake = mainUiState.isTouchLocked || isTrace || editorUiState.editorMode == EditorMode.AR
+                    // Force MAX brightness only where it's functionally needed — the TRACE lightbox.
+                    // Other modes keep system brightness (AR touch-lock at max brightness was pure
+                    // waste). Even in TRACE, cap brightness once battery is low.
+                    params.screenBrightness = when {
+                        !isTrace -> WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                        arUiState.batteryTier >= 2 -> 0.85f
+                        else -> 1.0f
                     }
                     window.attributes = params
                     if (keepAwake) {
@@ -1754,7 +1751,7 @@ class MainActivity : ComponentActivity() {
                                     onImperialUnitsChanged = { arViewModel.setImperialUnits(it) },
                                     backgroundColor = editorUiState.canvasBackground.toArgb(),
                                     onBackgroundColorChanged = { argb -> settingsViewModel.setBackgroundColor(argb) },
-                                    onCheckForUpdates = { dashboardViewModel.checkForUpdates(BuildConfig.VERSION_NAME) },
+                                    onCheckForUpdates = { dashboardViewModel.openUpdatePage(this@MainActivity) },
                                     onOpenUpdatePage = { dashboardViewModel.openUpdatePage(this@MainActivity) },
                                     onResetTutorials = {
                                         settingsViewModel.resetCompletedTutorials()
@@ -1972,6 +1969,12 @@ class MainActivity : ComponentActivity() {
                 color = navItemColor, classifiers = setOf("toggle", "effect"),
                 shape = AzButtonShape.NONE, disabled = showLibrary,
                 onClick = { editorViewModel.onToggleInvert() },
+            )
+            azRailSubItem(
+                id = "design.blend", hostId = "host.design", text = navStrings.blend,
+                color = navItemColor, classifiers = setOf("effect"),
+                shape = AzButtonShape.NONE, disabled = showLibrary,
+                onClick = { editorViewModel.onCycleBlendMode() },
             )
             azRailSubItem(
                 id = "design.outline", hostId = "host.design", text = navStrings.outline,

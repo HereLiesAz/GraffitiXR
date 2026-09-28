@@ -16,7 +16,8 @@ name: Android CI
 #   KEYSTORE_PASSWORD        — keystore password
 #   KEY_ALIAS                — key alias inside the keystore
 #   KEY_PASSWORD             — key password
-#   GH_TOKEN                 — GitHub token with write access (defaults to GITHUB_TOKEN)
+#   CRASH_REPORT_TOKEN       — fine-grained, Issues:write on this repo only; compiled into the APK
+#                              for opt-in crash reports (extractable — never a broader token)
 
 on:
   push:
@@ -75,6 +76,31 @@ jobs:
           name: unit-test-reports
           path: '**/build/reports/tests/'
 
+  release-build:
+    # The shipped variant: minify + shrink + proguard keep rules (incl. JNI reflection) and the
+    # android.r8.forceDisableFullMode workaround were never exercised by CI, so an R8 break that
+    # strips a JNI method would reach users unnoticed. Unsigned here (no keystore needed); this
+    # proves the release variant builds, it does not publish anything.
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Assemble release
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --build-cache --no-daemon --stacktrace
+
   build-and-release:
     needs: unit-tests
     runs-on: ubuntu-latest
@@ -125,7 +151,9 @@ jobs:
         id: gradle-build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          # Issues-only fine-grained token baked into the APK for opt-in crash reports. Never
+          # GH_TOKEN: anything here is extractable from the shipped app.
+          CRASH_REPORT_TOKEN: ${{ secrets.CRASH_REPORT_TOKEN }}
           KEYSTORE_FILE: ${{ github.workspace }}/app/keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
