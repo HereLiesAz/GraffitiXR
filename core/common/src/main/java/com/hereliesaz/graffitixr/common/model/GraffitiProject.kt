@@ -164,6 +164,12 @@ data class GraffitiProject(
     // inferred at load time.
     val fingerprintCaptureRotationDeg: Int = -1,
 
+    // The AR design quad's half-width in metres, fixed at its first placement in this project. The
+    // first placement fits the quad to the screen at the anchor's distance; persisting the result
+    // keeps the mural the same real-world size on every later visit instead of re-fitting to wherever
+    // the artist happens to stand. Height follows the design's aspect. -1 = never placed.
+    val arDesignHalfWidthM: Float = -1f,
+
     // How and where the device was held when this project's target was captured — attitude,
     // ARCore's three poses, the frame rotations, and a location fix. Null on projects saved before
     // the app collected any of it. See CaptureEnvironment for why each group is independently
