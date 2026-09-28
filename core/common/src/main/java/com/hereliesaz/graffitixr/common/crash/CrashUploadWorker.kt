@@ -35,7 +35,7 @@ class CrashUploadWorker {
     suspend fun uploadCaptured(token: String, baseTitle: String, report: String): Boolean =
         withContext(Dispatchers.IO) {
             if (token.isBlank()) {
-                Log.i("CrashUploadWorker", "No GH_TOKEN; skipping crash upload.")
+                Log.i("CrashUploadWorker", "No CRASH_REPORT_TOKEN; skipping crash upload.")
                 return@withContext false
             }
             try {

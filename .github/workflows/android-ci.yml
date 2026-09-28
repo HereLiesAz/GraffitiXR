@@ -16,7 +16,8 @@ name: Android CI
 #   KEYSTORE_PASSWORD        — keystore password
 #   KEY_ALIAS                — key alias inside the keystore
 #   KEY_PASSWORD             — key password
-#   GH_TOKEN                 — GitHub token with write access (defaults to GITHUB_TOKEN)
+#   CRASH_REPORT_TOKEN       — fine-grained, Issues:write on this repo only; compiled into the APK
+#                              for opt-in crash reports (extractable — never a broader token)
 
 on:
   push:
@@ -125,7 +126,9 @@ jobs:
         id: gradle-build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          # Issues-only fine-grained token baked into the APK for opt-in crash reports. Never
+          # GH_TOKEN: anything here is extractable from the shipped app.
+          CRASH_REPORT_TOKEN: ${{ secrets.CRASH_REPORT_TOKEN }}
           KEYSTORE_FILE: ${{ github.workspace }}/app/keystore.jks
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
