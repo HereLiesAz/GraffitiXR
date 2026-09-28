@@ -119,8 +119,8 @@ android {
 
     // Release signing is a property of the project, not of each CI invocation. The keystore and
     // credentials come from the environment: CI decodes the base64 `KEYSTORE_RAW` secret to
-    // app/keystore.jks and exports KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD (see the
-    // release-apk / release-aab / merged-build workflows). KEYSTORE_FILE may override the path.
+    // app/keystore.jks and exports KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD (see
+    // .github/workflows/android-ci.yml). KEYSTORE_FILE may override the path.
     //
     // When no keystore is present (local dev without the secrets) the "release" config is simply
     // not created — `findByName` then returns null below, so release builds stay unsigned and debug
@@ -163,10 +163,9 @@ android {
             signingConfig = signingConfigs.findByName("release")
         }
         debug {
-            // The auto-published CI build (merged-build.yml) assembles the debug variant. Sign it with
-            // the RELEASE key when available so its signature stays stable across builds (in-place
-            // updates keep working); fall back to the default debug key for local development.
-            signingConfig = signingConfigs.findByName("release") ?: signingConfig
+            // Always the default debug key. A debuggable APK signed with the release key can be
+            // installed over a real release, and `run-as` then exposes the app's private data, so
+            // the production key never signs debug builds (including the CI-published one).
         }
     }
 
